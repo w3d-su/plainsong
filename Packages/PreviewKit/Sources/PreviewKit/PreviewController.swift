@@ -21,6 +21,7 @@ public final class PreviewController: NSObject, ObservableObject {
     private var latestRequestedVersion = -1
     private var latestCompletedVersion = -1
     private var theme = "system"
+    private var workspaceAssetRootURL: URL?
 
     override public convenience init() {
         self.init(previewIndexURL: Self.defaultPreviewIndexURL())
@@ -73,9 +74,13 @@ public final class PreviewController: NSObject, ObservableObject {
     }
 
     public func render(_ change: DocumentTextChange) {
-        assetSchemeHandler.updateAllowedRoot(change.fileURL?.deletingLastPathComponent())
+        let assetContext = Self.assetContext(
+            fileURL: change.fileURL,
+            workspaceRootURL: workspaceAssetRootURL
+        )
+        assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
-        let payload = RenderPayload(change: change, theme: theme)
+        let payload = RenderPayload(change: change, theme: theme, baseDir: assetContext.baseDir)
         latestRequestedVersion = max(latestRequestedVersion, payload.version)
 
         guard isReady else {
@@ -93,6 +98,10 @@ public final class PreviewController: NSObject, ObservableObject {
     public func setTheme(_ theme: String) {
         self.theme = theme
         send(.setTheme(SetThemePayload(theme: theme)))
+    }
+
+    public func setWorkspaceAssetRoot(_ rootURL: URL?) {
+        workspaceAssetRootURL = rootURL?.standardizedFileURL
     }
 
     private func send(_ message: BridgeMessage) {
@@ -201,6 +210,31 @@ extension PreviewController {
 
         return .allow
     }
+
+    nonisolated static func assetContext(fileURL: URL?, workspaceRootURL: URL?) -> PreviewAssetContext {
+        guard let fileURL = fileURL?.standardizedFileURL else {
+            return PreviewAssetContext(allowedRoot: workspaceRootURL?.standardizedFileURL, baseDir: nil)
+        }
+
+        guard let workspaceRootURL = workspaceRootURL?.standardizedFileURL,
+              fileURL.isDescendant(of: workspaceRootURL)
+        else {
+            return PreviewAssetContext(
+                allowedRoot: fileURL.deletingLastPathComponent().standardizedFileURL,
+                baseDir: nil
+            )
+        }
+
+        return PreviewAssetContext(
+            allowedRoot: workspaceRootURL,
+            baseDir: fileURL.deletingLastPathComponent().pathRelative(to: workspaceRootURL)
+        )
+    }
+}
+
+struct PreviewAssetContext: Equatable {
+    let allowedRoot: URL?
+    let baseDir: String?
 }
 
 private extension PreviewController {
@@ -210,6 +244,40 @@ private extension PreviewController {
         }
 
         return value as? Int
+    }
+}
+
+private extension URL {
+    func isDescendant(of rootURL: URL) -> Bool {
+        let candidatePath = standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        let rootPath = Self.normalizedDirectoryPath(
+            rootURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        )
+        return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
+    }
+
+    func pathRelative(to rootURL: URL) -> String? {
+        let rootPath = Self.normalizedDirectoryPath(rootURL.standardizedFileURL.path(percentEncoded: false))
+        let candidatePath = standardizedFileURL.path(percentEncoded: false)
+        guard candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/") else { return nil }
+
+        var relativePath = String(candidatePath.dropFirst(rootPath.count))
+        if relativePath.hasPrefix("/") {
+            relativePath.removeFirst()
+        }
+        while relativePath.hasSuffix("/") {
+            relativePath.removeLast()
+        }
+        return relativePath.isEmpty ? nil : relativePath
+    }
+
+    static func normalizedDirectoryPath(_ path: String) -> String {
+        guard path != "/" else { return path }
+        var normalized = path
+        while normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        return normalized
     }
 }
 

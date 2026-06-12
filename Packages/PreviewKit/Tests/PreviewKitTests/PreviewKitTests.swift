@@ -90,6 +90,46 @@ final class PreviewKitTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testPreviewControllerLoadsWorkspaceRelativeImageAssets() async throws {
+        let workspaceRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let imageDirectory = workspaceRoot.appendingPathComponent("content/images", isDirectory: true)
+        let fileURL = workspaceRoot.appendingPathComponent("content/posts/post.md")
+        try FileManager.default.createDirectory(
+            at: imageDirectory,
+            withIntermediateDirectories: true
+        )
+        try Self.onePixelPNGData.write(to: imageDirectory.appendingPathComponent("pixel.png"))
+
+        let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        controller.setWorkspaceAssetRoot(workspaceRoot)
+
+        try await waitUntil("preview bridge ready") {
+            controller.isReady
+        }
+
+        controller.render(
+            DocumentTextChange(
+                text: """
+                # Image
+
+                ![Pixel](../images/pixel.png)
+                """,
+                version: 1,
+                fileKind: .markdown,
+                fileURL: fileURL
+            )
+        )
+
+        try await waitUntil("workspace image loaded") {
+            let naturalWidth = try await controller.webView.evaluateJavaScript(
+                "document.querySelector('img')?.naturalWidth"
+            ) as? Int
+            return naturalWidth == 1
+        }
+    }
+
     func testAssetResolverAllowsContainedPaths() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -139,6 +179,25 @@ final class PreviewKitTests: XCTestCase {
         }
     }
 
+    func testPreviewAssetContextUsesWorkspaceRootAndWorkspaceRelativeBaseDir() {
+        let root = URL(fileURLWithPath: "/tmp/site")
+        let file = root.appendingPathComponent("content/posts/post.md")
+
+        let context = PreviewController.assetContext(fileURL: file, workspaceRootURL: root)
+
+        XCTAssertEqual(context.allowedRoot, root.standardizedFileURL)
+        XCTAssertEqual(context.baseDir, "content/posts")
+    }
+
+    func testPreviewAssetContextFallsBackToFileParentWithoutWorkspace() {
+        let file = URL(fileURLWithPath: "/tmp/site/content/post.md")
+
+        let context = PreviewController.assetContext(fileURL: file, workspaceRootURL: nil)
+
+        XCTAssertEqual(context.allowedRoot, file.deletingLastPathComponent().standardizedFileURL)
+        XCTAssertNil(context.baseDir)
+    }
+
     private func previewIndexFixtureURL() throws -> URL {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
@@ -153,6 +212,10 @@ final class PreviewKitTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path), "Missing preview bundle fixture")
         return indexURL
     }
+
+    private nonisolated static let onePixelPNGData = Data(base64Encoded: """
+    iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/lD3G7wAAAABJRU5ErkJggg==
+    """)!
 
     @MainActor
     private func waitUntil(

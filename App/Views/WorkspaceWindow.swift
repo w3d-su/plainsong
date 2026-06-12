@@ -4,13 +4,13 @@ import MarkdownCore
 import PreviewKit
 import SwiftUI
 
-/// Main window: sidebar placeholder + single-file editor.
+/// Main window: folder sidebar + single editor/preview workspace.
 struct WorkspaceWindow: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
         NavigationSplitView {
-            SidebarPlaceholder(fileURL: appState.currentDocument.fileURL)
+            WorkspaceSidebar()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
             Group {
@@ -85,36 +85,6 @@ struct WorkspaceWindow: View {
     }
 }
 
-private struct SidebarPlaceholder: View {
-    let fileURL: URL?
-
-    var body: some View {
-        List {
-            Section("Workspace") {
-                Label("No folder open", systemImage: "sidebar.left")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("File") {
-                if let fileURL {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(fileURL.lastPathComponent)
-                            .lineLimit(1)
-                        Text(fileURL.deletingLastPathComponent().path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .padding(.vertical, 2)
-                } else {
-                    Text("No file open")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-}
-
 private struct EditorWorkspace: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var previewController = PreviewController()
@@ -128,6 +98,12 @@ private struct EditorWorkspace: View {
                 isDirty: appState.currentDocument.isDirty,
                 isSaving: appState.isSaving
             )
+
+            if appState.missingFilePrompt != nil {
+                MissingFileBanner()
+            } else if appState.externalChangePrompt != nil {
+                ExternalChangeBanner()
+            }
 
             Divider()
 
@@ -230,6 +206,33 @@ private struct DocumentHeader: View {
     }
 }
 
+private struct ExternalChangeBanner: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+
+            Text("File changed on disk:")
+                .font(.callout.weight(.medium))
+
+            Button("Reload") {
+                appState.reloadExternallyChangedFile()
+            }
+
+            Button("Keep mine") {
+                appState.keepMineForExternallyChangedFile()
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.yellow.opacity(0.16))
+    }
+}
+
 private struct DocumentEditor: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var session: DocumentSession
@@ -259,6 +262,7 @@ private struct DocumentEditor: View {
 }
 
 private struct PreviewPane: View {
+    @EnvironmentObject private var appState: AppState
     @ObservedObject var session: DocumentSession
     @ObservedObject var controller: PreviewController
 
@@ -268,9 +272,15 @@ private struct PreviewPane: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .onAppear {
+            controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
+            controller.render(session.currentTextChange)
+        }
+        .onChange(of: appState.previewAssetRootURL) { _, rootURL in
+            controller.setWorkspaceAssetRoot(rootURL)
             controller.render(session.currentTextChange)
         }
         .task(id: ObjectIdentifier(session)) {
+            controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
             await controller.observe(session)
         }
     }
@@ -291,7 +301,7 @@ private struct EmptyEditorState: View {
             Button {
                 appState.openFile()
             } label: {
-                Label("Open File", systemImage: "folder")
+                Label("Open...", systemImage: "folder")
             }
             .buttonStyle(.borderedProminent)
         }

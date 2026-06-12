@@ -315,7 +315,7 @@ must be kept in sync; both list message names in the same order with a
 | Direction | Message | Payload |
 |---|---|---|
 | JS→Swift | `ready` | `{protocolVersion}` |
-| Swift→JS | `render` | `{version, fileKind, text, baseDir, theme}` |
+| Swift→JS | `render` | `{version, fileKind, text, baseDir, theme}`; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
 | JS→Swift | `renderComplete` | `{version, blockCount}` |
 | Swift→JS | `scrollToLine` | `{line, animated}` |
 | JS→Swift | `previewScrolled` | `{topVisibleLine}` (only while preview owns scroll) |
@@ -599,6 +599,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | Keystrokes must not publish through the document model | Time Profiler showed per-key SwiftUI re-renders of the whole window (DynamicBody under `keyDown`) plus foreign-string traffic (`_StringGuts.foreign*`, CFStorage). `DocumentSession.text`/`version` are non-`@Published`; `isDirty` assignments are deduped; the coordinator eagerly `makeContiguousUTF8()`s the bridged string so downstream compares/counts run native. M2's preview must subscribe to text via its own debounced channel, not `objectWillChange`. |
 | 2026-06-12 | Product named **Plainsong**; bundle id namespace `app.plainsong.*` | Owner decision. Verified no editor-category collision (App Store / GitHub; "plainsong" in software is liturgical-chant apps only). `plainsong.app` domain is registered by a third party — marketing site will need a variant; bundle id does not depend on it. Exported MDX UTI is `app.plainsong.mdx`; UserDefaults keys and JS bridge globals renamed in the same commit (saved window/preview prefs reset once). Repo folder name stays `blogeditor`. |
 | 2026-06-12 | M2 scroll sync gets a narrow EditorKit scroll proxy exception | STTextView is an `NSView`, not `NSTextView`, so App-level hierarchy probing could never attach and retried forever. The exception is limited to `EditorScrollSupport.swift`, one optional `MarkdownEditorView(scrollProxy:)` parameter, and `MarkdownTextView` make/update wiring; `textViewDidChangeText` and the typing hot path remain unchanged. |
+| 2026-06-12 | M3 keeps workspace ownership in WorkspaceKit and uses bookmark-backed Open Recent | File-tree reconciliation, directory scanning, FSEvents, file operations, bookmark recents, and LRU eviction stay below App so App composes rather than owns workspace rules. Preview assets resolve from the workspace root when a folder is open, while single-file mode keeps file-parent resolution. A simple File > Open Recent submenu backed by app-scope bookmarks was chosen over adopting NSDocumentController because Plainsong still owns custom folder workspaces and warm sessions. |
 
 ---
 

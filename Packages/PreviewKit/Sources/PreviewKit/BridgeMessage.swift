@@ -59,12 +59,12 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         self.theme = theme
     }
 
-    public init(change: DocumentTextChange, theme: String) {
+    public init(change: DocumentTextChange, theme: String, baseDir: String? = nil) {
         self.init(
             version: change.version,
             fileKind: PreviewFileKind(change.fileKind),
             text: change.text,
-            baseDir: change.fileURL?.deletingLastPathComponent().path,
+            baseDir: baseDir,
             theme: theme
         )
     }
