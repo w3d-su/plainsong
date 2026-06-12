@@ -6,7 +6,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
     private let state = AssetURLSchemeHandlerState()
     private let readQueue: OperationQueue = {
         let queue = OperationQueue()
-        queue.name = "BlogEditor.asset-url-read"
+        queue.name = "Plainsong.asset-url-read"
         queue.qualityOfService = .userInitiated
         return queue
     }()

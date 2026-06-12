@@ -11,7 +11,7 @@ await build({
   bundle: true,
   minify: true,
   format: "iife",
-  globalName: "BlogEditorPreview",
+  globalName: "PlainsongPreview",
   target: ["safari17"],
   outfile: `${outDir}/bundle.js`,
 });

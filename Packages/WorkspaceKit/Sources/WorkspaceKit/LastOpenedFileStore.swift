@@ -1,7 +1,7 @@
 import Foundation
 
 public final class LastOpenedFileStore {
-    public static let defaultKey = "BlogEditor.LastOpenedFileBookmark"
+    public static let defaultKey = "Plainsong.LastOpenedFileBookmark"
 
     private let userDefaults: UserDefaults
     private let key: String

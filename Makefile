@@ -1,4 +1,4 @@
-# BlogEditor build entry points (agent.md §15).
+# Plainsong build entry points (agent.md §15).
 # Requires: Xcode 16+, Homebrew. Run `make bootstrap` once after cloning.
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
@@ -13,14 +13,14 @@ generate:
 	xcodegen generate
 
 build: generate
-	xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor -configuration Debug build
+	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug build
 
 test: generate
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
-	xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor -configuration Debug test
+	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug test
 	cd preview-src && npm test
 
 preview-bundle:
@@ -35,5 +35,5 @@ lint:
 	swiftlint
 
 clean:
-	rm -rf BlogEditor.xcodeproj
+	rm -rf Plainsong.xcodeproj
 	@for pkg in $(PACKAGES); do rm -rf Packages/$$pkg/.build; done

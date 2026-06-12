@@ -1,4 +1,4 @@
-# agent.md — BlogEditor (Native macOS Markdown/MDX Editor)
+# agent.md — Plainsong (Native macOS Markdown/MDX Editor)
 
 > **Read this file fully before writing any code.** It is the single source of truth for
 > architecture, conventions, and roadmap. If you (an LLM agent or human) make a decision
@@ -9,7 +9,7 @@
 
 ## 1. Project Overview
 
-**BlogEditor** is a native macOS Markdown editor written in Swift, in the spirit of Typora,
+**Plainsong** is a native macOS Markdown editor written in Swift, in the spirit of Typora,
 optimized for blog authoring workflows (`.md` and `.mdx` files, YAML frontmatter, folder-based
 projects such as Astro/Next.js content directories).
 
@@ -74,7 +74,7 @@ blogeditor/
 ├── project.yml               # XcodeGen manifest (source of truth for the Xcode project)
 ├── Makefile                  # bootstrap / generate / build / test / preview-bundle
 ├── App/                      # Thin app target (SwiftUI)
-│   ├── BlogEditorApp.swift   # @main, WindowGroup, Settings scene
+│   ├── PlainsongApp.swift   # @main, WindowGroup, Settings scene
 │   ├── AppState.swift        # open workspaces, recent items
 │   ├── Views/                # SwiftUI views: WorkspaceWindow, Sidebar, EditorSplit, StatusBar, FrontmatterPanel
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
@@ -160,7 +160,7 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   `startAccessingSecurityScopedResource()` pairs (helper in WorkspaceKit).
 - Open single file: standard `NSOpenPanel` / drag onto Dock / Finder "Open With"
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
-  `com.blogeditor.mdx` conforming to `public.plain-text` — the `public.*` namespace
+  `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
   is reserved for Apple).
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
@@ -514,7 +514,7 @@ component rendering.
 make bootstrap        # brew install xcodegen swiftformat swiftlint node; npm ci (preview-src)
 make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
-make build            # xcodebuild -scheme BlogEditor build
+make build            # xcodebuild -scheme Plainsong build
 make test             # swift test (packages) + xcodebuild test + (cd preview-src && npm test)
 make format           # swiftformat . && swiftlint --fix
 ```
@@ -591,6 +591,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | M0 ships with zero external Swift dependencies | First build must be deterministic; STTextView/Neon/grammars land in M1 with pinned versions. Packages use swift-tools 5.10 + StrictConcurrency experimental flag. |
 | 2026-06-12 | Editor typing hot path moves plain `String` only | Per-keystroke String⇄NSAttributedString⇄AttributedString bridging of the whole document caused visible lag on 1 MB files. The editor binding carries `String`; highlight output flows separately as a revisioned `HighlightedText` (Equatable by revision), is computed on a detached task, and is applied via in-place `setAttributes`. Statistics are likewise computed off-main. This shape is also what M1.5's Neon integration needs. |
 | 2026-06-12 | Keystrokes must not publish through the document model | Time Profiler showed per-key SwiftUI re-renders of the whole window (DynamicBody under `keyDown`) plus foreign-string traffic (`_StringGuts.foreign*`, CFStorage). `DocumentSession.text`/`version` are non-`@Published`; `isDirty` assignments are deduped; the coordinator eagerly `makeContiguousUTF8()`s the bridged string so downstream compares/counts run native. M2's preview must subscribe to text via its own debounced channel, not `objectWillChange`. |
+| 2026-06-12 | Product named **Plainsong**; bundle id namespace `app.plainsong.*` | Owner decision. Verified no editor-category collision (App Store / GitHub; "plainsong" in software is liturgical-chant apps only). `plainsong.app` domain is registered by a third party — marketing site will need a variant; bundle id does not depend on it. Exported MDX UTI is `app.plainsong.mdx`; UserDefaults keys and JS bridge globals renamed in the same commit (saved window/preview prefs reset once). Repo folder name stays `blogeditor`. |
 | 2026-06-12 | M2 scroll sync gets a narrow EditorKit scroll proxy exception | STTextView is an `NSView`, not `NSTextView`, so App-level hierarchy probing could never attach and retried forever. The exception is limited to `EditorScrollSupport.swift`, one optional `MarkdownEditorView(scrollProxy:)` parameter, and `MarkdownTextView` make/update wiring; `textViewDidChangeText` and the typing hot path remain unchanged. |
 
 ---

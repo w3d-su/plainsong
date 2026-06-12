@@ -1,8 +1,8 @@
-# BlogEditor Xcode project manifest (XcodeGen).
+# Plainsong Xcode project manifest (XcodeGen).
 # The .xcodeproj is GENERATED — edit this file, then run `make generate` (agent.md §15).
-name: BlogEditor
+name: Plainsong
 options:
-  bundleIdPrefix: com.blogeditor
+  bundleIdPrefix: app.plainsong
   createIntermediateGroups: true
   deploymentTarget:
     macOS: "14.0"
@@ -29,7 +29,7 @@ settings:
     CURRENT_PROJECT_VERSION: 1
 
 targets:
-  BlogEditor:
+  Plainsong:
     type: application
     platform: macOS
     sources:
@@ -48,8 +48,8 @@ targets:
       - package: WorkspaceKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.blogeditor.app
-        PRODUCT_NAME: BlogEditor
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor
+        PRODUCT_NAME: Plainsong
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
@@ -74,7 +74,7 @@ targets:
             CFBundleTypeRole: Editor
             LSHandlerRank: Owner
             LSItemContentTypes:
-              - com.blogeditor.mdx
+              - app.plainsong.mdx
         UTImportedTypeDeclarations:
           - UTTypeIdentifier: net.daringfireball.markdown
             UTTypeDescription: Markdown Document
@@ -85,7 +85,7 @@ targets:
                 - md
                 - markdown
         UTExportedTypeDeclarations:
-          - UTTypeIdentifier: com.blogeditor.mdx
+          - UTTypeIdentifier: app.plainsong.mdx
             UTTypeDescription: MDX Document
             UTTypeConformsTo:
               - public.plain-text
@@ -93,7 +93,7 @@ targets:
               public.filename-extension:
                 - mdx
     entitlements:
-      path: App/BlogEditor.entitlements
+      path: App/Plainsong.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
@@ -101,16 +101,16 @@ targets:
         com.apple.security.network.client: true
     scheme:
       testTargets:
-        - BlogEditorTests
+        - PlainsongTests
 
-  BlogEditorTests:
+  PlainsongTests:
     type: bundle.unit-test
     platform: macOS
     sources:
       - path: AppTests
     dependencies:
-      - target: BlogEditor
+      - target: Plainsong
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.blogeditor.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.tests
         GENERATE_INFOPLIST_FILE: YES

@@ -66,10 +66,10 @@ export type BridgeMessage =
 
 declare global {
   interface Window {
-    BlogEditorBridge: {
+    PlainsongBridge: {
       receive(message: BridgeMessage): void;
     };
-    BlogEditorPreview: {
+    PlainsongPreview: {
       PROTOCOL_VERSION: number;
     };
     webkit?: {

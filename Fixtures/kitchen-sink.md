@@ -1,6 +1,6 @@
 ---
 title: "Kitchen Sink Fixture"
-description: "Markdown coverage for BlogEditor M1/M2 acceptance checks."
+description: "Markdown coverage for Plainsong M1/M2 acceptance checks."
 date: 2026-06-12
 draft: false
 slug: kitchen-sink-fixture
@@ -15,7 +15,7 @@ hero:
 
 # Kitchen Sink Fixture
 
-This document exercises common Markdown and GFM constructs used by BlogEditor. It is
+This document exercises common Markdown and GFM constructs used by Plainsong. It is
 intended for editor highlighting, preview rendering, scroll sync, and performance smoke
 checks.
 

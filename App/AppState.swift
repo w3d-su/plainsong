@@ -60,7 +60,7 @@ final class AppState: ObservableObject {
     }
 
     var windowTitle: String {
-        currentDocument.fileURL?.lastPathComponent ?? "BlogEditor"
+        currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
     }
 
     func restoreLastOpenedFileIfNeeded() {
@@ -291,7 +291,7 @@ final class AppState: ObservableObject {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    private static let previewVisibleDefaultsKey = "BlogEditor.preview.isVisible"
+    private static let previewVisibleDefaultsKey = "Plainsong.preview.isVisible"
 
     private static func taskCheckboxStateRange(in line: String) -> Range<String.Index>? {
         let pattern = #"^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]"#

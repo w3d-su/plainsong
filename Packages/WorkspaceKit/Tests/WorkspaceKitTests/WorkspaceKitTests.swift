@@ -74,7 +74,7 @@ final class WorkspaceKitTests: XCTestCase {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("post.markdown")
         try "Restored".write(to: url, atomically: true, encoding: .utf8)
-        let suiteName = "BlogEditor.WorkspaceKitTests.\(UUID().uuidString)"
+        let suiteName = "Plainsong.WorkspaceKitTests.\(UUID().uuidString)"
         let userDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         userDefaults.removePersistentDomain(forName: suiteName)
         defer {

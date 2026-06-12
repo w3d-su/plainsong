@@ -2,7 +2,7 @@
 
 exports[`markdown preview pipeline > renders the kitchen sink fixture 1`] = `
 "<h1 data-line="16">Kitchen Sink Fixture</h1>
-<p data-line="18">This document exercises common Markdown and GFM constructs used by BlogEditor. It is
+<p data-line="18">This document exercises common Markdown and GFM constructs used by Plainsong. It is
 intended for editor highlighting, preview rendering, scroll sync, and performance smoke
 checks.</p>
 <h2 data-line="22">Headings</h2>

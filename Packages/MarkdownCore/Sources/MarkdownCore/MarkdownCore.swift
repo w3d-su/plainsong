@@ -1,6 +1,6 @@
 import Foundation
 
-/// MarkdownCore is the pure-logic layer of BlogEditor (agent.md §4):
+/// MarkdownCore is the pure-logic layer of Plainsong (agent.md §4):
 /// document model, completion engine, table formatter, scroll-sync mapping.
 /// **This package must never import AppKit, SwiftUI, or WebKit.**
 public enum MarkdownCoreInfo {

@@ -102,7 +102,7 @@ public final class PreviewController: NSObject, ObservableObject {
             return
         }
 
-        webView.evaluateJavaScript("window.BlogEditorBridge.receive(\(json));")
+        webView.evaluateJavaScript("window.PlainsongBridge.receive(\(json));")
     }
 
     private func receive(_ message: BridgeMessage) {
@@ -168,7 +168,7 @@ extension PreviewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didFinish _: WKNavigation!) {
-        let protocolVersionScript = "window.BlogEditorPreview && window.BlogEditorPreview.PROTOCOL_VERSION"
+        let protocolVersionScript = "window.PlainsongPreview && window.PlainsongPreview.PROTOCOL_VERSION"
         webView.evaluateJavaScript(protocolVersionScript) { @MainActor [weak self] result, _ in
             guard let version = PreviewController.protocolVersion(from: result),
                   version == PreviewBridge.protocolVersion
@@ -243,7 +243,7 @@ private extension WKWebView {
             loadHTMLString(
                 """
                 <!doctype html><meta charset="utf-8"><main id="preview-root"></main>
-                <script>window.BlogEditorBridge={receive:function(){}}</script>
+                <script>window.PlainsongBridge={receive:function(){}}</script>
                 """,
                 baseURL: nil
             )

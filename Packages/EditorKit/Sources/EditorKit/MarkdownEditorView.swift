@@ -1,7 +1,7 @@
 import MarkdownCore
 import SwiftUI
 
-/// BlogEditor's source editor abstraction.
+/// Plainsong's source editor abstraction.
 ///
 /// STTextView stays behind this view so App and lower layers never depend on concrete
 /// editor library types. The typing hot path moves plain `String` only; styling is

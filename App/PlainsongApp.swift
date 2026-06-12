@@ -3,7 +3,7 @@ import SwiftUI
 
 /// App entry point. Scenes only — state lives in `AppState` (agent.md §4).
 @main
-struct BlogEditorApp: App {
+struct PlainsongApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appState = AppState()
 

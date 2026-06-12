@@ -1,6 +1,6 @@
 ---
 title: "Large 1MB Fixture"
-description: "Deterministic markdown fixture for BlogEditor performance smoke checks."
+description: "Deterministic markdown fixture for Plainsong performance smoke checks."
 date: 2026-06-12
 draft: false
 tags:

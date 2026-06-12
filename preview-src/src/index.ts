@@ -35,13 +35,13 @@ let scrollFrame: number | undefined;
 registerHighlightLanguages();
 initializeMermaid("system");
 
-window.BlogEditorBridge = {
+window.PlainsongBridge = {
   receive(message: BridgeMessage) {
     void receive(message);
   },
 };
 
-window.BlogEditorPreview = {
+window.PlainsongPreview = {
   PROTOCOL_VERSION,
 };
 

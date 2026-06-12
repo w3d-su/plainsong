@@ -37,7 +37,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testPreviewNavigationPolicyOnlyAllowsBundledIndex() {
-        let indexURL = URL(fileURLWithPath: "/tmp/BlogEditor.app/Contents/Resources/preview/index.html")
+        let indexURL = URL(fileURLWithPath: "/tmp/Plainsong.app/Contents/Resources/preview/index.html")
 
         XCTAssertEqual(
             PreviewController.navigationPolicy(for: indexURL, previewIndexURL: indexURL),
@@ -45,7 +45,7 @@ final class PreviewKitTests: XCTestCase {
         )
         XCTAssertEqual(
             PreviewController.navigationPolicy(
-                for: URL(fileURLWithPath: "/tmp/BlogEditor.app/Contents/Resources/preview/other.html"),
+                for: URL(fileURLWithPath: "/tmp/Plainsong.app/Contents/Resources/preview/other.html"),
                 previewIndexURL: indexURL
             ),
             .cancel

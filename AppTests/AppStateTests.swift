@@ -1,4 +1,4 @@
-@testable import BlogEditor
+@testable import Plainsong
 import MarkdownCore
 import XCTest
 
@@ -9,7 +9,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertFalse(appState.hasOpenDocument)
         XCTAssertFalse(appState.canSave)
-        XCTAssertEqual(appState.windowTitle, "BlogEditor")
+        XCTAssertEqual(appState.windowTitle, "Plainsong")
     }
 
     func testReplaceDocumentTextDoesNotRegisterAppLevelTypingUndo() {
@@ -91,7 +91,7 @@ final class AppStateTests: XCTestCase {
     }
 
     func testPreviewVisibilityPersistsThroughUserDefaults() throws {
-        let suiteName = "BlogEditorTests.\(UUID().uuidString)"
+        let suiteName = "PlainsongTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
 
@@ -106,7 +106,7 @@ final class AppStateTests: XCTestCase {
 
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BlogEditorAppStateTests")
+            .appendingPathComponent("PlainsongAppStateTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
