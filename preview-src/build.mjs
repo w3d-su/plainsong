@@ -1,7 +1,7 @@
 // Builds the preview bundle into App/Resources/preview/ (agent.md §7.4).
 // The output is COMMITTED so the app builds without Node installed.
 import { build } from "esbuild";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const outDir = "../App/Resources/preview";
 mkdirSync(outDir, { recursive: true });
@@ -16,6 +16,14 @@ await build({
   outfile: `${outDir}/bundle.js`,
 });
 
-copyFileSync("src/index.html", `${outDir}/index.html`);
-copyFileSync("src/styles/base.css", `${outDir}/bundle.css`);
+const css = [
+  readFileSync("src/styles/base.css", "utf8"),
+  readFileSync("node_modules/katex/dist/katex.min.css", "utf8"),
+  readFileSync("node_modules/highlight.js/styles/github.css", "utf8"),
+].join("\n\n");
+
+writeFileSync(`${outDir}/index.html`, readFileSync("src/index.html", "utf8"));
+writeFileSync(`${outDir}/bundle.css`, css);
+rmSync(`${outDir}/fonts`, { recursive: true, force: true });
+cpSync("node_modules/katex/dist/fonts", `${outDir}/fonts`, { recursive: true });
 console.log(`preview bundle written to ${outDir}/`);

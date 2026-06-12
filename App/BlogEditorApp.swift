@@ -34,6 +34,14 @@ struct BlogEditorApp: App {
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!appState.canSave)
             }
+
+            CommandMenu("View") {
+                Button(appState.isPreviewVisible ? "Hide Preview" : "Show Preview") {
+                    appState.togglePreview()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(!appState.hasOpenDocument)
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase != .active else { return }

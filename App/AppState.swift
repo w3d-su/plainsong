@@ -23,10 +23,12 @@ final class AppState: ObservableObject {
 
     @Published private(set) var currentDocument: DocumentSession
     @Published private(set) var isSaving = false
+    @Published private(set) var isPreviewVisible: Bool
     @Published var presentedError: UserVisibleError?
 
     private let fileStore: MarkdownFileStore
     private let lastOpenedFileStore: any LastOpenedFilePersisting
+    private let userDefaults: UserDefaults
     private var autosaveTask: Task<Void, Never>?
     private var statisticsTask: Task<Void, Never>?
     private var documentChangeCancellable: AnyCancellable?
@@ -37,11 +39,14 @@ final class AppState: ObservableObject {
         currentDocument: DocumentSession = DocumentSession(),
         fileStore: MarkdownFileStore = MarkdownFileStore(),
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
-        shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest
+        shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
+        userDefaults: UserDefaults = .standard
     ) {
         self.currentDocument = currentDocument
         self.fileStore = fileStore
         self.lastOpenedFileStore = lastOpenedFileStore
+        self.userDefaults = userDefaults
+        isPreviewVisible = userDefaults.bool(forKey: Self.previewVisibleDefaultsKey)
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
         observeCurrentDocument()
     }
@@ -123,6 +128,49 @@ final class AppState: ObservableObject {
         currentDocument.replaceText(newText, refreshStatistics: false)
         scheduleStatisticsRefresh()
         scheduleAutosave()
+    }
+
+    func togglePreview() {
+        setPreviewVisible(!isPreviewVisible)
+    }
+
+    func setPreviewVisible(_ isVisible: Bool) {
+        guard isPreviewVisible != isVisible else { return }
+
+        isPreviewVisible = isVisible
+        userDefaults.set(isVisible, forKey: Self.previewVisibleDefaultsKey)
+    }
+
+    func setTaskCheckbox(line: Int, checked: Bool) {
+        guard let lineRange = currentDocument.text.rangeOfOneBasedLine(line) else { return }
+
+        let lineText = String(currentDocument.text[lineRange])
+        guard let checkboxRange = Self.taskCheckboxStateRange(in: lineText) else { return }
+
+        let desiredState = checked ? "x" : " "
+        guard String(lineText[checkboxRange]) != desiredState else { return }
+
+        var updatedLine = lineText
+        updatedLine.replaceSubrange(checkboxRange, with: desiredState)
+
+        var updatedText = currentDocument.text
+        updatedText.replaceSubrange(lineRange, with: updatedLine)
+        replaceDocumentText(updatedText)
+    }
+
+    func openPreviewLink(_ href: String) {
+        guard !href.hasPrefix("#"),
+              let baseURL = currentDocument.fileURL?.deletingLastPathComponent()
+        else {
+            return
+        }
+
+        let path = href.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first
+            .map(String.init) ?? href
+        let url = URL(fileURLWithPath: path, relativeTo: baseURL).standardizedFileURL
+        guard FileKind(url: url) != nil else { return }
+
+        openExternalFile(url)
     }
 
     private func open(url: URL, rememberAsLastOpened: Bool) throws {
@@ -241,6 +289,16 @@ final class AppState: ObservableObject {
     private static var isRunningUnderXCTest: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
+
+    private static let previewVisibleDefaultsKey = "BlogEditor.preview.isVisible"
+
+    private static func taskCheckboxStateRange(in line: String) -> Range<String.Index>? {
+        let pattern = #"^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let fullRange = NSRange(line.startIndex ..< line.endIndex, in: line)
+        guard let match = expression.firstMatch(in: line, range: fullRange) else { return nil }
+        return Range(match.range(at: 1), in: line)
+    }
 }
 
 private enum AppStateError: LocalizedError {
@@ -251,5 +309,25 @@ private enum AppStateError: LocalizedError {
         case let .unsupportedFile(url):
             "\(url.lastPathComponent) is not a supported Markdown file."
         }
+    }
+}
+
+private extension String {
+    func rangeOfOneBasedLine(_ requestedLine: Int) -> Range<String.Index>? {
+        guard requestedLine > 0 else { return nil }
+
+        var currentLine = 1
+        var lineStart = startIndex
+
+        while currentLine < requestedLine {
+            guard let newline = self[lineStart...].firstIndex(where: \.isNewline) else {
+                return nil
+            }
+            lineStart = index(after: newline)
+            currentLine += 1
+        }
+
+        let lineEnd = self[lineStart...].firstIndex(where: \.isNewline) ?? endIndex
+        return lineStart ..< lineEnd
     }
 }

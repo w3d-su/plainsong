@@ -37,6 +37,10 @@ targets:
         excludes:
           - "Info.plist"
           - "*.entitlements"
+          - "Resources/preview"
+      - path: App/Resources/preview
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: MarkdownCore
       - package: EditorKit
@@ -94,6 +98,7 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.files.bookmarks.app-scope: true
+        com.apple.security.network.client: true
     scheme:
       testTargets:
         - BlogEditorTests

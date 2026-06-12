@@ -1,6 +1,7 @@
 import AppKit
 import EditorKit
 import MarkdownCore
+import PreviewKit
 import SwiftUI
 
 /// Main window: sidebar placeholder + single-file editor.
@@ -34,6 +35,16 @@ struct WorkspaceWindow: View {
                     Label("Save", systemImage: "square.and.arrow.down")
                 }
                 .disabled(!appState.canSave)
+
+                Button {
+                    appState.togglePreview()
+                } label: {
+                    Label(
+                        appState.isPreviewVisible ? "Hide Preview" : "Show Preview",
+                        systemImage: "sidebar.right"
+                    )
+                }
+                .disabled(!appState.hasOpenDocument)
             }
         }
         .alert(
@@ -106,6 +117,8 @@ private struct SidebarPlaceholder: View {
 
 private struct EditorWorkspace: View {
     @EnvironmentObject private var appState: AppState
+    @StateObject private var previewController = PreviewController()
+    @StateObject private var scrollCoordinator = EditorPreviewScrollCoordinator()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -118,8 +131,27 @@ private struct EditorWorkspace: View {
 
             Divider()
 
-            DocumentEditor(session: appState.currentDocument)
+            HStack(spacing: 0) {
+                DocumentEditor(
+                    session: appState.currentDocument,
+                    isPreviewVisible: appState.isPreviewVisible,
+                    scrollCoordinator: scrollCoordinator
+                )
                 .environmentObject(appState)
+                .clipped()
+                .zIndex(0)
+
+                if appState.isPreviewVisible {
+                    Divider()
+
+                    PreviewPane(
+                        session: appState.currentDocument,
+                        controller: previewController
+                    )
+                    .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                    .zIndex(1)
+                }
+            }
 
             Divider()
 
@@ -129,6 +161,21 @@ private struct EditorWorkspace: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear(perform: configurePreviewCallbacks)
+    }
+
+    private func configurePreviewCallbacks() {
+        scrollCoordinator.connect(previewController: previewController)
+
+        previewController.onPreviewScrolled = { line in
+            scrollCoordinator.previewScrolled(to: line)
+        }
+        previewController.onCheckboxToggled = { line, checked in
+            appState.setTaskCheckbox(line: line, checked: checked)
+        }
+        previewController.onLinkClicked = { href in
+            appState.openPreviewLink(href)
+        }
     }
 }
 
@@ -186,6 +233,8 @@ private struct DocumentHeader: View {
 private struct DocumentEditor: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var session: DocumentSession
+    let isPreviewVisible: Bool
+    let scrollCoordinator: EditorPreviewScrollCoordinator
 
     var body: some View {
         MarkdownEditorView(
@@ -198,7 +247,31 @@ private struct DocumentEditor: View {
             fileKind: session.fileKind,
             showsLineNumbers: true
         )
+        .background(
+            EditorScrollBridge(proxy: scrollCoordinator.editorProxy) { line in
+                guard isPreviewVisible else { return }
+                scrollCoordinator.editorScrolled(to: line)
+            }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct PreviewPane: View {
+    @ObservedObject var session: DocumentSession
+    @ObservedObject var controller: PreviewController
+
+    var body: some View {
+        GeometryReader { proxy in
+            MarkdownPreviewWebView(controller: controller)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .onAppear {
+            controller.render(session.currentTextChange)
+        }
+        .task(id: ObjectIdentifier(session)) {
+            await controller.observe(session)
+        }
     }
 }
 

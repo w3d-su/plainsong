@@ -1,0 +1,164 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`markdown preview pipeline > renders the kitchen sink fixture 1`] = `
+"<h1 data-line="16">Kitchen Sink Fixture</h1>
+<p data-line="18">This document exercises common Markdown and GFM constructs used by BlogEditor. It is
+intended for editor highlighting, preview rendering, scroll sync, and performance smoke
+checks.</p>
+<h2 data-line="22">Headings</h2>
+<h3 data-line="24">Third Level</h3>
+<h4 data-line="26">Fourth Level</h4>
+<h5 data-line="28">Fifth Level</h5>
+<h6 data-line="30">Sixth Level</h6>
+<h2 data-line="32">Emphasis And Inline Spans</h2>
+<p data-line="34">Plain text can include <strong>bold</strong>, <em>italic</em>, <em><strong>bold italic</strong></em>, <del>strikethrough</del>, <code>inline code</code>,
+and an escaped asterisk like *this*. Smart punctuation stays ordinary in source: "quoted
+text", <code>--</code>, and <code>...</code>.</p>
+<p data-line="38">Inline math should remain readable in source and render in preview: <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mo>=</mo><mi>m</mi><msup><mi>c</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">E = mc^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord mathnormal">m</span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span>.</p>
+<h2 data-line="40">Links And Images</h2>
+<p data-line="42"><a href="./related-post.md">Relative Markdown link</a></p>
+<p data-line="44"><a href="https://example.com/blogeditor">External link</a></p>
+<p data-line="46"><img src="./assets/example-image.png" alt="Relative image reference" title="Fixture image"></p>
+<p data-line="48">Autolinks should be recognized by GFM: <a href="https://example.com">https://example.com</a> and <a href="mailto:support@example.com">support@example.com</a>.</p>
+<h2 data-line="50">Blockquote</h2>
+<blockquote data-line="52">
+<p data-line="52">A blockquote can contain <strong>formatting</strong> and a link to <a href="#headings">the heading</a>.</p>
+<ul data-line="54">
+<li data-line="54">Nested quoted list item</li>
+<li data-line="55">Another quoted list item</li>
+</ul>
+</blockquote>
+<h2 data-line="57">Lists</h2>
+<ul data-line="59">
+<li data-line="59">Unordered item</li>
+<li data-line="60">Unordered item with nested content
+<ul data-line="61">
+<li data-line="61">Nested bullet</li>
+<li data-line="62">Nested bullet with <code>inline code</code></li>
+</ul>
+</li>
+<li data-line="63">Final unordered item</li>
+</ul>
+<ol data-line="65">
+<li data-line="65">Ordered item</li>
+<li data-line="66">Ordered item with nested tasks
+<ul class="contains-task-list" data-line="67">
+<li class="task-list-item" data-line="67"><input type="checkbox" data-task-checkbox="true"> Draft the section</li>
+<li class="task-list-item" data-line="68"><input type="checkbox" checked data-task-checkbox="true"> Review the section</li>
+</ul>
+</li>
+<li data-line="69">Ordered item after nested tasks</li>
+</ol>
+<ul class="contains-task-list" data-line="71">
+<li class="task-list-item" data-line="71"><input type="checkbox" data-task-checkbox="true"> Open the fixture</li>
+<li class="task-list-item" data-line="72"><input type="checkbox" checked data-task-checkbox="true"> Confirm task list highlighting</li>
+<li class="task-list-item" data-line="73"><input type="checkbox" data-task-checkbox="true"> Toggle this item from preview during M2</li>
+</ul>
+<h2 data-line="75">Table</h2>
+<table data-line="77">
+<thead data-line="77">
+<tr data-line="77">
+<th data-line="77">Feature</th>
+<th align="right" data-line="77">Syntax</th>
+<th data-line="77">Expected Result</th>
+</tr>
+</thead>
+<tbody data-line="79">
+<tr data-line="79">
+<td data-line="79">Frontmatter</td>
+<td align="right" data-line="79"><code>---</code></td>
+<td data-line="79">Parsed as YAML metadata</td>
+</tr>
+<tr data-line="80">
+<td data-line="80">Task list</td>
+<td align="right" data-line="80"><code>- [x]</code></td>
+<td data-line="80">Rendered checkbox</td>
+</tr>
+<tr data-line="81">
+<td data-line="81">Table</td>
+<td align="right" data-line="81">pipes</td>
+<td data-line="81">GFM table layout</td>
+</tr>
+<tr data-line="82">
+<td data-line="82">Math</td>
+<td align="right" data-line="82"><code>$x$</code></td>
+<td data-line="82">KaTeX in preview</td>
+</tr>
+</tbody>
+</table>
+<h2 data-line="84">Fenced Code Blocks</h2>
+<pre data-line="86"><code class="language-swift">struct Post: Identifiable {
+    let id: UUID
+    var title: String
+    var draft: Bool
+}
+</code></pre>
+<pre data-line="94"><code class="language-javascript">export function wordCount(markdown) {
+  return markdown.trim().split(/\\s+/u).filter(Boolean).length;
+}
+</code></pre>
+<pre data-line="100"><code class="language-typescript">type RenderPayload = {
+  version: number;
+  fileKind: "md" | "mdx";
+  text: string;
+};
+</code></pre>
+<pre data-line="108"><code class="language-python">def slugify(title: str) -> str:
+    return "-".join(title.lower().split())
+</code></pre>
+<pre data-line="113"><code class="language-bash">set -euo pipefail
+swift test
+npm test
+</code></pre>
+<pre data-line="119"><code class="language-json">{
+  "theme": "github-light",
+  "lineNumbers": true,
+  "preview": "side-by-side"
+}
+</code></pre>
+<pre data-line="127"><code class="language-yaml">title: Nested YAML Fence
+tags:
+  - fixture
+  - yaml
+</code></pre>
+<pre data-line="134"><code class="language-html">&#x3C;article class="post-card">
+  &#x3C;h2>Rendered HTML Fence&#x3C;/h2>
+&#x3C;/article>
+</code></pre>
+<pre data-line="140"><code class="language-css">.post-card {
+  border: 1px solid currentColor;
+  padding: 1rem;
+}
+</code></pre>
+<h2 data-line="147">Math</h2>
+<p data-line="149">Display math:</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msubsup><mo>∫</mo><mn>0</mn><mn>1</mn></msubsup><msup><mi>x</mi><mn>2</mn></msup><mtext> </mtext><mi>d</mi><mi>x</mi><mo>=</mo><mfrac><mn>1</mn><mn>3</mn></mfrac></mrow><annotation encoding="application/x-tex">\\int_{0}^{1} x^2\\,dx = \\frac{1}{3}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:2.476em;vertical-align:-0.9119em;"></span><span class="mop"><span class="mop op-symbol large-op" style="margin-right:0.4445em;position:relative;top:-0.0011em;">∫</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.564em;"><span style="top:-1.7881em;margin-left:-0.4445em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">0</span></span></span></span><span style="top:-3.8129em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.9119em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">d</span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.0074em;vertical-align:-0.686em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3214em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">3</span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.686em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></span>
+<p data-line="155">Aligned expression:</p>
+<span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mtable rowspacing="0.25em" columnalign="right left" columnspacing="0em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mi mathvariant="normal">∇</mi><mo>⋅</mo><mover accent="true"><mi>E</mi><mo>⃗</mo></mover></mrow></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mfrac><mi>ρ</mi><msub><mi>ϵ</mi><mn>0</mn></msub></mfrac></mrow></mstyle></mtd></mtr></mtable><annotation encoding="application/x-tex">\\begin{aligned}
+a^2 + b^2 &#x26;= c^2 \\\\
+\\nabla \\cdot \\vec{E} &#x26;= \\frac{\\rho}{\\epsilon_0}
+\\end{aligned}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:3.4677em;vertical-align:-1.4838em;"></span><span class="mord"><span class="mtable"><span class="col-align-r"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.9838em;"><span style="top:-4.2273em;"><span class="pstrut" style="height:3.1076em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span><span style="top:-2.4597em;"><span class="pstrut" style="height:3.1076em;"></span><span class="mord"><span class="mord">∇</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.9663em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0576em;">E</span></span><span style="top:-3.2523em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.1522em;"><span class="overlay" style="height:0.714em;width:0.471em;"><svg xmlns="http://www.w3.org/2000/svg" width="0.471em" height="0.714em" style="width:0.471em" viewBox="0 0 471 714" preserveAspectRatio="xMinYMin"><path d="M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5
+3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11
+10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63
+-1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1
+-7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59
+H213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359
+c-16-25.333-24-45-24-59z"></path></svg></span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.4838em;"><span></span></span></span></span></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.9838em;"><span style="top:-4.2273em;"><span class="pstrut" style="height:3.1076em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span><span style="top:-2.4597em;"><span class="pstrut" style="height:3.1076em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.1076em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">ϵ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord mathnormal">ρ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.836em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.4838em;"><span></span></span></span></span></span></span></span></span></span></span></span>
+<h2 data-line="164">Mermaid</h2>
+<pre data-line="166"><code class="language-mermaid">flowchart TD
+    A[Open Markdown File] --> B[Edit Source]
+    B --> C{Preview Enabled?}
+    C -- Yes --> D[Render With Unified Pipeline]
+    C -- No --> E[Keep Source Focused]
+    D --> F[Sync Scroll Position]
+</code></pre>
+<pre data-line="175"><code class="language-mermaid">sequenceDiagram
+    participant Editor
+    participant Preview
+    Editor->>Preview: render(version, text)
+    Preview-->>Editor: renderComplete(version)
+</code></pre>
+<h2 data-line="183">Horizontal Rule</h2>
+<hr data-line="185">
+<p data-line="187">End of fixture.</p>"
+`;

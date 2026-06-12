@@ -146,4 +146,77 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(session.version, 1)
         XCTAssertTrue(session.isDirty)
     }
+
+    func testTextChangesStreamYieldsInitialReplaceAndMarkSavedChanges() async {
+        let session = DocumentSession(
+            text: "Original",
+            url: URL(fileURLWithPath: "/tmp/original.md"),
+            fileKind: .markdown
+        )
+        var iterator = session.textChanges().makeAsyncIterator()
+
+        let initial = await iterator.next()
+        XCTAssertEqual(
+            initial,
+            DocumentTextChange(
+                text: "Original",
+                version: 0,
+                fileKind: .markdown,
+                fileURL: URL(fileURLWithPath: "/tmp/original.md")
+            )
+        )
+
+        session.replaceText("Edited", refreshStatistics: false)
+
+        let edit = await iterator.next()
+        XCTAssertEqual(
+            edit,
+            DocumentTextChange(
+                text: "Edited",
+                version: 1,
+                fileKind: .markdown,
+                fileURL: URL(fileURLWithPath: "/tmp/original.md")
+            )
+        )
+
+        session.markSaved(text: "Edited", url: URL(fileURLWithPath: "/tmp/edited.mdx"))
+
+        let saved = await iterator.next()
+        XCTAssertEqual(
+            saved,
+            DocumentTextChange(
+                text: "Edited",
+                version: 2,
+                fileKind: .mdx,
+                fileURL: URL(fileURLWithPath: "/tmp/edited.mdx")
+            )
+        )
+    }
+
+    func testTextChangesStreamYieldsResetChanges() async {
+        let session = DocumentSession(
+            text: "Original",
+            url: URL(fileURLWithPath: "/tmp/original.md"),
+            fileKind: .markdown
+        )
+        var iterator = session.textChanges(includeCurrent: false).makeAsyncIterator()
+
+        session.reset(
+            text: "Reset",
+            url: URL(fileURLWithPath: "/tmp/reset.md"),
+            fileKind: .markdown,
+            isDirty: false
+        )
+
+        let reset = await iterator.next()
+        XCTAssertEqual(
+            reset,
+            DocumentTextChange(
+                text: "Reset",
+                version: 1,
+                fileKind: .markdown,
+                fileURL: URL(fileURLWithPath: "/tmp/reset.md")
+            )
+        )
+    }
 }

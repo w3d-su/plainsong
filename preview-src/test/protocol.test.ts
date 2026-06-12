@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { PROTOCOL_VERSION } from "../src/index";
+import { MESSAGE_NAMES, PROTOCOL_VERSION } from "../src/bridge";
 
 describe("bridge protocol", () => {
-  it("declares protocol version 1", () => {
-    expect(PROTOCOL_VERSION).toBe(1);
+  it("declares protocol version 2", () => {
+    expect(PROTOCOL_VERSION).toBe(2);
+  });
+
+  it("keeps message names in Swift bridge order", () => {
+    expect(MESSAGE_NAMES).toEqual([
+      "ready",
+      "render",
+      "renderComplete",
+      "scrollToLine",
+      "previewScrolled",
+      "linkClicked",
+      "checkboxToggled",
+      "setTheme",
+    ]);
   });
 });

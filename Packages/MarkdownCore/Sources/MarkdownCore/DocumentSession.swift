@@ -19,6 +19,7 @@ public final class DocumentSession: ObservableObject {
     @Published public private(set) var statistics: TextStatistics
 
     private var savedText: String?
+    private var textChangeContinuations: [UUID: AsyncStream<DocumentTextChange>.Continuation] = [:]
 
     public var snapshot: DocumentSnapshot {
         DocumentSnapshot(
@@ -28,6 +29,15 @@ public final class DocumentSession: ObservableObject {
             fileURL: fileURL,
             isDirty: isDirty,
             statistics: statistics
+        )
+    }
+
+    public var currentTextChange: DocumentTextChange {
+        DocumentTextChange(
+            text: text,
+            version: version,
+            fileKind: fileKind,
+            fileURL: fileURL
         )
     }
 
@@ -44,6 +54,27 @@ public final class DocumentSession: ObservableObject {
         self.isDirty = isDirty
         statistics = TextStatistics(text: text)
         savedText = isDirty ? nil : text
+    }
+
+    /// Explicit preview channel for high-frequency text/version changes.
+    ///
+    /// Consumers should debounce this stream themselves (M2 uses ~150 ms) and drop
+    /// stale renders by `version`. This deliberately does not call `objectWillChange`.
+    public func textChanges(includeCurrent: Bool = true) -> AsyncStream<DocumentTextChange> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let id = UUID()
+            textChangeContinuations[id] = continuation
+
+            if includeCurrent {
+                continuation.yield(currentTextChange)
+            }
+
+            continuation.onTermination = { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.textChangeContinuations[id] = nil
+                }
+            }
+        }
     }
 
     /// Applies editor text replacement. Equal text is a no-op to avoid false versions.
@@ -63,6 +94,7 @@ public final class DocumentSession: ObservableObject {
             isDirty = newIsDirty
         }
         version += 1
+        emitTextChange()
     }
 
     public func refreshStatistics() {
@@ -131,6 +163,17 @@ public final class DocumentSession: ObservableObject {
 
         if isDirty != newIsDirty {
             isDirty = newIsDirty
+        }
+
+        if renderableStateChanged {
+            emitTextChange()
+        }
+    }
+
+    private func emitTextChange() {
+        let change = currentTextChange
+        for continuation in textChangeContinuations.values {
+            continuation.yield(change)
         }
     }
 }
