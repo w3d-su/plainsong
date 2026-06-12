@@ -12,24 +12,30 @@ public struct MarkdownEditorView: View {
     @State private var styledText: HighlightedText?
     @State private var highlightRevision = 0
     @State private var selection: NSRange?
+    @StateObject private var defaultCommandProxy = EditorCommandProxy()
 
     private let fileKind: FileKind
     private let showsLineNumbers: Bool
     private let scrollProxy: EditorScrollProxy?
+    private let commandProxy: EditorCommandProxy?
 
     public init(
         text: Binding<String>,
         fileKind: FileKind,
         showsLineNumbers: Bool = true,
-        scrollProxy: EditorScrollProxy? = nil
+        scrollProxy: EditorScrollProxy? = nil,
+        commandProxy: EditorCommandProxy? = nil
     ) {
         _text = text
         self.fileKind = fileKind
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
+        self.commandProxy = commandProxy
     }
 
     public var body: some View {
+        let activeCommandProxy = commandProxy ?? defaultCommandProxy
+
         MarkdownTextView(
             // Proxy binding: typing no longer publishes through the document model
             // (DocumentSession.text is not @Published), so the editor schedules its
@@ -45,13 +51,18 @@ public struct MarkdownEditorView: View {
             styledText: styledText,
             selection: $selection,
             showsLineNumbers: showsLineNumbers,
-            scrollProxy: scrollProxy
+            scrollProxy: scrollProxy,
+            commandProxy: activeCommandProxy
         )
         .onChange(of: text) { _, _ in
             scheduleHighlight()
         }
         .onChange(of: fileKind) { _, _ in
+            activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
+        }
+        .onAppear {
+            activeCommandProxy.update(fileKind: fileKind)
         }
         .task(id: highlightRevision) {
             await applyDebouncedHighlight(for: highlightRevision)

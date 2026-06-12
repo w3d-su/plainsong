@@ -55,6 +55,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
+    private let commandProxy: EditorCommandProxy?
 
     init(
         text: Binding<String>,
@@ -62,6 +63,7 @@ struct MarkdownTextView: NSViewRepresentable {
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         scrollProxy: EditorScrollProxy? = nil,
+        commandProxy: EditorCommandProxy? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -70,6 +72,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
+        self.commandProxy = commandProxy
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
@@ -106,6 +109,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.text = text
         context.coordinator.isUpdating = false
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
+        context.coordinator.attachCommandProxy(commandProxy, to: textView)
 
         return scrollView
     }
@@ -117,6 +121,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
+        context.coordinator.attachCommandProxy(commandProxy, to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -218,6 +223,8 @@ struct MarkdownTextView: NSViewRepresentable {
         var isUserEditing = false
         var lastAppliedHighlightRevision: Int?
         private var scrollProxy: EditorScrollProxy?
+        private var commandProxy: EditorCommandProxy?
+        private var isApplyingEditingBehavior = false
 
         init(text: Binding<String>, selection: Binding<NSRange?>) {
             _text = text
@@ -233,6 +240,15 @@ struct MarkdownTextView: NSViewRepresentable {
             proxy?.attach(to: textView)
         }
 
+        func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
+            if commandProxy !== proxy {
+                commandProxy?.detach(from: textView)
+                commandProxy = proxy
+            }
+
+            proxy?.attach(to: textView, fileKind: proxy?.currentFileKind() ?? .markdown)
+        }
+
         func textViewDidChangeText(_ notification: Notification) {
             guard !isUpdating, let textView = notification.object as? STTextView else {
                 return
@@ -246,6 +262,20 @@ struct MarkdownTextView: NSViewRepresentable {
             var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
             newText.makeContiguousUTF8()
             text = newText
+        }
+
+        func textView(
+            _ textView: STTextView,
+            shouldChangeTextIn affectedCharRange: NSTextRange,
+            replacementString: String?
+        ) -> Bool {
+            EditingBehaviorsSupport.handleProposedChange(
+                in: textView,
+                affectedRange: affectedCharRange,
+                replacementString: replacementString,
+                fileKind: commandProxy?.currentFileKind() ?? .markdown,
+                isApplyingEdit: &isApplyingEditingBehavior
+            )
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

@@ -235,6 +235,7 @@ private struct ExternalChangeBanner: View {
 
 private struct DocumentEditor: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var editorCommandProxy: EditorCommandProxy
     @ObservedObject var session: DocumentSession
     let isPreviewVisible: Bool
     let scrollCoordinator: EditorPreviewScrollCoordinator
@@ -249,7 +250,8 @@ private struct DocumentEditor: View {
             ),
             fileKind: session.fileKind,
             showsLineNumbers: true,
-            scrollProxy: scrollCoordinator.editorProxy
+            scrollProxy: scrollCoordinator.editorProxy,
+            commandProxy: editorCommandProxy
         )
         .onAppear {
             scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)
@@ -385,4 +387,5 @@ private extension FileKind {
 #Preview {
     WorkspaceWindow()
         .environmentObject(AppState())
+        .environmentObject(EditorCommandProxy())
 }
