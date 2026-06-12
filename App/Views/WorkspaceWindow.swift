@@ -99,7 +99,9 @@ private struct EditorWorkspace: View {
                 isSaving: appState.isSaving
             )
 
-            if appState.externalChangePrompt != nil {
+            if appState.missingFilePrompt != nil {
+                MissingFileBanner()
+            } else if appState.externalChangePrompt != nil {
                 ExternalChangeBanner()
             }
 

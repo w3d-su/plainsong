@@ -33,6 +33,11 @@ final class AppState: ObservableObject {
         let fileURL: URL
     }
 
+    struct MissingFilePrompt: Identifiable, Equatable {
+        let id = UUID()
+        let fileURL: URL
+    }
+
     @Published var currentDocument: DocumentSession
     @Published var isSaving = false
     @Published private(set) var isPreviewVisible: Bool
@@ -42,6 +47,7 @@ final class AppState: ObservableObject {
     @Published var recentItemURLs: [URL] = []
     @Published var presentedError: UserVisibleError?
     @Published var externalChangePrompt: ExternalChangePrompt?
+    @Published var missingFilePrompt: MissingFilePrompt?
 
     let fileStore: MarkdownFileStore
     let lastOpenedFileStore: any LastOpenedFilePersisting
@@ -60,7 +66,9 @@ final class AppState: ObservableObject {
     var sessionCache: [URL: DocumentSession] = [:]
     var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
     var lastKnownDiskHashes: [URL: UInt64] = [:]
+    var lastKnownDiskModificationDates: [URL: Date] = [:]
     var pendingExternalTexts: [URL: String] = [:]
+    var detachedSessionURLs: Set<URL> = []
 
     init(
         currentDocument: DocumentSession = DocumentSession(),
@@ -90,7 +98,11 @@ final class AppState: ObservableObject {
     }
 
     var canSave: Bool {
-        currentDocument.fileURL != nil && !isSaving
+        guard let url = currentDocument.fileURL?.standardizedFileURL else { return false }
+        return !isSaving &&
+            !detachedSessionURLs.contains(url) &&
+            externalChangePrompt?.fileURL.standardizedFileURL != url &&
+            missingFilePrompt?.fileURL.standardizedFileURL != url
     }
 
     var windowTitle: String {
@@ -147,7 +159,7 @@ final class AppState: ObservableObject {
     }
 
     func flushAutosaveIfNeeded() {
-        guard currentDocument.isDirty else { return }
+        guard currentDocument.isDirty, canAutosaveCurrentDocument else { return }
 
         do {
             try saveCurrentDocument()
@@ -243,7 +255,7 @@ final class AppState: ObservableObject {
 
     private func scheduleAutosave() {
         autosaveTask?.cancel()
-        guard currentDocument.fileURL != nil else { return }
+        guard canAutosaveCurrentDocument else { return }
 
         autosaveTask = Task { [weak self] in
             do {
@@ -261,7 +273,7 @@ final class AppState: ObservableObject {
     /// idle, so it is off the typing hot path; a proper serialized background writer
     /// can come with M3's file coordination if profiling ever shows this hitch.
     private func autosaveIfNeeded() {
-        guard currentDocument.isDirty else { return }
+        guard currentDocument.isDirty, canAutosaveCurrentDocument else { return }
 
         do {
             try saveCurrentDocument()
@@ -281,7 +293,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private static var supportedContentTypes: [UTType] {
+    static var supportedContentTypes: [UTType] {
         [
             UTType(filenameExtension: "md"),
             UTType(filenameExtension: "markdown"),
@@ -302,15 +314,28 @@ final class AppState: ObservableObject {
         guard let match = expression.firstMatch(in: line, range: fullRange) else { return nil }
         return Range(match.range(at: 1), in: line)
     }
+
+    private var canAutosaveCurrentDocument: Bool {
+        guard let url = currentDocument.fileURL?.standardizedFileURL else { return false }
+        return !detachedSessionURLs.contains(url) &&
+            externalChangePrompt?.fileURL.standardizedFileURL != url &&
+            missingFilePrompt?.fileURL.standardizedFileURL != url
+    }
 }
 
 enum AppStateError: LocalizedError {
     case unsupportedFile(URL)
+    case missingFile(URL)
+    case unresolvedExternalChange(URL)
 
     var errorDescription: String? {
         switch self {
         case let .unsupportedFile(url):
             "\(url.lastPathComponent) is not a supported Markdown file."
+        case let .missingFile(url):
+            "\(url.lastPathComponent) is no longer on disk. Save a copy or close it."
+        case let .unresolvedExternalChange(url):
+            "\(url.lastPathComponent) changed on disk. Choose Reload or Keep mine before saving."
         }
     }
 }

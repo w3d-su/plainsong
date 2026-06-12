@@ -165,12 +165,100 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    func testWarmCleanSessionReloadsDiskChangeOnCacheHit() async throws {
+        let root = try makeTemporaryDirectory()
+        let firstPost = root.appendingPathComponent("a.md")
+        let secondPost = root.appendingPathComponent("b.md")
+        try writeText("A original", to: firstPost)
+        try writeText("B original", to: secondPost)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("first post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == firstPost.standardizedFileURL
+        }
+
+        appState.openWorkspaceFile(secondPost)
+        try await waitUntil("second post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == secondPost.standardizedFileURL
+        }
+
+        try writeText("A changed on disk", to: firstPost, touchOffset: 5)
+        appState.openWorkspaceFile(firstPost)
+
+        try await waitUntil("warm session reloaded from disk") {
+            appState.currentDocument.fileURL?.standardizedFileURL == firstPost.standardizedFileURL &&
+                appState.currentDocument.text == "A changed on disk" &&
+                appState.externalChangePrompt == nil
+        }
+    }
+
+    func testWarmDirtySessionShowsPromptOnCacheHitAndDoesNotAutosaveOverDisk() async throws {
+        let root = try makeTemporaryDirectory()
+        let firstPost = root.appendingPathComponent("a.md")
+        let secondPost = root.appendingPathComponent("b.md")
+        try writeText("A original", to: firstPost)
+        try writeText("B original", to: secondPost)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("first post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == firstPost.standardizedFileURL
+        }
+
+        appState.replaceDocumentText("A unsaved edits")
+        appState.openWorkspaceFile(secondPost)
+        try await waitUntil("second post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == secondPost.standardizedFileURL
+        }
+
+        try writeText("A changed on disk", to: firstPost, touchOffset: 5)
+        appState.openWorkspaceFile(firstPost)
+
+        try await waitUntil("dirty warm session prompted") {
+            appState.currentDocument.fileURL?.standardizedFileURL == firstPost.standardizedFileURL &&
+                appState.currentDocument.text == "A unsaved edits" &&
+                appState.externalChangePrompt?.fileURL.standardizedFileURL == firstPost.standardizedFileURL
+        }
+
+        try await Task.sleep(nanoseconds: 1_250_000_000)
+        XCTAssertEqual(try String(contentsOf: firstPost, encoding: .utf8), "A changed on disk")
+    }
+
+    func testDeletedCurrentFileDetachesAndSuppressesAutosave() async throws {
+        let directory = try makeTemporaryDirectory()
+        let post = directory.appendingPathComponent("post.md")
+        try writeText("Original", to: post)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(post)
+        appState.replaceDocumentText("Unsaved after delete")
+        try FileManager.default.removeItem(at: post)
+        appState.refreshWorkspaceAfterFileSystemChange()
+
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL.standardizedFileURL, post.standardizedFileURL)
+        XCTAssertFalse(appState.canSave)
+
+        try await Task.sleep(nanoseconds: 1_250_000_000)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: post.path))
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("PlainsongAppStateTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func writeText(_ text: String, to url: URL, touchOffset: TimeInterval = 0) throws {
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        if touchOffset != 0 {
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date().addingTimeInterval(touchOffset)],
+                ofItemAtPath: url.path
+            )
+        }
     }
 
     private func waitUntil(

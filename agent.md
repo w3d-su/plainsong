@@ -315,7 +315,7 @@ must be kept in sync; both list message names in the same order with a
 | Direction | Message | Payload |
 |---|---|---|
 | JS→Swift | `ready` | `{protocolVersion}` |
-| Swift→JS | `render` | `{version, fileKind, text, baseDir, theme}` |
+| Swift→JS | `render` | `{version, fileKind, text, baseDir, theme}`; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
 | JS→Swift | `renderComplete` | `{version, blockCount}` |
 | Swift→JS | `scrollToLine` | `{line, animated}` |
 | JS→Swift | `previewScrolled` | `{topVisibleLine}` (only while preview owns scroll) |

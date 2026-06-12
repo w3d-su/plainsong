@@ -128,7 +128,7 @@ extension AppState {
     }
 }
 
-private extension AppState {
+extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
         let root = url.standardizedFileURL
         closeWorkspace()
@@ -186,6 +186,11 @@ private extension AppState {
         sessionCache.removeAll()
         sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
         pendingExternalTexts.removeAll()
+        lastKnownDiskHashes.removeAll()
+        lastKnownDiskModificationDates.removeAll()
+        detachedSessionURLs.removeAll()
+        externalChangePrompt = nil
+        missingFilePrompt = nil
     }
 
     func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
@@ -216,6 +221,7 @@ private extension AppState {
 
         if let cachedSession = sessionCache[key] {
             setCurrentDocument(cachedSession)
+            handleExternalChange(for: cachedSession)
             handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
             return
         }
@@ -228,7 +234,11 @@ private extension AppState {
             isDirty: false
         )
         sessionCache[key] = session
-        lastKnownDiskHashes[key] = Self.contentHash(file.text)
+        detachedSessionURLs.remove(key)
+        if missingFilePrompt?.fileURL.standardizedFileURL == key {
+            missingFilePrompt = nil
+        }
+        recordKnownDiskText(file.text, for: key)
         setCurrentDocument(session)
         handleSessionAccess(url: key, isDirty: false)
     }
@@ -236,11 +246,16 @@ private extension AppState {
     func setCurrentDocument(_ session: DocumentSession) {
         guard currentDocument !== session else { return }
         currentDocument = session
+        clearPromptsNotMatchingCurrentDocument()
         observeCurrentDocument()
     }
 
     func handleSessionAccess(url: URL, isDirty: Bool) {
         let evictions = sessionPolicy.access(url, isDirty: isDirty)
+        handleSessionEvictions(evictions)
+    }
+
+    func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {
         for eviction in evictions {
             guard let session = sessionCache[eviction.url] else { continue }
             if eviction.requiresSave {
@@ -248,7 +263,7 @@ private extension AppState {
                     try save(session: session)
                 } catch {
                     present(error, title: "Could Not Save Warm File")
-                    sessionPolicy.access(eviction.url, isDirty: session.isDirty)
+                    handleSessionEvictions(sessionPolicy.access(eviction.url, isDirty: session.isDirty))
                     continue
                 }
             }
@@ -258,6 +273,14 @@ private extension AppState {
 
     func save(session: DocumentSession) throws {
         guard let url = session.fileURL?.standardizedFileURL else { return }
+        guard !detachedSessionURLs.contains(url),
+              missingFilePrompt?.fileURL.standardizedFileURL != url
+        else {
+            throw AppStateError.missingFile(url)
+        }
+        guard externalChangePrompt?.fileURL.standardizedFileURL != url else {
+            throw AppStateError.unresolvedExternalChange(url)
+        }
 
         autosaveTask?.cancel()
         isSaving = true
@@ -269,7 +292,8 @@ private extension AppState {
         }
         session.markSaved(text: text, url: url)
         sessionPolicy.updateDirtyState(for: url, isDirty: false)
-        lastKnownDiskHashes[url] = Self.contentHash(text)
+        detachedSessionURLs.remove(url)
+        recordKnownDiskText(text, for: url)
     }
 
     func rememberLastOpenedFile(_ url: URL) {
