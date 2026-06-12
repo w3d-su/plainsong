@@ -261,6 +261,22 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    func testUntitledFileNameDeduplicatesAgainstExistingFiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppStateNewFileTests")
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        XCTAssertEqual(AppState.untitledFileName(in: directory), "Untitled.md")
+
+        try Data().write(to: directory.appendingPathComponent("Untitled.md"))
+        XCTAssertEqual(AppState.untitledFileName(in: directory), "Untitled 2.md")
+
+        try Data().write(to: directory.appendingPathComponent("Untitled 2.md"))
+        XCTAssertEqual(AppState.untitledFileName(in: directory), "Untitled 3.md")
+    }
+
     private func waitUntil(
         _ description: String,
         timeoutNanoseconds: UInt64 = 3_000_000_000,
