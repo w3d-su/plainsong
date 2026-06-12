@@ -7,6 +7,8 @@ struct MarkdownTextViewUpdatePolicy {
     let hasMarkedText: Bool
     private let incomingTextEqualsCurrentText: () -> Bool
 
+    /// `incomingTextEqualsCurrentText` is an autoclosure so the O(n) comparison is
+    /// skipped entirely on the typing hot path, where `isUserEditing` already decides.
     init(
         isUserEditing: Bool,
         hasMarkedText: Bool,
@@ -26,17 +28,36 @@ struct MarkdownTextViewUpdatePolicy {
     }
 }
 
+/// Debounced highlighter output. Equality is by revision so SwiftUI prop diffing
+/// never compares whole attributed strings (O(n)).
+struct HighlightedText: Equatable {
+    let revision: Int
+    let text: AttributedString
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.revision == rhs.revision
+    }
+}
+
+/// STTextView wrapper with a String-only typing hot path.
+///
+/// Per-keystroke work must never convert the whole document between
+/// String/NSAttributedString/AttributedString — that bridging caused visible lag on
+/// 1 MB documents. Plain `String` flows through `text`; styling arrives separately
+/// (and rarely) via `styledText` and is applied in place.
 struct MarkdownTextView: NSViewRepresentable {
     @Environment(\.isEnabled) private var isEnabled
-    @Binding private var text: AttributedString
+    @Binding private var text: String
     @Binding private var selection: NSRange?
 
+    private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
 
     init(
-        text: Binding<AttributedString>,
+        text: Binding<String>,
+        styledText: HighlightedText?,
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
@@ -44,6 +65,7 @@ struct MarkdownTextView: NSViewRepresentable {
     ) {
         _text = text
         _selection = selection
+        self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
@@ -78,7 +100,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isSelectable = isEnabled
 
         context.coordinator.isUpdating = true
-        textView.attributedText = NSAttributedString(text)
+        textView.text = text
         context.coordinator.isUpdating = false
 
         return scrollView
@@ -89,57 +111,22 @@ struct MarkdownTextView: NSViewRepresentable {
             assertionFailure("Expected MarkdownTextView to update an STTextView-backed scroll view")
             return
         }
-        var resolvedCurrentText: NSAttributedString?
-        var resolvedIncomingText: NSAttributedString?
-        func currentText() -> NSAttributedString {
-            if let resolvedCurrentText {
-                return resolvedCurrentText
-            }
-
-            let currentText = textView.attributedText ?? NSAttributedString()
-            resolvedCurrentText = currentText
-            return currentText
-        }
-
-        func incomingText() -> NSAttributedString {
-            if let resolvedIncomingText {
-                return resolvedIncomingText
-            }
-
-            let incomingText = NSAttributedString(text)
-            resolvedIncomingText = incomingText
-            return incomingText
-        }
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
             hasMarkedText: textView.hasMarkedText(),
-            incomingTextEqualsCurrentText: currentText().isEqual(to: incomingText())
+            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, self.text)
         )
 
         if policy.shouldApplyIncomingText {
-            let incomingText = incomingText()
             context.coordinator.isUpdating = true
-            if let textStorage = (textView.textContentManager as? NSTextContentStorage)?.textStorage,
-               textStorage.string == incomingText.string {
-                // Same characters, new styling (the debounced highlight): apply
-                // attributes in place so the caret, IME state, and scroll position
-                // survive instead of replacing the whole document.
-                textStorage.beginEditing()
-                incomingText.enumerateAttributes(
-                    in: NSRange(location: 0, length: incomingText.length)
-                ) { attributes, range, _ in
-                    textStorage.setAttributes(attributes, range: range)
-                }
-                textStorage.endEditing()
-            } else {
-                let currentSelection = textView.selectedRange()
-                textView.attributedText = incomingText
-                textView.textSelection = currentSelection.clamped(toLength: incomingText.length)
-            }
-            resolvedCurrentText = incomingText
+            let currentSelection = textView.selectedRange()
+            textView.text = text
+            textView.textSelection = currentSelection.clamped(toLength: (text as NSString).length)
             context.coordinator.isUpdating = false
         }
+
+        applyStyledTextIfNeeded(to: textView, coordinator: context.coordinator)
         context.coordinator.isUserEditing = false
 
         let shouldApplySelection = selection.map { proposedSelection in
@@ -147,7 +134,7 @@ struct MarkdownTextView: NSViewRepresentable {
         } ?? false
 
         if shouldApplySelection, let selection {
-            let textLength = currentText().length
+            let textLength = Self.textStorage(of: textView)?.length ?? 0
             textView.textSelection = selection.clamped(toLength: textLength)
         }
 
@@ -160,9 +147,57 @@ struct MarkdownTextView: NSViewRepresentable {
         if textView.showsLineNumbers != showsLineNumbers {
             textView.showsLineNumbers = showsLineNumbers
         }
+        // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
+        // every SwiftUI update (i.e. every keystroke) is wasted work — text and
+        // attribute edits already invalidate exactly what changed.
+    }
 
-        textView.needsLayout = true
+    /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
+    /// state, and scroll position survive because the characters never change. Stale
+    /// styling (the text moved on) is dropped — a newer revision is already scheduled.
+    private func applyStyledTextIfNeeded(to textView: STTextView, coordinator: Coordinator) {
+        guard let styledText,
+              styledText.revision != coordinator.lastAppliedHighlightRevision,
+              !coordinator.isUserEditing,
+              !textView.hasMarkedText(),
+              let textStorage = Self.textStorage(of: textView)
+        else {
+            return
+        }
+
+        coordinator.lastAppliedHighlightRevision = styledText.revision
+        let incoming = NSAttributedString(styledText.text)
+        guard textStorage.string == incoming.string else {
+            return
+        }
+
+        coordinator.isUpdating = true
+        textStorage.beginEditing()
+        incoming.enumerateAttributes(
+            in: NSRange(location: 0, length: incoming.length)
+        ) { attributes, range, _ in
+            textStorage.setAttributes(attributes, range: range)
+        }
+        textStorage.endEditing()
         textView.needsDisplay = true
+        coordinator.isUpdating = false
+    }
+
+    @MainActor
+    static func textStorage(of textView: STTextView) -> NSTextStorage? {
+        (textView.textContentManager as? NSTextContentStorage)?.textStorage
+    }
+
+    /// Cheap length check first; the full comparison only runs when lengths match.
+    @MainActor
+    static func plainTextMatches(_ textView: STTextView, _ candidate: String) -> Bool {
+        guard let textStorage = textStorage(of: textView) else {
+            return false
+        }
+        guard textStorage.length == candidate.utf16.count else {
+            return false
+        }
+        return textStorage.string == candidate
     }
 
     func makeCoordinator() -> Coordinator {
@@ -171,12 +206,13 @@ struct MarkdownTextView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: @preconcurrency STTextViewDelegate {
-        @Binding var text: AttributedString
+        @Binding var text: String
         @Binding var selection: NSRange?
         var isUpdating = false
         var isUserEditing = false
+        var lastAppliedHighlightRevision: Int?
 
-        init(text: Binding<AttributedString>, selection: Binding<NSRange?>) {
+        init(text: Binding<String>, selection: Binding<NSRange?>) {
             _text = text
             _selection = selection
         }
@@ -187,7 +223,13 @@ struct MarkdownTextView: NSViewRepresentable {
             }
 
             isUserEditing = true
-            text = AttributedString(textView.attributedText ?? NSAttributedString())
+            // `textStorage.string` is a lazily bridged ("foreign") String backed by
+            // CFStorage — every downstream comparison and count would crawl through
+            // ObjC. One eager transcode here makes all later operations native-fast
+            // (confirmed by Time Profiler: _StringGuts.foreign* + CFStorageGetConstValue).
+            var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+            newText.makeContiguousUTF8()
+            text = newText
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

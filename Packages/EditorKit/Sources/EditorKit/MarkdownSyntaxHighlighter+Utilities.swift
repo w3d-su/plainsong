@@ -56,12 +56,21 @@ extension MarkdownSyntaxHighlighter {
         attributed.attribute(.font, at: location, effectiveRange: nil) as? NSFont ?? baseFont
     }
 
+    // Font derivation goes through NSFontDescriptor, not NSFontManager:
+    // the highlighter runs on a background task and NSFontManager is not
+    // documented as thread-safe.
     func boldFont(_ font: NSFont) -> NSFont {
-        NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
+        fontByAddingTraits(.bold, to: font)
     }
 
     func italicFont(_ font: NSFont) -> NSFont {
-        NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
+        fontByAddingTraits(.italic, to: font)
+    }
+
+    private func fontByAddingTraits(_ traits: NSFontDescriptor.SymbolicTraits, to font: NSFont) -> NSFont {
+        let mergedTraits = font.fontDescriptor.symbolicTraits.union(traits)
+        let descriptor = font.fontDescriptor.withSymbolicTraits(mergedTraits)
+        return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 }
 

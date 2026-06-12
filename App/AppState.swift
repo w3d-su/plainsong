@@ -159,8 +159,6 @@ final class AppState: ObservableObject {
         try SecurityScopedAccess.withAccess(to: url) {
             try fileStore.save(text: text, to: url)
         }
-        statisticsTask?.cancel()
-        currentDocument.refreshStatistics()
         currentDocument.markSaved(text: text, url: url)
     }
 
@@ -177,11 +175,19 @@ final class AppState: ObservableObject {
         statisticsTask = Task { @MainActor [weak self] in
             do {
                 try await Task.sleep(nanoseconds: 300_000_000)
-                guard !Task.isCancelled else { return }
-                self?.currentDocument.refreshStatistics()
             } catch {
                 return
             }
+            guard let self, !Task.isCancelled else { return }
+
+            // Counting a large document is O(n); keep it off the main thread.
+            let text = currentDocument.text
+            let statistics = await Task.detached(priority: .utility) {
+                TextStatistics(text: text)
+            }.value
+
+            guard !Task.isCancelled else { return }
+            currentDocument.applyStatistics(statistics)
         }
     }
 
@@ -200,6 +206,10 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Synchronous by design: a background write can race an explicit ⌘S or a
+    /// terminate flush and land *older* content last. The write happens after 1 s of
+    /// idle, so it is off the typing hot path; a proper serialized background writer
+    /// can come with M3's file coordination if profiling ever shows this hitch.
     private func autosaveIfNeeded() {
         guard currentDocument.isDirty else { return }
 

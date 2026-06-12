@@ -4,8 +4,15 @@ import Foundation
 /// Main-actor document model for one editable Markdown or MDX file.
 @MainActor
 public final class DocumentSession: ObservableObject {
-    @Published public private(set) var text: String
-    @Published public private(set) var version: Int
+    /// Deliberately NOT `@Published`: `text` and `version` change on every keystroke,
+    /// and publishing them re-rendered the whole window per key press (visible in
+    /// Time Profiler as SwiftUI DynamicBody work inside `keyDown`). The editor is the
+    /// source of truth while typing; UI-relevant state below stays published and
+    /// changes rarely. M2's preview should consume text via its own debounced
+    /// subscription, not via objectWillChange.
+    public private(set) var text: String
+    public private(set) var version: Int
+
     @Published public private(set) var fileURL: URL?
     @Published public private(set) var fileKind: FileKind
     @Published public private(set) var isDirty: Bool
@@ -49,12 +56,22 @@ public final class DocumentSession: ObservableObject {
         if refreshStatistics {
             self.refreshStatistics()
         }
-        isDirty = savedText.map { $0 != newText } ?? true
+        // Dedupe the assignment: `isDirty` is @Published, and republishing the same
+        // value on every keystroke would re-render observers needlessly.
+        let newIsDirty = savedText.map { $0 != newText } ?? true
+        if isDirty != newIsDirty {
+            isDirty = newIsDirty
+        }
         version += 1
     }
 
     public func refreshStatistics() {
-        let newStatistics = TextStatistics(text: text)
+        applyStatistics(TextStatistics(text: text))
+    }
+
+    /// Applies statistics computed elsewhere (e.g. on a background task — counting a
+    /// large document is O(n) and must stay off the typing hot path).
+    public func applyStatistics(_ newStatistics: TextStatistics) {
         if statistics != newStatistics {
             statistics = newStatistics
         }

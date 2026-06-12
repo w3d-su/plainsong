@@ -4,43 +4,49 @@ import SwiftUI
 /// BlogEditor's source editor abstraction.
 ///
 /// STTextView stays behind this view so App and lower layers never depend on concrete
-/// editor library types.
+/// editor library types. The typing hot path moves plain `String` only; styling is
+/// debounced, computed off the main thread, and applied in place (agent.md §12).
 @MainActor
 public struct MarkdownEditorView: View {
     @Binding private var text: String
-    @State private var attributedText: AttributedString
-    @State private var lastPlainText: String
-    @State private var highlightRevision: Int
+    @State private var styledText: HighlightedText?
+    @State private var highlightRevision = 0
     @State private var selection: NSRange?
 
     private let fileKind: FileKind
     private let showsLineNumbers: Bool
-    private let highlighter: MarkdownSyntaxHighlighter
 
     public init(
         text: Binding<String>,
         fileKind: FileKind,
         showsLineNumbers: Bool = true
     ) {
-        let initialText = text.wrappedValue
         _text = text
-        _attributedText = State(initialValue: AttributedString(initialText))
-        _lastPlainText = State(initialValue: initialText)
-        _highlightRevision = State(initialValue: 0)
-        _selection = State(initialValue: nil)
         self.fileKind = fileKind
         self.showsLineNumbers = showsLineNumbers
-        highlighter = MarkdownSyntaxHighlighter()
     }
 
     public var body: some View {
         MarkdownTextView(
-            text: attributedTextBinding,
+            // Proxy binding: typing no longer publishes through the document model
+            // (DocumentSession.text is not @Published), so the editor schedules its
+            // own highlight on every user edit here. `onChange(of: text)` below still
+            // covers external replacements (file open), which do re-render this view.
+            text: Binding(
+                get: { text },
+                set: { newValue in
+                    text = newValue
+                    scheduleHighlight()
+                }
+            ),
+            styledText: styledText,
             selection: $selection,
-            showsLineNumbers: showsLineNumbers
+            // Large-document mode also drops the gutter: absolute line numbers are
+            // O(document) to compute, which shows up as typing latency on huge files.
+            showsLineNumbers: showsLineNumbers && Self.shouldComputeHighlight(forLength: text.utf8.count)
         )
-        .onChange(of: text) { _, newValue in
-            syncFromExternalText(newValue)
+        .onChange(of: text) { _, _ in
+            scheduleHighlight()
         }
         .onChange(of: fileKind) { _, _ in
             scheduleHighlight()
@@ -50,39 +56,10 @@ public struct MarkdownEditorView: View {
         }
     }
 
-    private var attributedTextBinding: Binding<AttributedString> {
-        Binding(
-            get: { attributedText },
-            set: { newValue in
-                syncFromEditorText(newValue)
-            }
-        )
-    }
-
-    private func syncFromEditorText(_ newValue: AttributedString) {
-        let plainText = String(newValue.characters)
-        guard plainText != lastPlainText else { return }
-
-        lastPlainText = plainText
-        text = plainText
-        attributedText = newValue
-        scheduleHighlight()
-    }
-
-    private func syncFromExternalText(_ newValue: String) {
-        guard newValue != lastPlainText else {
-            return
-        }
-
-        lastPlainText = newValue
-        attributedText = AttributedString(newValue)
-        scheduleHighlight()
-    }
-
     /// Every text or file-kind change bumps the revision; `.task(id:)` in `body`
-    /// restarts, sleeps 300 ms, and only the latest revision applies. Scheduling
-    /// during IME composition is safe because `MarkdownTextViewUpdatePolicy` blocks
-    /// the apply while marked text exists.
+    /// restarts, sleeps 300 ms, and only the latest revision computes. Scheduling
+    /// during IME composition is safe because `MarkdownTextView` blocks the apply
+    /// while marked text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
     }
@@ -98,19 +75,29 @@ public struct MarkdownEditorView: View {
             return
         }
 
-        guard Self.shouldComputeHighlight(forLength: lastPlainText.utf16.count) else {
+        guard Self.shouldComputeHighlight(forLength: text.utf8.count) else {
             return
         }
 
-        attributedText = highlighter.highlight(lastPlainText, fileKind: fileKind)
+        let source = text
+        let kind = fileKind
+        let highlighted = await Task.detached(priority: .userInitiated) {
+            MarkdownSyntaxHighlighter().highlight(source, fileKind: kind)
+        }.value
+
+        guard !Task.isCancelled, revision == highlightRevision else {
+            return
+        }
+
+        styledText = HighlightedText(revision: revision, text: highlighted)
     }
 }
 
 extension MarkdownEditorView {
-    /// Documents longer than this (UTF-16 units) skip computed styling: the M1 regex
-    /// bridge re-styles the whole document synchronously, so very large files stay
-    /// plain to protect typing latency (agent.md §12, M1 acceptance). M1.5's
-    /// incremental tree-sitter highlighting removes this limit.
+    /// Documents longer than this (UTF-8 bytes — O(1) to read on native strings,
+    /// unlike `utf16.count`) enter large-document mode: computed styling and the
+    /// line-number gutter are disabled so typing latency stays flat (agent.md §12,
+    /// M1 acceptance). M1.5's incremental tree-sitter highlighting removes this limit.
     nonisolated static var maxComputedHighlightLength: Int { 200_000 }
 
     nonisolated static func shouldComputeHighlight(forLength length: Int) -> Bool {

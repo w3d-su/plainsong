@@ -458,8 +458,8 @@ next begins.
 - Temporary regex-based source styling is allowed only as a bridge to parser-backed
   highlighting; it must be debounced and must not synchronously re-highlight every
   keystroke. Documents above `MarkdownEditorView.maxComputedHighlightLength`
-  (~200k UTF-16 units) skip bridge styling entirely and stay plain to protect typing
-  latency; M1.5 removes this limit.
+  (~200 KB UTF-8) enter large-document mode: bridge styling and the line-number
+  gutter are disabled to keep typing latency flat; M1.5 removes this limit.
 - ✅ Accept: open/save `Fixtures/kitchen-sink.md`; type at top of `large-1mb.md` with
   no visible lag from the fallback styling path; quit & relaunch restores last file.
 
@@ -580,6 +580,8 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | App Sandbox on from day 1 | Retrofitting sandbox is painful; keeps App Store option open. |
 | 2026-06-12 | macOS 14+ | TextKit 2 mature, modern SwiftUI APIs; Typora-class audience updates quickly. |
 | 2026-06-12 | M0 ships with zero external Swift dependencies | First build must be deterministic; STTextView/Neon/grammars land in M1 with pinned versions. Packages use swift-tools 5.10 + StrictConcurrency experimental flag. |
+| 2026-06-12 | Editor typing hot path moves plain `String` only | Per-keystroke String⇄NSAttributedString⇄AttributedString bridging of the whole document caused visible lag on 1 MB files. The editor binding carries `String`; highlight output flows separately as a revisioned `HighlightedText` (Equatable by revision), is computed on a detached task, and is applied via in-place `setAttributes`. Statistics are likewise computed off-main. This shape is also what M1.5's Neon integration needs. |
+| 2026-06-12 | Keystrokes must not publish through the document model | Time Profiler showed per-key SwiftUI re-renders of the whole window (DynamicBody under `keyDown`) plus foreign-string traffic (`_StringGuts.foreign*`, CFStorage). `DocumentSession.text`/`version` are non-`@Published`; `isDirty` assignments are deduped; the coordinator eagerly `makeContiguousUTF8()`s the bridged string so downstream compares/counts run native. M2's preview must subscribe to text via its own debounced channel, not `objectWillChange`. |
 
 ---
 

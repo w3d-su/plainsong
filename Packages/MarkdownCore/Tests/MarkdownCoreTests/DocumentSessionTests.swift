@@ -105,6 +105,15 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(session.version, 2)
     }
 
+    func testApplyStatisticsReplacesStatistics() {
+        let session = DocumentSession(text: "One two")
+
+        session.applyStatistics(TextStatistics(text: "One two three"))
+
+        XCTAssertEqual(session.statistics.wordCount, 3)
+        XCTAssertEqual(session.statistics, TextStatistics(text: "One two three"))
+    }
+
     func testResetReplacesStateAndAdvancesVersionOnlyWhenRenderableStateChanges() {
         let session = DocumentSession(
             text: "Old",

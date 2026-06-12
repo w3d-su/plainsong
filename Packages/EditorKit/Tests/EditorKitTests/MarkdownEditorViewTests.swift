@@ -19,6 +19,15 @@ final class MarkdownEditorViewTests: XCTestCase {
         )
     }
 
+    func testHighlightedTextEqualityIsByRevisionOnly() {
+        let first = HighlightedText(revision: 1, text: AttributedString("a"))
+        let sameRevision = HighlightedText(revision: 1, text: AttributedString("b"))
+        let nextRevision = HighlightedText(revision: 2, text: AttributedString("a"))
+
+        XCTAssertEqual(first, sameRevision, "SwiftUI prop diffing must stay O(1) by revision")
+        XCTAssertNotEqual(first, nextRevision)
+    }
+
     func testTextViewUpdateSkipsIncomingTextWhileMarkedTextExists() {
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: false,
