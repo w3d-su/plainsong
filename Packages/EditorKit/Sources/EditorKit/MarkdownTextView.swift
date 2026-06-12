@@ -115,7 +115,7 @@ struct MarkdownTextView: NSViewRepresentable {
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
             hasMarkedText: textView.hasMarkedText(),
-            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, self.text)
+            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, text)
         )
 
         if policy.shouldApplyIncomingText {

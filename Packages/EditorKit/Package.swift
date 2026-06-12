@@ -10,7 +10,8 @@ let package = Package(
     dependencies: [
         .package(path: "../MarkdownCore"),
         .package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.3.10"),
-        // M1.5 adds: Neon, SwiftTreeSitter + grammars (agent.md §2).
+        .package(url: "https://github.com/tree-sitter/swift-tree-sitter.git", exact: "0.10.0"),
+        .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git", exact: "0.5.3"),
     ],
     targets: [
         .target(
@@ -18,8 +19,21 @@ let package = Package(
             dependencies: [
                 .product(name: "MarkdownCore", package: "MarkdownCore"),
                 .product(name: "STTextView", package: "STTextView"),
+                .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
+                .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown"),
+                "TreeSitterYAMLFixed",
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+        ),
+        .target(
+            name: "TreeSitterYAMLFixed",
+            path: "Sources/TreeSitterYAMLFixed",
+            sources: [
+                "src/parser.c",
+                "src/scanner.c",
+            ],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
         ),
         .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),
     ]

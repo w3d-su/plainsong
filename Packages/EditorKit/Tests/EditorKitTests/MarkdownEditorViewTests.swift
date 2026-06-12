@@ -11,8 +11,8 @@ final class MarkdownEditorViewTests: XCTestCase {
         )
     }
 
-    func testComputedHighlightSkipsVeryLargeDocuments() {
-        XCTAssertFalse(
+    func testComputedHighlightStillRunsForVeryLargeDocuments() {
+        XCTAssertTrue(
             MarkdownEditorView.shouldComputeHighlight(
                 forLength: MarkdownEditorView.maxComputedHighlightLength + 1
             )

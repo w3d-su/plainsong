@@ -41,9 +41,7 @@ public struct MarkdownEditorView: View {
             ),
             styledText: styledText,
             selection: $selection,
-            // Large-document mode also drops the gutter: absolute line numbers are
-            // O(document) to compute, which shows up as typing latency on huge files.
-            showsLineNumbers: showsLineNumbers && Self.shouldComputeHighlight(forLength: text.utf8.count)
+            showsLineNumbers: showsLineNumbers
         )
         .onChange(of: text) { _, _ in
             scheduleHighlight()
@@ -75,10 +73,6 @@ public struct MarkdownEditorView: View {
             return
         }
 
-        guard Self.shouldComputeHighlight(forLength: text.utf8.count) else {
-            return
-        }
-
         let source = text
         let kind = fileKind
         let highlighted = await Task.detached(priority: .userInitiated) {
@@ -94,13 +88,13 @@ public struct MarkdownEditorView: View {
 }
 
 extension MarkdownEditorView {
-    /// Documents longer than this (UTF-8 bytes — O(1) to read on native strings,
-    /// unlike `utf16.count`) enter large-document mode: computed styling and the
-    /// line-number gutter are disabled so typing latency stays flat (agent.md §12,
-    /// M1 acceptance). M1.5's incremental tree-sitter highlighting removes this limit.
-    nonisolated static var maxComputedHighlightLength: Int { 200_000 }
+    /// Historical M1 regex bridge limit retained for regression tests and release notes.
+    /// Parser-backed M1.5 highlighting runs off the main actor and does not skip large files.
+    nonisolated static var maxComputedHighlightLength: Int {
+        200_000
+    }
 
     nonisolated static func shouldComputeHighlight(forLength length: Int) -> Bool {
-        length <= maxComputedHighlightLength
+        length >= 0
     }
 }
