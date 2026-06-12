@@ -1,0 +1,97 @@
+# BlogEditor Xcode project manifest (XcodeGen).
+# The .xcodeproj is GENERATED — edit this file, then run `make generate` (agent.md §15).
+name: BlogEditor
+options:
+  bundleIdPrefix: com.blogeditor
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+
+fileGroups:
+  - agent.md
+
+packages:
+  MarkdownCore:
+    path: Packages/MarkdownCore
+  EditorKit:
+    path: Packages/EditorKit
+  PreviewKit:
+    path: Packages/PreviewKit
+  WorkspaceKit:
+    path: Packages/WorkspaceKit
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+
+targets:
+  BlogEditor:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+    dependencies:
+      - package: MarkdownCore
+      - package: EditorKit
+      - package: PreviewKit
+      - package: WorkspaceKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.blogeditor.app
+        PRODUCT_NAME: BlogEditor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: "© 2026 davis"
+        NSHighResolutionCapable: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Default
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+          - CFBundleTypeName: MDX Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.blogeditor.mdx
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - md
+                - markdown
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.blogeditor.mdx
+            UTTypeDescription: MDX Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mdx
+    entitlements:
+      path: App/BlogEditor.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+    scheme:
+      testTargets: []

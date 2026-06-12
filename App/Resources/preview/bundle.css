@@ -1,0 +1,10 @@
+/* Base preview styles. Real themes (github-light/dark) land in M2/M5 (agent.md §11). */
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  padding: 24px 32px;
+}

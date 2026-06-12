@@ -1,0 +1,18 @@
+included:
+  - App
+  - Packages
+
+excluded:
+  - "**/.build"
+  - App/Resources
+
+disabled_rules:
+  - todo
+  - trailing_comma # conflicts with SwiftFormat, which inserts trailing commas
+
+line_length:
+  warning: 120
+  error: 200
+
+identifier_name:
+  min_length: 2

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install xcodegen swiftformat swiftlint
+
+      - name: Lint
+        run: |
+          swiftformat --lint App Packages
+          swiftlint
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build app
+        run: >
+          xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor
+          -configuration Debug build CODE_SIGNING_ALLOWED=NO
+
+      - name: Swift package tests
+        run: |
+          set -e
+          for pkg in MarkdownCore EditorKit PreviewKit WorkspaceKit; do
+            echo "==> swift test: $pkg"
+            (cd Packages/$pkg && swift test)
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Preview pipeline tests
+        run: |
+          cd preview-src
+          npm ci
+          npm test

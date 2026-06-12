@@ -1,0 +1,15 @@
+{
+  "name": "blogeditor-preview",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
