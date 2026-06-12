@@ -9,12 +9,16 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../MarkdownCore"),
-        // M1 adds: STTextView, Neon, SwiftTreeSitter + grammars (agent.md §2).
+        .package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.3.10"),
+        // M1.5 adds: Neon, SwiftTreeSitter + grammars (agent.md §2).
     ],
     targets: [
         .target(
             name: "EditorKit",
-            dependencies: [.product(name: "MarkdownCore", package: "MarkdownCore")],
+            dependencies: [
+                .product(name: "MarkdownCore", package: "MarkdownCore"),
+                .product(name: "STTextView", package: "STTextView"),
+            ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(name: "EditorKitTests", dependencies: ["EditorKit"]),

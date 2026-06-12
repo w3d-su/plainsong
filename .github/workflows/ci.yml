@@ -14,33 +14,20 @@ jobs:
       - name: Install tools
         run: brew install xcodegen swiftformat swiftlint
 
-      - name: Lint
-        run: |
-          swiftformat --lint App Packages
-          swiftlint
-
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Build app
-        run: >
-          xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor
-          -configuration Debug build CODE_SIGNING_ALLOWED=NO
-
-      - name: Swift package tests
-        run: |
-          set -e
-          for pkg in MarkdownCore EditorKit PreviewKit WorkspaceKit; do
-            echo "==> swift test: $pkg"
-            (cd Packages/$pkg && swift test)
-          done
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Preview pipeline tests
+      - name: Install preview dependencies
         run: |
           cd preview-src
           npm ci
-          npm test
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Build app
+        run: make build

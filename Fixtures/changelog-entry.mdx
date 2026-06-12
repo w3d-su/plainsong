@@ -1,0 +1,38 @@
+---
+title: "Changelog Entry"
+version: "0.1.0"
+published: false
+---
+
+import { Aside } from "../components/Aside"
+
+# Changelog
+
+## 0.1.0
+
+Initial editor core work for opening, editing, and saving local markdown files.
+
+<Aside kind="warning">
+  This is fixture content. Components referenced here do not need to exist for editor tests.
+</Aside>
+
+### Added
+
+- Single-file markdown and MDX editing.
+- Autosave and explicit save actions.
+- Dirty indicator and basic document statistics.
+- Restore-last-file support.
+
+### Known Gaps
+
+- Parser-backed markdown highlighting is not complete yet.
+- Large-file latency still needs direct manual verification.
+
+```json
+{
+  "milestone": "M1",
+  "state": "partial",
+  "requiresParserHighlighting": true
+}
+```
+

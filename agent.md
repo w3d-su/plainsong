@@ -455,9 +455,19 @@ next begins.
 ### M1 — Editor core
 - STTextView wrapped, open/save single `.md` (sandbox + UTIs), autosave, dirty indicator,
   undo/redo, line numbers, word/char count in status bar.
+- Temporary regex-based source styling is allowed only as a bridge to parser-backed
+  highlighting; it must be debounced and must not synchronously re-highlight every
+  keystroke. Documents above `MarkdownEditorView.maxComputedHighlightLength`
+  (~200k UTF-16 units) skip bridge styling entirely and stay plain to protect typing
+  latency; M1.5 removes this limit.
+- ✅ Accept: open/save `Fixtures/kitchen-sink.md`; type at top of `large-1mb.md` with
+  no visible lag from the fallback styling path; quit & relaunch restores last file.
+
+### M1.5 — Parser-backed highlighting
 - Neon + tree-sitter markdown highlighting incl. frontmatter-yaml and fence injections.
-- ✅ Accept: open `Fixtures/kitchen-sink.md`, all constructs highlighted; type at top of
-  large-1mb.md with no visible lag; quit & relaunch restores last file.
+- ✅ Accept: open `Fixtures/kitchen-sink.md`, all constructs highlighted from the parser
+  tree; type at top of `large-1mb.md` with no visible lag; fallback regex highlighter is
+  removed or left only as an explicitly disabled emergency path.
 
 ### M2 — Live preview
 - WKWebView + bundled pipeline (md only), bridge protocol, debounced incremental render,
@@ -561,8 +571,9 @@ make format           # swiftformat . && swiftlint --fix
 | Date | Decision | Rationale / Alternatives |
 |---|---|---|
 | 2026-06-12 | Two-pane first, WYSIWYG as Phase 2 | Ship value early; WYSIWYG on TextKit 2 is the highest-risk component. Alt: WYSIWYG-first (rejected: months before usable). |
-| 2026-06-12 | STTextView over raw NSTextView | Line numbers, completion window, plugin points, active maintenance; wrapped behind EditorKit abstraction to keep swap cost low. |
+| 2026-06-12 | STTextView over raw NSTextView | Line numbers, completion window, plugin points, active maintenance; M1 pins STTextView 2.3.10 exactly for deterministic builds. Wrapped behind EditorKit abstraction to keep swap cost low; alt raw NSTextView remains fallback if dependency risk grows. |
 | 2026-06-12 | Neon + SwiftTreeSitter for highlighting | Incremental + async, proven in Chime/CodeEdit ecosystem. Alt: regex highlighting (rejected: wrong for nested fences), Highlightr (rejected: full-document re-highlight, no structure). |
+| 2026-06-12 | Regex styling is a temporary M1 bridge, not final highlighting | Used to unblock editor-core integration while Neon/tree-sitter dependency shape is resolved. It must stay behind `MarkdownEditorView`/`MarkdownSyntaxHighlighter`, use cached regexes, and debounce full-document work. M1.5 owns replacing it with Neon + SwiftTreeSitter before preview/workspace milestones proceed. |
 | 2026-06-12 | WKWebView + unified/remark preview | Only realistic MDX path; KaTeX/mermaid free. Alt: full native rendering (rejected: MDX/math/diagrams cost). Editor stays native — app is not a web app. |
 | 2026-06-12 | MDX components render as placeholder cards in Phase 1 | Real execution needs user project bundling + sandbox design. |
 | 2026-06-12 | XcodeGen + committed preview dist | pbxproj and node_modules are hostile to LLM diff-based collaboration. |
@@ -583,4 +594,3 @@ make format           # swiftformat . && swiftlint --fix
 - Yams (YAML): https://github.com/jpsim/Yams
 - XcodeGen: https://github.com/yonaskolb/XcodeGen
 - Typora (behavior reference): https://typora.io
-

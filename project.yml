@@ -9,6 +9,7 @@ options:
 
 fileGroups:
   - agent.md
+  - Fixtures
 
 packages:
   MarkdownCore:
@@ -94,4 +95,17 @@ targets:
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.files.bookmarks.app-scope: true
     scheme:
-      testTargets: []
+      testTargets:
+        - BlogEditorTests
+
+  BlogEditorTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: BlogEditor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.blogeditor.app.tests
+        GENERATE_INFOPLIST_FILE: YES

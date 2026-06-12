@@ -15,22 +15,23 @@ generate:
 build: generate
 	xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor -configuration Debug build
 
-test:
+test: generate
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+	xcodebuild -project BlogEditor.xcodeproj -scheme BlogEditor -configuration Debug test
 	cd preview-src && npm test
 
 preview-bundle:
 	cd preview-src && npm run build
 
 format:
-	swiftformat App Packages
+	swiftformat App AppTests Packages
 	swiftlint --fix --quiet
 
 lint:
-	swiftformat --lint App Packages
+	swiftformat App AppTests Packages --lint
 	swiftlint
 
 clean:

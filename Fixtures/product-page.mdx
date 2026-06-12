@@ -1,0 +1,37 @@
+---
+title: "Product Page Draft"
+slug: "/editor/product-page"
+description: "MDX fixture with imports, JSX, and markdown sections."
+---
+
+import { Callout } from "../components/Callout"
+import { FeatureGrid } from "../components/FeatureGrid"
+
+# BlogEditor
+
+BlogEditor is a focused desktop editor for long-form markdown and MDX writing.
+
+<Callout tone="info" title="Draft">
+  This fixture is meant for parser, highlighter, and editor behavior testing.
+</Callout>
+
+## Highlights
+
+<FeatureGrid
+  items={[
+    { title: "Fast editing", body: "Native TextKit editing with predictable keyboard behavior." },
+    { title: "Local files", body: "Open and save markdown files directly from disk." },
+    { title: "MDX ready", body: "Keep JSX regions readable while writing content." }
+  ]}
+/>
+
+## Example
+
+```tsx
+export function Badge({ label }: { label: string }) {
+  return <span className="badge">{label}</span>
+}
+```
+
+The editor should keep prose, frontmatter, fenced code, and JSX blocks visually distinct.
+
