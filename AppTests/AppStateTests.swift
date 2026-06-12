@@ -1,5 +1,5 @@
-@testable import Plainsong
 import MarkdownCore
+@testable import Plainsong
 import XCTest
 
 @MainActor
