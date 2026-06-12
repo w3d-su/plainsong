@@ -24,7 +24,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install tools
-        run: brew install xcodegen swiftformat swiftlint
+        run: |
+          brew install xcodegen swiftformat swiftlint
+          echo "xcodegen: $(xcodegen --version)"
+          echo "swiftformat: $(swiftformat --version)"
+          echo "swiftlint: $(swiftlint --version)"
 
       - uses: actions/setup-node@v4
         with:

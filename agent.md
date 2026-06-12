@@ -570,6 +570,12 @@ make format           # swiftformat . && swiftlint --fix
 12. **When uncertain about UX,** match Typora's behavior first, macOS HIG second, then ask.
 13. **Update documentation:** behavior changes → update relevant § here; architectural
     choices → Decision Log entry (date, decision, why, alternatives).
+14. **Branch + PR workflow (adopted after M2):** `main` is protected. Do all work on a
+    branch named `m<N>-<slug>` (e.g. `m3-workspace`) and open a PR against `main`.
+    State the branch name when you start. Never push to `main` directly, never create
+    branches with other naming schemes, never force-push, and never merge your own PR —
+    the maintainer merges (squash) after review and green CI. One milestone (or one
+    review-fix batch) per PR.
 
 ---
 
