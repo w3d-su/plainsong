@@ -18,6 +18,7 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
+import { workspaceRelativeAssetPath } from "./asset-path";
 import { renderMarkdown } from "./pipeline";
 
 export { PROTOCOL_VERSION } from "./bridge";
@@ -128,7 +129,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.innerHTML = html;
 
   morphdom(previewRoot, nextRoot, { childrenOnly: true });
-  rewriteImageSources();
+  rewriteImageSources(payload.baseDir);
   highlightCodeBlocks();
   await renderMermaidBlocks();
   if (payload.version < latestRenderVersion) return;
@@ -232,12 +233,13 @@ function sourceLineForElement(element: Element): number | undefined {
   return Number.isFinite(line) ? line : undefined;
 }
 
-function rewriteImageSources(): void {
+function rewriteImageSources(baseDir: string | null): void {
   for (const image of previewRoot.querySelectorAll<HTMLImageElement>("img[src]")) {
     const source = image.getAttribute("src");
     if (!source || !isWorkspaceRelativeURL(source)) continue;
 
-    image.src = `asset://${encodeURI(source).replaceAll("#", "%23")}`;
+    const assetPath = workspaceRelativeAssetPath(source, baseDir);
+    image.src = `asset://${encodeURI(assetPath).replaceAll("#", "%23")}`;
   }
 }
 

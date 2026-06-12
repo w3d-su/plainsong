@@ -12,7 +12,14 @@ protocol LastOpenedFilePersisting: AnyObject {
 
 extension LastOpenedFileStore: LastOpenedFilePersisting {}
 
-/// Top-level app state for the current single-file editing session.
+protocol RecentItemPersisting: AnyObject {
+    func save(_ url: URL) throws
+    func restore() throws -> [URL]
+}
+
+extension RecentItemStore: RecentItemPersisting {}
+
+/// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
     struct UserVisibleError: Identifiable {
@@ -21,33 +28,60 @@ final class AppState: ObservableObject {
         let message: String
     }
 
-    @Published private(set) var currentDocument: DocumentSession
-    @Published private(set) var isSaving = false
-    @Published private(set) var isPreviewVisible: Bool
-    @Published var presentedError: UserVisibleError?
+    struct ExternalChangePrompt: Identifiable, Equatable {
+        let id = UUID()
+        let fileURL: URL
+    }
 
-    private let fileStore: MarkdownFileStore
-    private let lastOpenedFileStore: any LastOpenedFilePersisting
-    private let userDefaults: UserDefaults
-    private var autosaveTask: Task<Void, Never>?
-    private var statisticsTask: Task<Void, Never>?
-    private var documentChangeCancellable: AnyCancellable?
-    private let shouldRestoreLastOpenedFile: Bool
-    private var didAttemptRestore = false
+    @Published var currentDocument: DocumentSession
+    @Published var isSaving = false
+    @Published private(set) var isPreviewVisible: Bool
+    @Published var workspaceRootURL: URL?
+    @Published var workspaceTree: WorkspaceFileTree?
+    @Published var showAllFiles = false
+    @Published var recentItemURLs: [URL] = []
+    @Published var presentedError: UserVisibleError?
+    @Published var externalChangePrompt: ExternalChangePrompt?
+
+    let fileStore: MarkdownFileStore
+    let lastOpenedFileStore: any LastOpenedFilePersisting
+    let recentItemStore: any RecentItemPersisting
+    let directoryScanner: WorkspaceDirectoryScanner
+    let fileOperations: WorkspaceFileOperations
+    let userDefaults: UserDefaults
+    var autosaveTask: Task<Void, Never>?
+    var statisticsTask: Task<Void, Never>?
+    var workspaceReloadTask: Task<Void, Never>?
+    var documentChangeCancellable: AnyCancellable?
+    let shouldRestoreLastOpenedFile: Bool
+    var didAttemptRestore = false
+    var workspaceAccess: SecurityScopedResourceAccess?
+    var workspaceWatcher: WorkspaceEventWatcher?
+    var sessionCache: [URL: DocumentSession] = [:]
+    var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
+    var lastKnownDiskHashes: [URL: UInt64] = [:]
+    var pendingExternalTexts: [URL: String] = [:]
 
     init(
         currentDocument: DocumentSession = DocumentSession(),
         fileStore: MarkdownFileStore = MarkdownFileStore(),
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
+        recentItemStore: any RecentItemPersisting = RecentItemStore(),
+        directoryScanner: WorkspaceDirectoryScanner = WorkspaceDirectoryScanner(),
+        fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard
     ) {
         self.currentDocument = currentDocument
         self.fileStore = fileStore
         self.lastOpenedFileStore = lastOpenedFileStore
+        self.recentItemStore = recentItemStore
+        self.directoryScanner = directoryScanner
+        self.fileOperations = fileOperations
         self.userDefaults = userDefaults
         isPreviewVisible = userDefaults.bool(forKey: Self.previewVisibleDefaultsKey)
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
+        recentItemURLs = (try? recentItemStore.restore()) ?? []
         observeCurrentDocument()
     }
 
@@ -60,7 +94,11 @@ final class AppState: ObservableObject {
     }
 
     var windowTitle: String {
-        currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
+        workspaceRootURL?.lastPathComponent ?? currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
+    }
+
+    var previewAssetRootURL: URL? {
+        workspaceRootURL
     }
 
     func restoreLastOpenedFileIfNeeded() {
@@ -69,7 +107,7 @@ final class AppState: ObservableObject {
 
         do {
             guard let url = try lastOpenedFileStore.restore() else { return }
-            try open(url: url, rememberAsLastOpened: false)
+            try open(url: url, rememberAsLastOpened: false, preserveWorkspace: false)
         } catch {
             present(error, title: "Could Not Reopen Last File")
         }
@@ -78,10 +116,10 @@ final class AppState: ObservableObject {
     func openFile() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowedContentTypes = Self.supportedContentTypes
-        panel.message = "Choose a Markdown or MDX file."
+        panel.message = "Choose a Markdown or MDX file, or a folder workspace."
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
@@ -94,7 +132,7 @@ final class AppState: ObservableObject {
                 try saveCurrentDocument()
             }
 
-            try open(url: url, rememberAsLastOpened: true)
+            try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
         } catch {
             present(error, title: "Could Not Open File")
         }
@@ -126,6 +164,9 @@ final class AppState: ObservableObject {
         guard newText != currentDocument.text else { return }
 
         currentDocument.replaceText(newText, refreshStatistics: false)
+        if let url = currentDocument.fileURL?.standardizedFileURL {
+            sessionPolicy.updateDirtyState(for: url, isDirty: currentDocument.isDirty)
+        }
         scheduleStatisticsRefresh()
         scheduleAutosave()
     }
@@ -171,51 +212,11 @@ final class AppState: ObservableObject {
         let url = URL(fileURLWithPath: path, relativeTo: baseURL).standardizedFileURL
         guard FileKind(url: url) != nil else { return }
 
-        openExternalFile(url)
-    }
-
-    private func open(url: URL, rememberAsLastOpened: Bool) throws {
-        guard FileKind(url: url) != nil else {
-            throw AppStateError.unsupportedFile(url)
-        }
-
-        autosaveTask?.cancel()
-        statisticsTask?.cancel()
-        let file = try SecurityScopedAccess.withAccess(to: url) {
-            try fileStore.load(url: url)
-        }
-
-        currentDocument.reset(
-            text: file.text,
-            url: file.url,
-            fileKind: file.fileKind,
-            isDirty: false
-        )
-
-        if rememberAsLastOpened {
-            rememberLastOpenedFile(url)
-        }
-    }
-
-    private func saveCurrentDocument() throws {
-        guard let url = currentDocument.fileURL else { return }
-
-        autosaveTask?.cancel()
-        isSaving = true
-        defer { isSaving = false }
-
-        let text = currentDocument.text
-        try SecurityScopedAccess.withAccess(to: url) {
-            try fileStore.save(text: text, to: url)
-        }
-        currentDocument.markSaved(text: text, url: url)
-    }
-
-    private func rememberLastOpenedFile(_ url: URL) {
-        do {
-            try lastOpenedFileStore.save(url)
-        } catch {
-            present(error, title: "Could Not Remember Last File")
+        let isWorkspaceLink = workspaceRootURL.map { Self.isDescendant(url, of: $0) } ?? false
+        if isWorkspaceLink {
+            openWorkspaceFile(url)
+        } else {
+            openExternalFile(url)
         }
     }
 
@@ -269,11 +270,12 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func present(_ error: Error, title: String) {
+    func present(_ error: Error, title: String) {
         presentedError = UserVisibleError(title: title, message: error.localizedDescription)
     }
 
-    private func observeCurrentDocument() {
+    func observeCurrentDocument() {
+        documentChangeCancellable?.cancel()
         documentChangeCancellable = currentDocument.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }
@@ -302,7 +304,7 @@ final class AppState: ObservableObject {
     }
 }
 
-private enum AppStateError: LocalizedError {
+enum AppStateError: LocalizedError {
     case unsupportedFile(URL)
 
     var errorDescription: String? {

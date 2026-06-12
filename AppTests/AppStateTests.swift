@@ -1,5 +1,5 @@
-@testable import Plainsong
 import MarkdownCore
+@testable import Plainsong
 import XCTest
 
 @MainActor
@@ -104,12 +104,88 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(second.isPreviewVisible)
     }
 
+    func testOpeningFolderBuildsWorkspaceTreeAndSelectsFirstMarkdownFile() async throws {
+        let root = try makeTemporaryDirectory()
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("content"),
+            withIntermediateDirectories: true
+        )
+        let post = root.appendingPathComponent("content/post.md")
+        try "# Workspace".write(to: post, atomically: true, encoding: .utf8)
+        try "notes".write(to: root.appendingPathComponent("notes.txt"), atomically: true, encoding: .utf8)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+
+        try await waitUntil("workspace tree loaded") {
+            appState.workspaceRootURL == root.standardizedFileURL &&
+                appState.workspaceTree?.selectedNode?.relativePath == "content/post.md" &&
+                appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
+    }
+
+    func testCleanOpenFileReloadsExternalChangesSilently() async throws {
+        let root = try makeTemporaryDirectory()
+        let post = root.appendingPathComponent("post.md")
+        try "Original".write(to: post, atomically: true, encoding: .utf8)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
+
+        try "Changed elsewhere".write(to: post, atomically: true, encoding: .utf8)
+        appState.refreshWorkspaceAfterFileSystemChange()
+
+        try await waitUntil("clean file reloaded") {
+            appState.currentDocument.text == "Changed elsewhere" &&
+                appState.externalChangePrompt == nil
+        }
+    }
+
+    func testDirtyOpenFileShowsExternalChangePrompt() async throws {
+        let root = try makeTemporaryDirectory()
+        let post = root.appendingPathComponent("post.md")
+        try "Original".write(to: post, atomically: true, encoding: .utf8)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
+
+        appState.replaceDocumentText("My edits")
+        try "Changed elsewhere".write(to: post, atomically: true, encoding: .utf8)
+        appState.refreshWorkspaceAfterFileSystemChange()
+
+        try await waitUntil("dirty conflict prompted") {
+            appState.currentDocument.text == "My edits" &&
+                appState.externalChangePrompt?.fileURL.standardizedFileURL == post.standardizedFileURL
+        }
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("PlainsongAppStateTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeoutNanoseconds: UInt64 = 3_000_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let start = DispatchTime.now().uptimeNanoseconds
+        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
+            if condition() {
+                return
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
     }
 }
 

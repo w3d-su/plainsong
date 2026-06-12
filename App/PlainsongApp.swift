@@ -21,10 +21,22 @@ struct PlainsongApp: App {
         .defaultSize(width: 1100, height: 720)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Open File...") {
+                Button("Open...") {
                     appState.openFile()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+
+                Menu("Open Recent") {
+                    if appState.recentItemURLs.isEmpty {
+                        Text("No Recent Items")
+                    } else {
+                        ForEach(appState.recentItemURLs, id: \.self) { url in
+                            Button(url.lastPathComponent) {
+                                appState.openExternalFile(url)
+                            }
+                        }
+                    }
+                }
             }
 
             CommandGroup(replacing: .saveItem) {
