@@ -473,8 +473,12 @@ next begins.
 - WKWebView + bundled pipeline (md only), bridge protocol, debounced incremental render,
   asset:// images, link handling, checkbox writeback, scroll sync both directions,
   KaTeX + mermaid + highlight.js working offline.
-- ✅ Accept: kitchen-sink renders correctly offline; scroll sync drift < 1 viewport on a
-  10k-line doc; toggling a checkbox in preview edits the source line.
+- Preview pane toggle: ⌘⇧P (and a toolbar button) switches between source-only and a
+  side-by-side fully rendered pane ("Warp-style" final-render view, owner-requested).
+  The chosen layout persists across relaunch.
+- ✅ Accept: kitchen-sink renders correctly offline; ⌘⇧P shows/hides the rendered pane
+  with the layout restored on relaunch; scroll sync drift < 1 viewport on a 10k-line
+  doc; toggling a checkbox in preview edits the source line.
 
 ### M3 — Workspace
 - Folder open, sidebar file tree (create/rename/delete/move, drag), FSEvents reconcile,
