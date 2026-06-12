@@ -21,6 +21,13 @@ struct PlainsongApp: App {
         .defaultSize(width: 1100, height: 720)
         .commands {
             CommandGroup(replacing: .newItem) {
+                Button("New File") {
+                    appState.newFile()
+                }
+                .keyboardShortcut("n", modifiers: .command)
+
+                Divider()
+
                 Button("Open...") {
                     appState.openFile()
                 }

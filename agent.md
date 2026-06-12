@@ -243,6 +243,7 @@ replacement local to EditorKit.
 | Toggle sidebar | ⌘⇧S (or native ⌃⌘S) | |
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
+| New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
 are discoverable and scriptable.
