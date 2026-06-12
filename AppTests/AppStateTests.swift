@@ -46,7 +46,7 @@ final class AppStateTests: XCTestCase {
             )
         )
 
-        appState.setTaskCheckbox(line: 3, checked: false)
+        appState.setTaskCheckbox(line: 3, checked: false, version: appState.currentDocument.version)
 
         XCTAssertEqual(
             appState.currentDocument.text,
@@ -54,6 +54,38 @@ final class AppStateTests: XCTestCase {
             - [ ] first
             plain text
             - [ ] third
+            """
+        )
+    }
+
+    func testPreviewCheckboxWritebackIgnoresStaleRenderVersion() {
+        let appState = AppState(
+            currentDocument: DocumentSession(
+                text: """
+                - [ ] first
+                - [ ] second
+                """,
+                fileKind: .markdown
+            )
+        )
+
+        let staleVersion = appState.currentDocument.version
+        appState.replaceDocumentText(
+            """
+            inserted
+            - [ ] first
+            - [ ] second
+            """
+        )
+
+        appState.setTaskCheckbox(line: 1, checked: true, version: staleVersion)
+
+        XCTAssertEqual(
+            appState.currentDocument.text,
+            """
+            inserted
+            - [ ] first
+            - [ ] second
             """
         )
     }

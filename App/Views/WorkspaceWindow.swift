@@ -170,8 +170,8 @@ private struct EditorWorkspace: View {
         previewController.onPreviewScrolled = { line in
             scrollCoordinator.previewScrolled(to: line)
         }
-        previewController.onCheckboxToggled = { line, checked in
-            appState.setTaskCheckbox(line: line, checked: checked)
+        previewController.onCheckboxToggled = { line, checked, version in
+            appState.setTaskCheckbox(line: line, checked: checked, version: version)
         }
         previewController.onLinkClicked = { href in
             appState.openPreviewLink(href)
@@ -245,14 +245,15 @@ private struct DocumentEditor: View {
                 }
             ),
             fileKind: session.fileKind,
-            showsLineNumbers: true
+            showsLineNumbers: true,
+            scrollProxy: scrollCoordinator.editorProxy
         )
-        .background(
-            EditorScrollBridge(proxy: scrollCoordinator.editorProxy) { line in
-                guard isPreviewVisible else { return }
-                scrollCoordinator.editorScrolled(to: line)
-            }
-        )
+        .onAppear {
+            scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)
+        }
+        .onChange(of: isPreviewVisible) { _, isVisible in
+            scrollCoordinator.setEditorScrollForwardingEnabled(isVisible)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

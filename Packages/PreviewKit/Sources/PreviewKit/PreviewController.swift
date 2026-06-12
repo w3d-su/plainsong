@@ -11,21 +11,27 @@ public final class PreviewController: NSObject, ObservableObject {
     public let webView: WKWebView
     public var onPreviewScrolled: ((Int) -> Void)?
     public var onLinkClicked: ((String) -> Void)?
-    public var onCheckboxToggled: ((Int, Bool) -> Void)?
+    public var onCheckboxToggled: ((Int, Bool, Int) -> Void)?
 
     private let assetSchemeHandler: AssetURLSchemeHandler
     private let scriptMessageProxy: ScriptMessageProxy
+    private let previewIndexURL: URL?
     private let jsonEncoder = JSONEncoder()
     private var queuedRender: RenderPayload?
     private var latestRequestedVersion = -1
     private var latestCompletedVersion = -1
     private var theme = "system"
 
-    override public init() {
+    override public convenience init() {
+        self.init(previewIndexURL: Self.defaultPreviewIndexURL())
+    }
+
+    init(previewIndexURL: URL?) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
         let assetSchemeHandler = AssetURLSchemeHandler()
         let scriptMessageProxy = ScriptMessageProxy()
+        let previewIndexURL = previewIndexURL?.standardizedFileURL
 
         userContentController.add(scriptMessageProxy, name: "bridge")
         configuration.userContentController = userContentController
@@ -35,15 +41,16 @@ public final class PreviewController: NSObject, ObservableObject {
         webView = WKWebView(frame: .zero, configuration: configuration)
         self.assetSchemeHandler = assetSchemeHandler
         self.scriptMessageProxy = scriptMessageProxy
+        self.previewIndexURL = previewIndexURL
 
         super.init()
 
         scriptMessageProxy.delegate = self
         webView.navigationDelegate = self
-        webView.setValue(false, forKey: "drawsBackground")
+        webView.underPageBackgroundColor = .clear
         webView.wantsLayer = true
         webView.layer?.backgroundColor = NSColor.clear.cgColor
-        webView.loadPreviewIndex()
+        webView.loadPreviewIndex(indexURL: previewIndexURL)
     }
 
     public func observe(_ session: DocumentSession, debounceNanoseconds: UInt64 = 150_000_000) async {
@@ -119,7 +126,7 @@ public final class PreviewController: NSObject, ObservableObject {
             openOrReportLink(payload.href)
 
         case let .checkboxToggled(payload):
-            onCheckboxToggled?(payload.line, payload.checked)
+            onCheckboxToggled?(payload.line, payload.checked, payload.version)
 
         case .render, .scrollToLine, .setTheme:
             break
@@ -151,6 +158,15 @@ public final class PreviewController: NSObject, ObservableObject {
 }
 
 extension PreviewController: WKNavigationDelegate {
+    public func webView(
+        _: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+    ) {
+        let policy = Self.navigationPolicy(for: navigationAction.request.url, previewIndexURL: previewIndexURL)
+        decisionHandler(policy)
+    }
+
     public func webView(_ webView: WKWebView, didFinish _: WKNavigation!) {
         let protocolVersionScript = "window.BlogEditorPreview && window.BlogEditorPreview.PROTOCOL_VERSION"
         webView.evaluateJavaScript(protocolVersionScript) { @MainActor [weak self] result, _ in
@@ -162,6 +178,28 @@ extension PreviewController: WKNavigationDelegate {
 
             self?.markReadyAndFlushQueuedRender()
         }
+    }
+}
+
+extension PreviewController {
+    private nonisolated static func defaultPreviewIndexURL() -> URL? {
+        Bundle.main.url(
+            forResource: "index",
+            withExtension: "html",
+            subdirectory: "preview"
+        )?.standardizedFileURL
+    }
+
+    nonisolated static func navigationPolicy(for url: URL?, previewIndexURL: URL?) -> WKNavigationActionPolicy {
+        guard let url = url?.standardizedFileURL,
+              let previewIndexURL = previewIndexURL?.standardizedFileURL,
+              url.isFileURL,
+              url == previewIndexURL
+        else {
+            return .cancel
+        }
+
+        return .allow
     }
 }
 
@@ -198,8 +236,8 @@ private final class ScriptMessageProxy: NSObject, WKScriptMessageHandler {
 }
 
 private extension WKWebView {
-    func loadPreviewIndex() {
-        if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "preview") {
+    func loadPreviewIndex(indexURL: URL?) {
+        if let indexURL {
             loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
         } else {
             loadHTMLString(

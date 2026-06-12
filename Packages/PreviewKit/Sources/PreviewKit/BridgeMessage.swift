@@ -2,7 +2,7 @@ import Foundation
 import MarkdownCore
 
 public enum PreviewBridge {
-    public static let protocolVersion = 2
+    public static let protocolVersion = 3
 }
 
 public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {
@@ -109,10 +109,12 @@ public struct LinkClickedPayload: Codable, Equatable, Sendable {
 public struct CheckboxToggledPayload: Codable, Equatable, Sendable {
     public let line: Int
     public let checked: Bool
+    public let version: Int
 
-    public init(line: Int, checked: Bool) {
+    public init(line: Int, checked: Bool, version: Int) {
         self.line = line
         self.checked = checked
+        self.version = version
     }
 }
 

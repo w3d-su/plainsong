@@ -141,7 +141,8 @@ final class AppState: ObservableObject {
         userDefaults.set(isVisible, forKey: Self.previewVisibleDefaultsKey)
     }
 
-    func setTaskCheckbox(line: Int, checked: Bool) {
+    func setTaskCheckbox(line: Int, checked: Bool, version: Int) {
+        guard version == currentDocument.version else { return }
         guard let lineRange = currentDocument.text.rangeOfOneBasedLine(line) else { return }
 
         let lineText = String(currentDocument.text[lineRange])

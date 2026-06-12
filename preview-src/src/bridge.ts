@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -47,6 +47,7 @@ export interface LinkClickedPayload {
 export interface CheckboxToggledPayload {
   line: number;
   checked: boolean;
+  version: number;
 }
 
 export interface SetThemePayload {

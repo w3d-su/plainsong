@@ -320,7 +320,7 @@ must be kept in sync; both list message names in the same order with a
 | Swift→JS | `scrollToLine` | `{line, animated}` |
 | JS→Swift | `previewScrolled` | `{topVisibleLine}` (only while preview owns scroll) |
 | JS→Swift | `linkClicked` | `{href}` |
-| JS→Swift | `checkboxToggled` | `{line, checked}` → Swift edits source text |
+| JS→Swift | `checkboxToggled` | `{line, checked, version}` → Swift edits source text only when `version` matches the current document |
 | Swift→JS | `setTheme` | `{theme}` |
 
 ### 7.4 Build
@@ -479,6 +479,9 @@ next begins.
 - ✅ Accept: kitchen-sink renders correctly offline; ⌘⇧P shows/hides the rendered pane
   with the layout restored on relaunch; scroll sync drift < 1 viewport on a 10k-line
   doc; toggling a checkbox in preview edits the source line.
+- Known M2 limitation: in single-file mode under the app sandbox, the app only receives
+  a security-scoped grant for the selected Markdown file. Sibling `asset://` images may
+  fail until M3's folder workspace grants directory scope.
 
 ### M3 — Workspace
 - Folder open, sidebar file tree (create/rename/delete/move, drag), FSEvents reconcile,
@@ -583,11 +586,12 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | MDX components render as placeholder cards in Phase 1 | Real execution needs user project bundling + sandbox design. |
 | 2026-06-12 | XcodeGen + committed preview dist | pbxproj and node_modules are hostile to LLM diff-based collaboration. |
 | 2026-06-12 | App Sandbox on from day 1 | Retrofitting sandbox is painful; keeps App Store option open. |
-| 2026-06-12 | WKWebView target keeps network-client entitlement but preview stays offline by CSP | WebKit's web/network helper processes fail to launch in the sandbox without `com.apple.security.network.client`, even for bundled file previews. Remote preview loads remain blocked by `default-src 'none'`, explicit `script-src/style-src/font-src 'self'`, `img-src asset: data:`, local bundled assets, and intercepted link handling. Alt: remove WKWebView (rejected: violates M2 preview plan and MDX path). |
+| 2026-06-12 | Keep network-client entitlement for sandboxed WKWebView startup | App-hosted `PreviewController()` smoke test reproduced WebContent process launch failure without `com.apple.security.network.client` (`Application does not have permission to communicate with network resources`), leaving the pane blank before any remote request. Preview remains offline by CSP and bundled resources. |
 | 2026-06-12 | macOS 14+ | TextKit 2 mature, modern SwiftUI APIs; Typora-class audience updates quickly. |
 | 2026-06-12 | M0 ships with zero external Swift dependencies | First build must be deterministic; STTextView/Neon/grammars land in M1 with pinned versions. Packages use swift-tools 5.10 + StrictConcurrency experimental flag. |
 | 2026-06-12 | Editor typing hot path moves plain `String` only | Per-keystroke String⇄NSAttributedString⇄AttributedString bridging of the whole document caused visible lag on 1 MB files. The editor binding carries `String`; highlight output flows separately as a revisioned `HighlightedText` (Equatable by revision), is computed on a detached task, and is applied via in-place `setAttributes`. Statistics are likewise computed off-main. This shape is also what M1.5's Neon integration needs. |
 | 2026-06-12 | Keystrokes must not publish through the document model | Time Profiler showed per-key SwiftUI re-renders of the whole window (DynamicBody under `keyDown`) plus foreign-string traffic (`_StringGuts.foreign*`, CFStorage). `DocumentSession.text`/`version` are non-`@Published`; `isDirty` assignments are deduped; the coordinator eagerly `makeContiguousUTF8()`s the bridged string so downstream compares/counts run native. M2's preview must subscribe to text via its own debounced channel, not `objectWillChange`. |
+| 2026-06-12 | M2 scroll sync gets a narrow EditorKit scroll proxy exception | STTextView is an `NSView`, not `NSTextView`, so App-level hierarchy probing could never attach and retried forever. The exception is limited to `EditorScrollSupport.swift`, one optional `MarkdownEditorView(scrollProxy:)` parameter, and `MarkdownTextView` make/update wiring; `textViewDidChangeText` and the typing hot path remain unchanged. |
 
 ---
 

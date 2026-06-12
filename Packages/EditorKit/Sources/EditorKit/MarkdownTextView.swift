@@ -54,12 +54,14 @@ struct MarkdownTextView: NSViewRepresentable {
     private let showsLineNumbers: Bool
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
+    private let scrollProxy: EditorScrollProxy?
 
     init(
         text: Binding<String>,
         styledText: HighlightedText?,
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
+        scrollProxy: EditorScrollProxy? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -67,6 +69,7 @@ struct MarkdownTextView: NSViewRepresentable {
         _selection = selection
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
+        self.scrollProxy = scrollProxy
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
@@ -102,6 +105,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
+        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
 
         return scrollView
     }
@@ -111,6 +115,8 @@ struct MarkdownTextView: NSViewRepresentable {
             assertionFailure("Expected MarkdownTextView to update an STTextView-backed scroll view")
             return
         }
+
+        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -211,10 +217,20 @@ struct MarkdownTextView: NSViewRepresentable {
         var isUpdating = false
         var isUserEditing = false
         var lastAppliedHighlightRevision: Int?
+        private var scrollProxy: EditorScrollProxy?
 
         init(text: Binding<String>, selection: Binding<NSRange?>) {
             _text = text
             _selection = selection
+        }
+
+        func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {
+            if scrollProxy !== proxy {
+                scrollProxy?.detach()
+                scrollProxy = proxy
+            }
+
+            proxy?.attach(to: textView)
         }
 
         func textViewDidChangeText(_ notification: Notification) {

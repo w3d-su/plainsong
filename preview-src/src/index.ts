@@ -27,6 +27,7 @@ type ScrollOwner = "editor" | "preview" | "none";
 const previewRoot = requirePreviewRoot();
 
 let latestRenderVersion = -1;
+let currentRenderedVersion = -1;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
@@ -69,7 +70,7 @@ previewRoot.addEventListener("click", (event) => {
     if (line !== undefined) {
       postBridgeMessage({
         name: "checkboxToggled",
-        payload: { line, checked: checkbox.checked },
+        payload: { line, checked: checkbox.checked, version: currentRenderedVersion },
       });
     }
     return;
@@ -130,6 +131,8 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   rewriteImageSources();
   highlightCodeBlocks();
   await renderMermaidBlocks();
+  if (payload.version < latestRenderVersion) return;
+  currentRenderedVersion = payload.version;
 
   postBridgeMessage({
     name: "renderComplete",

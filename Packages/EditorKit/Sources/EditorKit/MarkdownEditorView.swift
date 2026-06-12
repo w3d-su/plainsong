@@ -15,15 +15,18 @@ public struct MarkdownEditorView: View {
 
     private let fileKind: FileKind
     private let showsLineNumbers: Bool
+    private let scrollProxy: EditorScrollProxy?
 
     public init(
         text: Binding<String>,
         fileKind: FileKind,
-        showsLineNumbers: Bool = true
+        showsLineNumbers: Bool = true,
+        scrollProxy: EditorScrollProxy? = nil
     ) {
         _text = text
         self.fileKind = fileKind
         self.showsLineNumbers = showsLineNumbers
+        self.scrollProxy = scrollProxy
     }
 
     public var body: some View {
@@ -41,7 +44,8 @@ public struct MarkdownEditorView: View {
             ),
             styledText: styledText,
             selection: $selection,
-            showsLineNumbers: showsLineNumbers
+            showsLineNumbers: showsLineNumbers,
+            scrollProxy: scrollProxy
         )
         .onChange(of: text) { _, _ in
             scheduleHighlight()

@@ -91,4 +91,16 @@ final class MarkdownEditorViewTests: XCTestCase {
 
         XCTAssertTrue(policy.shouldApplyIncomingText)
     }
+
+    func testEditorScrollLineIndexMapsUTF16OffsetsAndLines() {
+        let index = EditorScrollLineIndex(text: "one\nemoji 🧪\nthree")
+
+        XCTAssertEqual(index.oneBasedLine(containingUTF16Offset: 0), 1)
+        XCTAssertEqual(index.oneBasedLine(containingUTF16Offset: 4), 2)
+        XCTAssertEqual(index.oneBasedLine(containingUTF16Offset: 13), 3)
+        XCTAssertEqual(index.utf16Offset(forOneBasedLine: 1), 0)
+        XCTAssertEqual(index.utf16Offset(forOneBasedLine: 2), 4)
+        XCTAssertEqual(index.utf16Offset(forOneBasedLine: 3), 13)
+        XCTAssertEqual(index.utf16Offset(forOneBasedLine: 99), "one\nemoji 🧪\nthree".utf16.count)
+    }
 }
