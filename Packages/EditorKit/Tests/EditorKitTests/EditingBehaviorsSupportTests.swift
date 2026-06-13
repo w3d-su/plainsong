@@ -41,19 +41,48 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         let textView = STTextView(frame: .zero)
         textView.text = "word"
         textView.textSelection = NSRange(location: 0, length: 4)
-        var isApplyingEdit = true
+        let editingGuard = EditingBehaviorGuard()
+        editingGuard.isApplying = true
 
-        EditingBehaviorsSupport.applyCommand(.format(.bold), to: textView, isApplyingEdit: &isApplyingEdit)
+        EditingBehaviorsSupport.applyCommand(.format(.bold), to: textView, editingGuard: editingGuard)
 
         XCTAssertEqual(Self.text(in: textView), "word")
-        XCTAssertTrue(isApplyingEdit)
+        XCTAssertTrue(editingGuard.isApplying)
 
-        isApplyingEdit = false
+        editingGuard.isApplying = false
         textView.textSelection = NSRange(location: 0, length: 4)
-        EditingBehaviorsSupport.applyCommand(.format(.bold), to: textView, isApplyingEdit: &isApplyingEdit)
+        EditingBehaviorsSupport.applyCommand(.format(.bold), to: textView, editingGuard: editingGuard)
 
-        XCTAssertFalse(isApplyingEdit)
+        XCTAssertFalse(editingGuard.isApplying)
         XCTAssertEqual(Self.text(in: textView), "**word**")
+    }
+
+    func testAutoPairInsertionSurvivesSynchronousDelegateReentry() {
+        let textView = STTextView(frame: .zero)
+        let delegate = ReentrantEditingBehaviorDelegate(fileKind: .markdown)
+        textView.textDelegate = delegate
+        textView.text = ""
+        textView.textSelection = NSRange(location: 0, length: 0)
+
+        textView.insertText("(", replacementRange: textView.selectedRange())
+
+        XCTAssertEqual(Self.text(in: textView), "()")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 1, length: 0))
+        XCTAssertFalse(delegate.editingGuard.isApplying)
+    }
+
+    func testMenuCommandSurvivesSynchronousDelegateReentry() {
+        let textView = STTextView(frame: .zero)
+        let delegate = ReentrantEditingBehaviorDelegate(fileKind: .markdown)
+        textView.textDelegate = delegate
+        textView.text = "word"
+        textView.textSelection = NSRange(location: 0, length: 4)
+
+        EditingBehaviorsSupport.applyCommand(.format(.bold), to: textView, editingGuard: delegate.editingGuard)
+
+        XCTAssertEqual(Self.text(in: textView), "**word**")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 2, length: 4))
+        XCTAssertFalse(delegate.editingGuard.isApplying)
     }
 
     func testMarkedTextCompositionNoOpsThroughEditingBehaviorPath() throws {
@@ -69,14 +98,14 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         let textBeforeBehavior = Self.text(in: textView)
         let selectedRange = textView.selectedRange()
         let affectedRange = try XCTUnwrap(NSTextRange(selectedRange, in: textView.textContentManager))
-        var isApplyingEdit = false
+        let editingGuard = EditingBehaviorGuard()
 
         let shouldAllowNativeInput = EditingBehaviorsSupport.handleProposedChange(
             in: textView,
             affectedRange: affectedRange,
             replacementString: "(",
             fileKind: .markdown,
-            isApplyingEdit: &isApplyingEdit
+            editingGuard: editingGuard
         )
 
         XCTAssertTrue(shouldAllowNativeInput)
@@ -90,14 +119,14 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         textView.text = fixtureText
         textView.textSelection = NSRange(location: 0, length: 0)
         let affectedRange = try XCTUnwrap(NSTextRange(textView.selectedRange(), in: textView.textContentManager))
-        var isApplyingEdit = false
+        let editingGuard = EditingBehaviorGuard()
 
         XCTAssertTrue(EditingBehaviorsSupport.handleProposedChange(
             in: textView,
             affectedRange: affectedRange,
             replacementString: "a",
             fileKind: .markdown,
-            isApplyingEdit: &isApplyingEdit
+            editingGuard: editingGuard
         ))
 
         var maxLatencyMilliseconds = 0.0
@@ -108,7 +137,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
                 affectedRange: affectedRange,
                 replacementString: "a",
                 fileKind: .markdown,
-                isApplyingEdit: &isApplyingEdit
+                editingGuard: editingGuard
             )
             maxLatencyMilliseconds = max(
                 maxLatencyMilliseconds,
@@ -132,5 +161,29 @@ final class EditingBehaviorsSupportTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+}
+
+@MainActor
+private final class ReentrantEditingBehaviorDelegate: @preconcurrency STTextViewDelegate {
+    let fileKind: FileKind
+    let editingGuard = EditingBehaviorGuard()
+
+    init(fileKind: FileKind) {
+        self.fileKind = fileKind
+    }
+
+    func textView(
+        _ textView: STTextView,
+        shouldChangeTextIn affectedCharRange: NSTextRange,
+        replacementString: String?
+    ) -> Bool {
+        EditingBehaviorsSupport.handleProposedChange(
+            in: textView,
+            affectedRange: affectedCharRange,
+            replacementString: replacementString,
+            fileKind: fileKind,
+            editingGuard: editingGuard
+        )
     }
 }

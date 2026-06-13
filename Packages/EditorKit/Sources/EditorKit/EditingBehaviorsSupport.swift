@@ -2,6 +2,10 @@ import AppKit
 import MarkdownCore
 import STTextView
 
+final class EditingBehaviorGuard {
+    var isApplying = false
+}
+
 @MainActor
 public final class EditorCommandProxy: ObservableObject {
     private weak var textView: STTextView?
@@ -48,9 +52,9 @@ enum EditingBehaviorsSupport {
         affectedRange: NSTextRange,
         replacementString: String?,
         fileKind: FileKind,
-        isApplyingEdit: inout Bool
+        editingGuard: EditingBehaviorGuard
     ) -> Bool {
-        guard !isApplyingEdit else { return true }
+        guard !editingGuard.isApplying else { return true }
         guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return true }
         guard let replacementString,
               needsMarkdownEvaluation(for: replacementString, fileKind: fileKind),
@@ -64,21 +68,21 @@ enum EditingBehaviorsSupport {
             return true
         }
 
-        apply(edit, to: textView, isApplyingEdit: &isApplyingEdit)
+        apply(edit, to: textView, editingGuard: editingGuard)
         return false
     }
 
     static func applyCommand(
         _ command: MarkdownEditCommand,
         to textView: STTextView,
-        isApplyingEdit: inout Bool
+        editingGuard: EditingBehaviorGuard
     ) {
-        guard !isApplyingEdit else { return }
+        guard !editingGuard.isApplying else { return }
         guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return }
         let selection = textView.selectedRange()
         guard let edit = edit(for: command, textView: textView, selection: selection) else { return }
 
-        apply(edit, to: textView, isApplyingEdit: &isApplyingEdit)
+        apply(edit, to: textView, editingGuard: editingGuard)
     }
 
     static func needsMarkdownEvaluation(for replacementString: String, fileKind: FileKind) -> Bool {
@@ -121,16 +125,18 @@ enum EditingBehaviorsSupport {
     private static func apply(
         _ edit: MarkdownEditResult,
         to textView: STTextView,
-        isApplyingEdit: inout Bool
+        editingGuard: EditingBehaviorGuard
     ) {
         if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
             textView.textSelection = edit.newSelection
             return
         }
 
-        isApplyingEdit = true
+        // Keep this as direct reference-state mutation. STTextView synchronously
+        // re-enters shouldChangeText during insertText, so an inout guard here traps.
+        editingGuard.isApplying = true
         textView.insertText(edit.replacementString, replacementRange: edit.replacementRange)
-        isApplyingEdit = false
+        editingGuard.isApplying = false
         textView.textSelection = edit.newSelection
     }
 

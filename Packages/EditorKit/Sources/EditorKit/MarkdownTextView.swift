@@ -225,7 +225,7 @@ struct MarkdownTextView: NSViewRepresentable {
         var lastAppliedHighlightRevision: Int?
         private var scrollProxy: EditorScrollProxy?
         private var commandProxy: EditorCommandProxy?
-        private var isApplyingEditingBehavior = false
+        private let editingBehaviorGuard = EditingBehaviorGuard()
 
         init(text: Binding<String>, selection: Binding<NSRange?>) {
             _text = text
@@ -260,7 +260,7 @@ struct MarkdownTextView: NSViewRepresentable {
             EditingBehaviorsSupport.applyCommand(
                 command,
                 to: textView,
-                isApplyingEdit: &isApplyingEditingBehavior
+                editingGuard: editingBehaviorGuard
             )
         }
 
@@ -289,7 +289,7 @@ struct MarkdownTextView: NSViewRepresentable {
                 affectedRange: affectedCharRange,
                 replacementString: replacementString,
                 fileKind: commandProxy?.currentFileKind() ?? .markdown,
-                isApplyingEdit: &isApplyingEditingBehavior
+                editingGuard: editingBehaviorGuard
             )
         }
 

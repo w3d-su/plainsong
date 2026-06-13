@@ -62,8 +62,14 @@ final class MarkdownEditingTests: XCTestCase {
         assertEdit(
             .type("*", fileKind: .markdown),
             from: "[[中文]]",
-            to: "**[[中文]]**"
+            to: "*[[中文]]*"
         )
+
+        XCTAssertNil(MarkdownEditing.apply(
+            .type("*", fileKind: .markdown),
+            to: "",
+            selection: NSRange(location: 0, length: 0)
+        ))
 
         assertEdit(
             .type("(", fileKind: .markdown),

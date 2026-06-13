@@ -215,8 +215,10 @@ replacement local to EditorKit.
   (renumbering ordered lists); Enter on an empty item removes the marker (exits list).
   Tab / Shift-Tab indents/outdents list items, including every list item overlapped by
   a multi-line selection.
-- **Auto-pairing:** `**`, `*`, `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx). Wrapping: with a
-  selection, typing a pair character wraps the selection. Skip-over on closing char.
+- **Auto-pairing:** `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx) auto-close at the
+  caret. `*` wraps a selection as italic (`*…*`) but does not auto-close at a bare
+  caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
+  typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
   cursor inside; language autocomplete fires after the opening fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
@@ -606,6 +608,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | M2 scroll sync gets a narrow EditorKit scroll proxy exception | STTextView is an `NSView`, not `NSTextView`, so App-level hierarchy probing could never attach and retried forever. The exception is limited to `EditorScrollSupport.swift`, one optional `MarkdownEditorView(scrollProxy:)` parameter, and `MarkdownTextView` make/update wiring; `textViewDidChangeText` and the typing hot path remain unchanged. |
 | 2026-06-13 | M4 editing behaviors get a narrow EditorKit command/interception exception | STTextView owns key input and undo, so editing behaviors must intercept `shouldChangeTextIn` and apply accepted transforms through STTextView insertion APIs. The exception is limited to `EditingBehaviorsSupport.swift`, one optional command-proxy parameter on `MarkdownEditorView`/`MarkdownTextView`, and a thin Coordinator delegate call; all transform logic stays pure in MarkdownCore, no textStorage writes are used for behavior edits, and the EditorKit boundary no-ops while IME marked text exists. Alt: App-layer text mutation was rejected because it would lose live selection and native one-step undo. |
 | 2026-06-13 | M4 review fixes keep behavior edits pure and selection-aware | Ordinary non-trigger typing returns from EditorKit before whole-document materialization, menu commands share the Coordinator reentrancy guard, ordered task-list continuation increments and preserves checkbox markers, and Tab/Shift-Tab over selected list lines indents/outdents the selected block. Alt: deferring multi-line list indentation to M4 part 2 was rejected because the pure transform is small and covered by MarkdownCore tests. |
+| 2026-06-13 | M4 reentrancy guard is a reference flag; `*` is wrap-selection-only | STTextView synchronously re-enters `shouldChangeText` during programmatic inserts, so EditorKit must never hold an `inout` or other mutating access to the editing-behavior guard across `insertText` or similar delegate-reentrant calls. The guard is a Coordinator-owned reference object read by reentrant calls. Maintainer decision: bare `*` inserts literally, selected text wraps as `*…*`, and `*` has no skip-over behavior; `_`, backticks, brackets, quotes, and MDX angle pairs keep existing auto-close behavior. Alt: keeping bold-first `*` auto-pairing was rejected because it blocks bullets and Typora-like italics. |
 | 2026-06-12 | M3 keeps workspace ownership in WorkspaceKit and uses bookmark-backed Open Recent | File-tree reconciliation, directory scanning, FSEvents, file operations, bookmark recents, and LRU eviction stay below App so App composes rather than owns workspace rules. Preview assets resolve from the workspace root when a folder is open, while single-file mode keeps file-parent resolution. A simple File > Open Recent submenu backed by app-scope bookmarks was chosen over adopting NSDocumentController because Plainsong still owns custom folder workspaces and warm sessions. |
 
 ---

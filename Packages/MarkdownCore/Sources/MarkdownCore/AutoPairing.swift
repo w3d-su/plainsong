@@ -8,6 +8,7 @@ enum AutoPairing {
         fileKind: FileKind
     ) -> MarkdownEditResult? {
         guard MarkdownTextEditingSupport.utf16Length(input) == 1 else { return nil }
+        guard input != "*" || selection.length > 0 else { return nil }
 
         if let skip = skipOverClosing(input, in: text, selection: selection, fileKind: fileKind) {
             return skip
@@ -66,7 +67,7 @@ enum AutoPairing {
     private static func pair(for input: String, fileKind: FileKind) -> (open: String, close: String)? {
         switch input {
         case "*":
-            ("**", "**")
+            ("*", "*")
         case "_":
             ("_", "_")
         case "`":
@@ -88,8 +89,6 @@ enum AutoPairing {
 
     private static func closingTokens(for input: String, fileKind: FileKind) -> [String] {
         switch input {
-        case "*":
-            ["**", "*"]
         case "_":
             ["_"]
         case "`":
