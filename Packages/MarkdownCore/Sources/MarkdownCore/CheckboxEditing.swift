@@ -18,13 +18,17 @@ enum CheckboxEditing {
         guard replacement != original else { return nil }
 
         if selection.length == 0 {
-            let deltaBeforeCursor = MarkdownTextEditingSupport.utf16Length(replacement) -
-                MarkdownTextEditingSupport.utf16Length(original)
+            let cursorOffset = selection.location - replacementRange.location
+            let mappedOffset = mappedCursorOffset(
+                from: original,
+                to: replacement,
+                cursorOffset: cursorOffset
+            )
             return MarkdownTextEditingSupport.replacement(
                 range: replacementRange,
                 string: replacement,
                 selection: NSRange(
-                    location: max(replacementRange.location, selection.location + deltaBeforeCursor),
+                    location: max(replacementRange.location, replacementRange.location + mappedOffset),
                     length: 0
                 )
             )
@@ -64,5 +68,42 @@ enum CheckboxEditing {
         let storage = line as NSString
         let prefix = storage.substring(with: NSRange(location: 0, length: item.prefixLength))
         return "\(prefix)[ ] \(storage.substring(from: item.prefixLength))"
+    }
+
+    private static func mappedCursorOffset(from original: String, to replacement: String, cursorOffset: Int) -> Int {
+        let originalUnits = Array(original.utf16)
+        let replacementUnits = Array(replacement.utf16)
+        let clampedOffset = min(max(cursorOffset, 0), originalUnits.count)
+
+        var commonPrefixLength = 0
+        while commonPrefixLength < min(originalUnits.count, replacementUnits.count) {
+            guard originalUnits[commonPrefixLength] == replacementUnits[commonPrefixLength] else {
+                break
+            }
+            commonPrefixLength += 1
+        }
+
+        var commonSuffixLength = 0
+        let remainingOriginalLength = originalUnits.count - commonPrefixLength
+        let remainingReplacementLength = replacementUnits.count - commonPrefixLength
+        while commonSuffixLength < min(remainingOriginalLength, remainingReplacementLength) {
+            let originalIndex = originalUnits.count - commonSuffixLength - 1
+            let replacementIndex = replacementUnits.count - commonSuffixLength - 1
+            guard originalUnits[originalIndex] == replacementUnits[replacementIndex] else {
+                break
+            }
+            commonSuffixLength += 1
+        }
+
+        let originalChangeEnd = originalUnits.count - commonSuffixLength
+        let replacementChangeEnd = replacementUnits.count - commonSuffixLength
+
+        if clampedOffset <= commonPrefixLength {
+            return clampedOffset
+        }
+        if clampedOffset >= originalChangeEnd {
+            return clampedOffset + replacementUnits.count - originalUnits.count
+        }
+        return replacementChangeEnd
     }
 }

@@ -190,7 +190,7 @@ enum FormattingEditing {
     private static func toggleCodeFence(in text: String, selection: NSRange) -> MarkdownEditResult? {
         if selection.length > 0 {
             let selected = MarkdownTextEditingSupport.substring(selection, in: text)
-            if selected.hasPrefix("```\n"), selected.hasSuffix("\n```") {
+            if selection.length >= 8, selected.hasPrefix("```\n"), selected.hasSuffix("\n```") {
                 let innerRange = NSRange(location: selection.location + 4, length: selection.length - 8)
                 let inner = MarkdownTextEditingSupport.substring(innerRange, in: text)
                 return MarkdownTextEditingSupport.replacement(

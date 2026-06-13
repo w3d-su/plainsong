@@ -82,7 +82,9 @@ enum ListEditing {
     }
 
     static func handleTab(in text: String, selection: NSRange, backwards: Bool) -> MarkdownEditResult? {
-        guard selection.length == 0 else { return nil }
+        guard selection.length == 0 else {
+            return handleBlockTab(in: text, selection: selection, backwards: backwards)
+        }
 
         let line = MarkdownTextEditingSupport.line(containing: selection.location, in: text)
         guard let item = MarkdownListItem(line.text) else { return nil }
@@ -101,6 +103,45 @@ enum ListEditing {
             range: NSRange(location: line.range.location, length: 0),
             string: "    ",
             selection: NSRange(location: selection.location + 4, length: 0)
+        )
+    }
+
+    private static func handleBlockTab(in text: String, selection: NSRange, backwards: Bool) -> MarkdownEditResult? {
+        let lines = MarkdownTextEditingSupport.lines(overlapping: selection, in: text)
+        guard let firstLine = lines.first, let lastLine = lines.last else { return nil }
+
+        var didChange = false
+        let transformedLines = lines.map { line in
+            guard let item = MarkdownListItem(line.text) else {
+                return line.text
+            }
+
+            if backwards {
+                let removable = min(4, MarkdownTextEditingSupport.utf16Length(item.indent))
+                guard removable > 0 else { return line.text }
+                didChange = true
+                let storage = line.text as NSString
+                return storage.substring(from: removable)
+            }
+
+            didChange = true
+            return "    \(line.text)"
+        }
+
+        guard didChange else { return nil }
+
+        let replacement = transformedLines.joined(separator: "\n")
+        let replacementRange = NSRange(
+            location: firstLine.range.location,
+            length: lastLine.endLocation - firstLine.range.location
+        )
+        return MarkdownTextEditingSupport.replacement(
+            range: replacementRange,
+            string: replacement,
+            selection: NSRange(
+                location: replacementRange.location,
+                length: MarkdownTextEditingSupport.utf16Length(replacement)
+            )
         )
     }
 
@@ -132,7 +173,8 @@ enum ListEditing {
                 break
             }
 
-            let replacementPrefix = "\(indent)\(nextNumber)\(delimiter) "
+            let checkbox = item.hasCheckbox ? "[\(String(item.checkboxState ?? " "))] " : ""
+            let replacementPrefix = "\(indent)\(nextNumber)\(delimiter) \(checkbox)"
             let contentRange = NSRange(
                 location: nextLine.range.location + item.prefixLength,
                 length: nextLine.range.length - item.prefixLength
@@ -224,11 +266,12 @@ struct MarkdownListItem {
     }
 
     var nextMarkerText: String {
+        if let orderedNumber, let orderedDelimiter {
+            let checkbox = hasCheckbox ? "[ ] " : ""
+            return "\(indent)\(orderedNumber + 1)\(orderedDelimiter) \(checkbox)"
+        }
         if hasCheckbox {
             return "\(indent)\(marker) [ ] "
-        }
-        if let orderedNumber, let orderedDelimiter {
-            return "\(indent)\(orderedNumber + 1)\(orderedDelimiter) "
         }
         return "\(indent)\(marker) "
     }

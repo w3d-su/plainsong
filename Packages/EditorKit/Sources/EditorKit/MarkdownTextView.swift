@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import STTextView
 import SwiftUI
 
@@ -246,7 +247,21 @@ struct MarkdownTextView: NSViewRepresentable {
                 commandProxy = proxy
             }
 
-            proxy?.attach(to: textView, fileKind: proxy?.currentFileKind() ?? .markdown)
+            proxy?.attach(
+                to: textView,
+                fileKind: proxy?.currentFileKind() ?? .markdown
+            ) { [weak self, weak textView] command in
+                guard let self, let textView else { return }
+                performCommand(command, in: textView)
+            }
+        }
+
+        private func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {
+            EditingBehaviorsSupport.applyCommand(
+                command,
+                to: textView,
+                isApplyingEdit: &isApplyingEditingBehavior
+            )
         }
 
         func textViewDidChangeText(_ notification: Notification) {

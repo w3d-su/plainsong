@@ -6,26 +6,33 @@ import STTextView
 public final class EditorCommandProxy: ObservableObject {
     private weak var textView: STTextView?
     private var fileKind: FileKind = .markdown
+    private var performCommand: ((MarkdownEditCommand) -> Void)?
 
     public init() {}
 
     public func perform(_ command: MarkdownEditCommand) {
-        guard let textView else { return }
-        EditingBehaviorsSupport.applyCommand(command, to: textView)
+        guard textView != nil else { return }
+        performCommand?(command)
     }
 
     public func update(fileKind: FileKind) {
         self.fileKind = fileKind
     }
 
-    func attach(to textView: STTextView, fileKind: FileKind) {
+    func attach(
+        to textView: STTextView,
+        fileKind: FileKind,
+        performCommand: @escaping (MarkdownEditCommand) -> Void
+    ) {
         self.textView = textView
         self.fileKind = fileKind
+        self.performCommand = performCommand
     }
 
     func detach(from textView: STTextView) {
         if self.textView === textView {
             self.textView = nil
+            performCommand = nil
         }
     }
 
@@ -46,6 +53,7 @@ enum EditingBehaviorsSupport {
         guard !isApplyingEdit else { return true }
         guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return true }
         guard let replacementString,
+              needsMarkdownEvaluation(for: replacementString, fileKind: fileKind),
               let command = command(for: replacementString, fileKind: fileKind),
               let selection = nsRange(for: affectedRange, in: textView)
         else {
@@ -60,13 +68,32 @@ enum EditingBehaviorsSupport {
         return false
     }
 
-    static func applyCommand(_ command: MarkdownEditCommand, to textView: STTextView) {
+    static func applyCommand(
+        _ command: MarkdownEditCommand,
+        to textView: STTextView,
+        isApplyingEdit: inout Bool
+    ) {
+        guard !isApplyingEdit else { return }
         guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return }
         let selection = textView.selectedRange()
         guard let edit = edit(for: command, textView: textView, selection: selection) else { return }
 
-        var isApplyingEdit = false
         apply(edit, to: textView, isApplyingEdit: &isApplyingEdit)
+    }
+
+    static func needsMarkdownEvaluation(for replacementString: String, fileKind: FileKind) -> Bool {
+        switch replacementString {
+        case "\n", "\r", "\u{2028}", "\u{2029}", "\t", "\u{19}":
+            true
+        case "*", "_", "`", "(", "[", "{", "\"", ")", "]", "}":
+            true
+        case "<" where fileKind == .mdx:
+            true
+        case ">" where fileKind == .mdx:
+            true
+        default:
+            false
+        }
     }
 
     private static func command(for replacementString: String, fileKind: FileKind) -> MarkdownEditCommand? {

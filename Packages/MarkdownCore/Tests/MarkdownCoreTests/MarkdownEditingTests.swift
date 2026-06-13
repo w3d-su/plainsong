@@ -17,6 +17,12 @@ final class MarkdownEditingTests: XCTestCase {
 
         assertEdit(
             .insertNewline(fileKind: .markdown),
+            from: "1. [ ] one<caret>\n2. [x] two",
+            to: "1. [ ] one\n2. [ ] <caret>\n3. [x] two"
+        )
+
+        assertEdit(
+            .insertNewline(fileKind: .markdown),
             from: "- [ ] todo<caret>",
             to: "- [ ] todo\n- [ ] <caret>"
         )
@@ -37,6 +43,18 @@ final class MarkdownEditingTests: XCTestCase {
             .insertTab(backwards: true),
             from: "    - item<caret>",
             to: "- item<caret>"
+        )
+
+        assertEdit(
+            .insertTab(backwards: false),
+            from: "[[- one\n- two]]\nparagraph",
+            to: "[[    - one\n    - two]]\nparagraph"
+        )
+
+        assertEdit(
+            .insertTab(backwards: true),
+            from: "[[    - one\n    - two]]\nparagraph",
+            to: "[[- one\n- two]]\nparagraph"
         )
     }
 
@@ -97,6 +115,12 @@ final class MarkdownEditingTests: XCTestCase {
             .toggleCheckbox,
             from: "- [ ] one\n[[- [x] two\n- [ ] 三]]",
             to: "- [ ] one\n[[- [ ] two\n- [x] 三]]"
+        )
+
+        assertEdit(
+            .toggleCheckbox,
+            from: "<caret>- item",
+            to: "<caret>- [ ] item"
         )
     }
 
@@ -180,11 +204,19 @@ final class MarkdownEditingTests: XCTestCase {
             from: "> Quote me<caret>",
             to: "Quote me<caret>"
         )
+    }
 
+    func testCodeFenceFormattingCommand() {
         assertEdit(
             .format(.codeFence),
             from: "[[print(\"hi\")]]",
             to: "```\n[[print(\"hi\")]]\n```"
+        )
+
+        assertEdit(
+            .format(.codeFence),
+            from: "[[```\n```]]",
+            to: "```\n[[```\n```]]\n```"
         )
     }
 
