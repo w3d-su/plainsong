@@ -18,8 +18,9 @@ public final class PreviewController: NSObject, ObservableObject {
     private let previewIndexURL: URL?
     private let jsonEncoder = JSONEncoder()
     private var queuedRender: RenderPayload?
-    private var latestRequestedVersion = -1
-    private var latestCompletedVersion = -1
+    private var nextRenderID = 0
+    private var latestRequestedRenderID = -1
+    private var latestCompletedRenderID = -1
     private var theme = "system"
     private var workspaceAssetRootURL: URL?
 
@@ -80,8 +81,10 @@ public final class PreviewController: NSObject, ObservableObject {
         )
         assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
-        let payload = RenderPayload(change: change, theme: theme, baseDir: assetContext.baseDir)
-        latestRequestedVersion = max(latestRequestedVersion, payload.version)
+        let renderID = nextRenderID
+        nextRenderID += 1
+        let payload = RenderPayload(change: change, renderID: renderID, theme: theme, baseDir: assetContext.baseDir)
+        latestRequestedRenderID = renderID
 
         guard isReady else {
             queuedRender = payload
@@ -123,10 +126,10 @@ public final class PreviewController: NSObject, ObservableObject {
             markReadyAndFlushQueuedRender()
 
         case let .renderComplete(payload):
-            guard payload.version >= latestRequestedVersion else {
+            guard payload.renderID >= latestRequestedRenderID else {
                 return
             }
-            latestCompletedVersion = max(latestCompletedVersion, payload.version)
+            latestCompletedRenderID = max(latestCompletedRenderID, payload.renderID)
 
         case let .previewScrolled(payload):
             onPreviewScrolled?(payload.topVisibleLine)

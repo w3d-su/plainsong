@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -19,6 +19,10 @@ export interface ReadyPayload {
 }
 
 export interface RenderPayload {
+  // Globally monotonic render-request id (stale-drop key); ordered across
+  // document switches. `version` resets per document and must not drive dropping.
+  renderID: number;
+  // Document version, used only for checkbox writeback round-tripping.
   version: number;
   fileKind: PreviewFileKind;
   text: string;
@@ -27,6 +31,7 @@ export interface RenderPayload {
 }
 
 export interface RenderCompletePayload {
+  renderID: number;
   version: number;
   blockCount: number;
 }

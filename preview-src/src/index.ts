@@ -27,7 +27,11 @@ type ScrollOwner = "editor" | "preview" | "none";
 
 const previewRoot = requirePreviewRoot();
 
-let latestRenderVersion = -1;
+// Drop-ordering key. Monotonic across document switches, unlike `version` which
+// resets per document — using `version` here stranded the preview on the previous
+// file after editing it then switching to a freshly opened (lower-version) file.
+let latestRenderID = -1;
+// Document version of the currently displayed render; only used for checkbox writeback.
 let currentRenderedVersion = -1;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
@@ -114,15 +118,15 @@ async function receive(message: BridgeMessage): Promise<void> {
 }
 
 async function render(payload: Extract<BridgeMessage, { name: "render" }>["payload"]) {
-  if (payload.version < latestRenderVersion) return;
-  latestRenderVersion = payload.version;
+  if (payload.renderID < latestRenderID) return;
+  latestRenderID = payload.renderID;
 
   const html =
     payload.fileKind === "md"
       ? await renderMarkdown(payload.text)
       : `<p data-line="1">MDX preview arrives in M5.</p>`;
 
-  if (payload.version < latestRenderVersion) return;
+  if (payload.renderID < latestRenderID) return;
 
   const nextRoot = document.createElement("main");
   nextRoot.id = "preview-root";
@@ -132,12 +136,13 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   rewriteImageSources(payload.baseDir);
   highlightCodeBlocks();
   await renderMermaidBlocks();
-  if (payload.version < latestRenderVersion) return;
+  if (payload.renderID < latestRenderID) return;
   currentRenderedVersion = payload.version;
 
   postBridgeMessage({
     name: "renderComplete",
     payload: {
+      renderID: payload.renderID,
       version: payload.version,
       blockCount: previewRoot.querySelectorAll("[data-line]").length,
     },

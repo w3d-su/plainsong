@@ -9,7 +9,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeProtocolVersionAndMessageOrder() {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 3)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 4)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [
@@ -34,6 +34,46 @@ final class PreviewKitTests: XCTestCase {
         let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)
 
         XCTAssertEqual(decoded, message)
+    }
+
+    /// Regression: switching to a different document whose `version` is lower than
+    /// the previously rendered document must still update the preview. `version`
+    /// resets to 0 per `DocumentSession`, so the stale-drop key is the monotonic
+    /// `renderID`; using `version` stranded the preview on the prior file.
+    @MainActor
+    func testRenderingLowerVersionDocumentAfterHigherVersionStillUpdates() async throws {
+        let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+
+        try await waitUntil("preview bridge ready") {
+            controller.isReady
+        }
+
+        controller.render(
+            DocumentTextChange(
+                text: "# First document",
+                version: 7,
+                fileKind: .markdown,
+                fileURL: nil
+            )
+        )
+        try await waitUntil("first document visible") {
+            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            return text?.contains("First document") == true
+        }
+
+        // A freshly opened file starts its version counter at 0 — lower than 7 above.
+        controller.render(
+            DocumentTextChange(
+                text: "# Second document",
+                version: 0,
+                fileKind: .markdown,
+                fileURL: nil
+            )
+        )
+        try await waitUntil("second document visible despite lower version") {
+            let text = try await controller.webView.evaluateJavaScript("document.body.innerText") as? String
+            return text?.contains("Second document") == true && text?.contains("First document") != true
+        }
     }
 
     func testPreviewNavigationPolicyOnlyAllowsBundledIndex() {

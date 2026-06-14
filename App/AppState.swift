@@ -130,7 +130,10 @@ final class AppState: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
-        panel.allowedContentTypes = Self.supportedContentTypes
+        // `.folder` must be included: setting `allowedContentTypes` otherwise disables
+        // directory selection in the panel even when `canChooseDirectories` is true,
+        // so folder workspaces could not be chosen despite the message inviting it.
+        panel.allowedContentTypes = Self.supportedContentTypes + [.folder]
         panel.message = "Choose a Markdown or MDX file, or a folder workspace."
 
         guard panel.runModal() == .OK, let url = panel.url else { return }

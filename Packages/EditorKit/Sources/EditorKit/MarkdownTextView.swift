@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 import STTextView
 import SwiftUI
 
@@ -55,6 +56,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
+    private let commandProxy: EditorCommandProxy?
 
     init(
         text: Binding<String>,
@@ -62,6 +64,7 @@ struct MarkdownTextView: NSViewRepresentable {
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         scrollProxy: EditorScrollProxy? = nil,
+        commandProxy: EditorCommandProxy? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -70,6 +73,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
+        self.commandProxy = commandProxy
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
@@ -106,6 +110,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.text = text
         context.coordinator.isUpdating = false
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
+        context.coordinator.attachCommandProxy(commandProxy, to: textView)
 
         return scrollView
     }
@@ -117,6 +122,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
+        context.coordinator.attachCommandProxy(commandProxy, to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -156,6 +162,12 @@ struct MarkdownTextView: NSViewRepresentable {
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.
+    }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        guard let textView = scrollView.documentView as? STTextView else { return }
+        coordinator.detachCommandProxy(from: textView)
+        coordinator.detachScrollProxy()
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
@@ -218,6 +230,8 @@ struct MarkdownTextView: NSViewRepresentable {
         var isUserEditing = false
         var lastAppliedHighlightRevision: Int?
         private var scrollProxy: EditorScrollProxy?
+        private var commandProxy: EditorCommandProxy?
+        private let editingBehaviorGuard = EditingBehaviorGuard()
 
         init(text: Binding<String>, selection: Binding<NSRange?>) {
             _text = text
@@ -233,6 +247,39 @@ struct MarkdownTextView: NSViewRepresentable {
             proxy?.attach(to: textView)
         }
 
+        func detachScrollProxy() {
+            scrollProxy?.detach()
+            scrollProxy = nil
+        }
+
+        func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
+            if commandProxy !== proxy {
+                commandProxy?.detach(from: textView)
+                commandProxy = proxy
+            }
+
+            proxy?.attach(
+                to: textView,
+                fileKind: proxy?.currentFileKind() ?? .markdown
+            ) { [weak self, weak textView] command in
+                guard let self, let textView else { return }
+                performCommand(command, in: textView)
+            }
+        }
+
+        func detachCommandProxy(from textView: STTextView) {
+            commandProxy?.detach(from: textView)
+            commandProxy = nil
+        }
+
+        private func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {
+            EditingBehaviorsSupport.applyCommand(
+                command,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        }
+
         func textViewDidChangeText(_ notification: Notification) {
             guard !isUpdating, let textView = notification.object as? STTextView else {
                 return
@@ -246,6 +293,20 @@ struct MarkdownTextView: NSViewRepresentable {
             var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
             newText.makeContiguousUTF8()
             text = newText
+        }
+
+        func textView(
+            _ textView: STTextView,
+            shouldChangeTextIn affectedCharRange: NSTextRange,
+            replacementString: String?
+        ) -> Bool {
+            EditingBehaviorsSupport.handleProposedChange(
+                in: textView,
+                affectedRange: affectedCharRange,
+                replacementString: replacementString,
+                fileKind: commandProxy?.currentFileKind() ?? .markdown,
+                editingGuard: editingBehaviorGuard
+            )
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {

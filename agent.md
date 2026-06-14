@@ -170,7 +170,9 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   reconcile tree diff instead of full reload to preserve expansion state.
 - External change to the open file: if editor is clean → silently reload; if dirty →
   non-modal banner "File changed on disk: Reload / Keep mine".
-- Multiple workspace windows allowed; one preview per editor pane.
+- Multiple workspace windows are structurally allowed, one preview per editor pane, but
+  Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
+  windows mirror the same workspace/current document until window-scoped state is built.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Multiple open
   `DocumentSession`s kept warm in an LRU (max 8) so switching files is instant.
@@ -213,9 +215,12 @@ replacement local to EditorKit.
 
 - **List continuation:** Enter inside `-`/`*`/`1.`/`- [ ]` list inserts next marker
   (renumbering ordered lists); Enter on an empty item removes the marker (exits list).
-  Tab / Shift-Tab indents/outdents list items.
-- **Auto-pairing:** `**`, `*`, `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx). Wrapping: with a
-  selection, typing a pair character wraps the selection. Skip-over on closing char.
+  Tab / Shift-Tab indents/outdents list items, including every list item overlapped by
+  a multi-line selection.
+- **Auto-pairing:** `_`, `` ` ``, `(`, `[`, `{`, `"`, `<` (mdx) auto-close at the
+  caret. `*` wraps a selection as italic (`*…*`) but does not auto-close at a bare
+  caret so bullets and manually typed italics stay natural. Wrapping: with a selection,
+  typing a pair character wraps the selection. Skip-over on closing char except for `*`.
 - **Code fence helper:** typing ``` ``` ``` then Enter auto-inserts closing fence and places
   cursor inside; language autocomplete fires after the opening fence.
 - **Smart paste:** pasting a URL over selected text creates `[selection](url)`. Pasting an
@@ -246,7 +251,10 @@ replacement local to EditorKit.
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
 
 All commands appear in the menu bar (Format menu) — menu first, shortcut second, so they
-are discoverable and scriptable.
+are discoverable and scriptable. Format menu actions route through the AppKit responder
+chain so commands apply to the focused editor in the key window; if focus is in the
+sidebar or preview, the formatting command no-ops instead of falling back to another
+editor.
 
 ### 6.5 Completion engine
 
@@ -316,8 +324,8 @@ must be kept in sync; both list message names in the same order with a
 | Direction | Message | Payload |
 |---|---|---|
 | JS→Swift | `ready` | `{protocolVersion}` |
-| Swift→JS | `render` | `{version, fileKind, text, baseDir, theme}`; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
-| JS→Swift | `renderComplete` | `{version, blockCount}` |
+| Swift→JS | `render` | `{renderID, version, fileKind, text, baseDir, theme}`; `renderID` is a controller-assigned globally-monotonic stale-drop key (ordered across document switches); `version` is the per-document `DocumentSession.version` used only for `checkboxToggled` round-tripping; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
+| JS→Swift | `renderComplete` | `{renderID, version, blockCount}` |
 | Swift→JS | `scrollToLine` | `{line, animated}` |
 | JS→Swift | `previewScrolled` | `{topVisibleLine}` (only while preview owns scroll) |
 | JS→Swift | `linkClicked` | `{href}` |
@@ -493,6 +501,9 @@ next begins.
 ### M4 — Authoring features
 - Completion engine (all contexts in §6.5), editing behaviors (§6.3), formatting
   commands + menu (§6.4), smart paste/drag of images, frontmatter panel, table helper.
+- M4 part 1 landed editing behaviors + formatting commands: list continuation, auto-pair,
+  code fence helper, checkbox toggle, table helper, and the Format menu. M4 part 2 remains:
+  completion engine, frontmatter panel, smart paste, and drag-in image handling.
 - ✅ Accept: unit tests cover every completion context and list/table behavior; manual
   script `docs/m4-checklist.md` passes.
 
@@ -600,7 +611,13 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-12 | Keystrokes must not publish through the document model | Time Profiler showed per-key SwiftUI re-renders of the whole window (DynamicBody under `keyDown`) plus foreign-string traffic (`_StringGuts.foreign*`, CFStorage). `DocumentSession.text`/`version` are non-`@Published`; `isDirty` assignments are deduped; the coordinator eagerly `makeContiguousUTF8()`s the bridged string so downstream compares/counts run native. M2's preview must subscribe to text via its own debounced channel, not `objectWillChange`. |
 | 2026-06-12 | Product named **Plainsong**; bundle id namespace `app.plainsong.*` | Owner decision. Verified no editor-category collision (App Store / GitHub; "plainsong" in software is liturgical-chant apps only). `plainsong.app` domain is registered by a third party — marketing site will need a variant; bundle id does not depend on it. Exported MDX UTI is `app.plainsong.mdx`; UserDefaults keys and JS bridge globals renamed in the same commit (saved window/preview prefs reset once). Repo folder name stays `blogeditor`. |
 | 2026-06-12 | M2 scroll sync gets a narrow EditorKit scroll proxy exception | STTextView is an `NSView`, not `NSTextView`, so App-level hierarchy probing could never attach and retried forever. The exception is limited to `EditorScrollSupport.swift`, one optional `MarkdownEditorView(scrollProxy:)` parameter, and `MarkdownTextView` make/update wiring; `textViewDidChangeText` and the typing hot path remain unchanged. |
+| 2026-06-13 | M4 editing behaviors get a narrow EditorKit command/interception exception | STTextView owns key input and undo, so editing behaviors must intercept `shouldChangeTextIn` and apply accepted transforms through STTextView insertion APIs. The exception is limited to `EditingBehaviorsSupport.swift`, one optional command-proxy parameter on `MarkdownEditorView`/`MarkdownTextView`, and a thin Coordinator delegate call; all transform logic stays pure in MarkdownCore, no textStorage writes are used for behavior edits, and the EditorKit boundary no-ops while IME marked text exists. Alt: App-layer text mutation was rejected because it would lose live selection and native one-step undo. |
+| 2026-06-13 | M4 review fixes keep behavior edits pure and selection-aware | Ordinary non-trigger typing returns from EditorKit before whole-document materialization, menu commands share the Coordinator reentrancy guard, ordered task-list continuation increments and preserves checkbox markers, and Tab/Shift-Tab over selected list lines indents/outdents the selected block. Alt: deferring multi-line list indentation to M4 part 2 was rejected because the pure transform is small and covered by MarkdownCore tests. |
+| 2026-06-13 | M4 reentrancy guard is a reference flag; `*` is wrap-selection-only | STTextView synchronously re-enters `shouldChangeText` during programmatic inserts, so EditorKit must never hold an `inout` or other mutating access to the editing-behavior guard across `insertText` or similar delegate-reentrant calls. The guard is a Coordinator-owned reference object read by reentrant calls. Maintainer decision: bare `*` inserts literally, selected text wraps as `*…*`, and `*` has no skip-over behavior; `_`, backticks, brackets, quotes, and MDX angle pairs keep existing auto-close behavior. Alt: keeping bold-first `*` auto-pairing was rejected because it blocks bullets and Typora-like italics. |
 | 2026-06-12 | M3 keeps workspace ownership in WorkspaceKit and uses bookmark-backed Open Recent | File-tree reconciliation, directory scanning, FSEvents, file operations, bookmark recents, and LRU eviction stay below App so App composes rather than owns workspace rules. Preview assets resolve from the workspace root when a folder is open, while single-file mode keeps file-parent resolution. A simple File > Open Recent submenu backed by app-scope bookmarks was chosen over adopting NSDocumentController because Plainsong still owns custom folder workspaces and warm sessions. |
+| 2026-06-14 | Preview stale-drop keyed on a controller `renderID`, not document `version` (bridge protocol v4) | The long-lived preview WebView dropped any render whose `version` was below the highest it had seen, but `DocumentSession.version` resets to 0 per file. After editing one file then selecting another freshly opened (lower-version) file, the new file's render was discarded and the preview stranded on the previous document. Fix decouples ordering from document version: `PreviewController` assigns a globally-monotonic `renderID` per render request used as the only drop key on both sides; `version` is retained solely for `checkboxToggled` writeback matching. Protocol bumped 3→4 with mirrored `BridgeMessage.swift`/`bridge.ts` and regenerated preview bundle. Alt: resetting the JS watermark on `fileURL` change was rejected because `baseDir` is not a reliable document identity (siblings share a directory) and it still needs a bridge signal. |
+| 2026-06-15 | M4 review follow-ups route format commands by focused editor and preserve line endings | Format menu commands now dispatch through the AppKit responder chain to the key window's first-responder editor instead of a shared App-level proxy. MarkdownCore multi-line transforms operate on `MarkdownLine` content ranges and re-stitch original line terminators, and the code-fence helper only auto-inserts a closing fence for opening fences. Alt: per-window shared proxies were rejected because AppKit already owns the correct focused-editor routing. |
+| 2026-06-15 | Defer independent multi-window document state | Phase 1 keeps one App-scoped `AppState` for `WindowGroup`, so multiple windows mirror the same current workspace/document even though Format commands route by first responder. Window-scoped `AppState` is deferred to a dedicated workspace/windowing change because it needs autosave, warm-session LRU, recents, and external-change behavior reviewed together. |
 
 ---
 
