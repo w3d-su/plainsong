@@ -108,10 +108,12 @@ enum ListEditing {
 
     private static func handleBlockTab(in text: String, selection: NSRange, backwards: Bool) -> MarkdownEditResult? {
         let lines = MarkdownTextEditingSupport.lines(overlapping: selection, in: text)
-        guard let firstLine = lines.first, let lastLine = lines.last else { return nil }
+        guard let replacementRange = MarkdownTextEditingSupport.replacementRange(covering: lines) else {
+            return nil
+        }
 
         var didChange = false
-        let transformedLines = lines.map { line in
+        let replacement = MarkdownTextEditingSupport.joinedLineText(lines, in: text) { line in
             guard let item = MarkdownListItem(line.text) else {
                 return line.text
             }
@@ -130,11 +132,6 @@ enum ListEditing {
 
         guard didChange else { return nil }
 
-        let replacement = transformedLines.joined(separator: "\n")
-        let replacementRange = NSRange(
-            location: firstLine.range.location,
-            length: lastLine.endLocation - firstLine.range.location
-        )
         return MarkdownTextEditingSupport.replacement(
             range: replacementRange,
             string: replacement,

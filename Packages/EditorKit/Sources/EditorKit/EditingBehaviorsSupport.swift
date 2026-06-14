@@ -31,17 +31,168 @@ public final class EditorCommandProxy: ObservableObject {
         self.textView = textView
         self.fileKind = fileKind
         self.performCommand = performCommand
+        EditorCommandResponderRegistry.attach(to: textView, performCommand: performCommand)
     }
 
     func detach(from textView: STTextView) {
         if self.textView === textView {
             self.textView = nil
             performCommand = nil
+            EditorCommandResponderRegistry.detach(from: textView)
         }
     }
 
     func currentFileKind() -> FileKind {
         fileKind
+    }
+}
+
+@MainActor
+public enum EditorCommandDispatcher {
+    public static func perform(_ command: MarkdownEditCommand) {
+        NSApp.sendAction(selector(for: command), to: nil, from: nil)
+    }
+
+    // Intentional flat mapping from public edit commands to responder-chain selectors.
+    // swiftlint:disable:next cyclomatic_complexity
+    private static func selector(for command: MarkdownEditCommand) -> Selector {
+        switch command {
+        case .format(.bold):
+            #selector(STTextView.plainsongFormatBold(_:))
+        case .format(.italic):
+            #selector(STTextView.plainsongFormatItalic(_:))
+        case .format(.strikethrough):
+            #selector(STTextView.plainsongFormatStrikethrough(_:))
+        case .format(.inlineCode):
+            #selector(STTextView.plainsongFormatInlineCode(_:))
+        case .format(.link):
+            #selector(STTextView.plainsongFormatLink(_:))
+        case .format(.heading(level: 1)):
+            #selector(STTextView.plainsongFormatHeading1(_:))
+        case .format(.heading(level: 2)):
+            #selector(STTextView.plainsongFormatHeading2(_:))
+        case .format(.heading(level: 3)):
+            #selector(STTextView.plainsongFormatHeading3(_:))
+        case .format(.heading(level: 4)):
+            #selector(STTextView.plainsongFormatHeading4(_:))
+        case .format(.heading(level: 5)):
+            #selector(STTextView.plainsongFormatHeading5(_:))
+        case .format(.heading(level: 6)):
+            #selector(STTextView.plainsongFormatHeading6(_:))
+        case .format(.paragraph):
+            #selector(STTextView.plainsongFormatParagraph(_:))
+        case .format(.quote):
+            #selector(STTextView.plainsongFormatQuote(_:))
+        case .format(.codeFence):
+            #selector(STTextView.plainsongFormatCodeFence(_:))
+        case .toggleCheckbox:
+            #selector(STTextView.plainsongToggleCheckbox(_:))
+        case .formatTable:
+            #selector(STTextView.plainsongFormatTable(_:))
+        case .insertNewline, .insertTab, .type, .format(.heading):
+            #selector(STTextView.plainsongNoopCommand(_:))
+        }
+    }
+}
+
+@MainActor
+private enum EditorCommandResponderRegistry {
+    private final class Route {
+        let performCommand: (MarkdownEditCommand) -> Void
+
+        init(performCommand: @escaping (MarkdownEditCommand) -> Void) {
+            self.performCommand = performCommand
+        }
+    }
+
+    private static var routes: [ObjectIdentifier: Route] = [:]
+
+    static func attach(
+        to textView: STTextView,
+        performCommand: @escaping (MarkdownEditCommand) -> Void
+    ) {
+        routes[ObjectIdentifier(textView)] = Route(performCommand: performCommand)
+    }
+
+    static func detach(from textView: STTextView) {
+        routes[ObjectIdentifier(textView)] = nil
+    }
+
+    static func perform(_ command: MarkdownEditCommand, in textView: STTextView) {
+        routes[ObjectIdentifier(textView)]?.performCommand(command)
+    }
+}
+
+@MainActor
+extension STTextView {
+    @objc func plainsongFormatBold(_ sender: Any?) {
+        plainsongPerform(.format(.bold), sender: sender)
+    }
+
+    @objc func plainsongFormatItalic(_ sender: Any?) {
+        plainsongPerform(.format(.italic), sender: sender)
+    }
+
+    @objc func plainsongFormatStrikethrough(_ sender: Any?) {
+        plainsongPerform(.format(.strikethrough), sender: sender)
+    }
+
+    @objc func plainsongFormatInlineCode(_ sender: Any?) {
+        plainsongPerform(.format(.inlineCode), sender: sender)
+    }
+
+    @objc func plainsongFormatLink(_ sender: Any?) {
+        plainsongPerform(.format(.link), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading1(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 1)), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading2(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 2)), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading3(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 3)), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading4(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 4)), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading5(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 5)), sender: sender)
+    }
+
+    @objc func plainsongFormatHeading6(_ sender: Any?) {
+        plainsongPerform(.format(.heading(level: 6)), sender: sender)
+    }
+
+    @objc func plainsongFormatParagraph(_ sender: Any?) {
+        plainsongPerform(.format(.paragraph), sender: sender)
+    }
+
+    @objc func plainsongFormatQuote(_ sender: Any?) {
+        plainsongPerform(.format(.quote), sender: sender)
+    }
+
+    @objc func plainsongFormatCodeFence(_ sender: Any?) {
+        plainsongPerform(.format(.codeFence), sender: sender)
+    }
+
+    @objc func plainsongToggleCheckbox(_ sender: Any?) {
+        plainsongPerform(.toggleCheckbox, sender: sender)
+    }
+
+    @objc func plainsongFormatTable(_ sender: Any?) {
+        plainsongPerform(.formatTable, sender: sender)
+    }
+
+    @objc func plainsongNoopCommand(_: Any?) {}
+
+    private func plainsongPerform(_ command: MarkdownEditCommand, sender _: Any?) {
+        EditorCommandResponderRegistry.perform(command, in: self)
     }
 }
 

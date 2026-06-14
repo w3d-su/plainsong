@@ -14,7 +14,8 @@ enum CodeFenceEditing {
         let indent = (line.text as NSString).substring(with: indentRange)
 
         guard MarkdownTextEditingSupport.trimSpaces(beforeCursor) == "```",
-              MarkdownTextEditingSupport.isBlank(afterCursor)
+              MarkdownTextEditingSupport.isBlank(afterCursor),
+              !isClosingFence(line, in: text)
         else {
             return nil
         }
@@ -28,5 +29,26 @@ enum CodeFenceEditing {
                 length: 0
             )
         )
+    }
+
+    private static func isClosingFence(_ currentLine: MarkdownLine, in text: String) -> Bool {
+        var cursor = 0
+        var hasOpenFence = false
+
+        while cursor < currentLine.range.location {
+            let line = MarkdownTextEditingSupport.line(containing: cursor, in: text)
+            if isBacktickFenceLine(line.text) {
+                hasOpenFence.toggle()
+            }
+
+            guard line.fullEndLocation > cursor else { break }
+            cursor = line.fullEndLocation
+        }
+
+        return hasOpenFence
+    }
+
+    private static func isBacktickFenceLine(_ line: String) -> Bool {
+        MarkdownTextEditingSupport.trimSpaces(line).hasPrefix("```")
     }
 }

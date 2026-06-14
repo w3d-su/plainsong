@@ -110,6 +110,16 @@ final class MarkdownEditingTests: XCTestCase {
         )
     }
 
+    func testCodeFenceHelperDoesNotInsertFenceFromClosingFence() {
+        let input = MarkedText("```swift\nprint(\"hi\")\n```<caret>")
+
+        XCTAssertNil(MarkdownEditing.apply(
+            .insertNewline(fileKind: .markdown),
+            to: input.text,
+            selection: input.selection
+        ))
+    }
+
     func testCheckboxToggleBehaviors() {
         assertEdit(
             .toggleCheckbox,
@@ -127,6 +137,22 @@ final class MarkdownEditingTests: XCTestCase {
             .toggleCheckbox,
             from: "<caret>- item",
             to: "<caret>- [ ] item"
+        )
+    }
+
+    func testCheckboxTogglePreservesCRLFLineEndings() {
+        assertEdit(
+            .toggleCheckbox,
+            from: "[[  \r\nplain]]",
+            to: "[[- [ ] \r\n- [ ] plain]]"
+        )
+    }
+
+    func testBlockListTabPreservesCRLFLineEndings() {
+        assertEdit(
+            .insertTab(backwards: false),
+            from: "[[- one\r\n- two]]\r\nparagraph",
+            to: "[[    - one\r\n    - two]]\r\nparagraph"
         )
     }
 
@@ -209,6 +235,14 @@ final class MarkdownEditingTests: XCTestCase {
             .format(.quote),
             from: "> Quote me<caret>",
             to: "Quote me<caret>"
+        )
+    }
+
+    func testQuoteTogglePreservesCRLFLineEndings() {
+        assertEdit(
+            .format(.quote),
+            from: "[[one\r\ntwo]]",
+            to: "[[> one\r\n> two]]"
         )
     }
 

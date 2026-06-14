@@ -2,7 +2,7 @@ import Foundation
 import MarkdownCore
 
 public enum PreviewBridge {
-    public static let protocolVersion = 3
+    public static let protocolVersion = 4
 }
 
 public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {
@@ -39,6 +39,12 @@ public struct ReadyPayload: Codable, Equatable, Sendable {
 }
 
 public struct RenderPayload: Codable, Equatable, Sendable {
+    /// Controller-assigned, globally monotonic render-request id. Used as the
+    /// stale-drop key so renders are ordered across document switches. `version`
+    /// (below) resets to 0 per `DocumentSession`, so it must NOT drive dropping.
+    public let renderID: Int
+    /// Document version of the rendered text, used only for checkbox writeback
+    /// round-tripping (`checkboxToggled` must match `DocumentSession.version`).
     public let version: Int
     public let fileKind: PreviewFileKind
     public let text: String
@@ -46,12 +52,14 @@ public struct RenderPayload: Codable, Equatable, Sendable {
     public let theme: String
 
     public init(
+        renderID: Int,
         version: Int,
         fileKind: PreviewFileKind,
         text: String,
         baseDir: String?,
         theme: String
     ) {
+        self.renderID = renderID
         self.version = version
         self.fileKind = fileKind
         self.text = text
@@ -59,8 +67,9 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         self.theme = theme
     }
 
-    public init(change: DocumentTextChange, theme: String, baseDir: String? = nil) {
+    public init(change: DocumentTextChange, renderID: Int, theme: String, baseDir: String? = nil) {
         self.init(
+            renderID: renderID,
             version: change.version,
             fileKind: PreviewFileKind(change.fileKind),
             text: change.text,
@@ -71,10 +80,12 @@ public struct RenderPayload: Codable, Equatable, Sendable {
 }
 
 public struct RenderCompletePayload: Codable, Equatable, Sendable {
+    public let renderID: Int
     public let version: Int
     public let blockCount: Int
 
-    public init(version: Int, blockCount: Int) {
+    public init(renderID: Int, version: Int, blockCount: Int) {
+        self.renderID = renderID
         self.version = version
         self.blockCount = blockCount
     }

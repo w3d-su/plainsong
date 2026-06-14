@@ -37,6 +37,28 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(observedCommands, [.toggleCheckbox])
     }
 
+    func testResponderActionUsesInvokedTextViewsCommandProxy() {
+        let firstTextView = STTextView(frame: .zero)
+        let secondTextView = STTextView(frame: .zero)
+        let firstProxy = EditorCommandProxy()
+        let secondProxy = EditorCommandProxy()
+        var firstCommands: [MarkdownEditCommand] = []
+        var secondCommands: [MarkdownEditCommand] = []
+
+        firstProxy.attach(to: firstTextView, fileKind: .markdown) { command in
+            firstCommands.append(command)
+        }
+        secondProxy.attach(to: secondTextView, fileKind: .markdown) { command in
+            secondCommands.append(command)
+        }
+
+        firstTextView.plainsongFormatBold(nil)
+        secondTextView.plainsongFormatBold(nil)
+
+        XCTAssertEqual(firstCommands, [.format(.bold)])
+        XCTAssertEqual(secondCommands, [.format(.bold)])
+    }
+
     func testApplyCommandHonorsSharedEditingGuard() {
         let textView = STTextView(frame: .zero)
         textView.text = "word"
@@ -148,6 +170,58 @@ final class EditingBehaviorsSupportTests: XCTestCase {
 
         print(String(format: "large-1mb.md plain typing hot path max: %.3f ms", maxLatencyMilliseconds))
         XCTAssertLessThan(maxLatencyMilliseconds, 16)
+    }
+
+    func testMarkdownTriggerHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
+        try assertLargeFixtureHotPath(
+            replacementString: "\n",
+            expectedNativeInput: true,
+            iterations: 200
+        )
+        try assertLargeFixtureHotPath(
+            replacementString: "(",
+            expectedNativeInput: false,
+            iterations: 50
+        )
+    }
+
+    private func assertLargeFixtureHotPath(
+        replacementString: String,
+        expectedNativeInput: Bool,
+        iterations: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let textView = STTextView(frame: .zero)
+        textView.text = fixtureText
+        textView.textSelection = NSRange(location: 0, length: 0)
+        let affectedRange = try XCTUnwrap(NSTextRange(textView.selectedRange(), in: textView.textContentManager))
+        let editingGuard = EditingBehaviorGuard()
+
+        var maxLatencyMilliseconds = 0.0
+        for _ in 0 ..< iterations {
+            let start = CFAbsoluteTimeGetCurrent()
+            let shouldAllowNativeInput = EditingBehaviorsSupport.handleProposedChange(
+                in: textView,
+                affectedRange: affectedRange,
+                replacementString: replacementString,
+                fileKind: .markdown,
+                editingGuard: editingGuard
+            )
+            maxLatencyMilliseconds = max(
+                maxLatencyMilliseconds,
+                (CFAbsoluteTimeGetCurrent() - start) * 1000
+            )
+            XCTAssertEqual(shouldAllowNativeInput, expectedNativeInput, file: file, line: line)
+        }
+
+        print(String(
+            format: "large-1mb.md trigger '%@' hot path max: %.3f ms",
+            replacementString == "\n" ? "\\n" : replacementString,
+            maxLatencyMilliseconds
+        ))
+        XCTAssertLessThan(maxLatencyMilliseconds, 16, file: file, line: line)
     }
 
     private static func text(in textView: STTextView) -> String {

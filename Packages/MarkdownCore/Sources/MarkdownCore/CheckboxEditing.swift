@@ -3,17 +3,14 @@ import Foundation
 enum CheckboxEditing {
     static func toggle(in text: String, selection: NSRange) -> MarkdownEditResult? {
         let lines = MarkdownTextEditingSupport.lines(overlapping: selection, in: text)
-        guard let firstLine = lines.first, let lastLine = lines.last else { return nil }
+        guard let replacementRange = MarkdownTextEditingSupport.replacementRange(covering: lines) else {
+            return nil
+        }
 
-        let replacementRange = NSRange(
-            location: firstLine.range.location,
-            length: lastLine.range.location + lastLine.range.length - firstLine.range.location
-        )
         let original = MarkdownTextEditingSupport.substring(replacementRange, in: text)
-        let transformedLines = original
-            .components(separatedBy: "\n")
-            .map(toggleLine)
-        let replacement = transformedLines.joined(separator: "\n")
+        let replacement = MarkdownTextEditingSupport.joinedLineText(lines, in: text) { line in
+            toggleLine(line.text)
+        }
 
         guard replacement != original else { return nil }
 

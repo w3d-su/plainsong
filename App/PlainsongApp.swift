@@ -8,13 +8,11 @@ import SwiftUI
 struct PlainsongApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appState = AppState()
-    @StateObject private var editorCommandProxy = EditorCommandProxy()
 
     var body: some Scene {
         WindowGroup {
             WorkspaceWindow()
                 .environmentObject(appState)
-                .environmentObject(editorCommandProxy)
                 .onOpenURL { url in
                     appState.openExternalFile(url)
                 }
@@ -68,31 +66,31 @@ struct PlainsongApp: App {
 
             CommandMenu("Format") {
                 Button("Bold") {
-                    editorCommandProxy.perform(.format(.bold))
+                    EditorCommandDispatcher.perform(.format(.bold))
                 }
                 .keyboardShortcut("b", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Italic") {
-                    editorCommandProxy.perform(.format(.italic))
+                    EditorCommandDispatcher.perform(.format(.italic))
                 }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Strikethrough") {
-                    editorCommandProxy.perform(.format(.strikethrough))
+                    EditorCommandDispatcher.perform(.format(.strikethrough))
                 }
                 .keyboardShortcut("x", modifiers: [.control, .command])
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Inline Code") {
-                    editorCommandProxy.perform(.format(.inlineCode))
+                    EditorCommandDispatcher.perform(.format(.inlineCode))
                 }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Link") {
-                    editorCommandProxy.perform(.format(.link))
+                    EditorCommandDispatcher.perform(.format(.link))
                 }
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
@@ -100,43 +98,43 @@ struct PlainsongApp: App {
                 Divider()
 
                 Button("Heading 1") {
-                    editorCommandProxy.perform(.format(.heading(level: 1)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 1)))
                 }
                 .keyboardShortcut("1", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Heading 2") {
-                    editorCommandProxy.perform(.format(.heading(level: 2)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 2)))
                 }
                 .keyboardShortcut("2", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Heading 3") {
-                    editorCommandProxy.perform(.format(.heading(level: 3)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 3)))
                 }
                 .keyboardShortcut("3", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Heading 4") {
-                    editorCommandProxy.perform(.format(.heading(level: 4)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 4)))
                 }
                 .keyboardShortcut("4", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Heading 5") {
-                    editorCommandProxy.perform(.format(.heading(level: 5)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 5)))
                 }
                 .keyboardShortcut("5", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Heading 6") {
-                    editorCommandProxy.perform(.format(.heading(level: 6)))
+                    EditorCommandDispatcher.perform(.format(.heading(level: 6)))
                 }
                 .keyboardShortcut("6", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Paragraph") {
-                    editorCommandProxy.perform(.format(.paragraph))
+                    EditorCommandDispatcher.perform(.format(.paragraph))
                 }
                 .keyboardShortcut("0", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
@@ -144,25 +142,25 @@ struct PlainsongApp: App {
                 Divider()
 
                 Button("Quote") {
-                    editorCommandProxy.perform(.format(.quote))
+                    EditorCommandDispatcher.perform(.format(.quote))
                 }
                 .keyboardShortcut("q", modifiers: [.command, .shift])
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Code Fence") {
-                    editorCommandProxy.perform(.format(.codeFence))
+                    EditorCommandDispatcher.perform(.format(.codeFence))
                 }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Toggle Checkbox") {
-                    editorCommandProxy.perform(.toggleCheckbox)
+                    EditorCommandDispatcher.perform(.toggleCheckbox)
                 }
                 .keyboardShortcut("l", modifiers: .command)
                 .disabled(!appState.hasOpenDocument)
 
                 Button("Format Table") {
-                    editorCommandProxy.perform(.formatTable)
+                    EditorCommandDispatcher.perform(.formatTable)
                 }
                 .keyboardShortcut("f", modifiers: [.option, .command])
                 .disabled(!appState.hasOpenDocument)

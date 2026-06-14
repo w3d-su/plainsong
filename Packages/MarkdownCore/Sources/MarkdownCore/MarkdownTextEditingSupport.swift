@@ -87,6 +87,35 @@ enum MarkdownTextEditingSupport {
         (text as NSString).substring(with: range)
     }
 
+    static func lineTerminator(after line: MarkdownLine, in text: String) -> String {
+        let terminatorLength = line.fullEndLocation - line.endLocation
+        guard terminatorLength > 0 else { return "" }
+        return substring(NSRange(location: line.endLocation, length: terminatorLength), in: text)
+    }
+
+    static func replacementRange(covering lines: [MarkdownLine]) -> NSRange? {
+        guard let firstLine = lines.first, let lastLine = lines.last else { return nil }
+        return NSRange(
+            location: firstLine.range.location,
+            length: lastLine.endLocation - firstLine.range.location
+        )
+    }
+
+    static func joinedLineText(
+        _ lines: [MarkdownLine],
+        in text: String,
+        transform: (MarkdownLine) -> String
+    ) -> String {
+        var transformed = ""
+        for (index, line) in lines.enumerated() {
+            transformed += transform(line)
+            if index < lines.count - 1 {
+                transformed += lineTerminator(after: line, in: text)
+            }
+        }
+        return transformed
+    }
+
     static func character(at location: Int, in text: String) -> String? {
         let storage = text as NSString
         guard location >= 0, location < storage.length else { return nil }

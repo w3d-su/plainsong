@@ -164,6 +164,12 @@ struct MarkdownTextView: NSViewRepresentable {
         // attribute edits already invalidate exactly what changed.
     }
 
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        guard let textView = scrollView.documentView as? STTextView else { return }
+        coordinator.detachCommandProxy(from: textView)
+        coordinator.detachScrollProxy()
+    }
+
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
     /// state, and scroll position survive because the characters never change. Stale
     /// styling (the text moved on) is dropped — a newer revision is already scheduled.
@@ -241,6 +247,11 @@ struct MarkdownTextView: NSViewRepresentable {
             proxy?.attach(to: textView)
         }
 
+        func detachScrollProxy() {
+            scrollProxy?.detach()
+            scrollProxy = nil
+        }
+
         func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
             if commandProxy !== proxy {
                 commandProxy?.detach(from: textView)
@@ -254,6 +265,11 @@ struct MarkdownTextView: NSViewRepresentable {
                 guard let self, let textView else { return }
                 performCommand(command, in: textView)
             }
+        }
+
+        func detachCommandProxy(from textView: STTextView) {
+            commandProxy?.detach(from: textView)
+            commandProxy = nil
         }
 
         private func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {

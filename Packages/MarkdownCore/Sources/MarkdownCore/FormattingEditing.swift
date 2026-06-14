@@ -145,34 +145,28 @@ enum FormattingEditing {
 
     private static func toggleQuote(in text: String, selection: NSRange) -> MarkdownEditResult? {
         let lines = MarkdownTextEditingSupport.lines(overlapping: selection, in: text)
-        guard let firstLine = lines.first, let lastLine = lines.last else { return nil }
+        guard let replacementRange = MarkdownTextEditingSupport.replacementRange(covering: lines) else {
+            return nil
+        }
 
         let allQuoted = lines
             .allSatisfy { quotePrefixRange(in: $0.text) != nil || MarkdownTextEditingSupport.isBlank($0.text) }
-        var transformed = ""
-        for (index, line) in lines.enumerated() {
-            if index > 0 {
-                transformed += "\n"
-            }
+        let transformed = MarkdownTextEditingSupport.joinedLineText(lines, in: text) { line in
             if allQuoted {
                 if let quoteRange = quotePrefixRange(in: line.text) {
                     let storage = line.text as NSString
-                    transformed += storage.substring(to: quoteRange.location)
-                    transformed += storage.substring(from: quoteRange.location + quoteRange.length)
-                } else {
-                    transformed += line.text
+                    return storage.substring(to: quoteRange.location) +
+                        storage.substring(from: quoteRange.location + quoteRange.length)
                 }
-            } else if MarkdownTextEditingSupport.isBlank(line.text) {
-                transformed += line.text
-            } else {
-                transformed += "> \(line.text)"
+                return line.text
             }
+
+            if MarkdownTextEditingSupport.isBlank(line.text) {
+                return line.text
+            }
+            return "> \(line.text)"
         }
 
-        let replacementRange = NSRange(
-            location: firstLine.range.location,
-            length: lastLine.endLocation - firstLine.range.location
-        )
         let original = MarkdownTextEditingSupport.substring(replacementRange, in: text)
         guard original != transformed else { return nil }
 
