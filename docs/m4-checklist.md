@@ -1,7 +1,7 @@
-# M4 Part 1 Manual Checklist
+# M4 Manual Checklist
 
-Use this checklist before accepting M4 part 1 editing behavior changes. Run it in a disposable
-Markdown file inside a folder workspace so file switching and preview rendering are also covered.
+Use this checklist before accepting M4 authoring-feature changes. Run it in a disposable Markdown
+file inside a folder workspace so file switching and preview rendering are also covered.
 
 ## Setup
 
@@ -62,6 +62,20 @@ Markdown file inside a folder workspace so file switching and preview rendering 
 - [ ] Confirm the command applies to the focused editor; Phase 1 windows currently share one document state.
 - [ ] Move focus to the sidebar or preview and run Cmd-B.
 - [ ] Confirm the command no-ops rather than applying to a background editor.
+
+## Completion Engine
+
+- [ ] At the start of a new empty Markdown file, type `#`.
+- [ ] Confirm completion suggestions include headings, quote/list/task snippets, a table, a fenced code block, and a frontmatter block.
+- [ ] Type `#` on a non-top line and confirm the frontmatter block is not suggested.
+- [ ] Type `` ``` `` and confirm language suggestions include `swift`, `ts`, `python`, and `mermaid`.
+- [ ] In a folder workspace, type `[post](` and confirm Markdown/MDX file paths and image paths are suggested.
+- [ ] Type `[section](#` in a document with headings and confirm current-file heading anchors are suggested.
+- [ ] Type `![](` and confirm only image paths are suggested.
+- [ ] Type `:sm` and confirm emoji shortcode suggestions insert the Unicode emoji.
+- [ ] Inside an existing YAML frontmatter block, start a new key line and confirm built-in keys plus keys from sibling files are suggested.
+- [ ] In an `.mdx` file with component imports, type `<` and confirm imported component names are suggested.
+- [ ] Hold normal typing in a large document and confirm typing remains responsive while completion requests appear only for trigger contexts or Control-Space.
 
 ## Preview And File-Switch Sanity
 

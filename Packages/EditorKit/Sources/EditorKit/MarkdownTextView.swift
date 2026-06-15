@@ -47,6 +47,8 @@ struct HighlightedText: Equatable {
 /// 1 MB documents. Plain `String` flows through `text`; styling arrives separately
 /// (and rarely) via `styledText` and is applied in place.
 struct MarkdownTextView: NSViewRepresentable {
+    typealias Coordinator = MarkdownTextViewCoordinator
+
     @Environment(\.isEnabled) private var isEnabled
     @Binding private var text: String
     @Binding private var selection: NSRange?
@@ -57,6 +59,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
+    private let completionWorkspace: CompletionWorkspace
 
     init(
         text: Binding<String>,
@@ -65,6 +68,7 @@ struct MarkdownTextView: NSViewRepresentable {
         showsLineNumbers: Bool,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
+        completionWorkspace: CompletionWorkspace = .empty,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -74,6 +78,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
+        self.completionWorkspace = completionWorkspace
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
@@ -111,6 +116,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.isUpdating = false
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
+        context.coordinator.updateCompletionWorkspace(completionWorkspace)
 
         return scrollView
     }
@@ -123,6 +129,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
+        context.coordinator.updateCompletionWorkspace(completionWorkspace)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -168,6 +175,7 @@ struct MarkdownTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? STTextView else { return }
         coordinator.detachCommandProxy(from: textView)
         coordinator.detachScrollProxy()
+        coordinator.cancelCompletionRequest()
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
@@ -220,113 +228,5 @@ struct MarkdownTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, selection: $selection)
-    }
-
-    @MainActor
-    final class Coordinator: @preconcurrency STTextViewDelegate {
-        @Binding var text: String
-        @Binding var selection: NSRange?
-        var isUpdating = false
-        var isUserEditing = false
-        var lastAppliedHighlightRevision: Int?
-        private var scrollProxy: EditorScrollProxy?
-        private var commandProxy: EditorCommandProxy?
-        private let editingBehaviorGuard = EditingBehaviorGuard()
-
-        init(text: Binding<String>, selection: Binding<NSRange?>) {
-            _text = text
-            _selection = selection
-        }
-
-        func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {
-            if scrollProxy !== proxy {
-                scrollProxy?.detach()
-                scrollProxy = proxy
-            }
-
-            proxy?.attach(to: textView)
-        }
-
-        func detachScrollProxy() {
-            scrollProxy?.detach()
-            scrollProxy = nil
-        }
-
-        func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
-            if commandProxy !== proxy {
-                commandProxy?.detach(from: textView)
-                commandProxy = proxy
-            }
-
-            proxy?.attach(
-                to: textView,
-                fileKind: proxy?.currentFileKind() ?? .markdown
-            ) { [weak self, weak textView] command in
-                guard let self, let textView else { return }
-                performCommand(command, in: textView)
-            }
-        }
-
-        func detachCommandProxy(from textView: STTextView) {
-            commandProxy?.detach(from: textView)
-            commandProxy = nil
-        }
-
-        private func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {
-            EditingBehaviorsSupport.applyCommand(
-                command,
-                to: textView,
-                editingGuard: editingBehaviorGuard
-            )
-        }
-
-        func textViewDidChangeText(_ notification: Notification) {
-            guard !isUpdating, let textView = notification.object as? STTextView else {
-                return
-            }
-
-            isUserEditing = true
-            // `textStorage.string` is a lazily bridged ("foreign") String backed by
-            // CFStorage — every downstream comparison and count would crawl through
-            // ObjC. One eager transcode here makes all later operations native-fast
-            // (confirmed by Time Profiler: _StringGuts.foreign* + CFStorageGetConstValue).
-            var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-            newText.makeContiguousUTF8()
-            text = newText
-        }
-
-        func textView(
-            _ textView: STTextView,
-            shouldChangeTextIn affectedCharRange: NSTextRange,
-            replacementString: String?
-        ) -> Bool {
-            EditingBehaviorsSupport.handleProposedChange(
-                in: textView,
-                affectedRange: affectedCharRange,
-                replacementString: replacementString,
-                fileKind: commandProxy?.currentFileKind() ?? .markdown,
-                editingGuard: editingBehaviorGuard
-            )
-        }
-
-        func textViewDidChangeSelection(_ notification: Notification) {
-            guard !isUpdating, let textView = notification.object as? STTextView else {
-                return
-            }
-
-            selection = textView.selectedRange()
-        }
-    }
-}
-
-private extension NSRange {
-    func clamped(toLength length: Int) -> NSRange {
-        guard location != NSNotFound else {
-            return self
-        }
-
-        let clampedLocation = min(max(location, 0), length)
-        let clampedLength = min(max(self.length, 0), length - clampedLocation)
-        return NSRange(location: clampedLocation, length: clampedLength)
     }
 }

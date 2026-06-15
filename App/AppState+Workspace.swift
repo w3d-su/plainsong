@@ -170,6 +170,8 @@ extension AppState {
     func closeWorkspace() {
         workspaceReloadTask?.cancel()
         workspaceReloadTask = nil
+        completionWorkspaceTask?.cancel()
+        completionWorkspaceTask = nil
         workspaceWatcher?.stop()
         workspaceWatcher = nil
         for session in sessionCache.values where session.isDirty {
@@ -183,6 +185,7 @@ extension AppState {
         workspaceAccess = nil
         workspaceRootURL = nil
         workspaceTree = nil
+        completionWorkspace = .empty
         sessionCache.removeAll()
         sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
         pendingExternalTexts.removeAll()
@@ -206,6 +209,7 @@ extension AppState {
         }
 
         workspaceTree = tree
+        scheduleCompletionWorkspaceRefresh()
 
         if let selectedNode = tree.selectedNode, selectedNode.isEditableMarkdown {
             try activateFileSession(
@@ -244,10 +248,14 @@ extension AppState {
     }
 
     func setCurrentDocument(_ session: DocumentSession) {
-        guard currentDocument !== session else { return }
+        guard currentDocument !== session else {
+            scheduleCompletionWorkspaceRefresh()
+            return
+        }
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
         observeCurrentDocument()
+        scheduleCompletionWorkspaceRefresh()
     }
 
     func handleSessionAccess(url: URL, isDirty: Bool) {
