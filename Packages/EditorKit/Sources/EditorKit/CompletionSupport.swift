@@ -2,7 +2,8 @@ import AppKit
 import MarkdownCore
 import STTextView
 
-final class MarkdownCompletionItem: STCompletionItem {
+@MainActor
+final class MarkdownCompletionItem: @preconcurrency STCompletionItem {
     let id: String
     let completion: Completion
 
@@ -14,12 +15,9 @@ final class MarkdownCompletionItem: STCompletionItem {
     var view: NSView {
         let labelText = completion.label
         let detailText = completion.kind.displayName
-        return MainActor.assumeIsolated {
-            Self.makeView(labelText: labelText, detailText: detailText)
-        }
+        return Self.makeView(labelText: labelText, detailText: detailText)
     }
 
-    @MainActor
     private static func makeView(labelText: String, detailText: String) -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
@@ -47,26 +45,63 @@ final class MarkdownCompletionItem: STCompletionItem {
 
 @MainActor
 enum EditorCompletionSupport {
+    static let recentCompletionLimit = 20
+
     static func shouldTriggerCompletion(
         replacementString: String,
-        textBeforeChange: String,
-        selection: NSRange,
+        emojiShortcodePrefixBeforeChange: @autoclosure () -> String?,
         fileKind: FileKind
     ) -> Bool {
         guard replacementString.utf16.count == 1 else { return false }
 
         switch replacementString {
-        case "#", ">", "-", "`", "(", "/", ":":
+        case "#", ">", "-", "`", "(", "/":
             return true
         case "<":
             return fileKind == .mdx
         default:
             return continuesEmojiShortcode(
                 replacementString: replacementString,
-                textBeforeChange: textBeforeChange,
-                selection: selection
+                emojiShortcodePrefixBeforeChange: emojiShortcodePrefixBeforeChange
             )
         }
+    }
+
+    static func emojiShortcodePrefixBeforeSelection(
+        in textView: STTextView,
+        selection proposedSelection: NSRange? = nil,
+        limit: Int = 64
+    ) -> String? {
+        guard let textStorage = MarkdownTextView.textStorage(of: textView) else {
+            return nil
+        }
+
+        let storage = textStorage.mutableString
+        let rawSelection = proposedSelection ?? textView.selectedRange()
+        guard rawSelection.location != NSNotFound else {
+            return nil
+        }
+
+        let cursor = min(max(rawSelection.location, 0), storage.length)
+        var location = cursor
+        var remaining = limit
+        while location > 0, remaining > 0 {
+            let previousLocation = location - 1
+            let previous = storage.character(at: previousLocation)
+            if previous == 58 {
+                return storage.substring(with: NSRange(
+                    location: previousLocation + 1,
+                    length: cursor - previousLocation - 1
+                ))
+            }
+            if previous == 10 || previous == 13 || previous == 9 || previous == 32 {
+                return nil
+            }
+            location = previousLocation
+            remaining -= 1
+        }
+
+        return nil
     }
 
     static func insert(
@@ -87,38 +122,35 @@ enum EditorCompletionSupport {
         textView.textSelection = NSRange(location: selectionLocation, length: 0)
     }
 
+    static func recentCompletionIDs(
+        selecting completionID: String,
+        existing: [String],
+        limit: Int = recentCompletionLimit
+    ) -> [String] {
+        var updated = [completionID]
+        for id in existing where id != completionID {
+            updated.append(id)
+            if updated.count == limit {
+                break
+            }
+        }
+        return updated
+    }
+
     private static func continuesEmojiShortcode(
         replacementString: String,
-        textBeforeChange: String,
-        selection: NSRange
+        emojiShortcodePrefixBeforeChange: () -> String?
     ) -> Bool {
         guard replacementString.rangeOfCharacter(from: .alphanumerics) != nil else {
             return false
         }
 
-        let storage = textBeforeChange as NSString
-        let cursor = min(max(selection.location, 0), storage.length)
-        let line = linePrefix(in: textBeforeChange, cursor: cursor)
-        guard let colon = line.range(of: ":", options: .backwards) else {
+        guard let query = emojiShortcodePrefixBeforeChange() else {
             return false
         }
 
-        let query = String(line[colon.upperBound...])
-        return query.utf16.count >= 1 && !query.contains(where: { $0.isWhitespace || $0 == ":" })
-    }
-
-    private static func linePrefix(in text: String, cursor: Int) -> String {
-        let storage = text as NSString
-        var lineStart = cursor
-        while lineStart > 0 {
-            let previous = storage.character(at: lineStart - 1)
-            if previous == 10 || previous == 13 {
-                break
-            }
-            lineStart -= 1
-        }
-
-        return storage.substring(with: NSRange(location: lineStart, length: cursor - lineStart))
+        // emojiShortcodePrefixBeforeSelection returns only text after the trigger colon.
+        return query.utf16.count >= 1
     }
 }
 
