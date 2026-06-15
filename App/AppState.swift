@@ -44,6 +44,7 @@ final class AppState: ObservableObject {
     @Published var workspaceRootURL: URL?
     @Published var workspaceTree: WorkspaceFileTree?
     @Published var showAllFiles = false
+    @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
     @Published var presentedError: UserVisibleError?
     @Published var externalChangePrompt: ExternalChangePrompt?
@@ -58,6 +59,7 @@ final class AppState: ObservableObject {
     var autosaveTask: Task<Void, Never>?
     var statisticsTask: Task<Void, Never>?
     var workspaceReloadTask: Task<Void, Never>?
+    var completionWorkspaceTask: Task<Void, Never>?
     var documentChangeCancellable: AnyCancellable?
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
@@ -183,6 +185,7 @@ final class AppState: ObservableObject {
             sessionPolicy.updateDirtyState(for: url, isDirty: currentDocument.isDirty)
         }
         scheduleStatisticsRefresh()
+        scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
         scheduleAutosave()
     }
 

@@ -124,6 +124,39 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    func testOpeningFolderPublishesCompletionWorkspace() async throws {
+        let root = try makeTemporaryDirectory()
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("content"),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("assets"),
+            withIntermediateDirectories: true
+        )
+        let post = root.appendingPathComponent("content/post.md")
+        try "# Workspace\n\n## Details".write(to: post, atomically: true, encoding: .utf8)
+        try """
+        ---
+        layout: post
+        custom_key: yes
+        ---
+        Body
+        """.write(to: root.appendingPathComponent("content/sibling.md"), atomically: true, encoding: .utf8)
+        try Data([0x89, 0x50, 0x4E, 0x47]).write(to: root.appendingPathComponent("assets/hero.png"))
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+
+        try await waitUntil("completion workspace loaded") {
+            appState.completionWorkspace.currentFilePath == "content/post.md" &&
+                appState.completionWorkspace.markdownFilePaths.contains("content/sibling.md") &&
+                appState.completionWorkspace.imageFilePaths == ["assets/hero.png"] &&
+                appState.completionWorkspace.currentFileHeadingAnchors == ["#workspace", "#details"] &&
+                appState.completionWorkspace.frontmatterKeys.contains("custom_key")
+        }
+    }
+
     func testCleanOpenFileReloadsExternalChangesSilently() async throws {
         let root = try makeTemporaryDirectory()
         let post = root.appendingPathComponent("post.md")

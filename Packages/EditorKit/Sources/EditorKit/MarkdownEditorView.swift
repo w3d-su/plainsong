@@ -18,19 +18,22 @@ public struct MarkdownEditorView: View {
     private let showsLineNumbers: Bool
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
+    private let completionWorkspace: CompletionWorkspace
 
     public init(
         text: Binding<String>,
         fileKind: FileKind,
         showsLineNumbers: Bool = true,
         scrollProxy: EditorScrollProxy? = nil,
-        commandProxy: EditorCommandProxy? = nil
+        commandProxy: EditorCommandProxy? = nil,
+        completionWorkspace: CompletionWorkspace = .empty
     ) {
         _text = text
         self.fileKind = fileKind
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
+        self.completionWorkspace = completionWorkspace
     }
 
     public var body: some View {
@@ -52,7 +55,8 @@ public struct MarkdownEditorView: View {
             selection: $selection,
             showsLineNumbers: showsLineNumbers,
             scrollProxy: scrollProxy,
-            commandProxy: activeCommandProxy
+            commandProxy: activeCommandProxy,
+            completionWorkspace: completionWorkspace
         )
         .onChange(of: text) { _, _ in
             scheduleHighlight()

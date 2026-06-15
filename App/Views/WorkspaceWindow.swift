@@ -249,7 +249,8 @@ private struct DocumentEditor: View {
             ),
             fileKind: session.fileKind,
             showsLineNumbers: true,
-            scrollProxy: scrollCoordinator.editorProxy
+            scrollProxy: scrollCoordinator.editorProxy,
+            completionWorkspace: appState.completionWorkspace
         )
         .onAppear {
             scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)
