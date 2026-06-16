@@ -18,7 +18,7 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
-import { workspaceRelativeAssetPath } from "./asset-path";
+import { assetURLPath, workspaceRelativeAssetPath } from "./asset-path";
 import { renderMarkdown } from "./pipeline";
 
 export { PROTOCOL_VERSION } from "./bridge";
@@ -244,7 +244,7 @@ function rewriteImageSources(baseDir: string | null): void {
     if (!source || !isWorkspaceRelativeURL(source)) continue;
 
     const assetPath = workspaceRelativeAssetPath(source, baseDir);
-    image.src = `asset://${encodeURI(assetPath).replaceAll("#", "%23")}`;
+    image.src = `asset://${assetURLPath(assetPath)}`;
   }
 }
 

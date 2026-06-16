@@ -2,6 +2,7 @@
 import Foundation
 import MarkdownCore
 import STTextView
+import SwiftUI
 import XCTest
 
 @MainActor
@@ -135,6 +136,131 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(Self.text(in: textView), textBeforeBehavior)
     }
 
+    func testURLPasteOverSelectionInsertsMarkdownLinkThroughPasteHandler() {
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Read more",
+            selection: NSRange(location: 0, length: 4)
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setString("https://example.com", forType: .string)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
+
+        XCTAssertEqual(Self.text(in: textView), "[Read](https://example.com) more")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 27, length: 0))
+    }
+
+    func testMultilineURLPasteFallsThroughToNativePaste() {
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Read more",
+            selection: NSRange(location: 0, length: 4)
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setString("https://example.com\nhttps://example.org", forType: .string)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), false)
+        XCTAssertEqual(Self.text(in: textView), "Read more")
+    }
+
+    func testMarkedTextCompositionNoOpsThroughPasteHandler() {
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Read more",
+            selection: NSRange(location: 0, length: 4)
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        textView.setMarkedText(
+            "ㄓ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setString("https://example.com", forType: .string)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), false)
+        XCTAssertTrue(textView.hasMarkedText())
+    }
+
+    func testClipboardImagePasteUsesAssetInserterAndMarkdownImageBuilder() async throws {
+        let inserter: EditorImageAssetInserter = { assets in
+            XCTAssertEqual(assets, [.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
+            return ["assets/image.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setData(Data([1, 2, 3]), forType: .png)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
+
+        try await waitForText(in: textView, toEqual: "Before ![](assets/image.png)")
+    }
+
+    func testImageFileDropUsesAssetInserterAndMarkdownImageBuilder() async throws {
+        let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
+        let inserter: EditorImageAssetInserter = { assets in
+            XCTAssertEqual(assets, [.file(droppedURL)])
+            return ["assets/hero.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+
+        XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
+
+        try await waitForText(in: textView, toEqual: "Before ![](assets/hero.png)")
+    }
+
+    func testDelayedImagePasteAbortsWhenEditorTextChangesBeforeInserterReturns() async throws {
+        let inserter: EditorImageAssetInserter = { _ in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            return ["assets/image.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setData(Data([1, 2, 3]), forType: .png)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
+        textView.insertText("X", replacementRange: NSRange(location: 0, length: 0))
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(Self.text(in: textView), "XBefore ")
+    }
+
+    func testDelayedImageDropAbortsWhenEditorContextChangesBeforeInserterReturns() async throws {
+        let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
+        let inserter: EditorImageAssetInserter = { _ in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            return ["assets/hero.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter,
+            imageAssetContextID: "file-a"
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+
+        XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
+        coordinator.updateImageAssetContextID("file-b")
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(Self.text(in: textView), "Before ")
+    }
+
     func testPlainTypingHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
         let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
         let textView = STTextView(frame: .zero)
@@ -226,6 +352,42 @@ final class EditingBehaviorsSupportTests: XCTestCase {
 
     private static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+    }
+
+    private func makeInterceptingTextView(
+        text: String,
+        selection: NSRange,
+        imageAssetInserter: EditorImageAssetInserter? = nil,
+        imageAssetContextID: String? = nil
+    ) -> (MarkdownSTTextView, MarkdownTextViewCoordinator) {
+        let textView = MarkdownSTTextView(frame: .zero)
+        let coordinator = MarkdownTextViewCoordinator(
+            text: .constant(text),
+            selection: .constant(selection)
+        )
+        textView.textDelegate = coordinator
+        textView.text = text
+        textView.textSelection = selection
+        coordinator.updateImageAssetInserter(imageAssetInserter)
+        coordinator.updateImageAssetContextID(imageAssetContextID)
+        coordinator.attachPasteAndDragHandlers(to: textView)
+        return (textView, coordinator)
+    }
+
+    private static func uniquePasteboard() -> NSPasteboard {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongTests.\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        return pasteboard
+    }
+
+    private func waitForText(in textView: STTextView, toEqual expected: String) async throws {
+        for _ in 0 ..< 20 {
+            if Self.text(in: textView) == expected {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(Self.text(in: textView), expected)
     }
 
     private static var repoRoot: URL {

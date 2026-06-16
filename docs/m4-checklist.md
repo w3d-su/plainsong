@@ -77,6 +77,36 @@ file inside a folder workspace so file switching and preview rendering are also 
 - [ ] In an `.mdx` file with component imports, type `<` and confirm imported component names are suggested.
 - [ ] Hold normal typing in a large document and confirm typing remains responsive while completion requests appear only for trigger contexts or Control-Space.
 
+## Frontmatter Panel
+
+- [ ] Open `Fixtures/kitchen-sink.md` or another Markdown file whose first bytes are `---` and whose frontmatter includes `title`, `date`, `tags`, `draft`, and at least one custom key.
+- [ ] Edit `title` in the sidebar panel and confirm the source text changes while the body and custom key remain unchanged.
+- [ ] Change `date` with the date picker and confirm the YAML value stays in `yyyy-MM-dd` form.
+- [ ] Edit `tags` as comma-separated tokens and confirm the source rewrites only the `tags` key as a YAML list.
+- [ ] Toggle `draft` and confirm it writes `true` or `false`.
+- [ ] Open `Fixtures/broken-frontmatter.md` or create a file with malformed frontmatter such as `title: [broken`.
+- [ ] Confirm the panel shows the raw YAML and error message, and that changing focus or saving does not rewrite the malformed block.
+
+## Smart Paste
+
+- [ ] Copy `https://example.com/post` to the clipboard, select non-empty text in the editor, and paste.
+- [ ] Confirm the selection is replaced with `[selected text](https://example.com/post)`.
+- [ ] Copy multiline text or plain text that is not a URL, select text, and paste.
+- [ ] Confirm Plainsong falls through to normal paste instead of creating a link.
+- [ ] Copy an image to the clipboard while editing a file inside a folder workspace.
+- [ ] Paste and confirm Plainsong creates `assets/` next to the current file, writes the image there, and inserts `![](assets/<name>.png)`.
+- [ ] Repeat with an existing asset name and confirm the new file is deduped with `-1` rather than overwriting.
+- [ ] Try image paste in single-file mode and confirm it no-ops or falls through without crashing or writing outside a granted folder.
+
+## Drag-In Image
+
+- [ ] Drag an image file that is already inside the folder workspace onto the editor.
+- [ ] Confirm Plainsong inserts a relative `![](path)` for the existing file and does not copy it.
+- [ ] Drag an image file from outside the folder workspace onto the editor.
+- [ ] Confirm Plainsong copies it into the current file's `assets/` folder and inserts `![](assets/<name>)`.
+- [ ] Drag a duplicate-named external image and confirm the copied filename is deduped with `-1`, `-2`, and so on.
+- [ ] Repeat from a Markdown file in a subdirectory and confirm the inserted path is relative to that file's directory.
+
 ## Preview And File-Switch Sanity
 
 - [ ] Type a heading, list, checkbox, code fence, and table in the editor.

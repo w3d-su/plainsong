@@ -20,6 +20,45 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.currentDocument.text, "Typed text")
     }
 
+    func testSessionScopedTextReplacementIgnoresStaleEditorSession() {
+        let staleSession = DocumentSession(text: "Old document", fileKind: .markdown)
+        let currentSession = DocumentSession(text: "Current document", fileKind: .markdown)
+        let appState = AppState(currentDocument: staleSession)
+        appState.setCurrentDocument(currentSession)
+
+        appState.replaceDocumentText("Old document ![](assets/image.png)", in: staleSession)
+
+        XCTAssertEqual(staleSession.text, "Old document")
+        XCTAssertEqual(currentSession.text, "Current document")
+    }
+
+    func testCapturedImageAssetInserterUsesOriginatingDocumentAfterFileSwitch() async throws {
+        let root = try makeTemporaryDirectory()
+        let firstDirectory = root.appendingPathComponent("first", isDirectory: true)
+        let secondDirectory = root.appendingPathComponent("second", isDirectory: true)
+        try FileManager.default.createDirectory(at: firstDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: secondDirectory, withIntermediateDirectories: true)
+        let firstURL = firstDirectory.appendingPathComponent("post.md")
+        let secondURL = secondDirectory.appendingPathComponent("post.md")
+        try "First".write(to: firstURL, atomically: true, encoding: .utf8)
+        try "Second".write(to: secondURL, atomically: true, encoding: .utf8)
+        let firstSession = DocumentSession(text: "First", url: firstURL, fileKind: .markdown)
+        let secondSession = DocumentSession(text: "Second", url: secondURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: firstSession)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        appState.setCurrentDocument(secondSession)
+
+        let relativePaths = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
+
+        XCTAssertEqual(relativePaths, ["assets/image.png"])
+        XCTAssertTrue(FileManager.default
+            .fileExists(atPath: firstDirectory.appendingPathComponent("assets/image.png").path))
+        XCTAssertFalse(FileManager.default
+            .fileExists(atPath: secondDirectory.appendingPathComponent("assets/image.png").path))
+    }
+
     func testSavingOpenDocumentDoesNotRewriteLastOpenedBookmark() throws {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("post.md")

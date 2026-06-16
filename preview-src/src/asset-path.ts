@@ -6,6 +6,14 @@ export function workspaceRelativeAssetPath(source: string, baseDir: string | nul
   return normalizeRelativePath(combinedPath);
 }
 
+export function assetURLPath(relativePath: string): string {
+  return relativePath
+    .replace(/%(?![0-9a-fA-F]{2})/g, "%25")
+    .replaceAll(" ", "%20")
+    .replaceAll("#", "%23")
+    .replaceAll("?", "%3F");
+}
+
 function normalizeRelativePath(path: string): string {
   const segments: string[] = [];
 

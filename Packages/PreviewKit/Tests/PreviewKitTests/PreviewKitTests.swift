@@ -141,6 +141,7 @@ final class PreviewKitTests: XCTestCase {
             withIntermediateDirectories: true
         )
         try Self.onePixelPNGData.write(to: imageDirectory.appendingPathComponent("pixel.png"))
+        try Self.onePixelPNGData.write(to: imageDirectory.appendingPathComponent("spaced pixel.png"))
 
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
         controller.setWorkspaceAssetRoot(workspaceRoot)
@@ -155,6 +156,8 @@ final class PreviewKitTests: XCTestCase {
                 # Image
 
                 ![Pixel](../images/pixel.png)
+
+                ![Spaced](<../images/spaced pixel.png>)
                 """,
                 version: 1,
                 fileKind: .markdown,
@@ -163,10 +166,10 @@ final class PreviewKitTests: XCTestCase {
         )
 
         try await waitUntil("workspace image loaded") {
-            let naturalWidth = try await controller.webView.evaluateJavaScript(
-                "document.querySelector('img')?.naturalWidth"
-            ) as? Int
-            return naturalWidth == 1
+            let naturalWidths = try await controller.webView.evaluateJavaScript(
+                "Array.from(document.querySelectorAll('img')).map((image) => image.naturalWidth)"
+            ) as? [Int]
+            return naturalWidths == [1, 1]
         }
     }
 
@@ -180,6 +183,19 @@ final class PreviewKitTests: XCTestCase {
         XCTAssertEqual(
             resolved,
             root.appendingPathComponent("images/photo.png").standardizedFileURL
+        )
+    }
+
+    func testAssetResolverDecodesEscapedSpacesInContainedPaths() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let resolver = AssetURLResolver(allowedRoot: root)
+
+        let resolved = try resolver.resolve(XCTUnwrap(URL(string: "asset://images/spaced%20pixel.png")))
+
+        XCTAssertEqual(
+            resolved,
+            root.appendingPathComponent("images/spaced pixel.png").standardizedFileURL
         )
     }
 

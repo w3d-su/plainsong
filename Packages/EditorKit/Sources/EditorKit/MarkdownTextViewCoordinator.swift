@@ -14,6 +14,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var commandProxy: EditorCommandProxy?
     private let editingBehaviorGuard = EditingBehaviorGuard()
     private var completionWorkspace: CompletionWorkspace = .empty
+    private var imageAssetInserter: EditorImageAssetInserter?
+    private var imageAssetContextID: String?
     private var recentCompletionIDs: [String] = []
     private var completionRequestID = 0
     private var completionTask: Task<[Completion], Never>?
@@ -59,6 +61,35 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     func updateCompletionWorkspace(_ workspace: CompletionWorkspace) {
         completionWorkspace = workspace
+    }
+
+    func updateImageAssetInserter(_ inserter: EditorImageAssetInserter?) {
+        imageAssetInserter = inserter
+    }
+
+    func updateImageAssetContextID(_ contextID: String?) {
+        imageAssetContextID = contextID
+    }
+
+    func attachPasteAndDragHandlers(to textView: MarkdownSTTextView) {
+        textView.pasteHandler = { [weak self, weak textView] _, pasteboard in
+            guard let self, let textView else { return false }
+            return handlePaste(in: textView, pasteboard: pasteboard)
+        }
+
+        if imageAssetInserter == nil {
+            textView.imageFileDropHandler = nil
+        } else {
+            textView.imageFileDropHandler = { [weak self, weak textView] _, urls in
+                guard let self, let textView else { return false }
+                return handleImageFileDrop(in: textView, urls: urls)
+            }
+        }
+    }
+
+    func detachPasteAndDragHandlers(from textView: MarkdownSTTextView) {
+        textView.pasteHandler = nil
+        textView.imageFileDropHandler = nil
     }
 
     func cancelCompletionRequest() {
@@ -175,6 +206,108 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             await Task.yield()
             guard let textView, !textView.hasMarkedText() else { return }
             textView.complete(nil)
+        }
+    }
+
+    private func handlePaste(in textView: MarkdownSTTextView, pasteboard: NSPasteboard) -> Bool {
+        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else {
+            return false
+        }
+
+        if applyURLSmartPaste(in: textView, pasteboard: pasteboard) {
+            return true
+        }
+
+        guard imageAssetInserter != nil else { return false }
+        let assets = MarkdownSTTextView.imageAssets(from: pasteboard)
+        guard !assets.isEmpty else { return false }
+
+        insertImageAssets(assets, into: textView, replacementRange: textView.selectedRange())
+        return true
+    }
+
+    private func applyURLSmartPaste(in textView: MarkdownSTTextView, pasteboard: NSPasteboard) -> Bool {
+        guard let url = pasteboard.string(forType: .string),
+              SmartPaste.isSingleURL(url)
+        else {
+            return false
+        }
+
+        let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        let textLength = (text as NSString).length
+        let selectionRange = textView.selectedRange().clamped(toLength: textLength)
+        guard selectionRange.length > 0 else { return false }
+
+        let selectedText = (text as NSString).substring(with: selectionRange)
+        guard let replacement = SmartPaste.linkReplacement(selection: selectedText, url: url) else {
+            return false
+        }
+
+        let newSelection = NSRange(
+            location: selectionRange.location + (replacement as NSString).length,
+            length: 0
+        )
+        EditingBehaviorsSupport.applyReplacement(
+            replacement,
+            replacementRange: selectionRange,
+            newSelection: newSelection,
+            to: textView,
+            editingGuard: editingBehaviorGuard
+        )
+        return true
+    }
+
+    private func handleImageFileDrop(in textView: MarkdownSTTextView, urls: [URL]) -> Bool {
+        guard imageAssetInserter != nil,
+              MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()),
+              !urls.isEmpty
+        else {
+            return false
+        }
+
+        insertImageAssets(urls.map(EditorImageAsset.file), into: textView, replacementRange: textView.selectedRange())
+        return true
+    }
+
+    private func insertImageAssets(
+        _ assets: [EditorImageAsset],
+        into textView: MarkdownSTTextView,
+        replacementRange: NSRange
+    ) {
+        guard let imageAssetInserter else { return }
+        let capturedText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        let capturedRange = replacementRange.clamped(toLength: (capturedText as NSString).length)
+        let capturedContextID = imageAssetContextID
+
+        Task { @MainActor [weak self, weak textView] in
+            guard let self, let textView else { return }
+            let relativePaths = await imageAssetInserter(assets)
+            guard !relativePaths.isEmpty,
+                  imageAssetContextID == capturedContextID,
+                  MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
+            else {
+                return
+            }
+
+            let insertion = relativePaths
+                .map { SmartPaste.imageInsertion(relativePath: $0) }
+                .joined(separator: "\n")
+            let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+            guard currentText == capturedText else {
+                return
+            }
+            let replacementRange = capturedRange.clamped(toLength: (currentText as NSString).length)
+            let newSelection = NSRange(
+                location: replacementRange.location + (insertion as NSString).length,
+                length: 0
+            )
+            EditingBehaviorsSupport.applyReplacement(
+                insertion,
+                replacementRange: replacementRange,
+                newSelection: newSelection,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
         }
     }
 }
