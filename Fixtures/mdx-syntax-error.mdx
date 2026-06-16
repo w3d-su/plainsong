@@ -1,0 +1,19 @@
+---
+title: "Broken MDX Fixture"
+description: "Intentionally invalid MDX for Plainsong M5 error-liveness checks."
+date: 2026-06-15
+---
+
+import { Callout } from "../components/Callout"
+
+# Broken MDX Fixture
+
+This file is intentionally invalid. M5 preview should show an inline error banner, keep the last
+good render when one exists, and never leave the preview pane blank or waiting forever.
+
+<Callout tone="warning" title="Missing closing tag">
+  This component is never closed.
+
+## Content After The Error
+
+This heading helps verify whether the stale render remains visible below or behind the error state.

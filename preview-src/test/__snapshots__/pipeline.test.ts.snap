@@ -162,3 +162,72 @@ c-16-25.333-24-45-24-59z"></path></svg></span></span></span></span></span></span
 <hr data-line="185">
 <p data-line="187">End of fixture.</p>"
 `;
+
+exports[`mdx preview pipeline > renders the MDX kitchen sink fixture 1`] = `
+"<div class="mdx-esm-placeholder" data-line="13">⟨import Hero, { Callout, FeatureGrid as Grid } from "../components/marketing" import * as Charts from "../components/cha…⟩</div>
+<h1 data-line="17">MDX Kitchen Sink Fixture</h1>
+<p data-line="19">This fixture exercises Markdown mixed with ESM imports, JSX components, inline expressions,
+frontmatter, fenced code, and ordinary prose. M5 preview should render the Markdown content,
+show imports and exports as compact chips, and replace custom components with placeholder cards.</p>
+<div class="mdx-component-card mdx-component-card-flow" data-line="23"><div class="mdx-component-header" data-line="23"><span class="mdx-component-name">Hero</span><code class="mdx-component-props">eyebrow="Native Markdown" title="Plainsong writes MDX without ex…"</code></div></div>
+<h2 data-line="25">Markdown Still Works</h2>
+<ul data-line="27">
+<li data-line="27"><strong>Bold</strong> and <em>italic</em> spans remain ordinary Markdown.</li>
+<li data-line="28"><a href="./kitchen-sink.md">Relative Markdown links</a> should stay clickable.</li>
+<li data-line="29">Inline math still renders: <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">a^2 + b^2 = c^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8974em;vertical-align:-0.0833em;"></span><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span>.</li>
+<li data-line="30">Emoji shortcodes are typed in source as <code>:sparkles:</code> and completed by M4.</li>
+</ul>
+<blockquote data-line="32">
+<p data-line="32">A blockquote inside an MDX document should preserve its preview styling and source-line anchor.</p>
+</blockquote>
+<h2 data-line="34">JSX Flow Elements</h2>
+<div class="mdx-component-card mdx-component-card-flow" data-line="36"><div class="mdx-component-header" data-line="36"><span class="mdx-component-name">Callout</span><code class="mdx-component-props">tone="info" title="Placeholder rendering"</code></div><div class="mdx-component-body" data-line="36"><p data-line="37">Component children may contain <strong>Markdown</strong>, links to <a href="#markdown-still-works">headings</a>, and
+inline code. M5 should render the children where safe while keeping the component itself as a
+non-executed placeholder card.</p></div></div>
+<div class="mdx-component-card mdx-component-card-flow" data-line="42"><div class="mdx-component-header" data-line="42"><span class="mdx-component-name">Grid</span><code class="mdx-component-props">columns={3} items={[ { title: "Fast editing", body…}</code></div></div>
+<div class="mdx-component-card mdx-component-card-flow" data-line="51"><div class="mdx-component-header" data-line="51"><span class="mdx-component-name">Charts.LineChart</span><code class="mdx-component-props">dataKey="views" height={240}</code></div></div>
+<h2 data-line="53">Inline JSX And Expressions</h2>
+<p data-line="55">Inline components like <span class="mdx-component-card mdx-component-card-text"><span class="mdx-component-header"><span class="mdx-component-name">Badge</span><code class="mdx-component-props">tone="success"</code></span><span class="mdx-component-body">Ready</span></span> should become safe inline placeholders.
+Expressions such as <code class="mdx-expression-chip">{readingTime}</code> and <code class="mdx-expression-chip">{new Date("2026-06-15").getFullYear()}</code> should render as code chips,
+not execute JavaScript.</p>
+<p data-line="59">Lowercase HTML can remain real HTML when sanitized:</p>
+<div class="note" data-line="61"><p data-line="62"><strong>HTML island:</strong> this should not execute scripts or remote resources.</p></div>
+<h2 data-line="65">Fenced Code</h2>
+<pre data-line="67"><code class="language-tsx">export function Badge({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return &#x3C;span data-tone={tone}>{children}&#x3C;/span>
+}
+</code></pre>
+<pre data-line="73"><code class="language-mermaid">flowchart LR
+    A[MDX Source] --> B[remark-mdx]
+    B --> C[Placeholder Components]
+    C --> D[Non-blank Preview]
+</code></pre>
+<h2 data-line="80">Table</h2>
+<table data-line="82">
+<thead data-line="82">
+<tr data-line="82">
+<th data-line="82">Area</th>
+<th data-line="82">M5 Expectation</th>
+</tr>
+</thead>
+<tbody data-line="84">
+<tr data-line="84">
+<td data-line="84">Imports</td>
+<td data-line="84">Collapsed chip row</td>
+</tr>
+<tr data-line="85">
+<td data-line="85">Components</td>
+<td data-line="85">Placeholder card with escaped props</td>
+</tr>
+<tr data-line="86">
+<td data-line="86">Expressions</td>
+<td data-line="86">Code chip, never executed</td>
+</tr>
+<tr data-line="87">
+<td data-line="87">Errors</td>
+<td data-line="87">Banner plus last good render</td>
+</tr>
+</tbody>
+</table>
+<p data-line="89">End of MDX kitchen sink fixture.</p>"
+`;

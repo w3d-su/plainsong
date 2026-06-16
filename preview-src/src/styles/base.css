@@ -120,6 +120,111 @@ input[type="checkbox"] {
   margin-right: 0.45em;
 }
 
+.preview-stale::before {
+  color: var(--preview-muted);
+  content: "Preview showing last valid MDX render";
+  display: block;
+  font-size: 0.82em;
+  margin: 0 0 8px;
+}
+
+.mdx-error-banner {
+  background: #fff8c5;
+  border: 1px solid #d4a72c;
+  border-radius: 6px;
+  color: #3b2300;
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+}
+
+.mdx-error-banner span {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  white-space: pre-wrap;
+}
+
+.mdx-esm-placeholder,
+.mdx-expression-row {
+  color: var(--preview-muted);
+}
+
+.mdx-esm-placeholder {
+  background: var(--preview-code-bg);
+  border: 1px solid var(--preview-border);
+  border-radius: 999px;
+  display: inline-block;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82em;
+  margin: 0 0 1em;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0.25em 0.6em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdx-expression-chip {
+  color: var(--preview-muted);
+}
+
+.mdx-component-card {
+  border: 1px solid var(--preview-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.mdx-component-card-flow {
+  display: block;
+  margin: 0 0 1em;
+}
+
+.mdx-component-card-text {
+  display: inline-flex;
+  gap: 0.35em;
+  padding: 0.08em 0.35em;
+  vertical-align: baseline;
+}
+
+.mdx-component-header {
+  align-items: baseline;
+  background: var(--preview-code-bg);
+  border-bottom: 1px solid var(--preview-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  padding: 0.45em 0.65em;
+}
+
+.mdx-component-card-text .mdx-component-header {
+  background: transparent;
+  border: 0;
+  display: inline-flex;
+  padding: 0;
+}
+
+.mdx-component-name {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.mdx-component-props {
+  color: var(--preview-muted);
+  overflow-wrap: anywhere;
+}
+
+.mdx-component-body {
+  display: block;
+  padding: 0.7em 0.8em;
+}
+
+.mdx-component-card-text .mdx-component-body {
+  display: inline;
+  padding: 0;
+}
+
 .mermaid-rendered {
   margin: 1em 0;
   overflow: auto;
@@ -147,5 +252,12 @@ input[type="checkbox"] {
 
   tr:nth-child(2n) {
     background: #161b22;
+  }
+
+  .mdx-error-banner,
+  .mermaid-error {
+    background: #332b00;
+    border-color: #9e7f14;
+    color: #f0d98c;
   }
 }
