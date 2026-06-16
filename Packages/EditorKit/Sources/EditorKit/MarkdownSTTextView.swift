@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 @MainActor
 final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
+    var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
 
     @objc override func paste(_ sender: Any?) {
         if pasteHandler?(self, .general) == true {
@@ -12,6 +13,34 @@ final class MarkdownSTTextView: STTextView {
         }
 
         super.paste(sender)
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        if !Self.imageFileURLs(from: sender.draggingPasteboard).isEmpty {
+            return imageFileDropHandler == nil ? [] : .copy
+        }
+
+        return super.draggingEntered(sender)
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        if !Self.imageFileURLs(from: sender.draggingPasteboard).isEmpty {
+            guard imageFileDropHandler != nil else { return [] }
+            _ = super.draggingUpdated(sender)
+            return .copy
+        }
+
+        return super.draggingUpdated(sender)
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let imageURLs = Self.imageFileURLs(from: sender.draggingPasteboard)
+        guard !imageURLs.isEmpty else {
+            return super.performDragOperation(sender)
+        }
+
+        _ = super.draggingUpdated(sender)
+        return imageFileDropHandler?(self, imageURLs) == true
     }
 }
 

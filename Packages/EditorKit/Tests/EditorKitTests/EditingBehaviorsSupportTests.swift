@@ -201,6 +201,24 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         try await waitForText(in: textView, toEqual: "Before ![](assets/image.png)")
     }
 
+    func testImageFileDropUsesAssetInserterAndMarkdownImageBuilder() async throws {
+        let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
+        let inserter: EditorImageAssetInserter = { assets in
+            XCTAssertEqual(assets, [.file(droppedURL)])
+            return ["assets/hero.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+
+        XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
+
+        try await waitForText(in: textView, toEqual: "Before ![](assets/hero.png)")
+    }
+
     func testPlainTypingHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
         let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
         let textView = STTextView(frame: .zero)

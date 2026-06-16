@@ -70,10 +70,20 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             guard let self, let textView else { return false }
             return handlePaste(in: textView, pasteboard: pasteboard)
         }
+
+        if imageAssetInserter == nil {
+            textView.imageFileDropHandler = nil
+        } else {
+            textView.imageFileDropHandler = { [weak self, weak textView] _, urls in
+                guard let self, let textView else { return false }
+                return handleImageFileDrop(in: textView, urls: urls)
+            }
+        }
     }
 
     func detachPasteAndDragHandlers(from textView: MarkdownSTTextView) {
         textView.pasteHandler = nil
+        textView.imageFileDropHandler = nil
     }
 
     func cancelCompletionRequest() {
@@ -232,6 +242,18 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             to: textView,
             editingGuard: editingBehaviorGuard
         )
+        return true
+    }
+
+    private func handleImageFileDrop(in textView: MarkdownSTTextView, urls: [URL]) -> Bool {
+        guard imageAssetInserter != nil,
+              MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()),
+              !urls.isEmpty
+        else {
+            return false
+        }
+
+        insertImageAssets(urls.map(EditorImageAsset.file), into: textView, replacementRange: textView.selectedRange())
         return true
     }
 
