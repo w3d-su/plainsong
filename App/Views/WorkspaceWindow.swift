@@ -250,7 +250,8 @@ private struct DocumentEditor: View {
             fileKind: session.fileKind,
             showsLineNumbers: true,
             scrollProxy: scrollCoordinator.editorProxy,
-            completionWorkspace: appState.completionWorkspace
+            completionWorkspace: appState.completionWorkspace,
+            imageAssetInserter: appState.editorImageAssetInserter
         )
         .onAppear {
             scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)

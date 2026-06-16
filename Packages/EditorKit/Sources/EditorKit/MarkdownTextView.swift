@@ -60,6 +60,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
     private let completionWorkspace: CompletionWorkspace
+    private let imageAssetInserter: EditorImageAssetInserter?
 
     init(
         text: Binding<String>,
@@ -69,6 +70,7 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
+        imageAssetInserter: EditorImageAssetInserter? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -79,14 +81,15 @@ struct MarkdownTextView: NSViewRepresentable {
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
+        self.imageAssetInserter = imageAssetInserter
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = STTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? STTextView else {
-            assertionFailure("Expected STTextView.scrollableTextView() to contain an STTextView")
+        let scrollView = MarkdownSTTextView.scrollableTextView()
+        guard let textView = scrollView.documentView as? MarkdownSTTextView else {
+            assertionFailure("Expected MarkdownSTTextView.scrollableTextView() to contain a MarkdownSTTextView")
             return scrollView
         }
 
@@ -117,19 +120,23 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
+        context.coordinator.updateImageAssetInserter(imageAssetInserter)
+        context.coordinator.attachPasteAndDragHandlers(to: textView)
 
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? STTextView else {
-            assertionFailure("Expected MarkdownTextView to update an STTextView-backed scroll view")
+        guard let textView = scrollView.documentView as? MarkdownSTTextView else {
+            assertionFailure("Expected MarkdownTextView to update a MarkdownSTTextView-backed scroll view")
             return
         }
 
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
+        context.coordinator.updateImageAssetInserter(imageAssetInserter)
+        context.coordinator.attachPasteAndDragHandlers(to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -172,7 +179,8 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
-        guard let textView = scrollView.documentView as? STTextView else { return }
+        guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
+        coordinator.detachPasteAndDragHandlers(from: textView)
         coordinator.detachCommandProxy(from: textView)
         coordinator.detachScrollProxy()
         coordinator.cancelCompletionRequest()
