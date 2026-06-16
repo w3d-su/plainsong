@@ -35,6 +35,10 @@ const safeClassNameRule: [string, RegExp] = ["className", /^[A-Za-z0-9_-]+$/];
 
 export const mdxSanitizeSchema: SanitizeSchema = {
   ...defaultSchema,
+  required: {
+    ...defaultSchema.required,
+    input: { type: "checkbox" },
+  },
   attributes: {
     ...defaultSchema.attributes,
     "*": [

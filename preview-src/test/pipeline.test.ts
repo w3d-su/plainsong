@@ -73,6 +73,20 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).toContain('class="mdx-component-card mdx-component-card-flow" data-line="3"');
   });
 
+  it("keeps MDX task-list checkboxes clickable for source writeback", async () => {
+    const source = "- [ ] task\n- [x] done\n";
+    const mdInputs = (await renderMarkdown(source)).match(/<input[^>]*>/g) ?? [];
+    const mdxInputs = (await renderMdx(source)).match(/<input[^>]*>/g) ?? [];
+
+    expect(mdxInputs).toHaveLength(2);
+    expect(mdxInputs).toEqual(mdInputs);
+
+    for (const input of mdxInputs) {
+      expect(input).toContain('data-task-checkbox="true"');
+      expect(input).not.toContain("disabled");
+    }
+  });
+
   it("surfaces syntax errors without blanking and recovers after a fix", async () => {
     const lastGood = await renderMdx("# Good\n\n<Callout>Still visible</Callout>\n");
     let banner = "";
