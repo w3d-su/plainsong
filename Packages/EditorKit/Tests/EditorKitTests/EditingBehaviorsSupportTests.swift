@@ -311,14 +311,38 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         )
     }
 
+    func testMDXTriggerHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
+        let mdxPrefix = """
+        import Hero from "./Hero"
+
+        """
+        try assertLargeFixtureHotPath(
+            replacementString: "a",
+            expectedNativeInput: true,
+            iterations: 200,
+            fileKind: .mdx,
+            fixturePrefix: mdxPrefix
+        )
+        try assertLargeFixtureHotPath(
+            replacementString: "<",
+            expectedNativeInput: false,
+            iterations: 50,
+            fileKind: .mdx,
+            fixturePrefix: mdxPrefix
+        )
+    }
+
     private func assertLargeFixtureHotPath(
         replacementString: String,
         expectedNativeInput: Bool,
         iterations: Int,
+        fileKind: FileKind = .markdown,
+        fixturePrefix: String = "",
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
-        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let baseFixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let fixtureText = fixturePrefix + baseFixtureText
         let textView = STTextView(frame: .zero)
         textView.text = fixtureText
         textView.textSelection = NSRange(location: 0, length: 0)
@@ -332,7 +356,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
                 in: textView,
                 affectedRange: affectedRange,
                 replacementString: replacementString,
-                fileKind: .markdown,
+                fileKind: fileKind,
                 editingGuard: editingGuard
             )
             maxLatencyMilliseconds = max(
@@ -343,7 +367,8 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         }
 
         print(String(
-            format: "large-1mb.md trigger '%@' hot path max: %.3f ms",
+            format: "large-1mb.md %@ trigger '%@' hot path max: %.3f ms",
+            fileKind == .mdx ? "mdx" : "markdown",
             replacementString == "\n" ? "\\n" : replacementString,
             maxLatencyMilliseconds
         ))

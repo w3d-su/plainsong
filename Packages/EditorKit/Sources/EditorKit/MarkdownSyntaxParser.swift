@@ -3,6 +3,7 @@ import MarkdownCore
 import SwiftTreeSitter
 import TreeSitterMarkdown
 import TreeSitterMarkdownInline
+import TreeSitterTSXFixed
 import TreeSitterYAMLFixed
 
 struct MarkdownSyntaxToken {
@@ -24,6 +25,11 @@ struct MarkdownSyntaxToken {
         case tableDelimiter
         case tablePipe
         case mdxSource
+        case tsxKeyword
+        case tsxString
+        case tsxTag
+        case tsxAttribute
+        case tsxPunctuation
     }
 
     var kind: Kind
@@ -36,16 +42,25 @@ final class MarkdownSyntaxParser {
     static let inlineParsingLimit = 250_000
 
     private let markdownParser: Parser
-    private let inlineParser: Parser
+    let inlineParser: Parser
+    let tsxParser: Parser
+    let tsxHighlightQuery: Query
     private let yamlParser: Parser
 
     init() throws {
         markdownParser = Parser()
         inlineParser = Parser()
+        tsxParser = Parser()
         yamlParser = Parser()
 
         try markdownParser.setLanguage(Language(language: tree_sitter_markdown()))
         try inlineParser.setLanguage(Language(language: tree_sitter_markdown_inline()))
+        let tsxLanguage = Language(language: tree_sitter_tsx())
+        try tsxParser.setLanguage(tsxLanguage)
+        tsxHighlightQuery = try Query(
+            language: tsxLanguage,
+            data: Self.tsxHighlightQuerySource.data(using: .utf8) ?? Data()
+        )
         try yamlParser.setLanguage(Language(language: tree_sitter_yaml()))
     }
 
@@ -63,7 +78,12 @@ final class MarkdownSyntaxParser {
         appendBlockTokens(from: root, parsesInlineMarkup: parsesInlineMarkup, to: &tokens)
 
         if fileKind == .mdx {
-            appendMDXSourceTokens(in: source, to: &tokens)
+            appendMDXTokens(
+                from: root,
+                in: source,
+                canParseTSX: parsesInlineMarkup,
+                to: &tokens
+            )
         }
 
         return tokens
@@ -77,7 +97,7 @@ final class MarkdownSyntaxParser {
     }
 }
 
-private extension MarkdownSyntaxParser {
+extension MarkdownSyntaxParser {
     func appendBlockTokens(
         from node: Node,
         parsesInlineMarkup: Bool,
@@ -286,25 +306,6 @@ private extension MarkdownSyntaxParser {
                 continue
             }
             tokens.append(MarkdownSyntaxToken(kind: .tablePipe, range: nsRange(for: child)))
-        }
-    }
-
-    func appendMDXSourceTokens(in source: String, to tokens: inout [MarkdownSyntaxToken]) {
-        let nsSource = source as NSString
-        var location = 0
-
-        while location < nsSource.length {
-            let lineRange = nsSource.lineRange(for: NSRange(location: location, length: 0))
-            let rawLine = nsSource.substring(with: lineRange)
-            let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            let isImportOrExport = trimmed.hasPrefix("import ") || trimmed.hasPrefix("export ")
-            let isComponentLine = trimmed.hasPrefix("<") && trimmed.dropFirst().first?.isUppercase == true
-
-            if isImportOrExport || isComponentLine {
-                tokens.append(MarkdownSyntaxToken(kind: .mdxSource, range: lineRange))
-            }
-
-            location = NSMaxRange(lineRange)
         }
     }
 

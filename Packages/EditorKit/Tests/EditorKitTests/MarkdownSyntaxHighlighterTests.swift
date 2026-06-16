@@ -67,7 +67,55 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         XCTAssertNotNil(fencedCodeAttributes[.backgroundColor])
     }
 
-    func testStylesMDXImportsAsSourceCode() throws {
+    func testStylesMDXImportsAndJSXWithTSXTokens() throws {
+        let source = """
+        import Button from "./Button"
+        export const label = "Read more"
+
+        # Post
+
+        <Button label="Read more" />
+        """
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertTrue(tokens.kinds(in: source, for: "import").contains(.tsxKeyword))
+        XCTAssertTrue(tokens.kinds(in: source, for: "\"./Button\"").contains(.tsxString))
+        XCTAssertTrue(tokens.kinds(in: source, for: "Button label").contains(.tsxTag))
+        XCTAssertTrue(tokens.kinds(in: source, for: "label=").contains(.tsxAttribute))
+
+        let attributed = MarkdownSyntaxHighlighter().highlight(source, fileKind: .mdx)
+        let inspected = NSAttributedString(attributed)
+
+        let importAttributes = try inspected.attributes(for: "import")
+        let importFont = try XCTUnwrap(importAttributes[.font] as? NSFont)
+        XCTAssertTrue(importFont.fontDescriptor.symbolicTraits.contains(.monoSpace))
+        XCTAssertEqual(importAttributes[.foregroundColor] as? NSColor, MarkdownSyntaxTheme.standard.tsxKeywordColor)
+
+        let stringAttributes = try inspected.attributes(for: "\"./Button\"")
+        XCTAssertEqual(stringAttributes[.foregroundColor] as? NSColor, MarkdownSyntaxTheme.standard.tsxStringColor)
+
+        let attributeAttributes = try inspected.attributes(for: "label=\"Read more\"")
+        XCTAssertEqual(
+            attributeAttributes[.foregroundColor] as? NSColor,
+            MarkdownSyntaxTheme.standard.tsxAttributeColor
+        )
+    }
+
+    func testMDXFixturesProduceTSXTokensInsteadOfCoarseSource() throws {
+        for fixtureName in ["kitchen-sink.mdx", "product-page.mdx"] {
+            let source = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/\(fixtureName)"))
+            let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+            XCTAssertFalse(tokens.contains(kind: .mdxSource), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxKeyword), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxString), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxTag), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxAttribute), fixtureName)
+        }
+    }
+
+    func testMarkdownFilesDoNotReceiveMDXTSXTokens() throws {
         let source = """
         import Button from "./Button"
 
@@ -76,13 +124,49 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         <Button label="Read more" />
         """
 
-        let attributed = MarkdownSyntaxHighlighter().highlight(source, fileKind: .mdx)
-        let inspected = NSAttributedString(attributed)
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .markdown)
 
-        let importAttributes = try inspected.attributes(for: "import")
-        let importFont = try XCTUnwrap(importAttributes[.font] as? NSFont)
-        XCTAssertTrue(importFont.fontDescriptor.symbolicTraits.contains(.monoSpace))
-        XCTAssertNotNil(importAttributes[.foregroundColor])
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertFalse(tokens.containsTSXToken)
+    }
+
+    func testFencedTSXCodeKeepsCodeFenceHighlightingInMDX() throws {
+        let source = """
+        # Example
+
+        ```tsx
+        export function Badge({ label }: { label: string }) {
+          return <span className="badge">{label}</span>
+        }
+        ```
+
+        <Button label="Read more" />
+        """
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+        let fencedExportKinds = tokens.kinds(in: source, for: "export function")
+
+        XCTAssertTrue(fencedExportKinds.contains(.codeBlock))
+        XCTAssertFalse(fencedExportKinds.contains(.tsxKeyword))
+        XCTAssertTrue(tokens.kinds(in: source, for: "Button label").contains(.tsxTag))
+    }
+
+    func testLargeMDXFallsBackToCoarseSourceAboveInlineLimit() throws {
+        let filler = String(repeating: "Plain paragraph without inline markup.\n", count: 8000)
+        let source = """
+        import Hero from "./Hero"
+
+        \(filler)
+
+        <Hero title="Large document" />
+        """
+
+        XCTAssertGreaterThan(source.utf8.count, MarkdownSyntaxParser.inlineParsingLimit)
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertTrue(tokens.contains(kind: .mdxSource))
+        XCTAssertFalse(tokens.containsTSXToken)
     }
 
     func testEscapedEmphasisDelimitersStayPlainText() throws {
@@ -175,5 +259,44 @@ private extension NSAttributedString {
         let range = (string as NSString).range(of: substring)
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
         return attributes(at: range.location, effectiveRange: nil)
+    }
+}
+
+private extension MarkdownSyntaxHighlighterTests {
+    static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+}
+
+private extension [MarkdownSyntaxToken] {
+    var containsTSXToken: Bool {
+        contains { $0.kind.isTSXToken }
+    }
+
+    func contains(kind: MarkdownSyntaxToken.Kind) -> Bool {
+        contains { $0.kind == kind }
+    }
+
+    func kinds(in source: String, for substring: String) -> [MarkdownSyntaxToken.Kind] {
+        let range = (source as NSString).range(of: substring)
+        XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
+
+        return filter { NSIntersectionRange($0.range, range).length > 0 }.map(\.kind)
+    }
+}
+
+private extension MarkdownSyntaxToken.Kind {
+    var isTSXToken: Bool {
+        switch self {
+        case .tsxKeyword, .tsxString, .tsxTag, .tsxAttribute, .tsxPunctuation:
+            true
+        default:
+            false
+        }
     }
 }
