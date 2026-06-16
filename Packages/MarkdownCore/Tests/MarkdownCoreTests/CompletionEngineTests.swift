@@ -98,6 +98,16 @@ final class CompletionEngineTests: XCTestCase {
         XCTAssertEqual(allKeyResults.count(named: "title"), 1)
     }
 
+    func testFrontmatterKeyContextIgnoresDelimiterLines() {
+        let workspace = CompletionWorkspace(frontmatterKeys: ["layout"])
+
+        let openingDelimiterResults = completions(from: "<caret>---\ntitle: Post\n---\nBody", workspace: workspace)
+        XCTAssertFalse(openingDelimiterResults.contains { $0.kind == .frontmatterKey })
+
+        let closingDelimiterResults = completions(from: "---\ntitle: Post\n<caret>---\nBody", workspace: workspace)
+        XCTAssertFalse(closingDelimiterResults.contains { $0.kind == .frontmatterKey })
+    }
+
     func testMDXComponentContextScansImportLines() {
         let workspace = CompletionWorkspace(currentFilePath: "posts/page.mdx")
         let text = """
@@ -128,6 +138,32 @@ final class CompletionEngineTests: XCTestCase {
         XCTAssertEqual(results.count, 50)
         XCTAssertEqual(results.first?.label, "posts/049.md")
         XCTAssertFalse(results.containsLabel("docs/postscript.md"))
+    }
+
+    func testRankingUsesRecentCompletionOrderForEqualMatches() {
+        let workspace = CompletionWorkspace(
+            markdownFilePaths: ["posts/a.md", "posts/z.md"],
+            recentlyUsedCompletionIDs: ["filePath:posts/z.md", "filePath:posts/a.md"]
+        )
+
+        let results = completions(from: "[link](<caret>)", workspace: workspace)
+
+        XCTAssertEqual(results.map(\.label), ["posts/z.md", "posts/a.md"])
+    }
+
+    func testRankingDoesNotPenalizeOlderRecentIDsWhenRecentListExceedsBoostWindow() {
+        let olderRecentID = "filePath:posts/a-recent.md"
+        let workspace = CompletionWorkspace(
+            markdownFilePaths: ["posts/a-recent.md", "posts/z-never.md"],
+            recentlyUsedCompletionIDs: (0 ..< 260).map { "filePath:posts/dummy-\($0).md" } + [olderRecentID]
+        )
+
+        let results = completions(from: "[link](<caret>)", workspace: workspace)
+
+        XCTAssertLessThan(
+            results.firstIndex { $0.id == olderRecentID } ?? Int.max,
+            results.firstIndex { $0.id == "filePath:posts/z-never.md" } ?? Int.max
+        )
     }
 
     func testCompletionContextMissIsCheapOnLargeDocuments() throws {

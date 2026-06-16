@@ -13,7 +13,10 @@ extension CompletionEngine {
         workspace: CompletionWorkspace
     ) -> [Completion] {
         let normalizedQuery = normalized(query)
-        let recentIDs = Set(workspace.recentlyUsedCompletionIDs)
+        var recentIDRanks: [String: Int] = [:]
+        for (idRank, id) in workspace.recentlyUsedCompletionIDs.enumerated() where recentIDRanks[id] == nil {
+            recentIDRanks[id] = idRank
+        }
 
         let scored = candidates.compactMap { candidate -> ScoredCompletion? in
             let score: Int
@@ -30,7 +33,7 @@ extension CompletionEngine {
                 }
             }
 
-            let recentBoost = recentIDs.contains(candidate.completion.id) ? 250 : 0
+            let recentBoost = recentIDRanks[candidate.completion.id].map { max(0, 250 - $0) } ?? 0
             return ScoredCompletion(
                 completion: candidate.completion,
                 score: score + recentBoost,

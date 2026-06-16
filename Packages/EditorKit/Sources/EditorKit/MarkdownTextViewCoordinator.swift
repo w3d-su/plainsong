@@ -16,6 +16,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var completionWorkspace: CompletionWorkspace = .empty
     private var imageAssetInserter: EditorImageAssetInserter?
     private var imageAssetContextID: String?
+    private var recentCompletionIDs: [String] = []
     private var completionRequestID = 0
     private var completionTask: Task<[Completion], Never>?
 
@@ -125,12 +126,13 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     ) -> Bool {
         let fileKind = commandProxy?.currentFileKind() ?? .markdown
         let selection = NSRange(affectedCharRange, in: textView.textContentManager)
-        let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
         let shouldTriggerCompletion = replacementString.map {
             EditorCompletionSupport.shouldTriggerCompletion(
                 replacementString: $0,
-                textBeforeChange: currentText,
-                selection: selection,
+                emojiShortcodePrefixBeforeChange: EditorCompletionSupport.emojiShortcodePrefixBeforeSelection(
+                    in: textView,
+                    selection: selection
+                ),
                 fileKind: fileKind
             )
         } ?? false
@@ -157,7 +159,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         guard !textView.hasMarkedText() else { return nil }
         let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
         let cursor = textView.selectedRange().location
-        let workspace = completionWorkspace
+        var workspace = completionWorkspace
+        workspace.recentlyUsedCompletionIDs = recentCompletionIDs
         completionRequestID += 1
         let requestID = completionRequestID
         completionTask?.cancel()
@@ -183,6 +186,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     func textView(_ textView: STTextView, insertCompletionItem item: any STCompletionItem) {
         guard let item = item as? MarkdownCompletionItem else { return }
+        recentCompletionIDs = EditorCompletionSupport.recentCompletionIDs(
+            selecting: item.id,
+            existing: recentCompletionIDs
+        )
         EditorCompletionSupport.insert(item.completion, into: textView, editingGuard: editingBehaviorGuard)
     }
 
