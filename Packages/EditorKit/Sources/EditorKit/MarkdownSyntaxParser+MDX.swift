@@ -98,18 +98,22 @@ extension MarkdownSyntaxParser {
             return
         }
 
-        appendMDXLineTSXTokens(in: source, excluding: excludedRanges, to: &tokens)
-        appendMDXHTMLTokens(from: root, to: &tokens)
+        let lineTSXRanges = appendMDXLineTSXTokens(in: source, excluding: excludedRanges, to: &tokens)
+        appendMDXHTMLTokens(from: root, excludingInlineRanges: lineTSXRanges, to: &tokens)
     }
 
-    func appendMDXHTMLTokens(from node: Node, to tokens: inout [MarkdownSyntaxToken]) {
+    func appendMDXHTMLTokens(
+        from node: Node,
+        excludingInlineRanges excludedInlineRanges: [NSRange],
+        to tokens: inout [MarkdownSyntaxToken]
+    ) {
         switch node.nodeType {
         case "html_block":
             appendTSXTokens(from: node, to: &tokens)
             return
 
         case "inline":
-            appendMDXInlineHTMLTokens(from: node, to: &tokens)
+            appendMDXInlineHTMLTokens(from: node, excluding: excludedInlineRanges, to: &tokens)
             return
 
         case "fenced_code_block", "indented_code_block", "minus_metadata", "plus_metadata":
@@ -123,11 +127,15 @@ extension MarkdownSyntaxParser {
             guard let child = node.child(at: index) else {
                 continue
             }
-            appendMDXHTMLTokens(from: child, to: &tokens)
+            appendMDXHTMLTokens(from: child, excludingInlineRanges: excludedInlineRanges, to: &tokens)
         }
     }
 
-    func appendMDXInlineHTMLTokens(from inlineNode: Node, to tokens: inout [MarkdownSyntaxToken]) {
+    func appendMDXInlineHTMLTokens(
+        from inlineNode: Node,
+        excluding excludedRanges: [NSRange],
+        to tokens: inout [MarkdownSyntaxToken]
+    ) {
         guard
             let inlineSource = inlineNode.text,
             !inlineSource.isEmpty,
@@ -140,6 +148,7 @@ extension MarkdownSyntaxParser {
         appendMDXInlineHTMLTokens(
             from: root,
             baseLocation: nsRange(for: inlineNode).location,
+            excluding: excludedRanges,
             to: &tokens
         )
     }
@@ -147,13 +156,19 @@ extension MarkdownSyntaxParser {
     func appendMDXInlineHTMLTokens(
         from node: Node,
         baseLocation: Int,
+        excluding excludedRanges: [NSRange],
         to tokens: inout [MarkdownSyntaxToken]
     ) {
-        if node.nodeType == "html_inline" {
+        if node.nodeType == "html_inline" || node.nodeType == "html_tag" {
+            let fallbackRange = nsRange(for: node, offset: baseLocation)
+            guard !fallbackRange.intersects(any: excludedRanges) else {
+                return
+            }
+
             appendTSXTokens(
                 in: node.text ?? "",
                 baseLocation: baseLocation + nsRange(for: node).location,
-                fallbackRange: nsRange(for: node, offset: baseLocation),
+                fallbackRange: fallbackRange,
                 to: &tokens
             )
             return
@@ -163,17 +178,24 @@ extension MarkdownSyntaxParser {
             guard let child = node.child(at: index) else {
                 continue
             }
-            appendMDXInlineHTMLTokens(from: child, baseLocation: baseLocation, to: &tokens)
+            appendMDXInlineHTMLTokens(
+                from: child,
+                baseLocation: baseLocation,
+                excluding: excludedRanges,
+                to: &tokens
+            )
         }
     }
 
+    @discardableResult
     func appendMDXLineTSXTokens(
         in source: String,
         excluding excludedRanges: [NSRange],
         to tokens: inout [MarkdownSyntaxToken]
-    ) {
+    ) -> [NSRange] {
         let nsSource = source as NSString
         var location = 0
+        var parsedRanges: [NSRange] = []
 
         while location < nsSource.length {
             let lineRange = nsSource.lineRange(for: NSRange(location: location, length: 0))
@@ -188,10 +210,13 @@ extension MarkdownSyntaxParser {
                     fallbackRange: lineRange,
                     to: &tokens
                 )
+                parsedRanges.append(lineRange)
             }
 
             location = NSMaxRange(lineRange)
         }
+
+        return parsedRanges
     }
 
     func appendTSXTokens(from node: Node, to tokens: inout [MarkdownSyntaxToken]) {

@@ -122,12 +122,47 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         # Post
 
         <Button label="Read more" />
+
+        Text with <Em>x</Em> inline.
         """
 
         let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .markdown)
 
         XCTAssertFalse(tokens.contains(kind: .mdxSource))
         XCTAssertFalse(tokens.containsTSXToken)
+    }
+
+    func testStylesMidParagraphInlineJSXWithTSXTokens() throws {
+        let source = "Text with <Em>x</Em> inline.\nA <Tag/> mid line."
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertEqual(tokens.ranges(kind: .tsxTag), source.ranges(of: "Em") + source.ranges(of: "Tag"))
+
+        let nsSource = source as NSString
+        let openingRange = nsSource.range(of: "<Em>")
+        let closingRange = nsSource.range(of: "</Em>")
+        let selfClosingRange = nsSource.range(of: "<Tag/>")
+        XCTAssertEqual(tokens.ranges(kind: .tsxPunctuation), [
+            NSRange(location: openingRange.location, length: 1),
+            NSRange(location: NSMaxRange(openingRange) - 1, length: 1),
+            NSRange(location: closingRange.location, length: 1),
+            NSRange(location: NSMaxRange(closingRange) - 1, length: 1),
+            NSRange(location: selfClosingRange.location, length: 1),
+            NSRange(location: NSMaxRange(selfClosingRange) - 2, length: 2),
+        ])
+
+        assertNoOverlappingTSXTokens(tokens)
+    }
+
+    func testLineStartJSXDoesNotEmitDuplicateOverlappingTSXTokens() throws {
+        let source = "<Button>top level</Button>"
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertEqual(tokens.ranges(kind: .tsxTag), source.ranges(of: "Button"))
+        assertNoOverlappingTSXTokens(tokens)
     }
 
     func testFencedTSXCodeKeepsCodeFenceHighlightingInMDX() throws {
@@ -287,6 +322,60 @@ private extension [MarkdownSyntaxToken] {
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
 
         return filter { NSIntersectionRange($0.range, range).length > 0 }.map(\.kind)
+    }
+
+    func ranges(kind: MarkdownSyntaxToken.Kind) -> [NSRange] {
+        filter { $0.kind == kind }
+            .map(\.range)
+            .sorted { lhs, rhs in
+                if lhs.location != rhs.location {
+                    return lhs.location < rhs.location
+                }
+                return lhs.length < rhs.length
+            }
+    }
+
+    var tsxTokens: [MarkdownSyntaxToken] {
+        filter(\.kind.isTSXToken)
+            .sorted { lhs, rhs in
+                if lhs.range.location != rhs.range.location {
+                    return lhs.range.location < rhs.range.location
+                }
+                return lhs.range.length < rhs.range.length
+            }
+    }
+}
+
+private extension XCTestCase {
+    func assertNoOverlappingTSXTokens(
+        _ tokens: [MarkdownSyntaxToken],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let sortedTokens = tokens.tsxTokens
+        for (previous, current) in zip(sortedTokens, sortedTokens.dropFirst()) {
+            XCTAssertLessThanOrEqual(NSMaxRange(previous.range), current.range.location, file: file, line: line)
+        }
+    }
+}
+
+private extension String {
+    func ranges(of substring: String) -> [NSRange] {
+        let nsString = self as NSString
+        var ranges: [NSRange] = []
+        var searchLocation = 0
+
+        while searchLocation < nsString.length {
+            let searchRange = NSRange(location: searchLocation, length: nsString.length - searchLocation)
+            let range = nsString.range(of: substring, options: [], range: searchRange)
+            guard range.location != NSNotFound else {
+                break
+            }
+            ranges.append(range)
+            searchLocation = NSMaxRange(range)
+        }
+
+        return ranges
     }
 }
 
