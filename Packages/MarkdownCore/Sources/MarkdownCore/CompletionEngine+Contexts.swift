@@ -96,6 +96,10 @@ extension CompletionEngine {
         linePrefix: String,
         cursor: Int
     ) -> CompletionContext? {
+        guard line.text.trimmingCharacters(in: .whitespaces) != "---" else {
+            return nil
+        }
+
         guard isInsideFrontmatter(text: text, cursor: cursor) else {
             return nil
         }
@@ -124,16 +128,20 @@ extension CompletionEngine {
         let storage = text as NSString
         let length = storage.length
         let firstLine = MarkdownTextEditingSupport.line(containing: 0, in: text)
+        guard cursor >= firstLine.fullEndLocation else {
+            return false
+        }
+
         var lineStart = firstLine.fullEndLocation
 
         while lineStart < length {
             let line = MarkdownTextEditingSupport.line(containing: lineStart, in: text)
-            if line.range.location >= cursor {
-                return true
-            }
-
             if line.text.trimmingCharacters(in: .whitespaces) == "---" {
                 return cursor < line.range.location
+            }
+
+            if line.range.location >= cursor {
+                return true
             }
 
             if cursor <= line.fullEndLocation {
