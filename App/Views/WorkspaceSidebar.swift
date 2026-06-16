@@ -70,6 +70,14 @@ struct WorkspaceSidebar: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if appState.hasOpenDocument {
+                Section {
+                    FrontmatterPanel(session: appState.currentDocument) { newText in
+                        appState.replaceDocumentText(newText)
+                    }
+                }
+            }
         }
         .alert("Create Item", isPresented: createAlertIsPresented) {
             TextField("Name", text: $itemName)
