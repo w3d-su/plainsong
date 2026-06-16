@@ -53,6 +53,47 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
         )
     }
 
+    func testSymlinkInsideWorkspacePointingOutsideCopiesRealFileIntoAssets() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        let outside = try makeTemporaryDirectory()
+        let outsideImage = outside.appendingPathComponent("secret.png")
+        let imageData = Data([4, 5, 6])
+        try imageData.write(to: outsideImage)
+
+        let link = root.appendingPathComponent("link.png")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outsideImage)
+
+        let paths = try WorkspaceImageAssetStore().place(
+            [.file(link)],
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        XCTAssertEqual(paths, ["assets/secret.png"])
+        XCTAssertFalse(paths[0].split(separator: "/").contains(".."))
+
+        let copiedImage = root.appendingPathComponent(paths[0])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: copiedImage.path(percentEncoded: false)))
+        XCTAssertEqual(try Data(contentsOf: copiedImage), imageData)
+        XCTAssertFalse(
+            try copiedImage.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink ?? false
+        )
+        XCTAssertNotEqual(
+            copiedImage.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false),
+            outsideImage.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        )
+
+        var rootPath = root.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        while rootPath.count > 1, rootPath.hasSuffix("/") {
+            rootPath.removeLast()
+        }
+        let copiedPath = copiedImage.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        XCTAssertTrue(copiedPath == rootPath || copiedPath.hasPrefix("\(rootPath)/"))
+    }
+
     func testClipboardImageDataWritesIntoAssetsAndDedupesFilename() throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")

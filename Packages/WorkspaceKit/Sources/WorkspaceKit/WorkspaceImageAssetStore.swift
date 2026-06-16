@@ -67,7 +67,11 @@ public struct WorkspaceImageAssetStore: Sendable {
                     ) else {
                         throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(destinationURL.lastPathComponent)
                     }
-                    insertedPaths.append(Self.relativePath(from: currentDirectoryURL, to: destinationURL))
+                    try insertedPaths.append(copiedAssetRelativePath(
+                        from: currentDirectoryURL,
+                        to: destinationURL,
+                        rootURL: rootURL
+                    ))
 
                 case let .file(sourceURL):
                     let sourceURL = sourceURL.standardizedFileURL
@@ -80,14 +84,25 @@ public struct WorkspaceImageAssetStore: Sendable {
                         at: assetDirectoryURL,
                         withIntermediateDirectories: true
                     )
+                    let resolvedSourceURL = sourceURL.resolvingSymlinksInPath()
                     let destinationURL = try uniqueDestinationURL(
-                        named: sanitizedFilename(sourceURL.lastPathComponent),
+                        named: sanitizedFilename(resolvedSourceURL.lastPathComponent),
                         in: assetDirectoryURL
                     )
                     try SecurityScopedAccess.withAccess(to: sourceURL) {
-                        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+                        guard try FileManager.default.createFile(
+                            atPath: destinationURL.path(percentEncoded: false),
+                            contents: Data(contentsOf: resolvedSourceURL)
+                        ) else {
+                            throw WorkspaceImageAssetStoreError
+                                .couldNotCreateAssetFile(destinationURL.lastPathComponent)
+                        }
                     }
-                    insertedPaths.append(Self.relativePath(from: currentDirectoryURL, to: destinationURL))
+                    try insertedPaths.append(copiedAssetRelativePath(
+                        from: currentDirectoryURL,
+                        to: destinationURL,
+                        rootURL: rootURL
+                    ))
                 }
             }
 
@@ -146,6 +161,18 @@ private extension WorkspaceImageAssetStore {
         return lastPathComponent
     }
 
+    func copiedAssetRelativePath(from directoryURL: URL, to destinationURL: URL, rootURL: URL) throws -> String {
+        guard Self.isContained(destinationURL, in: rootURL) else {
+            throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(destinationURL.lastPathComponent)
+        }
+
+        let relativePath = Self.relativePath(from: directoryURL, to: destinationURL)
+        guard !Self.containsParentDirectoryComponent(relativePath) else {
+            throw WorkspaceImageAssetStoreError.couldNotCreateAssetFile(destinationURL.lastPathComponent)
+        }
+        return relativePath
+    }
+
     static func isContained(_ url: URL, in rootURL: URL) -> Bool {
         let candidatePath = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
         let rootPath = normalizedDirectoryPath(rootURL)
@@ -166,6 +193,12 @@ private extension WorkspaceImageAssetStore {
         let parentComponents = Array(repeating: "..", count: directoryComponents.count - sharedCount)
         let targetComponents = Array(fileComponents.dropFirst(sharedCount))
         return (parentComponents + targetComponents).joined(separator: "/")
+    }
+
+    static func containsParentDirectoryComponent(_ path: String) -> Bool {
+        path
+            .split(separator: "/", omittingEmptySubsequences: false)
+            .contains("..")
     }
 
     static func normalizedDirectoryPath(_ url: URL) -> String {
