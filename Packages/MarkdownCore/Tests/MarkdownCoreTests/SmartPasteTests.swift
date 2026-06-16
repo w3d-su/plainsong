@@ -30,4 +30,11 @@ final class SmartPasteTests: XCTestCase {
             "![](assets/hero.png)"
         )
     }
+
+    func testImageInsertionQuotesRelativePathWithMarkdownDelimiters() {
+        XCTAssertEqual(
+            SmartPaste.imageInsertion(relativePath: "assets/My Photo (final).png"),
+            "![](<assets/My Photo (final).png>)"
+        )
+    }
 }

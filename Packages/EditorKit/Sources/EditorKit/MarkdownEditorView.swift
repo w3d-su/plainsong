@@ -20,6 +20,7 @@ public struct MarkdownEditorView: View {
     private let commandProxy: EditorCommandProxy?
     private let completionWorkspace: CompletionWorkspace
     private let imageAssetInserter: EditorImageAssetInserter?
+    private let imageAssetContextID: String?
 
     public init(
         text: Binding<String>,
@@ -28,7 +29,8 @@ public struct MarkdownEditorView: View {
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
-        imageAssetInserter: EditorImageAssetInserter? = nil
+        imageAssetInserter: EditorImageAssetInserter? = nil,
+        imageAssetContextID: String? = nil
     ) {
         _text = text
         self.fileKind = fileKind
@@ -37,6 +39,7 @@ public struct MarkdownEditorView: View {
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
         self.imageAssetInserter = imageAssetInserter
+        self.imageAssetContextID = imageAssetContextID
     }
 
     public var body: some View {
@@ -60,7 +63,8 @@ public struct MarkdownEditorView: View {
             scrollProxy: scrollProxy,
             commandProxy: activeCommandProxy,
             completionWorkspace: completionWorkspace,
-            imageAssetInserter: imageAssetInserter
+            imageAssetInserter: imageAssetInserter,
+            imageAssetContextID: imageAssetContextID
         )
         .onChange(of: text) { _, _ in
             scheduleHighlight()

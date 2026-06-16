@@ -114,6 +114,35 @@ final class FrontmatterTests: XCTestCase {
         )
     }
 
+    func testIndentedFenceInsideBlockScalarDoesNotCloseFrontmatter() {
+        let text = """
+        ---
+        title: Old
+        description: |
+          ---
+          inside
+        draft: false
+        ---
+        Body
+        """
+
+        let updated = Frontmatter.updating(text, key: "title", value: .string("New"))
+
+        XCTAssertEqual(
+            updated,
+            """
+            ---
+            title: New
+            description: |
+              ---
+              inside
+            draft: false
+            ---
+            Body
+            """
+        )
+    }
+
     func testNestedMappingParsesAsReadOnlyRawSource() throws {
         let text = """
         ---

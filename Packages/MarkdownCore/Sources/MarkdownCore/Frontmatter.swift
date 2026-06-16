@@ -233,7 +233,7 @@ private extension Frontmatter {
         while lineStart < storage.length {
             let lineEnd = endOfLine(startingAt: lineStart, in: storage)
             let lineText = storage.substring(with: NSRange(location: lineStart, length: lineEnd - lineStart))
-            if lineText.trimmingCharacters(in: .whitespaces) == "---" {
+            if lineText == "---" {
                 let rawYAML = storage.substring(with: NSRange(location: rawStart, length: lineStart - rawStart))
                 let afterClosingDelimiter = storage.substring(from: lineEnd)
                 return .closed(Bounds(

@@ -15,6 +15,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private let editingBehaviorGuard = EditingBehaviorGuard()
     private var completionWorkspace: CompletionWorkspace = .empty
     private var imageAssetInserter: EditorImageAssetInserter?
+    private var imageAssetContextID: String?
     private var completionRequestID = 0
     private var completionTask: Task<[Completion], Never>?
 
@@ -63,6 +64,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     func updateImageAssetInserter(_ inserter: EditorImageAssetInserter?) {
         imageAssetInserter = inserter
+    }
+
+    func updateImageAssetContextID(_ contextID: String?) {
+        imageAssetContextID = contextID
     }
 
     func attachPasteAndDragHandlers(to textView: MarkdownSTTextView) {
@@ -263,13 +268,15 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         replacementRange: NSRange
     ) {
         guard let imageAssetInserter else { return }
-        let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        let capturedRange = replacementRange.clamped(toLength: (text as NSString).length)
+        let capturedText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        let capturedRange = replacementRange.clamped(toLength: (capturedText as NSString).length)
+        let capturedContextID = imageAssetContextID
 
         Task { @MainActor [weak self, weak textView] in
             guard let self, let textView else { return }
             let relativePaths = await imageAssetInserter(assets)
             guard !relativePaths.isEmpty,
+                  imageAssetContextID == capturedContextID,
                   MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
             else {
                 return
@@ -279,6 +286,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
                 .map { SmartPaste.imageInsertion(relativePath: $0) }
                 .joined(separator: "\n")
             let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+            guard currentText == capturedText else {
+                return
+            }
             let replacementRange = capturedRange.clamped(toLength: (currentText as NSString).length)
             let newSelection = NSRange(
                 location: replacementRange.location + (insertion as NSString).length,

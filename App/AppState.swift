@@ -178,11 +178,19 @@ final class AppState: ObservableObject {
     }
 
     func replaceDocumentText(_ newText: String) {
-        guard newText != currentDocument.text else { return }
+        replaceDocumentText(newText, in: currentDocument)
+    }
 
-        currentDocument.replaceText(newText, refreshStatistics: false)
-        if let url = currentDocument.fileURL?.standardizedFileURL {
-            sessionPolicy.updateDirtyState(for: url, isDirty: currentDocument.isDirty)
+    func replaceDocumentText(_ newText: String, in session: DocumentSession) {
+        guard session === currentDocument,
+              newText != session.text
+        else {
+            return
+        }
+
+        session.replaceText(newText, refreshStatistics: false)
+        if let url = session.fileURL?.standardizedFileURL {
+            sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
         scheduleStatisticsRefresh()
         scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)

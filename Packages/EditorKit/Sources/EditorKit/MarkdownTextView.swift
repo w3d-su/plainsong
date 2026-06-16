@@ -61,6 +61,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let commandProxy: EditorCommandProxy?
     private let completionWorkspace: CompletionWorkspace
     private let imageAssetInserter: EditorImageAssetInserter?
+    private let imageAssetContextID: String?
 
     init(
         text: Binding<String>,
@@ -71,6 +72,7 @@ struct MarkdownTextView: NSViewRepresentable {
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
         imageAssetInserter: EditorImageAssetInserter? = nil,
+        imageAssetContextID: String? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25
     ) {
@@ -82,6 +84,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
         self.imageAssetInserter = imageAssetInserter
+        self.imageAssetContextID = imageAssetContextID
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
     }
@@ -121,6 +124,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
+        context.coordinator.updateImageAssetContextID(imageAssetContextID)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
 
         return scrollView
@@ -136,6 +140,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
+        context.coordinator.updateImageAssetContextID(imageAssetContextID)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(

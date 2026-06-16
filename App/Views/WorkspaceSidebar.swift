@@ -73,8 +73,9 @@ struct WorkspaceSidebar: View {
 
             if appState.hasOpenDocument {
                 Section {
-                    FrontmatterPanel(session: appState.currentDocument) { newText in
-                        appState.replaceDocumentText(newText)
+                    let session = appState.currentDocument
+                    FrontmatterPanel(session: session) { newText in
+                        appState.replaceDocumentText(newText, in: session)
                     }
                 }
             }

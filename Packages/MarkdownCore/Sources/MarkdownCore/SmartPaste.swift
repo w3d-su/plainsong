@@ -23,6 +23,18 @@ public enum SmartPaste {
     }
 
     public static func imageInsertion(relativePath: String) -> String {
-        "![](\(relativePath))"
+        "![](\(markdownDestination(relativePath)))"
     }
+
+    static func markdownDestination(_ relativePath: String) -> String {
+        guard relativePath.rangeOfCharacter(from: markdownDestinationDelimiterCharacters) != nil else {
+            return relativePath
+        }
+
+        let escapedPath = relativePath.replacingOccurrences(of: ">", with: "\\>")
+        return "<\(escapedPath)>"
+    }
+
+    private static let markdownDestinationDelimiterCharacters = CharacterSet.whitespacesAndNewlines
+        .union(CharacterSet(charactersIn: "()<>#?"))
 }

@@ -244,14 +244,15 @@ private struct DocumentEditor: View {
             text: Binding(
                 get: { session.text },
                 set: { newText in
-                    appState.replaceDocumentText(newText)
+                    appState.replaceDocumentText(newText, in: session)
                 }
             ),
             fileKind: session.fileKind,
             showsLineNumbers: true,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
-            imageAssetInserter: appState.editorImageAssetInserter
+            imageAssetInserter: appState.editorImageAssetInserter,
+            imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false)
         )
         .onAppear {
             scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)

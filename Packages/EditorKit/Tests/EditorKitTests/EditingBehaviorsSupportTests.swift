@@ -219,6 +219,48 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         try await waitForText(in: textView, toEqual: "Before ![](assets/hero.png)")
     }
 
+    func testDelayedImagePasteAbortsWhenEditorTextChangesBeforeInserterReturns() async throws {
+        let inserter: EditorImageAssetInserter = { _ in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            return ["assets/image.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+        let pasteboard = Self.uniquePasteboard()
+        pasteboard.setData(Data([1, 2, 3]), forType: .png)
+
+        XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
+        textView.insertText("X", replacementRange: NSRange(location: 0, length: 0))
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(Self.text(in: textView), "XBefore ")
+    }
+
+    func testDelayedImageDropAbortsWhenEditorContextChangesBeforeInserterReturns() async throws {
+        let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
+        let inserter: EditorImageAssetInserter = { _ in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            return ["assets/hero.png"]
+        }
+        let (textView, coordinator) = makeInterceptingTextView(
+            text: "Before ",
+            selection: NSRange(location: 7, length: 0),
+            imageAssetInserter: inserter,
+            imageAssetContextID: "file-a"
+        )
+        defer { coordinator.detachPasteAndDragHandlers(from: textView) }
+
+        XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
+        coordinator.updateImageAssetContextID("file-b")
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(Self.text(in: textView), "Before ")
+    }
+
     func testPlainTypingHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
         let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
         let textView = STTextView(frame: .zero)
@@ -315,7 +357,8 @@ final class EditingBehaviorsSupportTests: XCTestCase {
     private func makeInterceptingTextView(
         text: String,
         selection: NSRange,
-        imageAssetInserter: EditorImageAssetInserter? = nil
+        imageAssetInserter: EditorImageAssetInserter? = nil,
+        imageAssetContextID: String? = nil
     ) -> (MarkdownSTTextView, MarkdownTextViewCoordinator) {
         let textView = MarkdownSTTextView(frame: .zero)
         let coordinator = MarkdownTextViewCoordinator(
@@ -326,6 +369,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         textView.text = text
         textView.textSelection = selection
         coordinator.updateImageAssetInserter(imageAssetInserter)
+        coordinator.updateImageAssetContextID(imageAssetContextID)
         coordinator.attachPasteAndDragHandlers(to: textView)
         return (textView, coordinator)
     }
