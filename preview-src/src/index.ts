@@ -304,8 +304,8 @@ function isWorkspaceRelativeURL(value: string): boolean {
 function highlightCodeBlocks(): void {
   for (const code of previewRoot.querySelectorAll<HTMLElement>("pre code")) {
     if (code.classList.contains("language-mermaid")) continue;
+    if (code.dataset.highlighted) continue;
 
-    delete code.dataset.highlighted;
     hljs.highlightElement(code);
   }
 }
@@ -319,7 +319,15 @@ function preserveUnchangedHighlightedCode(fromElement: Element, toElement: Eleme
   }
   return (
     fromElement.textContent !== toElement.textContent ||
-    fromElement.className !== toElement.className
+    codeLanguageClass(fromElement) !== codeLanguageClass(toElement)
+  );
+}
+
+function codeLanguageClass(element: HTMLElement): string {
+  return (
+    Array.from(element.classList).find(
+      (className) => className.startsWith("language-") || className.startsWith("lang-"),
+    ) ?? ""
   );
 }
 
