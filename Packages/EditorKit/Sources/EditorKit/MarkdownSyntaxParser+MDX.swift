@@ -56,10 +56,8 @@ extension MarkdownSyntaxParser {
       "satisfies"
       "type"
     ] @keyword
-
     (string) @string
     (template_string) @string
-
     (jsx_opening_element
       name: [(identifier) (jsx_namespace_name)] @tag)
     (jsx_closing_element
@@ -68,7 +66,6 @@ extension MarkdownSyntaxParser {
       name: [(identifier) (jsx_namespace_name)] @tag)
     (jsx_attribute
       (property_identifier) @attribute)
-
     [
       "<"
       ">"
@@ -201,9 +198,9 @@ extension MarkdownSyntaxParser {
             let lineRange = nsSource.lineRange(for: NSRange(location: location, length: 0))
             let rawLine = nsSource.substring(with: lineRange)
             let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isMDXLine = isMDXESMLine(trimmed) || isMDXJSXLine(trimmed)
 
-            if isMDXESMLine(trimmed) || isMDXJSXLine(trimmed),
-               !lineRange.intersects(any: excludedRanges) {
+            if isMDXLine, !lineRange.intersects(any: excludedRanges) {
                 appendTSXTokens(
                     in: rawLine,
                     baseLocation: lineRange.location,

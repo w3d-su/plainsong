@@ -331,8 +331,11 @@ final class EditingBehaviorsSupportTests: XCTestCase {
             fixturePrefix: mdxPrefix
         )
     }
+}
 
-    private func assertLargeFixtureHotPath(
+@MainActor
+private extension EditingBehaviorsSupportTests {
+    func assertLargeFixtureHotPath(
         replacementString: String,
         expectedNativeInput: Bool,
         iterations: Int,
@@ -375,11 +378,11 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertLessThan(maxLatencyMilliseconds, 16, file: file, line: line)
     }
 
-    private static func text(in textView: STTextView) -> String {
+    static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
 
-    private func makeInterceptingTextView(
+    func makeInterceptingTextView(
         text: String,
         selection: NSRange,
         imageAssetInserter: EditorImageAssetInserter? = nil,
@@ -399,13 +402,13 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         return (textView, coordinator)
     }
 
-    private static func uniquePasteboard() -> NSPasteboard {
+    static func uniquePasteboard() -> NSPasteboard {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongTests.\(UUID().uuidString)"))
         pasteboard.clearContents()
         return pasteboard
     }
 
-    private func waitForText(in textView: STTextView, toEqual expected: String) async throws {
+    func waitForText(in textView: STTextView, toEqual expected: String) async throws {
         for _ in 0 ..< 20 {
             if Self.text(in: textView) == expected {
                 return
@@ -415,7 +418,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(Self.text(in: textView), expected)
     }
 
-    private static var repoRoot: URL {
+    static var repoRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
