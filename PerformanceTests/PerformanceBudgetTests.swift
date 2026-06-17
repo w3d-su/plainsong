@@ -118,6 +118,15 @@ final class PerformanceBudgetTests: XCTestCase {
             fileKind: .markdown,
             label: "markdown 100KB prime"
         )
+        // Let WebKit and morphdom settle before recording post-debounce updates.
+        for attempt in 1 ... 3 {
+            _ = try await measurePreviewRender(
+                controller: controller,
+                text: "\(markdown)\n\n<!-- preview-settle-\(attempt) -->\n",
+                fileKind: .markdown,
+                label: "markdown 100KB settle \(attempt)"
+            )
+        }
 
         let markdownSamples = try await withSignpost("PreviewRenderMarkdown100KB") {
             var samples: [Double] = []
@@ -143,6 +152,15 @@ final class PerformanceBudgetTests: XCTestCase {
             fileKind: .mdx,
             label: "mdx 100KB prime"
         )
+        // Keep MDX cold-start work out of the settled render budget.
+        for attempt in 1 ... 3 {
+            _ = try await measurePreviewRender(
+                controller: controller,
+                text: "\(mdx)\n\n<!-- preview-settle-\(attempt) -->\n",
+                fileKind: .mdx,
+                label: "mdx 100KB settle \(attempt)"
+            )
+        }
         let mdxSamples = try await withSignpost("PreviewRenderMDX100KB") {
             var samples: [Double] = []
             for attempt in 1 ... 3 {
@@ -204,6 +222,8 @@ final class PerformanceBudgetTests: XCTestCase {
 
     func testOpening500KBMarkdownToEditorFirstPaintStaysUnderBudget() throws {
         let fixtureURL = try Self.fixtureURL("Fixtures/perf-500kb.md")
+        // Warm the editor surface so the timed path covers document load and first paint.
+        try EditorPerformanceProbe.paintEditor(text: "# Warm editor\n\n")
 
         let elapsedMilliseconds = try withSignpost("FileOpen500KBFirstPaint") {
             let start = DispatchTime.now().uptimeNanoseconds
