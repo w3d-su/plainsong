@@ -149,18 +149,25 @@ final class MarkdownEditingTests: XCTestCase {
     }
 
     func testLineSelectionsIncludeLastLineWhenSelectionEndsAtLineStart() {
-        let testCases: [(name: String, command: MarkdownEditCommand, input: String, expected: String)] = [
-            (
-                "checkbox",
-                .toggleCheckbox,
-                "[[a\nb]]",
-                "[[- [ ] a\n- [ ] b]]"
+        struct TestCase {
+            let name: String
+            let command: MarkdownEditCommand
+            let input: String
+            let expected: String
+        }
+
+        let testCases: [TestCase] = [
+            .init(
+                name: "checkbox",
+                command: .toggleCheckbox,
+                input: "[[a\nb]]",
+                expected: "[[- [ ] a\n- [ ] b]]"
             ),
-            (
-                "quote",
-                .format(.quote),
-                "[[a\nb]]",
-                "[[> a\n> b]]"
+            .init(
+                name: "quote",
+                command: .format(.quote),
+                input: "[[a\nb]]",
+                expected: "[[> a\n> b]]"
             ),
         ]
 

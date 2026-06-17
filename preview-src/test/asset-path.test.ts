@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workspaceRelativeAssetPath } from "../src/asset-path";
+import { assetURLPath, workspaceRelativeAssetPath } from "../src/asset-path";
 
 describe("workspace asset paths", () => {
   it("joins image sources against the workspace-relative base directory", () => {
@@ -22,5 +22,17 @@ describe("workspace asset paths", () => {
 
   it("preserves leading parent segments so native containment still rejects escapes", () => {
     expect(workspaceRelativeAssetPath("../secret.png", null)).toBe("../secret.png");
+  });
+
+  it("preserves existing percent escapes when building asset URLs", () => {
+    expect(assetURLPath("content/images/spaced%20pixel.png")).toBe(
+      "content/images/spaced%20pixel.png",
+    );
+  });
+
+  it("escapes raw asset URL delimiters without double-encoding valid escapes", () => {
+    expect(assetURLPath("content/images/a 100% done?#.png")).toBe(
+      "content/images/a%20100%25%20done%3F%23.png",
+    );
   });
 });

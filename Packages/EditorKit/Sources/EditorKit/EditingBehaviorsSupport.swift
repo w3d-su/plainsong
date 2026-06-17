@@ -236,6 +236,21 @@ enum EditingBehaviorsSupport {
         apply(edit, to: textView, editingGuard: editingGuard)
     }
 
+    static func applyReplacement(
+        _ replacementString: String,
+        replacementRange: NSRange,
+        newSelection: NSRange,
+        to textView: STTextView,
+        editingGuard: EditingBehaviorGuard
+    ) {
+        let edit = MarkdownEditResult(
+            replacementRange: replacementRange,
+            replacementString: replacementString,
+            newSelection: newSelection
+        )
+        apply(edit, to: textView, editingGuard: editingGuard)
+    }
+
     static func needsMarkdownEvaluation(for replacementString: String, fileKind: FileKind) -> Bool {
         switch replacementString {
         case "\n", "\r", "\u{2028}", "\u{2029}", "\t", "\u{19}":

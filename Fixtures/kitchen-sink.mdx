@@ -1,0 +1,89 @@
+---
+title: "MDX Kitchen Sink Fixture"
+description: "MDX coverage for Plainsong M5 preview, highlighting, completion, and scroll-sync checks."
+date: 2026-06-15
+draft: true
+slug: mdx-kitchen-sink-fixture
+tags:
+  - plainsong
+  - mdx
+  - fixture
+---
+
+import Hero, { Callout, FeatureGrid as Grid } from "../components/marketing"
+import * as Charts from "../components/charts"
+export const readingTime = "4 min"
+
+# MDX Kitchen Sink Fixture
+
+This fixture exercises Markdown mixed with ESM imports, JSX components, inline expressions,
+frontmatter, fenced code, and ordinary prose. M5 preview should render the Markdown content,
+show imports and exports as compact chips, and replace custom components with placeholder cards.
+
+<Hero eyebrow="Native Markdown" title="Plainsong writes MDX without executing components" />
+
+## Markdown Still Works
+
+- **Bold** and *italic* spans remain ordinary Markdown.
+- [Relative Markdown links](./kitchen-sink.md) should stay clickable.
+- Inline math still renders: $a^2 + b^2 = c^2$.
+- Emoji shortcodes are typed in source as `:sparkles:` and completed by M4.
+
+> A blockquote inside an MDX document should preserve its preview styling and source-line anchor.
+
+## JSX Flow Elements
+
+<Callout tone="info" title="Placeholder rendering">
+  Component children may contain **Markdown**, links to [headings](#markdown-still-works), and
+  inline code. M5 should render the children where safe while keeping the component itself as a
+  non-executed placeholder card.
+</Callout>
+
+<Grid
+  columns={3}
+  items={[
+    { title: "Fast editing", body: "Native TextKit source editing." },
+    { title: "Local preview", body: "WKWebView renders bundled assets offline." },
+    { title: "MDX aware", body: "Components stay visible without executing user code." }
+  ]}
+/>
+
+<Charts.LineChart dataKey="views" height={240} />
+
+## Inline JSX And Expressions
+
+Inline components like <Badge tone="success">Ready</Badge> should become safe inline placeholders.
+Expressions such as {readingTime} and {new Date("2026-06-15").getFullYear()} should render as code chips,
+not execute JavaScript.
+
+Lowercase HTML can remain real HTML when sanitized:
+
+<div className="note" data-kind="fixture">
+  <strong>HTML island:</strong> this should not execute scripts or remote resources.
+</div>
+
+## Fenced Code
+
+```tsx
+export function Badge({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return <span data-tone={tone}>{children}</span>
+}
+```
+
+```mermaid
+flowchart LR
+    A[MDX Source] --> B[remark-mdx]
+    B --> C[Placeholder Components]
+    C --> D[Non-blank Preview]
+```
+
+## Table
+
+| Area | M5 Expectation |
+|---|---|
+| Imports | Collapsed chip row |
+| Components | Placeholder card with escaped props |
+| Expressions | Code chip, never executed |
+| Errors | Banner plus last good render |
+
+End of MDX kitchen sink fixture.

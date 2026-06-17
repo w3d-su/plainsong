@@ -67,14 +67,22 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         XCTAssertNotNil(fencedCodeAttributes[.backgroundColor])
     }
 
-    func testStylesMDXImportsAsSourceCode() throws {
+    func testStylesMDXImportsAndJSXWithTSXTokens() throws {
         let source = """
         import Button from "./Button"
+        export const label = "Read more"
 
         # Post
 
         <Button label="Read more" />
         """
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertTrue(tokens.kinds(in: source, for: "import").contains(.tsxKeyword))
+        XCTAssertTrue(tokens.kinds(in: source, for: "\"./Button\"").contains(.tsxString))
+        XCTAssertTrue(tokens.kinds(in: source, for: "Button label").contains(.tsxTag))
+        XCTAssertTrue(tokens.kinds(in: source, for: "label=").contains(.tsxAttribute))
 
         let attributed = MarkdownSyntaxHighlighter().highlight(source, fileKind: .mdx)
         let inspected = NSAttributedString(attributed)
@@ -82,7 +90,118 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         let importAttributes = try inspected.attributes(for: "import")
         let importFont = try XCTUnwrap(importAttributes[.font] as? NSFont)
         XCTAssertTrue(importFont.fontDescriptor.symbolicTraits.contains(.monoSpace))
-        XCTAssertNotNil(importAttributes[.foregroundColor])
+        XCTAssertEqual(importAttributes[.foregroundColor] as? NSColor, MarkdownSyntaxTheme.standard.tsxKeywordColor)
+
+        let stringAttributes = try inspected.attributes(for: "\"./Button\"")
+        XCTAssertEqual(stringAttributes[.foregroundColor] as? NSColor, MarkdownSyntaxTheme.standard.tsxStringColor)
+
+        let attributeAttributes = try inspected.attributes(for: "label=\"Read more\"")
+        XCTAssertEqual(
+            attributeAttributes[.foregroundColor] as? NSColor,
+            MarkdownSyntaxTheme.standard.tsxAttributeColor
+        )
+    }
+
+    func testMDXFixturesProduceTSXTokensInsteadOfCoarseSource() throws {
+        for fixtureName in ["kitchen-sink.mdx", "product-page.mdx"] {
+            let source = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/\(fixtureName)"))
+            let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+            XCTAssertFalse(tokens.contains(kind: .mdxSource), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxKeyword), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxString), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxTag), fixtureName)
+            XCTAssertTrue(tokens.contains(kind: .tsxAttribute), fixtureName)
+        }
+    }
+
+    func testMarkdownFilesDoNotReceiveMDXTSXTokens() throws {
+        let source = """
+        import Button from "./Button"
+
+        # Post
+
+        <Button label="Read more" />
+
+        Text with <Em>x</Em> inline.
+        """
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .markdown)
+
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertFalse(tokens.containsTSXToken)
+    }
+
+    func testStylesMidParagraphInlineJSXWithTSXTokens() throws {
+        let source = "Text with <Em>x</Em> inline.\nA <Tag/> mid line."
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertEqual(tokens.ranges(kind: .tsxTag), source.ranges(of: "Em") + source.ranges(of: "Tag"))
+
+        let nsSource = source as NSString
+        let openingRange = nsSource.range(of: "<Em>")
+        let closingRange = nsSource.range(of: "</Em>")
+        let selfClosingRange = nsSource.range(of: "<Tag/>")
+        XCTAssertEqual(tokens.ranges(kind: .tsxPunctuation), [
+            NSRange(location: openingRange.location, length: 1),
+            NSRange(location: NSMaxRange(openingRange) - 1, length: 1),
+            NSRange(location: closingRange.location, length: 1),
+            NSRange(location: NSMaxRange(closingRange) - 1, length: 1),
+            NSRange(location: selfClosingRange.location, length: 1),
+            NSRange(location: NSMaxRange(selfClosingRange) - 2, length: 2),
+        ])
+
+        assertNoOverlappingTSXTokens(tokens)
+    }
+
+    func testLineStartJSXDoesNotEmitDuplicateOverlappingTSXTokens() throws {
+        let source = "<Button>top level</Button>"
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertEqual(tokens.ranges(kind: .tsxTag), source.ranges(of: "Button"))
+        assertNoOverlappingTSXTokens(tokens)
+    }
+
+    func testFencedTSXCodeKeepsCodeFenceHighlightingInMDX() throws {
+        let source = """
+        # Example
+
+        ```tsx
+        export function Badge({ label }: { label: string }) {
+          return <span className="badge">{label}</span>
+        }
+        ```
+
+        <Button label="Read more" />
+        """
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+        let fencedExportKinds = tokens.kinds(in: source, for: "export function")
+
+        XCTAssertTrue(fencedExportKinds.contains(.codeBlock))
+        XCTAssertFalse(fencedExportKinds.contains(.tsxKeyword))
+        XCTAssertTrue(tokens.kinds(in: source, for: "Button label").contains(.tsxTag))
+    }
+
+    func testLargeMDXFallsBackToCoarseSourceAboveInlineLimit() throws {
+        let filler = String(repeating: "Plain paragraph without inline markup.\n", count: 8000)
+        let source = """
+        import Hero from "./Hero"
+
+        \(filler)
+
+        <Hero title="Large document" />
+        """
+
+        XCTAssertGreaterThan(source.utf8.count, MarkdownSyntaxParser.inlineParsingLimit)
+
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx)
+
+        XCTAssertTrue(tokens.contains(kind: .mdxSource))
+        XCTAssertFalse(tokens.containsTSXToken)
     }
 
     func testEscapedEmphasisDelimitersStayPlainText() throws {
@@ -175,5 +294,98 @@ private extension NSAttributedString {
         let range = (string as NSString).range(of: substring)
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
         return attributes(at: range.location, effectiveRange: nil)
+    }
+}
+
+private extension MarkdownSyntaxHighlighterTests {
+    static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+}
+
+private extension [MarkdownSyntaxToken] {
+    var containsTSXToken: Bool {
+        contains { $0.kind.isTSXToken }
+    }
+
+    func contains(kind: MarkdownSyntaxToken.Kind) -> Bool {
+        contains { $0.kind == kind }
+    }
+
+    func kinds(in source: String, for substring: String) -> [MarkdownSyntaxToken.Kind] {
+        let range = (source as NSString).range(of: substring)
+        XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
+
+        return filter { NSIntersectionRange($0.range, range).length > 0 }.map(\.kind)
+    }
+
+    func ranges(kind: MarkdownSyntaxToken.Kind) -> [NSRange] {
+        filter { $0.kind == kind }
+            .map(\.range)
+            .sorted { lhs, rhs in
+                if lhs.location != rhs.location {
+                    return lhs.location < rhs.location
+                }
+                return lhs.length < rhs.length
+            }
+    }
+
+    var tsxTokens: [MarkdownSyntaxToken] {
+        filter(\.kind.isTSXToken)
+            .sorted { lhs, rhs in
+                if lhs.range.location != rhs.range.location {
+                    return lhs.range.location < rhs.range.location
+                }
+                return lhs.range.length < rhs.range.length
+            }
+    }
+}
+
+private extension XCTestCase {
+    func assertNoOverlappingTSXTokens(
+        _ tokens: [MarkdownSyntaxToken],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let sortedTokens = tokens.tsxTokens
+        for (previous, current) in zip(sortedTokens, sortedTokens.dropFirst()) {
+            XCTAssertLessThanOrEqual(NSMaxRange(previous.range), current.range.location, file: file, line: line)
+        }
+    }
+}
+
+private extension String {
+    func ranges(of substring: String) -> [NSRange] {
+        let nsString = self as NSString
+        var ranges: [NSRange] = []
+        var searchLocation = 0
+
+        while searchLocation < nsString.length {
+            let searchRange = NSRange(location: searchLocation, length: nsString.length - searchLocation)
+            let range = nsString.range(of: substring, options: [], range: searchRange)
+            guard range.location != NSNotFound else {
+                break
+            }
+            ranges.append(range)
+            searchLocation = NSMaxRange(range)
+        }
+
+        return ranges
+    }
+}
+
+private extension MarkdownSyntaxToken.Kind {
+    var isTSXToken: Bool {
+        switch self {
+        case .tsxKeyword, .tsxString, .tsxTag, .tsxAttribute, .tsxPunctuation:
+            true
+        default:
+            false
+        }
     }
 }

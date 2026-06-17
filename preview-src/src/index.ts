@@ -18,8 +18,9 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
-import { workspaceRelativeAssetPath } from "./asset-path";
-import { renderMarkdown } from "./pipeline";
+import { assetURLPath, workspaceRelativeAssetPath } from "./asset-path";
+import { mdxErrorDetails } from "./mdx-error";
+import { renderMarkdown, renderMdx } from "./pipeline";
 
 export { PROTOCOL_VERSION } from "./bridge";
 
@@ -121,10 +122,27 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   if (payload.renderID < latestRenderID) return;
   latestRenderID = payload.renderID;
 
-  const html =
-    payload.fileKind === "md"
-      ? await renderMarkdown(payload.text)
-      : `<p data-line="1">MDX preview arrives in M5.</p>`;
+  let html: string;
+  try {
+    html =
+      payload.fileKind === "md"
+        ? await renderMarkdown(payload.text)
+        : await renderMdx(payload.text);
+  } catch (error) {
+    if (payload.fileKind !== "mdx") throw error;
+    if (payload.renderID < latestRenderID) return;
+
+    showMdxErrorBanner(error);
+    postBridgeMessage({
+      name: "renderComplete",
+      payload: {
+        renderID: payload.renderID,
+        version: payload.version,
+        blockCount: previewRoot.querySelectorAll("[data-line]").length,
+      },
+    });
+    return;
+  }
 
   if (payload.renderID < latestRenderID) return;
 
@@ -132,6 +150,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
 
+  clearMdxErrorBanner();
   morphdom(previewRoot, nextRoot, { childrenOnly: true });
   rewriteImageSources(payload.baseDir);
   highlightCodeBlocks();
@@ -147,6 +166,33 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
       blockCount: previewRoot.querySelectorAll("[data-line]").length,
     },
   });
+}
+
+function showMdxErrorBanner(error: unknown): void {
+  previewRoot.classList.add("preview-stale");
+
+  const details = mdxErrorDetails(error);
+  let banner = previewRoot.querySelector<HTMLElement>(".mdx-error-banner");
+  if (!banner) {
+    banner = document.createElement("aside");
+    banner.className = "mdx-error-banner";
+    banner.setAttribute("role", "status");
+    previewRoot.prepend(banner);
+  }
+
+  const title = document.createElement("strong");
+  title.textContent =
+    details.line === undefined ? "MDX syntax error" : `MDX syntax error on line ${details.line}`;
+
+  const message = document.createElement("span");
+  message.textContent = details.message;
+
+  banner.replaceChildren(title, message);
+}
+
+function clearMdxErrorBanner(): void {
+  previewRoot.classList.remove("preview-stale");
+  previewRoot.querySelector(".mdx-error-banner")?.remove();
 }
 
 function scrollToLine(line: number, animated: boolean): void {
@@ -244,7 +290,7 @@ function rewriteImageSources(baseDir: string | null): void {
     if (!source || !isWorkspaceRelativeURL(source)) continue;
 
     const assetPath = workspaceRelativeAssetPath(source, baseDir);
-    image.src = `asset://${encodeURI(assetPath).replaceAll("#", "%23")}`;
+    image.src = `asset://${assetURLPath(assetPath)}`;
   }
 }
 

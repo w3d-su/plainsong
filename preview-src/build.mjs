@@ -15,6 +15,10 @@ await build({
   target: ["safari17"],
   outfile: `${outDir}/bundle.js`,
 });
+writeFileSync(
+  `${outDir}/bundle.js`,
+  readFileSync(`${outDir}/bundle.js`, "utf8").replace(/[ \t]+$/gm, ""),
+);
 
 const css = [
   readFileSync("src/styles/base.css", "utf8"),

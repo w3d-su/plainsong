@@ -21,9 +21,20 @@ let package = Package(
                 .product(name: "STTextView", package: "STTextView"),
                 .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
                 .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown"),
+                "TreeSitterTSXFixed",
                 "TreeSitterYAMLFixed",
             ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
+        ),
+        .target(
+            name: "TreeSitterTSXFixed",
+            path: "Sources/TreeSitterTSXFixed",
+            sources: [
+                "src/parser.c",
+                "src/scanner.c",
+            ],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
         ),
         .target(
             name: "TreeSitterYAMLFixed",
