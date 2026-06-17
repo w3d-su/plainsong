@@ -1,26 +1,18 @@
 import rehypeKatex from "rehype-katex";
+import rehypeSanitize from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
-
-interface SourcePosition {
-  start?: {
-    line?: number;
-  };
-}
-
-interface TreeNode {
-  type?: string;
-  tagName?: string;
-  value?: string;
-  properties?: Record<string, unknown>;
-  children?: TreeNode[];
-  position?: SourcePosition;
-}
+import {
+  mdxSanitizeSchema,
+  remarkMdxPlaceholders,
+  type TreeNode,
+} from "./mdx-placeholders";
 
 const blockTags = new Set([
   "address",
@@ -59,20 +51,37 @@ const blockTags = new Set([
 ]);
 
 export async function renderMarkdown(markdown: string): Promise<string> {
-  const file = await unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkFrontmatter, ["yaml"])
-    .use(stripFrontmatter)
-    .use(remarkMath)
-    .use(remarkRehype)
-    .use(rehypeKatex)
-    .use(rehypeSourceLines)
-    .use(rehypeStringify)
-    .process(markdown);
-
-  return String(file);
+  return String(await markdownProcessor.process(markdown));
 }
+
+export async function renderMdx(markdown: string): Promise<string> {
+  return String(await mdxProcessor.process(markdown));
+}
+
+const markdownProcessor = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkFrontmatter, ["yaml"])
+  .use(stripFrontmatter)
+  .use(remarkMath)
+  .use(remarkRehype)
+  .use(rehypeKatex)
+  .use(rehypeSourceLines)
+  .use(rehypeStringify);
+
+const mdxProcessor = unified()
+  .use(remarkParse)
+  .use(remarkMdx)
+  .use(remarkGfm)
+  .use(remarkFrontmatter, ["yaml"])
+  .use(stripFrontmatter)
+  .use(remarkMath)
+  .use(remarkMdxPlaceholders)
+  .use(remarkRehype)
+  .use(rehypeKatex)
+  .use(rehypeSourceLines)
+  .use(rehypeSanitize, mdxSanitizeSchema)
+  .use(rehypeStringify);
 
 function stripFrontmatter() {
   return (tree: TreeNode) => {
@@ -86,7 +95,7 @@ function stripFrontmatter() {
 
 function rehypeSourceLines() {
   return (tree: TreeNode) => {
-    visit(tree, (node) => {
+    visitTree(tree, (node) => {
       if (node.type !== "element" || !node.tagName) return;
 
       const line = node.position?.start?.line;
@@ -103,10 +112,10 @@ function rehypeSourceLines() {
   };
 }
 
-function visit(node: TreeNode, visitor: (node: TreeNode) => void): void {
+function visitTree(node: TreeNode, visitor: (node: TreeNode) => void): void {
   visitor(node);
 
   for (const child of node.children ?? []) {
-    visit(child, visitor);
+    visitTree(child, visitor);
   }
 }
