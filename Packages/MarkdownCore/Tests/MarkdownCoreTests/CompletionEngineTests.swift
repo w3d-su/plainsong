@@ -126,6 +126,17 @@ final class CompletionEngineTests: XCTestCase {
         XCTAssertTrue(results.containsLabel("CTA"))
     }
 
+    func testMDXImportParserHandlesPureNamedImports() {
+        let testCases: [(source: String, expectedNames: [String])] = [
+            ("import { Button, Card } from './ui'", ["Button", "Card"]),
+            ("import { A, B as Renamed, type T } from 'x'", ["A", "Renamed"]),
+        ]
+
+        for testCase in testCases {
+            XCTAssertEqual(MDXImportParser.componentNames(in: testCase.source), testCase.expectedNames)
+        }
+    }
+
     func testRankingBoostsRecentlyUsedPrefixMatchesAndCapsResults() {
         let markdownPaths = (0 ..< 70).map { String(format: "posts/%03d.md", $0) }
         let workspace = CompletionWorkspace(

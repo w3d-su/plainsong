@@ -74,7 +74,8 @@ enum MarkdownTextEditingSupport {
             let nextLine = line(containing: cursor, in: text)
             lines.append(nextLine)
             let nextCursor = nextLine.fullEndLocation
-            if nextCursor <= cursor || nextCursor >= effectiveEnd {
+            // Non-empty selections include a next line that starts at effectiveEnd.
+            if nextCursor <= cursor || selection.length == 0 || nextCursor > effectiveEnd {
                 break
             }
             cursor = nextCursor

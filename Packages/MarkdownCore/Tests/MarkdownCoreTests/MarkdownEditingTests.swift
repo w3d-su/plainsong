@@ -148,6 +148,29 @@ final class MarkdownEditingTests: XCTestCase {
         )
     }
 
+    func testLineSelectionsIncludeLastLineWhenSelectionEndsAtLineStart() {
+        let testCases: [(name: String, command: MarkdownEditCommand, input: String, expected: String)] = [
+            (
+                "checkbox",
+                .toggleCheckbox,
+                "[[a\nb]]",
+                "[[- [ ] a\n- [ ] b]]"
+            ),
+            (
+                "quote",
+                .format(.quote),
+                "[[a\nb]]",
+                "[[> a\n> b]]"
+            ),
+        ]
+
+        for testCase in testCases {
+            XCTContext.runActivity(named: testCase.name) { _ in
+                assertEdit(testCase.command, from: testCase.input, to: testCase.expected)
+            }
+        }
+    }
+
     func testBlockListTabPreservesCRLFLineEndings() {
         assertEdit(
             .insertTab(backwards: false),

@@ -27,16 +27,29 @@ public enum MDXImportParser {
 
 private extension MDXImportParser {
     static func importedComponentNames(from clause: String) -> [String] {
-        if let comma = clause.firstIndex(of: ",") {
-            return defaultComponentName(from: String(clause[..<comma])) +
-                namedComponentNames(from: String(clause[clause.index(after: comma)...]))
+        let trimmedClause = clause.trimmingCharacters(in: .whitespaces)
+        guard !trimmedClause.hasPrefix("type ") else { return [] }
+
+        // Braces identify the named group; comma splitting first would split pure named imports.
+        if trimmedClause.hasPrefix("{") {
+            return namedComponentNames(from: trimmedClause)
         }
 
-        if clause.trimmingCharacters(in: .whitespaces).hasPrefix("{") {
-            return namedComponentNames(from: clause)
+        if let openBrace = trimmedClause.firstIndex(of: "{") {
+            var defaultClause = String(trimmedClause[..<openBrace]).trimmingCharacters(in: .whitespaces)
+            if defaultClause.hasSuffix(",") {
+                defaultClause.removeLast()
+            }
+            return defaultComponentName(from: defaultClause) +
+                namedComponentNames(from: String(trimmedClause[openBrace...]))
         }
 
-        return defaultComponentName(from: clause)
+        if let comma = trimmedClause.firstIndex(of: ",") {
+            return defaultComponentName(from: String(trimmedClause[..<comma])) +
+                namedComponentNames(from: String(trimmedClause[trimmedClause.index(after: comma)...]))
+        }
+
+        return defaultComponentName(from: trimmedClause)
     }
 
     static func defaultComponentName(from clause: String) -> [String] {
@@ -63,7 +76,7 @@ private extension MDXImportParser {
         return imports.split(separator: ",").compactMap { rawImport -> String? in
             var name = rawImport.trimmingCharacters(in: .whitespaces)
             if name.hasPrefix("type ") {
-                name = String(name.dropFirst("type ".count))
+                return nil
             }
             if let aliasRange = name.range(of: " as ") {
                 name = String(name[aliasRange.upperBound...])
