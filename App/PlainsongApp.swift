@@ -13,6 +13,7 @@ struct PlainsongApp: App {
         WindowGroup {
             WorkspaceWindow()
                 .environmentObject(appState)
+                .tint(.accentColor)
                 .onOpenURL { url in
                     appState.openExternalFile(url)
                 }
@@ -173,6 +174,7 @@ struct PlainsongApp: App {
 
         Settings {
             SettingsView()
+                .tint(.accentColor)
         }
     }
 }
