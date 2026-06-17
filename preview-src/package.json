@@ -14,13 +14,16 @@
   },
   "dependencies": {
     "highlight.js": "^11.11.1",
+    "mdast-util-mdx": "^3.0.0",
     "mermaid": "^11.15.0",
     "morphdom": "^2.7.8",
     "rehype-katex": "^7.0.1",
+    "rehype-sanitize": "^6.0.0",
     "rehype-stringify": "^10.0.1",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "unified": "^11.0.5"
