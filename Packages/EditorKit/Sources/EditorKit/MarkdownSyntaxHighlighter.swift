@@ -57,6 +57,10 @@ private extension MarkdownSyntaxHighlighter {
             return
         }
 
+        if applyTSXToken(token, to: attributed) {
+            return
+        }
+
         applyMDXToken(token, to: attributed)
     }
 
@@ -261,6 +265,45 @@ private extension MarkdownSyntaxHighlighter {
             )
         default:
             return
+        }
+    }
+
+    func applyTSXToken(_ token: MarkdownSyntaxToken, to attributed: NSMutableAttributedString) -> Bool {
+        switch token.kind {
+        case .tsxKeyword:
+            attributed.addAttributes(
+                [
+                    .font: boldFont(baseFont),
+                    .foregroundColor: theme.tsxKeywordColor,
+                ],
+                range: token.range
+            )
+            return true
+
+        case .tsxString:
+            attributed.addAttribute(.foregroundColor, value: theme.tsxStringColor, range: token.range)
+            return true
+
+        case .tsxTag:
+            attributed.addAttributes(
+                [
+                    .font: boldFont(baseFont),
+                    .foregroundColor: theme.tsxTagColor,
+                ],
+                range: token.range
+            )
+            return true
+
+        case .tsxAttribute:
+            attributed.addAttribute(.foregroundColor, value: theme.tsxAttributeColor, range: token.range)
+            return true
+
+        case .tsxPunctuation:
+            attributed.addAttribute(.foregroundColor, value: theme.tsxPunctuationColor, range: token.range)
+            return true
+
+        default:
+            return false
         }
     }
 }

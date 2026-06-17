@@ -311,14 +311,41 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         )
     }
 
-    private func assertLargeFixtureHotPath(
+    func testMDXTriggerHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
+        let mdxPrefix = """
+        import Hero from "./Hero"
+
+        """
+        try assertLargeFixtureHotPath(
+            replacementString: "a",
+            expectedNativeInput: true,
+            iterations: 200,
+            fileKind: .mdx,
+            fixturePrefix: mdxPrefix
+        )
+        try assertLargeFixtureHotPath(
+            replacementString: "<",
+            expectedNativeInput: false,
+            iterations: 50,
+            fileKind: .mdx,
+            fixturePrefix: mdxPrefix
+        )
+    }
+}
+
+@MainActor
+private extension EditingBehaviorsSupportTests {
+    func assertLargeFixtureHotPath(
         replacementString: String,
         expectedNativeInput: Bool,
         iterations: Int,
+        fileKind: FileKind = .markdown,
+        fixturePrefix: String = "",
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
-        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let baseFixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let fixtureText = fixturePrefix + baseFixtureText
         let textView = STTextView(frame: .zero)
         textView.text = fixtureText
         textView.textSelection = NSRange(location: 0, length: 0)
@@ -332,7 +359,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
                 in: textView,
                 affectedRange: affectedRange,
                 replacementString: replacementString,
-                fileKind: .markdown,
+                fileKind: fileKind,
                 editingGuard: editingGuard
             )
             maxLatencyMilliseconds = max(
@@ -343,18 +370,19 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         }
 
         print(String(
-            format: "large-1mb.md trigger '%@' hot path max: %.3f ms",
+            format: "large-1mb.md %@ trigger '%@' hot path max: %.3f ms",
+            fileKind == .mdx ? "mdx" : "markdown",
             replacementString == "\n" ? "\\n" : replacementString,
             maxLatencyMilliseconds
         ))
         XCTAssertLessThan(maxLatencyMilliseconds, 16, file: file, line: line)
     }
 
-    private static func text(in textView: STTextView) -> String {
+    static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
 
-    private func makeInterceptingTextView(
+    func makeInterceptingTextView(
         text: String,
         selection: NSRange,
         imageAssetInserter: EditorImageAssetInserter? = nil,
@@ -374,13 +402,13 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         return (textView, coordinator)
     }
 
-    private static func uniquePasteboard() -> NSPasteboard {
+    static func uniquePasteboard() -> NSPasteboard {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongTests.\(UUID().uuidString)"))
         pasteboard.clearContents()
         return pasteboard
     }
 
-    private func waitForText(in textView: STTextView, toEqual expected: String) async throws {
+    func waitForText(in textView: STTextView, toEqual expected: String) async throws {
         for _ in 0 ..< 20 {
             if Self.text(in: textView) == expected {
                 return
@@ -390,7 +418,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(Self.text(in: textView), expected)
     }
 
-    private static var repoRoot: URL {
+    static var repoRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()

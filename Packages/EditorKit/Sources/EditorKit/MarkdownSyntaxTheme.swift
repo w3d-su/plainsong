@@ -11,6 +11,11 @@ public struct MarkdownSyntaxTheme {
     public var frontmatterColor: NSColor
     public var frontmatterBackgroundColor: NSColor
     public var listMarkerColor: NSColor
+    public var tsxKeywordColor: NSColor
+    public var tsxStringColor: NSColor
+    public var tsxTagColor: NSColor
+    public var tsxAttributeColor: NSColor
+    public var tsxPunctuationColor: NSColor
 
     public init(
         textColor: NSColor,
@@ -21,7 +26,12 @@ public struct MarkdownSyntaxTheme {
         codeBackgroundColor: NSColor,
         frontmatterColor: NSColor,
         frontmatterBackgroundColor: NSColor,
-        listMarkerColor: NSColor
+        listMarkerColor: NSColor,
+        tsxKeywordColor: NSColor,
+        tsxStringColor: NSColor,
+        tsxTagColor: NSColor,
+        tsxAttributeColor: NSColor,
+        tsxPunctuationColor: NSColor
     ) {
         self.textColor = textColor
         self.mutedColor = mutedColor
@@ -32,6 +42,11 @@ public struct MarkdownSyntaxTheme {
         self.frontmatterColor = frontmatterColor
         self.frontmatterBackgroundColor = frontmatterBackgroundColor
         self.listMarkerColor = listMarkerColor
+        self.tsxKeywordColor = tsxKeywordColor
+        self.tsxStringColor = tsxStringColor
+        self.tsxTagColor = tsxTagColor
+        self.tsxAttributeColor = tsxAttributeColor
+        self.tsxPunctuationColor = tsxPunctuationColor
     }
 
     public static var standard: MarkdownSyntaxTheme {
@@ -44,7 +59,12 @@ public struct MarkdownSyntaxTheme {
             codeBackgroundColor: .controlBackgroundColor.withAlphaComponent(0.8),
             frontmatterColor: .systemTeal,
             frontmatterBackgroundColor: .controlBackgroundColor.withAlphaComponent(0.6),
-            listMarkerColor: .systemOrange
+            listMarkerColor: .systemOrange,
+            tsxKeywordColor: .systemPink,
+            tsxStringColor: .systemGreen,
+            tsxTagColor: .systemBlue,
+            tsxAttributeColor: .systemTeal,
+            tsxPunctuationColor: .secondaryLabelColor
         )
     }
 }
