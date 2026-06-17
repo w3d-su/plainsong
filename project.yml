@@ -105,6 +105,7 @@ targets:
     scheme:
       testTargets:
         - PlainsongTests
+        - PerformanceTests
 
   PlainsongTests:
     type: bundle.unit-test
@@ -116,4 +117,25 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  PerformanceTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PerformanceTests
+      - path: Fixtures
+        type: folder
+        buildPhase: resources
+      - path: App/Resources/preview
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: MarkdownCore
+      - package: EditorKit
+      - package: PreviewKit
+      - package: WorkspaceKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.performance-tests
         GENERATE_INFOPLIST_FILE: YES

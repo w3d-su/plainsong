@@ -151,7 +151,10 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.innerHTML = html;
 
   clearMdxErrorBanner();
-  morphdom(previewRoot, nextRoot, { childrenOnly: true });
+  morphdom(previewRoot, nextRoot, {
+    childrenOnly: true,
+    onBeforeElUpdated: preserveUnchangedHighlightedCode,
+  });
   rewriteImageSources(payload.baseDir);
   highlightCodeBlocks();
   await renderMermaidBlocks();
@@ -305,6 +308,19 @@ function highlightCodeBlocks(): void {
     delete code.dataset.highlighted;
     hljs.highlightElement(code);
   }
+}
+
+function preserveUnchangedHighlightedCode(fromElement: Element, toElement: Element): boolean {
+  if (!(fromElement instanceof HTMLElement) || !(toElement instanceof HTMLElement)) {
+    return true;
+  }
+  if (!fromElement.matches("pre code") || !toElement.matches("pre code")) {
+    return true;
+  }
+  return (
+    fromElement.textContent !== toElement.textContent ||
+    fromElement.className !== toElement.className
+  );
 }
 
 async function renderMermaidBlocks(): Promise<void> {

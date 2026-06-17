@@ -12,6 +12,7 @@ public final class PreviewController: NSObject, ObservableObject {
     public var onPreviewScrolled: ((Int) -> Void)?
     public var onLinkClicked: ((String) -> Void)?
     public var onCheckboxToggled: ((Int, Bool, Int) -> Void)?
+    var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
 
     private let assetSchemeHandler: AssetURLSchemeHandler
     private let scriptMessageProxy: ScriptMessageProxy
@@ -130,6 +131,7 @@ public final class PreviewController: NSObject, ObservableObject {
                 return
             }
             latestCompletedRenderID = max(latestCompletedRenderID, payload.renderID)
+            renderCompletionObserver?(payload)
 
         case let .previewScrolled(payload):
             onPreviewScrolled?(payload.topVisibleLine)
