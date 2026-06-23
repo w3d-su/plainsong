@@ -7,9 +7,9 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 
 | ID | Risk | Severity | Current signal | Mitigation / next action | Owner surface |
 |---|---|---:|---|---|---|
-| R1 | M5 can be declared complete before the real performance gates are done | High | PR #15 merged as infrastructure; this branch measures #14, but #13, settings, and hardening remain open | Keep `docs/perf-log.md` honest; do not close M5 until every remaining gate passes | Docs, PerformanceTests |
+| R1 | M5 can be declared complete before the real performance gates are done | High | PR #15 merged as infrastructure; this stack measures #14 and #13, but settings and hardening remain open | Keep `docs/perf-log.md` honest; do not close M5 until every remaining gate passes | Docs, PerformanceTests |
 | R2 | Visible-range highlighting is not plumbed/instrumented | High | This branch plumbs visible-range-first request/apply and measures Markdown 17.918 ms max, MDX 22.670 ms max | Merge this branch, then close #14 from the measured perf-log evidence | EditorKit, PerformanceTests |
-| R3 | Memory budget lacks deterministic 2-live-webview harness | High | Issue #13 open; PR #15 records single-webview memory only | Add deterministic harness/workflow for 8 warm sessions + 2 live previews and update perf log | App, PreviewKit, PerformanceTests |
+| R3 | Memory budget lacks deterministic 2-live-webview harness | High | This branch records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews; single-webview RSS remains informational only | Merge this branch, then close #13 from the measured perf-log evidence | App, PreviewKit, PerformanceTests |
 | R4 | MDX sanitizer schema is broader than needed | High | Review found broad `style` allowance risk | Tighten schema; add malicious MDX/HTML snapshot tests for style spoofing, event handlers, scripts, giant layout | preview-src |
 | R5 | Local asset and image import paths can read whole large files into memory | Medium | Review found `Data(contentsOf:)` on asset/image paths | Add size/type guards and streaming or `FileManager.copyItem` where possible | PreviewKit, WorkspaceKit |
 | R6 | Settings/themes are not implemented despite being in M5 scope | Medium | Search found no settings/theme implementation beyond icon/accent | Implement Settings scene panes or defer with Decision Log entry | App, EditorKit, PreviewKit |
@@ -25,7 +25,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 
 1. PR #15 has landed as performance infrastructure, not as full M5 completion.
 2. Merge this branch to close R2 / issue #14 with measured visible-range highlighting.
-3. Close R3 via issue #13.
+3. Merge this branch to close R3 / issue #13 with measured two-webview memory.
 4. Close R4/R5 with a focused security hardening PR.
 5. Implement or explicitly defer R6.
 6. Keep R13 visible whenever CI is green from informational preview timing.

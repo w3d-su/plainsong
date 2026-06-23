@@ -25,7 +25,7 @@ a milestone or gate as accepted.
 | M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 local result bundle reports Markdown median 46.631 ms, MDX median 14.556 ms; GitHub runner timing is informational only | Accepted |
 | M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
 | M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | This branch records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md` | Accepted on merge of this branch |
-| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | Issue #13 open; PR #15 single-webview result is informational only | Blocked / not accepted |
+| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | This branch records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md` | Accepted on merge of this branch |
 | M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | No focused hardening PR found | Needed before public alpha |
 | Phase 2 WYSIWYG gate | M1–M5 complete and `docs/wysiwyg-design.md` approved | Draft doc exists from PR #9 | Design only; implementation blocked until M5 complete |
 
@@ -34,8 +34,8 @@ a milestone or gate as accepted.
 | Release target | Recommendation | Reason |
 |---|---|---|
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
-| Private alpha with trusted users | Maybe, after #13 plus settings/security triage | Highlight is measured here, but memory, settings, and security gaps remain. |
-| Public alpha | No | #13 and hardening are open; license/release signing are also not final. |
+| Private alpha with trusted users | Maybe, after settings/security triage | Highlight and memory are measured here, but settings and security gaps remain. |
+| Public alpha | No | Security hardening is open; license/release signing are also not final. |
 | Phase 2 WYSIWYG implementation | No | `agent.md` requires M1–M5 complete and design approval first. |
 
 ## M5 exit checklist
@@ -44,7 +44,7 @@ M5 should not be called complete until all items below are true:
 
 - [x] PR #15 merged or superseded by equivalent performance infrastructure.
 - [x] Issue #14 closed with measured <50 ms visible-range highlighting.
-- [ ] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
+- [x] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
 - [ ] Settings + themes from `agent.md` §11 implemented or explicitly deferred with a Decision Log entry.
 - [ ] Security hardening PR landed for MDX sanitizer and asset handling.
 - [ ] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results.
