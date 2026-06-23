@@ -2,6 +2,7 @@
 # Requires: Xcode 16+, Homebrew. Run `make bootstrap` once after cloning.
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
+SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests Scripts
 
 .PHONY: bootstrap generate build run test format lint preview-bundle clean
 
@@ -27,11 +28,11 @@ preview-bundle:
 	cd preview-src && npm run build
 
 format:
-	swiftformat App AppTests Packages
+	swiftformat $(SWIFT_FORMAT_PATHS)
 	swiftlint --fix --quiet
 
 lint:
-	swiftformat App AppTests Packages --lint
+	swiftformat $(SWIFT_FORMAT_PATHS) --lint
 	swiftlint
 
 clean:

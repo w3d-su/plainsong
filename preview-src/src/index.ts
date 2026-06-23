@@ -151,7 +151,10 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.innerHTML = html;
 
   clearMdxErrorBanner();
-  morphdom(previewRoot, nextRoot, { childrenOnly: true });
+  morphdom(previewRoot, nextRoot, {
+    childrenOnly: true,
+    onBeforeElUpdated: preserveUnchangedHighlightedCode,
+  });
   rewriteImageSources(payload.baseDir);
   highlightCodeBlocks();
   await renderMermaidBlocks();
@@ -301,10 +304,31 @@ function isWorkspaceRelativeURL(value: string): boolean {
 function highlightCodeBlocks(): void {
   for (const code of previewRoot.querySelectorAll<HTMLElement>("pre code")) {
     if (code.classList.contains("language-mermaid")) continue;
+    if (code.dataset.highlighted) continue;
 
-    delete code.dataset.highlighted;
     hljs.highlightElement(code);
   }
+}
+
+function preserveUnchangedHighlightedCode(fromElement: Element, toElement: Element): boolean {
+  if (!(fromElement instanceof HTMLElement) || !(toElement instanceof HTMLElement)) {
+    return true;
+  }
+  if (!fromElement.matches("pre code") || !toElement.matches("pre code")) {
+    return true;
+  }
+  return (
+    fromElement.textContent !== toElement.textContent ||
+    codeLanguageClass(fromElement) !== codeLanguageClass(toElement)
+  );
+}
+
+function codeLanguageClass(element: HTMLElement): string {
+  return (
+    Array.from(element.classList).find(
+      (className) => className.startsWith("language-") || className.startsWith("lang-"),
+    ) ?? ""
+  );
 }
 
 async function renderMermaidBlocks(): Promise<void> {

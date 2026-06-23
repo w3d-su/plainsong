@@ -262,40 +262,11 @@ final class EditingBehaviorsSupportTests: XCTestCase {
     }
 
     func testPlainTypingHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
-        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
-        let textView = STTextView(frame: .zero)
-        textView.text = fixtureText
-        textView.textSelection = NSRange(location: 0, length: 0)
-        let affectedRange = try XCTUnwrap(NSTextRange(textView.selectedRange(), in: textView.textContentManager))
-        let editingGuard = EditingBehaviorGuard()
-
-        XCTAssertTrue(EditingBehaviorsSupport.handleProposedChange(
-            in: textView,
-            affectedRange: affectedRange,
+        try assertLargeFixtureHotPath(
             replacementString: "a",
-            fileKind: .markdown,
-            editingGuard: editingGuard
-        ))
-
-        var maxLatencyMilliseconds = 0.0
-        for _ in 0 ..< 200 {
-            let start = CFAbsoluteTimeGetCurrent()
-            let shouldAllowNativeInput = EditingBehaviorsSupport.handleProposedChange(
-                in: textView,
-                affectedRange: affectedRange,
-                replacementString: "a",
-                fileKind: .markdown,
-                editingGuard: editingGuard
-            )
-            maxLatencyMilliseconds = max(
-                maxLatencyMilliseconds,
-                (CFAbsoluteTimeGetCurrent() - start) * 1000
-            )
-            XCTAssertTrue(shouldAllowNativeInput)
-        }
-
-        print(String(format: "large-1mb.md plain typing hot path max: %.3f ms", maxLatencyMilliseconds))
-        XCTAssertLessThan(maxLatencyMilliseconds, 16)
+            expectedNativeInput: true,
+            iterations: 200
+        )
     }
 
     func testMarkdownTriggerHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
@@ -344,38 +315,24 @@ private extension EditingBehaviorsSupportTests {
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
-        let baseFixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
-        let fixtureText = fixturePrefix + baseFixtureText
-        let textView = STTextView(frame: .zero)
-        textView.text = fixtureText
-        textView.textSelection = NSRange(location: 0, length: 0)
-        let affectedRange = try XCTUnwrap(NSTextRange(textView.selectedRange(), in: textView.textContentManager))
-        let editingGuard = EditingBehaviorGuard()
-
-        var maxLatencyMilliseconds = 0.0
-        for _ in 0 ..< iterations {
-            let start = CFAbsoluteTimeGetCurrent()
-            let shouldAllowNativeInput = EditingBehaviorsSupport.handleProposedChange(
-                in: textView,
-                affectedRange: affectedRange,
-                replacementString: replacementString,
-                fileKind: fileKind,
-                editingGuard: editingGuard
-            )
-            maxLatencyMilliseconds = max(
-                maxLatencyMilliseconds,
-                (CFAbsoluteTimeGetCurrent() - start) * 1000
-            )
-            XCTAssertEqual(shouldAllowNativeInput, expectedNativeInput, file: file, line: line)
-        }
+        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let result = try EditorPerformanceProbe.measureTypingHotPath(
+            fixtureText: fixtureText,
+            fileKind: fileKind,
+            replacementString: replacementString,
+            expectedNativeInput: expectedNativeInput,
+            iterations: iterations,
+            fixturePrefix: fixturePrefix
+        )
 
         print(String(
             format: "large-1mb.md %@ trigger '%@' hot path max: %.3f ms",
             fileKind == .mdx ? "mdx" : "markdown",
             replacementString == "\n" ? "\\n" : replacementString,
-            maxLatencyMilliseconds
+            result.maxLatencyMilliseconds
         ))
-        XCTAssertLessThan(maxLatencyMilliseconds, 16, file: file, line: line)
+        XCTAssertEqual(result.nativeInputMismatches, 0, file: file, line: line)
+        XCTAssertLessThan(result.maxLatencyMilliseconds, 16, file: file, line: line)
     }
 
     static func text(in textView: STTextView) -> String {

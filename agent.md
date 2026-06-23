@@ -423,6 +423,13 @@ highlighting, morphdom patching, render-version dropping, LRU sessions, mermaid 
 by fence content hash. **Any PR that regresses typing latency is rejected regardless of
 features.** Add a `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
 
+M5 planning note: the highlight budget is not accepted until visible-range
+highlighting is actually plumbed and instrumented; the current parser defers inline
+parsing above 250 KB, so that cutoff cannot be counted as a pass. The memory budget
+is still the 2-webview gate above; single-webview measurements are only
+informational until the branch has a deterministic two-live-webview workflow or
+harness.
+
 ---
 
 ## 13. Phase 2 — Typora-Style WYSIWYG (design sketch, do not build during Phase 1)
@@ -551,7 +558,9 @@ make format           # swiftformat . && swiftlint --fix
   `data-line` presence; placeholder rendering of MDX nodes.
 - **Fixtures:** `Fixtures/kitchen-sink.md` (every GFM construct + math + mermaid),
   `Fixtures/kitchen-sink.mdx`, `Fixtures/large-1mb.md` (generated, committed),
-  `Fixtures/broken-frontmatter.md`, `Fixtures/mdx-syntax-error.mdx`.
+  `Fixtures/broken-frontmatter.md`, `Fixtures/mdx-syntax-error.mdx`,
+  `Fixtures/product-page.mdx`, `Fixtures/perf-100kb.md`,
+  `Fixtures/perf-500kb.md`.
 - UI tests: minimal smoke (launch, open fixture, type, preview updates). Don't invest in
   brittle full UI automation.
 
