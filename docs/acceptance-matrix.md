@@ -1,0 +1,52 @@
+# Acceptance Matrix
+
+Status snapshot: 2026-06-23.
+
+This matrix is the short operational view of `agent.md` milestones. It does not replace
+`agent.md`; it records whether the evidence currently on the repository is enough to treat
+a milestone or gate as accepted.
+
+## Milestone state
+
+| Area | Required acceptance | Evidence / reference | State |
+|---|---|---|---|
+| M0 scaffold | Generated project builds, CI exists, package tests run | `project.yml`, `Makefile`, CI workflow | Accepted |
+| M1 editor core | Open/save, autosave/session restore, dirty indicator, status stats, no large-doc fallback lag | Landed before current M5 work | Accepted |
+| M1.5 parser highlighting | Parser-backed Markdown/frontmatter/fence highlighting replaces regex fallback | Landed before current M5 work | Accepted |
+| M2 live preview | Offline WKWebView preview, GFM, KaTeX, Mermaid, checkbox writeback, scroll sync, preview toggle | Landed before current M5 work | Accepted |
+| M3 workspace | Folder workspace, sidebar, FSEvents, file operations, recents/bookmarks, LRU sessions | PR #2 merged | Accepted |
+| M4 authoring | Formatting/editing behaviors, completion, frontmatter, smart paste, image drag/drop, table helper | PR #4, #5, #6, #7 merged | Accepted |
+| M5 MDX preview | `.mdx` preview pipeline with non-executed placeholders, error liveness, sanitizer, fixtures | PR #8 merged | Accepted for feature scope; hardening still tracked below |
+| M5 TSX highlighting | MDX ESM/JSX regions receive TSX injection highlighting | PR #10 merged | Accepted with documented multiline JSX limitation |
+| M5 icon/accent | App icon and accent assets exist | PR #11 merged | Accepted as first-pass art; product sign-off still subjective |
+| M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 | No implementation found in current search | Not started |
+| M5 performance infrastructure | Dedicated performance fixtures/tests and `docs/perf-log.md` measurements | PR #15 open | In progress |
+| M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Pending PR #15 merge |
+| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 reports Markdown median 46.631 ms, MDX median 14.556 ms | Pending PR #15 merge |
+| M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Pending PR #15 merge |
+| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | Issue #14 open | Blocked / not accepted |
+| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | Issue #13 open; PR #15 single-webview result is informational only | Blocked / not accepted |
+| M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | No focused hardening PR found | Needed before public alpha |
+| Phase 2 WYSIWYG gate | M1–M5 complete and `docs/wysiwyg-design.md` approved | Draft doc exists from PR #9 | Design only; implementation blocked until M5 complete |
+
+## Current release posture
+
+| Release target | Recommendation | Reason |
+|---|---|---|
+| Local dogfood | Yes | Core editor/workspace/preview features are in place. |
+| Private alpha with trusted users | Maybe, after PR #15 and settings/security triage | Perf infrastructure is not fully accepted and settings/security gaps remain. |
+| Public alpha | No | #13/#14 and hardening are open; license/release signing are also not final. |
+| Phase 2 WYSIWYG implementation | No | `agent.md` requires M1–M5 complete and design approval first. |
+
+## M5 exit checklist
+
+M5 should not be called complete until all items below are true:
+
+- [ ] PR #15 merged or superseded by equivalent performance infrastructure.
+- [ ] Issue #14 closed with measured <50 ms visible-range highlighting.
+- [ ] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
+- [ ] Settings + themes from `agent.md` §11 implemented or explicitly deferred with a Decision Log entry.
+- [ ] Security hardening PR landed for MDX sanitizer and asset handling.
+- [ ] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results.
+- [ ] `docs/m5-checklist.md` passes manually.
+- [ ] README, `agent.md`, and planning docs no longer contain stale milestone claims.
