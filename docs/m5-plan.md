@@ -1,109 +1,84 @@
-# M5 Slice Plan & Dependency Order
+# M5 Stabilization Plan & Dependency Order
 
-> Living plan for M5 (MDX + polish, agent.md §14). M5 is too large for one PR, so it is split
-> into five PR-sized slices, each its own `m5-*` branch and PR (agent.md §17 rule 2).
-> Status snapshot: **2026-06-17**.
+> Living plan for M5 (MDX + polish, `agent.md` §14). M5 is too large for one PR, so it is split
+> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-23**.
 
-## Slice catalog
+## Current snapshot
 
-| Slice | Content | Primary surface (layers/files) | New dependency / gate | Status |
-|---|---|---|---|---|
-| **1 — MDX preview** | mdx pipeline + non-executed placeholders + inline error banner / last-good DOM | `preview-src/`, `PreviewKit` | `remark-mdx`, `mdast-util-mdx`, `rehype-sanitize` (Decision Log added); protocol stays v4 | ✅ PR #8 — implemented & verified, **awaiting maintainer merge** |
-| **2 — tsx highlighting** | MDX editor tsx-injection (replace coarse `.mdxSource` token) | `EditorKit`, `Package.swift`, `project.yml` | **tsx grammar (needs Decision Log; highest technical risk)** | Not started |
-| **3 — Settings + themes** | §11 panes + editor/preview themes, user CSS override | `App`, `EditorKit` (theme), `preview-src/styles` | none new (reuses `setTheme`, Yams already in); **relaxes §7.1 CSP** for remote images | Not started |
-| **4 — App icon + polish** | populate AppIcon + AccentColor, light/dark coherence | `App/Resources/Assets.xcassets` (+ icon-gen script) | none (but **icon/accent need maintainer design sign-off**) | Not started |
-| **5 — Performance pass** | measure + record §12 budgets, add PerformanceTests target | `PerformanceTests`, `Fixtures/`, `docs/perf-log.md` | none; adds a test target | Not started (**do last**) |
+M5 feature slices have mostly landed, but M5 is **not complete** because the hard performance gates and
+some polish/hardening work remain open.
 
-## Dependency matrix
+| Item | Content | Status | Notes |
+|---|---|---|---|
+| Slice 1 — MDX preview | `remark-mdx`, non-executed placeholders, stale/error preview liveness | ✅ Merged PR #8 | Feature accepted; sanitizer still needs hardening below |
+| Planning docs | M5 checklist, perf log, slice plan, WYSIWYG design draft | ✅ Merged PR #9 | `docs/wysiwyg-design.md` remains draft / not approved |
+| Slice 2 — TSX highlighting | Vendored TSX grammar and MDX ESM/JSX injection highlighting | ✅ Merged PR #10 | Known multiline JSX limitation remains acceptable for M5 |
+| Slice 4 — App icon/accent | App icon, accent color, deterministic generator | ✅ Merged PR #11 | First-pass art; final brand sign-off remains subjective |
+| Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | 🚧 Open PR #15 | Infrastructure only; #13 and #14 stay open |
+| Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ❌ Not started | Required unless explicitly deferred with Decision Log entry |
+| Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ❌ Not started | Needed before public alpha |
+| Hidden perf gate — highlight | Visible-range highlight update <50 ms | ❌ Issue #14 open | Must be measured; current cutoff cannot count as pass |
+| Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB | ❌ Issue #13 open | PR #15 single-webview result is informational only |
 
-| Slice | Depends on | Can run in parallel with |
-|---|---|---|
-| 1 | — | 2, 4 |
-| 2 | — | 1, 4 |
-| 3 | (soft) 1, 2 | 4 |
-| 4 | — | 1, 2, 3 |
-| 5 | **1, 2, 3, 4 (all)** | — |
+## Recommended next sequence
 
-## Recommended merge order (linear)
-
-```
-1 (MDX preview, awaiting merge)
-  → 4 (app icon — insertable anytime, no conflicts)
-  → 3 (Settings + themes)
-  → 2 (tsx highlighting)
-  → 5 (perf pass — after everything)
+```text
+0. Merge or finish PR #15 as M5 performance infrastructure.
+1. Implement issue #14: visible-range highlight instrumentation and <50 ms budget.
+2. Implement issue #13: deterministic two-live-webview memory harness and <400 MB budget.
+3. Implement Settings + themes or explicitly defer them with a Decision Log entry.
+4. Run a focused M5 security-hardening PR.
+5. Update docs/perf-log.md, docs/m5-checklist.md, README, and agent.md to match the final M5 state.
+6. Only then approve docs/wysiwyg-design.md and start Phase 2 spikes/build work.
 ```
 
-2 and 3 may swap, but **must be sequenced (not parallel)** — see conflict hotspots. 3-before-2 is
-recommended so tsx capture colors slot into the finished theme system (JSON / light-dark) rather than
-being rewritten once. If MDX editor fidelity is higher priority, run 2 first; the second lander rebases.
+The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1–M5 are
+complete and a WYSIWYG design doc is approved; the current repository is not there yet.
 
-## Parallel waves (handoff view)
+## Conflict hotspots
 
-- **Dispatchable now (no shared files):** slice 2 and slice 4 (slice 1 is already done).
-- **Slice 3** should wait until slice 1 is merged (shared `preview-src/src/styles/base.css`) and be
-  sequenced with slice 2 (shared `MarkdownSyntaxTheme.swift`).
-- **Slice 5** starts only after 1–4 are merged (it measures the whole M5 system).
-
-## Conflict hotspots (same file → sequence, don't parallelize)
-
-| File | Touched by | Handling |
+| File / area | Touched by | Handling |
 |---|---|---|
-| `preview-src/src/styles/base.css` | 1 (placeholder styles) + 3 (theme CSS) | land 1 before 3; 3 rebases |
-| `Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxTheme.swift` | 2 (tsx token colors) + 3 (theme JSON/light-dark) | sequence 2 & 3; second rebases |
-| `agent.md` (Decision Log / §16 fixtures / §12) | 2 (tsx dep), 5 (fixtures + perf note) | each adds its entry; watch the merge |
-| `project.yml` / `Package.resolved` | 2 (grammar dep) | only slice 2 touches; standalone |
+| `project.yml` | PR #15 PerformanceTests, future test targets | Edit manifest only; run `make generate`; never commit hand-edited `.xcodeproj` |
+| `docs/perf-log.md` | PR #15, #13, #14 | Keep blocked/informational language until real measurements exist |
+| `preview-src/src/pipeline.ts` | MDX sanitizer hardening, theme/remote image work | Sequence security hardening and theme/CSP changes carefully |
+| `preview-src/src/index.ts` | Preview render caching, theme bridge, scroll sync | Require `npm run typecheck`, `npm test`, and regenerated dist when changed |
+| `MarkdownEditorView` / `MarkdownTextView` | Visible-range highlighting, IME safety, future WYSIWYG | Do not start WYSIWYG folding until #14 lands |
+| `agent.md` | Decision Log and milestone status | Update in the same PR when behavior or dependency policy changes |
 
-## Risks & caveats
+## Risk notes
 
-- **Slice 2 tsx grammar dependency** is the biggest M5 technical risk: compatibility with the pinned
-  `swift-tree-sitter` 0.10.0 and the Neon-vs-grammar pin conflict noted in the Decision Log. Mitigation:
-  vendor the tsx C source as an SPM target (mirror `TreeSitterYAMLFixed`). Start early to surface risk.
-- **Slice 5 must not fake passes.** Per the §12 M5 planning note: the highlight-update budget is not
-  accepted until visible-range highlighting is plumbed/instrumented (the parser defers inline parsing above
-  250 KB, so that cutoff is not a pass); the memory budget is the 2-webview gate (single-webview numbers are
-  informational only). Record these honestly as blocked/informational if the prerequisites are absent.
+- **PR #15 must not be treated as full M5 completion.** It records visible-range highlight as blocked and
+  single-webview memory as informational.
+- **Visible-range highlighting is the most important pre-WYSIWYG engineering gate.** Phase 2 folding will
+  amplify any current selection, styling, and IME weaknesses.
+- **The two-webview memory gate may require a test-only harness.** Phase 1 has shared app-scoped state, so a
+  deterministic harness is preferable to ambiguous manual multi-window behavior.
+- **Settings + themes can be implemented after perf infrastructure, but before public alpha.** If deferred,
+  the deferral must be explicit because `agent.md` currently includes it in M5.
+- **Security hardening should happen before any public alpha.** MDX preview intentionally does not execute
+  components, but sanitizer and asset policy still need tests against spoofing and large-file cases.
 
-## Docs landing gap
+## Codex dispatch map
 
-`docs/m5-checklist.md` and `docs/perf-log.md` exist locally but are **not on `main`** yet. Land the
-checklist early (it is the M5 acceptance script) via a small docs PR; `perf-log.md` lands filled-in with
-slice 5. This file (`docs/m5-plan.md`) is also not yet on `main`.
+Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
-## Status snapshot (2026-06-17)
+| Goal | Branch suggestion | Output |
+|---|---|---|
+| Review/finish PR #15 | continue `m5-perf-pass` or review PR #15 directly | PR #15 ready to merge or exact blockers |
+| Visible-range highlight gate | `m5-visible-range-highlight` | Closes #14 with measured <50 ms update |
+| Two-webview memory gate | `m5-two-webview-memory` | Closes #13 with measured <400 MB memory |
+| Settings + themes | `m5-settings-themes` | Implements `agent.md` §11 or documents a deferral |
+| Security hardening | `m5-security-hardening` | Tightens sanitizer/assets and adds tests |
+| CI/docs cleanup | `m5-ci-docs-sync` | Typecheck in CI and synchronized docs |
 
-- M4 fully merged to `main` (PR #7), including the smart-paste symlink containment fix.
-- M5 sequencing gate (agent.md §14) is **cleared**.
-- Slice 1 (PR #8) implemented, reviewed, and verified (MDX placeholders, sanitization, error liveness,
-  data-line, math-through-sanitize all confirmed; the `.mdx` checkbox-`disabled` regression was fixed and
-  re-verified). Awaiting maintainer squash-merge.
-- Next actions: merge slice 1; dispatch slice 2 and slice 4 in parallel.
+## Beyond M5
 
----
+There is no accepted "M6" in `agent.md`. After M5, the roadmap is Phase 2 WYSIWYG, then unscheduled Phase 3
+candidates. Recommended order after M5:
 
-# Beyond M5 — Roadmap & Scheduling
-
-> There is **no "M6"** in agent.md. After M5 (the last Phase 1 milestone) the roadmap is Phase 2
-> (WYSIWYG, §13) then Phase 3 (unscheduled candidates, §14). This section sequences the path forward.
-
-## Sequence
-
-| Stage | Deliverable | Prerequisite / gate | Risk | Decision owner |
-|---|---|---|---|---|
-| **A. Finish M5** | slices 2→5 merged; `docs/m5-checklist.md` passes; §12 budgets recorded | slice 1 merged | med (slice 2 tsx dep) | dev (per slice plan above) |
-| **B. Phase 2 design** | `docs/wysiwyg-design.md` approved + spikes A/B/C (IME, undo, selection) | **M1–M5 complete** (agent.md §13) | high (this is the gate) | **maintainer** approves design |
-| **C. Phase 2 build** | WYSIWYG v1 behind ⌘⇧P (fold/reveal engine + low-risk constructs first; tables/mermaid last) | stage B approved | very high (TextKit 2, IME) | dev, after B sign-off |
-| **(opt) Phase 3 slice** | e.g. export HTML/PDF via preview print (lowest-risk, reuses preview) | maintainer schedules it (Phase 3 is "not scheduled") | low–med | **maintainer** product call |
-
-## Decision point (maintainer)
-
-After M5, choose: **(1)** go straight to Phase 2 (write/approve `wysiwyg-design.md` → spikes → build), or
-**(2)** insert a Phase 3 slice (export is the cheapest visible win) before taking on WYSIWYG risk.
-Recommended default: **finish M5 → write the WYSIWYG design doc + run the IME/undo/selection spikes
-(risk discovery) → then decide Phase 2 build vs. an interim export slice.** Phase 3 ordering needs a
-Decision Log entry since agent.md marks it unscheduled.
-
-## "M6" naming note
-
-If the M-numbering is kept past M5, the de-facto "M6" is **Phase 2 WYSIWYG** — but it is gated on the
-design doc above, so its first deliverable is `docs/wysiwyg-design.md` + spikes, not feature code.
+1. Approve `docs/wysiwyg-design.md`.
+2. Run Phase 2 spikes for IME, undo, selection, and delimiter folding.
+3. Ship inline-only WYSIWYG first: headings, emphasis, inline code, links, task checkbox.
+4. Defer images, tables, Mermaid, and embedded block widgets until the inline engine is proven.
+5. Keep two-pane source + preview mode permanently available.
