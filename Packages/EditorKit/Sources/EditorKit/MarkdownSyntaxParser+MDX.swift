@@ -233,14 +233,15 @@ extension MarkdownSyntaxParser {
     ) {
         guard
             !source.isEmpty,
-            let tree = tsxParser.parse(source),
+            let resources = tsxResources(),
+            let tree = resources.parser.parse(source),
             let root = tree.rootNode
         else {
             tokens.append(MarkdownSyntaxToken(kind: .mdxSource, range: fallbackRange))
             return
         }
 
-        let cursor = tsxHighlightQuery.execute(node: root, in: tree)
+        let cursor = resources.query.execute(node: root, in: tree)
         for highlight in cursor.highlights() {
             guard let kind = MarkdownSyntaxToken.Kind(tsxCaptureName: highlight.name) else {
                 continue

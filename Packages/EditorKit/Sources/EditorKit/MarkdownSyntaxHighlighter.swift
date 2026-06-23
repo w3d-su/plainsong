@@ -2,6 +2,24 @@ import AppKit
 import Foundation
 import MarkdownCore
 
+struct MarkdownHighlightResult: Equatable {
+    let range: NSRange
+    let text: AttributedString
+}
+
+actor MarkdownHighlightService {
+    private let highlighter = MarkdownSyntaxHighlighter()
+    private let parser: MarkdownSyntaxParser?
+
+    init() {
+        parser = try? MarkdownSyntaxParser()
+    }
+
+    func highlight(_ text: String, fileKind: FileKind, visibleRange: NSRange) -> MarkdownHighlightResult {
+        highlighter.highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: parser)
+    }
+}
+
 /// Parser-backed source styling for Markdown and MDX source mode.
 ///
 /// This remains a facade: callers depend on String + FileKind -> AttributedString,
@@ -23,6 +41,55 @@ public struct MarkdownSyntaxHighlighter {
     }
 
     public func highlight(_ text: String, fileKind: FileKind) -> AttributedString {
+        attributedText(
+            text,
+            tokens: (try? MarkdownSyntaxParser().tokens(in: text, fileKind: fileKind)) ?? []
+        )
+    }
+
+    func highlight(_ text: String, fileKind: FileKind, visibleRange: NSRange) -> MarkdownHighlightResult {
+        highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: try? MarkdownSyntaxParser())
+    }
+
+    func highlight(
+        _ text: String,
+        fileKind: FileKind,
+        visibleRange: NSRange,
+        parser: MarkdownSyntaxParser?
+    ) -> MarkdownHighlightResult {
+        guard let parser else {
+            let range = MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
+            return MarkdownHighlightResult(
+                range: range,
+                text: attributedText(text.fragment(in: range) ?? "", tokens: [])
+            )
+        }
+
+        let range = MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
+        let fragment = text.fragment(in: range) ?? ""
+        let tokens = parser.tokens(in: text, fileKind: fileKind, visibleRange: visibleRange)
+            .compactMap { token -> MarkdownSyntaxToken? in
+                guard NSIntersectionRange(token.range, range).length > 0 else {
+                    return nil
+                }
+                return MarkdownSyntaxToken(
+                    kind: token.kind,
+                    range: NSRange(
+                        location: token.range.location - range.location,
+                        length: token.range.length
+                    )
+                )
+            }
+
+        return MarkdownHighlightResult(
+            range: range,
+            text: attributedText(fragment, tokens: tokens)
+        )
+    }
+}
+
+private extension MarkdownSyntaxHighlighter {
+    func attributedText(_ text: String, tokens: [MarkdownSyntaxToken]) -> AttributedString {
         let attributed = NSMutableAttributedString(
             string: text,
             attributes: [
@@ -31,11 +98,7 @@ public struct MarkdownSyntaxHighlighter {
             ]
         )
 
-        guard let parser = try? MarkdownSyntaxParser() else {
-            return AttributedString(attributed)
-        }
-
-        for token in parser.tokens(in: text, fileKind: fileKind) {
+        for token in tokens {
             apply(token, to: attributed)
         }
 
@@ -305,5 +368,14 @@ private extension MarkdownSyntaxHighlighter {
         default:
             return false
         }
+    }
+}
+
+private extension String {
+    func fragment(in range: NSRange) -> String? {
+        guard let stringRange = Range(range, in: self) else {
+            return nil
+        }
+        return String(self[stringRange])
     }
 }

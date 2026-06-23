@@ -78,6 +78,103 @@ final class PerformanceBudgetTests: XCTestCase {
         }
     }
 
+    func testVisibleRangeHighlightUpdateAfterEditStaysUnderBudgetForLargeMarkdownAndMDX() async throws {
+        let markdown = try Self.fixtureText("Fixtures/large-1mb.md")
+        let markdownVisibleRange = try Self.visibleRange(
+            in: markdown,
+            around: "This deterministic paragraph gives the editor ordinary prose"
+        )
+        let markdownEditLocation = try Self.location(in: markdown, of: "ordinary prose")
+        let highlightService = MarkdownHighlightService()
+
+        _ = try await EditorPerformanceProbe.measureVisibleRangeHighlightUpdate(
+            fixtureText: markdown,
+            fileKind: .markdown,
+            visibleRange: markdownVisibleRange,
+            editLocation: markdownEditLocation,
+            insertion: "warm ",
+            highlightService: highlightService
+        )
+
+        let markdownSamples = try await withSignpost("VisibleRangeHighlightMarkdown1MB") {
+            var samples: [Double] = []
+            for attempt in 1 ... 3 {
+                let result = try await EditorPerformanceProbe.measureVisibleRangeHighlightUpdate(
+                    fixtureText: markdown,
+                    fileKind: .markdown,
+                    visibleRange: markdownVisibleRange,
+                    editLocation: markdownEditLocation,
+                    insertion: "m\(attempt)",
+                    highlightService: highlightService
+                )
+                XCTAssertTrue(result.didApplyHighlight, "markdown attempt \(attempt)")
+                XCTAssertEqual(
+                    result.selectionAfterApply.location,
+                    markdownEditLocation + 2,
+                    "markdown attempt \(attempt)"
+                )
+                samples.append(result.elapsedMilliseconds)
+            }
+            return samples
+        }
+        let markdownMax = markdownSamples.max() ?? 0
+        print(String(
+            format: "M5 PERF visible highlight markdown 1MB max %.3f ms samples %@",
+            markdownMax,
+            Self.formatSamples(markdownSamples)
+        ))
+
+        let mdx = """
+        import Hero from "./Hero"
+
+        <Hero title="Visible range" />
+
+        \(markdown)
+        """
+        let mdxVisibleRange = try Self.visibleRange(in: mdx, around: "<Hero title")
+        let mdxEditLocation = try Self.location(in: mdx, of: "Visible range")
+
+        _ = try await EditorPerformanceProbe.measureVisibleRangeHighlightUpdate(
+            fixtureText: mdx,
+            fileKind: .mdx,
+            visibleRange: mdxVisibleRange,
+            editLocation: mdxEditLocation,
+            insertion: "warm ",
+            highlightService: highlightService
+        )
+
+        let mdxSamples = try await withSignpost("VisibleRangeHighlightMDX1MB") {
+            var samples: [Double] = []
+            for attempt in 1 ... 3 {
+                let result = try await EditorPerformanceProbe.measureVisibleRangeHighlightUpdate(
+                    fixtureText: mdx,
+                    fileKind: .mdx,
+                    visibleRange: mdxVisibleRange,
+                    editLocation: mdxEditLocation,
+                    insertion: "x\(attempt)",
+                    highlightService: highlightService
+                )
+                XCTAssertTrue(result.didApplyHighlight, "mdx attempt \(attempt)")
+                XCTAssertEqual(
+                    result.selectionAfterApply.location,
+                    mdxEditLocation + 2,
+                    "mdx attempt \(attempt)"
+                )
+                samples.append(result.elapsedMilliseconds)
+            }
+            return samples
+        }
+        let mdxMax = mdxSamples.max() ?? 0
+        print(String(
+            format: "M5 PERF visible highlight mdx 1MB max %.3f ms samples %@",
+            mdxMax,
+            Self.formatSamples(mdxSamples)
+        ))
+
+        XCTAssertLessThan(markdownMax, Self.visibleRangeHighlightBudgetMilliseconds)
+        XCTAssertLessThan(mdxMax, Self.visibleRangeHighlightBudgetMilliseconds)
+    }
+
     func testPreviewRenderFor100KBMarkdownAndMDXStaysUnderBudget() async throws {
         let controller = try PreviewController(previewIndexURL: Self.previewIndexFixtureURL())
         try await waitUntil("preview bridge ready") {
@@ -249,6 +346,7 @@ private extension PerformanceBudgetTests {
     }
 
     static let typingLatencyBudgetMilliseconds = 16.0
+    static let visibleRangeHighlightBudgetMilliseconds = 50.0
     static let previewRenderBudgetMilliseconds = 100.0
     static let fileOpenBudgetMilliseconds = 300.0
     static let signpostLog = OSLog(subsystem: "app.plainsong.performance", category: "M5")
@@ -297,6 +395,21 @@ private extension PerformanceBudgetTests {
 
     static func formatSamples(_ values: [Double]) -> String {
         "[" + values.map { String(format: "%.3f", $0) }.joined(separator: ", ") + "]"
+    }
+
+    static func visibleRange(in text: String, around substring: String, length: Int = 6000) throws -> NSRange {
+        let location = try location(in: text, of: substring)
+        let textLength = (text as NSString).length
+        let start = max(0, location - 512)
+        return NSRange(location: start, length: min(length, textLength - start))
+    }
+
+    static func location(in text: String, of substring: String) throws -> Int {
+        let range = (text as NSString).range(of: substring)
+        return try XCTUnwrap(
+            range.location == NSNotFound ? nil : range.location,
+            "missing substring in performance fixture: \(substring)"
+        )
     }
 
     static func residentMemoryMegabytes() -> Double {

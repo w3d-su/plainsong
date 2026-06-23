@@ -16,12 +16,24 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Build configuration | `Debug`; `make test` / Xcode scheme `Plainsong` |
 | Notes | Evidence: Xcode result bundle `~/Library/Developer/Xcode/DerivedData/Plainsong-awqexsyzmttqfhcfdgdaneqwnuwq/Logs/Test/Test-Plainsong-2026.06.17_16-49-55-+0800.xcresult`; signpost subsystem `app.plainsong.performance`, category `M5`. |
 
+## Issue #14 Highlight Gate Environment
+
+| Field | Value |
+|---|---|
+| Date | 2026-06-24 |
+| Commit | Base commit `249afe7d02e9acb75550023761d28fcc71861eb5` plus issue #14 worktree changes |
+| macOS | macOS 27.0 (26A5353q) |
+| Xcode | Xcode 27.0 (27A5194q) |
+| Machine | Apple M1 Pro, arm64, 16 GB RAM |
+| Build configuration | `Debug`; Xcode scheme `Plainsong` |
+| Notes | Evidence: Xcode result bundle `~/Library/Developer/Xcode/DerivedData/Plainsong-ewedbdrqcwagpxgzdhgoznouomjz/Logs/Test/Test-Plainsong-2026.06.24_04-17-41-+0800.xcresult`; signposts `VisibleRangeHighlightMarkdown1MB` and `VisibleRangeHighlightMDX1MB`. |
+
 ## Summary
 
 | Metric | Budget | Measured | Result | Procedure |
 |---|---:|---:|---|---|
 | Typing latency | < 16 ms | 0.254 ms max | Pass | See [Typing Latency](#typing-latency) |
-| Highlight update visible range | < 50 ms | Not accepted | Blocked: visible-range plumbing gap | See [Highlight Update](#highlight-update) |
+| Highlight update visible range | < 50 ms | Markdown 17.918 ms max; MDX 22.670 ms max | Pass | See [Highlight Update](#highlight-update) |
 | Preview render, 100 KB document | < 100 ms after debounce | Markdown 46.631 ms median; MDX 14.556 ms median | Pass | See [Preview Render](#preview-render) |
 | File open, 500 KB Markdown | < 300 ms to first paint | 33.765 ms | Pass | See [File Open](#file-open) |
 | Memory with 8 warm sessions + 2 webviews | < 400 MB | 139.8 MB with 1 webview only | Informational; 2-webview gate unmet | See [Memory](#memory) |
@@ -46,16 +58,21 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 
 - Fixture: `Fixtures/large-1mb.md` plus an MDX fixture with multiline JSX.
 - Procedure:
-  1. Open the fixture and edit a visible Markdown line.
-  2. Measure visible-range highlight update time, excluding unrelated preview debounce time.
-  3. Repeat after switching editor theme if M5 theme support changed highlighter behavior.
-- Measured value: not accepted as a passing measurement on this branch.
-- Result: Blocked.
-- Notes: Choice: flag this as hidden remaining M5 work rather than adjust the agent.md
-  Section 12 budget to a smaller proxy. Current parser code defers inline parsing until
-  visible-range plumbing lands and skips inline parsing above 250 KB, so current measurements
-  must not be treated as passing the visible-range budget. Follow-up must plumb and
-  instrument visible-range highlighting before this budget can become green.
+  1. Ran `PerformanceTests.testVisibleRangeHighlightUpdateAfterEditStaysUnderBudgetForLargeMarkdownAndMDX`.
+  2. The test edits the committed 1 MB Markdown fixture and an MDX wrapper around that
+     fixture, then highlights a 6 KB viewport-like visible range around the edit.
+  3. The highlighter expands the request to whole lines and lightweight frontmatter/fence
+     context, parses inline/TSX markup inside that visible request, and applies attributes
+     only to the highlighted range.
+  4. The measurement includes visible-range tokenization plus in-place attribute apply,
+     and excludes preview debounce/render work.
+- Measured value: Markdown max 17.918 ms, samples `[17.918, 15.860, 16.691]`;
+  MDX max 22.670 ms, samples `[21.703, 21.189, 22.670]`.
+- Result: Pass.
+- Notes: This pass is based on visible-range-first plumbing and instrumentation, not on
+  the historical 250 KB full-document inline parsing cutoff. The partial apply preserves
+  selection and scroll position, disables undo registration for style-only edits, and
+  skips apply while CJK IME marked text exists.
 
 ## Preview Render
 
@@ -115,8 +132,9 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 
 ## Follow-up Actions
 
-- [ ] [#14](https://github.com/w3d-su/plainsong/issues/14): land and instrument visible-range highlighting before claiming the
-  < 50 ms highlight-update budget; current inline parsing is deferred and skipped above 250 KB.
+- [x] [#14](https://github.com/w3d-su/plainsong/issues/14): land and instrument visible-range highlighting before claiming the
+  < 50 ms highlight-update budget; current evidence uses visible-range-first parsing/apply, not the historical
+  250 KB full-document inline parsing cutoff.
 - [ ] [#13](https://github.com/w3d-su/plainsong/issues/13): add or confirm a deterministic two-live-webview workflow or memory harness; current
   perf procedure records single-webview memory only because independent multi-window document
   state is deferred.

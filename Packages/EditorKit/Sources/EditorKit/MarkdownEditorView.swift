@@ -12,7 +12,10 @@ public struct MarkdownEditorView: View {
     @State private var styledText: HighlightedText?
     @State private var highlightRevision = 0
     @State private var selection: NSRange?
+    @State private var visibleTextRange: NSRange?
     @StateObject private var defaultCommandProxy = EditorCommandProxy()
+
+    private static let highlightService = MarkdownHighlightService()
 
     private let fileKind: FileKind
     private let showsLineNumbers: Bool
@@ -65,7 +68,14 @@ public struct MarkdownEditorView: View {
             completionWorkspace: completionWorkspace,
             imageAssetInserter: imageAssetInserter,
             imageAssetContextID: imageAssetContextID
-        )
+        ) { range in
+            Task { @MainActor in
+                updateVisibleRange(range)
+            }
+        }
+        .task(id: highlightRevision) {
+            await applyVisibleHighlight(for: highlightRevision)
+        }
         .onChange(of: text) { _, _ in
             scheduleHighlight()
         }
@@ -75,42 +85,57 @@ public struct MarkdownEditorView: View {
         }
         .onAppear {
             activeCommandProxy.update(fileKind: fileKind)
-        }
-        .task(id: highlightRevision) {
-            await applyDebouncedHighlight(for: highlightRevision)
+            scheduleHighlight()
         }
     }
 
-    /// Every text or file-kind change bumps the revision; `.task(id:)` in `body`
-    /// restarts, sleeps 300 ms, and only the latest revision computes. Scheduling
-    /// during IME composition is safe because `MarkdownTextView` blocks the apply
-    /// while marked text exists.
+    /// Every text, file-kind, or viewport change bumps the revision; `.task(id:)`
+    /// restarts so only the latest visible-range request applies. Scheduling during
+    /// IME composition is safe because `MarkdownTextView` blocks the apply while
+    /// marked text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
     }
 
-    private func applyDebouncedHighlight(for revision: Int) async {
-        do {
-            try await Task.sleep(nanoseconds: 300_000_000)
-        } catch {
+    private func updateVisibleRange(_ range: NSRange) {
+        guard visibleTextRange != range else {
             return
         }
 
-        guard !Task.isCancelled, revision == highlightRevision else {
-            return
-        }
+        visibleTextRange = range
+        scheduleHighlight()
+    }
 
+    private func applyVisibleHighlight(for revision: Int) async {
         let source = text
         let kind = fileKind
-        let highlighted = await Task.detached(priority: .userInitiated) {
-            MarkdownSyntaxHighlighter().highlight(source, fileKind: kind)
-        }.value
+        let requestedRange = Self.highlightRequestRange(
+            textLength: source.utf16.count,
+            visibleRange: visibleTextRange,
+            selection: selection
+        )
+        let highlighted = await Self.highlightService.highlight(source, fileKind: kind, visibleRange: requestedRange)
 
         guard !Task.isCancelled, revision == highlightRevision else {
             return
         }
 
-        styledText = HighlightedText(revision: revision, text: highlighted)
+        styledText = HighlightedText(revision: revision, range: highlighted.range, text: highlighted.text)
+    }
+
+    nonisolated static func highlightRequestRange(
+        textLength: Int,
+        visibleRange: NSRange?,
+        selection: NSRange?
+    ) -> NSRange {
+        if let visibleRange, visibleRange.length > 0 {
+            return visibleRange.clamped(toLength: textLength)
+        }
+
+        let anchor = selection?.location ?? 0
+        let location = min(max(anchor, 0), textLength)
+        let fallbackLength = min(MarkdownSyntaxParser.visibleHighlightMinimumLength, textLength - location)
+        return NSRange(location: location, length: fallbackLength).clamped(toLength: textLength)
     }
 }
 
