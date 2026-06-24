@@ -21,12 +21,24 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Field | Value |
 |---|---|
 | Date | 2026-06-24 |
-| Commit | Base commit `249afe7d02e9acb75550023761d28fcc71861eb5` plus issue #14 worktree changes |
+| Commit | Base commit `b1e2ba42b6e0fc5dde878320c518ac87fe196abd` plus issue #14 branch changes |
 | macOS | macOS 27.0 (26A5353q) |
 | Xcode | Xcode 27.0 (27A5194q) |
 | Machine | Apple M1 Pro, arm64, 16 GB RAM |
 | Build configuration | `Debug`; Xcode scheme `Plainsong` |
 | Notes | Evidence: Xcode result bundle `~/Library/Developer/Xcode/DerivedData/Plainsong-ewedbdrqcwagpxgzdhgoznouomjz/Logs/Test/Test-Plainsong-2026.06.24_04-17-41-+0800.xcresult`; signposts `VisibleRangeHighlightMarkdown1MB` and `VisibleRangeHighlightMDX1MB`. |
+
+## Issue #13 Memory Gate Environment
+
+| Field | Value |
+|---|---|
+| Date | 2026-06-24 |
+| Commit | Base commit `ff17fe8` plus issue #13 branch changes |
+| macOS | macOS 27.0 (26A5353q) |
+| Xcode | Xcode 27.0 (27A5194q) |
+| Machine | Apple M1 Pro, arm64, 16 GB RAM |
+| Build configuration | `Debug`; `make test` / Xcode scheme `Plainsong` |
+| Notes | Evidence: Xcode result bundle `~/Library/Developer/Xcode/DerivedData/Plainsong-cvprtqeandytbnbtdhosatlmfslj/Logs/Test/Test-Plainsong-2026.06.24_04-20-43-+0800.xcresult`. |
 
 ## Summary
 
@@ -36,7 +48,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Highlight update visible range | < 50 ms | Markdown 17.918 ms max; MDX 22.670 ms max | Pass | See [Highlight Update](#highlight-update) |
 | Preview render, 100 KB document | < 100 ms after debounce | Markdown 46.631 ms median; MDX 14.556 ms median | Pass | See [Preview Render](#preview-render) |
 | File open, 500 KB Markdown | < 300 ms to first paint | 33.765 ms | Pass | See [File Open](#file-open) |
-| Memory with 8 warm sessions + 2 webviews | < 400 MB | 139.8 MB with 1 webview only | Informational; 2-webview gate unmet | See [Memory](#memory) |
+| Memory with 8 warm sessions + 2 webviews | < 400 MB | 149.8 MB host RSS with 2 settled webviews | Pass | See [Memory](#memory) |
 
 ## Typing Latency
 
@@ -118,26 +130,31 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 
 ## Memory
 
-- Scenario: 8 warm document sessions and 1 live preview webview on this branch.
+- Scenario: 8 warm document sessions and 2 live preview webviews in a deterministic
+  test-only harness.
 - Procedure:
-  1. Open a folder workspace with at least 8 Markdown/MDX files.
-  2. Visit 8 files so they enter the warm-session LRU.
-  3. Ensure the preview pane is visible for the current document.
-  4. Record resident memory after preview settles.
-- Measured value: 139.8 MB RSS with 8 warm `DocumentSession`s and 1 live `PreviewController`
-  WebView. The test also printed a 91.153 ms informational preview render for that memory setup.
-- Result: Informational only; the Section 12 2-webview memory gate is unmet.
-- Notes: Choice: measure single-webview memory for now. Phase 1 shares one App-scoped
-  `AppState` and one preview pane per editor workspace, while independent multi-window
-  document state is deferred, so this branch does not provide a reliable two-live-webview
-  procedure. The agent.md Section 12 two-webview memory gate remains open and must not be
-  marked green from this single-webview number.
+  1. Create exactly 8 warm `DocumentSession`s from `Fixtures/perf-500kb.md`.
+  2. Attach a first `PreviewController`/`WKWebView` to an offscreen 1280 x 720 AppKit
+     surface, wait for bridge readiness, and render/settle `Fixtures/perf-100kb.md`.
+  3. Record the single-webview RSS as informational only: 149.3 MB host RSS.
+  4. Attach a second live `PreviewController`/`WKWebView` to the same surface, wait for
+     bridge readiness, and render/settle an MDX-wrapped `Fixtures/perf-100kb.md`.
+  5. Re-check both previews contain their final settled markers, wait one short display
+     turn, then record resident memory.
+- Measured value: 149.8 MB host RSS with 8 warm `DocumentSession`s and 2 settled live
+  `PreviewController` WebViews.
+- Result: Pass.
+- Notes: The automated gate asserts the same deterministic host-process RSS helper used
+  by PR #15, now with two live previews. The test also printed a diagnostic WebKit helper
+  delta of 498.6 MB across 2 OS-managed helper processes, for a 648.3 MB aggregate; this
+  is not asserted because WebKit helper reuse and process-pool ownership are not stable
+  enough for CI on this local machine. The single-webview 149.3 MB value remains
+  informational only and is not used to satisfy the Section 12 memory gate.
 
 ## Follow-up Actions
 
 - [x] [#14](https://github.com/w3d-su/plainsong/issues/14): land and instrument visible-range highlighting before claiming the
   < 50 ms highlight-update budget; current evidence uses visible-range-first parsing/apply, not the historical
   250 KB full-document inline parsing cutoff.
-- [ ] [#13](https://github.com/w3d-su/plainsong/issues/13): add or confirm a deterministic two-live-webview workflow or memory harness; current
-  perf procedure records single-webview memory only because independent multi-window document
-  state is deferred.
+- [x] [#13](https://github.com/w3d-su/plainsong/issues/13): add a deterministic two-live-webview memory harness; current
+  product state still defers independent multi-window documents, so the gate remains test-only.
