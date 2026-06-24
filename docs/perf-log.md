@@ -21,7 +21,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Field | Value |
 |---|---|
 | Date | 2026-06-24 |
-| Commit | Base commit `b1e2ba42b6e0fc5dde878320c518ac87fe196abd` plus issue #14 branch changes |
+| Commit | PR #20 commit `ff17fe8` after rebasing onto `main` |
 | macOS | macOS 27.0 (26A5353q) |
 | Xcode | Xcode 27.0 (27A5194q) |
 | Machine | Apple M1 Pro, arm64, 16 GB RAM |
@@ -33,7 +33,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Field | Value |
 |---|---|
 | Date | 2026-06-24 |
-| Commit | Base commit `ff17fe8` plus issue #13 branch changes |
+| Commit | PR #21 commit `cf48820`, merged into PR #20 and included on `main` |
 | macOS | macOS 27.0 (26A5353q) |
 | Xcode | Xcode 27.0 (27A5194q) |
 | Machine | Apple M1 Pro, arm64, 16 GB RAM |
@@ -48,7 +48,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Highlight update visible range | < 50 ms | Markdown 17.918 ms max; MDX 22.670 ms max | Pass | See [Highlight Update](#highlight-update) |
 | Preview render, 100 KB document | < 100 ms after debounce | Markdown 46.631 ms median; MDX 14.556 ms median | Pass | See [Preview Render](#preview-render) |
 | File open, 500 KB Markdown | < 300 ms to first paint | 33.765 ms | Pass | See [File Open](#file-open) |
-| Memory with 8 warm sessions + 2 webviews | < 400 MB | 149.8 MB host RSS with 2 settled webviews | Pass | See [Memory](#memory) |
+| Memory with 8 warm sessions + 2 webviews | < 400 MB host-process RSS | 149.8 MB host RSS with 2 settled webviews | Pass | See [Memory](#memory) |
 
 ## Typing Latency
 
@@ -144,17 +144,18 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 - Measured value: 149.8 MB host RSS with 8 warm `DocumentSession`s and 2 settled live
   `PreviewController` WebViews.
 - Result: Pass.
-- Notes: The automated gate asserts the same deterministic host-process RSS helper used
-  by PR #15, now with two live previews. The test also printed a diagnostic WebKit helper
-  delta of 498.6 MB across 2 OS-managed helper processes, for a 648.3 MB aggregate; this
-  is not asserted because WebKit helper reuse and process-pool ownership are not stable
-  enough for CI on this local machine. The single-webview 149.3 MB value remains
-  informational only and is not used to satisfy the Section 12 memory gate.
+- Notes: The Section 12 M5 memory gate is app host-process RSS. The automated gate asserts
+  the same deterministic host-process RSS helper used by PR #15, now with two live previews.
+  The test also printed a diagnostic WebKit helper delta of 498.6 MB across 2 OS-managed
+  helper processes, for a 648.3 MB aggregate; this is not asserted because WebKit helper
+  reuse and process-pool ownership are not stable enough for CI on this local machine. The
+  single-webview 149.3 MB value remains informational only and is not used to satisfy the
+  Section 12 memory gate.
 
 ## Follow-up Actions
 
 - [x] [#14](https://github.com/w3d-su/plainsong/issues/14): land and instrument visible-range highlighting before claiming the
   < 50 ms highlight-update budget; current evidence uses visible-range-first parsing/apply, not the historical
   250 KB full-document inline parsing cutoff.
-- [x] [#13](https://github.com/w3d-su/plainsong/issues/13): add a deterministic two-live-webview memory harness; current
-  product state still defers independent multi-window documents, so the gate remains test-only.
+- [x] [#13](https://github.com/w3d-su/plainsong/issues/13): add a deterministic two-live-webview memory harness under the
+  host-process RSS policy. If GitHub did not auto-close the issue, close it manually with the scope note above.

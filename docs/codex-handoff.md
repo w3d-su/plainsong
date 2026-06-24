@@ -1,6 +1,6 @@
 # Codex Handoff — M5 Stabilization and Phase 2 Gate
 
-Status snapshot: 2026-06-23.
+Status snapshot: 2026-06-24.
 
 This document turns the current review findings into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -14,14 +14,16 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #9 — M5 planning docs and draft WYSIWYG design.
   - PR #10 — TSX injection highlighting for MDX.
   - PR #11 — app icon and accent color.
+  - PR #15 — performance infrastructure, fixtures, and perf log.
+  - PR #20 — visible-range highlighting gate; closed issue #14.
+  - PR #21 — deterministic two-live-webview host-process RSS memory harness; included on `main` through PR #20.
 - Open / not complete:
-  - PR #15 — performance infrastructure and perf log. This is mergeable, but it does **not** close the
-    hidden M5 performance work by itself.
-  - Issue #14 — visible-range highlight instrumentation and <50 ms budget.
-  - Issue #13 — deterministic 8 warm sessions + 2 live webviews memory harness, <400 MB.
-  - Settings + themes from `agent.md` §11 are still not implemented.
-  - Security hardening around MDX sanitizer scope, preview asset guards, and large image handling still
-    needs a focused pass.
+  - Issue #13 is still open in GitHub even though PR #21 measured 149.8 MB host RSS. Close it manually
+    if the host-process RSS scope decision remains accepted; WebKit helper memory stays diagnostic.
+  - Issue #16 — Settings + themes from `agent.md` §11 are still not implemented.
+  - Issue #17 — security hardening around MDX sanitizer scope, preview asset guards, and large image
+    handling still needs a focused pass.
+  - Issue #18 — preview TypeScript typecheck should be explicit in CI; this cleanup PR should close it.
 
 ## Rules for every Codex run
 
@@ -39,115 +41,15 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
 
 ---
 
-# Goal 0 — Review and land PR #15 safely
+# Completed reference — landed performance work
 
-```text
-You are working in w3d-su/plainsong. Goal: review and finish PR #15 (`m5-perf-pass`) without overstating M5 completion.
+- PR #15 merged on 2026-06-23 as M5 performance infrastructure.
+- PR #20 merged on 2026-06-24 and closed issue #14 with measured visible-range highlighting.
+- PR #21 merged into the PR #20 stack and is included on `main`; it measured 149.8 MB host-process RSS
+  with 8 warm sessions and 2 settled live webviews. If issue #13 is still open, close it manually with
+  the host-process RSS scope note from `docs/perf-log.md`.
 
-Read first:
-- agent.md §12, §14, §16, §17
-- docs/m5-plan.md
-- docs/perf-log.md
-- GitHub PR #15 body
-- Issues #13 and #14
-
-Use a review subagent if available:
-1. Performance reviewer: inspect PerformanceTests, fixtures, signposts, and docs/perf-log.md.
-2. Preview reviewer: inspect the morphdom/highlight preservation optimization for correctness.
-3. CI reviewer: inspect project.yml / Makefile / workflow coverage.
-
-Tasks:
-- Rebase/update PR #15 if needed.
-- Confirm PerformanceTests is wired through project.yml and the app test scheme.
-- Confirm perf fixtures are deterministic and not accidentally deleting useful existing fixtures.
-- Confirm docs/perf-log.md honestly records:
-  - typing latency as passing only if measured under 16 ms,
-  - preview render as passing only if measured under 100 ms after debounce,
-  - file open as passing only if measured under 300 ms,
-  - visible-range highlighting as blocked until #14,
-  - memory as informational until the 2-webview #13 harness exists.
-- Run `make format` and `make test`.
-- If preview-src changed, also run `cd preview-src && npm run typecheck && npm test`.
-
-Acceptance:
-- PR #15 is ready to merge or has a concise review comment listing exact blockers.
-- docs/perf-log.md does not claim #13 or #14 are complete.
-- Follow-up issues #13 and #14 remain open unless their full acceptance is implemented.
-```
-
-# Goal 1 — Issue #14: visible-range highlighting gate
-
-```text
-You are working in w3d-su/plainsong. Goal: implement the M5 visible-range highlighting gate from issue #14.
-
-Read first:
-- agent.md §6.2, §12, §16, §17
-- Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift
-- Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift
-- Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxHighlighter.swift and parser/highlight mapper files
-- docs/perf-log.md
-
-Use subagents if available:
-1. EditorKit architecture subagent: trace current visible line/range plumbing from STTextView to highlighter apply.
-2. Performance test subagent: add deterministic signpost/XCTest coverage without depending on fragile UI automation.
-3. IME safety subagent: verify styling apply is skipped/deferred while marked text exists and does not corrupt selection.
-
-Implementation constraints:
-- Keep source text as the model; do not mutate text for presentation.
-- No synchronous full-document parse/apply on the typing hot path.
-- Prefer visible-range-first tokenization/apply; dirty-range expansion is fine if documented.
-- Preserve current selection, scroll position, undo behavior, and CJK IME marked text.
-- Keep MarkdownCore UI-free.
-
-Tasks:
-- Plumb visible range information into the highlighting request/apply path.
-- Add signposts or test hooks that measure highlight update time after an edit for visible ranges.
-- Add/extend PerformanceTests for large Markdown and large MDX fixtures.
-- Update docs/perf-log.md with measured values and environment.
-- Add regression tests for selection/marked-text safety if feasible.
-
-Acceptance:
-- Highlight update visible range is measured under 50 ms on the target fixtures, or the PR explicitly explains the remaining blocker.
-- The 250 KB inline parsing cutoff is not used as proof of passing.
-- `make format` and `make test` pass.
-```
-
-# Goal 2 — Issue #13: deterministic two-webview memory harness
-
-```text
-You are working in w3d-su/plainsong. Goal: implement issue #13, the M5 memory gate.
-
-Read first:
-- agent.md §5, §12, §14, §16
-- App workspace/window state files
-- PreviewKit controller lifecycle
-- PerformanceTests from PR #15 after it lands
-- docs/perf-log.md
-
-Use subagents if available:
-1. App/windowing subagent: identify the least invasive way to create two live preview webviews deterministically.
-2. PreviewKit lifecycle subagent: ensure both webviews settle before memory capture and are released when the harness ends.
-3. Performance harness subagent: implement RSS measurement and threshold assertion.
-
-Implementation constraints:
-- Do not accidentally start full Phase 2 or independent multi-window state unless unavoidable.
-- The harness may be test-only if that gives deterministic 2 live previews.
-- The gate is exactly: 8 warm sessions + 2 live preview webviews, resident memory <400 MB.
-- Keep existing single-webview measurement marked informational.
-
-Tasks:
-- Add or document a deterministic workflow/harness with 8 warm sessions and 2 live preview webviews.
-- Wait for both previews to finish rendering before memory capture.
-- Assert <400 MB if deterministic on CI; if CI variance is too high, make the CI behavior explicit and keep a local/manual gate in docs.
-- Update docs/perf-log.md with environment, value, and pass/fail.
-
-Acceptance:
-- docs/perf-log.md has a real 2-webview measurement.
-- The test or manual harness is reproducible by another agent/human.
-- `make format` and `make test` pass.
-```
-
-# Goal 3 — M5 Settings + themes
+# Goal 0 — M5 Settings + themes (#16)
 
 ```text
 You are working in w3d-su/plainsong. Goal: implement M5 Settings + themes from agent.md §11.
@@ -183,7 +85,7 @@ Acceptance:
 - `make format`, `make test`, and `cd preview-src && npm run typecheck && npm test` pass if preview-src changed.
 ```
 
-# Goal 4 — M5 security hardening
+# Goal 1 — M5 security hardening (#17)
 
 ```text
 You are working in w3d-su/plainsong. Goal: harden MDX preview sanitization and local asset handling before public alpha.
@@ -215,7 +117,7 @@ Acceptance:
 - `make format`, `make test`, and `cd preview-src && npm run typecheck && npm test` pass if preview-src changed.
 ```
 
-# Goal 5 — CI/docs cleanup
+# Goal 2 — CI/docs cleanup (#18)
 
 ```text
 You are working in w3d-su/plainsong. Goal: make CI and docs reflect the actual M5 state.
@@ -232,12 +134,12 @@ Tasks:
 - Add `cd preview-src && npm run typecheck` to CI if it is not already covered.
 - Keep `make test` behavior documented accurately.
 - Update README/agent.md/docs if any milestone status is stale.
-- Ensure docs link to #13, #14, and #15 where relevant.
+- Ensure docs link to PR #15/#20/#21 and issues #13/#14/#16/#17/#18 where relevant.
 - Add Decision Log entries for any behavior or policy changes.
 
 Acceptance:
 - CI catches preview TypeScript type errors.
-- README and docs do not claim M5 is complete until #13 and #14 are done.
+- README and docs do not claim M5 is complete until #16/#17 are resolved and #13 closure is explicit; #14 is already closed.
 - `make format` and `make test` pass.
 ```
 

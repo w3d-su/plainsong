@@ -30,6 +30,40 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertNotEqual(first, nextRevision)
     }
 
+    func testHighlightSchedulingDebouncesAndDropsStaleRevisions() async {
+        XCTAssertGreaterThan(MarkdownEditorView.highlightDebounceNanoseconds, 0)
+
+        let latestRevision = HighlightRevisionProbe()
+        let starts = HighlightStartProbe()
+        await withTaskGroup(of: Void.self) { group in
+            for revision in 1 ... 5 {
+                await latestRevision.set(revision)
+                group.addTask {
+                    let debounceCompleted = await MarkdownEditorView.waitForHighlightDebounce(nanoseconds: 10_000_000)
+                    let currentRevision = await latestRevision.current()
+                    guard debounceCompleted,
+                          MarkdownEditorView.shouldApplyScheduledHighlight(
+                              revision: revision,
+                              currentRevision: currentRevision,
+                              taskIsCancelled: Task.isCancelled
+                          )
+                    else {
+                        return
+                    }
+
+                    await starts.record(revision)
+                }
+            }
+        }
+
+        let recordedRevisions = await starts.recordedRevisions()
+        XCTAssertEqual(
+            recordedRevisions,
+            [5],
+            "Rapid typing should let only the latest revision reach parser work."
+        )
+    }
+
     func testHighlightRequestFallsBackToSelectionWindowWhenViewportIsEmpty() {
         let range = MarkdownEditorView.highlightRequestRange(
             textLength: 50000,
@@ -157,5 +191,29 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertEqual(index.utf16Offset(forOneBasedLine: 2), 4)
         XCTAssertEqual(index.utf16Offset(forOneBasedLine: 3), 13)
         XCTAssertEqual(index.utf16Offset(forOneBasedLine: 99), "one\nemoji 🧪\nthree".utf16.count)
+    }
+}
+
+private actor HighlightRevisionProbe {
+    private var revision = 0
+
+    func set(_ revision: Int) {
+        self.revision = revision
+    }
+
+    func current() -> Int {
+        revision
+    }
+}
+
+private actor HighlightStartProbe {
+    private var revisions: [Int] = []
+
+    func record(_ revision: Int) {
+        revisions.append(revision)
+    }
+
+    func recordedRevisions() -> [Int] {
+        revisions
     }
 }

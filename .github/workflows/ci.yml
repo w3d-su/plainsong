@@ -53,6 +53,9 @@ jobs:
           cd preview-src
           npm ci
 
+      - name: Typecheck preview
+        run: cd preview-src && npm run typecheck
+
       - name: Lint
         run: make lint
 

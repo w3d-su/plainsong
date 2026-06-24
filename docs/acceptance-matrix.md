@@ -24,9 +24,10 @@ a milestone or gate as accepted.
 | M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Accepted |
 | M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 local result bundle reports Markdown median 46.631 ms, MDX median 14.556 ms; GitHub runner timing is informational only | Accepted |
 | M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
-| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | This branch records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md` | Accepted on merge of this branch |
-| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | This branch records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md` | Accepted on merge of this branch |
+| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | PR #20 records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md`; issue #14 closed | Accepted |
+| M5 performance: memory | <400 MB host-process RSS with 8 warm sessions + 2 live webviews | PR #21 records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md`; WebKit helper RSS is diagnostic | Accepted under host-RSS policy; issue #13 still open pending manual closure |
 | M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | No focused hardening PR found | Needed before public alpha |
+| M5 CI preview typecheck | CI runs `cd preview-src && npm run typecheck` and still runs preview tests | This review-fix PR adds the CI step; `make test` still runs preview tests only | Accepted on merge of this PR |
 | Phase 2 WYSIWYG gate | M1–M5 complete and `docs/wysiwyg-design.md` approved | Draft doc exists from PR #9 | Design only; implementation blocked until M5 complete |
 
 ## Current release posture
@@ -44,9 +45,10 @@ M5 should not be called complete until all items below are true:
 
 - [x] PR #15 merged or superseded by equivalent performance infrastructure.
 - [x] Issue #14 closed with measured <50 ms visible-range highlighting.
-- [x] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
+- [ ] Issue #13 closed manually or otherwise reconciled with the host-process RSS scope decision.
 - [ ] Settings + themes from `agent.md` §11 implemented or explicitly deferred with a Decision Log entry.
 - [ ] Security hardening PR landed for MDX sanitizer and asset handling.
+- [ ] CI/docs cleanup landed with preview TypeScript typecheck coverage.
 - [ ] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results.
 - [ ] `docs/m5-checklist.md` passes manually.
 - [ ] README, `agent.md`, and planning docs no longer contain stale milestone claims.
