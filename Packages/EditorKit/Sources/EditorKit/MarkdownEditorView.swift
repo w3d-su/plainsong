@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// STTextView stays behind this view so App and lower layers never depend on concrete
 /// editor library types. The typing hot path moves plain `String` only; styling is
-/// debounced, computed off the main thread, and applied in place (agent.md §12).
+/// lightly debounced, computed off the main thread, and applied in place (agent.md §12).
 @MainActor
 public struct MarkdownEditorView: View {
     @Binding private var text: String
@@ -16,6 +16,7 @@ public struct MarkdownEditorView: View {
     @StateObject private var defaultCommandProxy = EditorCommandProxy()
 
     private static let highlightService = MarkdownHighlightService()
+    nonisolated static let highlightDebounceNanoseconds: UInt64 = 20_000_000
 
     private let fileKind: FileKind
     private let showsLineNumbers: Bool
@@ -53,6 +54,8 @@ public struct MarkdownEditorView: View {
             // (DocumentSession.text is not @Published), so the editor schedules its
             // own highlight on every user edit here. `onChange(of: text)` below still
             // covers external replacements (file open), which do re-render this view.
+            // If SwiftUI also observes a local edit, the debounce/revision gate
+            // collapses the duplicate request before stale parser work applies.
             text: Binding(
                 get: { text },
                 set: { newValue in
@@ -74,7 +77,7 @@ public struct MarkdownEditorView: View {
             }
         }
         .task(id: highlightRevision) {
-            await applyVisibleHighlight(for: highlightRevision)
+            await applyScheduledVisibleHighlight(for: highlightRevision)
         }
         .onChange(of: text) { _, _ in
             scheduleHighlight()
@@ -90,9 +93,9 @@ public struct MarkdownEditorView: View {
     }
 
     /// Every text, file-kind, or viewport change bumps the revision; `.task(id:)`
-    /// restarts so only the latest visible-range request applies. Scheduling during
-    /// IME composition is safe because `MarkdownTextView` blocks the apply while
-    /// marked text exists.
+    /// restarts after a short debounce so rapid typing cancels stale visible-range
+    /// work before it reaches the parser. Scheduling during IME composition is safe
+    /// because `MarkdownTextView` blocks the apply while marked text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
     }
@@ -106,7 +109,35 @@ public struct MarkdownEditorView: View {
         scheduleHighlight()
     }
 
+    private func applyScheduledVisibleHighlight(for revision: Int) async {
+        guard await Self.waitForHighlightDebounce() else {
+            return
+        }
+
+        await applyVisibleHighlight(for: revision)
+    }
+
+    nonisolated static func waitForHighlightDebounce(
+        nanoseconds: UInt64 = highlightDebounceNanoseconds
+    ) async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: nanoseconds)
+        } catch {
+            return false
+        }
+
+        return !Task.isCancelled
+    }
+
     private func applyVisibleHighlight(for revision: Int) async {
+        guard Self.shouldApplyScheduledHighlight(
+            revision: revision,
+            currentRevision: highlightRevision,
+            taskIsCancelled: Task.isCancelled
+        ) else {
+            return
+        }
+
         let source = text
         let kind = fileKind
         let requestedRange = Self.highlightRequestRange(
@@ -116,11 +147,23 @@ public struct MarkdownEditorView: View {
         )
         let highlighted = await Self.highlightService.highlight(source, fileKind: kind, visibleRange: requestedRange)
 
-        guard !Task.isCancelled, revision == highlightRevision else {
+        guard Self.shouldApplyScheduledHighlight(
+            revision: revision,
+            currentRevision: highlightRevision,
+            taskIsCancelled: Task.isCancelled
+        ) else {
             return
         }
 
         styledText = HighlightedText(revision: revision, range: highlighted.range, text: highlighted.text)
+    }
+
+    nonisolated static func shouldApplyScheduledHighlight(
+        revision: Int,
+        currentRevision: Int,
+        taskIsCancelled: Bool
+    ) -> Bool {
+        !taskIsCancelled && revision == currentRevision
     }
 
     nonisolated static func highlightRequestRange(

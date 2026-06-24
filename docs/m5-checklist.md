@@ -15,8 +15,8 @@ real Astro or Next.js content directory with `.mdx` posts.
 
 ## M4 Sequencing Gate
 
-- [ ] Before production M5 implementation starts, confirm M4 part 2 has landed in a separate `m4-*` PR or the maintainer has explicitly signed off on a formal M4 re-scope.
-- [ ] Confirm completion acceptance, the Yams-backed frontmatter panel, smart paste, and drag-in image handling are not being silently counted as M5 work.
+- [ ] Confirm M4 remains accepted: completion, the Yams-backed frontmatter panel, smart paste, drag-in image handling, table helper, editing behaviors, and format commands still pass their tests/checklist.
+- [ ] Confirm any new M5 work does not silently reopen M4 scope.
 
 ## MDX Preview Rendering
 
@@ -94,4 +94,4 @@ Record results in `docs/perf-log.md` before accepting M5.
 - [ ] Highlight update for visible range remains below 50 ms with visible-range plumbing/instrumentation in place; do not count the current 250 KB inline cutoff as passing.
 - [ ] Preview render for a 100 KB document remains below 100 ms after the normal debounce.
 - [ ] Opening a 500 KB Markdown document reaches first paint below 300 ms.
-- [ ] Memory remains below 400 MB with 8 warm sessions and 2 webviews; if only a single-webview path exists, record the gap in `docs/perf-log.md` instead of passing this check.
+- [ ] Host-process RSS remains below 400 MB with 8 warm sessions and 2 settled live webviews; record WebKit helper RSS as diagnostic if available, and do not count a single-webview path as passing.

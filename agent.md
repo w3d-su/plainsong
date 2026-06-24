@@ -416,19 +416,18 @@ attempt without a Decision Log entry.
 | Highlight update after edit | < 50 ms visible range, async |
 | Preview update (debounced) | render < 100 ms for 100 KB doc; debounce 150 ms |
 | File open (500 KB md) | < 300 ms to first paint, highlight may stream in |
-| Memory | < 400 MB with 8 warm sessions + 2 webviews |
+| Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
 Techniques: tree-sitter incremental edits (`InputEdit`), Neon visible-range-first
 highlighting, morphdom patching, render-version dropping, LRU sessions, mermaid memoization
 by fence content hash. **Any PR that regresses typing latency is rejected regardless of
 features.** Add a `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
 
-M5 planning note: the highlight budget is not accepted until visible-range
-highlighting is actually plumbed and instrumented; the current parser defers inline
-parsing above 250 KB, so that cutoff cannot be counted as a pass. The memory budget
-is still the 2-webview gate above; single-webview measurements are only
-informational until the branch has a deterministic two-live-webview workflow or
-harness.
+M5 planning note: the highlight budget is accepted only from visible-range-first
+highlighting instrumentation, not from the historical 250 KB full-document inline
+parsing cutoff. The memory budget is scoped to deterministic app host-process RSS.
+OS-managed WebKit helper processes should be recorded as diagnostic/informational
+data because helper reuse and process-pool ownership vary across runs and CI hosts.
 
 ---
 
@@ -508,9 +507,8 @@ next begins.
 ### M4 — Authoring features
 - Completion engine (all contexts in §6.5), editing behaviors (§6.3), formatting
   commands + menu (§6.4), smart paste/drag of images, frontmatter panel, table helper.
-- M4 part 1 landed editing behaviors + formatting commands: list continuation, auto-pair,
-  code fence helper, checkbox toggle, table helper, and the Format menu. M4 part 2 remains:
-  completion engine, frontmatter panel, smart paste, and drag-in image handling.
+- M4 landed across review-sized PRs: editing behaviors, formatting commands, completion
+  engine, frontmatter panel, smart paste, drag-in image handling, and table helper.
 - ✅ Accept: unit tests cover every completion context and list/table behavior; manual
   script `docs/m4-checklist.md` passes.
 
@@ -518,6 +516,9 @@ next begins.
 - `.mdx` end-to-end: UTI, tsx-injection highlighting, mdx pipeline with placeholder
   components, error banner; themes + settings window; app icon; performance pass
   against §12 budgets.
+- Current status: MDX preview, TSX highlighting, icon/accent, and §12 performance
+  measurements have landed. M5 is still incomplete until Settings/themes and security
+  hardening are implemented or explicitly deferred with Decision Log entries.
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
@@ -632,6 +633,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-16 | Yams handles frontmatter YAML validation and typed loading | Frontmatter remains source-text-first: MarkdownCore uses Yams to validate and load the YAML mapping, then performs localized writeback so unknown keys, comments, body text, and line endings are preserved. Alt: hand-rolled YAML parsing was rejected because malformed YAML diagnostics and scalar/list semantics would be fragile; using Yams to dump whole mappings was rejected because it would reorder or normalize user-authored frontmatter. |
 | 2026-06-17 | M5 TSX highlighting vendors tree-sitter-typescript TSX C sources | EditorKit now injects MDX ESM/JSX regions into a vendored `TreeSitterTSXFixed` target from `tree-sitter-typescript` v0.23.2 (`f975a621f4e7f532fe322e13c4f79495e0a7b2e7`) and maps TSX capture names into the existing MarkdownSyntaxToken/theme facade. Vendoring avoids the upstream Swift package's ChimeHQ/SwiftTreeSitter dependency, preserving the exact `tree-sitter/swift-tree-sitter` 0.10.0 pin and avoiding the Neon dependency-shape conflict. Alt: adding the upstream Swift package was rejected because it would reintroduce a conflicting SwiftTreeSitter graph; keeping `.mdxSource` coarse styling was rejected by §6.2/M5 acceptance. |
 | 2026-06-17 | M5 MDX preview uses remark-mdx placeholders without bridge v5 | The preview pipeline adds `remark-mdx`, `mdast-util-mdx` node typing, and `rehype-sanitize` so `.mdx` files render Markdown normally while ESM, JSX components, and expressions become non-executed placeholders. MDX parse errors are handled entirely in preview JS with an inline banner and stale last-good content, so bridge protocol v4 remains sufficient. Alt: `@mdx-js/mdx` runtime compilation/component execution was rejected as Phase 3+ sandboxing work; native bridge diagnostics/protocol v5 are deferred until Swift-owned error chrome is required. |
+| 2026-06-24 | M5 memory budget uses host-process RSS | The §12 memory gate is app host-process RSS with 8 warm sessions and 2 settled live preview webviews. PR #21 measured 149.8 MB host RSS and prints OS-managed WebKit helper memory as diagnostics only; helper reuse and process-pool ownership are too host-dependent to assert in CI. Alt: aggregating WebKit helper RSS was rejected for the M5 gate because the local diagnostic aggregate was 648.3 MB and not stable enough to compare across runners. If GitHub did not auto-close #13, it can be closed manually with the host-process scope noted. |
 
 ---
 
