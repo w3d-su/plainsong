@@ -27,16 +27,16 @@ real Astro or Next.js content directory with `.mdx` posts.
 - [ ] Confirm component children containing Markdown render safely inside or near the placeholder card.
 - [ ] Confirm inline JSX and expression nodes render as safe placeholders/code chips and do not execute JavaScript.
 - [ ] Confirm lowercase HTML renders only through the approved sanitized path.
-- [ ] Confirm lowercase HTML strips inline `style`, event-handler attributes, scripts, `srcdoc`, fixed-position overlays, giant dimensions, and URL-bearing background styles.
+- [x] Confirm lowercase HTML strips inline `style`, event-handler attributes, scripts, `srcdoc`, fixed-position overlays, giant dimensions, and URL-bearing background styles. Covered by PR #24 sanitizer tests.
 - [ ] Confirm source-line anchors remain good enough for editor-to-preview scroll sync.
 
 ## Preview Asset Security
 
-- [ ] Confirm `asset://` images resolve only inside the granted file/workspace root, including symlink targets.
-- [ ] Confirm `../` traversal and percent-encoded traversal are rejected.
-- [ ] Confirm preview assets larger than 10 MiB are rejected before file data is read.
-- [ ] Confirm only PNG, JPEG, GIF, and WebP assets are served through `asset://`; SVG, TIFF, BMP, text, and unknown types are rejected.
-- [ ] Confirm pasted/dragged external image files use file copy after metadata validation instead of whole-file `Data(contentsOf:)` reads.
+- [x] Confirm `asset://` images resolve only inside the granted file/workspace root, including symlink targets. Covered by PR #24 PreviewKit tests.
+- [x] Confirm `../` traversal and percent-encoded traversal are rejected. Covered by PR #24 PreviewKit tests.
+- [x] Confirm preview assets larger than 10 MiB are rejected before file data is read. Covered by PR #24 PreviewKit tests.
+- [x] Confirm only PNG, JPEG, GIF, and WebP assets are served through `asset://`; SVG, TIFF, BMP, text, and unknown types are rejected. Covered by PR #24 PreviewKit/WorkspaceKit tests.
+- [x] Confirm pasted/dragged external image files use file copy after metadata validation instead of whole-file `Data(contentsOf:)` reads. Covered by PR #24 WorkspaceKit tests.
 
 ## MDX Error Liveness
 

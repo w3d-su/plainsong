@@ -4,12 +4,13 @@ A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/Tex
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
 
-**Status: in development.** M0–M4 have landed and M5 is in stabilization. The M5
-performance work is mostly measured: PR #15 added the infrastructure, PR #20 measured
-visible-range highlighting, and PR #21 measured the two-webview host-process RSS memory
-gate. M5 is still not complete because Settings/themes (#16) and security hardening (#17)
-remain open. Do not start Phase 2 WYSIWYG implementation until M5 is complete or any
-remaining scope is explicitly deferred in `agent.md`.
+**Status: in development.** M0–M4 have landed and M5 is in stabilization. M5
+performance and security hardening have landed: PR #15 added the performance
+infrastructure, PR #20 measured visible-range highlighting, PR #21 measured the
+two-webview host-process RSS memory gate, and PR #24 hardened MDX preview/assets.
+M5 remains incomplete because Settings/themes (#16) remains open. Do not start
+Phase 2 WYSIWYG implementation until M5 is complete or any remaining scope is
+explicitly deferred in `agent.md`.
 
 ## Development
 

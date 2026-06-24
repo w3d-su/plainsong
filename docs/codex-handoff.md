@@ -18,10 +18,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #20 — visible-range highlighting gate; closed issue #14.
   - PR #21 — deterministic two-live-webview host-process RSS memory harness; included on `main` through PR #20.
   - PR #22 — post-merge docs/CI/scheduling cleanup; closed issues #13 and #18.
+  - PR #24 — MDX preview sanitizer and asset hardening; closed issue #17.
 - Open / not complete:
   - Issue #16 — Settings + themes from `agent.md` §11 are still not implemented.
-  - Issue #17 — security hardening around MDX sanitizer scope, preview asset guards, and large image
-    handling still needs a focused pass.
+  - M5 remains incomplete until #16 is implemented or explicitly deferred, `docs/m5-checklist.md`
+    passes, and the final stale-doc check is complete.
 
 ## Rules for every Codex run
 
@@ -47,44 +48,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   with 8 warm sessions and 2 settled live webviews.
 - PR #22 merged on 2026-06-24, clarified the host-process RSS scope, added preview TypeScript typecheck
   to CI, and closed issues #13 and #18.
+- PR #24 merged on 2026-06-24, closed issue #17, and documented the security policy: no inline style
+  in sanitized MDX preview, script-like elements dropped before sanitize, preview/imported images limited
+  to PNG/JPEG/GIF/WebP up to 10 MiB, and SVG rejected until a separate sanitizer/design exists.
 
-# Goal 0 — M5 security hardening (#17)
-
-```text
-You are working in w3d-su/plainsong. Goal: harden MDX preview sanitization and local asset handling before public alpha.
-
-Read first:
-- agent.md §5, §7.1, §9, §16
-- preview-src/src/pipeline.ts and sanitizer schema
-- PreviewKit asset URL scheme handler
-- WorkspaceKit/ImageAssetStore or equivalent image-copy path
-- docs/risk-register.md
-
-Use subagents if available:
-1. Preview sanitizer subagent: tighten `rehype-sanitize` schema and add malicious MDX/HTML snapshot tests.
-2. Asset handler subagent: add path, MIME/type, and size guards to the asset scheme handler.
-3. Image import subagent: replace large-file `Data(contentsOf:)` copies with streaming or FileManager copy where appropriate.
-4. Regression test subagent: add tests for symlink escape, `../`, huge files, unsupported MIME, and blocked style spoofing.
-
-Tasks:
-- Remove broad `style` allowance from the sanitizer unless a narrow allowlist is required for a specific internal feature.
-- Add tests for `position: fixed`, high `z-index`, giant dimensions, background URL, event handlers, and script-like payloads.
-- Enforce preview asset containment, supported file types, and maximum size.
-- Avoid reading large image/asset files entirely into memory where streaming/copyItem is possible.
-- Document any size limits and rationale.
-
-Non-goals:
-- Do not start #16 Settings/themes in this PR.
-- Do not start Phase 2 WYSIWYG.
-
-Acceptance:
-- MDX placeholders still render, but unsafe styles/attributes are stripped.
-- Asset tests prove path containment and size/type rejection.
-- Large image imports do not spike memory via whole-file Data loads.
-- `make format`, `make test`, and `cd preview-src && npm run typecheck && npm test` pass if preview-src changed.
-```
-
-# Goal 1 — M5 Settings + themes (#16)
+# Goal 0 — M5 Settings + themes (#16)
 
 ```text
 You are working in w3d-su/plainsong. Goal: implement M5 Settings + themes from agent.md §11.
@@ -123,7 +91,7 @@ Acceptance:
 # Phase 2 gate prompt — design/spike only, no WYSIWYG feature build yet
 
 ```text
-You are working in w3d-su/plainsong. Goal: prepare Phase 2 WYSIWYG design/spikes after M5 gates are complete. Do not build full WYSIWYG yet.
+You are working in w3d-su/plainsong. Goal: prepare Phase 2 WYSIWYG design/spikes after M5 gates are complete or #16 is explicitly deferred. Do not build full WYSIWYG yet.
 
 Read first:
 - agent.md §13
@@ -140,5 +108,5 @@ Use subagents if available:
 Acceptance for the design gate:
 - docs/wysiwyg-design.md lists exact v1 scope, deferred scope, risks, and acceptance tests.
 - Spike results cover IME, undo, selection, and source round-trip.
-- No Phase 2 implementation PR starts until M5 is complete or any remaining M5 scope is explicitly deferred.
+- No Phase 2 implementation PR starts until M5 is complete or #16 is explicitly deferred with a Decision Log entry.
 ```
