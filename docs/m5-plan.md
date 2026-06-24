@@ -6,7 +6,8 @@
 ## Current snapshot
 
 M5 feature slices, performance gates, security hardening, and Settings/themes are in place. M5 is
-**not complete** until the manual checklist passes and the final stale-doc/status sweep lands.
+**not accepted** because the 2026-06-24 final sweep left manual checklist blockers in
+`docs/m5-checklist.md`.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
@@ -15,7 +16,7 @@ M5 feature slices, performance gates, security hardening, and Settings/themes ar
 | Slice 2 — TSX highlighting | Vendored TSX grammar and MDX ESM/JSX injection highlighting | ✅ Merged PR #10 | Known multiline JSX limitation remains acceptable for M5 |
 | Slice 4 — App icon/accent | App icon, accent color, deterministic generator | ✅ Merged PR #11 | First-pass art; final brand sign-off remains subjective |
 | Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | ✅ Merged PR #15 | Infrastructure only; follow-up gates tracked below |
-| Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ✅ This PR | Implements issue #16 scope; custom JSON/user CSS are deferred by Decision Log |
+| Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ✅ Merged PR #26; issue #16 closed | Custom JSON/user CSS are deferred by Decision Log |
 | Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ✅ Merged PR #24 + PR #27 follow-up; issue #17 closed | No inline `style`, script-like elements dropped before sanitize, raster assets only up to 10 MiB, SVG/path rejected |
 | Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ Merged PR #20; issue #14 closed | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
 | Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
@@ -23,15 +24,15 @@ M5 feature slices, performance gates, security hardening, and Settings/themes ar
 ## Recommended next sequence
 
 ```text
-0. PR #15, PR #20, PR #21, PR #22, PR #24, and PR #27 have merged; issues #13, #14, #17, and #18 are closed.
-1. Merge the focused #16 Settings/themes PR or resolve its review feedback without expanding into Phase 2.
-2. Run `docs/m5-checklist.md`.
-3. Update README, `agent.md`, `docs/perf-log.md`, and this plan to the final M5 state.
-4. Only then approve `docs/wysiwyg-design.md` and start Phase 2 design spikes. Do not start Phase 2 implementation before M5 exits.
+0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, and PR #27 have merged; issues #13, #14, #16, #17, and #18 are closed.
+1. Resolve the remaining unchecked items in `docs/m5-checklist.md` without adding new M5 features.
+2. If the checklist then passes, mark M5 accepted and move to Phase 2 WYSIWYG design approval/spikes only.
+3. Do not start Phase 2 implementation before M5 is accepted and `docs/wysiwyg-design.md` is approved.
 ```
 
-The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1–M5 are
-complete and a WYSIWYG design doc is approved; the current repository is not there yet.
+The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1-M5 are
+complete and a WYSIWYG design doc is approved; the current repository is not there yet because the
+manual checklist is incomplete.
 
 ## Conflict hotspots
 
@@ -41,7 +42,7 @@ complete and a WYSIWYG design doc is approved; the current repository is not the
 | `docs/perf-log.md` | PR #15, #20, #21, future final M5 state update | Keep host RSS and WebKit helper diagnostics explicit |
 | `preview-src/src/pipeline.ts` / `preview-src/src/index.ts` | MDX sanitizer hardening, theme/remote image work | Keep sanitizer and remote-image policy tests with any preview change |
 | `preview-src/src/index.ts` | Preview render caching, theme bridge, scroll sync | Require `npm run typecheck`, `npm test`, and regenerated dist when changed |
-| `MarkdownEditorView` / `MarkdownTextView` | Visible-range highlighting, IME safety, future WYSIWYG | Do not start WYSIWYG folding until M5 exits are complete |
+| `MarkdownEditorView` / `MarkdownTextView` | Visible-range highlighting, IME safety, future WYSIWYG | Do not start WYSIWYG folding until M5 is accepted and the design gate is approved |
 | `agent.md` | Decision Log and milestone status | Update in the same PR when behavior or dependency policy changes |
 
 ## Risk notes
@@ -49,12 +50,12 @@ complete and a WYSIWYG design doc is approved; the current repository is not the
 - **PR #15 must not be treated as full M5 completion.** It landed performance infrastructure while
   follow-up gates remained tracked separately.
 - **Visible-range highlighting has landed, but remains a regression risk.** PR #20 measured the gate
-  with visible-range-first parsing/apply; Phase 2 folding should still wait for the remaining M5 exits.
+  with visible-range-first parsing/apply; Phase 2 folding should still wait for M5 acceptance.
 - **The two-webview memory gate uses a test-only harness.** Phase 1 has shared app-scoped state, so this
   PR #21 measured two live `PreviewController` WebViews attached to an offscreen AppKit surface. The
   accepted M5 gate is host-process RSS; WebKit helper memory remains diagnostic.
-- **Settings + themes are implemented for the #16 scope, but manual validation remains.** Custom editor-theme
-  JSON and user CSS overrides are deferred by Decision Log until separate import/sanitizer designs exist.
+- **Settings + themes are implemented for the #16 scope in PR #26, but manual validation remains.** Custom
+  editor-theme JSON and user CSS overrides are deferred by Decision Log until separate import/sanitizer designs exist.
 - **Security hardening has landed, but remains a regression risk.** MDX preview intentionally does not execute
   components; keep sanitizer and asset policy tests with any preview-src, PreviewKit, or WorkspaceKit change.
 
@@ -64,13 +65,13 @@ Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
 | Goal | Branch suggestion | Output |
 |---|---|---|
-| M5 manual checklist | `m5-final-checklist-docs` | Runs `docs/m5-checklist.md` and records any final evidence/status changes |
-| Phase 2 design gate | `phase2-wysiwyg-design-gate` | Approves/refines design and spikes only after M5 exits |
+| M5 checklist blockers | `m5-checklist-blockers` | Completes the remaining unchecked manual items in `docs/m5-checklist.md` |
+| Phase 2 design gate | `phase2-wysiwyg-design-gate` | Approves/refines design and spikes only after M5 is accepted |
 
 ## Beyond M5
 
-There is no accepted "M6" in `agent.md`. After M5, the roadmap is Phase 2 WYSIWYG, then unscheduled Phase 3
-candidates. Recommended order after M5:
+There is no accepted "M6" in `agent.md`. After M5 is accepted, the roadmap is Phase 2 WYSIWYG, then unscheduled Phase 3
+candidates. Recommended order after M5 acceptance:
 
 1. Approve `docs/wysiwyg-design.md`.
 2. Run Phase 2 spikes for IME, undo, selection, and delimiter folding.

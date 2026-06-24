@@ -50,6 +50,24 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | File open, 500 KB Markdown | < 300 ms to first paint | 33.765 ms | Pass | See [File Open](#file-open) |
 | Memory with 8 warm sessions + 2 webviews | < 400 MB host-process RSS | 149.8 MB host RSS with 2 settled webviews | Pass | See [Memory](#memory) |
 
+## Final Checklist Verification Run
+
+| Field | Value |
+|---|---|
+| Date | 2026-06-24 |
+| Branch | `m5-final-checklist-docs` |
+| Commit | Working tree after PR #26 merge commit `7286fe5` |
+| Result | Automated performance gates passed; M5 not accepted because manual checklist blockers remain in `docs/m5-checklist.md`. |
+
+Current sweep values from `make test`:
+
+| Metric | Current sweep value | Result |
+|---|---:|---|
+| Typing latency | 0.373 ms max | Pass |
+| Highlight update visible range | Markdown 17.244 ms max; MDX 22.280 ms max | Pass |
+| Preview render, 100 KB document | Markdown 49.663 ms median; MDX 15.661 ms median | Pass |
+| Memory with 8 warm sessions + 2 webviews | 136.1 MB host RSS; WebKit helper aggregate 648.0 MB diagnostic | Pass |
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`

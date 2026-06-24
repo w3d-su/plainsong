@@ -460,8 +460,8 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
   / source only / WYSIWYG once it ships).
 
-Phase 2 begins only when Milestones M1–M5 are complete and a dedicated design doc
-(`docs/wysiwyg-design.md`) is approved.
+Phase 2 implementation begins only when Milestones M1-M5 are accepted and a dedicated
+design doc (`docs/wysiwyg-design.md`) is approved.
 
 ---
 
@@ -526,9 +526,9 @@ next begins.
   components, error banner; themes + settings window; app icon; performance pass
   against §12 budgets.
 - Current status: MDX preview, TSX highlighting, icon/accent, §12 performance
-  measurements, PR #24/#27 security hardening, and Settings/themes have landed. M5 is
-  still incomplete until `docs/m5-checklist.md` passes manually and the final stale-doc
-  status sweep lands.
+  measurements, PR #24/#27 security hardening, and PR #26 Settings/themes have landed.
+  M5 feature implementation is done, but M5 is **not accepted** because the 2026-06-24
+  final sweep left unchecked items in `docs/m5-checklist.md`.
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
