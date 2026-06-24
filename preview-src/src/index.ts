@@ -18,7 +18,7 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
-import { imageSourcePolicy } from "./image-policy";
+import { rewriteImageSources } from "./image-rewrite";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
@@ -109,7 +109,7 @@ async function receive(message: BridgeMessage): Promise<void> {
       break;
     case "setTheme":
       applyPreviewSettings(message.payload.theme, message.payload.allowRemoteImages);
-      rewriteImageSources(currentBaseDir, currentAllowRemoteImages);
+      rewriteImageSources(previewRoot, currentBaseDir, currentAllowRemoteImages);
       break;
     case "ready":
     case "renderComplete":
@@ -153,13 +153,13 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   const nextRoot = document.createElement("main");
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
+  rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages);
 
   clearMdxErrorBanner();
   morphdom(previewRoot, nextRoot, {
     childrenOnly: true,
     onBeforeElUpdated: preserveUnchangedHighlightedCode,
   });
-  rewriteImageSources(payload.baseDir, payload.allowRemoteImages);
   highlightCodeBlocks();
   await renderMermaidBlocks();
   if (payload.renderID < latestRenderID) return;
@@ -295,30 +295,6 @@ function applyPreviewSettings(theme: string, allowRemoteImages: boolean): void {
   document.documentElement.dataset.theme = theme;
   currentAllowRemoteImages = allowRemoteImages;
   initializeMermaid(theme);
-}
-
-function rewriteImageSources(baseDir: string | null, allowRemoteImages: boolean): void {
-  for (const image of previewRoot.querySelectorAll<HTMLImageElement>("img")) {
-    const source = image.dataset.plainsongOriginalSrc ?? image.getAttribute("src");
-    if (!source) continue;
-
-    image.dataset.plainsongOriginalSrc = source;
-    const policy = imageSourcePolicy(source, baseDir, allowRemoteImages);
-    switch (policy.action) {
-      case "keep":
-        image.src = source;
-        delete image.dataset.plainsongBlockedSrc;
-        break;
-      case "rewrite":
-        image.src = policy.src;
-        delete image.dataset.plainsongBlockedSrc;
-        break;
-      case "block":
-        image.removeAttribute("src");
-        image.dataset.plainsongBlockedSrc = source;
-        break;
-    }
-  }
 }
 
 function highlightCodeBlocks(): void {
