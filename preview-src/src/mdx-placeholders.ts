@@ -94,12 +94,6 @@ export const mdxSanitizeSchema: SanitizeSchema = {
     semantics: [],
     annotation: ["encoding"],
     span: [...safeSanitizeAttributes(defaultSchema.attributes?.span), safeClassNameRule, "ariaHidden"],
-    svg: [
-      "xmlns",
-      "viewBox",
-      "preserveAspectRatio",
-    ],
-    path: ["d"],
   },
   tagNames: [
     ...(defaultSchema.tagNames ?? []),
@@ -120,8 +114,6 @@ export const mdxSanitizeSchema: SanitizeSchema = {
     "mstyle",
     "semantics",
     "annotation",
-    "svg",
-    "path",
   ],
 };
 

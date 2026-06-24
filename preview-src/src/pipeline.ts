@@ -61,6 +61,11 @@ const scriptLikeTags = new Set([
   "style",
 ]);
 
+const sourceSvgTags = new Set([
+  "path",
+  "svg",
+]);
+
 export async function renderMarkdown(markdown: string): Promise<string> {
   return String(await markdownProcessor.process(markdown));
 }
@@ -89,6 +94,7 @@ const mdxProcessor = unified()
   .use(remarkMath)
   .use(remarkMdxPlaceholders)
   .use(remarkRehype)
+  .use(rehypeDropSourceSvgElements)
   .use(rehypeKatex)
   .use(rehypeSourceLines)
   .use(rehypeDropScriptLikeElements)
@@ -126,20 +132,26 @@ function rehypeSourceLines() {
 
 function rehypeDropScriptLikeElements() {
   return (tree: TreeNode) => {
-    dropScriptLikeChildren(tree);
+    dropChildrenByTagName(tree, scriptLikeTags);
   };
 }
 
-function dropScriptLikeChildren(node: TreeNode): void {
+function rehypeDropSourceSvgElements() {
+  return (tree: TreeNode) => {
+    dropChildrenByTagName(tree, sourceSvgTags);
+  };
+}
+
+function dropChildrenByTagName(node: TreeNode, tagNames: Set<string>): void {
   if (!node.children) return;
 
   node.children = node.children.filter((child) => {
     if (child.type !== "element" || !child.tagName) return true;
-    return !scriptLikeTags.has(child.tagName.toLowerCase());
+    return !tagNames.has(child.tagName.toLowerCase());
   });
 
   for (const child of node.children) {
-    dropScriptLikeChildren(child);
+    dropChildrenByTagName(child, tagNames);
   }
 }
 

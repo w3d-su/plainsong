@@ -16,7 +16,7 @@ a milestone or gate as accepted.
 | M2 live preview | Offline WKWebView preview, GFM, KaTeX, Mermaid, checkbox writeback, scroll sync, preview toggle | Landed before current M5 work | Accepted |
 | M3 workspace | Folder workspace, sidebar, FSEvents, file operations, recents/bookmarks, LRU sessions | PR #2 merged | Accepted |
 | M4 authoring | Formatting/editing behaviors, completion, frontmatter, smart paste, image drag/drop, table helper | PR #4, #5, #6, #7 merged | Accepted |
-| M5 MDX preview | `.mdx` preview pipeline with non-executed placeholders, error liveness, sanitizer, fixtures | PR #8 merged | Accepted for feature scope; hardening still tracked below |
+| M5 MDX preview | `.mdx` preview pipeline with non-executed placeholders, error liveness, sanitizer, fixtures | PR #8 merged; PR #24 hardened sanitizer policy | Accepted for feature scope and current security policy |
 | M5 TSX highlighting | MDX ESM/JSX regions receive TSX injection highlighting | PR #10 merged | Accepted with documented multiline JSX limitation |
 | M5 icon/accent | App icon and accent assets exist | PR #11 merged | Accepted as first-pass art; product sign-off still subjective |
 | M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 | No implementation found in current search | Not started |
@@ -26,7 +26,7 @@ a milestone or gate as accepted.
 | M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
 | M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | PR #20 records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md`; issue #14 closed | Accepted |
 | M5 performance: memory | <400 MB host-process RSS with 8 warm sessions + 2 live webviews | PR #21 records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md`; WebKit helper RSS is diagnostic; issue #13 closed after PR #22 clarified scope | Accepted |
-| M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | No focused hardening PR found | Needed before public alpha |
+| M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | PR #24 closed #17; follow-up removes the stale inline SVG/path sanitizer allowance | Accepted; keep as regression risk |
 | M5 CI preview typecheck | CI runs `cd preview-src && npm run typecheck` and still runs preview tests | PR #22 added the CI step; `make test` still runs preview tests only; issue #18 closed | Accepted |
 | Phase 2 WYSIWYG gate | M1–M5 complete and `docs/wysiwyg-design.md` approved | Draft doc exists from PR #9 | Design only; implementation blocked until M5 complete |
 
@@ -35,8 +35,8 @@ a milestone or gate as accepted.
 | Release target | Recommendation | Reason |
 |---|---|---|
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
-| Private alpha with trusted users | Maybe, after settings/security triage | Highlight and memory are measured here, but settings and security gaps remain. |
-| Public alpha | No | Security hardening is open; license/release signing are also not final. |
+| Private alpha with trusted users | Maybe, after settings triage | Highlight, memory, and security hardening are measured here, but Settings/themes (#16) remains open. |
+| Public alpha | No | Settings/themes (#16), license, and release signing are not final. |
 | Phase 2 WYSIWYG implementation | No | `agent.md` requires M1–M5 complete and design approval first. |
 
 ## M5 exit checklist
@@ -47,7 +47,7 @@ M5 should not be called complete until all items below are true:
 - [x] Issue #14 closed with measured <50 ms visible-range highlighting.
 - [x] Issue #13 closed under the host-process RSS scope decision.
 - [ ] Settings + themes from `agent.md` §11 implemented or explicitly deferred with a Decision Log entry.
-- [ ] Security hardening PR landed for MDX sanitizer and asset handling.
+- [x] Security hardening PR landed for MDX sanitizer and asset handling (#17 closed by PR #24; SVG policy drift fixed by the follow-up PR).
 - [x] CI/docs cleanup landed with preview TypeScript typecheck coverage.
 - [x] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results for the performance gates.
 - [ ] `docs/m5-checklist.md` passes manually.
