@@ -56,7 +56,7 @@ projects such as Astro/Next.js content directories).
 | Structure parsing (outline, etc.) | Reuse the tree-sitter syntax tree. Optionally [swift-markdown](https://github.com/swiftlang/swift-markdown) for export tasks. | Avoid two parsers driving the same UI. |
 | Preview | `WKWebView` + local JS bundle built with **esbuild** from `preview-src/` | No remote network access by default (strict CSP). |
 | Preview JS pipeline | unified: `remark-parse`, `remark-gfm`, `remark-frontmatter`, `remark-math`, `remark-mdx` (mdx only) → `rehype`, `rehype-katex`, `highlight.js` for fences; `mermaid` for ```mermaid fences; `morphdom` for incremental DOM patching | unified/remark is the standard 2026 pipeline and the only realistic path to MDX support. |
-| Persistence of prefs | `UserDefaults` + JSON theme files in Application Support | |
+| Persistence of prefs | `UserDefaults` + built-in theme IDs; custom theme/user CSS imports deferred | |
 | Project generation | **XcodeGen** (`project.yml` committed; `.xcodeproj` is generated, never hand-edited) | pbxproj diffs are hostile to LLM collaboration. |
 | Lint/format | SwiftFormat + SwiftLint (configs committed) | |
 | JS tooling | Node 20+, npm, esbuild, vitest (preview pipeline unit tests) | |
@@ -284,8 +284,11 @@ compute async, cancel stale requests.
 - One `WKWebView` per editor pane, non-opaque, loads the bundled `index.html` once and
   stays alive (re-render via JS, never reload the page per keystroke).
 - **Security:** strict CSP (`default-src 'none'; script-src 'self'; style-src 'self'
-  'unsafe-inline'; img-src asset: data:`), `isElementFullscreenEnabled` off, no remote
-  loads by default. A user preference can later allow `https:` images.
+  'unsafe-inline'; img-src asset: data: https:`), `isElementFullscreenEnabled` off, and
+  no remote loads by default. The preview JS removes remote image `src` values unless
+  the user enables the Allow Remote Images preference; that preference permits only
+  `https:` images and does not relax script, style, navigation, or non-image network
+  behavior.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root, enforces path containment
@@ -402,10 +405,12 @@ attempt without a Decision Log entry.
 
 ## 11. Theming & Settings
 
-- **Editor themes:** JSON files (capture name → color/traits), in Application Support;
-  two built-ins. Live-switch with system appearance.
-- **Preview themes:** CSS files paired with editor themes (`github-light`, `github-dark`
-  defaults). User CSS override file supported (loaded after theme).
+- **Editor themes:** two built-ins wired through Settings and applied live. Custom JSON
+  theme files in Application Support are deferred until a separate import/validation
+  design exists.
+- **Preview themes:** bundled CSS variables for system/light/dark preview themes, paired
+  with the editor settings bridge. User CSS overrides are deferred until a separate
+  sanitizer/design exists.
 - **Settings window (SwiftUI `Settings` scene):** General (default folder, autosave
   interval), Editor (font, size, line numbers, typewriter sync), Preview (theme, allow
   remote images), Files (image-paste asset folder pattern, default extension `.md`/`.mdx`).
@@ -521,8 +526,9 @@ next begins.
   components, error banner; themes + settings window; app icon; performance pass
   against §12 budgets.
 - Current status: MDX preview, TSX highlighting, icon/accent, §12 performance
-  measurements, and PR #24 security hardening have landed. M5 is still incomplete until
-  Settings/themes (#16) are implemented or explicitly deferred with a Decision Log entry.
+  measurements, PR #24/#27 security hardening, and Settings/themes have landed. M5 is
+  still incomplete until `docs/m5-checklist.md` passes manually and the final stale-doc
+  status sweep lands.
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
@@ -639,7 +645,8 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-17 | M5 TSX highlighting vendors tree-sitter-typescript TSX C sources | EditorKit now injects MDX ESM/JSX regions into a vendored `TreeSitterTSXFixed` target from `tree-sitter-typescript` v0.23.2 (`f975a621f4e7f532fe322e13c4f79495e0a7b2e7`) and maps TSX capture names into the existing MarkdownSyntaxToken/theme facade. Vendoring avoids the upstream Swift package's ChimeHQ/SwiftTreeSitter dependency, preserving the exact `tree-sitter/swift-tree-sitter` 0.10.0 pin and avoiding the Neon dependency-shape conflict. Alt: adding the upstream Swift package was rejected because it would reintroduce a conflicting SwiftTreeSitter graph; keeping `.mdxSource` coarse styling was rejected by §6.2/M5 acceptance. |
 | 2026-06-17 | M5 MDX preview uses remark-mdx placeholders without bridge v5 | The preview pipeline adds `remark-mdx`, `mdast-util-mdx` node typing, and `rehype-sanitize` so `.mdx` files render Markdown normally while ESM, JSX components, and expressions become non-executed placeholders. MDX parse errors are handled entirely in preview JS with an inline banner and stale last-good content, so bridge protocol v4 remains sufficient. Alt: `@mdx-js/mdx` runtime compilation/component execution was rejected as Phase 3+ sandboxing work; native bridge diagnostics/protocol v5 are deferred until Swift-owned error chrome is required. |
 | 2026-06-24 | M5 memory budget uses host-process RSS | The §12 memory gate is app host-process RSS with 8 warm sessions and 2 settled live preview webviews. PR #21 measured 149.8 MB host RSS and prints OS-managed WebKit helper memory as diagnostics only; helper reuse and process-pool ownership are too host-dependent to assert in CI. Alt: aggregating WebKit helper RSS was rejected for the M5 gate because the local diagnostic aggregate was 648.3 MB and not stable enough to compare across runners. Issue #13 is closed under this host-process RSS scope. |
-| 2026-06-24 | PR #24 M5 preview security rejects active HTML/SVG and uses bounded raster assets | Sanitized MDX/lowercase HTML strips inline `style` instead of CSS-sanitizing because Phase 1 has no user-authored CSS policy and style spoofing can cover the app with fixed or giant layout boxes. Script-like elements are dropped before sanitize so payload text does not leak into preview output. `asset://` preview serving and image file imports accept only PNG, JPEG, GIF, and WebP up to 10 MiB per file; SVG is rejected as active content until a dedicated sanitizer/design exists, and larger files should be inserted by link/reference outside the preview asset path. Alt: allowing all `UTType.image` files was rejected because it includes scriptable or memory-heavy formats. |
+| 2026-06-24 | PR #24/#27 M5 preview security rejects active HTML/SVG and uses bounded raster assets | Sanitized MDX/lowercase HTML strips inline `style` instead of CSS-sanitizing because Phase 1 has no user-authored CSS policy and style spoofing can cover the app with fixed or giant layout boxes. Script-like elements are dropped before sanitize so payload text does not leak into preview output. `asset://` preview serving and image file imports accept only PNG, JPEG, GIF, and WebP up to 10 MiB per file; inline user-authored SVG/path is rejected as active content until a dedicated sanitizer/design exists, and larger files should be inserted by link/reference outside the preview asset path. Alt: allowing all `UTType.image` files was rejected because it includes scriptable or memory-heavy formats. |
+| 2026-06-24 | M5 settings use UserDefaults and opt-in HTTPS-only remote images | Settings persist through `UserDefaults` with the default folder stored as a security-scoped bookmark and no new persistence dependency. Editor settings apply by updating the existing STTextView font, gutter, and highlight theme instead of reloading document text; preview settings travel over bridge protocol v5. Remote images remain disabled by default; enabling them permits only `https:` image `src` values while keeping script, style, navigation, asset containment, and SVG rejection policies unchanged. Custom editor-theme JSON and user CSS overrides are deferred until separate import/sanitizer designs exist. Alt: broad WebView network allowance or arbitrary CSS/theme file loading in M5 was rejected as unnecessary release risk. |
 
 ---
 

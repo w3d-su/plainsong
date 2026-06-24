@@ -1,3 +1,4 @@
+import AppKit
 import MarkdownCore
 import SwiftUI
 
@@ -19,6 +20,10 @@ public struct MarkdownEditorView: View {
     nonisolated static let highlightDebounceNanoseconds: UInt64 = 20_000_000
 
     private let fileKind: FileKind
+    private let fontName: String
+    private let fontSize: CGFloat
+    private let editorTheme: MarkdownEditorTheme
+    private let appearanceID: String
     private let showsLineNumbers: Bool
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
@@ -29,6 +34,10 @@ public struct MarkdownEditorView: View {
     public init(
         text: Binding<String>,
         fileKind: FileKind,
+        fontName: String = MarkdownSyntaxHighlighter.systemMonospacedFontName,
+        fontSize: CGFloat = MarkdownSyntaxHighlighter.defaultFont.pointSize,
+        editorTheme: MarkdownEditorTheme = .standard,
+        appearanceID: String = "standard",
         showsLineNumbers: Bool = true,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
@@ -38,6 +47,10 @@ public struct MarkdownEditorView: View {
     ) {
         _text = text
         self.fileKind = fileKind
+        self.fontName = fontName
+        self.fontSize = fontSize
+        self.editorTheme = editorTheme
+        self.appearanceID = appearanceID
         self.showsLineNumbers = showsLineNumbers
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
@@ -70,7 +83,8 @@ public struct MarkdownEditorView: View {
             commandProxy: activeCommandProxy,
             completionWorkspace: completionWorkspace,
             imageAssetInserter: imageAssetInserter,
-            imageAssetContextID: imageAssetContextID
+            imageAssetContextID: imageAssetContextID,
+            font: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         ) { range in
             Task { @MainActor in
                 updateVisibleRange(range)
@@ -84,6 +98,9 @@ public struct MarkdownEditorView: View {
         }
         .onChange(of: fileKind) { _, _ in
             activeCommandProxy.update(fileKind: fileKind)
+            scheduleHighlight()
+        }
+        .onChange(of: appearanceID) { _, _ in
             scheduleHighlight()
         }
         .onAppear {
@@ -145,7 +162,14 @@ public struct MarkdownEditorView: View {
             visibleRange: visibleTextRange,
             selection: selection
         )
-        let highlighted = await Self.highlightService.highlight(source, fileKind: kind, visibleRange: requestedRange)
+        let highlighted = await Self.highlightService.highlight(
+            source,
+            fileKind: kind,
+            visibleRange: requestedRange,
+            theme: editorTheme,
+            fontName: fontName,
+            fontSize: fontSize
+        )
 
         guard Self.shouldApplyScheduledHighlight(
             revision: revision,

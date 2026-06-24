@@ -18,8 +18,14 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #20 — visible-range highlighting gate; closed issue #14.
   - PR #21 — deterministic two-live-webview host-process RSS memory harness; included on `main` through PR #20.
   - PR #22 — post-merge docs/CI/scheduling cleanup; closed issues #13 and #18.
+  - PR #24 — MDX preview/asset security hardening; closed issue #17.
+- Current M5 slice in review:
+  - Issue #16 — Settings + themes from `agent.md` §11 are implemented in the current PR; keep any review
+    fixes scoped to Settings/themes and do not expand into Phase 2.
 - Open / not complete:
-  - Issue #16 — Settings + themes from `agent.md` §11 are still not implemented.
+  - `docs/m5-checklist.md` still needs to be run manually.
+  - Final M5 status/stale-doc sweep still needs to land after the checklist.
+  - Phase 2 WYSIWYG remains blocked until M5 exits and `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
 
@@ -37,7 +43,7 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
 
 ---
 
-# Completed reference — landed performance and security work
+# Completed reference — landed performance/security/settings work
 
 - PR #15 merged on 2026-06-23 as M5 performance infrastructure.
 - PR #20 merged on 2026-06-24 and closed issue #14 with measured visible-range highlighting.
@@ -45,44 +51,50 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   with 8 warm sessions and 2 settled live webviews.
 - PR #22 merged on 2026-06-24, clarified the host-process RSS scope, added preview TypeScript typecheck
   to CI, and closed issues #13 and #18.
-- PR #24 merged on 2026-06-24 and closed issue #17 with MDX sanitizer hardening, bounded raster-only
-  preview/imported assets, and large image import safeguards. Inline user-authored SVG remains rejected
-  unless a future Decision Log adds a dedicated sanitizer/design.
+- PR #24 merged on 2026-06-24 and closed issue #17 with the M5 security policy: no inline sanitized
+  HTML style, script-like element drops before sanitize, bounded raster-only preview/import assets, and
+  SVG rejection until a separate sanitizer/design exists.
+- PR #27 merged on 2026-06-24 and removed stale inline SVG/path sanitizer allowances so source-authored
+  SVG/path payloads are dropped before sanitize.
+- This PR implements issue #16 Settings/themes with UserDefaults-backed panes, live editor/preview
+  preferences, and an HTTPS-only remote image opt-in. Custom editor-theme JSON and user CSS remain
+  deferred by Decision Log.
 
-# Goal 0 — M5 Settings + themes (#16)
+# Goal 0 — M5 checklist and final status sweep
 
 ```text
-You are working in w3d-su/plainsong. Goal: implement M5 Settings + themes from agent.md §11.
+You are working in w3d-su/plainsong. Goal: run the M5 manual checklist and make the final M5 status/docs update.
 
 Read first:
-- agent.md §6.2, §7.1, §11, §17
-- App settings scene / AppState / preferences files
-- EditorKit theme files
-- PreviewKit theme bridge and preview-src styles
+- README.md
+- agent.md §11, §12, §14, §17
 - docs/m5-checklist.md
+- docs/acceptance-matrix.md
+- docs/m5-plan.md
+- docs/risk-register.md
+- docs/perf-log.md
 
 Use subagents if available:
-1. SwiftUI settings subagent: implement General, Editor, Preview, and Files panes with UserDefaults-backed settings.
-2. Editor theme subagent: ensure editor font/line numbers/theme changes apply live without reloading the document.
-3. Preview theme subagent: wire preview theme and optional user CSS through the existing bridge safely.
-4. Security subagent: ensure any remote image preference changes CSP/navigation policy intentionally and is tested.
+1. Manual checklist subagent: walk `docs/m5-checklist.md` in a disposable workspace and capture blockers/evidence.
+2. Docs sweep subagent: search README/agent/docs for stale #13/#14/#16/#17/M5 claims.
+3. Release posture subagent: keep private-alpha/public-alpha language separated from M5 completion.
 
-Scope:
-- General: default folder, autosave interval.
-- Editor: font, size, line numbers, typewriter sync.
-- Preview: theme, allow remote images.
-- Files: image-paste asset folder pattern, default extension `.md`/`.mdx`.
+Tasks:
+- Run the automated checks requested by the checklist.
+- Launch Plainsong and perform the manual M5 checklist.
+- Record any final evidence or blockers without faking passes.
+- Update README, `agent.md`, `docs/acceptance-matrix.md`, `docs/m5-plan.md`, `docs/risk-register.md`,
+  `docs/codex-handoff.md`, and `docs/perf-log.md` only as evidence warrants.
+- If all gates pass, mark M5 complete in docs; otherwise keep the exact remaining blocker explicit.
 
-Implementation constraints:
-- UserDefaults is fine; do not add a persistence dependency.
-- If bridge protocol changes, mirror Swift/TS constants and regenerate preview assets.
-- Do not relax CSP broadly. If allowing remote images, only allow what the setting requires and keep scripts/network execution blocked.
+Non-goals:
+- Do not start Phase 2 WYSIWYG.
+- Do not reopen security or Settings implementation scope unless the checklist finds a regression.
 
 Acceptance:
-- Settings are visible in the macOS Settings scene and persist across relaunch.
-- Editor and preview settings apply live where reasonable.
-- Preview remote image policy is tested and documented.
-- `make format`, `make test`, and `cd preview-src && npm run typecheck && npm test` pass if preview-src changed.
+- M5 checklist evidence is recorded honestly.
+- M5 is called complete only if the full checklist passes and docs no longer contain stale milestone claims.
+- Phase 2 remains design/spike-only until M5 exits and the design doc is approved.
 ```
 
 # Phase 2 gate prompt — design/spike only, no WYSIWYG feature build yet

@@ -9,22 +9,25 @@ extension AppState {
     /// workspace root and opens it; in single-file mode, asks for a location first.
     func newFile() {
         if let workspaceRootURL {
-            let name = Self.untitledFileName(in: workspaceRootURL)
+            let name = Self.untitledFileName(
+                in: workspaceRootURL,
+                fileExtension: preferences.defaultFileExtension.rawValue
+            )
             createWorkspaceFile(named: name, inDirectoryID: nil)
         } else {
             newFileViaSavePanel()
         }
     }
 
-    static func untitledFileName(in directory: URL) -> String {
+    static func untitledFileName(in directory: URL, fileExtension: String = "md") -> String {
         let base = "Untitled"
-        var candidate = "\(base).md"
+        var candidate = "\(base).\(fileExtension)"
         var counter = 2
 
         while FileManager.default.fileExists(
             atPath: directory.appendingPathComponent(candidate).path
         ) {
-            candidate = "\(base) \(counter).md"
+            candidate = "\(base) \(counter).\(fileExtension)"
             counter += 1
         }
 
@@ -35,9 +38,10 @@ extension AppState {
 private extension AppState {
     func newFileViaSavePanel() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Untitled.md"
+        panel.nameFieldStringValue = "Untitled.\(preferences.defaultFileExtension.rawValue)"
         panel.allowedContentTypes = Self.supportedContentTypes
         panel.canCreateDirectories = true
+        panel.directoryURL = preferences.defaultFolderURL
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 

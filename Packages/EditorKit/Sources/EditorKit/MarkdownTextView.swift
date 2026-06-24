@@ -196,6 +196,10 @@ struct MarkdownTextView: NSViewRepresentable {
         if textView.showsLineNumbers != showsLineNumbers {
             textView.showsLineNumbers = showsLineNumbers
         }
+        if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
+            textView.font = font
+            textView.gutterView?.font = font
+        }
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.

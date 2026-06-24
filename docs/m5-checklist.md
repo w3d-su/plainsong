@@ -61,6 +61,10 @@ real Astro or Next.js content directory with `.mdx` posts.
 
 ## Settings And Themes
 
+M5 #16 scope covers built-in editor/preview themes and preference wiring. Custom editor-theme JSON
+files and user CSS overrides are deferred by Decision Log until separate import/sanitizer designs
+exist.
+
 - [ ] Open Settings and confirm it is no longer a placeholder.
 - [ ] Change the General default folder and confirm the configured folder is used by default-folder workflows.
 - [ ] Change the General autosave interval and confirm autosave behavior follows the configured interval.
@@ -69,12 +73,12 @@ real Astro or Next.js content directory with `.mdx` posts.
 - [ ] Toggle line numbers and confirm the active editor updates.
 - [ ] Toggle typewriter sync and confirm editor/preview scroll sync behavior updates immediately.
 - [ ] Confirm the two built-in editor themes are available.
-- [ ] Add or select an editor-theme JSON file from Application Support and confirm its name, colors, and traits load correctly.
+- [ ] Confirm custom editor-theme JSON files remain deferred by Decision Log and are not exposed as incomplete UI.
 - [ ] Change editor theme or appearance and confirm syntax colors update without affecting typing responsiveness.
 - [ ] Change preview theme to light and dark and confirm preview colors update independent of the OS appearance.
-- [ ] Add a user CSS override and confirm it loads after the selected preview theme.
+- [ ] Confirm user CSS overrides remain deferred by Decision Log and are not exposed as incomplete UI.
 - [ ] Confirm Mermaid output follows the selected preview theme.
-- [ ] With remote images disabled, confirm `https:` preview images are blocked by the strict CSP/default image policy.
+- [ ] With remote images disabled, confirm `https:` preview images are blocked by the default image policy.
 - [ ] Enable Allow Remote Images and confirm `https:` preview images load without allowing other remote script/style loads.
 - [ ] Change the image-paste asset-folder pattern and confirm pasted images are stored under the configured folder.
 - [ ] Change the default file extension between `.md` and `.mdx` and confirm new files use the selected extension.

@@ -71,6 +71,7 @@ final class AppState: ObservableObject {
     var lastKnownDiskModificationDates: [URL: Date] = [:]
     var pendingExternalTexts: [URL: String] = [:]
     var detachedSessionURLs: Set<URL> = []
+    let preferences: PlainsongPreferences
 
     init(
         currentDocument: DocumentSession = DocumentSession(),
@@ -91,7 +92,12 @@ final class AppState: ObservableObject {
         self.userDefaults = userDefaults
         isPreviewVisible = userDefaults.bool(forKey: Self.previewVisibleDefaultsKey)
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
+        preferences = PlainsongPreferences(userDefaults: userDefaults)
         recentItemURLs = (try? recentItemStore.restore()) ?? []
+        preferences.onChange = { [weak self] in
+            self?.objectWillChange.send()
+            self?.scheduleAutosave()
+        }
         observeCurrentDocument()
     }
 
@@ -136,6 +142,7 @@ final class AppState: ObservableObject {
         // directory selection in the panel even when `canChooseDirectories` is true,
         // so folder workspaces could not be chosen despite the message inviting it.
         panel.allowedContentTypes = Self.supportedContentTypes + [.folder]
+        panel.directoryURL = preferences.defaultFolderURL
         panel.message = "Choose a Markdown or MDX file, or a folder workspace."
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -271,9 +278,10 @@ final class AppState: ObservableObject {
         autosaveTask?.cancel()
         guard canAutosaveCurrentDocument else { return }
 
+        let delayNanoseconds = UInt64(preferences.autosaveIntervalSeconds * 1_000_000_000)
         autosaveTask = Task { [weak self] in
             do {
-                try await Task.sleep(nanoseconds: 1_000_000_000)
+                try await Task.sleep(nanoseconds: delayNanoseconds)
                 guard !Task.isCancelled else { return }
                 self?.autosaveIfNeeded()
             } catch {

@@ -2,7 +2,7 @@ import Foundation
 import MarkdownCore
 
 public enum PreviewBridge {
-    public static let protocolVersion = 4
+    public static let protocolVersion = 5
 }
 
 public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {
@@ -50,6 +50,7 @@ public struct RenderPayload: Codable, Equatable, Sendable {
     public let text: String
     public let baseDir: String?
     public let theme: String
+    public let allowRemoteImages: Bool
 
     public init(
         renderID: Int,
@@ -57,7 +58,8 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         fileKind: PreviewFileKind,
         text: String,
         baseDir: String?,
-        theme: String
+        theme: String,
+        allowRemoteImages: Bool
     ) {
         self.renderID = renderID
         self.version = version
@@ -65,16 +67,24 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         self.text = text
         self.baseDir = baseDir
         self.theme = theme
+        self.allowRemoteImages = allowRemoteImages
     }
 
-    public init(change: DocumentTextChange, renderID: Int, theme: String, baseDir: String? = nil) {
+    public init(
+        change: DocumentTextChange,
+        renderID: Int,
+        theme: String,
+        allowRemoteImages: Bool,
+        baseDir: String? = nil
+    ) {
         self.init(
             renderID: renderID,
             version: change.version,
             fileKind: PreviewFileKind(change.fileKind),
             text: change.text,
             baseDir: baseDir,
-            theme: theme
+            theme: theme,
+            allowRemoteImages: allowRemoteImages
         )
     }
 }
@@ -131,9 +141,11 @@ public struct CheckboxToggledPayload: Codable, Equatable, Sendable {
 
 public struct SetThemePayload: Codable, Equatable, Sendable {
     public let theme: String
+    public let allowRemoteImages: Bool
 
-    public init(theme: String) {
+    public init(theme: String, allowRemoteImages: Bool) {
         self.theme = theme
+        self.allowRemoteImages = allowRemoteImages
     }
 }
 

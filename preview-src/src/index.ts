@@ -18,7 +18,7 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
-import { assetURLPath, workspaceRelativeAssetPath } from "./asset-path";
+import { imageSourcePolicy } from "./image-policy";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
@@ -34,6 +34,8 @@ const previewRoot = requirePreviewRoot();
 let latestRenderID = -1;
 // Document version of the currently displayed render; only used for checkbox writeback.
 let currentRenderedVersion = -1;
+let currentBaseDir: string | null = null;
+let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
@@ -106,8 +108,8 @@ async function receive(message: BridgeMessage): Promise<void> {
       scrollToLine(message.payload.line, message.payload.animated);
       break;
     case "setTheme":
-      document.documentElement.dataset.theme = message.payload.theme;
-      initializeMermaid(message.payload.theme);
+      applyPreviewSettings(message.payload.theme, message.payload.allowRemoteImages);
+      rewriteImageSources(currentBaseDir, currentAllowRemoteImages);
       break;
     case "ready":
     case "renderComplete":
@@ -121,6 +123,8 @@ async function receive(message: BridgeMessage): Promise<void> {
 async function render(payload: Extract<BridgeMessage, { name: "render" }>["payload"]) {
   if (payload.renderID < latestRenderID) return;
   latestRenderID = payload.renderID;
+  currentBaseDir = payload.baseDir;
+  applyPreviewSettings(payload.theme, payload.allowRemoteImages);
 
   let html: string;
   try {
@@ -155,7 +159,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
     childrenOnly: true,
     onBeforeElUpdated: preserveUnchangedHighlightedCode,
   });
-  rewriteImageSources(payload.baseDir);
+  rewriteImageSources(payload.baseDir, payload.allowRemoteImages);
   highlightCodeBlocks();
   await renderMermaidBlocks();
   if (payload.renderID < latestRenderID) return;
@@ -287,18 +291,34 @@ function sourceLineForElement(element: Element): number | undefined {
   return Number.isFinite(line) ? line : undefined;
 }
 
-function rewriteImageSources(baseDir: string | null): void {
-  for (const image of previewRoot.querySelectorAll<HTMLImageElement>("img[src]")) {
-    const source = image.getAttribute("src");
-    if (!source || !isWorkspaceRelativeURL(source)) continue;
-
-    const assetPath = workspaceRelativeAssetPath(source, baseDir);
-    image.src = `asset://${assetURLPath(assetPath)}`;
-  }
+function applyPreviewSettings(theme: string, allowRemoteImages: boolean): void {
+  document.documentElement.dataset.theme = theme;
+  currentAllowRemoteImages = allowRemoteImages;
+  initializeMermaid(theme);
 }
 
-function isWorkspaceRelativeURL(value: string): boolean {
-  return !/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(value);
+function rewriteImageSources(baseDir: string | null, allowRemoteImages: boolean): void {
+  for (const image of previewRoot.querySelectorAll<HTMLImageElement>("img")) {
+    const source = image.dataset.plainsongOriginalSrc ?? image.getAttribute("src");
+    if (!source) continue;
+
+    image.dataset.plainsongOriginalSrc = source;
+    const policy = imageSourcePolicy(source, baseDir, allowRemoteImages);
+    switch (policy.action) {
+      case "keep":
+        image.src = source;
+        delete image.dataset.plainsongBlockedSrc;
+        break;
+      case "rewrite":
+        image.src = policy.src;
+        delete image.dataset.plainsongBlockedSrc;
+        break;
+      case "block":
+        image.removeAttribute("src");
+        image.dataset.plainsongBlockedSrc = source;
+        break;
+    }
+  }
 }
 
 function highlightCodeBlocks(): void {
