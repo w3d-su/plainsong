@@ -527,8 +527,8 @@ next begins.
   against §12 budgets.
 - Current status: MDX preview, TSX highlighting, icon/accent, §12 performance
   measurements, PR #24/#27 security hardening, and PR #26 Settings/themes have landed.
-  M5 feature implementation is done, but M5 is **not accepted** because the 2026-06-24
-  final sweep left unchecked items in `docs/m5-checklist.md`.
+  M5 feature implementation is done, but M5 is **not accepted** because the 2026-06-25
+  final sweep still leaves unchecked items in `docs/m5-checklist.md`.
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 
@@ -647,6 +647,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-24 | M5 memory budget uses host-process RSS | The §12 memory gate is app host-process RSS with 8 warm sessions and 2 settled live preview webviews. PR #21 measured 149.8 MB host RSS and prints OS-managed WebKit helper memory as diagnostics only; helper reuse and process-pool ownership are too host-dependent to assert in CI. Alt: aggregating WebKit helper RSS was rejected for the M5 gate because the local diagnostic aggregate was 648.3 MB and not stable enough to compare across runners. Issue #13 is closed under this host-process RSS scope. |
 | 2026-06-24 | PR #24/#27 M5 preview security rejects active HTML/SVG and uses bounded raster assets | Sanitized MDX/lowercase HTML strips inline `style` instead of CSS-sanitizing because Phase 1 has no user-authored CSS policy and style spoofing can cover the app with fixed or giant layout boxes. Script-like elements are dropped before sanitize so payload text does not leak into preview output. `asset://` preview serving and image file imports accept only PNG, JPEG, GIF, and WebP up to 10 MiB per file; inline user-authored SVG/path is rejected as active content until a dedicated sanitizer/design exists, and larger files should be inserted by link/reference outside the preview asset path. Alt: allowing all `UTType.image` files was rejected because it includes scriptable or memory-heavy formats. |
 | 2026-06-24 | M5 settings use UserDefaults and opt-in HTTPS-only remote images | Settings persist through `UserDefaults` with the default folder stored as a security-scoped bookmark and no new persistence dependency. Editor settings apply by updating the existing STTextView font, gutter, and highlight theme instead of reloading document text; preview settings travel over bridge protocol v5. Remote images remain disabled by default; enabling them permits only `https:` image `src` values while keeping script, style, navigation, asset containment, and SVG rejection policies unchanged. Custom editor-theme JSON and user CSS overrides are deferred until separate import/sanitizer designs exist. Alt: broad WebView network allowance or arbitrary CSS/theme file loading in M5 was rejected as unnecessary release risk. |
+| 2026-06-25 | M5 editor-to-preview scroll sync emits selection and visible-range source lines | The M5 checklist found that editor selection/Page Down movement could leave the preview near the previous top anchor even though source-line anchors existed. EditorKit now emits the source line containing the current selection and reported visible range through the existing scroll proxy, deduping repeated line sends and staying within the narrow M2 scroll-proxy exception. Alt: changing preview anchoring or adding a new bridge message was rejected because the failure was in when the existing editor line signal was emitted, not in the preview protocol. |
 
 ---
 

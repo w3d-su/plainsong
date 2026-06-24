@@ -237,6 +237,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         }
 
         selection = textView.selectedRange()
+        scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
+        reportVisibleRangeIfNeeded(in: textView)
     }
 
     private func requestCompletion(afterApplyingChangeIn textView: STTextView) {
@@ -255,6 +257,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         }
 
         lastVisibleTextRange = visibleRange
+        scrollProxy?.emitVisibleLine(containingUTF16Offset: visibleRange.location, in: textView)
         visibleRangeChangeHandler?(visibleRange)
     }
 

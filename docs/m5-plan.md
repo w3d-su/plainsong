@@ -1,13 +1,13 @@
 # M5 Stabilization Plan & Dependency Order
 
 > Living plan for M5 (MDX + polish, `agent.md` §14). M5 is too large for one PR, so it is split
-> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-24**.
+> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-25**.
 
 ## Current snapshot
 
 M5 feature slices, performance gates, security hardening, and Settings/themes are in place. M5 is
-**not accepted** because the 2026-06-24 final sweep left manual checklist blockers in
-`docs/m5-checklist.md`.
+feature-complete but **not accepted** because the 2026-06-25 final sweep still leaves manual
+checklist blockers in `docs/m5-checklist.md`.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|

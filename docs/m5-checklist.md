@@ -4,10 +4,11 @@ Use this checklist before accepting M5 changes. Run the automated checks first, 
 manual checks in a disposable folder workspace that contains the committed fixtures and at least one
 real Astro or Next.js content directory with `.mdx` posts.
 
-Final sweep status, 2026-06-24: **not fully passed**. Automated verification passed, and a partial
-current-build UI pass covered the fixture workspace, preview pane, MDX rendering, Markdown rendering,
-and broken-MDX error banner behavior. M5 remains **not accepted** until the unchecked manual items
-below are completed.
+Final sweep status, 2026-06-25: **not fully passed**. Automated verification passed after a minimal
+editor-to-preview scroll-sync fix, and current-build UI passes covered the fixture workspace, preview
+pane, MDX rendering, Markdown rendering, broken-MDX error banner display, a real Next.js content
+folder sweep, and the non-placeholder Settings window. M5 remains **not accepted** until the
+unchecked manual items below are completed.
 
 Evidence from this sweep:
 
@@ -17,13 +18,20 @@ Evidence from this sweep:
   PerformanceTests, and preview Vitest. Current performance samples stayed under the M5 budgets.
 - Current-build UI smoke used
   `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dqqnpwbhqyqxrwbnadviosajkzol/Build/Products/Debug/Plainsong.app`
-  with disposable workspace `/tmp/plainsong-m5-manual`.
+  with disposable workspace `/tmp/plainsong-m5-manual` and real Next.js project
+  `/Users/davis._.su/Documents/blog`.
 - UI smoke confirmed `Fixtures/kitchen-sink.mdx`, `Fixtures/kitchen-sink.md`,
   `Fixtures/product-page.mdx`, and `Fixtures/mdx-syntax-error.mdx` render/nonblank behavior where
   checked below.
-- Remaining unchecked items are not assumed to pass. A later Computer Use attempt to replace the full
-  STTextView content became unreliable/windowless, so settings-window and additional editor-popup
-  checks were stopped instead of faked.
+- Real-content UI smoke opened all 13 `.mdx` files under `/Users/davis._.su/Documents/blog/content`;
+  each rendered nonblank. That content set did not include inline body images, so real-content image
+  behavior remains unchecked below.
+- One checklist failure was found: editor-to-preview scroll sync did not reliably follow selection/
+  visible-range movement. The current sweep fixes the bridge by emitting the selected/visible source line from
+  EditorKit, adds an EditorKit regression test, and was manually rechecked on `article-template.mdx`.
+- Remaining unchecked items are not assumed to pass. Settings workflow/theme toggles, the full
+  broken-MDX edit/reintroduce loop, completion-popup behavior, Dock icon/light-mode polish, inline
+  body-image real-content behavior, and rapid mixed-file switching still need manual validation.
 
 ## Setup
 
@@ -37,7 +45,7 @@ Evidence from this sweep:
 ## M4 Sequencing Gate
 
 - [x] Confirm M4 remains accepted: completion, the Yams-backed frontmatter panel, smart paste, drag-in image handling, table helper, editing behaviors, and format commands still pass their tests/checklist. Covered by `make test` in this sweep, including MarkdownCore, EditorKit, WorkspaceKit, and app tests.
-- [x] Confirm any new M5 work does not silently reopen M4 scope. This docs/status sweep adds no M5 feature work.
+- [x] Confirm any new M5 work does not silently reopen M4 scope. This sweep adds only a minimal scroll-sync checklist fix plus docs/status updates; no new product features were added.
 
 ## MDX Preview Rendering
 
@@ -50,7 +58,7 @@ Evidence from this sweep:
 - [x] Confirm lowercase HTML renders only through the approved sanitized path. Observed in preview and covered by preview-src tests.
 - [x] Confirm lowercase HTML strips inline `style`, event-handler attributes, scripts, `srcdoc`, fixed-position overlays, giant dimensions, and URL-bearing background styles. Covered by PR #24 preview tests and re-run by this sweep.
 - [x] Confirm inline user-authored SVG is rejected and SVG payload text/attributes do not leak into preview. Covered by PR #27 policy/test coverage and re-run by this sweep.
-- [ ] Confirm source-line anchors remain good enough for editor-to-preview scroll sync. `data-line` coverage passed in preview-src tests, but manual editor-to-preview scroll sync was not rechecked in this sweep.
+- [x] Confirm source-line anchors remain good enough for editor-to-preview scroll sync. `data-line` coverage passed in preview-src tests; a manual failure on `article-template.mdx` was fixed by emitting selected/visible source lines from EditorKit, covered by `MarkdownEditorViewTests.testEditorScrollProxyEmitsLineContainingSelectionOffset`, and manually retested with the editor around line 33 while the preview followed the same document region.
 
 ## Preview Asset Security
 
@@ -65,7 +73,7 @@ Evidence from this sweep:
 - [x] Open `Fixtures/mdx-syntax-error.mdx`. Performed in the disposable workspace.
 - [x] Confirm the preview shows an inline parse/render error banner with a useful line reference when available. Observed `MDX syntax error on line 14`.
 - [x] Confirm the preview pane does not blank. Observed last valid render under the error banner.
-- [ ] Confirm the preview bridge remains live: switching to another valid Markdown/MDX file renders normally. Not completed after the UI automation session became unreliable; manual recheck required.
+- [ ] Confirm the preview bridge remains live: switching from the broken fixture to another valid Markdown/MDX file renders normally. The initial broken-file banner and last-good render were observed, but this exact post-error switch was not completed manually.
 - [ ] Edit the broken fixture into valid MDX and confirm the preview recovers without relaunching. Covered by preview-src test `surfaces syntax errors without blanking and recovers after a fix`, but not completed manually in the app.
 - [ ] Reintroduce a syntax error and confirm the last good render remains visible where possible. Initial broken-file path showed last good render, but this specific edit/reintroduce loop was not completed manually.
 
@@ -86,13 +94,13 @@ M5 #16 scope covers built-in editor/preview themes and preference wiring. Custom
 files and user CSS overrides are deferred by Decision Log until separate import/sanitizer designs
 exist.
 
-- [ ] Open Settings and confirm it is no longer a placeholder. Not manually completed in this sweep.
-- [ ] Change the General default folder and confirm the configured folder is used by default-folder workflows. PR #26 persists the bookmark, but workflow behavior was not manually completed.
+- [x] Open Settings and confirm it is no longer a placeholder. Manually opened Settings on 2026-06-25; General, Editor, Preview, and Files panes were visible, with General controls for default folder and autosave interval.
+- [ ] Change the General default folder and confirm the configured folder is used by default-folder workflows. PR #26 persists the bookmark; a macOS Documents-folder permission prompt appeared during Settings inspection, and the workflow behavior was not manually completed.
 - [ ] Change the General autosave interval and confirm autosave behavior follows the configured interval. PR #26 covers preference persistence, but manual timing behavior was not completed.
 - [ ] Change editor font family and confirm the active editor updates without reopening the file. PR #26 covers setting wiring; visual active-editor confirmation was not completed.
 - [ ] Change editor font size and confirm the active editor updates without reopening the file. PR #26 covers setting wiring; visual active-editor confirmation was not completed.
 - [ ] Toggle line numbers and confirm the active editor updates. PR #26 covers preference persistence; visual active-editor confirmation was not completed.
-- [ ] Toggle typewriter sync and confirm editor/preview scroll sync behavior updates immediately. PR #26 covers preference persistence; manual scroll behavior was not completed.
+- [ ] Toggle typewriter sync and confirm editor/preview scroll sync behavior updates immediately. Core editor-to-preview scroll sync was fixed/rechecked in this sweep, but the Settings preference toggle behavior was not manually completed.
 - [x] Confirm the two built-in editor themes are available. Covered by PR #26 EditorKit tests.
 - [x] Confirm custom editor-theme JSON files remain deferred by Decision Log and are not exposed as incomplete UI. Deferred in `agent.md` Decision Log and §11.
 - [ ] Change editor theme or appearance and confirm syntax colors update without affecting typing responsiveness. Built-in theme tests passed, but visual color update plus typing-responsiveness check was not completed manually.
@@ -110,23 +118,23 @@ exist.
 - [x] Build and launch the app from Finder or Xcode. Built and launched current DerivedData app.
 - [ ] Confirm the Dock/app switcher icon is the Plainsong icon, not the generic placeholder. Not manually completed in this sweep.
 - [x] Confirm the app accent color appears in standard controls where applicable. Observed in the current-build main window and backed by `NSAccentColorName`.
-- [ ] Confirm the main window, settings window, editor, and preview remain visually coherent in light and dark appearances. Main window/editor/preview were observed in dark appearance; Settings and light appearance were not completed manually.
+- [ ] Confirm the main window, settings window, editor, and preview remain visually coherent in light and dark appearances. Main window/editor/preview and the Settings window were observed in dark appearance; light appearance was not completed manually.
 
 ## Real Content Folder Acceptance
 
-- [ ] Open a representative Astro or Next.js content folder containing multiple `.mdx` posts. A disposable representative folder with copied MDX posts was used for smoke, but a real project content folder was not supplied/verified.
-- [ ] Open every `.mdx` post in that folder. Not completed.
-- [ ] Confirm each post renders non-blank preview content. Partially observed for copied fixtures only; not completed for a real content folder.
-- [ ] Confirm imports/exports/components are represented as placeholders rather than executed. Observed for copied fixtures only; not completed for a real content folder.
-- [ ] Confirm links, images that are within the granted folder scope, headings, and code fences behave as expected. Partially observed for copied fixtures only; not completed for a real content folder.
-- [ ] Switch rapidly between `.md`, `.mdx`, and broken `.mdx` files and confirm the preview never strands on the previous document. Partial switching was observed; rapid switching after the broken file was not completed.
+- [x] Open a representative Astro or Next.js content folder containing multiple `.mdx` posts. Opened `/Users/davis._.su/Documents/blog`, a Next.js project with `next.config.ts` and `content/**/*.mdx`.
+- [x] Open every `.mdx` post in that folder. Opened all 13 files under `content/articles`, `content/notes`, `content/pages`, `content/photography`, `content/projects`, and `content/templates`.
+- [x] Confirm each post renders non-blank preview content. All 13 real-content files rendered nonblank preview output.
+- [x] Confirm imports/exports/components are represented as placeholders rather than executed. Real-content component uses rendered as non-executed placeholders/cards; import/export behavior remains covered by fixtures and preview-src tests because the representative content set did not include source-level import/export lines.
+- [ ] Confirm links, images that are within the granted folder scope, headings, and code fences behave as expected. Headings, links, lists, code fences, and component placeholders were observed in the real content folder; no inline body images were present, so in-scope image behavior remains unchecked.
+- [ ] Switch rapidly between `.md`, `.mdx`, and broken `.mdx` files and confirm the preview never strands on the previous document. Real-content switching across valid `.mdx` files was observed; rapid mixed `.md`/`.mdx`/broken `.mdx` switching was not completed.
 
 ## Performance Acceptance
 
 Record results in `docs/perf-log.md` before accepting M5.
 
-- [x] Typing latency remains below 16 ms on `Fixtures/large-1mb.md`. Current sweep max was 0.373 ms.
-- [x] Highlight update for visible range remains below 50 ms with visible-range plumbing/instrumentation in place; do not count the current 250 KB inline cutoff as passing. Current sweep max was Markdown 17.244 ms, MDX 22.280 ms.
-- [x] Preview render for a 100 KB document remains below 100 ms after the normal debounce. Current sweep medians were Markdown 49.663 ms, MDX 15.661 ms.
+- [x] Typing latency remains below 16 ms on `Fixtures/large-1mb.md`. Current sweep max was 0.309 ms.
+- [x] Highlight update for visible range remains below 50 ms with visible-range plumbing/instrumentation in place; do not count the current 250 KB inline cutoff as passing. Current sweep max was Markdown 15.876 ms, MDX 22.189 ms.
+- [x] Preview render for a 100 KB document remains below 100 ms after the normal debounce. Current sweep medians were Markdown 62.257 ms, MDX 15.343 ms.
 - [x] Opening a 500 KB Markdown document reaches first paint below 300 ms. PerformanceTests passed; prior recorded value remains 33.765 ms.
-- [x] Host-process RSS remains below 400 MB with 8 warm sessions and 2 settled live webviews; record WebKit helper RSS as diagnostic if available, and do not count a single-webview path as passing. Current sweep reported 136.1 MB host RSS; WebKit helper aggregate remained diagnostic only.
+- [x] Host-process RSS remains below 400 MB with 8 warm sessions and 2 settled live webviews; record WebKit helper RSS as diagnostic if available, and do not count a single-webview path as passing. Current sweep reported 141.6 MB host RSS; WebKit helper aggregate 639.7 MB remained diagnostic only.
