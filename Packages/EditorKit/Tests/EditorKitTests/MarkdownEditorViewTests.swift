@@ -208,6 +208,25 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertEqual(index.utf16Offset(forOneBasedLine: 3), 13)
         XCTAssertEqual(index.utf16Offset(forOneBasedLine: 99), "one\nemoji 🧪\nthree".utf16.count)
     }
+
+    @MainActor
+    func testEditorScrollProxyEmitsLineContainingSelectionOffset() {
+        let textView = STTextView(frame: .zero)
+        textView.text = "one\ntwo\nthree\n"
+        let otherTextView = STTextView(frame: .zero)
+        otherTextView.text = textView.text
+        let proxy = EditorScrollProxy()
+        var emittedLines: [Int] = []
+        proxy.onVisibleLineChanged = { emittedLines.append($0) }
+        proxy.attach(to: textView)
+        emittedLines.removeAll()
+
+        proxy.emitVisibleLine(containingUTF16Offset: "one\ntwo\n".utf16.count, in: textView)
+        proxy.emitVisibleLine(containingUTF16Offset: "one\ntwo\n".utf16.count, in: textView)
+        proxy.emitVisibleLine(containingUTF16Offset: 0, in: otherTextView)
+
+        XCTAssertEqual(emittedLines, [3])
+    }
 }
 
 private actor HighlightRevisionProbe {

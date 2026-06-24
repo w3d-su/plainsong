@@ -15,6 +15,11 @@ public final class EditorScrollProxy: ObservableObject {
         attachment?.scrollToLine(line)
     }
 
+    func emitVisibleLine(containingUTF16Offset offset: Int, in textView: STTextView) {
+        guard attachment?.isAttached(to: textView) == true else { return }
+        attachment?.emitVisibleLine(containingUTF16Offset: offset)
+    }
+
     func attach(to textView: STTextView) {
         if attachment?.isAttached(to: textView) == true {
             return
@@ -141,8 +146,18 @@ private final class EditorScrollAttachment {
         })
     }
 
+    func emitVisibleLine(containingUTF16Offset offset: Int) {
+        emitVisibleLineIfNeeded(currentLineIndex().oneBasedLine(containingUTF16Offset: offset))
+    }
+
     private func emitVisibleLineIfNeeded() {
         guard let line = firstVisibleLine(), line != lastEmittedLine else { return }
+
+        emitVisibleLineIfNeeded(line)
+    }
+
+    private func emitVisibleLineIfNeeded(_ line: Int) {
+        guard line != lastEmittedLine else { return }
 
         lastEmittedLine = line
         proxy?.onVisibleLineChanged?(line)

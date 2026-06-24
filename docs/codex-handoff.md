@@ -1,6 +1,6 @@
 # Codex Handoff — M5 Stabilization and Phase 2 Gate
 
-Status snapshot: 2026-06-24.
+Status snapshot: 2026-06-25.
 
 This document turns the current review findings into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -8,7 +8,7 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
 
 ## Current state
 
-- `main` has M0–M4 plus most M5 feature slices landed.
+- `main` has M0–M4 plus M5 feature implementation landed.
 - Merged M5 slices:
   - PR #8 — MDX preview placeholders.
   - PR #9 — M5 planning docs and draft WYSIWYG design.
@@ -21,8 +21,9 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #24 — MDX preview/asset security hardening; closed issue #17.
   - PR #26 — Settings/themes; closed issue #16.
   - PR #27 — SVG preview security policy alignment.
+  - PR #28 — recorded the first final-checklist blocker sweep.
 - Open / not accepted:
-  - `docs/m5-checklist.md` has remaining unchecked manual blockers from the 2026-06-24 final sweep.
+  - `docs/m5-checklist.md` has remaining unchecked manual blockers from the 2026-06-25 final sweep.
   - Phase 2 WYSIWYG remains blocked until M5 is accepted and `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
@@ -57,6 +58,7 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
 - PR #26 merged on 2026-06-24 and closed issue #16 with UserDefaults-backed Settings panes, live
   editor/preview preferences, and an HTTPS-only remote image opt-in. Custom editor-theme JSON and
   user CSS remain deferred by Decision Log.
+- PR #28 merged on 2026-06-24 and recorded the first final-checklist blockers without accepting M5.
 
 # Goal 0 — M5 checklist blocker resolution
 
@@ -73,9 +75,9 @@ Read first:
 - docs/perf-log.md
 
 Use subagents if available:
-1. Manual checklist subagent: complete the unchecked app UI and real-content items in `docs/m5-checklist.md`.
+1. Manual checklist subagent: complete the unchecked app UI items and mixed-file switching in `docs/m5-checklist.md`.
 2. Settings/theme subagent: verify Settings panes, preview/editor theme changes, Mermaid theme behavior, and persistence.
-3. Real-content subagent: run a real Astro or Next.js content folder through the remaining MDX acceptance checks.
+3. Real-content subagent: add or supply a real content file with an inline in-scope body image and verify image behavior.
 
 Tasks:
 - Launch Plainsong from the current branch and finish only the unchecked items in `docs/m5-checklist.md`.

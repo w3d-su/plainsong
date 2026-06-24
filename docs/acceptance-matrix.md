@@ -1,6 +1,6 @@
 # Acceptance Matrix
 
-Status snapshot: 2026-06-24.
+Status snapshot: 2026-06-25.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -50,7 +50,7 @@ M5 should not be called accepted until all items below are true:
 - [x] Security hardening PR landed for MDX sanitizer and asset handling; PR #24 closed issue #17 and PR #27 fixed SVG policy drift.
 - [x] CI/docs cleanup landed with preview TypeScript typecheck coverage.
 - [x] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results for the performance gates.
-- [ ] `docs/m5-checklist.md` passes manually. Remaining blockers include source-line scroll-sync recheck, post-error valid-file switch/recovery loop, MDX completion popup checks, Settings visual/theme checks, Dock icon/light-mode polish checks, and a real Astro/Next.js content-folder sweep.
+- [ ] `docs/m5-checklist.md` passes manually. A 2026-06-25 sweep fixed and rechecked editor-to-preview scroll sync and completed a real Next.js content-folder sweep, but remaining blockers include the post-error valid-file switch/recovery loop, MDX completion popup checks, Settings workflow/theme/persistence checks, Dock icon/light-mode polish checks, inline body-image behavior in a real content folder, and rapid mixed-file switching.
 - [x] README, `agent.md`, and planning docs no longer contain stale PR #26/#27 milestone claims.
 
-M5 final status: **Not accepted** as of 2026-06-24 because `docs/m5-checklist.md` does not fully pass.
+M5 final status: **Feature-complete but not accepted** as of 2026-06-25 because `docs/m5-checklist.md` does not fully pass.
