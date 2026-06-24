@@ -1,6 +1,6 @@
 # Acceptance Matrix
 
-Status snapshot: 2026-06-23.
+Status snapshot: 2026-06-24.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -20,12 +20,12 @@ a milestone or gate as accepted.
 | M5 TSX highlighting | MDX ESM/JSX regions receive TSX injection highlighting | PR #10 merged | Accepted with documented multiline JSX limitation |
 | M5 icon/accent | App icon and accent assets exist | PR #11 merged | Accepted as first-pass art; product sign-off still subjective |
 | M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 | No implementation found in current search | Not started |
-| M5 performance infrastructure | Dedicated performance fixtures/tests and `docs/perf-log.md` measurements | PR #15 open | In progress |
-| M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Pending PR #15 merge |
-| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 reports Markdown median 46.631 ms, MDX median 14.556 ms | Pending PR #15 merge |
-| M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Pending PR #15 merge |
-| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | Issue #14 open | Blocked / not accepted |
-| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | Issue #13 open; PR #15 single-webview result is informational only | Blocked / not accepted |
+| M5 performance infrastructure | Dedicated performance fixtures/tests and `docs/perf-log.md` measurements | PR #15 merged | Accepted as infrastructure; not full M5 completion |
+| M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Accepted |
+| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 local result bundle reports Markdown median 46.631 ms, MDX median 14.556 ms; GitHub runner timing is informational only | Accepted |
+| M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
+| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | This branch records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md` | Accepted on merge of this branch |
+| M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | This branch records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md` | Accepted on merge of this branch |
 | M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | No focused hardening PR found | Needed before public alpha |
 | Phase 2 WYSIWYG gate | M1–M5 complete and `docs/wysiwyg-design.md` approved | Draft doc exists from PR #9 | Design only; implementation blocked until M5 complete |
 
@@ -34,17 +34,17 @@ a milestone or gate as accepted.
 | Release target | Recommendation | Reason |
 |---|---|---|
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
-| Private alpha with trusted users | Maybe, after PR #15 and settings/security triage | Perf infrastructure is not fully accepted and settings/security gaps remain. |
-| Public alpha | No | #13/#14 and hardening are open; license/release signing are also not final. |
+| Private alpha with trusted users | Maybe, after settings/security triage | Highlight and memory are measured here, but settings and security gaps remain. |
+| Public alpha | No | Security hardening is open; license/release signing are also not final. |
 | Phase 2 WYSIWYG implementation | No | `agent.md` requires M1–M5 complete and design approval first. |
 
 ## M5 exit checklist
 
 M5 should not be called complete until all items below are true:
 
-- [ ] PR #15 merged or superseded by equivalent performance infrastructure.
-- [ ] Issue #14 closed with measured <50 ms visible-range highlighting.
-- [ ] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
+- [x] PR #15 merged or superseded by equivalent performance infrastructure.
+- [x] Issue #14 closed with measured <50 ms visible-range highlighting.
+- [x] Issue #13 closed with measured <400 MB for 8 warm sessions + 2 live webviews.
 - [ ] Settings + themes from `agent.md` §11 implemented or explicitly deferred with a Decision Log entry.
 - [ ] Security hardening PR landed for MDX sanitizer and asset handling.
 - [ ] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results.

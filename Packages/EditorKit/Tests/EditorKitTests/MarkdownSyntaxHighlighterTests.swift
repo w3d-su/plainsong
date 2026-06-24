@@ -204,6 +204,68 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         XCTAssertFalse(tokens.containsTSXToken)
     }
 
+    func testVisibleRangeMarkdownParsesInlineMarkupAboveFullDocumentInlineLimit() throws {
+        let filler = String(repeating: "Plain paragraph without inline markup.\n", count: 8000)
+        let source = """
+        \(filler)
+        Visible paragraph with **bold visible text** and [a link](https://example.com).
+        """
+
+        XCTAssertGreaterThan(source.utf8.count, MarkdownSyntaxParser.inlineParsingLimit)
+
+        let visibleRange = (source as NSString).range(of: "Visible paragraph")
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: visibleRange
+        )
+        let inspected = NSAttributedString(highlighted.text)
+
+        let boldFont = try XCTUnwrap(inspected.attributes(for: "bold visible text")[.font] as? NSFont)
+        XCTAssertTrue(boldFont.fontDescriptor.symbolicTraits.contains(.bold))
+        XCTAssertNotNil(try inspected.attributes(for: "a link")[.underlineStyle])
+    }
+
+    func testVisibleRangeMDXParsesTSXAboveFullDocumentInlineLimit() throws {
+        let filler = String(repeating: "Plain paragraph without inline markup.\n", count: 8000)
+        let source = """
+        \(filler)
+        <Hero title="Large document" />
+        """
+
+        XCTAssertGreaterThan(source.utf8.count, MarkdownSyntaxParser.inlineParsingLimit)
+
+        let visibleRange = (source as NSString).range(of: "<Hero title")
+        let tokens = try MarkdownSyntaxParser().tokens(in: source, fileKind: .mdx, visibleRange: visibleRange)
+
+        XCTAssertFalse(tokens.contains(kind: .mdxSource))
+        XCTAssertTrue(tokens.kinds(in: source, for: "Hero title").contains(.tsxTag))
+        XCTAssertTrue(tokens.kinds(in: source, for: "title=").contains(.tsxAttribute))
+        XCTAssertTrue(tokens.kinds(in: source, for: "\"Large document\"").contains(.tsxString))
+    }
+
+    func testVisibleRangeInsideFenceExpandsToFenceContext() throws {
+        let source = """
+        Intro
+
+        ```swift
+        let visible = true
+        ```
+
+        Outro
+        """
+
+        let visibleRange = (source as NSString).range(of: "let visible")
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: visibleRange
+        )
+        let inspected = NSAttributedString(highlighted.text)
+
+        XCTAssertNotNil(try inspected.attributes(for: "let visible")[.backgroundColor])
+    }
+
     func testEscapedEmphasisDelimitersStayPlainText() throws {
         let source = #"Escaped \*not italic\* text"#
 

@@ -11,6 +11,13 @@ enum EditorPerformanceProbe {
         let nativeInputMismatches: Int
     }
 
+    struct VisibleRangeHighlightUpdateResult: Equatable {
+        let elapsedMilliseconds: Double
+        let highlightedRange: NSRange
+        let didApplyHighlight: Bool
+        let selectionAfterApply: NSRange
+    }
+
     enum ProbeError: Error {
         case missingTextRange
         case missingTextView
@@ -62,6 +69,55 @@ enum EditorPerformanceProbe {
         )
     }
 
+    static func measureVisibleRangeHighlightUpdate(
+        fixtureText: String,
+        fileKind: FileKind,
+        visibleRange: NSRange,
+        editLocation: Int,
+        insertion: String,
+        highlightService: MarkdownHighlightService = MarkdownHighlightService()
+    ) async throws -> VisibleRangeHighlightUpdateResult {
+        let fixture = fixtureText as NSString
+        let editRange = NSRange(location: editLocation, length: 0).clamped(toLength: fixture.length)
+        let editedText = fixture.replacingCharacters(in: editRange, with: insertion)
+        let selectedRange = NSRange(
+            location: editRange.location + (insertion as NSString).length,
+            length: 0
+        ).clamped(toLength: (editedText as NSString).length)
+
+        let scrollView = MarkdownSTTextView.scrollableTextView()
+        scrollView.frame = NSRect(x: 0, y: 0, width: 1200, height: 800)
+        guard let textView = scrollView.documentView as? MarkdownSTTextView else {
+            throw ProbeError.missingTextView
+        }
+
+        textView.frame = scrollView.bounds
+        textView.text = editedText
+        textView.textSelection = selectedRange
+        scrollView.layoutSubtreeIfNeeded()
+
+        let requestRange = visibleRange.clamped(toLength: (editedText as NSString).length)
+        let start = DispatchTime.now().uptimeNanoseconds
+        let highlighted = await highlightService.highlight(
+            editedText,
+            fileKind: fileKind,
+            visibleRange: requestRange
+        )
+
+        let didApply = MarkdownTextView.applyHighlightedText(
+            HighlightedText(revision: 1, range: highlighted.range, text: highlighted.text),
+            to: textView
+        )
+        scrollView.displayIfNeeded()
+
+        return VisibleRangeHighlightUpdateResult(
+            elapsedMilliseconds: milliseconds(since: start),
+            highlightedRange: highlighted.range,
+            didApplyHighlight: didApply,
+            selectionAfterApply: textView.selectedRange()
+        )
+    }
+
     static func paintEditor(text: String, frame: NSRect = NSRect(x: 0, y: 0, width: 1200, height: 800)) throws {
         let scrollView = MarkdownSTTextView.scrollableTextView()
         scrollView.frame = frame
@@ -74,5 +130,9 @@ enum EditorPerformanceProbe {
         textView.text = text
         scrollView.layoutSubtreeIfNeeded()
         scrollView.displayIfNeeded()
+    }
+
+    private static func milliseconds(since start: UInt64) -> Double {
+        Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
     }
 }

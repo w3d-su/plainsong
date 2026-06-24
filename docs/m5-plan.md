@@ -1,7 +1,7 @@
 # M5 Stabilization Plan & Dependency Order
 
 > Living plan for M5 (MDX + polish, `agent.md` §14). M5 is too large for one PR, so it is split
-> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-23**.
+> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-24**.
 
 ## Current snapshot
 
@@ -14,18 +14,18 @@ some polish/hardening work remain open.
 | Planning docs | M5 checklist, perf log, slice plan, WYSIWYG design draft | ✅ Merged PR #9 | `docs/wysiwyg-design.md` remains draft / not approved |
 | Slice 2 — TSX highlighting | Vendored TSX grammar and MDX ESM/JSX injection highlighting | ✅ Merged PR #10 | Known multiline JSX limitation remains acceptable for M5 |
 | Slice 4 — App icon/accent | App icon, accent color, deterministic generator | ✅ Merged PR #11 | First-pass art; final brand sign-off remains subjective |
-| Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | 🚧 Open PR #15 | Infrastructure only; #13 and #14 stay open |
+| Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | ✅ Merged PR #15 | Infrastructure only; hidden gates tracked below |
 | Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ❌ Not started | Required unless explicitly deferred with Decision Log entry |
 | Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ❌ Not started | Needed before public alpha |
-| Hidden perf gate — highlight | Visible-range highlight update <50 ms | ❌ Issue #14 open | Must be measured; current cutoff cannot count as pass |
-| Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB | ❌ Issue #13 open | PR #15 single-webview result is informational only |
+| Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ This branch | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
+| Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB | ✅ This branch | Measured 149.8 MB host RSS with 2 settled live webviews; PR #15 single-webview result remains informational only |
 
 ## Recommended next sequence
 
 ```text
-0. Merge or finish PR #15 as M5 performance infrastructure.
-1. Implement issue #14: visible-range highlight instrumentation and <50 ms budget.
-2. Implement issue #13: deterministic two-live-webview memory harness and <400 MB budget.
+0. PR #15 has merged as M5 performance infrastructure.
+1. Merge this branch to close issue #14: visible-range highlight instrumentation and <50 ms budget.
+2. Merge this branch to close issue #13: deterministic two-live-webview memory harness and <400 MB budget.
 3. Implement Settings + themes or explicitly defer them with a Decision Log entry.
 4. Run a focused M5 security-hardening PR.
 5. Update docs/perf-log.md, docs/m5-checklist.md, README, and agent.md to match the final M5 state.
@@ -48,12 +48,13 @@ complete and a WYSIWYG design doc is approved; the current repository is not the
 
 ## Risk notes
 
-- **PR #15 must not be treated as full M5 completion.** It records visible-range highlight as blocked and
-  single-webview memory as informational.
-- **Visible-range highlighting is the most important pre-WYSIWYG engineering gate.** Phase 2 folding will
-  amplify any current selection, styling, and IME weaknesses.
-- **The two-webview memory gate may require a test-only harness.** Phase 1 has shared app-scoped state, so a
-  deterministic harness is preferable to ambiguous manual multi-window behavior.
+- **PR #15 must not be treated as full M5 completion.** It landed performance infrastructure while
+  hidden gates remained tracked separately.
+- **Visible-range highlighting is the most important pre-WYSIWYG engineering gate.** This branch
+  measures the gate with visible-range-first parsing/apply; Phase 2 folding should still wait for
+  the remaining M5 exits.
+- **The two-webview memory gate uses a test-only harness.** Phase 1 has shared app-scoped state, so this
+  branch measures two live `PreviewController` WebViews attached to an offscreen AppKit surface.
 - **Settings + themes can be implemented after perf infrastructure, but before public alpha.** If deferred,
   the deferral must be explicit because `agent.md` currently includes it in M5.
 - **Security hardening should happen before any public alpha.** MDX preview intentionally does not execute

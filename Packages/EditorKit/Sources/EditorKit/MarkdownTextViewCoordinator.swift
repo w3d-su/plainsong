@@ -19,6 +19,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var recentCompletionIDs: [String] = []
     private var completionRequestID = 0
     private var completionTask: Task<[Completion], Never>?
+    private weak var visibleRangeTextView: STTextView?
+    private var visibleRangeObserver: CoordinatorNotificationObserver?
+    private var visibleRangeChangeHandler: ((NSRange) -> Void)?
+    private var lastVisibleTextRange: NSRange?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
         _text = text
@@ -37,6 +41,39 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     func detachScrollProxy() {
         scrollProxy?.detach()
         scrollProxy = nil
+    }
+
+    func attachVisibleRangeReporter(_ handler: @escaping (NSRange) -> Void, to textView: STTextView) {
+        visibleRangeChangeHandler = handler
+
+        if visibleRangeTextView !== textView {
+            visibleRangeObserver = nil
+            visibleRangeTextView = textView
+            lastVisibleTextRange = nil
+
+            if let clipView = textView.enclosingScrollView?.contentView {
+                clipView.postsBoundsChangedNotifications = true
+                visibleRangeObserver = CoordinatorNotificationObserver(NotificationCenter.default.addObserver(
+                    forName: NSView.boundsDidChangeNotification,
+                    object: clipView,
+                    queue: .main
+                ) { [weak self, weak textView] _ in
+                    Task { @MainActor [weak self, weak textView] in
+                        guard let textView else { return }
+                        self?.reportVisibleRangeIfNeeded(in: textView)
+                    }
+                })
+            }
+        }
+
+        reportVisibleRangeIfNeeded(in: textView)
+    }
+
+    func detachVisibleRangeReporter() {
+        visibleRangeObserver = nil
+        visibleRangeTextView = nil
+        visibleRangeChangeHandler = nil
+        lastVisibleTextRange = nil
     }
 
     func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
@@ -117,6 +154,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
         newText.makeContiguousUTF8()
         text = newText
+        reportVisibleRangeIfNeeded(in: textView)
     }
 
     func textView(
@@ -207,6 +245,17 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             guard let textView, !textView.hasMarkedText() else { return }
             textView.complete(nil)
         }
+    }
+
+    private func reportVisibleRangeIfNeeded(in textView: STTextView) {
+        guard let visibleRange = MarkdownTextView.visibleTextRange(of: textView),
+              visibleRange != lastVisibleTextRange
+        else {
+            return
+        }
+
+        lastVisibleTextRange = visibleRange
+        visibleRangeChangeHandler?(visibleRange)
     }
 
     private func handlePaste(in textView: MarkdownSTTextView, pasteboard: NSPasteboard) -> Bool {
@@ -309,5 +358,17 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
                 editingGuard: editingBehaviorGuard
             )
         }
+    }
+}
+
+private final class CoordinatorNotificationObserver {
+    private let token: NSObjectProtocol
+
+    init(_ token: NSObjectProtocol) {
+        self.token = token
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(token)
     }
 }

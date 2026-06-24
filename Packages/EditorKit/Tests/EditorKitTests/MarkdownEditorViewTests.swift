@@ -1,4 +1,6 @@
+import AppKit
 @testable import EditorKit
+import STTextView
 import XCTest
 
 final class MarkdownEditorViewTests: XCTestCase {
@@ -26,6 +28,59 @@ final class MarkdownEditorViewTests: XCTestCase {
 
         XCTAssertEqual(first, sameRevision, "SwiftUI prop diffing must stay O(1) by revision")
         XCTAssertNotEqual(first, nextRevision)
+    }
+
+    func testHighlightRequestFallsBackToSelectionWindowWhenViewportIsEmpty() {
+        let range = MarkdownEditorView.highlightRequestRange(
+            textLength: 50000,
+            visibleRange: NSRange(location: 0, length: 0),
+            selection: NSRange(location: 20000, length: 0)
+        )
+
+        XCTAssertEqual(range.location, 20000)
+        XCTAssertEqual(range.length, MarkdownSyntaxParser.visibleHighlightMinimumLength)
+    }
+
+    @MainActor
+    func testPartialHighlightApplyPreservesTextAndSelection() {
+        let source = "# Heading\n\nPlain **bold** text\n"
+        let textView = STTextView(frame: .zero)
+        textView.text = source
+        textView.textSelection = NSRange(location: 4, length: 3)
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: source.utf16.count)
+        )
+
+        let didApply = MarkdownTextView.applyHighlightedText(
+            HighlightedText(revision: 1, range: highlighted.range, text: highlighted.text),
+            to: textView
+        )
+
+        XCTAssertTrue(didApply)
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 4, length: 3))
+    }
+
+    @MainActor
+    func testPartialHighlightApplySkipsWhileMarkedTextExists() {
+        let textView = STTextView(frame: .zero)
+        textView.text = "# Heading\n"
+        textView.textSelection = NSRange(location: 0, length: 0)
+        textView.setMarkedText(
+            "ㄓ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+
+        let didApply = MarkdownTextView.applyHighlightedText(
+            HighlightedText(revision: 1, range: NSRange(location: 0, length: 0), text: AttributedString("")),
+            to: textView
+        )
+
+        XCTAssertFalse(didApply)
+        XCTAssertTrue(textView.hasMarkedText())
     }
 
     func testTextViewUpdateSkipsIncomingTextWhileMarkedTextExists() {

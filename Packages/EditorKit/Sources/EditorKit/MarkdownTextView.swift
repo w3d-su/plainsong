@@ -33,7 +33,20 @@ struct MarkdownTextViewUpdatePolicy {
 /// never compares whole attributed strings (O(n)).
 struct HighlightedText: Equatable {
     let revision: Int
+    let range: NSRange
     let text: AttributedString
+
+    init(revision: Int, range: NSRange, text: AttributedString) {
+        self.revision = revision
+        self.range = range
+        self.text = text
+    }
+
+    init(revision: Int, text: AttributedString) {
+        self.revision = revision
+        self.text = text
+        range = NSRange(location: 0, length: NSAttributedString(text).length)
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.revision == rhs.revision
@@ -62,6 +75,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let completionWorkspace: CompletionWorkspace
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
+    private let onVisibleRangeChange: (NSRange) -> Void
 
     init(
         text: Binding<String>,
@@ -74,7 +88,8 @@ struct MarkdownTextView: NSViewRepresentable {
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
-        lineHeightMultiple: CGFloat = 1.25
+        lineHeightMultiple: CGFloat = 1.25,
+        onVisibleRangeChange: @escaping (NSRange) -> Void = { _ in }
     ) {
         _text = text
         _selection = selection
@@ -87,6 +102,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.imageAssetContextID = imageAssetContextID
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
+        self.onVisibleRangeChange = onVisibleRangeChange
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -126,6 +142,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
+        context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
 
         return scrollView
     }
@@ -142,6 +159,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
+        context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -188,6 +206,7 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.detachPasteAndDragHandlers(from: textView)
         coordinator.detachCommandProxy(from: textView)
         coordinator.detachScrollProxy()
+        coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()
     }
 
@@ -198,33 +217,108 @@ struct MarkdownTextView: NSViewRepresentable {
         guard let styledText,
               styledText.revision != coordinator.lastAppliedHighlightRevision,
               !coordinator.isUserEditing,
-              !textView.hasMarkedText(),
-              let textStorage = Self.textStorage(of: textView)
+              !textView.hasMarkedText()
         else {
             return
         }
 
-        coordinator.lastAppliedHighlightRevision = styledText.revision
-        let incoming = NSAttributedString(styledText.text)
-        guard textStorage.string == incoming.string else {
-            return
+        coordinator.isUpdating = true
+        if Self.applyHighlightedText(styledText, to: textView) {
+            coordinator.lastAppliedHighlightRevision = styledText.revision
+        }
+        coordinator.isUpdating = false
+    }
+
+    @MainActor
+    @discardableResult
+    static func applyHighlightedText(_ styledText: HighlightedText, to textView: STTextView) -> Bool {
+        guard
+            !textView.hasMarkedText(),
+            let textStorage = textStorage(of: textView)
+        else {
+            return false
         }
 
-        coordinator.isUpdating = true
+        let incoming = NSAttributedString(styledText.text)
+        let targetRange = styledText.range.clamped(toLength: textStorage.length)
+        guard targetRange.length == incoming.length else {
+            return false
+        }
+
+        if incoming.length > 0 {
+            let currentText = (textStorage.string as NSString).substring(with: targetRange)
+            guard currentText == incoming.string else {
+                return false
+            }
+        }
+
+        let selectedRange = textView.selectedRange()
+        let clipView = textView.enclosingScrollView?.contentView
+        let visibleOrigin = clipView?.bounds.origin
+        let undoManager = textView.undoManager
+        let shouldRestoreUndoRegistration = undoManager?.isUndoRegistrationEnabled == true
+        undoManager?.disableUndoRegistration()
+        defer {
+            if shouldRestoreUndoRegistration {
+                undoManager?.enableUndoRegistration()
+            }
+            if textView.selectedRange() != selectedRange {
+                textView.textSelection = selectedRange.clamped(toLength: textStorage.length)
+            }
+            if let clipView, let visibleOrigin {
+                clipView.scroll(to: visibleOrigin)
+                textView.enclosingScrollView?.reflectScrolledClipView(clipView)
+            }
+        }
+
         textStorage.beginEditing()
         incoming.enumerateAttributes(
             in: NSRange(location: 0, length: incoming.length)
         ) { attributes, range, _ in
-            textStorage.setAttributes(attributes, range: range)
+            let destinationRange = NSRange(
+                location: targetRange.location + range.location,
+                length: range.length
+            )
+            textStorage.setAttributes(attributes, range: destinationRange)
         }
         textStorage.endEditing()
         textView.needsDisplay = true
-        coordinator.isUpdating = false
+        return true
     }
 
     @MainActor
     static func textStorage(of textView: STTextView) -> NSTextStorage? {
         (textView.textContentManager as? NSTextContentStorage)?.textStorage
+    }
+
+    @MainActor
+    static func visibleTextRange(of textView: STTextView) -> NSRange? {
+        guard let textStorage = textStorage(of: textView) else {
+            return nil
+        }
+
+        let textLength = textStorage.length
+        guard textLength > 0 else {
+            return NSRange(location: 0, length: 0)
+        }
+
+        let layoutManager = textView.textLayoutManager
+        let contentManager = textView.textContentManager
+        guard let viewportRange = layoutManager.textViewportLayoutController.viewportRange else {
+            return textView.selectedRange().clamped(toLength: textLength)
+        }
+
+        let documentStart = contentManager.documentRange.location
+        let start = contentManager.offset(from: documentStart, to: viewportRange.location)
+        let end = contentManager.offset(from: documentStart, to: viewportRange.endLocation)
+        guard start != NSNotFound, end != NSNotFound else {
+            return textView.selectedRange().clamped(toLength: textLength)
+        }
+
+        return NSRange(
+            location: min(start, end),
+            length: max(0, end - start)
+        ).clamped(toLength: textLength)
     }
 
     /// Cheap length check first; the full comparison only runs when lengths match.
