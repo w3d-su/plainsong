@@ -4,14 +4,15 @@ A native macOS Markdown/MDX editor, built with Swift (SwiftUI shell + AppKit/Tex
 editor core) — in the spirit of Typora, tuned for blog authoring workflows
 (Astro/Next.js content folders, YAML frontmatter, CJK-friendly).
 
-**Status: in development.** M0–M4 have landed and M5 is in stabilization. M5
-performance and security hardening have landed: PR #15 added the infrastructure, PR #20
-measured visible-range highlighting, PR #21 measured the two-webview host-process RSS
-memory gate, and PR #24/#27 closed issue #17 with the MDX sanitizer/asset/SVG policy. The M5
-Settings/themes slice (#16) is implemented in this branch, but M5 is still not complete
-until `docs/m5-checklist.md` passes manually and the final stale-doc sweep lands. Do not
-start Phase 2 WYSIWYG implementation until M5 is complete or any remaining scope is
-explicitly deferred in `agent.md`.
+**Status: in development.** M0-M4 have landed and M5 feature implementation has landed.
+M5 performance and security hardening have landed: PR #15 added the infrastructure,
+PR #20 measured visible-range highlighting, PR #21 measured the two-webview
+host-process RSS memory gate, and PR #24/#27 closed issue #17 with the MDX
+sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. M5 is
+accepted only when `docs/m5-checklist.md` passes; the 2026-06-24 final sweep left
+manual checklist blockers, so M5 is not accepted yet. Do not start Phase 2 WYSIWYG
+implementation until M5 acceptance is explicitly completed and the WYSIWYG design gate
+is approved.
 
 ## Development
 

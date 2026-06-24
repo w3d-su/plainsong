@@ -19,13 +19,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #21 — deterministic two-live-webview host-process RSS memory harness; included on `main` through PR #20.
   - PR #22 — post-merge docs/CI/scheduling cleanup; closed issues #13 and #18.
   - PR #24 — MDX preview/asset security hardening; closed issue #17.
-- Current M5 slice in review:
-  - Issue #16 — Settings + themes from `agent.md` §11 are implemented in the current PR; keep any review
-    fixes scoped to Settings/themes and do not expand into Phase 2.
-- Open / not complete:
-  - `docs/m5-checklist.md` still needs to be run manually.
-  - Final M5 status/stale-doc sweep still needs to land after the checklist.
-  - Phase 2 WYSIWYG remains blocked until M5 exits and `docs/wysiwyg-design.md` is approved.
+  - PR #26 — Settings/themes; closed issue #16.
+  - PR #27 — SVG preview security policy alignment.
+- Open / not accepted:
+  - `docs/m5-checklist.md` has remaining unchecked manual blockers from the 2026-06-24 final sweep.
+  - Phase 2 WYSIWYG remains blocked until M5 is accepted and `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
 
@@ -56,14 +54,14 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   SVG rejection until a separate sanitizer/design exists.
 - PR #27 merged on 2026-06-24 and removed stale inline SVG/path sanitizer allowances so source-authored
   SVG/path payloads are dropped before sanitize.
-- This PR implements issue #16 Settings/themes with UserDefaults-backed panes, live editor/preview
-  preferences, and an HTTPS-only remote image opt-in. Custom editor-theme JSON and user CSS remain
-  deferred by Decision Log.
+- PR #26 merged on 2026-06-24 and closed issue #16 with UserDefaults-backed Settings panes, live
+  editor/preview preferences, and an HTTPS-only remote image opt-in. Custom editor-theme JSON and
+  user CSS remain deferred by Decision Log.
 
-# Goal 0 — M5 checklist and final status sweep
+# Goal 0 — M5 checklist blocker resolution
 
 ```text
-You are working in w3d-su/plainsong. Goal: run the M5 manual checklist and make the final M5 status/docs update.
+You are working in w3d-su/plainsong. Goal: resolve the remaining unchecked M5 checklist blockers without adding new M5 features.
 
 Read first:
 - README.md
@@ -75,17 +73,16 @@ Read first:
 - docs/perf-log.md
 
 Use subagents if available:
-1. Manual checklist subagent: walk `docs/m5-checklist.md` in a disposable workspace and capture blockers/evidence.
-2. Docs sweep subagent: search README/agent/docs for stale #13/#14/#16/#17/M5 claims.
-3. Release posture subagent: keep private-alpha/public-alpha language separated from M5 completion.
+1. Manual checklist subagent: complete the unchecked app UI and real-content items in `docs/m5-checklist.md`.
+2. Settings/theme subagent: verify Settings panes, preview/editor theme changes, Mermaid theme behavior, and persistence.
+3. Real-content subagent: run a real Astro or Next.js content folder through the remaining MDX acceptance checks.
 
 Tasks:
-- Run the automated checks requested by the checklist.
-- Launch Plainsong and perform the manual M5 checklist.
-- Record any final evidence or blockers without faking passes.
-- Update README, `agent.md`, `docs/acceptance-matrix.md`, `docs/m5-plan.md`, `docs/risk-register.md`,
-  `docs/codex-handoff.md`, and `docs/perf-log.md` only as evidence warrants.
-- If all gates pass, mark M5 complete in docs; otherwise keep the exact remaining blocker explicit.
+- Launch Plainsong from the current branch and finish only the unchecked items in `docs/m5-checklist.md`.
+- Record evidence or blockers without faking passes.
+- If all gates pass, mark M5 accepted in README, `agent.md`, `docs/acceptance-matrix.md`,
+  `docs/m5-plan.md`, `docs/risk-register.md`, and `docs/codex-handoff.md`.
+- If any item still fails, keep M5 not accepted and document the exact blocker.
 
 Non-goals:
 - Do not start Phase 2 WYSIWYG.
@@ -93,14 +90,14 @@ Non-goals:
 
 Acceptance:
 - M5 checklist evidence is recorded honestly.
-- M5 is called complete only if the full checklist passes and docs no longer contain stale milestone claims.
-- Phase 2 remains design/spike-only until M5 exits and the design doc is approved.
+- M5 is called accepted only if the full checklist passes.
+- Phase 2 remains design/spike-only until M5 is accepted and the design doc is approved.
 ```
 
 # Phase 2 gate prompt — design/spike only, no WYSIWYG feature build yet
 
 ```text
-You are working in w3d-su/plainsong. Goal: prepare Phase 2 WYSIWYG design/spikes after M5 gates are complete. Do not build full WYSIWYG yet.
+You are working in w3d-su/plainsong. Goal: prepare Phase 2 WYSIWYG design/spikes after M5 is accepted. Do not build full WYSIWYG yet.
 
 Read first:
 - agent.md §13
@@ -117,5 +114,5 @@ Use subagents if available:
 Acceptance for the design gate:
 - docs/wysiwyg-design.md lists exact v1 scope, deferred scope, risks, and acceptance tests.
 - Spike results cover IME, undo, selection, and source round-trip.
-- No Phase 2 implementation PR starts until M5 is complete or any remaining M5 scope is explicitly deferred.
+- No Phase 2 implementation PR starts until M5 is accepted and the WYSIWYG design doc is approved.
 ```
