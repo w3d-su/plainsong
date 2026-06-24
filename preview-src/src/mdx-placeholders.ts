@@ -32,6 +32,7 @@ const componentPropCountLimit = 4;
 const esmPreviewLimit = 120;
 const expressionPreviewLimit = 96;
 const safeClassNameRule: [string, RegExp] = ["className", /^[A-Za-z0-9_-]+$/];
+const unsafePreviewAttributes = new Set(["height", "style", "width"]);
 
 export const mdxSanitizeSchema: SanitizeSchema = {
   ...defaultSchema,
@@ -42,31 +43,30 @@ export const mdxSanitizeSchema: SanitizeSchema = {
   attributes: {
     ...defaultSchema.attributes,
     "*": [
-      ...(defaultSchema.attributes?.["*"] ?? []),
+      ...safeSanitizeAttributes(defaultSchema.attributes?.["*"]),
       "dataLine",
       "dataTaskCheckbox",
       safeClassNameRule,
       "ariaHidden",
-      "style",
     ],
-    a: [...(defaultSchema.attributes?.a ?? []), "href", "title"],
+    a: [...safeSanitizeAttributes(defaultSchema.attributes?.a), "href", "title"],
     code: [
-      ...(defaultSchema.attributes?.code ?? []).filter((attribute) => {
+      ...safeSanitizeAttributes(defaultSchema.attributes?.code).filter((attribute) => {
         const name = typeof attribute === "string" ? attribute : attribute[0];
         return name !== "className";
       }),
       safeClassNameRule,
     ],
-    div: [...(defaultSchema.attributes?.div ?? [])],
+    div: [...safeSanitizeAttributes(defaultSchema.attributes?.div)],
     input: [
-      ...(defaultSchema.attributes?.input ?? []),
+      ...safeSanitizeAttributes(defaultSchema.attributes?.input),
       ["type", "checkbox"],
       "checked",
       "disabled",
       "dataTaskCheckbox",
     ],
-    img: [...(defaultSchema.attributes?.img ?? []), "alt", "title", "width", "height"],
-    li: [...(defaultSchema.attributes?.li ?? [])],
+    img: [...safeSanitizeAttributes(defaultSchema.attributes?.img), "alt", "title"],
+    li: [...safeSanitizeAttributes(defaultSchema.attributes?.li)],
     math: [
       "xmlns",
       "display",
@@ -93,14 +93,11 @@ export const mdxSanitizeSchema: SanitizeSchema = {
     mstyle: ["scriptlevel", "displaystyle"],
     semantics: [],
     annotation: ["encoding"],
-    span: [...(defaultSchema.attributes?.span ?? []), safeClassNameRule, "ariaHidden", "style"],
+    span: [...safeSanitizeAttributes(defaultSchema.attributes?.span), safeClassNameRule, "ariaHidden"],
     svg: [
       "xmlns",
-      "width",
-      "height",
       "viewBox",
       "preserveAspectRatio",
-      "style",
     ],
     path: ["d"],
   },
@@ -127,6 +124,15 @@ export const mdxSanitizeSchema: SanitizeSchema = {
     "path",
   ],
 };
+
+function safeSanitizeAttributes(
+  attributes: NonNullable<SanitizeSchema["attributes"]>[string] = [],
+): NonNullable<SanitizeSchema["attributes"]>[string] {
+  return attributes.filter((attribute) => {
+    const name = Array.isArray(attribute) ? attribute[0] : attribute;
+    return !(typeof name === "string" && unsafePreviewAttributes.has(name));
+  });
+}
 
 export function remarkMdxPlaceholders() {
   return (tree: TreeNode) => {

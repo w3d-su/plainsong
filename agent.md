@@ -289,7 +289,9 @@ compute async, cancel stale requests.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
   against the current file's directory / workspace root, enforces path containment
-  (reject `..` escapes outside the workspace), streams the file.
+  (reject `..` and symlink escapes outside the workspace), and serves only PNG, JPEG,
+  GIF, or WebP assets up to 10 MiB. SVG and other active/ambiguous formats are rejected
+  until a separate sanitization policy exists.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
   Relative `.md`/`.mdx` → open that file in the editor. `#anchor` → scroll preview.
 
@@ -371,7 +373,8 @@ the user's project dependencies — out of scope. Defined behavior:
     '../components'⟩`, monospace, dimmed.
   - JSX elements → a "component card": bordered box, header = component name + key props
     (stringified, truncated), body = rendered markdown children if any. Lowercase HTML
-    elements (`<div>`, `<img>`) render as real HTML (sanitized).
+    elements (`<div>`, `<img>`) render as real HTML through the sanitizer, but inline
+    `style`, event-handler attributes, scripts, and `srcdoc` are stripped.
   - `{expression}` inline → rendered as code chip with the raw expression.
 - Parse errors (MDX is stricter than MD): show inline error banner in preview with line
   number; editor keeps last good render below the banner. Never blank the preview while
@@ -635,6 +638,7 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-06-17 | M5 TSX highlighting vendors tree-sitter-typescript TSX C sources | EditorKit now injects MDX ESM/JSX regions into a vendored `TreeSitterTSXFixed` target from `tree-sitter-typescript` v0.23.2 (`f975a621f4e7f532fe322e13c4f79495e0a7b2e7`) and maps TSX capture names into the existing MarkdownSyntaxToken/theme facade. Vendoring avoids the upstream Swift package's ChimeHQ/SwiftTreeSitter dependency, preserving the exact `tree-sitter/swift-tree-sitter` 0.10.0 pin and avoiding the Neon dependency-shape conflict. Alt: adding the upstream Swift package was rejected because it would reintroduce a conflicting SwiftTreeSitter graph; keeping `.mdxSource` coarse styling was rejected by §6.2/M5 acceptance. |
 | 2026-06-17 | M5 MDX preview uses remark-mdx placeholders without bridge v5 | The preview pipeline adds `remark-mdx`, `mdast-util-mdx` node typing, and `rehype-sanitize` so `.mdx` files render Markdown normally while ESM, JSX components, and expressions become non-executed placeholders. MDX parse errors are handled entirely in preview JS with an inline banner and stale last-good content, so bridge protocol v4 remains sufficient. Alt: `@mdx-js/mdx` runtime compilation/component execution was rejected as Phase 3+ sandboxing work; native bridge diagnostics/protocol v5 are deferred until Swift-owned error chrome is required. |
 | 2026-06-24 | M5 memory budget uses host-process RSS | The §12 memory gate is app host-process RSS with 8 warm sessions and 2 settled live preview webviews. PR #21 measured 149.8 MB host RSS and prints OS-managed WebKit helper memory as diagnostics only; helper reuse and process-pool ownership are too host-dependent to assert in CI. Alt: aggregating WebKit helper RSS was rejected for the M5 gate because the local diagnostic aggregate was 648.3 MB and not stable enough to compare across runners. Issue #13 is closed under this host-process RSS scope. |
+| 2026-06-24 | M5 preview security uses no inline HTML style and bounded raster assets | Inline `style` in sanitized MDX/HTML is stripped instead of CSS-sanitized because Phase 1 has no user-authored CSS policy and style spoofing can cover the app with fixed or giant layout boxes. `asset://` preview serving and image file imports accept only PNG, JPEG, GIF, and WebP up to 10 MiB per file; SVG is rejected as active content until a dedicated sanitizer exists, and larger files should be inserted by link/reference outside the preview asset path. Alt: allowing all `UTType.image` files was rejected because it includes scriptable or memory-heavy formats. |
 
 ---
 

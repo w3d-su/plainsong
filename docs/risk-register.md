@@ -10,8 +10,8 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R1 | M5 can be declared complete before remaining M5 exits are done | High | PR #15, #20, and #21 merged, but settings and hardening remain open | Keep `docs/perf-log.md` honest; do not close M5 until every remaining gate passes or is explicitly deferred | Docs, PerformanceTests |
 | R2 | Visible-range highlighting regresses after PR #20 | Medium | PR #20 plumbed visible-range-first request/apply, measured Markdown 17.918 ms max and MDX 22.670 ms max, and closed #14 | Keep PerformanceTests and scheduling regression coverage in place before Phase 2 folding work | EditorKit, PerformanceTests |
 | R3 | Memory gate scope is misunderstood after PR #21/#22 | Medium | PR #21 records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews; PR #22 clarified host-process RSS scope and #13 is closed | Keep M5 scoped to host-process RSS and keep helper-inclusive memory diagnostic unless a future system-footprint budget is created | App, PreviewKit, PerformanceTests |
-| R4 | MDX sanitizer schema is broader than needed | High | Review found broad `style` allowance risk | Tighten schema; add malicious MDX/HTML snapshot tests for style spoofing, event handlers, scripts, giant layout | preview-src |
-| R5 | Local asset and image import paths can read whole large files into memory | Medium | Review found `Data(contentsOf:)` on asset/image paths | Add size/type guards and streaming or `FileManager.copyItem` where possible | PreviewKit, WorkspaceKit |
+| R4 | MDX sanitizer schema can regress toward active/spoofing HTML | High | M5 hardening strips inline `style`, event handlers, scripts, `srcdoc`, fixed overlays, giant layout, and background URL payloads from sanitized MDX/HTML | Keep malicious snapshot coverage; require a new Decision Log entry before allowing any user-authored inline CSS | preview-src |
+| R5 | Local asset and image import paths can read large or active files into memory | Medium | M5 hardening limits preview/imported assets to PNG, JPEG, GIF, or WebP up to 10 MiB and copies external files without whole-file `Data(contentsOf:)` reads | Keep size/type/path rejection tests; create a separate sanitizer/design before allowing SVG or larger managed assets | PreviewKit, WorkspaceKit |
 | R6 | Settings/themes are not implemented despite being in M5 scope | Medium | Search found no settings/theme implementation beyond icon/accent | Implement Settings scene panes or defer with Decision Log entry | App, EditorKit, PreviewKit |
 | R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Current render path rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
 | R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | README previously said M0–M2 only; `agent.md` still has older roadmap wording in some places | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
@@ -25,7 +25,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 ## Immediate risk burn-down order
 
 1. PR #15/#20/#21/#22 have landed; keep them as performance/CI evidence, not full M5 completion.
-2. Close R4/R5 with a focused #17 security hardening PR.
+2. Merge the focused #17 security hardening PR to close R4/R5.
 3. Implement or explicitly defer R6 via #16.
 4. Keep R14 visible for any future helper-inclusive memory budget.
 5. Keep R13 visible whenever CI is green from informational preview timing.
