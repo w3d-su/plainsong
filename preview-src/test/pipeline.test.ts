@@ -61,6 +61,43 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).not.toContain("onerror");
   });
 
+  it("strips unsafe MDX preview styles and attributes", async () => {
+    const html = await renderMdx(`<div className="safe-note" style="position: fixed; z-index: 2147483647; width: 999999px; height: 999999px; background: url(https://example.invalid/pixel.png)" onclick="alert('x')">
+  <span style="position:fixed">Visible copy</span>
+  <a href="javascript:alert('link')" title="Link">Bad link</a>
+  <img src="./asset.png" alt="Asset" width={"999999"} height={"999999"} onerror="alert('x')" />
+  <script>alert("script-payload")</script>
+  <style>{\`body { background: url(https://example.invalid/style.png); }\`}</style>
+  <iframe srcDoc="<script>alert('srcdoc')</script>"></iframe>
+  <object data="javascript:alert('object')"></object>
+  <embed src="javascript:alert('embed')" />
+</div>
+`);
+
+    expect(html).toMatchSnapshot();
+    expect(html).toContain('<div class="safe-note" data-line="1">');
+    expect(html).toContain("<span>Visible copy</span>");
+    expect(html).toContain('<a title="Link">Bad link</a>');
+    expect(html).toContain('<img src="./asset.png" alt="Asset">');
+    expect(html).not.toMatch(/\sstyle=/iu);
+    expect(html).not.toMatch(/\s(?:onerror|onclick)=/iu);
+    expect(html).not.toMatch(/\s(?:width|height)=/iu);
+    expect(html).not.toContain("position: fixed");
+    expect(html).not.toContain("position:fixed");
+    expect(html).not.toContain("z-index");
+    expect(html).not.toContain("999999");
+    expect(html).not.toContain("background:");
+    expect(html).not.toContain("url(");
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("script-payload");
+    expect(html).not.toContain("<style");
+    expect(html).not.toContain("<iframe");
+    expect(html).not.toContain("srcdoc");
+    expect(html).not.toContain("<object");
+    expect(html).not.toContain("<embed");
+    expect(html).not.toContain("javascript:");
+  });
+
   it("preserves data-line attributes on MDX block elements", async () => {
     const html = await renderMdx(`# Title
 

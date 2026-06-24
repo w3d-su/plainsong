@@ -50,6 +50,17 @@ const blockTags = new Set([
   "ul",
 ]);
 
+const scriptLikeTags = new Set([
+  "base",
+  "embed",
+  "iframe",
+  "link",
+  "meta",
+  "object",
+  "script",
+  "style",
+]);
+
 export async function renderMarkdown(markdown: string): Promise<string> {
   return String(await markdownProcessor.process(markdown));
 }
@@ -80,6 +91,7 @@ const mdxProcessor = unified()
   .use(remarkRehype)
   .use(rehypeKatex)
   .use(rehypeSourceLines)
+  .use(rehypeDropScriptLikeElements)
   .use(rehypeSanitize, mdxSanitizeSchema)
   .use(rehypeStringify);
 
@@ -110,6 +122,25 @@ function rehypeSourceLines() {
       }
     });
   };
+}
+
+function rehypeDropScriptLikeElements() {
+  return (tree: TreeNode) => {
+    dropScriptLikeChildren(tree);
+  };
+}
+
+function dropScriptLikeChildren(node: TreeNode): void {
+  if (!node.children) return;
+
+  node.children = node.children.filter((child) => {
+    if (child.type !== "element" || !child.tagName) return true;
+    return !scriptLikeTags.has(child.tagName.toLowerCase());
+  });
+
+  for (const child of node.children) {
+    dropScriptLikeChildren(child);
+  }
 }
 
 function visitTree(node: TreeNode, visitor: (node: TreeNode) => void): void {

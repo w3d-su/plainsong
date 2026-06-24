@@ -1,6 +1,67 @@
 import Foundation
-import UniformTypeIdentifiers
 @preconcurrency import WebKit
+
+enum AssetURLPolicyError: Error, Equatable {
+    case unsupportedType(String)
+    case missingFileSize
+    case fileTooLarge(actualBytes: Int64, maxBytes: Int64)
+}
+
+struct AssetURLPolicyResult: Equatable {
+    let mimeType: String
+    let data: Data
+}
+
+enum AssetURLPolicy {
+    /// Local preview images should stay lightweight; 10 MiB admits typical screenshots
+    /// and blog photos while bounding per-asset WebKit reads.
+    static let maxAssetBytes: Int64 = 10 * 1024 * 1024
+
+    private static let mimeTypesByExtension = [
+        "gif": "image/gif",
+        "jpeg": "image/jpeg",
+        "jpg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+    ]
+
+    static func loadAsset(at fileURL: URL) throws -> AssetURLPolicyResult {
+        let mimeType = try mimeType(for: fileURL)
+        try validateSize(for: fileURL)
+
+        let data = try Data(contentsOf: fileURL)
+        try validateSize(Int64(data.count))
+
+        return AssetURLPolicyResult(mimeType: mimeType, data: data)
+    }
+
+    static func mimeType(for fileURL: URL) throws -> String {
+        let pathExtension = fileURL.pathExtension.lowercased()
+        guard let mimeType = mimeTypesByExtension[pathExtension] else {
+            throw AssetURLPolicyError.unsupportedType(pathExtension)
+        }
+
+        return mimeType
+    }
+
+    private static func validateSize(for fileURL: URL) throws {
+        let values = try fileURL.resourceValues(forKeys: [.fileSizeKey])
+        guard let fileSize = values.fileSize else {
+            throw AssetURLPolicyError.missingFileSize
+        }
+
+        try validateSize(Int64(fileSize))
+    }
+
+    private static func validateSize(_ byteCount: Int64) throws {
+        guard byteCount <= maxAssetBytes else {
+            throw AssetURLPolicyError.fileTooLarge(
+                actualBytes: byteCount,
+                maxBytes: maxAssetBytes
+            )
+        }
+    }
+}
 
 final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
     private let state = AssetURLSchemeHandlerState()
@@ -35,14 +96,14 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
         readQueue.addOperation {
             let result = Result {
                 let fileURL = try AssetURLResolver(allowedRoot: root).resolve(url)
-                let data = try Data(contentsOf: fileURL)
+                let asset = try AssetURLPolicy.loadAsset(at: fileURL)
                 let response = URLResponse(
                     url: url,
-                    mimeType: Self.mimeType(for: fileURL),
-                    expectedContentLength: data.count,
+                    mimeType: asset.mimeType,
+                    expectedContentLength: asset.data.count,
                     textEncodingName: nil
                 )
-                return (response, data)
+                return (response, asset.data)
             }
 
             callbackQueue.addOperation { [state] in
@@ -65,10 +126,6 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func fail(_ task: WKURLSchemeTask, error: Error) {
         task.didFailWithError(error)
-    }
-
-    private nonisolated static func mimeType(for fileURL: URL) -> String {
-        UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
     }
 }
 

@@ -211,6 +211,18 @@ final class PreviewKitTests: XCTestCase {
         }
     }
 
+    func testAssetResolverRejectsNestedParentDirectoryTraversal() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let resolver = AssetURLResolver(allowedRoot: root)
+
+        XCTAssertThrowsError(
+            try resolver.resolve(XCTUnwrap(URL(string: "asset://images/../../secret.png")))
+        ) { error in
+            XCTAssertEqual(error as? AssetURLResolverError, .pathEscapesRoot)
+        }
+    }
+
     func testAssetResolverRejectsEncodedTraversalEscapes() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -232,6 +244,81 @@ final class PreviewKitTests: XCTestCase {
             try resolver.resolve(XCTUnwrap(URL(string: "asset://..")))
         ) { error in
             XCTAssertEqual(error as? AssetURLResolverError, .pathEscapesRoot)
+        }
+    }
+
+    func testAssetResolverRejectsSymlinkEscapesRoot() throws {
+        let root = try temporaryDirectory()
+        let outsideRoot = try temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outsideRoot)
+        }
+
+        let escapedTarget = outsideRoot.appendingPathComponent("secret.png")
+        try Self.onePixelPNGData.write(to: escapedTarget)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("linked.png"),
+            withDestinationURL: escapedTarget
+        )
+
+        let resolver = AssetURLResolver(allowedRoot: root)
+
+        XCTAssertThrowsError(
+            try resolver.resolve(XCTUnwrap(URL(string: "asset://linked.png")))
+        ) { error in
+            XCTAssertEqual(error as? AssetURLResolverError, .pathEscapesRoot)
+        }
+    }
+
+    func testAssetPolicyRejectsUnsupportedTypes() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let unsupportedFiles = [
+            ("vector.svg", "svg"),
+            ("scan.tiff", "tiff"),
+            ("bitmap.bmp", "bmp"),
+            ("note.txt", "txt"),
+            ("unknown", ""),
+        ]
+
+        for (fileName, pathExtension) in unsupportedFiles {
+            let fileURL = root.appendingPathComponent(fileName)
+            try Data("unsupported".utf8).write(to: fileURL)
+
+            XCTAssertThrowsError(
+                try AssetURLPolicy.loadAsset(at: fileURL),
+                fileName
+            ) { error in
+                XCTAssertEqual(
+                    error as? AssetURLPolicyError,
+                    .unsupportedType(pathExtension)
+                )
+            }
+        }
+    }
+
+    func testAssetPolicyRejectsOversizedFiles() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let fileURL = root.appendingPathComponent("too-large.png")
+        XCTAssertTrue(FileManager.default.createFile(atPath: fileURL.path, contents: nil))
+        let fileHandle = try FileHandle(forWritingTo: fileURL)
+        try fileHandle.truncate(atOffset: UInt64(AssetURLPolicy.maxAssetBytes + 1))
+        try fileHandle.close()
+
+        XCTAssertThrowsError(
+            try AssetURLPolicy.loadAsset(at: fileURL)
+        ) { error in
+            XCTAssertEqual(
+                error as? AssetURLPolicyError,
+                .fileTooLarge(
+                    actualBytes: AssetURLPolicy.maxAssetBytes + 1,
+                    maxBytes: AssetURLPolicy.maxAssetBytes
+                )
+            )
         }
     }
 
@@ -267,6 +354,13 @@ final class PreviewKitTests: XCTestCase {
             .standardizedFileURL
         XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path), "Missing preview bundle fixture")
         return indexURL
+    }
+
+    private func temporaryDirectory() throws -> URL {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     private nonisolated static let onePixelPNGData = Data(base64Encoded: """

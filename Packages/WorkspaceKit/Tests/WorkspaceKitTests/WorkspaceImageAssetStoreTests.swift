@@ -53,6 +53,33 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
         )
     }
 
+    func testOutsideWorkspaceImageCopiesThroughFileCopyOperation() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        let outside = try makeTemporaryDirectory()
+        let image = outside.appendingPathComponent("hero.webp")
+        let imageData = Data([1, 2, 3])
+        try imageData.write(to: image)
+
+        let recorder = CopyRecorder()
+        let paths = try WorkspaceImageAssetStore(copyFile: { sourceURL, destinationURL in
+            try recorder.copyFile(from: sourceURL, to: destinationURL)
+        }).place(
+            [.file(image)],
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        XCTAssertEqual(paths, ["assets/hero.webp"])
+        XCTAssertEqual(recorder.copiedSourceURLs, [image.standardizedFileURL.resolvingSymlinksInPath()])
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("assets/hero.webp")),
+            imageData
+        )
+    }
+
     func testSymlinkInsideWorkspacePointingOutsideCopiesRealFileIntoAssets() throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -94,6 +121,61 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
         XCTAssertTrue(copiedPath == rootPath || copiedPath.hasPrefix("\(rootPath)/"))
     }
 
+    func testRejectsUnsupportedFileImageTypesBeforeCopying() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        let outside = try makeTemporaryDirectory()
+        let unsupportedFilenames = [
+            "vector.svg",
+            "scan.tiff",
+            "bitmap.bmp",
+            "notes.txt",
+            "unknown",
+        ]
+
+        for filename in unsupportedFilenames {
+            let file = outside.appendingPathComponent(filename)
+            try Data([1, 2, 3]).write(to: file)
+
+            XCTAssertThrowsError(try WorkspaceImageAssetStore(copyFile: failIfCopyFileIsCalled).place(
+                [.file(file)],
+                rootURL: root,
+                currentFileURL: currentFile
+            )) { error in
+                XCTAssertEqual(error as? WorkspaceImageAssetStoreError, .unsupportedImageType(filename))
+            }
+        }
+    }
+
+    func testRejectsOversizedFileImageBeforeCopying() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        let outside = try makeTemporaryDirectory()
+        let image = outside.appendingPathComponent("huge.png")
+        try createSparseFile(
+            at: image,
+            byteCount: UInt64(WorkspaceImageAssetStore.defaultMaximumImportedImageSizeBytes + 1)
+        )
+
+        XCTAssertThrowsError(try WorkspaceImageAssetStore(copyFile: failIfCopyFileIsCalled).place(
+            [.file(image)],
+            rootURL: root,
+            currentFileURL: currentFile
+        )) { error in
+            XCTAssertEqual(
+                error as? WorkspaceImageAssetStoreError,
+                .importedImageTooLarge(
+                    "huge.png",
+                    maximumBytes: WorkspaceImageAssetStore.defaultMaximumImportedImageSizeBytes
+                )
+            )
+        }
+    }
+
     func testClipboardImageDataWritesIntoAssetsAndDedupesFilename() throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -113,6 +195,45 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
             try Data(contentsOf: assets.appendingPathComponent("image-1.png")),
             Data([9, 8, 7])
         )
+    }
+
+    func testRejectsClipboardImageDataWithUnsupportedSuggestedType() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try WorkspaceImageAssetStore().place(
+            [.data(Data([1, 2, 3]), suggestedFilename: "vector.svg")],
+            rootURL: root,
+            currentFileURL: currentFile
+        )) { error in
+            XCTAssertEqual(error as? WorkspaceImageAssetStoreError, .unsupportedImageType("vector.svg"))
+        }
+    }
+
+    func testRejectsOversizedClipboardImageData() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try WorkspaceImageAssetStore().place(
+            [
+                .data(
+                    Data(count: Int(WorkspaceImageAssetStore.defaultMaximumImportedImageSizeBytes + 1)),
+                    suggestedFilename: "huge.png"
+                ),
+            ],
+            rootURL: root,
+            currentFileURL: currentFile
+        )) { error in
+            XCTAssertEqual(
+                error as? WorkspaceImageAssetStoreError,
+                .importedImageTooLarge(
+                    "huge.png",
+                    maximumBytes: WorkspaceImageAssetStore.defaultMaximumImportedImageSizeBytes
+                )
+            )
+        }
     }
 
     func testRejectsCurrentFileOutsideWorkspaceRoot() throws {
@@ -155,5 +276,36 @@ final class WorkspaceImageAssetStoreTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func createSparseFile(at url: URL, byteCount: UInt64) throws {
+        FileManager.default.createFile(atPath: url.path(percentEncoded: false), contents: nil)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.truncate(atOffset: byteCount)
+        try handle.close()
+    }
+}
+
+private struct UnexpectedCopyFileCallError: Error {}
+
+private let failIfCopyFileIsCalled: @Sendable (URL, URL) throws -> Void = { _, _ in
+    throw UnexpectedCopyFileCallError()
+}
+
+private final class CopyRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var sourceURLs: [URL] = []
+
+    var copiedSourceURLs: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return sourceURLs
+    }
+
+    func copyFile(from sourceURL: URL, to destinationURL: URL) throws {
+        lock.lock()
+        sourceURLs.append(sourceURL)
+        lock.unlock()
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
     }
 }
