@@ -158,4 +158,4 @@ raw profiler exports or screenshots outside the repo unless they are small and i
   < 50 ms highlight-update budget; current evidence uses visible-range-first parsing/apply, not the historical
   250 KB full-document inline parsing cutoff.
 - [x] [#13](https://github.com/w3d-su/plainsong/issues/13): add a deterministic two-live-webview memory harness under the
-  host-process RSS policy. If GitHub did not auto-close the issue, close it manually with the scope note above.
+  host-process RSS policy. Issue #13 is closed with the scope note above.
