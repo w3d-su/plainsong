@@ -61,6 +61,33 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).not.toContain("onerror");
   });
 
+  it("rejects inline SVG lowercase HTML without leaking payloads", async () => {
+    const html = await renderMdx(`<div className="safe-note">
+  <svg viewBox="0 0 10 10" aria-label="svg-attr-payload" data-secret="svg-data-payload" onclick="alert('svg-click')">
+    <title>svg-title-payload</title>
+    <desc>svg-desc-payload</desc>
+    <path d="M0 0H10V10Z" fill="url(#paint)" onload="alert('path-load')">path-text-payload</path>
+  </svg>
+  <p>Visible after SVG</p>
+</div>
+`);
+
+    expect(html).toContain('<div class="safe-note" data-line="1">');
+    expect(html).toContain("Visible after SVG");
+    expect(html).not.toContain("<svg");
+    expect(html).not.toContain("<path");
+    expect(html).not.toContain("viewBox");
+    expect(html).not.toContain("svg-attr-payload");
+    expect(html).not.toContain("svg-data-payload");
+    expect(html).not.toContain("svg-click");
+    expect(html).not.toContain("svg-title-payload");
+    expect(html).not.toContain("svg-desc-payload");
+    expect(html).not.toContain("M0 0H10V10Z");
+    expect(html).not.toContain("url(#paint)");
+    expect(html).not.toContain("path-load");
+    expect(html).not.toContain("path-text-payload");
+  });
+
   it("strips unsafe MDX preview styles and attributes", async () => {
     const html = await renderMdx(`<div className="safe-note" style="position: fixed; z-index: 2147483647; width: 999999px; height: 999999px; background: url(https://example.invalid/pixel.png)" onclick="alert('x')">
   <span style="position:fixed">Visible copy</span>
@@ -96,6 +123,17 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).not.toContain("<object");
     expect(html).not.toContain("<embed");
     expect(html).not.toContain("javascript:");
+  });
+
+  it("keeps MDX math rendering after SVG policy tightening", async () => {
+    const html = await renderMdx("Inline math: $a^2 + b^2 = c^2$.\n\nVector math: $\\vec{E}$.\n");
+
+    expect(html).toContain('class="katex"');
+    expect(html).toContain("<math");
+    expect(html).toContain("<mover");
+    expect(html).toContain('encoding="application/x-tex"');
+    expect(html).not.toContain("<svg");
+    expect(html).not.toContain("<path");
   });
 
   it("preserves data-line attributes on MDX block elements", async () => {

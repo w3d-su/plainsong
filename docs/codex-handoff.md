@@ -20,8 +20,6 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #22 — post-merge docs/CI/scheduling cleanup; closed issues #13 and #18.
 - Open / not complete:
   - Issue #16 — Settings + themes from `agent.md` §11 are still not implemented.
-  - Issue #17 — security hardening around MDX sanitizer scope, preview asset guards, and large image
-    handling still needs a focused pass.
 
 ## Rules for every Codex run
 
@@ -39,7 +37,7 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
 
 ---
 
-# Completed reference — landed performance work
+# Completed reference — landed performance and security work
 
 - PR #15 merged on 2026-06-23 as M5 performance infrastructure.
 - PR #20 merged on 2026-06-24 and closed issue #14 with measured visible-range highlighting.
@@ -47,44 +45,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   with 8 warm sessions and 2 settled live webviews.
 - PR #22 merged on 2026-06-24, clarified the host-process RSS scope, added preview TypeScript typecheck
   to CI, and closed issues #13 and #18.
+- PR #24 merged on 2026-06-24 and closed issue #17 with MDX sanitizer hardening, bounded raster-only
+  preview/imported assets, and large image import safeguards. Inline user-authored SVG remains rejected
+  unless a future Decision Log adds a dedicated sanitizer/design.
 
-# Goal 0 — M5 security hardening (#17)
-
-```text
-You are working in w3d-su/plainsong. Goal: harden MDX preview sanitization and local asset handling before public alpha.
-
-Read first:
-- agent.md §5, §7.1, §9, §16
-- preview-src/src/pipeline.ts and sanitizer schema
-- PreviewKit asset URL scheme handler
-- WorkspaceKit/ImageAssetStore or equivalent image-copy path
-- docs/risk-register.md
-
-Use subagents if available:
-1. Preview sanitizer subagent: tighten `rehype-sanitize` schema and add malicious MDX/HTML snapshot tests.
-2. Asset handler subagent: add path, MIME/type, and size guards to the asset scheme handler.
-3. Image import subagent: replace large-file `Data(contentsOf:)` copies with streaming or FileManager copy where appropriate.
-4. Regression test subagent: add tests for symlink escape, `../`, huge files, unsupported MIME, and blocked style spoofing.
-
-Tasks:
-- Remove broad `style` allowance from the sanitizer unless a narrow allowlist is required for a specific internal feature.
-- Add tests for `position: fixed`, high `z-index`, giant dimensions, background URL, event handlers, and script-like payloads.
-- Enforce preview asset containment, supported file types, and maximum size.
-- Avoid reading large image/asset files entirely into memory where streaming/copyItem is possible.
-- Document any size limits and rationale.
-
-Non-goals:
-- Do not start #16 Settings/themes in this PR.
-- Do not start Phase 2 WYSIWYG.
-
-Acceptance:
-- MDX placeholders still render, but unsafe styles/attributes are stripped.
-- Asset tests prove path containment and size/type rejection.
-- Large image imports do not spike memory via whole-file Data loads.
-- `make format`, `make test`, and `cd preview-src && npm run typecheck && npm test` pass if preview-src changed.
-```
-
-# Goal 1 — M5 Settings + themes (#16)
+# Goal 0 — M5 Settings + themes (#16)
 
 ```text
 You are working in w3d-su/plainsong. Goal: implement M5 Settings + themes from agent.md §11.

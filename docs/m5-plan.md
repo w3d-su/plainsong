@@ -5,30 +5,29 @@
 
 ## Current snapshot
 
-M5 feature slices have mostly landed, and the performance gates are accepted. M5 is **not complete**
-because Settings/themes and security hardening remain open.
+M5 feature slices have mostly landed, and the performance/security gates are accepted. M5 is **not complete**
+because Settings/themes (#16) remains open.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
-| Slice 1 — MDX preview | `remark-mdx`, non-executed placeholders, stale/error preview liveness | ✅ Merged PR #8 | Feature accepted; sanitizer still needs hardening below |
+| Slice 1 — MDX preview | `remark-mdx`, non-executed placeholders, stale/error preview liveness | ✅ Merged PR #8 | Feature accepted; sanitizer hardening landed in PR #24 |
 | Planning docs | M5 checklist, perf log, slice plan, WYSIWYG design draft | ✅ Merged PR #9 | `docs/wysiwyg-design.md` remains draft / not approved |
 | Slice 2 — TSX highlighting | Vendored TSX grammar and MDX ESM/JSX injection highlighting | ✅ Merged PR #10 | Known multiline JSX limitation remains acceptable for M5 |
 | Slice 4 — App icon/accent | App icon, accent color, deterministic generator | ✅ Merged PR #11 | First-pass art; final brand sign-off remains subjective |
 | Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | ✅ Merged PR #15 | Infrastructure only; follow-up gates tracked below |
 | Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ❌ Not started | Required unless explicitly deferred with Decision Log entry |
-| Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ❌ Not started | Needed before public alpha |
+| Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ✅ Merged PR #24; issue #17 closed | Follow-up removes stale inline SVG/path sanitizer allowance; keep policy as regression risk |
 | Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ Merged PR #20; issue #14 closed | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
 | Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
 
 ## Recommended next sequence
 
 ```text
-0. PR #15, PR #20, PR #21, and PR #22 have merged; issues #13, #14, and #18 are closed.
-1. Run a focused #17 security-hardening PR for sanitizer, asset guards, and large image handling.
-2. Implement #16 Settings + themes or explicitly defer them with a Decision Log entry.
-3. Run `docs/m5-checklist.md`.
-4. Update README, `agent.md`, `docs/perf-log.md`, and this plan to the final M5 state.
-5. Only then approve `docs/wysiwyg-design.md` and start Phase 2 design spikes. Do not start Phase 2 implementation before M5 exits.
+0. PR #15, PR #20, PR #21, PR #22, and PR #24 have merged; issues #13, #14, #17, and #18 are closed.
+1. Implement #16 Settings + themes or explicitly defer them with a Decision Log entry.
+2. Run `docs/m5-checklist.md`.
+3. Update README, `agent.md`, `docs/perf-log.md`, and this plan to the final M5 state.
+4. Only then approve `docs/wysiwyg-design.md` and start Phase 2 design spikes. Do not start Phase 2 implementation before M5 exits.
 ```
 
 The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1–M5 are
@@ -40,7 +39,7 @@ complete and a WYSIWYG design doc is approved; the current repository is not the
 |---|---|---|
 | `project.yml` | PR #15 PerformanceTests, future test targets | Edit manifest only; run `make generate`; never commit hand-edited `.xcodeproj` |
 | `docs/perf-log.md` | PR #15, #20, #21, future final M5 state update | Keep host RSS and WebKit helper diagnostics explicit |
-| `preview-src/src/pipeline.ts` | MDX sanitizer hardening, theme/remote image work | Sequence security hardening and theme/CSP changes carefully |
+| `preview-src/src/pipeline.ts` | MDX sanitizer regression tests, theme/remote image work | Keep SVG rejected unless a future Decision Log adds a dedicated sanitizer/design |
 | `preview-src/src/index.ts` | Preview render caching, theme bridge, scroll sync | Require `npm run typecheck`, `npm test`, and regenerated dist when changed |
 | `MarkdownEditorView` / `MarkdownTextView` | Visible-range highlighting, IME safety, future WYSIWYG | Do not start WYSIWYG folding until M5 exits are complete |
 | `agent.md` | Decision Log and milestone status | Update in the same PR when behavior or dependency policy changes |
@@ -54,10 +53,10 @@ complete and a WYSIWYG design doc is approved; the current repository is not the
 - **The two-webview memory gate uses a test-only harness.** Phase 1 has shared app-scoped state, so this
   PR #21 measured two live `PreviewController` WebViews attached to an offscreen AppKit surface. The
   accepted M5 gate is host-process RSS; WebKit helper memory remains diagnostic.
-- **Settings + themes can be implemented after perf infrastructure, but before public alpha.** If deferred,
+- **Settings + themes can be implemented after perf/security infrastructure, but before public alpha.** If deferred,
   the deferral must be explicit because `agent.md` currently includes it in M5.
-- **Security hardening should happen before any public alpha.** MDX preview intentionally does not execute
-  components, but sanitizer and asset policy still need tests against spoofing and large-file cases.
+- **Security hardening has landed but remains a regression risk.** MDX preview intentionally does not execute
+  components; keep malicious sanitizer coverage, bounded raster asset policy, and SVG rejection in place.
 
 ## Codex dispatch map
 
@@ -65,7 +64,6 @@ Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
 | Goal | Branch suggestion | Output |
 |---|---|---|
-| Security hardening | `m5-security-hardening` | Tightens sanitizer/assets and adds tests |
 | Settings + themes | `m5-settings-themes` | Implements `agent.md` §11 or documents a deferral |
 
 ## Beyond M5
