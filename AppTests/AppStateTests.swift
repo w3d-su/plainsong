@@ -143,6 +143,83 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(second.isPreviewVisible)
     }
 
+    func testSettingsPreferencesPersistThroughUserDefaults() throws {
+        let suiteName = "PlainsongSettingsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let first = PlainsongPreferences(userDefaults: defaults)
+        first.setAutosaveIntervalSeconds(2.5)
+        first.setEditorFontName("Menlo")
+        first.setEditorFontSize(16)
+        first.setShowsLineNumbers(false)
+        first.setTypewriterSyncEnabled(false)
+        first.setEditorTheme(.graphite)
+        first.setPreviewTheme(.dark)
+        first.setAllowsRemoteImages(true)
+        first.setAssetFolderRelativePath("media/images")
+        first.setDefaultFileExtension(.mdx)
+
+        let second = PlainsongPreferences(userDefaults: defaults)
+        XCTAssertEqual(second.autosaveIntervalSeconds, 2.5)
+        XCTAssertEqual(second.editorFontName, "Menlo")
+        XCTAssertEqual(second.editorFontSize, 16)
+        XCTAssertFalse(second.showsLineNumbers)
+        XCTAssertFalse(second.typewriterSyncEnabled)
+        XCTAssertEqual(second.editorTheme, .graphite)
+        XCTAssertEqual(second.previewTheme, .dark)
+        XCTAssertTrue(second.allowsRemoteImages)
+        XCTAssertEqual(second.assetFolderRelativePath, "media/images")
+        XCTAssertEqual(second.defaultFileExtension, .mdx)
+    }
+
+    func testDefaultFolderPreferencePersistsSecurityScopedBookmarkWhenAvailable() throws {
+        let suiteName = "PlainsongDefaultFolderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let folder = try makeTemporaryDirectory()
+        let first = PlainsongPreferences(userDefaults: defaults)
+
+        do {
+            try first.setDefaultFolderURL(folder)
+        } catch {
+            throw XCTSkip("Security-scoped bookmarks are unavailable in this test environment: \(error)")
+        }
+
+        let second = PlainsongPreferences(userDefaults: defaults)
+        XCTAssertEqual(second.defaultFolderURL?.standardizedFileURL, folder.standardizedFileURL)
+    }
+
+    func testConfiguredAssetFolderIsUsedForEditorImageInsertion() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let suiteName = "PlainsongAssetFolderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let appState = AppState(currentDocument: session, userDefaults: defaults)
+        appState.workspaceRootURL = root
+        appState.preferences.setAssetFolderRelativePath("media/images")
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let relativePaths = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
+
+        XCTAssertEqual(relativePaths, ["media/images/image.png"])
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("media/images/image.png").path(percentEncoded: false)
+        ))
+    }
+
     func testOpeningFolderBuildsWorkspaceTreeAndSelectsFirstMarkdownFile() async throws {
         let root = try makeTemporaryDirectory()
         try FileManager.default.createDirectory(
@@ -341,6 +418,7 @@ final class AppStateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
 
         XCTAssertEqual(AppState.untitledFileName(in: directory), "Untitled.md")
+        XCTAssertEqual(AppState.untitledFileName(in: directory, fileExtension: "mdx"), "Untitled.mdx")
 
         try Data().write(to: directory.appendingPathComponent("Untitled.md"))
         XCTAssertEqual(AppState.untitledFileName(in: directory), "Untitled 2.md")

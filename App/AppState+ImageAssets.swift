@@ -33,10 +33,13 @@ extension AppState {
                 WorkspaceImageAssetSource.file(url)
             }
         }
+        let assetFolderRelativePath = preferences.assetFolderRelativePath
 
         do {
             let paths = try await Task.detached(priority: .userInitiated) {
-                try WorkspaceImageAssetStore().place(
+                try WorkspaceImageAssetStore(
+                    assetFolderRelativePath: assetFolderRelativePath
+                ).place(
                     workspaceSources,
                     rootURL: rootURL,
                     currentFileURL: currentFileURL

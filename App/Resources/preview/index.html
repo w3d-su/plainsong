@@ -2,10 +2,10 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <!-- Strict CSP: no remote content, ever (agent.md §7.1). -->
+    <!-- Strict CSP: remote fetches remain blocked except opt-in https image loads. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src asset: data:; font-src 'self';"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src asset: data: https:; font-src 'self';"
     />
     <link rel="stylesheet" href="bundle.css" />
   </head>

@@ -23,6 +23,7 @@ public final class PreviewController: NSObject, ObservableObject {
     private var latestRequestedRenderID = -1
     private var latestCompletedRenderID = -1
     private var theme = "system"
+    private var allowRemoteImages = false
     private var workspaceAssetRootURL: URL?
 
     override public convenience init() {
@@ -84,7 +85,13 @@ public final class PreviewController: NSObject, ObservableObject {
 
         let renderID = nextRenderID
         nextRenderID += 1
-        let payload = RenderPayload(change: change, renderID: renderID, theme: theme, baseDir: assetContext.baseDir)
+        let payload = RenderPayload(
+            change: change,
+            renderID: renderID,
+            theme: theme,
+            allowRemoteImages: allowRemoteImages,
+            baseDir: assetContext.baseDir
+        )
         latestRequestedRenderID = renderID
 
         guard isReady else {
@@ -101,7 +108,12 @@ public final class PreviewController: NSObject, ObservableObject {
 
     public func setTheme(_ theme: String) {
         self.theme = theme
-        send(.setTheme(SetThemePayload(theme: theme)))
+        sendPreviewSettings()
+    }
+
+    public func setAllowsRemoteImages(_ allowRemoteImages: Bool) {
+        self.allowRemoteImages = allowRemoteImages
+        sendPreviewSettings()
     }
 
     public func setWorkspaceAssetRoot(_ rootURL: URL?) {
@@ -116,6 +128,11 @@ public final class PreviewController: NSObject, ObservableObject {
         }
 
         webView.evaluateJavaScript("window.PlainsongBridge.receive(\(json));")
+    }
+
+    private func sendPreviewSettings() {
+        guard isReady else { return }
+        send(.setTheme(SetThemePayload(theme: theme, allowRemoteImages: allowRemoteImages)))
     }
 
     private func receive(_ message: BridgeMessage) {
@@ -152,6 +169,8 @@ public final class PreviewController: NSObject, ObservableObject {
         if let queuedRender {
             self.queuedRender = nil
             send(.render(queuedRender))
+        } else {
+            sendPreviewSettings()
         }
     }
 

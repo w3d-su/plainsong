@@ -9,7 +9,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeProtocolVersionAndMessageOrder() {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 4)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 5)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [
@@ -26,9 +26,26 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeMessageRoundTrip() throws {
-        let message = BridgeMessage.checkboxToggled(
-            CheckboxToggledPayload(line: 12, checked: true, version: 42)
+        let message = BridgeMessage.render(
+            RenderPayload(
+                renderID: 1,
+                version: 42,
+                fileKind: .mdx,
+                text: "# Title",
+                baseDir: "content",
+                theme: "dark",
+                allowRemoteImages: true
+            )
         )
+
+        let data = try JSONEncoder().encode(message)
+        let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)
+
+        XCTAssertEqual(decoded, message)
+    }
+
+    func testSetThemePayloadCarriesRemoteImagePolicy() throws {
+        let message = BridgeMessage.setTheme(SetThemePayload(theme: "dark", allowRemoteImages: true))
 
         let data = try JSONEncoder().encode(message)
         let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { MESSAGE_NAMES, PROTOCOL_VERSION } from "../src/bridge";
 
 describe("bridge protocol", () => {
-  it("declares protocol version 4", () => {
-    expect(PROTOCOL_VERSION).toBe(4);
+  it("declares protocol version 5", () => {
+    expect(PROTOCOL_VERSION).toBe(5);
   });
 
   it("keeps message names in Swift bridge order", () => {

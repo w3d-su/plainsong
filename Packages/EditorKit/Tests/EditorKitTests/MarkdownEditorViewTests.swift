@@ -30,6 +30,22 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertNotEqual(first, nextRevision)
     }
 
+    func testEditorFontUsesConfiguredFamilyAndFallback() {
+        let menlo = MarkdownSyntaxHighlighter.editorFont(named: "Menlo", size: 15)
+        XCTAssertEqual(menlo.pointSize, 15)
+
+        let fallback = MarkdownSyntaxHighlighter.editorFont(named: "Definitely Missing Font", size: 17)
+        XCTAssertEqual(fallback.pointSize, 17)
+        XCTAssertTrue(fallback.fontDescriptor.symbolicTraits.contains(.monoSpace))
+    }
+
+    func testBuiltInEditorThemesAreAvailable() {
+        XCTAssertEqual(MarkdownEditorTheme.allCases.map(\.displayName), ["Plainsong", "Graphite"])
+
+        let graphite = MarkdownSyntaxTheme.builtIn(.graphite)
+        XCTAssertNotEqual(graphite.listMarkerColor, MarkdownSyntaxTheme.standard.listMarkerColor)
+    }
+
     func testHighlightSchedulingDebouncesAndDropsStaleRevisions() async {
         XCTAssertGreaterThan(MarkdownEditorView.highlightDebounceNanoseconds, 0)
 

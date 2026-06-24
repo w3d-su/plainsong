@@ -8,15 +8,25 @@ struct MarkdownHighlightResult: Equatable {
 }
 
 actor MarkdownHighlightService {
-    private let highlighter = MarkdownSyntaxHighlighter()
     private let parser: MarkdownSyntaxParser?
 
     init() {
         parser = try? MarkdownSyntaxParser()
     }
 
-    func highlight(_ text: String, fileKind: FileKind, visibleRange: NSRange) -> MarkdownHighlightResult {
-        highlighter.highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: parser)
+    func highlight(
+        _ text: String,
+        fileKind: FileKind,
+        visibleRange: NSRange,
+        theme: MarkdownEditorTheme,
+        fontName: String,
+        fontSize: CGFloat
+    ) -> MarkdownHighlightResult {
+        let highlighter = MarkdownSyntaxHighlighter(
+            theme: .builtIn(theme),
+            baseFont: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
+        )
+        return highlighter.highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: parser)
     }
 }
 
@@ -25,8 +35,18 @@ actor MarkdownHighlightService {
 /// This remains a facade: callers depend on String + FileKind -> AttributedString,
 /// while tree-sitter parsing and theme mapping stay local to EditorKit.
 public struct MarkdownSyntaxHighlighter {
+    public static let systemMonospacedFontName = "System Monospaced"
+
     public static var defaultFont: NSFont {
         NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    }
+
+    public static func editorFont(named fontName: String, size: CGFloat) -> NSFont {
+        if fontName == systemMonospacedFontName {
+            return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        }
+
+        return NSFont(name: fontName, size: size) ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
     }
 
     let theme: MarkdownSyntaxTheme

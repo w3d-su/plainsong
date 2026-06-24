@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -28,6 +28,7 @@ export interface RenderPayload {
   text: string;
   baseDir: string | null;
   theme: string;
+  allowRemoteImages: boolean;
 }
 
 export interface RenderCompletePayload {
@@ -57,6 +58,7 @@ export interface CheckboxToggledPayload {
 
 export interface SetThemePayload {
   theme: string;
+  allowRemoteImages: boolean;
 }
 
 export type BridgeMessage =

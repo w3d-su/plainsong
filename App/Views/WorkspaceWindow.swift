@@ -144,6 +144,7 @@ private struct EditorWorkspace: View {
         scrollCoordinator.connect(previewController: previewController)
 
         previewController.onPreviewScrolled = { line in
+            guard appState.preferences.typewriterSyncEnabled else { return }
             scrollCoordinator.previewScrolled(to: line)
         }
         previewController.onCheckboxToggled = { line, checked, version in
@@ -248,17 +249,25 @@ private struct DocumentEditor: View {
                 }
             ),
             fileKind: session.fileKind,
-            showsLineNumbers: true,
+            fontName: appState.preferences.editorFontName,
+            fontSize: CGFloat(appState.preferences.editorFontSize),
+            editorTheme: appState.preferences.editorTheme,
+            appearanceID: appState.preferences.editorAppearanceID,
+            showsLineNumbers: appState.preferences.showsLineNumbers,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
             imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false)
         )
         .onAppear {
-            scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible)
+            scrollCoordinator
+                .setEditorScrollForwardingEnabled(isPreviewVisible && appState.preferences.typewriterSyncEnabled)
         }
         .onChange(of: isPreviewVisible) { _, isVisible in
-            scrollCoordinator.setEditorScrollForwardingEnabled(isVisible)
+            scrollCoordinator.setEditorScrollForwardingEnabled(isVisible && appState.preferences.typewriterSyncEnabled)
+        }
+        .onChange(of: appState.preferences.typewriterSyncEnabled) { _, isEnabled in
+            scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible && isEnabled)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -276,14 +285,24 @@ private struct PreviewPane: View {
         }
         .onAppear {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
+            controller.setTheme(appState.preferences.previewTheme.rawValue)
+            controller.setAllowsRemoteImages(appState.preferences.allowsRemoteImages)
             controller.render(session.currentTextChange)
         }
         .onChange(of: appState.previewAssetRootURL) { _, rootURL in
             controller.setWorkspaceAssetRoot(rootURL)
             controller.render(session.currentTextChange)
         }
+        .onChange(of: appState.preferences.previewTheme) { _, theme in
+            controller.setTheme(theme.rawValue)
+        }
+        .onChange(of: appState.preferences.allowsRemoteImages) { _, allowsRemoteImages in
+            controller.setAllowsRemoteImages(allowsRemoteImages)
+        }
         .task(id: ObjectIdentifier(session)) {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
+            controller.setTheme(appState.preferences.previewTheme.rawValue)
+            controller.setAllowsRemoteImages(appState.preferences.allowsRemoteImages)
             await controller.observe(session)
         }
     }

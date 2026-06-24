@@ -101,7 +101,10 @@ enum EditorPerformanceProbe {
         let highlighted = await highlightService.highlight(
             editedText,
             fileKind: fileKind,
-            visibleRange: requestRange
+            visibleRange: requestRange,
+            theme: .standard,
+            fontName: MarkdownSyntaxHighlighter.systemMonospacedFontName,
+            fontSize: MarkdownSyntaxHighlighter.defaultFont.pointSize
         )
 
         let didApply = MarkdownTextView.applyHighlightedText(

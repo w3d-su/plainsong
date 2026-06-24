@@ -174,6 +174,7 @@ struct PlainsongApp: App {
 
         Settings {
             SettingsView()
+                .environmentObject(appState)
                 .tint(.accentColor)
         }
     }

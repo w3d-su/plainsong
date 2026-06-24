@@ -5,7 +5,8 @@
 > architecture, the risk-reduction spikes, and the open decisions. Nothing in Phase 2 is implemented
 > until this is signed off. Update agent.md's Decision Log when a decision here is accepted.
 >
-> Prerequisites not yet met: **M5 is incomplete** (slice 1 of 5). Treat this as planning only.
+> Prerequisites not yet met: **M5 is incomplete** until the manual M5 checklist and final status sweep
+> pass. Treat this as planning only.
 
 ## 1. Goal & non-goals
 
