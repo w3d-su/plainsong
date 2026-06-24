@@ -22,7 +22,7 @@ a milestone or gate as accepted.
 | M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 | No implementation found in current search | Not started |
 | M5 performance infrastructure | Dedicated performance fixtures/tests and `docs/perf-log.md` measurements | PR #15 merged | Accepted as infrastructure; not full M5 completion |
 | M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Accepted |
-| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 reports Markdown median 46.631 ms, MDX median 14.556 ms | Accepted |
+| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 local result bundle reports Markdown median 46.631 ms, MDX median 14.556 ms; GitHub runner timing is informational only | Accepted |
 | M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
 | M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | This branch records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md` | Accepted on merge of this branch |
 | M5 performance: memory | <400 MB with 8 warm sessions + 2 live webviews | Issue #13 open; PR #15 single-webview result is informational only | Blocked / not accepted |

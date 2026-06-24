@@ -84,7 +84,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
      highlight, and morphdom startup work out of the settled post-debounce budget.
   3. Measured three settled large-document updates from Swift render request to JS
      `renderComplete`.
-  4. Gated the median of three settled updates for `.md` and `.mdx`; raw samples are printed by the test.
+  4. Gated the median of three settled updates for `.md` and `.mdx` in local runs; raw samples are printed by the test.
   5. Captured `PreviewRenderMarkdown100KB` and `PreviewRenderMDX100KB` signposts in the Xcode result bundle.
 - Measured value: Markdown median 46.631 ms, samples `[63.104, 45.942, 46.631]`.
   MDX median 14.556 ms, samples `[14.981, 14.556, 14.355]`.
@@ -97,7 +97,10 @@ raw profiler exports or screenshots outside the repo unless they are small and i
   settled large-document updates do not re-highlight unchanged fences. The budget measurement
   intentionally excludes the 150 ms debounce and records settled update render work after
   debounce. The first 100 KB Markdown prime is recorded above as informational, not claimed
-  as the passing update measurement.
+  as the passing update measurement. GitHub Actions `macos-15` WebKit runs for PR #20/#21
+  observed Markdown medians above the local budget (107.397 ms and 148.847 ms) while MDX
+  stayed under budget (44.673 ms and 70.334 ms); those hosted-runner values are recorded
+  as CI informational only and are not M5 passing evidence.
 
 ## File Open
 

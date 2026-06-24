@@ -19,6 +19,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R10 | CJK IME correctness regresses when styling/folding increases | High | `agent.md` says IME correctness is non-negotiable; Phase 2 will stress it | Add IME marked-text regression coverage before delimiter folding or visual replacement work | EditorKit |
 | R11 | CI misses TypeScript type errors | Low–Medium | `preview-src/package.json` has `typecheck`; CI coverage needs confirmation | Add `cd preview-src && npm run typecheck` to CI if absent | CI, preview-src |
 | R12 | Public alpha starts without release hardening | Medium | License, signing, hardened runtime, notarization are not final | Keep public release blocked until license and release pipeline are decided | Release/docs |
+| R13 | Hosted CI runner variance can fail WebKit preview timing despite local M5 evidence | Medium | PR #20/#21 GitHub `macos-15` runs exceeded the 100 ms Markdown preview budget while local PR #15 evidence passed | Keep CI preview timing informational and require local/result-bundle evidence before accepting the M5 preview gate | PerformanceTests, docs |
 
 ## Immediate risk burn-down order
 
@@ -27,4 +28,5 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 3. Close R3 via issue #13.
 4. Close R4/R5 with a focused security hardening PR.
 5. Implement or explicitly defer R6.
-6. Only then advance the Phase 2 WYSIWYG design from draft to approved.
+6. Keep R13 visible whenever CI is green from informational preview timing.
+7. Only then advance the Phase 2 WYSIWYG design from draft to approved.
