@@ -9,10 +9,12 @@ struct WorkspaceWindow: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             WorkspaceSidebar()
-                .navigationSplitViewColumnWidth(min: 180, ideal: 220)
-        } detail: {
+                .frame(width: 220)
+
+            Divider()
+
             Group {
                 if appState.hasOpenDocument {
                     EditorWorkspace()
@@ -20,7 +22,9 @@ struct WorkspaceWindow: View {
                     EmptyEditorState()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(minWidth: 760, minHeight: 420)
         .toolbar {
             ToolbarItemGroup {
                 Button {
