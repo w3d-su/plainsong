@@ -317,7 +317,7 @@ extension AppState {
             try recentItemStore.save(url)
             recentItemURLs = try recentItemStore.restore()
         } catch {
-            present(error, title: "Could Not Update Open Recent")
+            recentItemURLs = (try? recentItemStore.restore()) ?? recentItemURLs
         }
     }
 

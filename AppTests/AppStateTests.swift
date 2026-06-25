@@ -73,6 +73,23 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(lastOpenedFileStore.savedURLs, [url])
     }
 
+    func testRecentItemFailureDoesNotBlockOpenedFile() throws {
+        let directory = try makeTemporaryDirectory()
+        let url = directory.appendingPathComponent("post.md")
+        try "Original".write(to: url, atomically: true, encoding: .utf8)
+        let recentItemStore = SpyRecentItemStore(saveError: CocoaError(.fileReadUnknown))
+        let appState = AppState(
+            lastOpenedFileStore: SpyLastOpenedFileStore(),
+            recentItemStore: recentItemStore,
+            shouldRestoreLastOpenedFile: false
+        )
+
+        appState.openExternalFile(url)
+
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, url.standardizedFileURL)
+        XCTAssertNil(appState.presentedError)
+    }
+
     func testPreviewCheckboxWritebackUpdatesOnlyRequestedTaskLine() {
         let appState = AppState(
             currentDocument: DocumentSession(
@@ -453,5 +470,25 @@ private final class SpyLastOpenedFileStore: LastOpenedFilePersisting {
 
     func restore() throws -> URL? {
         restoredURL
+    }
+}
+
+private final class SpyRecentItemStore: RecentItemPersisting {
+    private let saveError: Error?
+    private let restoredURLs: [URL]
+
+    init(saveError: Error? = nil, restoredURLs: [URL] = []) {
+        self.saveError = saveError
+        self.restoredURLs = restoredURLs
+    }
+
+    func save(_ url: URL) throws {
+        if let saveError {
+            throw saveError
+        }
+    }
+
+    func restore() throws -> [URL] {
+        restoredURLs
     }
 }
