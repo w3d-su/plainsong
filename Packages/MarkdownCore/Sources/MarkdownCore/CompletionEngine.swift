@@ -133,6 +133,12 @@ struct CompletionContext {
     let replacementRange: NSRange
 }
 
+struct FenceMarker {
+    let character: Character
+    let length: Int
+    let canClose: Bool
+}
+
 struct DestinationContext {
     let query: String
     let matchQuery: String

@@ -157,14 +157,15 @@ extension CompletionEngine {
     }
 
     func componentContext(
-        text _: String,
+        text: String,
         linePrefix: String,
         lineStart: Int,
         cursor: Int,
         workspace: CompletionWorkspace
     ) -> CompletionContext? {
         guard workspace.currentFileKind == .mdx,
-              let openAngle = linePrefix.range(of: "<", options: .backwards)
+              let openAngle = linePrefix.range(of: "<", options: .backwards),
+              !isInsideFencedCodeBlock(text: text, cursor: cursor)
         else {
             return nil
         }
@@ -181,6 +182,68 @@ extension CompletionEngine {
         return CompletionContext(
             query: query,
             replacementRange: NSRange(location: location, length: cursor - location)
+        )
+    }
+
+    func isInsideFencedCodeBlock(text: String, cursor: Int) -> Bool {
+        let storage = text as NSString
+        let length = storage.length
+        let cursor = min(max(cursor, 0), length)
+        var lineStart = 0
+        var openFence: FenceMarker?
+
+        while lineStart < cursor {
+            let line = MarkdownTextEditingSupport.line(containing: lineStart, in: text)
+            if let fence = fenceMarker(in: line.text) {
+                if let currentFence = openFence {
+                    if fence.character == currentFence.character,
+                       fence.length >= currentFence.length,
+                       fence.canClose
+                    {
+                        openFence = nil
+                    }
+                } else {
+                    openFence = fence
+                }
+            }
+
+            let nextLineStart = line.fullEndLocation
+            guard nextLineStart > lineStart else { break }
+            lineStart = nextLineStart
+        }
+
+        return openFence != nil
+    }
+
+    func fenceMarker(in line: String) -> FenceMarker? {
+        var index = line.startIndex
+        var leadingSpaces = 0
+        while index < line.endIndex, line[index] == " " {
+            leadingSpaces += 1
+            guard leadingSpaces <= 3 else { return nil }
+            index = line.index(after: index)
+        }
+
+        guard index < line.endIndex,
+              line[index] == "`" || line[index] == "~"
+        else {
+            return nil
+        }
+
+        let character = line[index]
+        var markerEnd = index
+        var markerLength = 0
+        while markerEnd < line.endIndex, line[markerEnd] == character {
+            markerLength += 1
+            markerEnd = line.index(after: markerEnd)
+        }
+        guard markerLength >= 3 else { return nil }
+
+        let rest = String(line[markerEnd...])
+        return FenceMarker(
+            character: character,
+            length: markerLength,
+            canClose: rest.trimmingCharacters(in: .whitespaces).isEmpty
         )
     }
 

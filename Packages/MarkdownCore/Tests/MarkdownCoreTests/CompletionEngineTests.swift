@@ -126,6 +126,38 @@ final class CompletionEngineTests: XCTestCase {
         XCTAssertTrue(results.containsLabel("CTA"))
     }
 
+    func testMDXComponentContextIgnoresFencedCodeBlocks() {
+        let workspace = CompletionWorkspace(currentFilePath: "posts/page.mdx")
+        let text = """
+        import Card from "./components"
+
+        ```tsx
+        <Ca<caret>
+        ```
+        """
+
+        let results = completions(from: text, workspace: workspace)
+
+        XCTAssertTrue(results.isEmpty)
+    }
+
+    func testMDXComponentContextResumesAfterFencedCodeBlocks() {
+        let workspace = CompletionWorkspace(currentFilePath: "posts/page.mdx")
+        let text = """
+        import Card from "./components"
+
+        ```tsx
+        <Card />
+        ```
+
+        <Ca<caret>
+        """
+
+        let results = completions(from: text, workspace: workspace)
+
+        XCTAssertEqual(results.first?.label, "Card")
+    }
+
     func testMDXImportParserHandlesPureNamedImports() {
         let testCases: [(source: String, expectedNames: [String])] = [
             ("import { Button, Card } from './ui'", ["Button", "Card"]),
