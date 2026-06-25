@@ -5,9 +5,10 @@
 
 ## Current snapshot
 
-M5 feature slices, performance gates, security hardening, and Settings/themes are in place. M5 is
-feature-complete but **not accepted** because the 2026-06-25 final sweep still leaves manual
-checklist blockers in `docs/m5-checklist.md`.
+M5 feature slices, performance gates, security hardening, Settings/themes, launch stability, and
+Open Recent failure handling are in place. M5 is feature-complete but **not accepted** because the
+2026-06-25 final sweep still leaves manual editor-input checklist blockers in
+`docs/m5-checklist.md`.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
@@ -20,12 +21,20 @@ checklist blockers in `docs/m5-checklist.md`.
 | Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ✅ Merged PR #24 + PR #27 follow-up; issue #17 closed | No inline `style`, script-like elements dropped before sanitize, raster assets only up to 10 MiB, SVG/path rejected |
 | Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ Merged PR #20; issue #14 closed | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
 | Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
+| Final checklist blocker fixes | Workspace launch stability, Open Recent failure handling, and updated M5 checklist evidence | ✅ Merged PR #30 | Stable fixed-width `HStack` sidebar/detail shell accepted for M5; adjustable/native sidebar restoration is post-M5 polish |
+
+Remaining unchecked M5 blockers are limited to live editor-input validation:
+
+1. Edit `Fixtures/mdx-syntax-error.mdx` back to valid MDX and confirm preview recovery without relaunch.
+2. Reintroduce an MDX syntax error in-editor and confirm the last-good render remains visible where possible.
+3. Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
+4. Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
 
 ## Recommended next sequence
 
 ```text
-0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, and PR #27 have merged; issues #13, #14, #16, #17, and #18 are closed.
-1. Resolve the remaining unchecked items in `docs/m5-checklist.md` without adding new M5 features.
+0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, PR #27, PR #29, and PR #30 have merged; issues #13, #14, #16, #17, and #18 are closed.
+1. Resolve only the remaining editor-input items in `docs/m5-checklist.md` without adding new M5 features.
 2. If the checklist then passes, mark M5 accepted and move to Phase 2 WYSIWYG design approval/spikes only.
 3. Do not start Phase 2 implementation before M5 is accepted and `docs/wysiwyg-design.md` is approved.
 ```
@@ -54,8 +63,12 @@ manual checklist is incomplete.
 - **The two-webview memory gate uses a test-only harness.** Phase 1 has shared app-scoped state, so this
   PR #21 measured two live `PreviewController` WebViews attached to an offscreen AppKit surface. The
   accepted M5 gate is host-process RSS; WebKit helper memory remains diagnostic.
-- **Settings + themes are implemented for the #16 scope in PR #26, but manual validation remains.** Custom
-  editor-theme JSON and user CSS overrides are deferred by Decision Log until separate import/sanitizer designs exist.
+- **Settings + themes are implemented for the #16 scope in PR #26 and manually checked in PR #30.** Keep
+  them as regression-sensitive because they touch live editor/preview state; custom editor-theme JSON and
+  user CSS overrides are deferred by Decision Log until separate import/sanitizer designs exist.
+- **The PR #30 workspace shell uses `HStack` intentionally.** `NavigationSplitView` caused an AppKit
+  constraint-loop crash during manual launch, so the fixed-width sidebar/detail `HStack` is the accepted
+  M5 stability tradeoff. Restoring an adjustable/native sidebar is post-M5 polish, not part of PR #30.
 - **Security hardening has landed, but remains a regression risk.** MDX preview intentionally does not execute
   components; keep sanitizer and asset policy tests with any preview-src, PreviewKit, or WorkspaceKit change.
 

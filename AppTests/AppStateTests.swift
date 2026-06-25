@@ -482,7 +482,7 @@ private final class SpyRecentItemStore: RecentItemPersisting {
         self.restoredURLs = restoredURLs
     }
 
-    func save(_ url: URL) throws {
+    func save(_: URL) throws {
         if let saveError {
             throw saveError
         }
