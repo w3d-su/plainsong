@@ -10,8 +10,9 @@ PR #20 measured visible-range highlighting, PR #21 measured the two-webview
 host-process RSS memory gate, and PR #24/#27 closed issue #17 with the MDX
 sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. M5 is
 accepted only when `docs/m5-checklist.md` passes; the 2026-06-25 final sweep fixed a
-scroll-sync checklist failure but still leaves manual checklist blockers, so M5 is
-feature-complete but not accepted yet. Do not start Phase 2 WYSIWYG
+scroll-sync checklist failure, PR #30 fixed launch/Open Recent blockers, and only
+manual editor-input checklist blockers remain. M5 is feature-complete but not
+accepted yet. Do not start Phase 2 WYSIWYG
 implementation until M5 acceptance is explicitly completed and the WYSIWYG design gate
 is approved.
 

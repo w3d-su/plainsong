@@ -22,8 +22,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #26 — Settings/themes; closed issue #16.
   - PR #27 — SVG preview security policy alignment.
   - PR #28 — recorded the first final-checklist blocker sweep.
+  - PR #29 — editor-to-preview scroll-sync checklist fix.
+  - PR #30 — workspace launch stability, Open Recent failure handling, and final checklist evidence sync.
 - Open / not accepted:
-  - `docs/m5-checklist.md` has remaining unchecked manual blockers from the 2026-06-25 final sweep.
+  - `docs/m5-checklist.md` has four remaining unchecked manual editor-input blockers from the
+    2026-06-25 final sweep.
   - Phase 2 WYSIWYG remains blocked until M5 is accepted and `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
@@ -59,6 +62,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   editor/preview preferences, and an HTTPS-only remote image opt-in. Custom editor-theme JSON and
   user CSS remain deferred by Decision Log.
 - PR #28 merged on 2026-06-24 and recorded the first final-checklist blockers without accepting M5.
+- PR #29 merged on 2026-06-25 and fixed/rechecked editor-to-preview scroll sync without accepting M5.
+- PR #30 merged on 2026-06-25 and fixed two checklist blockers without accepting M5: the workspace
+  launch AppKit constraint-loop crash by using a stable `HStack` shell instead of `NavigationSplitView`,
+  and optional Open Recent persistence failures by treating them as best-effort. The `HStack` is the M5
+  stability tradeoff; restoring an adjustable/native sidebar is post-M5 polish.
 
 # Goal 0 — M5 checklist blocker resolution
 
@@ -74,13 +82,12 @@ Read first:
 - docs/risk-register.md
 - docs/perf-log.md
 
-Use subagents if available:
-1. Manual checklist subagent: complete the unchecked app UI items and mixed-file switching in `docs/m5-checklist.md`.
-2. Settings/theme subagent: verify Settings panes, preview/editor theme changes, Mermaid theme behavior, and persistence.
-3. Real-content subagent: add or supply a real content file with an inline in-scope body image and verify image behavior.
-
 Tasks:
-- Launch Plainsong from the current branch and finish only the unchecked items in `docs/m5-checklist.md`.
+- Launch Plainsong from the current branch and finish only these unchecked editor-input items in `docs/m5-checklist.md`:
+  - Edit `Fixtures/mdx-syntax-error.mdx` back to valid MDX and confirm preview recovery without relaunch.
+  - Reintroduce an MDX syntax error in-editor and confirm the last-good render remains visible where possible.
+  - Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
+  - Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
 - Record evidence or blockers without faking passes.
 - If all gates pass, mark M5 accepted in README, `agent.md`, `docs/acceptance-matrix.md`,
   `docs/m5-plan.md`, `docs/risk-register.md`, and `docs/codex-handoff.md`.
@@ -88,7 +95,8 @@ Tasks:
 
 Non-goals:
 - Do not start Phase 2 WYSIWYG.
-- Do not reopen security or Settings implementation scope unless the checklist finds a regression.
+- Do not reopen security, Settings/theme, app icon, real-content image, rapid-switching, launch-shell, or
+  Open Recent scope unless the checklist finds a regression.
 
 Acceptance:
 - M5 checklist evidence is recorded honestly.
