@@ -4,14 +4,14 @@ Use this checklist before accepting M5 changes. Run the automated checks first, 
 manual checks in a disposable folder workspace that contains the committed fixtures and at least one
 real Astro or Next.js content directory with `.mdx` posts.
 
-Final sweep status, 2026-06-25 on `m5-editor-input-checklist`: **not fully passed**. Automated
+Final sweep status, 2026-06-25 on `m5-completion-popup-ui`: **passed**. Automated
 verification passed, and current-build UI passes covered the fixture workspace, preview pane, MDX
 rendering, Markdown rendering, broken-MDX error banner display, post-error file switching, a
 representative Next.js content folder with an in-scope body image, rapid mixed-file switching,
 Settings/theme workflows, preview theme/Mermaid behavior, app icon wiring, and light/dark visual
 polish. This follow-up live-verified the broken-MDX edit/reintroduce recovery loop and fixed a
-fenced-code completion-engine regression, but M5 remains **not accepted** until the live MDX
-completion popup UI items below are completed.
+fenced-code completion-engine regression, then live-verified the MDX completion popup UI. M5 is
+**accepted** because all checklist items below are complete.
 
 Evidence from this sweep:
 
@@ -39,14 +39,14 @@ Evidence from this sweep:
   Editing `Fixtures/mdx-syntax-error.mdx` to add `</Callout>` recovered the preview without
   relaunch; pasting the original broken text back showed `MDX syntax error on line 14` while the
   previous valid render remained visible under the banner.
-- Remaining unchecked items are not assumed to pass. The MDX completion popup UI still needs live
-  editor-input validation. Follow-up attempts opened `Fixtures/product-page.mdx`, targeted the live
-  STTextView, and tried AX selection, paste, Unicode key events, ABC input-source switching, and
-  STTextView completion commands; local automation either inserted through the active Zhuyin input
-  source or failed to show a visible completion popup. The tag-context completion popup therefore
-  remains a blocker. A minimal MarkdownCore fix now prevents component completions in fenced code,
-  covered by `CompletionEngineTests.testMDXComponentContextIgnoresFencedCodeBlocks`, but the live UI
-  negative case remains unchecked because the popup itself could not be live-verified.
+- Final live completion-popup evidence on `m5-completion-popup-ui` used the current
+  `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
+  with disposable files under `/tmp/plainsong-m5-completion`. With the ABC input source selected for
+  literal key synthesis, typing `<` at EOF in `tag-context.mdx` auto-paired to `<>` and opened the
+  STTextView completion window named `Untitled`; Accessibility inspection found rows for `Card` and
+  `FeatureGrid`, each labeled `Component`. Typing `<` at EOF inside an open `tsx` fence in
+  `fenced-context.mdx` auto-paired to `<>` but produced zero `Untitled` completion windows. The input
+  source was restored to Zhuyin - Traditional after verification.
 
 ## Setup
 
@@ -102,8 +102,8 @@ Evidence from this sweep:
 - [x] Confirm self-closing JSX components and closing tag lines are styled consistently. Observed in `product-page.mdx` / `kitchen-sink.mdx`; EditorKit highlighting tests also passed.
 - [x] Confirm fenced `tsx` code retains code-fence highlighting behavior. Observed and covered by EditorKit tests.
 - [x] Confirm ordinary `.md` files still use Markdown highlighting and are not treated as MDX. Observed `Fixtures/kitchen-sink.md` with Markdown badge; EditorKit tests also passed.
-- [ ] M4 completion re-verification: Type `<` in an `.mdx` file with imports and confirm imported component completions appear. Still blocked. `Fixtures/product-page.mdx` was opened live and local automation could focus STTextView and mutate text, but could not synthesize a reliable literal `<` typed event or display a visible STTextView completion popup. Engine/workspace coverage still passes.
-- [ ] M4 completion re-verification: Confirm MDX component completion does not appear inside obvious non-tag contexts such as fenced code blocks. A follow-up MarkdownCore regression fix prevents component completions while the cursor is inside fenced code, and `CompletionEngineTests.testMDXComponentContextIgnoresFencedCodeBlocks` passes. The live UI negative case remains unchecked because the tag-context popup itself could not be live-verified.
+- [x] M4 completion re-verification: Type `<` in an `.mdx` file with imports and confirm imported component completions appear. Live-checked on `m5-completion-popup-ui` with `/tmp/plainsong-m5-completion/tag-context.mdx`; typing literal `<` through STTextView at EOF auto-paired to `<>` and opened the completion popup with `Card` and `FeatureGrid` component rows.
+- [x] M4 completion re-verification: Confirm MDX component completion does not appear inside obvious non-tag contexts such as fenced code blocks. Live-checked on `m5-completion-popup-ui` with `/tmp/plainsong-m5-completion/fenced-context.mdx`; typing literal `<` inside an open `tsx` fence auto-paired to `<>` and no `Untitled` completion popup window appeared. MarkdownCore also covers fenced-code suppression with `CompletionEngineTests.testMDXComponentContextIgnoresFencedCodeBlocks`.
 
 ## Settings And Themes
 

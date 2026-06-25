@@ -5,8 +5,8 @@
 > architecture, the risk-reduction spikes, and the open decisions. Nothing in Phase 2 is implemented
 > until this is signed off. Update agent.md's Decision Log when a decision here is accepted.
 >
-> Prerequisites not yet met: **M5 is not accepted** because the 2026-06-25 final M5 checklist sweep left
-> unchecked manual blockers. Treat this as planning only.
+> Remaining prerequisite: **this design doc is not approved**. M5 is accepted, but Phase 2
+> implementation is still blocked until the maintainer approves this design gate.
 
 ## 1. Goal & non-goals
 

@@ -2,6 +2,7 @@
 import Foundation
 import MarkdownCore
 import STTextView
+import SwiftUI
 import XCTest
 
 @MainActor
@@ -134,7 +135,108 @@ final class CompletionSupportTests: XCTestCase {
         XCTAssertFalse(updated.contains("filePath:post-20.md"))
     }
 
+    func testCoordinatorRequestsCompletionAfterMDXComponentTrigger() async {
+        let textView = CompletionProbeTextView(frame: .zero)
+        let source = "import Card from \"./Card\"\n\n"
+        textView.text = source
+        textView.textSelection = NSRange(location: source.utf16.count, length: 0)
+        let coordinator = Self.makeCoordinator(fileKind: .mdx, textView: textView)
+
+        let shouldChange = coordinator.textView(
+            textView,
+            shouldChangeTextIn: Self.insertionTextRange(in: textView),
+            replacementString: "<"
+        )
+
+        XCTAssertFalse(shouldChange)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(textView.completeCallCount, 1)
+    }
+
+    func testCoordinatorReturnsMDXComponentItemsInTagContext() async {
+        let textView = STTextView(frame: .zero)
+        let source = "import Card from \"./Card\"\n\n<"
+        textView.text = source
+        textView.textSelection = NSRange(location: source.utf16.count, length: 0)
+        let coordinator = Self.makeCoordinator(fileKind: .mdx, textView: textView)
+        coordinator.updateCompletionWorkspace(CompletionWorkspace(
+            currentFilePath: "page.mdx",
+            componentNames: ["Card"]
+        ))
+
+        let items = await coordinator.textView(
+            textView,
+            completionItemsAtLocation: Self.textLocation(in: textView)
+        )
+
+        let completions = items?.compactMap { ($0 as? MarkdownCompletionItem)?.completion } ?? []
+        XCTAssertTrue(completions.contains { $0.label == "Card" && $0.kind == .component })
+    }
+
+    func testCoordinatorDoesNotReturnMDXComponentItemsInsideFencedCode() async {
+        let textView = STTextView(frame: .zero)
+        let source = """
+        import Card from "./Card"
+
+        ```tsx
+        <
+        ```
+        """
+        let cursor = source.range(of: "<").map { source[..<$0.upperBound].utf16.count } ?? source.utf16.count
+        textView.text = source
+        textView.textSelection = NSRange(location: cursor, length: 0)
+        let coordinator = Self.makeCoordinator(fileKind: .mdx, textView: textView)
+        coordinator.updateCompletionWorkspace(CompletionWorkspace(
+            currentFilePath: "page.mdx",
+            componentNames: ["Card"]
+        ))
+
+        let items = await coordinator.textView(
+            textView,
+            completionItemsAtLocation: Self.textLocation(in: textView)
+        )
+
+        XCTAssertNil(items)
+    }
+
     private static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+    }
+
+    private static func makeCoordinator(
+        fileKind: FileKind,
+        textView: STTextView
+    ) -> MarkdownTextViewCoordinator {
+        let coordinator = MarkdownTextViewCoordinator(
+            text: .constant(text(in: textView)),
+            selection: .constant(textView.selectedRange())
+        )
+        let commandProxy = EditorCommandProxy()
+        commandProxy.update(fileKind: fileKind)
+        coordinator.attachCommandProxy(commandProxy, to: textView)
+        return coordinator
+    }
+
+    private static func insertionTextRange(in textView: STTextView) -> NSTextRange {
+        let contentManager = textView.textContentManager
+        let documentStart = contentManager.documentRange.location
+        let location = contentManager.location(
+            documentStart,
+            offsetBy: textView.selectedRange().location
+        ) ?? contentManager.documentRange.endLocation
+        return NSTextRange(location: location, end: location)!
+    }
+
+    private static func textLocation(in textView: STTextView) -> any NSTextLocation {
+        insertionTextRange(in: textView).location
+    }
+}
+
+@MainActor
+private final class CompletionProbeTextView: STTextView {
+    var completeCallCount = 0
+
+    override func complete(_: Any?) {
+        completeCallCount += 1
     }
 }

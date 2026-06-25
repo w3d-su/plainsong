@@ -24,13 +24,13 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #28 — recorded the first final-checklist blocker sweep.
   - PR #29 — editor-to-preview scroll-sync checklist fix.
   - PR #30 — workspace launch stability, Open Recent failure handling, and final checklist evidence sync.
-- Open / not accepted:
-  - `docs/m5-checklist.md` has remaining unchecked live MDX completion-popup blockers from the
-    2026-06-25 final sweep. The `m5-editor-input-checklist` follow-up live-verified the
-    broken-MDX edit/reintroduce recovery loop and added MarkdownCore regression coverage for
-    fenced-code component completion suppression, but the live completion popup still needs
-    tag-context and non-tag-context UI verification.
-  - Phase 2 WYSIWYG remains blocked until M5 is accepted and `docs/wysiwyg-design.md` is approved.
+- M5 accepted:
+  - `docs/m5-checklist.md` now passes. The final 2026-06-25 follow-ups live-verified the
+    broken-MDX edit/reintroduce recovery loop, added MarkdownCore regression coverage for
+    fenced-code component completion suppression, and live-verified the STTextView MDX completion
+    popup in both tag-context and fenced-code contexts.
+- Open gate:
+  - Phase 2 WYSIWYG remains blocked until `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
 
@@ -71,39 +71,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   and optional Open Recent persistence failures by treating them as best-effort. The `HStack` is the M5
   stability tradeoff; restoring an adjustable/native sidebar is post-M5 polish.
 
-# Goal 0 — M5 checklist blocker resolution
+# Completed reference — M5 checklist blocker resolution
 
-```text
-You are working in w3d-su/plainsong. Goal: resolve the remaining unchecked M5 checklist blockers without adding new M5 features.
-
-Read first:
-- README.md
-- agent.md §11, §12, §14, §17
-- docs/m5-checklist.md
-- docs/acceptance-matrix.md
-- docs/m5-plan.md
-- docs/risk-register.md
-- docs/perf-log.md
-
-Tasks:
-- Launch Plainsong from the current branch and finish only these unchecked editor-input items in `docs/m5-checklist.md`:
-  - Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
-  - Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
-- Record evidence or blockers without faking passes.
-- If all gates pass, mark M5 accepted in README, `agent.md`, `docs/acceptance-matrix.md`,
-  `docs/m5-plan.md`, `docs/risk-register.md`, and `docs/codex-handoff.md`.
-- If any item still fails, keep M5 not accepted and document the exact blocker.
-
-Non-goals:
-- Do not start Phase 2 WYSIWYG.
-- Do not reopen security, Settings/theme, app icon, real-content image, rapid-switching, launch-shell, or
-  Open Recent scope unless the checklist finds a regression.
-
-Acceptance:
-- M5 checklist evidence is recorded honestly.
-- M5 is called accepted only if the full checklist passes.
-- Phase 2 remains design/spike-only until M5 is accepted and the design doc is approved.
-```
+The final M5 checklist blocker goal is complete as of the `m5-completion-popup-ui` follow-up. Final
+evidence lives in `docs/m5-checklist.md`: live STTextView MDX component completions appear after
+typing `<` in a tag context, and the component popup does not appear inside fenced code.
 
 # Phase 2 gate prompt — design/spike only, no WYSIWYG feature build yet
 
