@@ -5,6 +5,13 @@ import MarkdownCore
 struct MarkdownHighlightResult: Equatable {
     let range: NSRange
     let text: AttributedString
+    let foldPlan: WYSIWYGFoldPlan?
+
+    init(range: NSRange, text: AttributedString, foldPlan: WYSIWYGFoldPlan? = nil) {
+        self.range = range
+        self.text = text
+        self.foldPlan = foldPlan
+    }
 }
 
 actor MarkdownHighlightService {
@@ -20,13 +27,22 @@ actor MarkdownHighlightService {
         visibleRange: NSRange,
         theme: MarkdownEditorTheme,
         fontName: String,
-        fontSize: CGFloat
+        fontSize: CGFloat,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
+        selection: NSRange? = nil
     ) -> MarkdownHighlightResult {
         let highlighter = MarkdownSyntaxHighlighter(
             theme: .builtIn(theme),
             baseFont: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         )
-        return highlighter.highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: parser)
+        return highlighter.highlight(
+            text,
+            fileKind: fileKind,
+            visibleRange: visibleRange,
+            parser: parser,
+            developmentPresentation: developmentPresentation,
+            selection: selection
+        )
     }
 }
 
@@ -67,15 +83,30 @@ public struct MarkdownSyntaxHighlighter {
         )
     }
 
-    func highlight(_ text: String, fileKind: FileKind, visibleRange: NSRange) -> MarkdownHighlightResult {
-        highlight(text, fileKind: fileKind, visibleRange: visibleRange, parser: try? MarkdownSyntaxParser())
+    func highlight(
+        _ text: String,
+        fileKind: FileKind,
+        visibleRange: NSRange,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
+        selection: NSRange? = nil
+    ) -> MarkdownHighlightResult {
+        highlight(
+            text,
+            fileKind: fileKind,
+            visibleRange: visibleRange,
+            parser: try? MarkdownSyntaxParser(),
+            developmentPresentation: developmentPresentation,
+            selection: selection
+        )
     }
 
     func highlight(
         _ text: String,
         fileKind: FileKind,
         visibleRange: NSRange,
-        parser: MarkdownSyntaxParser?
+        parser: MarkdownSyntaxParser?,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
+        selection: NSRange? = nil
     ) -> MarkdownHighlightResult {
         guard let parser else {
             let range = MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
@@ -85,9 +116,20 @@ public struct MarkdownSyntaxHighlighter {
             )
         }
 
-        let range = MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
+        let foldEnabled = developmentPresentation.enablesInlineFoldReveal
+        let visiblePlan = foldEnabled ? parser.visibleTokensAndFoldPlan(
+            in: text,
+            fileKind: fileKind,
+            visibleRange: visibleRange,
+            selection: selection ?? NSRange(location: 0, length: 0)
+        ) : nil
+
+        let range = visiblePlan?.visibleRange
+            ?? MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
         let fragment = text.fragment(in: range) ?? ""
-        let tokens = parser.tokens(in: text, fileKind: fileKind, visibleRange: visibleRange)
+        let absoluteTokens = visiblePlan?.tokens
+            ?? parser.tokens(in: text, fileKind: fileKind, visibleRange: visibleRange)
+        let tokens = absoluteTokens
             .compactMap { token -> MarkdownSyntaxToken? in
                 guard NSIntersectionRange(token.range, range).length > 0 else {
                     return nil
@@ -101,15 +143,30 @@ public struct MarkdownSyntaxHighlighter {
                 )
             }
 
+        let foldPlan = visiblePlan?.foldPlan
+        let attributed = mutableAttributedText(fragment, tokens: tokens)
+        if let foldPlan {
+            WYSIWYGInlineFoldPresentation(theme: theme, baseFont: baseFont).apply(
+                plan: foldPlan,
+                visibleRange: range,
+                to: attributed
+            )
+        }
+
         return MarkdownHighlightResult(
             range: range,
-            text: attributedText(fragment, tokens: tokens)
+            text: AttributedString(attributed),
+            foldPlan: foldPlan
         )
     }
 }
 
 private extension MarkdownSyntaxHighlighter {
     func attributedText(_ text: String, tokens: [MarkdownSyntaxToken]) -> AttributedString {
+        AttributedString(mutableAttributedText(text, tokens: tokens))
+    }
+
+    func mutableAttributedText(_ text: String, tokens: [MarkdownSyntaxToken]) -> NSMutableAttributedString {
         let attributed = NSMutableAttributedString(
             string: text,
             attributes: [
@@ -122,7 +179,7 @@ private extension MarkdownSyntaxHighlighter {
             apply(token, to: attributed)
         }
 
-        return AttributedString(attributed)
+        return attributed
     }
 }
 
@@ -160,7 +217,7 @@ private extension MarkdownSyntaxHighlighter {
             return true
         }
 
-        if token.kind == .listMarker {
+        if token.kind == .listMarker || token.kind == .quoteMarker {
             attributed.addAttributes(
                 [
                     .foregroundColor: theme.listMarkerColor,

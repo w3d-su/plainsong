@@ -140,34 +140,49 @@ final class WYSIWYGSelectionMappingSpikeTests: XCTestCase {
     }
 
     @MainActor
-    func testSTTextViewCopyUsesRawBackingStringForAttributedHiddenDelimiters() {
-        let source = Self.foldedBoldAndLinkSource
+    func testProductionFoldPresentationCopyUsesRawBackingString() {
+        let source = "A **bold** and ~~gone~~ done"
         let textView = STTextView(frame: .zero)
         textView.text = source
-        let rawSelection = source.nsRange(of: "**bold** and [link](https://example.com)")
-        textView.textSelection = rawSelection
 
-        let textStorage = MarkdownTextView.textStorage(of: textView)
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (source as NSString).length),
+            developmentPresentation: .inlineFoldReveal,
+            selection: NSRange(location: 0, length: 0)
+        )
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+            HighlightedText(
+                revision: 1,
+                range: highlighted.range,
+                text: highlighted.text,
+                foldPlan: highlighted.foldPlan
+            ),
+            to: textView
+        ))
+
+        guard let textStorage = MarkdownTextView.textStorage(of: textView) else {
+            XCTFail("Expected text storage")
+            return
+        }
         for delimiter in [
             source.nsRange(of: "**bold**", selecting: "**"),
             source.nsRange(of: "**bold**", selectingLast: "**"),
-            source.nsRange(of: "[link]", selecting: "["),
-            source.nsRange(of: "[link](https://example.com)", selecting: "](https://example.com)"),
+            source.nsRange(of: "~~gone~~", selecting: "~~"),
+            source.nsRange(of: "~~gone~~", selectingLast: "~~"),
         ] {
-            textStorage?.addAttributes(
-                [
-                    .foregroundColor: NSColor.clear,
-                    .font: NSFont.systemFont(ofSize: 0.1),
-                ],
-                range: delimiter
-            )
+            let attributes = textStorage.attributes(at: delimiter.location, effectiveRange: nil)
+            XCTAssertTrue(WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes))
         }
 
+        let rawSelection = source.nsRange(of: "**bold** and ~~gone~~")
+        textView.textSelection = rawSelection
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongWYSIWYGSpike.\(UUID().uuidString)"))
         pasteboard.clearContents()
 
         XCTAssertTrue(textView.writeSelection(to: pasteboard, types: [.string]))
-        XCTAssertEqual(pasteboard.string(forType: .string), "**bold** and [link](https://example.com)")
+        XCTAssertEqual(pasteboard.string(forType: .string), "**bold** and ~~gone~~")
     }
 
     private static let foldedBoldAndLinkSource = "A **bold** and [link](https://example.com) done"

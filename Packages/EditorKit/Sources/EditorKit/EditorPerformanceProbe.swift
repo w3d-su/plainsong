@@ -75,6 +75,7 @@ enum EditorPerformanceProbe {
         visibleRange: NSRange,
         editLocation: Int,
         insertion: String,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
         highlightService: MarkdownHighlightService = MarkdownHighlightService()
     ) async throws -> VisibleRangeHighlightUpdateResult {
         let fixture = fixtureText as NSString
@@ -104,7 +105,9 @@ enum EditorPerformanceProbe {
             visibleRange: requestRange,
             theme: .standard,
             fontName: MarkdownSyntaxHighlighter.systemMonospacedFontName,
-            fontSize: MarkdownSyntaxHighlighter.defaultFont.pointSize
+            fontSize: MarkdownSyntaxHighlighter.defaultFont.pointSize,
+            developmentPresentation: developmentPresentation,
+            selection: selectedRange
         )
 
         let didApply = MarkdownTextView.applyHighlightedText(

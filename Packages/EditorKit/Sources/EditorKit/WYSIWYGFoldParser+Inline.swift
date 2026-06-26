@@ -1,7 +1,7 @@
 import Foundation
 import SwiftTreeSitter
 
-extension WYSIWYGFoldParser {
+extension MarkdownSyntaxParser {
     func appendInlineCandidates(
         from inlineNode: Node,
         baseLocation: Int,

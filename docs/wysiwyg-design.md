@@ -225,3 +225,61 @@ and rerun these gates before any user-visible mode change.
 - Partial folded-span copy is not specified by this spike beyond avoiding hidden delimiter caret stops;
   production needs an explicit policy before enabling visual selection over folded tokens.
 - Defer tables, Mermaid/math, image attachments, and framed code fences until inline WYSIWYG is stable.
+
+## 11. Production-core result — 2026-06-26
+
+**Recommendation: PASS for development plumbing only.** The first production-core PR wires the
+inline fold/reveal mechanism into EditorKit's existing visible-range highlight pipeline without adding
+a user-facing WYSIWYG mode. Source text remains canonical, source-only and source+preview modes are
+unchanged, and the app-level `⌘⇧P` cycle still only toggles the preview pane.
+
+### Production approach
+
+- `WYSIWYGFoldParser` is now a compatibility wrapper over `MarkdownSyntaxParser`; production uses the
+  parser already held by the `MarkdownHighlightService` actor.
+- Fold planning and syntax highlighting share one visible block parse through a combined visible parse
+  API, avoiding the initial double-parse path that measured 60.700 ms on the 1 MB fold fixture.
+- Fold/reveal remains derived from source `NSRange`s plus the current raw selection. Selection changes
+  schedule recompute only when the non-user-facing fold presentation hook is enabled.
+- Presentation is attribute-only and applied through the existing `MarkdownTextView.applyHighlightedText`
+  path, which disables undo registration, rejects stale text, preserves selection/scroll, and skips while
+  marked text exists.
+- The hook is `MarkdownEditorView(..., _developmentPresentation: .inlineFoldReveal)`, defaulting to
+  `.source`. The App does not pass it, it is not persisted, and it is intended for tests/development only.
+
+### Constructs included/deferred
+
+- Included in production presentation: headings, strong/emphasis, strikethrough, inline code, plus
+  list/quote marker styling only.
+- Link ranges remain in the pure fold model for offset/reveal validation, but production presentation
+  does not fold links yet. Link folding stays blocked on a native selection/caret policy for hidden link
+  chrome and partial folded-span copy.
+- Still deferred: image thumbnails, fenced-code fragments, tables, Mermaid/math, MDX component rendering,
+  attachments, and layout-fragment customization.
+
+### Gate results
+
+- **IME — PASS for automated production path.** `WYSIWYGIMESpikeTests` now applies production
+  fold/reveal output from `MarkdownSyntaxHighlighter(..., developmentPresentation: .inlineFoldReveal)`
+  before running the Zhuyin and Pinyin `setMarkedText` scripts. Fold attributes are skipped during active
+  marked text and reapplied after commit without changing source text, marked range, or caret.
+- **Undo — PASS.** `MarkdownEditorViewTests.testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation`
+  now uses the production fold presentation. Attribute state still does not enter undo/redo, stale
+  presentation is rejected after undo, and recomputation follows current source plus selection.
+- **Selection/copy — PASS for raw source semantics on included folds.**
+  `WYSIWYGSelectionMappingSpikeTests.testProductionFoldPresentationCopyUsesRawBackingString` applies the
+  production presentation to folded bold/strike spans and confirms STTextView copy returns raw Markdown.
+  Pure link range mapping remains covered, but link presentation is deferred.
+- **Performance — PASS after combined visible parse.** The production fold/highlight/apply probe on the
+  1 MB fixture measured 20.706 ms during the full `make test` run, under the §12 50 ms visible-highlight
+  budget. A targeted EditorKit rerun measured 21.206 ms, and existing typing hot-path samples stayed below
+  1 ms max for Markdown/MDX triggers.
+
+### Remaining blockers
+
+- Run actual macOS Zhuyin/Pinyin input-method event streams before exposing WYSIWYG to users; current IME
+  evidence is automated `setMarkedText`.
+- Define and test native arrow-key, mouse, shift-selection, and partial folded-span copy semantics for
+  hidden delimiter edges before enabling link folding or a user-facing WYSIWYG mode.
+- Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until a dedicated UI PR
+  clears those remaining gates.

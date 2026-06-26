@@ -1,21 +1,117 @@
 import Foundation
 import MarkdownCore
 import SwiftTreeSitter
-import TreeSitterMarkdown
-import TreeSitterMarkdownInline
 
-/// Range-only WYSIWYG spike model. It intentionally does not apply attributes,
-/// customize layout fragments, mutate source text, or connect to editor modes.
+/// Compatibility wrapper for tests and focused fold/reveal callers.
+///
+/// Production presentation uses `MarkdownSyntaxParser.foldPlan(...)` through
+/// `MarkdownHighlightService` so visible-range highlighting and folding share a
+/// parser actor instead of creating a parser on each edit.
 final class WYSIWYGFoldParser {
-    private let markdownParser: Parser
-    let inlineParser: Parser
+    private let parser: MarkdownSyntaxParser
 
     init() throws {
-        markdownParser = Parser()
-        inlineParser = Parser()
+        parser = try MarkdownSyntaxParser()
+    }
 
-        try markdownParser.setLanguage(Language(language: tree_sitter_markdown()))
-        try inlineParser.setLanguage(Language(language: tree_sitter_markdown_inline()))
+    init(parser: MarkdownSyntaxParser) {
+        self.parser = parser
+    }
+
+    func foldPlan(
+        in source: String,
+        fileKind: FileKind,
+        visibleRange requestedRange: NSRange,
+        selection: NSRange
+    ) -> WYSIWYGFoldPlan {
+        parser.foldPlan(
+            in: source,
+            fileKind: fileKind,
+            visibleRange: requestedRange,
+            selection: selection
+        )
+    }
+}
+
+extension MarkdownSyntaxParser {
+    func visibleTokensAndFoldPlan(
+        in source: String,
+        fileKind: FileKind,
+        visibleRange requestedRange: NSRange,
+        selection: NSRange
+    ) -> (visibleRange: NSRange, tokens: [MarkdownSyntaxToken], foldPlan: WYSIWYGFoldPlan) {
+        let sourceLength = (source as NSString).length
+        guard sourceLength > 0 else {
+            let emptyRange = NSRange(location: 0, length: 0)
+            return (emptyRange, [], WYSIWYGFoldPlan(visibleRange: emptyRange, regions: []))
+        }
+
+        let visibleRange = MarkdownSyntaxParser.visibleHighlightRange(
+            in: source,
+            requestedRange: requestedRange.clamped(toLength: sourceLength)
+        )
+        guard
+            let fragment = source.fragment(in: visibleRange),
+            let tree = markdownParser.parse(fragment),
+            let root = tree.rootNode
+        else {
+            return (visibleRange, [], WYSIWYGFoldPlan(visibleRange: visibleRange, regions: []))
+        }
+
+        var tokens: [MarkdownSyntaxToken] = []
+        appendBlockTokens(from: root, parsesInlineMarkup: true, to: &tokens)
+
+        if fileKind == .mdx {
+            appendMDXTokens(
+                from: root,
+                in: fragment,
+                canParseTSX: true,
+                to: &tokens
+            )
+        }
+
+        let absoluteTokens = tokens
+            .filter { $0.range.location != NSNotFound && $0.range.length > 0 }
+            .map { token in
+                MarkdownSyntaxToken(
+                    kind: token.kind,
+                    range: NSRange(
+                        location: token.range.location + visibleRange.location,
+                        length: token.range.length
+                    )
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.range.location != rhs.range.location {
+                    return lhs.range.location < rhs.range.location
+                }
+                return lhs.range.length > rhs.range.length
+            }
+
+        var candidates: [WYSIWYGFoldCandidate] = []
+        appendBlockCandidates(
+            from: root,
+            fragment: fragment,
+            baseLocation: visibleRange.location,
+            to: &candidates
+        )
+
+        let filteredCandidates = uniqueCandidates(candidates)
+            .filter { $0.sourceRange.intersects(visibleRange) }
+            .sorted { lhs, rhs in
+                if lhs.sourceRange.location != rhs.sourceRange.location {
+                    return lhs.sourceRange.location < rhs.sourceRange.location
+                }
+                return lhs.sourceRange.length > rhs.sourceRange.length
+            }
+
+        let foldPlan = WYSIWYGFoldResolver.resolve(
+            candidates: filteredCandidates,
+            visibleRange: visibleRange,
+            selection: selection.clamped(toLength: sourceLength)
+        )
+
+        return (visibleRange, absoluteTokens, foldPlan)
     }
 
     func foldPlan(
@@ -74,7 +170,7 @@ final class WYSIWYGFoldParser {
     }
 }
 
-extension WYSIWYGFoldParser {
+extension MarkdownSyntaxParser {
     func appendBlockCandidates(
         from node: Node,
         fragment: String,
@@ -173,35 +269,6 @@ extension WYSIWYGFoldParser {
         }
 
         return ranges
-    }
-
-    func headingLevel(from node: Node) -> Int {
-        for index in 0 ..< node.childCount {
-            guard let type = node.child(at: index)?.nodeType else {
-                continue
-            }
-
-            if type.hasPrefix("atx_h"), let level = type.dropFirst(5).first?.wholeNumberValue {
-                return min(max(level, 1), 6)
-            }
-
-            if type == "setext_h1_underline" {
-                return 1
-            }
-
-            if type == "setext_h2_underline" {
-                return 2
-            }
-        }
-
-        return 1
-    }
-
-    func nsRange(for node: Node, offset: Int = 0) -> NSRange {
-        let bytes = node.byteRange
-        let location = Int(bytes.lowerBound / 2) + offset
-        let length = Int((bytes.upperBound - bytes.lowerBound) / 2)
-        return NSRange(location: location, length: length)
     }
 }
 
