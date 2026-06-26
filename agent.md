@@ -527,9 +527,9 @@ next begins.
   against §12 budgets.
 - Current status: MDX preview, TSX highlighting, icon/accent, §12 performance
   measurements, PR #24/#27 security hardening, and PR #26 Settings/themes have landed.
-  M5 feature implementation is done, but M5 is **not accepted** because the 2026-06-25
-  final sweep still leaves unchecked manual editor-input items in
-  `docs/m5-checklist.md`.
+  The 2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness,
+  and live MDX completion-popup checklist blockers; M5 is **accepted** because
+  `docs/m5-checklist.md` now passes.
 - ✅ Accept: open a real Astro/Next.js content folder; every `.mdx` post renders without
   blanking; all §12 budgets measured and recorded in `docs/perf-log.md`.
 

@@ -6,10 +6,11 @@
 ## Current snapshot
 
 M5 feature slices, performance gates, security hardening, Settings/themes, launch stability, and
-Open Recent failure handling are in place. The `m5-editor-input-checklist` follow-up live-verified
-the broken-MDX edit/reintroduce recovery loop and fixed fenced-code component completion suppression
-in MarkdownCore. M5 is feature-complete but **not accepted** because `docs/m5-checklist.md` still
-leaves live completion-popup checklist blockers.
+Open Recent failure handling are in place. PR #32 live-verified the broken-MDX edit/reintroduce
+recovery loop and fixed MarkdownCore fenced-code component completion suppression. PR #33 is the
+final M5 acceptance PR: it adds live imported-component completion popup evidence for both
+tag-context pass and fenced-code suppression in the running editor. M5 is **accepted** after PR #33
+because `docs/m5-checklist.md` now passes.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
@@ -23,24 +24,23 @@ leaves live completion-popup checklist blockers.
 | Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ Merged PR #20; issue #14 closed | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
 | Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
 | Final checklist blocker fixes | Workspace launch stability, Open Recent failure handling, and updated M5 checklist evidence | ✅ Merged PR #30 | Stable fixed-width `HStack` sidebar/detail shell accepted for M5; adjustable/native sidebar restoration is post-M5 polish |
+| Final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | ✅ PR #32 + final PR #33 | PR #32 covered broken-MDX edit/recovery and MarkdownCore fenced-code suppression; PR #33 provides final live popup evidence |
 
-Remaining unchecked M5 blockers are limited to live MDX completion-popup validation:
-
-1. Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
-2. Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
+There are no remaining M5 checklist blockers. Phase 2 implementation remains blocked until
+`docs/wysiwyg-design.md` is approved.
 
 ## Recommended next sequence
 
 ```text
-0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, PR #27, PR #29, and PR #30 have merged; issues #13, #14, #16, #17, and #18 are closed.
-1. Resolve only the remaining editor-input items in `docs/m5-checklist.md` without adding new M5 features.
-2. If the checklist then passes, mark M5 accepted and move to Phase 2 WYSIWYG design approval/spikes only.
-3. Do not start Phase 2 implementation before M5 is accepted and `docs/wysiwyg-design.md` is approved.
+0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, PR #27, PR #29, PR #30, and PR #32 have merged; PR #33 is the final M5 acceptance PR; issues #13, #14, #16, #17, and #18 are closed.
+1. Keep M5 acceptance evidence synchronized with `docs/m5-checklist.md`.
+2. Move only to Phase 2 WYSIWYG design approval/spikes.
+3. Do not start Phase 2 implementation before `docs/wysiwyg-design.md` is approved.
 ```
 
-The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1-M5 are
-complete and a WYSIWYG design doc is approved; the current repository is not there yet because the
-manual checklist is incomplete.
+The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1-M5
+are complete and a WYSIWYG design doc is approved; M5 is now complete, but the design doc is still
+draft / not approved.
 
 ## Conflict hotspots
 
@@ -77,7 +77,7 @@ Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
 | Goal | Branch suggestion | Output |
 |---|---|---|
-| M5 checklist blockers | `m5-editor-input-checklist` | Completes or documents the remaining live editor-input items in `docs/m5-checklist.md` |
+| M5 checklist blockers | PR #33 (`m5-completion-popup-ui`) | Completes final live editor-input evidence in `docs/m5-checklist.md` after PR #32's broken-MDX/fenced-code follow-up |
 | Phase 2 design gate | `phase2-wysiwyg-design-gate` | Approves/refines design and spikes only after M5 is accepted |
 
 ## Beyond M5
