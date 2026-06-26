@@ -9,8 +9,8 @@ verification passed, and current-build UI passes covered the fixture workspace, 
 rendering, Markdown rendering, broken-MDX error banner display, post-error file switching, a
 representative Next.js content folder with an in-scope body image, rapid mixed-file switching,
 Settings/theme workflows, preview theme/Mermaid behavior, app icon wiring, and light/dark visual
-polish. PR #33 includes/supersedes PR #32's broken-MDX edit/reintroduce recovery loop and
-fenced-code completion-engine regression fix, then live-verified the MDX completion popup UI. M5 is
+polish. PR #32 live-verified the broken-MDX edit/reintroduce recovery loop and fixed the fenced-code
+completion-engine regression; PR #33 then live-verified the MDX completion popup UI. M5 is
 **accepted** after PR #33 because all checklist items below are complete.
 
 Evidence from this sweep:
@@ -33,8 +33,7 @@ Evidence from this sweep:
   sidebar/detail `HStack` to avoid the AppKit constraint-loop crash seen during launch, and optional
   Open Recent persistence failures refresh recents without presenting a blocking error over an
   otherwise opened document. A regression test covers the Open Recent failure path.
-- PR #32 (`m5-editor-input-checklist`) live editor-input evidence, now included/superseded by PR #33,
-  used the current
+- PR #32 (`m5-editor-input-checklist`) live editor-input evidence used the current
   `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`.
   Accessibility plus Quartz input focused the live STTextView and pasted through the editor UI.
   Editing `Fixtures/mdx-syntax-error.mdx` to add `</Callout>` recovered the preview without

@@ -24,12 +24,12 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #28 — recorded the first final-checklist blocker sweep.
   - PR #29 — editor-to-preview scroll-sync checklist fix.
   - PR #30 — workspace launch stability, Open Recent failure handling, and final checklist evidence sync.
+  - PR #32 — broken-MDX edit/recovery evidence and MarkdownCore fenced-code completion suppression.
 - M5 accepted:
   - `docs/m5-checklist.md` now passes after PR #33. PR #33 is the final M5 acceptance PR: it
-    includes/supersedes PR #32's broken-MDX edit/reintroduce recovery evidence and MarkdownCore
-    fenced-code component completion suppression, then live-verified the STTextView MDX completion
-    popup in both tag-context and fenced-code contexts. Do not merge PR #32 separately; close PR #32
-    after PR #33 merges.
+    follows PR #32's broken-MDX edit/reintroduce recovery evidence and MarkdownCore fenced-code
+    component completion suppression, then live-verified the STTextView MDX completion popup in both
+    tag-context and fenced-code contexts.
 - Open gate:
   - Phase 2 WYSIWYG remains blocked until `docs/wysiwyg-design.md` is approved.
 
@@ -71,17 +71,17 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   launch AppKit constraint-loop crash by using a stable `HStack` shell instead of `NavigationSplitView`,
   and optional Open Recent persistence failures by treating them as best-effort. The `HStack` is the M5
   stability tradeoff; restoring an adjustable/native sidebar is post-M5 polish.
-- PR #33 is the final M5 acceptance PR. It includes/supersedes PR #32's broken-MDX edit/recovery
-  evidence and MarkdownCore fenced-code completion suppression, then live-verifies MDX component
-  completion popup behavior in tag context and no popup inside fenced code. Do not merge PR #32
-  separately; close PR #32 after PR #33 merges.
+- PR #32 merged on 2026-06-26 with broken-MDX edit/recovery evidence and MarkdownCore fenced-code
+  component completion suppression.
+- PR #33 is the final M5 acceptance PR. It live-verifies MDX component completion popup behavior in
+  tag context and no popup inside fenced code.
 
 # Completed reference — M5 checklist blocker resolution
 
 The final M5 checklist blocker goal is complete in PR #33. Final evidence lives in
 `docs/m5-checklist.md`: broken-MDX edit/recovery works, live STTextView MDX component completions
 appear after typing `<` in a tag context, and the component popup does not appear inside fenced code.
-PR #32 is superseded by PR #33 and should not remain an active Codex goal.
+PR #32 is already merged and should not remain an active Codex goal.
 
 # Phase 2 gate prompt — design/spike only, no WYSIWYG feature build yet
 
