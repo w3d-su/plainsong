@@ -7,6 +7,11 @@
 >
 > Scope discipline: Phase 2 stays native TextKit 2. Source text remains the only model.
 > The two-pane source+preview mode remains available indefinitely.
+>
+> Current note (2026-06-27): §§12-14 are historical gate records. Native input,
+> selection, and pointer gates are complete as of §§16-19; WYSIWYG is available only as an
+> off-by-default Experimental mode, and stable/default promotion remains blocked by
+> `docs/wysiwyg-release-checklist.md`.
 
 ## 1. Goal & non-goals
 
@@ -284,15 +289,16 @@ unchanged, and the app-level `⌘⇧P` cycle still only toggles the preview pane
 - Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until a dedicated UI PR
   clears those remaining gates.
 
-## 12. Native interaction gate result — 2026-06-26
+## 12. Historical native interaction gate result — 2026-06-26
 
-**Recommendation: PARTIAL PASS; user-facing WYSIWYG remains blocked.** PR #41 added production-path
-STTextView tests for native selection, copy, and paste around the #38 development hook. The follow-up
-actual-IME gate now proves macOS Traditional Chinese Zhuyin event streams through the same hook, but
-Pinyin remains unrun on this machine because the Pinyin input methods are installed but not enabled or
-selectable. No PR in this sequence adds WYSIWYG to the app layout cycle, exposes a user-facing mode, or
-expands visual folding beyond headings, strong/emphasis, strikethrough, inline code, and list/quote
-marker styling.
+**Historical recommendation: PARTIAL PASS, superseded by §§13-19.** PR #41 added production-path
+STTextView tests for native selection, copy, and paste around the #38 development hook. At that point,
+the follow-up actual-IME gate proved macOS Traditional Chinese Zhuyin event streams through the same
+hook, but Pinyin remained unrun on this machine because the Pinyin input methods were installed but not
+enabled or selectable. Later sections record the completed Pinyin, pointer, mechanism, edge-snapping,
+and Experimental mode gates. No PR in this sequence added WYSIWYG to the app layout cycle, exposed a
+user-facing mode, or expanded visual folding beyond headings, strong/emphasis, strikethrough, inline
+code, and list/quote marker styling.
 
 ### Issue tracking
 
@@ -316,10 +322,11 @@ marker styling.
   `testNativeShiftSelectionAcrossFoldedBoldStrikeAndInlineCodeCopiesRawMarkdown` extends native
   shift-selection from folded bold through strike and inline code, confirms all touched fold regions
   reveal, and confirms copy writes the selected raw Markdown.
-- **Mouse/click-to-caret — PARTIAL PASS.**
+- **Historical mouse/click-to-caret — PARTIAL PASS, closed by §14.**
   `testMouseLikeBoundaryCaretsRecomputeFoldedStateFromRawSelection` covers the raw boundary selections
-  expected from click-to-caret near heading, bold, and inline-code delimiters. True pointer hit-testing
-  against laid-out zero-width delimiter attributes is still manual-release evidence, not fully automated.
+  expected from click-to-caret near heading, bold, and inline-code delimiters. At this point true pointer
+  hit-testing against laid-out zero-width delimiter attributes was still manual-release evidence, not fully
+  automated; §14 records the later automated pointer pass.
 
 The accepted fallback policy for this development hook is conservative: native selection may enter raw
 delimiter offsets, but any selection that touches a folded region reveals that region on the next
@@ -406,7 +413,7 @@ link chrome, destinations, and boundary selections have equivalent native covera
   rendering deferred.
 - Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle.
 
-### Next PR recommendation
+### Historical next PR recommendation (completed by §§13-14)
 
 The next PR should enable/run the opt-in actual Pinyin harness on a machine with Pinyin enabled. If Pinyin
 passes, follow with a narrow pointer hit-testing/selection-edge PR. User-facing WYSIWYG should remain
@@ -548,7 +555,7 @@ scope changed, link folding stays deferred, and the App still never passes the h
   (`NSTextLayoutFragment` customization or attachment-based hiding) and rerun the IME, selection, and this
   pointer gate against that mechanism, per §10/§11 constraints.
 
-### Whether user-facing WYSIWYG remains blocked
+### Historical user-facing status after this gate
 
 Yes. This PR adds pointer-gate tests only. The App does not pass `_developmentPresentation:
 .inlineFoldReveal`, no `⌘⇧P` exposure or persisted WYSIWYG layout mode was added, construct scope is
