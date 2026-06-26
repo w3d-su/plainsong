@@ -68,6 +68,20 @@ Current sweep values from `make test`:
 | Preview render, 100 KB document | Markdown 62.257 ms median; MDX 15.343 ms median | Pass |
 | Memory with 8 warm sessions + 2 webviews | 141.6 MB host RSS; WebKit helpers 498.1 MB across 2 helpers, aggregate 639.7 MB diagnostic | Pass |
 
+## Phase 2 WYSIWYG Zero-width Mechanism Verification
+
+| Field | Value |
+|---|---|
+| Date | 2026-06-26 |
+| Branch | `phase2-wysiwyg-zerowidth-mechanism` |
+| Commit | Working tree after replacing the baseline-offset fold mechanism with the TextKit 2 content-storage projection |
+| Command | `swift test --filter MarkdownEditorViewTests/testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` after full `make test` |
+| Fixture | `Fixtures/large-1mb.md`, visible-range WYSIWYG fold/highlight/apply path |
+| Budget | <= 50 ms |
+| Measured | `WYSIWYG visible-range fold highlight/apply: 26.964 ms` |
+| Result | Pass |
+| Notes | This run verifies B10 in `docs/wysiwyg-release-checklist.md` against the replacement zero-width mechanism. The projection keeps the backing Markdown string canonical and collapses folded delimiter layout without the old `baselineOffset(-1000)` line-height inflation. |
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`

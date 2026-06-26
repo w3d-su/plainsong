@@ -31,9 +31,15 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   keyboard selection/copy/paste/accessibility, and pointer/selection-edge.
 - The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
   source+preview/source-only only.
-- Next active goal: specify the user-facing WYSIWYG release checklist (a cleaner zero-width fold mechanism,
-  edge snapping, the `⌘⇧P` cycle entry + persisted layout mode, and a gate-rerun matrix). WYSIWYG stays
-  blocked until that checklist is written and green.
+- The user-facing WYSIWYG release checklist is now written: see `docs/wysiwyg-release-checklist.md`
+  (Goal 5, branch `phase2-wysiwyg-release-checklist`). It remains blocking — WYSIWYG stays behind the
+  development hook until every checkbox is green with linked evidence.
+- Goal 6 replaced the `baselineOffset(-1000)` zero-width fold mechanism with a TextKit 2
+  content-storage paragraph projection behind the non-user-facing hook and reran B1-B13 green. R18 is
+  closed by the new B13 layout-geometry gate.
+- Next active goal: implement the **edge-snapping / mode-integration checklist** (§C/§D of
+  `docs/wysiwyg-release-checklist.md`). This is the first user-facing WYSIWYG integration work, but it
+  must still keep link visual folding and deferred constructs out of scope.
 
 ## Rules for every Codex run
 
@@ -262,7 +268,7 @@ Result:
   gates. See `docs/wysiwyg-design.md` §14.
 - User-facing WYSIWYG remains blocked.
 
-# Goal 5 — User-facing WYSIWYG release checklist — active
+# Goal 5 — User-facing WYSIWYG release checklist — completed by phase2-wysiwyg-release-checklist
 
 ```text
 Goal: specify (do not yet ship) the user-facing WYSIWYG release checklist.
@@ -284,4 +290,122 @@ Checklist must define:
 
 Acceptance:
 - A reviewed checklist doc with explicit, testable gates. WYSIWYG stays blocked until each is green.
+```
+
+Result:
+- `docs/wysiwyg-release-checklist.md` is the blocking checklist. It is grouped A (mechanism), B (gate-rerun
+  matrix), C (UX policy), D (mode integration), E (scope), F (final sign-off), and every item is a `- [ ]`
+  release gate requiring linked evidence.
+- Mechanism decision: primary = `NSTextLayoutFragment` customization (TextKit 2-native, keeps the backing
+  string canonical); fallback = attachment-based hiding, only if it proves exact-raw copy and raw
+  accessibility value; tiny-font/kern, TextKit 1 glyph suppression, and text deletion rejected. Recorded in
+  the `agent.md` Decision Log.
+- The §B matrix requires every existing native gate (IME Zhuyin/Pinyin, keyboard arrow/shift-selection,
+  pointer click/drag, copy, paste, accessibility, large-doc performance, undo/redo, source-only/source+
+  preview regression) to rerun against the §A mechanism, plus a new layout-geometry sanity gate (B13) that
+  closes R18.
+- UX policy: reveal-on-touch retained; edge-snapping required for user-facing mode; selection may still span
+  raw delimiter offsets; copy stays exact raw Markdown; link visual folding deferred behind its own sub-gate.
+- Mode integration: three-state `⌘⇧P` cycle, three-state persisted enum with migration from
+  `Plainsong.preview.isVisible`, kill switch + deterministic fallback to source-only, off-by-default
+  Experimental label until the checklist is fully green.
+- This PR exposes no user-facing WYSIWYG, persists no WYSIWYG layout mode, adds no link folding, and changes
+  no construct scope.
+
+# Goal 6 — Cleaner zero-width fold mechanism prototype — completed by phase2-wysiwyg-zerowidth-mechanism
+
+```text
+Goal: replace the baselineOffset(-1000) zero-width fold mechanism (R18) and rerun the gate matrix.
+This is NOT the user-facing mode PR.
+
+Branch:
+- phase2-wysiwyg-zerowidth-mechanism (suggested)
+- One focused PR against main.
+- Keep WYSIWYG behind _developmentPresentation: .inlineFoldReveal. Do not expose it in Command-Shift-P
+  and do not persist a WYSIWYG layout mode.
+- Do not enable link visual folding. Do not expand construct scope.
+
+Read first:
+- docs/wysiwyg-release-checklist.md (especially §A and §B)
+- docs/risk-register.md R18
+- Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift
+- Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift
+- Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativePointerGateTests.swift
+
+Implement:
+- Primary: NSTextLayoutFragment customization (via NSTextLayoutManagerDelegate) that lays the delimiter
+  run out at zero advance and skips drawing it, without mutating the backing string. Confirm STTextView
+  lets us own/chain the layout-fragment delegate.
+- Fallback (only if STTextView cannot host the custom fragment): zero-size NSTextAttachment hiding, with
+  explicit proof that copy and AXValue remain exact raw Markdown (no U+FFFC leakage).
+- Remove or demote baselineOffset(-1000) + 0.1pt clear-font hiding once the replacement lands.
+
+Acceptance (checklist §A + §B):
+- A.3 invariants proven (source canonicality, geometry sanity, source-only/source+preview unchanged,
+  attribute compatibility, no undo pollution).
+- New layout-geometry test (B13): folded-line fragment height ≈ unfolded-line height; multi-line fold does
+  not displace the viewport.
+- Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf-log.md.
+- Record the chosen mechanism in the agent.md Decision Log; update R18 (close only when A + B13 are green).
+
+Verification:
+- make format
+- make test
+- git diff --check
+- PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests (from Packages/EditorKit)
+```
+
+Result:
+- Implemented a TextKit 2 `NSTextContentStorageDelegate` paragraph projection behind
+  `_developmentPresentation: .inlineFoldReveal`: folded delimiter attributes project to equal-length
+  U+200B runs for layout while `NSTextStorage.string` remains exact raw Markdown.
+- The `NSTextLayoutFragment` delegate path was attempted but not used because STTextView 2.3.10 owns the
+  layout-fragment delegate (`STTextLayoutFragment`) and the custom line-fragment prototype did not safely
+  drive native `firstRect` / pointer hit-testing.
+- Removed the old `baselineOffset(-1000)` + 0.1 pt clear-font hiding from `WYSIWYGInlineFoldPresentation`.
+  No attachment fallback was used, no U+FFFC is introduced, and no TextKit 1 path was added.
+- Added B13:
+  `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport`.
+- Reran B1-B13 green, including the opt-in actual Zhuyin/Pinyin IME harness, and recorded WYSIWYG
+  visible-range fold/highlight/apply at 26.964 ms in `docs/perf-log.md`.
+- R18 is closed. User-facing WYSIWYG still remains blocked: no `⌘⇧P` exposure, no persisted WYSIWYG layout
+  mode, no link visual folding, and no deferred constructs were added.
+
+# Goal 7 — Edge-snapping / mode integration checklist — active
+
+```text
+Goal: implement the remaining user-facing WYSIWYG checklist gates after the zero-width mechanism passed.
+
+Branch:
+- phase2-wysiwyg-edge-snapping-mode-integration (suggested)
+- One focused PR against main, or split into edge-snapping and mode-integration PRs if review scope grows.
+
+Read first:
+- docs/wysiwyg-release-checklist.md §C/§D/§F
+- docs/wysiwyg-design.md §16
+- docs/risk-register.md R12/R18
+- agent.md Decision Log entries dated 2026-06-26
+- Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift
+- Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift
+- App/AppState.swift
+
+Implement:
+- Delimiter edge-snapping for caret rest positions near hidden delimiters, while preserving raw source
+  selection/copy semantics.
+- A reviewed three-state `⌘⇧P` cycle (source+preview → source-only → WYSIWYG), persisted layout enum and
+  migration from `Plainsong.preview.isVisible`, kill switch / deterministic recovery, and Experimental
+  labeling.
+- Keep WYSIWYG off by default until all release gates are green.
+
+Do not:
+- Enable link visual folding.
+- Add images, fenced-code custom fragments, tables, Mermaid/math widgets, or real MDX rendering.
+- Change copy policy away from exact raw Markdown.
+
+Verification:
+- make format
+- make test
+- git diff --check
+- PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests (from Packages/EditorKit)
+- Add targeted edge-snapping and mode-persistence/migration tests.
 ```

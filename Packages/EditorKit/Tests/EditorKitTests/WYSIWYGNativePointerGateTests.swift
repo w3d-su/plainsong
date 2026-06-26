@@ -12,6 +12,52 @@ import XCTest
 /// hit-test, so this exercises the production pointer path against laid-out hidden delimiters.
 @MainActor
 final class WYSIWYGNativePointerGateTests: XCTestCase {
+    func testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport() throws {
+        let source = "Top line\nA **bold** middle ~~gone~~ and `code` tail\nBottom line\n"
+        let foldedLine = source.nsRange(of: "A **bold**")
+        let topLine = source.nsRange(of: "Top line")
+        let bottomLine = source.nsRange(of: "Bottom line")
+        let foldedDelimiters = [
+            source.nsRange(of: "**bold**", selecting: "**"),
+            source.nsRange(of: "**bold**", selectingLast: "**"),
+            source.nsRange(of: "~~gone~~", selecting: "~~"),
+            source.nsRange(of: "~~gone~~", selectingLast: "~~"),
+            source.nsRange(of: "`code`", selecting: "`"),
+            source.nsRange(of: "`code`", selectingLast: "`"),
+        ]
+
+        let unfoldedFixture = try makeWindowedEditor(source: source)
+        let unfoldedFoldedLineFrame = try layoutFragmentFrame(containing: foldedLine, in: unfoldedFixture.textView)
+        let unfoldedSiblingDistance = try siblingLineDistance(
+            from: topLine,
+            to: bottomLine,
+            in: unfoldedFixture.textView
+        )
+
+        let foldedFixture = try makeWindowedEditor(source: source)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: foldedFixture.textView
+        ))
+
+        let foldedLineFrame = try layoutFragmentFrame(containing: foldedLine, in: foldedFixture.textView)
+        XCTAssertEqual(foldedLineFrame.height, unfoldedFoldedLineFrame.height, accuracy: 2)
+
+        let foldedSiblingDistance = try siblingLineDistance(
+            from: topLine,
+            to: bottomLine,
+            in: foldedFixture.textView
+        )
+        XCTAssertEqual(foldedSiblingDistance, unfoldedSiblingDistance, accuracy: 4)
+
+        for delimiter in foldedDelimiters {
+            let advance = try delimiterAdvance(for: delimiter, in: foldedFixture.textView)
+            XCTAssertLessThanOrEqual(advance, 0.5, "Expected folded delimiter \(delimiter) to have zero advance")
+        }
+    }
+
     func testPointerClickOnFoldedHeadingContentRevealsMarkerWithoutTrap() throws {
         let source = "# Heading\n\nBody paragraph here"
         let fixture = try makeWindowedEditor(source: source)
@@ -184,6 +230,7 @@ private extension WYSIWYGNativePointerGateTests {
         textView.showsLineNumbers = false
         textView.font = MarkdownSyntaxHighlighter.defaultFont
         textView.text = source
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
 
         let window = NSWindow(
             contentRect: frame,
@@ -198,6 +245,66 @@ private extension WYSIWYGNativePointerGateTests {
         textView.layoutSubtreeIfNeeded()
         textView.textLayoutManager.ensureLayout(for: textView.textLayoutManager.documentRange)
         return WindowedEditor(window: window, textView: textView)
+    }
+
+    func layoutFragmentFrame(containing range: NSRange, in textView: STTextView) throws -> CGRect {
+        textView.textLayoutManager.ensureLayout(for: textView.textLayoutManager.documentRange)
+        let textRange = try XCTUnwrap(NSTextRange(range, in: textView.textContentManager))
+        let fragment = try XCTUnwrap(textView.textLayoutManager.textLayoutFragment(for: textRange.location))
+        return fragment.layoutFragmentFrame
+    }
+
+    func siblingLineDistance(from firstRange: NSRange, to secondRange: NSRange,
+                             in textView: STTextView) throws -> CGFloat {
+        let first = try lineFragmentFrame(containing: firstRange, in: textView)
+        let second = try lineFragmentFrame(containing: secondRange, in: textView)
+        return abs(second.minY - first.minY)
+    }
+
+    func lineFragmentFrame(containing range: NSRange, in textView: STTextView) throws -> CGRect {
+        try lineFragmentInfo(containing: range, in: textView).frame
+    }
+
+    func delimiterAdvance(for range: NSRange, in textView: STTextView) throws -> CGFloat {
+        let info = try lineFragmentInfo(containing: range, in: textView)
+        let localLocation = range.location - info.documentRange.location
+        let start = info.lineFragment.locationForCharacter(at: localLocation)
+        let end = info.lineFragment.locationForCharacter(at: localLocation + range.length)
+        return abs(end.x - start.x)
+    }
+
+    func lineFragmentInfo(
+        containing range: NSRange,
+        in textView: STTextView
+    ) throws -> (lineFragment: NSTextLineFragment, documentRange: NSRange, frame: CGRect) {
+        textView.textLayoutManager.ensureLayout(for: textView.textLayoutManager.documentRange)
+        var result: (NSTextLineFragment, NSRange, CGRect)?
+
+        textView.textLayoutManager.enumerateTextLayoutFragments(
+            from: textView.textLayoutManager.documentRange.location,
+            options: [.ensuresLayout]
+        ) { fragment in
+            let elementRange = NSRange(fragment.rangeInElement, in: textView.textContentManager)
+            for lineFragment in fragment.textLineFragments {
+                let lineRange = NSRange(
+                    location: elementRange.location + lineFragment.characterRange.location,
+                    length: lineFragment.characterRange.length
+                )
+                guard NSLocationInRange(range.location, lineRange) else {
+                    continue
+                }
+
+                let frame = lineFragment.typographicBounds.offsetBy(
+                    dx: fragment.layoutFragmentFrame.minX,
+                    dy: fragment.layoutFragmentFrame.minY
+                )
+                result = (lineFragment, lineRange, frame)
+                return false
+            }
+            return true
+        }
+
+        return try XCTUnwrap(result)
     }
 
     /// Dispatches a real left-mouse-down at the on-screen midpoint of `characterRange` and
@@ -330,6 +437,30 @@ private extension String {
         let range = (self as NSString).range(of: substring)
         XCTAssertNotEqual(range.location, NSNotFound, "Expected substring '\(substring)' in '\(self)'")
         return range
+    }
+
+    func nsRange(of containingSubstring: String, selecting selectedSubstring: String) -> NSRange {
+        let containerRange = nsRange(of: containingSubstring)
+        let container = (self as NSString).substring(with: containerRange) as NSString
+        let selectedRange = container.range(of: selectedSubstring)
+        XCTAssertNotEqual(
+            selectedRange.location,
+            NSNotFound,
+            "Expected substring '\(selectedSubstring)' in '\(containingSubstring)'"
+        )
+        return NSRange(location: containerRange.location + selectedRange.location, length: selectedRange.length)
+    }
+
+    func nsRange(of containingSubstring: String, selectingLast selectedSubstring: String) -> NSRange {
+        let containerRange = nsRange(of: containingSubstring)
+        let container = (self as NSString).substring(with: containerRange) as NSString
+        let selectedRange = container.range(of: selectedSubstring, options: .backwards)
+        XCTAssertNotEqual(
+            selectedRange.location,
+            NSNotFound,
+            "Expected substring '\(selectedSubstring)' in '\(containingSubstring)'"
+        )
+        return NSRange(location: containerRange.location + selectedRange.location, length: selectedRange.length)
     }
 
     func substring(with range: NSRange) -> String {

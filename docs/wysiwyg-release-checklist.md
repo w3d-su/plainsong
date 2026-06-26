@@ -1,14 +1,14 @@
 # User-Facing WYSIWYG Release Checklist
 
-> **Status: BLOCKING SPECIFICATION. WYSIWYG is not user-facing.**
+> **Status: BLOCKING CHECKLIST. WYSIWYG is not user-facing.**
 > This document defines every gate that must be green before Plainsong exposes a WYSIWYG
 > editing mode to users. Until every checkbox in this file is checked with linked evidence,
 > WYSIWYG stays behind `MarkdownEditorView(..., _developmentPresentation: .inlineFoldReveal)`,
 > out of the `⌘⇧P` cycle, and out of persisted layout state.
 >
-> This is a **specification PR**. It adds no user-facing mode, no persisted WYSIWYG layout
-> value, no link visual folding, and no new construct rendering. It tells the next
-> implementation PRs exactly what to build and what to re-prove.
+> This checklist started as a specification and now records implementation evidence as gates
+> turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26,
+> but user-facing WYSIWYG remains blocked by the UX and mode-integration gates.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
 interaction gates (IME §12/§13, keyboard selection/copy/paste/accessibility §12, pointer/
@@ -41,15 +41,14 @@ What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 
 What still blocks a user-facing mode:
 
-1. **Mechanism (R18).** The dev hook hides delimiters with `baselineOffset(-1000)` + a
-   0.1 pt clear font. A single folded line lays out as an ~1013 pt-tall fragment. It does not
-   trap the caret, but in multi-line documents the geometry pushes sibling lines outside the
-   viewport. This is acceptable for tests, **not** for a mode users edit in.
-2. **All native gates were proven against that throwaway mechanism.** A cleaner mechanism is
-   a different layout path, so IME/selection/pointer/accessibility/performance must rerun
-   against it (§A constraints in `docs/wysiwyg-design.md` §10/§11).
-3. **No UX policy** for delimiter edge-snapping, mode cycling, persistence, or experimental
-   labeling has been specified or implemented.
+1. **UX and mode integration are still unimplemented.** Delimiter edge-snapping, the
+   three-state `⌘⇧P` cycle, persisted layout migration, kill switch / recovery, and
+   Experimental labeling remain unchecked (§C/§D).
+2. **The working mechanism is still behind the non-user-facing hook.** The App does not pass
+   `_developmentPresentation: .inlineFoldReveal`, and no persisted WYSIWYG layout mode exists.
+3. **Link visual folding and deferred constructs remain blocked.** This checklist does not
+   authorize links, images, fenced-code custom fragments, tables, Mermaid/math widgets, or real
+   MDX rendering in the editor surface.
 
 ---
 
@@ -57,8 +56,8 @@ What still blocks a user-facing mode:
 
 ### A.1 Problem
 
-`Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift` folds delimiters
-with attribute-only hiding:
+Historically, `Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift`
+folded delimiters with attribute-only hiding:
 
 ```swift
 private static var foldedDelimiterFont: NSFont { .monospacedSystemFont(ofSize: 0.1, weight: .regular) }
@@ -71,43 +70,59 @@ private static var foldedDelimiterBaselineOffset: CGFloat { -1000 }
 viewport in multi-line documents (R18). The replacement must collapse the delimiter run to
 genuine zero advance **without** abusing baseline and **without** mutating source text.
 
+The 2026-06-26 mechanism PR removes this baseline/tiny-font path from production code.
+
 ### A.2 Options evaluated
 
 | Option | Mechanism | Pros | Cons / risks | Verdict |
 |---|---|---|---|---|
-| **NSTextLayoutFragment customization** (TextKit 2) | Provide a custom `NSTextLayoutFragment` (via `NSTextLayoutManagerDelegate.textLayoutManager(_:textLayoutFragmentFor:in:)`) that lays out the delimiter elements with zero advance and skips drawing them. | Native TextKit 2 path STTextView already uses; collapses geometry correctly (no 1013 pt line); backing string untouched, so copy/AX value stay raw; no object-replacement characters. | Must confirm STTextView lets us own / chain the layout-fragment delegate without breaking its own fragment work; fragment math is the trickiest TextKit 2 surface; caret/firstRect mapping into a collapsed run must be re-verified. | **PRIMARY** |
-| **Attachment-based hiding** | Apply a zero-size `NSTextAttachment` (drawing nothing, `attachmentBounds` = `.zero`) over each delimiter run. | Conceptually simple; attachment cell controls its own size, so no baseline abuse. | Attachments normally pair with an object-replacement character (U+FFFC); applying one over *existing* text risks copy emitting `\u{FFFC}` and accessibility value diverging from raw source, violating the exact-raw-copy and raw-AX-value policies. Needs explicit proof those stay raw. | **FALLBACK** (only if A.3 invariants pass with extra copy/AX coverage) |
+| **NSTextContentStorage paragraph projection** (TextKit 2) | Install a dev-hook-only `NSTextContentStorageDelegate` that returns an `NSTextParagraph` copy only for paragraphs containing folded delimiter attributes; folded delimiter characters are projected to equal-length U+200B runs for layout. | STTextView keeps its own `NSTextLayoutManager` delegate and `STTextLayoutFragment`; delimiter advance collapses to zero; backing `NSTextStorage.string` stays exact raw Markdown; no attachments, no U+FFFC, no TextKit 1 path. | The layout paragraph differs from the backing paragraph, so raw pointer and keyboard offsets need narrow WYSIWYG-only adapters. | **CHOSEN** (2026-06-26) |
+| **NSTextLayoutFragment customization** (TextKit 2) | Provide a custom `NSTextLayoutFragment` (via `NSTextLayoutManagerDelegate.textLayoutManager(_:textLayoutFragmentFor:in:)`) that lays out the delimiter elements with zero advance and skips drawing them. | Native TextKit 2 path STTextView already uses; collapses geometry correctly in principle; backing string untouched, so copy/AX value stay raw; no object-replacement characters. | STTextView 2.3.10 already owns `textLayoutManager.delegate` and returns `STTextLayoutFragment`; a direct owner would break that chain. A public `NSTextLineFragment` override prototype also did not drive TextKit's segment/`firstRect` hit-testing path reliably enough for native pointer gates. | **ATTEMPTED; not used** |
+| **Attachment-based hiding** | Apply a zero-size `NSTextAttachment` (drawing nothing, `attachmentBounds` = `.zero`) over each delimiter run. | Conceptually simple; attachment cell controls its own size, so no baseline abuse. | Attachments normally pair with an object-replacement character (U+FFFC); applying one over *existing* text risks copy emitting `\u{FFFC}` and accessibility value diverging from raw source, violating the exact-raw-copy and raw-AX-value policies. Needs explicit proof those stay raw. | **FALLBACK; not needed** |
 | Negative `.kern` / tiny-font only (no baseline) | Shrink + kern the run toward zero width. | No baseline inflation. | Still leaves measurable advance and selectable sub-pixel glyphs; same class of hack as the current one; fragile across fonts/zoom. | Rejected |
 | TextKit 1 `NSLayoutManager` glyph generation (zero `NSGlyphProperty`) | Suppress glyphs in TextKit 1. | Well-trodden in TextKit 1 editors. | Plainsong/STTextView are TextKit 2; reintroducing a TextKit 1 layout path is a regression against the architecture. | Rejected |
 | Real text deletion / replacement | Edit the backing string to drop delimiters. | Trivial layout. | Violates the non-negotiable rule that source text is the only model and is never mutated for presentation. | Rejected |
 
 ### A.3 Invariants the replacement mechanism MUST preserve
 
-- [ ] **Source canonicality.** The backing `String` is never mutated for presentation. No
+- [x] **Source canonicality.** The backing `String` is never mutated for presentation. No
   delimiter is deleted, replaced, or substituted with an object-replacement character.
-- [ ] **Geometry sanity.** A folded line's fragment height equals a normal rendered line's
+  Evidence: `WYSIWYGZeroWidthTextContentProjection.swift` projects only `NSTextParagraph`
+  copies; `WYSIWYGSelectionMappingSpikeTests.testProductionFoldPresentationCopyUsesRawBackingString`,
+  `WYSIWYGNativeInteractionGateTests.testAccessibilityValueRemainsRawMarkdownSource`, and
+  `...testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` pass.
+- [x] **Geometry sanity.** A folded line's fragment height equals a normal rendered line's
   height (no ~1013 pt fragments); folding a line does not push sibling lines out of the
   viewport. Add a layout-geometry assertion (folded-line height ≈ unfolded-line height
   within tolerance) over a multi-line fixture.
-- [ ] **Source-only mode unchanged.** With `_developmentPresentation: .source` (and in the
+  Evidence: `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport`.
+- [x] **Source-only mode unchanged.** With `_developmentPresentation: .source` (and in the
   shipping source-only mode), layout, selection, copy, and the line-number gutter are
   byte-for-byte unchanged from today.
-- [ ] **Source+preview mode unchanged.** The preview pipeline, bridge, scroll sync, and
+  Evidence: `make test` passed on 2026-06-26; the zero-width delegate is installed only when
+  `_developmentPresentation: .inlineFoldReveal` is enabled.
+- [x] **Source+preview mode unchanged.** The preview pipeline, bridge, scroll sync, and
   `data-line` anchoring are unaffected by the mechanism change.
-- [ ] **Attribute compatibility.** Highlight attributes from `MarkdownSyntaxHighlighter`
+  Evidence: `make test` passed on 2026-06-26, including the Xcode `Plainsong` scheme,
+  `PreviewKitTests`, and preview-src Vitest.
+- [x] **Attribute compatibility.** Highlight attributes from `MarkdownSyntaxHighlighter`
   still apply over the same ranges; the new mechanism composes with highlighting rather than
   replacing it.
-- [ ] **No undo pollution.** Presentation continues to flow through the
+  Evidence: `MarkdownSyntaxHighlighterTests.testDevelopmentInlineFoldRevealFoldsIncludedConstructsAndDefersLinks`
+  and `MarkdownEditorViewTests.testPartialHighlightApplyPreservesTextAndSelection`.
+- [x] **No undo pollution.** Presentation continues to flow through the
   `MarkdownTextView.applyHighlightedText` path that disables undo registration and skips
   while marked text exists.
+  Evidence: `MarkdownEditorViewTests.testAttributeOnlyPresentationDoesNotEnterUndoOrRedoStack`
+  and `...testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation`.
 
 ### A.4 Mechanism decision
 
-- [ ] A mechanism-prototype PR lands the **NSTextLayoutFragment customization** path (primary)
-  behind the existing non-user-facing hook, or — if STTextView cannot host the custom
-  fragment cleanly — the **attachment-based** fallback with the extra copy/accessibility proof
-  required by A.2. The chosen mechanism is recorded in the `agent.md` Decision Log.
-- [ ] `baselineOffset(-1000)` and the 0.1 pt clear-font hiding are removed from
+- [x] A mechanism-prototype PR lands the TextKit 2 **NSTextContentStorage paragraph projection**
+  behind the existing non-user-facing hook. The `NSTextLayoutFragment` primary was attempted
+  but not used because STTextView owns the layout-fragment delegate; the attachment fallback
+  was not needed. The chosen mechanism is recorded in the `agent.md` Decision Log.
+- [x] `baselineOffset(-1000)` and the 0.1 pt clear-font hiding are removed from
   `WYSIWYGInlineFoldPresentation.swift` (or demoted to an explicitly test-only path) once the
   replacement lands.
 
@@ -115,25 +130,25 @@ genuine zero advance **without** abusing baseline and **without** mutating sourc
 
 ## B. Gate-rerun matrix (against the §A replacement mechanism)
 
-Every gate below was proven against the `baselineOffset(-1000)` dev hook. Each must rerun and
-pass against the §A replacement before WYSIWYG is user-facing. "New mechanism" means the §A.4
-mechanism, not the current one.
+Every gate below was originally proven against the `baselineOffset(-1000)` dev hook and has now rerun
+against the §A replacement. "New mechanism" means the §A.4 content-storage projection, not the old
+baseline-offset mechanism.
 
 | # | Gate | Current evidence (dev hook) | Rerun requirement | Status |
 |---|---|---|---|---|
-| B1 | Actual Zhuyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries` (opt-in) | Re-run opt-in harness against new mechanism; no source corruption, no caret escape, no premature commit, fold attrs skipped during marked text, reapplied after commit | - [ ] |
-| B2 | Actual Pinyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled` (opt-in) | Re-run opt-in harness against new mechanism; same acceptance as B1 | - [ ] |
-| B3 | Keyboard arrow movement near folded delimiters | `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping` | Re-run; caret stays sane, touched span reveals, no trap | - [ ] |
-| B4 | Reverse shift-selection across folded spans | `...testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` | Re-run; selected range is exact raw Markdown, region reveals, copy is raw | - [ ] |
-| B5 | True pointer click-to-caret | `WYSIWYGNativePointerGateTests.testPointerClick*` / `testPointerBoundaryClicks*` | Re-run real `NSEvent` hit-testing against new fragment geometry; sane caret, reveal-on-touch, no trap | - [ ] |
-| B6 | Pointer drag (pointer-extend) selection across folds | `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` | Re-run; sane non-empty range, exact raw-Markdown copy, all touched spans reveal | - [ ] |
-| B7 | Copy = exact raw Markdown policy | `WYSIWYGNativeInteractionGateTests.testPartialFoldedSpanCopyPolicyUsesExactRawSelection` | Re-run; entire spans include delimiters, content-only copies content, boundary copies exact `NSRange` | - [ ] |
-| B8 | Paste through folded/revealed regions | `...testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` | Re-run; backing string mutates normally, no ORC/presentation-only text inserted | - [ ] |
-| B9 | Accessibility value / role | `...testAccessibilityValueRemainsRawMarkdownSource` | Re-run; `AXTextArea` value is exact raw Markdown under the new mechanism (critical for attachment fallback) | - [ ] |
-| B10 | Large-document visible-range performance | `MarkdownEditorViewTests.testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` (≤ 50 ms, §12) | Re-run on the 1 MB fixture against new mechanism; record result in `docs/perf-log.md` | - [ ] |
-| B11 | Undo / redo | `MarkdownEditorViewTests.testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation` | Re-run; presentation never enters undo, stale presentation rejected, fold state recomputed | - [ ] |
-| B12 | Source-only / source+preview regression | source-only + source+preview existing EditorKit/App tests | Re-run full `make test`; confirm A.3 "unchanged" invariants hold with the mechanism present | - [ ] |
-| B13 | Layout-geometry sanity (new) | none (new gate for the new mechanism) | New test: folded-line fragment height ≈ unfolded-line height; multi-line fold does not displace the viewport (closes R18) | - [ ] |
+| B1 | Actual Zhuyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries` (opt-in) | Re-run opt-in harness against new mechanism; no source corruption, no caret escape, no premature commit, fold attrs skipped during marked text, reapplied after commit | - [x] 2026-06-26: `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests` passed; Zhuyin input source `com.apple.inputmethod.TCIM.Zhuyin` |
+| B2 | Actual Pinyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled` (opt-in) | Re-run opt-in harness against new mechanism; same acceptance as B1 | - [x] 2026-06-26: same opt-in command passed; Pinyin input source `com.apple.inputmethod.TCIM.Pinyin` |
+| B3 | Keyboard arrow movement near folded delimiters | `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping` | Re-run; caret stays sane, touched span reveals, no trap | - [x] `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping` |
+| B4 | Reverse shift-selection across folded spans | `...testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` | Re-run; selected range is exact raw Markdown, region reveals, copy is raw | - [x] `WYSIWYGNativeInteractionGateTests.testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` |
+| B5 | True pointer click-to-caret | `WYSIWYGNativePointerGateTests.testPointerClick*` / `testPointerBoundaryClicks*` | Re-run real `NSEvent` hit-testing against new fragment geometry; sane caret, reveal-on-touch, no trap | - [x] `WYSIWYGNativePointerGateTests.testPointerClickAcrossFoldedInlineDelimitersPlacesSaneCaretAndReveals`, `...testPointerClickOnFoldedHeadingContentRevealsMarkerWithoutTrap`, `...testPointerBoundaryClicksAtFoldedDelimiterEdgesDoNotTrapCaret` |
+| B6 | Pointer drag (pointer-extend) selection across folds | `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` | Re-run; sane non-empty range, exact raw-Markdown copy, all touched spans reveal | - [x] `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` |
+| B7 | Copy = exact raw Markdown policy | `WYSIWYGNativeInteractionGateTests.testPartialFoldedSpanCopyPolicyUsesExactRawSelection` | Re-run; entire spans include delimiters, content-only copies content, boundary copies exact `NSRange` | - [x] `WYSIWYGNativeInteractionGateTests.testPartialFoldedSpanCopyPolicyUsesExactRawSelection` and `...testNativeShiftSelectionAcrossFoldedBoldStrikeAndInlineCodeCopiesRawMarkdown` |
+| B8 | Paste through folded/revealed regions | `...testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` | Re-run; backing string mutates normally, no ORC/presentation-only text inserted | - [x] `WYSIWYGNativeInteractionGateTests.testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` |
+| B9 | Accessibility value / role | `...testAccessibilityValueRemainsRawMarkdownSource` | Re-run; `AXTextArea` value is exact raw Markdown under the new mechanism (critical for attachment fallback) | - [x] `WYSIWYGNativeInteractionGateTests.testAccessibilityValueRemainsRawMarkdownSource` |
+| B10 | Large-document visible-range performance | `MarkdownEditorViewTests.testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` (≤ 50 ms, §12) | Re-run on the 1 MB fixture against new mechanism; record result in `docs/perf-log.md` | - [x] `MarkdownEditorViewTests.testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` recorded `WYSIWYG visible-range fold highlight/apply: 26.964 ms`; see `docs/perf-log.md` |
+| B11 | Undo / redo | `MarkdownEditorViewTests.testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation` | Re-run; presentation never enters undo, stale presentation rejected, fold state recomputed | - [x] `MarkdownEditorViewTests.testAttributeOnlyPresentationDoesNotEnterUndoOrRedoStack` and `...testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation` |
+| B12 | Source-only / source+preview regression | source-only + source+preview existing EditorKit/App tests | Re-run full `make test`; confirm A.3 "unchanged" invariants hold with the mechanism present | - [x] 2026-06-26: full `make test` passed, including package tests, Xcode `Plainsong` scheme, and preview-src Vitest |
+| B13 | Layout-geometry sanity (new) | none (new gate for the new mechanism) | New test: folded-line fragment height ≈ unfolded-line height; multi-line fold does not displace the viewport (closes R18) | - [x] `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport` |
 
 ---
 
@@ -253,9 +268,9 @@ copy/accessibility/performance) against the §A mechanism before it becomes user
 
 WYSIWYG may be exposed to users only when **all** of the following are checked:
 
-- [ ] **A** — Replacement zero-width mechanism landed; A.3 invariants proven; `baselineOffset(-1000)`
+- [x] **A** — Replacement zero-width mechanism landed; A.3 invariants proven; `baselineOffset(-1000)`
   removed/demoted; mechanism recorded in Decision Log.
-- [ ] **B** — Every row B1–B13 re-run and green against the §A mechanism; performance recorded in
+- [x] **B** — Every row B1–B13 re-run and green against the §A mechanism; performance recorded in
   `docs/perf-log.md`.
 - [ ] **C** — Reveal-on-touch, edge-snapping, selection/copy, and link-deferral policies implemented
   and tested.
@@ -276,8 +291,9 @@ Until then, the only valid WYSIWYG surface is the non-user-facing
 - `docs/wysiwyg-design.md` §10–§14 — spike results, production core, and native interaction gates.
 - `docs/risk-register.md` — R10 (selection/caret), R11 (copy policy), R12 (checklist-before-gates),
   R18 (zero-width mechanism distortion).
-- `docs/codex-handoff.md` — Goal 4 (pointer gate) and Goal 5 (this checklist).
-- `Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift` — current dev-hook mechanism.
+- `docs/codex-handoff.md` — Goals 4-6 and the next active edge-snapping / mode-integration goal.
+- `Packages/EditorKit/Sources/EditorKit/WYSIWYGZeroWidthTextContentProjection.swift` — current
+  zero-width mechanism.
 - `Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativePointerGateTests.swift`,
   `WYSIWYGNativeInteractionGateTests.swift`, `WYSIWYGActualIMEEventGateTests.swift`,
   `WYSIWYGIMESpikeTests.swift`, `WYSIWYGSelectionMappingSpikeTests.swift` — gate evidence.

@@ -7,8 +7,7 @@ import XCTest
 final class WYSIWYGNativeInteractionGateTests: XCTestCase {
     func testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping() throws {
         let source = "A **bold** and `code` done"
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
 
         let outsideSelection = NSRange(location: 0, length: 0)
         XCTAssertTrue(applyProductionPresentation(source, selection: outsideSelection, revision: 1, to: textView))
@@ -39,8 +38,7 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
 
     func testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane() throws {
         let source = "A **bold** then ~~gone~~ and `code` done"
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         textView.textSelection = NSRange(location: 0, length: 0)
         XCTAssertTrue(applyProductionPresentation(
             source,
@@ -80,8 +78,7 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
 
     func testNativeShiftSelectionAcrossFoldedBoldStrikeAndInlineCodeCopiesRawMarkdown() throws {
         let source = "A **bold** then ~~gone~~ and `code` done"
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         textView.textSelection = NSRange(location: 0, length: 0)
         XCTAssertTrue(applyProductionPresentation(
             source,
@@ -175,8 +172,7 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
 
     func testPartialFoldedSpanCopyPolicyUsesExactRawSelection() {
         let source = "A **bold** and `code` plus ~~gone~~."
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         XCTAssertTrue(applyProductionPresentation(
             source,
             selection: NSRange(location: 0, length: 0),
@@ -209,8 +205,7 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
 
     func testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly() {
         let source = "A **bold** and `code` done"
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         XCTAssertTrue(applyProductionPresentation(
             source,
             selection: NSRange(location: 0, length: 0),
@@ -245,8 +240,7 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
 
     func testAccessibilityValueRemainsRawMarkdownSource() {
         let source = "# Heading\n\nA **bold** and `code` plus ~~gone~~."
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         XCTAssertTrue(applyProductionPresentation(
             source,
             selection: NSRange(location: 0, length: 0),
@@ -298,8 +292,7 @@ private extension WYSIWYGNativeInteractionGateTests {
         delimiters: [NSRange],
         isRevealed: Bool
     ) throws {
-        let textView = STTextView(frame: .zero)
-        textView.text = source
+        let textView = makeWYSIWYGTextView(source: source)
         textView.textSelection = selection
 
         let presentation = productionPresentation(source, selection: selection, revision: 1)
@@ -364,6 +357,14 @@ private extension WYSIWYGNativeInteractionGateTests {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongNativeGate.\(UUID().uuidString)"))
         pasteboard.clearContents()
         return pasteboard
+    }
+
+    func makeWYSIWYGTextView(source: String) -> MarkdownSTTextView {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.font = MarkdownSyntaxHighlighter.defaultFont
+        textView.text = source
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        return textView
     }
 }
 

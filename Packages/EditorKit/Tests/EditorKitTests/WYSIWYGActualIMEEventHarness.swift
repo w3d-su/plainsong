@@ -228,6 +228,7 @@ final class ActualIMEEventHarness {
         textView.isEditable = true
         textView.isSelectable = true
         textView.font = MarkdownSyntaxHighlighter.defaultFont
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
 
         let window = NSWindow(
             contentRect: frame,
