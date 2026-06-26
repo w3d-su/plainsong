@@ -56,7 +56,7 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
             developmentPresentation: .inlineFoldReveal,
             selection: NSRange(location: (source as NSString).length, length: 0)
         )
-        let inspected = NSAttributedString(highlighted.text)
+        let inspected = NSAttributedString.materializedPresentation(highlighted)
 
         XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "#")))
         XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
@@ -85,7 +85,7 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
             developmentPresentation: .inlineFoldReveal,
             selection: NSRange(location: source.nsRange(of: "bold").location, length: 0)
         )
-        let inspected = NSAttributedString(highlighted.text)
+        let inspected = NSAttributedString.materializedPresentation(highlighted)
 
         XCTAssertFalse(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
         XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "`code`", selecting: "`")))
@@ -407,6 +407,18 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
 }
 
 private extension NSAttributedString {
+    static func materializedPresentation(_ highlighted: MarkdownHighlightResult) -> NSAttributedString {
+        let attributed = NSMutableAttributedString(attributedString: NSAttributedString(highlighted.text))
+        if let foldPlan = highlighted.foldPlan {
+            WYSIWYGInlineFoldPresentation.applyFoldedDelimiterAttributes(
+                plan: foldPlan,
+                visibleRange: highlighted.range,
+                to: attributed
+            )
+        }
+        return attributed
+    }
+
     func attributes(for substring: String) throws -> [NSAttributedString.Key: Any] {
         let range = (string as NSString).range(of: substring)
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")

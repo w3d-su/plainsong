@@ -13,6 +13,8 @@ public enum MarkdownEditorDevelopmentPresentation: Equatable, Sendable {
 }
 
 struct WYSIWYGInlineFoldPresentation {
+    static let foldedDelimiterAttribute = NSAttributedString.Key("app.plainsong.wysiwyg.foldedDelimiter")
+
     let theme: MarkdownSyntaxTheme
     let baseFont: NSFont
 
@@ -25,6 +27,14 @@ struct WYSIWYGInlineFoldPresentation {
             applyContentAttributes(for: region, visibleRange: visibleRange, to: attributed)
         }
 
+        Self.applyFoldedDelimiterAttributes(plan: plan, visibleRange: visibleRange, to: attributed)
+    }
+
+    static func applyFoldedDelimiterAttributes(
+        plan: WYSIWYGFoldPlan,
+        visibleRange: NSRange,
+        to attributed: NSMutableAttributedString
+    ) {
         for range in plan.regions
             .filter({ Self.includes($0.kind) && !$0.isRevealed })
             .flatMap(\.foldRanges) {
@@ -48,7 +58,7 @@ struct WYSIWYGInlineFoldPresentation {
     }
 
     static func containsFoldedDelimiterAttributes(_ attributes: [NSAttributedString.Key: Any]) -> Bool {
-        attributes[.toolTip] as? String == foldedDelimiterMarker
+        attributes[foldedDelimiterAttribute] as? Bool == true
     }
 
     private func applyContentAttributes(
@@ -86,11 +96,9 @@ struct WYSIWYGInlineFoldPresentation {
         }
     }
 
-    private static let foldedDelimiterMarker = "app.plainsong.wysiwyg.foldedDelimiter"
-
     private static var foldedDelimiterAttributes: [NSAttributedString.Key: Any] {
         [
-            .toolTip: foldedDelimiterMarker,
+            foldedDelimiterAttribute: true,
         ]
     }
 }

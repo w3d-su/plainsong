@@ -613,9 +613,9 @@ which made native pointer placement unsafe. The content-storage projection keeps
 delegate intact and stays fully on TextKit 2.
 
 Because the layout paragraph differs from the raw backing paragraph, `MarkdownSTTextView` adds narrow
-WYSIWYG-only pointer and raw-offset keyboard adapters while the projection delegate is installed. Source-only
-and source+preview paths do not install the delegate and remain unchanged. The old `baselineOffset(-1000)` +
-0.1 pt clear-font mechanism is removed from the implementation.
+WYSIWYG-only pointer and composed-character-aware keyboard adapters while the projection delegate is
+installed. Source-only and source+preview paths do not install the delegate and remain unchanged. The old
+`baselineOffset(-1000)` + 0.1 pt clear-font mechanism is removed from the implementation.
 
 Checklist §A and §B are green against this mechanism: the opt-in actual Zhuyin/Pinyin IME event stream,
 keyboard arrow and reverse shift-selection gates, true pointer click/drag gates, exact raw copy, paste,
