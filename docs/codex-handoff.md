@@ -20,13 +20,20 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   hook, but left actual macOS IME event streams incomplete.
 - The actual Zhuyin follow-up gate passed through the production development hook at heading, bold,
   italic, and inline-code boundaries.
-- The actual Pinyin follow-up gate now also passes through the same hook (PR for
+- The actual Pinyin follow-up gate now also passes through the same hook (PR #43,
   `phase2-actual-pinyin-ime-gate`), using the enabled `com.apple.inputmethod.TCIM.Pinyin`
   (`Pinyin – Traditional`) input method. IME is no longer a Phase 2 blocker.
+- The native pointer hit-testing / selection-edge gate now passes (PR for
+  `phase2-native-pointer-selection-gate`): real `NSEvent` mouse-downs at the laid-out position of folded
+  heading/bold/strike/inline-code delimiters place a sane caret, reveal the touched span, copy exact raw
+  Markdown across a pointer-extended (drag) selection, and never trap the caret in a hidden delimiter.
+- All native interaction gates for the attribute-only hook are now complete: IME (Zhuyin + Pinyin),
+  keyboard selection/copy/paste/accessibility, and pointer/selection-edge.
 - The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
   source+preview/source-only only.
-- Next active goal: add a narrow native pointer hit-testing / selection-edge gate against the production
-  development hook before any user-facing WYSIWYG mode is considered.
+- Next active goal: specify the user-facing WYSIWYG release checklist (a cleaner zero-width fold mechanism,
+  edge snapping, the `⌘⇧P` cycle entry + persisted layout mode, and a gate-rerun matrix). WYSIWYG stays
+  blocked until that checklist is written and green.
 
 ## Rules for every Codex run
 
@@ -214,7 +221,7 @@ Result:
   deterministic.
 - User-facing WYSIWYG remains blocked. See `docs/wysiwyg-design.md` §13.
 
-# Goal 4 — Native pointer hit-testing / selection-edge gate — active
+# Goal 4 — Native pointer hit-testing / selection-edge gate — completed by phase2-native-pointer-selection-gate
 
 ```text
 Goal: prove native pointer interaction safety for the PR #38 inline fold/reveal production core.
@@ -236,4 +243,45 @@ Gate scope:
 Acceptance:
 - If the pointer gates pass, the next PR can specify the user-facing WYSIWYG release checklist.
 - If any pointer gate fails, keep user-facing WYSIWYG blocked and document the exact fallback.
+```
+
+Result:
+- `WYSIWYGNativePointerGateTests` lays the production hook out in a real `NSWindow`, folds inline
+  delimiters to ~zero width, and dispatches real `NSEvent` left-mouse-downs at the on-screen position of
+  folded content (target from `firstRect(forCharacterRange:)`, caret from STTextView's own
+  `mouseDown → caretLocation` hit-test).
+- PASS: heading-marker, bold/strike/inline-code content, and delimiter-edge boundary clicks place a sane
+  caret, reveal the touched span, and never trap the caret inside a hidden delimiter; clicks on trailing
+  text keep spans folded. Pointer-extend (shift-click) drag selection across folded bold→strike→code
+  copies exact raw Markdown (delimiters included) and reveals every touched span.
+- Edge policy: reveal-on-touch is sufficient for the attribute-only hook; no delimiter edge-snapping is
+  needed at this layer. Edge snapping is a UX refinement for the user-facing PR.
+- Mechanism caveat (R18): the `baselineOffset(-1000)` zero-width fold makes a single folded line ~1013 pt
+  tall, distorting multi-line viewport (an exhaustive every-glyph sweep was abandoned for this reason). It
+  does not trap the caret. A user-facing WYSIWYG must adopt a cleaner zero-width mechanism and rerun the
+  gates. See `docs/wysiwyg-design.md` §14.
+- User-facing WYSIWYG remains blocked.
+
+# Goal 5 — User-facing WYSIWYG release checklist — active
+
+```text
+Goal: specify (do not yet ship) the user-facing WYSIWYG release checklist.
+
+Branch:
+- phase2-wysiwyg-release-checklist
+- One focused PR against main. Documentation/spec only unless a Decision Log entry justifies code.
+- Still do not expose WYSIWYG in Command-Shift-P or persist a WYSIWYG layout mode in this PR.
+
+Checklist must define:
+- A cleaner zero-width fold mechanism (NSTextLayoutFragment customization or attachment hiding) to replace
+  baselineOffset(-1000), with the gate-rerun matrix (IME Zhuyin/Pinyin, keyboard + pointer selection/copy,
+  accessibility, performance) against that mechanism (R18).
+- Delimiter edge-snapping UX for caret/selection near hidden delimiters.
+- The ⌘⇧P cycle entry (source+preview → source-only → WYSIWYG) and persisted layout mode.
+- Link visual folding only after its own native selection/copy coverage exists.
+- Construct scope stays headings/emphasis/strike/inline-code/list-quote; images/fences/tables/
+  Mermaid/math/MDX rendering stay deferred.
+
+Acceptance:
+- A reviewed checklist doc with explicit, testable gates. WYSIWYG stays blocked until each is green.
 ```
