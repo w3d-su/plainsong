@@ -7,7 +7,7 @@ final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
     private var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
-    private var wysiwygPreviousTextContentStorageDelegate: NSTextContentStorageDelegate?
+    private weak var wysiwygPreviousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
     func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) {
         guard let textContentStorage = textContentManager as? NSTextContentStorage else {
@@ -15,12 +15,15 @@ final class MarkdownSTTextView: STTextView {
         }
 
         if isEnabled {
-            if wysiwygZeroWidthContentStorageDelegate == nil {
-                wysiwygZeroWidthContentStorageDelegate = WYSIWYGZeroWidthTextContentStorageDelegate()
-            }
-            if textContentStorage.delegate !== wysiwygZeroWidthContentStorageDelegate {
-                wysiwygPreviousTextContentStorageDelegate = textContentStorage.delegate
-                textContentStorage.delegate = wysiwygZeroWidthContentStorageDelegate
+            if wysiwygZeroWidthContentStorageDelegate == nil ||
+                textContentStorage.delegate !== wysiwygZeroWidthContentStorageDelegate {
+                let previousDelegate = textContentStorage.delegate
+                let zeroWidthDelegate = WYSIWYGZeroWidthTextContentStorageDelegate(
+                    previousDelegate: previousDelegate
+                )
+                wysiwygPreviousTextContentStorageDelegate = previousDelegate
+                wysiwygZeroWidthContentStorageDelegate = zeroWidthDelegate
+                textContentStorage.delegate = zeroWidthDelegate
                 textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
             }
         } else {
@@ -28,6 +31,7 @@ final class MarkdownSTTextView: STTextView {
                 textContentStorage.delegate = wysiwygPreviousTextContentStorageDelegate
                 textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
             }
+            wysiwygZeroWidthContentStorageDelegate?.previousDelegate = nil
             wysiwygZeroWidthContentStorageDelegate = nil
             wysiwygPreviousTextContentStorageDelegate = nil
         }
@@ -176,24 +180,48 @@ final class MarkdownSTTextView: STTextView {
             return false
         }
 
-        let textLength = textStorage.length
+        let text = textStorage.string as NSString
+        let textLength = text.length
         let selection = selectedRange().clamped(toLength: textLength)
 
         if extending {
             if delta < 0 {
-                let location = max(0, selection.location - 1)
+                let location = wysiwygComposedCharacterBoundary(
+                    from: selection.location,
+                    moving: -1,
+                    in: text
+                )
                 textSelection = NSRange(location: location, length: NSMaxRange(selection) - location)
             } else {
-                let end = min(textLength, NSMaxRange(selection) + 1)
+                let end = wysiwygComposedCharacterBoundary(
+                    from: NSMaxRange(selection),
+                    moving: 1,
+                    in: text
+                )
                 textSelection = NSRange(location: selection.location, length: end - selection.location)
             }
         } else {
             let base = delta < 0 ? selection.location : NSMaxRange(selection)
-            let location = min(max(base + delta, 0), textLength)
+            let location = wysiwygComposedCharacterBoundary(from: base, moving: delta, in: text)
             textSelection = NSRange(location: location, length: 0)
         }
 
         return true
+    }
+
+    private func wysiwygComposedCharacterBoundary(
+        from location: Int,
+        moving delta: Int,
+        in text: NSString
+    ) -> Int {
+        let location = min(max(location, 0), text.length)
+        if delta < 0 {
+            guard location > 0 else { return 0 }
+            return text.rangeOfComposedCharacterSequence(at: location - 1).location
+        }
+
+        guard location < text.length else { return text.length }
+        return NSMaxRange(text.rangeOfComposedCharacterSequence(at: location))
     }
 }
 

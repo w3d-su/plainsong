@@ -359,6 +359,11 @@ Result:
 - Implemented a TextKit 2 `NSTextContentStorageDelegate` paragraph projection behind
   `_developmentPresentation: .inlineFoldReveal`: folded delimiter attributes project to equal-length
   U+200B runs for layout while `NSTextStorage.string` remains exact raw Markdown.
+- The projection delegate now chains safely: it forwards paragraphs without folded delimiter markers to the
+  previous `NSTextContentStorageDelegate`, owns only folded paragraph projection, and restores the previous
+  delegate when WYSIWYG is disabled.
+- Folded delimiter markers use the internal `NSAttributedString.Key("app.plainsong.wysiwyg.foldedDelimiter")`
+  instead of `.toolTip`, so no user-visible tooltip semantics are introduced.
 - The `NSTextLayoutFragment` delegate path was attempted but not used because STTextView 2.3.10 owns the
   layout-fragment delegate (`STTextLayoutFragment`) and the custom line-fragment prototype did not safely
   drive native `firstRect` / pointer hit-testing.
@@ -366,7 +371,8 @@ Result:
   No attachment fallback was used, no U+FFFC is introduced, and no TextKit 1 path was added.
 - Added B13:
   `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport`.
-- Reran B1-B13 green, including the opt-in actual Zhuyin/Pinyin IME harness, and recorded WYSIWYG
+- Reran B1-B13 green, including the opt-in actual Zhuyin/Pinyin IME harness and composed-character-safe
+  keyboard movement/shift-selection across emoji, CJK, bold, and inline-code fixtures. Recorded WYSIWYG
   visible-range fold/highlight/apply at 26.964 ms in `docs/perf-log.md`.
 - R18 is closed. User-facing WYSIWYG still remains blocked: no `⌘⇧P` exposure, no persisted WYSIWYG layout
   mode, no link visual folding, and no deferred constructs were added.

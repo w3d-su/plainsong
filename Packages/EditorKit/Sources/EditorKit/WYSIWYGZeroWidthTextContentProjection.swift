@@ -6,12 +6,19 @@ import AppKit
 /// characters are projected to equal-length U+200B runs inside NSTextParagraphs so
 /// TextKit produces zero-advance geometry without object-replacement characters.
 final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
+    weak var previousDelegate: NSTextContentStorageDelegate?
+
+    init(previousDelegate: NSTextContentStorageDelegate? = nil) {
+        self.previousDelegate = previousDelegate
+        super.init()
+    }
+
     func textContentStorage(
         _ textContentStorage: NSTextContentStorage,
         textParagraphWith range: NSRange
     ) -> NSTextParagraph? {
         guard let textStorage = textContentStorage.textStorage else {
-            return nil
+            return previousDelegate?.textContentStorage?(textContentStorage, textParagraphWith: range)
         }
 
         let paragraph = textStorage.attributedSubstring(from: range).mutableCopy() as! NSMutableAttributedString
@@ -26,9 +33,12 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
         }
 
         guard !foldedRanges.isEmpty else {
-            return nil
+            return previousDelegate?.textContentStorage?(textContentStorage, textParagraphWith: range)
         }
 
+        // TextKit asks for one paragraph object for the range. Once folded delimiters
+        // are present, this delegate owns that projection so backing Markdown can stay
+        // canonical while layout sees equal-length zero-width delimiter runs.
         for foldedRange in foldedRanges {
             let zeroWidthSpaces = String(repeating: "\u{200B}", count: foldedRange.length)
             paragraph.mutableString.replaceCharacters(in: foldedRange, with: zeroWidthSpaces)

@@ -57,12 +57,40 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
             selection: NSRange(location: (source as NSString).length, length: 0)
         )
         let inspected = NSAttributedString(highlighted.text)
+        let foldPlan = try XCTUnwrap(highlighted.foldPlan)
 
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "#")))
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "*italic*", selecting: "*")))
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "~~gone~~", selecting: "~~")))
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "`code`", selecting: "`")))
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .heading(level: 1)).foldRanges,
+            [source.nsRange(of: "# ")]
+        )
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .strong).foldRanges,
+            [
+                source.nsRange(of: "**bold**", selecting: "**"),
+                source.nsRange(of: "**bold**", selectingLast: "**"),
+            ]
+        )
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .emphasis).foldRanges,
+            [
+                source.nsRange(of: "*italic*", selecting: "*"),
+                source.nsRange(of: "*italic*", selectingLast: "*"),
+            ]
+        )
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .strikethrough).foldRanges,
+            [
+                source.nsRange(of: "~~gone~~", selecting: "~~"),
+                source.nsRange(of: "~~gone~~", selectingLast: "~~"),
+            ]
+        )
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .inlineCode).foldRanges,
+            [
+                source.nsRange(of: "`code`", selecting: "`"),
+                source.nsRange(of: "`code`", selectingLast: "`"),
+            ]
+        )
 
         let strikeAttributes = try inspected.attributes(for: "gone")
         XCTAssertEqual(strikeAttributes[.strikethroughStyle] as? Int, NSUnderlineStyle.single.rawValue)
@@ -70,10 +98,13 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         let quoteAttributes = try inspected.attributes(for: ">")
         XCTAssertNotNil(quoteAttributes[.foregroundColor])
 
-        XCTAssertFalse(
-            try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "[link]", selecting: "["))
+        XCTAssertFalse(WYSIWYGInlineFoldPresentation.includes(.link))
+        XCTAssertEqual(
+            try foldPlan.onlyRegion(kind: .link).sourceRange,
+            source.nsRange(of: "[link](https://example.com)")
         )
         XCTAssertNotNil(try inspected.attributes(for: "link")[.underlineStyle])
+        XCTAssertNil(try inspected.attributes(for: "#")[.toolTip])
     }
 
     func testDevelopmentInlineFoldRevealRevealsTouchedRegionOnly() throws {
@@ -87,12 +118,18 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         )
         let inspected = NSAttributedString(highlighted.text)
 
-        XCTAssertFalse(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
-        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "`code`", selecting: "`")))
         let strong = try XCTUnwrap(try highlighted.foldPlan?.onlyRegion(kind: .strong))
         let inlineCode = try XCTUnwrap(try highlighted.foldPlan?.onlyRegion(kind: .inlineCode))
         XCTAssertTrue(strong.isRevealed)
         XCTAssertFalse(inlineCode.isRevealed)
+        XCTAssertEqual(
+            inlineCode.foldRanges,
+            [
+                source.nsRange(of: "`code`", selecting: "`"),
+                source.nsRange(of: "`code`", selectingLast: "`"),
+            ]
+        )
+        XCTAssertNil(try inspected.attributes(for: "**")[.toolTip])
     }
 
     func testStylesFrontmatterAndFencedCodeBlocks() throws {
@@ -412,13 +449,6 @@ private extension NSAttributedString {
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
         return attributes(at: range.location, effectiveRange: nil)
     }
-
-    func hasFoldedDelimiterAttributes(at range: NSRange) throws -> Bool {
-        XCTAssertNotEqual(range.location, NSNotFound)
-        return WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(
-            attributes(at: range.location, effectiveRange: nil)
-        )
-    }
 }
 
 private extension WYSIWYGFoldPlan {
@@ -506,6 +536,18 @@ private extension String {
         let containerRange = nsRange(of: containingSubstring)
         let container = (self as NSString).substring(with: containerRange) as NSString
         let selectedRange = container.range(of: selectedSubstring)
+        XCTAssertNotEqual(
+            selectedRange.location,
+            NSNotFound,
+            "Expected substring '\(selectedSubstring)' in '\(containingSubstring)'"
+        )
+        return NSRange(location: containerRange.location + selectedRange.location, length: selectedRange.length)
+    }
+
+    func nsRange(of containingSubstring: String, selectingLast selectedSubstring: String) -> NSRange {
+        let containerRange = nsRange(of: containingSubstring)
+        let container = (self as NSString).substring(with: containerRange) as NSString
+        let selectedRange = container.range(of: selectedSubstring, options: .backwards)
         XCTAssertNotEqual(
             selectedRange.location,
             NSNotFound,

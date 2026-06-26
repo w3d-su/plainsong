@@ -605,6 +605,14 @@ only those delimiter characters are replaced by equal-length U+200B runs. The ba
 remains exact raw Markdown, so copy, paste, undo/redo, and accessibility continue to operate on source
 offsets. No attachment path is used, so no U+FFFC can leak into copy, `AXValue`, or source text.
 
+The folded delimiter marker is an internal `NSAttributedString.Key("app.plainsong.wysiwyg.foldedDelimiter")`,
+not `.toolTip`, so the layout-only marker carries no user-visible tooltip semantics. The projection delegate
+also chains safely: while enabled it keeps the previous `NSTextContentStorageDelegate` weakly, forwards
+paragraph requests that contain no folded delimiter markers, and restores the previous delegate when disabled.
+When folded delimiter markers are present, the projection owns the paragraph because TextKit accepts one
+custom `NSTextParagraph` for the range and the zero-width replacement must stay paired with the exact backing
+Markdown range.
+
 The originally preferred `NSTextLayoutFragment` customization was prototyped but not chosen for the pinned
 STTextView 2.3.10 integration. STTextView owns `textLayoutManager.delegate` and supplies
 `STTextLayoutFragment`; taking that delegate directly would break STTextView's fragment chain. A public
@@ -613,16 +621,19 @@ which made native pointer placement unsafe. The content-storage projection keeps
 delegate intact and stays fully on TextKit 2.
 
 Because the layout paragraph differs from the raw backing paragraph, `MarkdownSTTextView` adds narrow
-WYSIWYG-only pointer and raw-offset keyboard adapters while the projection delegate is installed. Source-only
-and source+preview paths do not install the delegate and remain unchanged. The old `baselineOffset(-1000)` +
-0.1 pt clear-font mechanism is removed from the implementation.
+WYSIWYG-only pointer and keyboard adapters while the projection delegate is installed. Keyboard movement and
+shift-selection advance by composed-character sequence boundaries, so mixed emoji/surrogate-pair, CJK, bold,
+and inline-code fixtures never place the caret or selection endpoint inside an invalid UTF-16 boundary.
+Source-only and source+preview paths do not install the delegate and remain unchanged. The old
+`baselineOffset(-1000)` + 0.1 pt clear-font mechanism is removed from the implementation.
 
 Checklist §A and §B are green against this mechanism: the opt-in actual Zhuyin/Pinyin IME event stream,
-keyboard arrow and reverse shift-selection gates, true pointer click/drag gates, exact raw copy, paste,
-accessibility, undo/redo, source-only/source+preview regression, and the new B13 layout-geometry sanity test
-all pass. B13 verifies folded-line height is approximately the unfolded-line height and that folded lines do
-not push sibling lines out of the viewport, so R18 is closed. The large-document WYSIWYG fold/highlight/apply
-measurement is 26.964 ms on the 1 MB fixture, recorded in `docs/perf-log.md`.
+delegate chaining/restoration, composed-character-safe keyboard arrow and shift-selection gates, true pointer
+click/drag gates, exact raw copy, paste, accessibility, undo/redo, source-only/source+preview regression, and
+the new B13 layout-geometry sanity test all pass. B13 verifies folded-line height is approximately the
+unfolded-line height and that folded lines do not push sibling lines out of the viewport, so R18 is closed.
+The large-document WYSIWYG fold/highlight/apply measurement is 26.964 ms on the 1 MB fixture, recorded in
+`docs/perf-log.md`.
 
 User-facing WYSIWYG remains blocked. This mechanism PR does not expose WYSIWYG in `⌘⇧P`, does not add a
 persisted WYSIWYG layout mode, does not enable link visual folding, and does not add images, fenced-code
