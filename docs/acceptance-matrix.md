@@ -50,9 +50,7 @@ M5 should not be called accepted until all items below are true:
 - [x] Security hardening PR landed for MDX sanitizer and asset handling; PR #24 closed issue #17 and PR #27 fixed SVG policy drift.
 - [x] CI/docs cleanup landed with preview TypeScript typecheck coverage.
 - [x] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results for the performance gates.
-- [ ] `docs/m5-checklist.md` passes manually. The 2026-06-25 sweeps fixed and rechecked editor-to-preview scroll sync, completed the real Next.js content-folder/settings/icon/polish/switching checks, and PR #30 fixed the launch stability and optional Open Recent persistence blockers. The only remaining blockers are:
-  - In-editor edit of `Fixtures/mdx-syntax-error.mdx` back to valid MDX and recovery without relaunch.
-  - In-editor reintroduction of an MDX syntax error and last-good render confirmation.
+- [ ] `docs/m5-checklist.md` passes manually. The 2026-06-25 sweeps fixed and rechecked editor-to-preview scroll sync, completed the real Next.js content-folder/settings/icon/polish/switching checks, and PR #30 fixed the launch stability and optional Open Recent persistence blockers. The `m5-editor-input-checklist` follow-up live-verified the broken-MDX edit/reintroduce recovery loop and added MarkdownCore regression coverage for fenced-code component completion suppression. The remaining blockers are:
   - Live UI completion popup for imported MDX components after typing `<` in a tag context.
   - Live UI confirmation that MDX component completion does not appear inside fenced code or obvious non-tag contexts.
 - [x] README, `agent.md`, and planning docs no longer contain stale PR #26/#27 milestone claims.

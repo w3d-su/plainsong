@@ -25,8 +25,11 @@ work crosses Swift/AppKit, PreviewKit, and preview-src.
   - PR #29 — editor-to-preview scroll-sync checklist fix.
   - PR #30 — workspace launch stability, Open Recent failure handling, and final checklist evidence sync.
 - Open / not accepted:
-  - `docs/m5-checklist.md` has four remaining unchecked manual editor-input blockers from the
-    2026-06-25 final sweep.
+  - `docs/m5-checklist.md` has remaining unchecked live MDX completion-popup blockers from the
+    2026-06-25 final sweep. The `m5-editor-input-checklist` follow-up live-verified the
+    broken-MDX edit/reintroduce recovery loop and added MarkdownCore regression coverage for
+    fenced-code component completion suppression, but the live completion popup still needs
+    tag-context and non-tag-context UI verification.
   - Phase 2 WYSIWYG remains blocked until M5 is accepted and `docs/wysiwyg-design.md` is approved.
 
 ## Rules for every Codex run
@@ -84,8 +87,6 @@ Read first:
 
 Tasks:
 - Launch Plainsong from the current branch and finish only these unchecked editor-input items in `docs/m5-checklist.md`:
-  - Edit `Fixtures/mdx-syntax-error.mdx` back to valid MDX and confirm preview recovery without relaunch.
-  - Reintroduce an MDX syntax error in-editor and confirm the last-good render remains visible where possible.
   - Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
   - Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
 - Record evidence or blockers without faking passes.

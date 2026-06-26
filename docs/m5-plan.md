@@ -6,9 +6,10 @@
 ## Current snapshot
 
 M5 feature slices, performance gates, security hardening, Settings/themes, launch stability, and
-Open Recent failure handling are in place. M5 is feature-complete but **not accepted** because the
-2026-06-25 final sweep still leaves manual editor-input checklist blockers in
-`docs/m5-checklist.md`.
+Open Recent failure handling are in place. The `m5-editor-input-checklist` follow-up live-verified
+the broken-MDX edit/reintroduce recovery loop and fixed fenced-code component completion suppression
+in MarkdownCore. M5 is feature-complete but **not accepted** because `docs/m5-checklist.md` still
+leaves live completion-popup checklist blockers.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
@@ -23,12 +24,10 @@ Open Recent failure handling are in place. M5 is feature-complete but **not acce
 | Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
 | Final checklist blocker fixes | Workspace launch stability, Open Recent failure handling, and updated M5 checklist evidence | ✅ Merged PR #30 | Stable fixed-width `HStack` sidebar/detail shell accepted for M5; adjustable/native sidebar restoration is post-M5 polish |
 
-Remaining unchecked M5 blockers are limited to live editor-input validation:
+Remaining unchecked M5 blockers are limited to live MDX completion-popup validation:
 
-1. Edit `Fixtures/mdx-syntax-error.mdx` back to valid MDX and confirm preview recovery without relaunch.
-2. Reintroduce an MDX syntax error in-editor and confirm the last-good render remains visible where possible.
-3. Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
-4. Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
+1. Type `<` in an `.mdx` tag context with imports and confirm the imported-component completion popup appears.
+2. Confirm MDX component completion does not appear inside fenced code or obvious non-tag contexts.
 
 ## Recommended next sequence
 
@@ -78,7 +77,7 @@ Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
 | Goal | Branch suggestion | Output |
 |---|---|---|
-| M5 checklist blockers | `m5-checklist-blockers` | Completes the remaining unchecked manual items in `docs/m5-checklist.md` |
+| M5 checklist blockers | `m5-editor-input-checklist` | Completes or documents the remaining live editor-input items in `docs/m5-checklist.md` |
 | Phase 2 design gate | `phase2-wysiwyg-design-gate` | Approves/refines design and spikes only after M5 is accepted |
 
 ## Beyond M5
