@@ -410,3 +410,75 @@ link chrome, destinations, and boundary selections have equivalent native covera
 The next PR should enable/run the opt-in actual Pinyin harness on a machine with Pinyin enabled. If Pinyin
 passes, follow with a narrow pointer hit-testing/selection-edge PR. User-facing WYSIWYG should remain
 blocked until those pass.
+
+## 13. Actual Pinyin event-stream gate result — 2026-06-26
+
+**Recommendation: PASS for actual Pinyin; user-facing WYSIWYG remains blocked.** The opt-in actual-IME
+harness now drives a real macOS Traditional Chinese Pinyin input method through the production
+`_developmentPresentation: .inlineFoldReveal` hook at heading, bold, italic, and inline-code fold
+boundaries. With both actual Zhuyin (§12) and actual Pinyin event streams passing, IME is no longer a gate
+blocker. WYSIWYG stays out of the user-facing `⌘⇧P` cycle and out of persisted layout state until the
+remaining native pointer hit-test and release-checklist gates pass. No construct scope was expanded and
+link visual folding remains deferred.
+
+### Pinyin input-source environment
+
+- Enabled/selected source during the passing run: `com.apple.inputmethod.TCIM.Pinyin`
+  (`Pinyin – Traditional`), type `TISTypeKeyboardInputMode`.
+- Pinyin was installed but not enabled on this machine, reproducing PR #42's state: TIS
+  `includeAllInstalled=false` found no enabled Pinyin source, and direct `TISSelectInputSource` returned
+  `-50`. Enabling it programmatically with `TISEnableInputSource(com.apple.inputmethod.TCIM.Pinyin)`
+  returned `0`, after which the source selected with `0`.
+- `com.apple.inputmethod.SCIM.ITABC` (`Pinyin – Simplified`) reported enable `0` but still returned `-50`
+  on select in this environment, so the Traditional Pinyin IME was used. Either Simplified or Traditional
+  satisfies the gate.
+- The two plain Pinyin keyboard *layouts* (`com.apple.keylayout.PinyinKeyboard`,
+  `com.apple.keylayout.TraditionalPinyinKeyboard`) match the harness CJK name filter but are
+  `TISTypeKeyboardLayout` and never produce marked text. The harness now selects only composition-capable
+  input methods so it can never pick a keyboard layout for the IME gate. Those two layouts were disabled
+  after the run, and the current keyboard source was restored to `com.apple.keylayout.ABC`; the
+  `TCIM.Pinyin` and `TCIM.Zhuyin` input methods remain enabled.
+
+### Pinyin evidence
+
+- `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled`
+  passed (27.2 s) and is reproducible across repeated runs.
+- Event path: physical `CGEvent.postToPid` key presses into the xctest process, through
+  `MarkdownSTTextView` → `STTextView.keyDown` → `NSTextInputContext`.
+- Composition script `t → a → i` produced marked text `t`/`ta`/`tai`; `space` committed the first
+  candidate `太` (the deterministic toneless-"tai" top candidate in the Traditional Pinyin IME, stable
+  across runs). This is the expected, legitimate difference from the Zhuyin ㄊㄞˊ tone-2 script, which
+  commits 台/臺; the Pinyin fixture now accepts 太/台/臺.
+- Verified at every fold boundary (heading; bold/italic/inline-code before and after both the opening and
+  the closing delimiter): no source composition corruption, no caret escape from the marked range, no
+  premature commit, fold/reveal attributes skipped while marked text is active, fold attributes never
+  cover the active marked range, and presentation reapplies after commit. The PR #42 commit-key guard
+  (space/Return/keypad-Enter reserved for the input context while marked text exists) held for Pinyin.
+- Cold-start note: the first run after enabling the IME produced no composition because the TCIM Pinyin
+  server was not yet warm (it logged `error messaging the mach port for IMKCFRunLoopWakeUpReliable`).
+  Reruns once the server is warm pass deterministically; re-run the gate once if the IME has never been
+  activated in the session.
+
+### Harness change
+
+- `ActualIMEInputSource` now records `kTISPropertyInputSourceType`, and `enabled(matching:)` selects only
+  composition-capable input methods (`TISTypeKeyboardInputMode` /
+  `TISTypeKeyboardInputMethodWithoutModes` / `TISTypeKeyboardInputMethodModeEnabled`), never a
+  `TISTypeKeyboardLayout`. This keeps Zhuyin selecting `com.apple.inputmethod.TCIM.Zhuyin` (re-verified
+  passing) and makes Pinyin deterministically select the real IME instead of a same-named keyboard layout.
+
+### Remaining blockers
+
+- Add true mouse hit-test / pointer selection-edge evidence against the laid-out editor before exposing
+  WYSIWYG beyond tests or enabling delimiter edge-snapping/link folding.
+- Keep link visual folding, image thumbnails, fenced-code fragments, tables, Mermaid/math, and MDX
+  rendering deferred.
+- Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until the pointer gate and a
+  written release checklist pass.
+
+### Next PR recommendation
+
+The next PR should add a narrow native pointer hit-testing / selection-edge gate against the production
+development hook (click-to-caret near hidden delimiters and drag selection across folded spans). After
+that passes, a separate PR can specify the user-facing WYSIWYG release checklist. User-facing WYSIWYG
+remains blocked until both land.

@@ -19,12 +19,14 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - PR #41 completed native selection/copy/paste/accessibility evidence for the production development
   hook, but left actual macOS IME event streams incomplete.
 - The actual Zhuyin follow-up gate passed through the production development hook at heading, bold,
-  italic, and inline-code boundaries. Pinyin remains unproven because the local Pinyin input methods are
-  installed but not enabled/selectable.
+  italic, and inline-code boundaries.
+- The actual Pinyin follow-up gate now also passes through the same hook (PR for
+  `phase2-actual-pinyin-ime-gate`), using the enabled `com.apple.inputmethod.TCIM.Pinyin`
+  (`Pinyin – Traditional`) input method. IME is no longer a Phase 2 blocker.
 - The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
   source+preview/source-only only.
-- Next active goal: enable a macOS Pinyin input method and run the opt-in actual Pinyin harness before
-  any user-facing WYSIWYG mode is considered.
+- Next active goal: add a narrow native pointer hit-testing / selection-edge gate against the production
+  development hook before any user-facing WYSIWYG mode is considered.
 
 ## Rules for every Codex run
 
@@ -176,7 +178,7 @@ Actual Zhuyin follow-up result:
 - Pinyin remains blocked on this machine: TIS sees Pinyin input methods as installed, but none are
   enabled/selectable and direct selection returned `-50`. Keep user-facing WYSIWYG blocked.
 
-# Goal 3 — Actual Pinyin event-stream gate — active
+# Goal 3 — Actual Pinyin event-stream gate — completed by phase2-actual-pinyin-ime-gate
 
 ```text
 Goal: enable a macOS Pinyin input method and rerun the actual IME harness.
@@ -192,4 +194,46 @@ Verification:
 Acceptance:
 - If Pinyin passes, recommend the next narrow pointer hit-testing/selection-edge PR.
 - If Pinyin fails, keep WYSIWYG blocked and document the exact source/caret/commit failure.
+```
+
+Result:
+- Pinyin was installed but not enabled on the machine (reproducing PR #42: TIS enabled lookup found none
+  and direct `TISSelectInputSource` returned `-50`). Enabling it with
+  `TISEnableInputSource(com.apple.inputmethod.TCIM.Pinyin)` returned `0`, after which the source selected.
+- The harness selected enabled `com.apple.inputmethod.TCIM.Pinyin` (`Pinyin – Traditional`,
+  `TISTypeKeyboardInputMode`). A robustness fix makes `ActualIMEInputSource.enabled(matching:)` pick only
+  composition-capable input methods, never the same-named `com.apple.keylayout.PinyinKeyboard` /
+  `TraditionalPinyinKeyboard` layouts that produce no marked text. Zhuyin was re-verified passing.
+- `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled`
+  passed at every fold boundary (heading; bold/italic/inline-code before and after both delimiters):
+  no source corruption, no caret escape from the marked range, no premature commit, fold attributes
+  skipped during marked text and never over the marked range, and presentation reapplied after commit.
+  Toneless "tai" + space commits `太`; the Pinyin fixture now accepts 太/台/臺.
+- Cold-start caveat: the first run after enabling the IME may produce no composition (TCIM server not yet
+  warm; `error messaging the mach port for IMKCFRunLoopWakeUpReliable`). Re-run once; warm runs are
+  deterministic.
+- User-facing WYSIWYG remains blocked. See `docs/wysiwyg-design.md` §13.
+
+# Goal 4 — Native pointer hit-testing / selection-edge gate — active
+
+```text
+Goal: prove native pointer interaction safety for the PR #38 inline fold/reveal production core.
+
+Branch:
+- phase2-native-pointer-selection-gate
+- One focused PR against main.
+- Do not expose WYSIWYG in the user-facing Command-Shift-P cycle.
+- Do not add a persisted WYSIWYG layout mode.
+- Do not expand construct scope beyond the #38 development hook.
+- Do not enable link visual folding.
+
+Gate scope:
+- True mouse hit-test / click-to-caret against the laid-out editor near hidden fold delimiters.
+- Drag selection across folded bold, strike, and inline-code spans.
+- Confirm raw source offsets, reveal-on-touch recompute, and exact raw-selection copy still hold under
+  real pointer events (not just programmatic boundary selections).
+
+Acceptance:
+- If the pointer gates pass, the next PR can specify the user-facing WYSIWYG release checklist.
+- If any pointer gate fails, keep user-facing WYSIWYG blocked and document the exact fallback.
 ```
