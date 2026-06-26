@@ -283,3 +283,106 @@ unchanged, and the app-level `⌘⇧P` cycle still only toggles the preview pane
   hidden delimiter edges before enabling link folding or a user-facing WYSIWYG mode.
 - Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until a dedicated UI PR
   clears those remaining gates.
+
+## 12. Native interaction gate result — 2026-06-26
+
+**Recommendation: PARTIAL PASS; user-facing WYSIWYG remains blocked.** This PR adds production-path
+STTextView tests for native selection, copy, and paste around the #38 development hook. It does not add
+WYSIWYG to the app layout cycle, does not expose a user-facing mode, and does not expand visual folding
+beyond headings, strong/emphasis, strikethrough, inline code, and list/quote marker styling.
+
+### Issue tracking
+
+- Issue #37 is closed as completed by PR #38. The remaining work is tracked as follow-up native
+  interaction gates, not as unfinished production-core scope.
+- `docs/codex-handoff.md` now marks PR #36 spikes and PR #38 production dev hook complete, with native
+  interaction gates as the active Phase 2 goal.
+
+### Native selection/caret evidence
+
+- **Arrow movement — PASS for the current fallback policy.**
+  `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping`
+  drives STTextView's native `moveRight` into a raw folded delimiter offset. The raw selection remains
+  sane, and the next production presentation recompute reveals the touched span instead of leaving the
+  caret inside hidden delimiter attributes.
+- **Reverse shift-selection — PASS.**
+  `testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` uses native
+  `moveLeftAndModifySelection` across `~~gone~~`, confirms the selected source range is exactly the raw
+  Markdown span, confirms the selected folded region reveals, and confirms copy writes raw Markdown.
+- **Selection across included folds — PASS for bold, strike, and inline code.**
+  `testNativeShiftSelectionAcrossFoldedBoldStrikeAndInlineCodeCopiesRawMarkdown` extends native
+  shift-selection from folded bold through strike and inline code, confirms all touched fold regions
+  reveal, and confirms copy writes the selected raw Markdown.
+- **Mouse/click-to-caret — PARTIAL PASS.**
+  `testMouseLikeBoundaryCaretsRecomputeFoldedStateFromRawSelection` covers the raw boundary selections
+  expected from click-to-caret near heading, bold, and inline-code delimiters. True pointer hit-testing
+  against laid-out zero-width delimiter attributes is still manual-release evidence, not fully automated.
+
+The accepted fallback policy for this development hook is conservative: native selection may enter raw
+delimiter offsets, but any selection that touches a folded region reveals that region on the next
+presentation pass. A later user-facing WYSIWYG PR can add delimiter-skipping/edge snapping, but it must
+rerun these gates.
+
+### Copy/paste policy
+
+- **Policy:** copy is exact raw source selection. Entire folded spans copy delimiters, visible-content-only
+  selections copy only content, and boundary selections copy exactly the Markdown characters included by
+  the raw `NSRange`. The editor does not synthesize rendered/plaintext output from folded presentation.
+- **Evidence:** `testPartialFoldedSpanCopyPolicyUsesExactRawSelection` covers entire folded bold/code/strike
+  spans, visible bold content, and selections beginning or ending at bold fold boundaries.
+- **Paste evidence:** `testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` pastes through
+  STTextView's pasteboard read path into a folded boundary and a revealed inline-code content range. The
+  backing string changes normally and no attachment or presentation-only placeholder text is inserted.
+
+This policy is safe for the current attribute-only dev hook. Link visual folding remains deferred until
+link chrome, destinations, and boundary selections have equivalent native coverage.
+
+### Paste, accessibility, and performance evidence
+
+- **Paste — PASS for backing-source mutation.**
+  `testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` exercises STTextView pasteboard reads
+  at a folded bold boundary and inside revealed inline-code content. Both edits mutate the raw backing
+  string only and insert no object-replacement characters or presentation-only text.
+- **Accessibility — PASS for raw value exposure in the development hook.**
+  `testAccessibilityValueRemainsRawMarkdownSource` applies production fold/reveal attributes and confirms
+  STTextView still reports `AXTextArea` with the exact raw Markdown source as its accessibility value.
+  This is attribute-only accessibility evidence; any future layout-fragment, attachment, or user-facing
+  WYSIWYG mode must rerun accessibility checks.
+- **Large-doc performance — PASS.**
+  `MarkdownEditorViewTests.testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` ran during the
+  final `make test` pass on the 1 MB fixture and measured visible-range fold/highlight/apply at 21.468 ms,
+  under the §12 50 ms budget.
+
+### IME evidence
+
+- Automated production-path IME coverage remains green:
+  `WYSIWYGIMESpikeTests.testZhuyinAndPinyinMarkedTextRoundTripsAtFoldBoundaries` covers Zhuyin and Pinyin
+  marked text at heading marker, bold, italic, and inline-code delimiter boundaries through
+  `MarkdownSyntaxHighlighter(..., developmentPresentation: .inlineFoldReveal)`.
+- Local input-source inspection found Traditional Chinese Zhuyin selected and enabled:
+  `AppleSelectedInputSources` includes `com.apple.inputmethod.TCIM.Zhuyin`,
+  `AppleEnabledInputSources` includes ABC plus TCIM Zhuyin, and
+  `AppleCurrentKeyboardLayoutInputSourceID` returned `com.apple.keylayout.ZhuyinBopomofo`. A TIS input
+  source query for Zhuyin/Pinyin IDs returned only `com.apple.inputmethod.TCIM.Zhuyin`; Pinyin did not
+  appear in the installed or enabled input-source list on this machine. This is environment evidence
+  only, not an actual composition-event run.
+- **Actual macOS input-method event stream gate is not complete.** No committed automated test drives
+  real TIS/input-context key events for both Zhuyin and Pinyin through the production development hook.
+  Treat this as the primary blocker before any user-facing WYSIWYG mode.
+
+### Remaining blockers
+
+- Capture actual macOS Zhuyin and Pinyin event-stream evidence at heading, bold/italic, and inline-code
+  boundaries, including composition, commit, caret stability, skipped fold attributes while marked text is
+  active, and reapply after commit.
+- Add true mouse hit-test evidence against the laid-out editor if the next PR changes delimiter hiding,
+  adds edge snapping, or exposes WYSIWYG beyond tests.
+- Keep link visual folding, image thumbnails, fenced-code fragments, tables, Mermaid/math, and MDX
+  rendering deferred.
+- Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle.
+
+### Next PR recommendation
+
+The next PR should be an actual macOS IME/manual-harness gate for the existing development hook. If that
+passes for Zhuyin and Pinyin, follow with a narrow pointer hit-testing/selection-edge PR. User-facing
+WYSIWYG should remain blocked until those pass.
