@@ -87,6 +87,7 @@ public struct MarkdownEditorView: View {
             completionWorkspace: completionWorkspace,
             imageAssetInserter: imageAssetInserter,
             imageAssetContextID: imageAssetContextID,
+            isWYSIWYGZeroWidthFoldingEnabled: developmentPresentation.enablesInlineFoldReveal,
             font: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         ) { range in
             Task { @MainActor in

@@ -48,16 +48,7 @@ struct WYSIWYGInlineFoldPresentation {
     }
 
     static func containsFoldedDelimiterAttributes(_ attributes: [NSAttributedString.Key: Any]) -> Bool {
-        guard let font = attributes[.font] as? NSFont,
-              let foregroundColor = attributes[.foregroundColor] as? NSColor,
-              let baselineOffset = attributes[.baselineOffset] as? CGFloat
-        else {
-            return false
-        }
-
-        return font.pointSize == foldedDelimiterFont.pointSize
-            && foregroundColor == foldedDelimiterForegroundColor
-            && baselineOffset == foldedDelimiterBaselineOffset
+        attributes[.toolTip] as? String == foldedDelimiterMarker
     }
 
     private func applyContentAttributes(
@@ -95,23 +86,11 @@ struct WYSIWYGInlineFoldPresentation {
         }
     }
 
-    private static var foldedDelimiterFont: NSFont {
-        NSFont.monospacedSystemFont(ofSize: 0.1, weight: .regular)
-    }
-
-    private static var foldedDelimiterForegroundColor: NSColor {
-        NSColor.clear
-    }
-
-    private static var foldedDelimiterBaselineOffset: CGFloat {
-        -1000
-    }
+    private static let foldedDelimiterMarker = "app.plainsong.wysiwyg.foldedDelimiter"
 
     private static var foldedDelimiterAttributes: [NSAttributedString.Key: Any] {
         [
-            .font: foldedDelimiterFont,
-            .foregroundColor: foldedDelimiterForegroundColor,
-            .baselineOffset: foldedDelimiterBaselineOffset,
+            .toolTip: foldedDelimiterMarker,
         ]
     }
 }

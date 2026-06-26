@@ -78,6 +78,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let completionWorkspace: CompletionWorkspace
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
+    private let isWYSIWYGZeroWidthFoldingEnabled: Bool
     private let onVisibleRangeChange: (NSRange) -> Void
 
     init(
@@ -90,6 +91,7 @@ struct MarkdownTextView: NSViewRepresentable {
         completionWorkspace: CompletionWorkspace = .empty,
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
+        isWYSIWYGZeroWidthFoldingEnabled: Bool = false,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25,
         onVisibleRangeChange: @escaping (NSRange) -> Void = { _ in }
@@ -103,6 +105,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.completionWorkspace = completionWorkspace
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
+        self.isWYSIWYGZeroWidthFoldingEnabled = isWYSIWYGZeroWidthFoldingEnabled
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
         self.onVisibleRangeChange = onVisibleRangeChange
@@ -135,6 +138,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isEditable = isEnabled
         textView.isSelectable = isEnabled
+        textView.setWYSIWYGZeroWidthFoldingEnabled(isWYSIWYGZeroWidthFoldingEnabled)
 
         context.coordinator.isUpdating = true
         textView.text = text
@@ -144,6 +148,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
+        textView.setWYSIWYGZeroWidthFoldingEnabled(isWYSIWYGZeroWidthFoldingEnabled)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
 
@@ -289,6 +294,10 @@ struct MarkdownTextView: NSViewRepresentable {
             textStorage.setAttributes(attributes, range: destinationRange)
         }
         textStorage.endEditing()
+        if styledText.foldPlan != nil,
+           let textRange = NSTextRange(targetRange, in: textView.textContentManager) {
+            textView.textLayoutManager.invalidateLayout(for: textRange)
+        }
         textView.needsDisplay = true
         return true
     }

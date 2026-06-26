@@ -6,6 +6,32 @@ import UniformTypeIdentifiers
 final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
+    private var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
+    private var wysiwygPreviousTextContentStorageDelegate: NSTextContentStorageDelegate?
+
+    func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) {
+        guard let textContentStorage = textContentManager as? NSTextContentStorage else {
+            return
+        }
+
+        if isEnabled {
+            if wysiwygZeroWidthContentStorageDelegate == nil {
+                wysiwygZeroWidthContentStorageDelegate = WYSIWYGZeroWidthTextContentStorageDelegate()
+            }
+            if textContentStorage.delegate !== wysiwygZeroWidthContentStorageDelegate {
+                wysiwygPreviousTextContentStorageDelegate = textContentStorage.delegate
+                textContentStorage.delegate = wysiwygZeroWidthContentStorageDelegate
+                textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+            }
+        } else {
+            if textContentStorage.delegate === wysiwygZeroWidthContentStorageDelegate {
+                textContentStorage.delegate = wysiwygPreviousTextContentStorageDelegate
+                textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+            }
+            wysiwygZeroWidthContentStorageDelegate = nil
+            wysiwygPreviousTextContentStorageDelegate = nil
+        }
+    }
 
     override func keyDown(with event: NSEvent) {
         if Self.shouldReserveMarkedTextKeyForInputContext(event, hasMarkedText: hasMarkedText()),
@@ -15,6 +41,50 @@ final class MarkdownSTTextView: STTextView {
         }
 
         super.keyDown(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard wysiwygZeroWidthContentStorageDelegate != nil,
+              let caret = wysiwygZeroWidthCharacterIndex(at: convert(event.locationInWindow, from: nil))
+        else {
+            super.mouseDown(with: event)
+            return
+        }
+
+        if event.modifierFlags.contains(.shift) {
+            let anchor = selectedRange().location
+            textSelection = NSRange(location: min(anchor, caret), length: abs(caret - anchor))
+        } else {
+            textSelection = NSRange(location: caret, length: 0)
+        }
+    }
+
+    override func moveLeft(_ sender: Any?) {
+        guard applyWYSIWYGRawCharacterMovement(delta: -1, extending: false) else {
+            super.moveLeft(sender)
+            return
+        }
+    }
+
+    override func moveRight(_ sender: Any?) {
+        guard applyWYSIWYGRawCharacterMovement(delta: 1, extending: false) else {
+            super.moveRight(sender)
+            return
+        }
+    }
+
+    override func moveLeftAndModifySelection(_ sender: Any?) {
+        guard applyWYSIWYGRawCharacterMovement(delta: -1, extending: true) else {
+            super.moveLeftAndModifySelection(sender)
+            return
+        }
+    }
+
+    override func moveRightAndModifySelection(_ sender: Any?) {
+        guard applyWYSIWYGRawCharacterMovement(delta: 1, extending: true) else {
+            super.moveRightAndModifySelection(sender)
+            return
+        }
     }
 
     @objc override func paste(_ sender: Any?) {
@@ -51,6 +121,79 @@ final class MarkdownSTTextView: STTextView {
 
         _ = super.draggingUpdated(sender)
         return imageFileDropHandler?(self, imageURLs) == true
+    }
+
+    private func wysiwygZeroWidthCharacterIndex(at pointInView: CGPoint) -> Int? {
+        let point = CGPoint(x: pointInView.x - (gutterView?.frame.width ?? 0), y: pointInView.y)
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+        var nearest: (distance: CGFloat, offset: Int)?
+
+        textLayoutManager.enumerateTextLayoutFragments(
+            from: textLayoutManager.documentRange.location,
+            options: [.ensuresLayout]
+        ) { fragment in
+            let elementRange = NSRange(fragment.rangeInElement, in: textContentManager)
+            for lineFragment in fragment.textLineFragments {
+                let lineFrame = lineFragment.typographicBounds.offsetBy(
+                    dx: fragment.layoutFragmentFrame.minX,
+                    dy: fragment.layoutFragmentFrame.minY
+                )
+                let verticalDistance: CGFloat = if point.y < lineFrame.minY {
+                    lineFrame.minY - point.y
+                } else if point.y > lineFrame.maxY {
+                    point.y - lineFrame.maxY
+                } else {
+                    0
+                }
+
+                guard nearest == nil || verticalDistance < nearest!.distance else {
+                    continue
+                }
+
+                let localPoint = CGPoint(
+                    x: point.x - lineFrame.minX,
+                    y: point.y - lineFrame.minY
+                )
+                let localIndex = lineFragment.characterIndex(for: localPoint)
+                let lineRange = NSRange(
+                    location: elementRange.location + lineFragment.characterRange.location,
+                    length: lineFragment.characterRange.length
+                )
+                let offset = min(max(lineRange.location + localIndex, lineRange.location), NSMaxRange(lineRange))
+                nearest = (verticalDistance, offset)
+            }
+            return true
+        }
+
+        return nearest?.offset
+    }
+
+    private func applyWYSIWYGRawCharacterMovement(delta: Int, extending: Bool) -> Bool {
+        guard wysiwygZeroWidthContentStorageDelegate != nil,
+              !hasMarkedText(),
+              let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage
+        else {
+            return false
+        }
+
+        let textLength = textStorage.length
+        let selection = selectedRange().clamped(toLength: textLength)
+
+        if extending {
+            if delta < 0 {
+                let location = max(0, selection.location - 1)
+                textSelection = NSRange(location: location, length: NSMaxRange(selection) - location)
+            } else {
+                let end = min(textLength, NSMaxRange(selection) + 1)
+                textSelection = NSRange(location: selection.location, length: end - selection.location)
+            }
+        } else {
+            let base = delta < 0 ? selection.location : NSMaxRange(selection)
+            let location = min(max(base + delta, 0), textLength)
+            textSelection = NSRange(location: location, length: 0)
+        }
+
+        return true
     }
 }
 

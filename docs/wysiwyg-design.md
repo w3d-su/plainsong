@@ -539,7 +539,7 @@ scope changed, link folding stays deferred, and the App still never passes the h
 - **A user-facing WYSIWYG mode should still add edge-snapping and must rerun this gate**, because edge
   snapping is a UX refinement (avoiding a one-frame reveal flicker and making arrow/click landing feel
   intentional) rather than a correctness fix. It belongs in the user-facing PR, not the dev hook.
-- **Mechanism caveat (real finding).** The current zero-width folding uses `baselineOffset(-1000)` plus a
+- **Mechanism caveat (superseded by §16).** The pointer-gate implementation used `baselineOffset(-1000)` plus a
   0.1 pt clear font. This makes a *single folded line* lay out as an ~1013 pt-tall text fragment. It does
   not trap the caret, but in a multi-line document the extreme fragment geometry distorts the viewport
   (an exhaustive every-glyph hit-test sweep was abandoned because folded lines pushed sibling lines
@@ -560,3 +560,70 @@ keyboard selection/copy/paste/accessibility — §12, and pointer/selection-edge
 specify the **user-facing WYSIWYG release checklist** (the cleaner zero-width fold mechanism, edge
 snapping, the `⌘⇧P` cycle entry and persisted layout mode, and a gate-rerun matrix), and only then begin
 exposing WYSIWYG. WYSIWYG stays blocked until that checklist is written and green.
+
+## 15. User-facing WYSIWYG release checklist — 2026-06-26
+
+**The release checklist now exists: see [`docs/wysiwyg-release-checklist.md`](wysiwyg-release-checklist.md).**
+It is the single blocking gate list for exposing WYSIWYG to users and supersedes the ad-hoc "next PR"
+notes above. WYSIWYG stays behind `_developmentPresentation: .inlineFoldReveal` until every checkbox in
+that file is green with linked evidence.
+
+The checklist is organized as:
+
+- **A — Zero-width fold mechanism replacement.** Replace `baselineOffset(-1000)` (R18). The final mechanism
+  is the TextKit 2 content-storage paragraph projection described in §16. `NSTextLayoutFragment`
+  customization was attempted but not used with STTextView 2.3.10, and the attachment fallback was not
+  needed. Tiny-font/kern-only, TextKit 1 glyph suppression, and real text deletion remain rejected.
+- **B — Gate-rerun matrix.** Every native gate already proven against the dev-hook mechanism (IME Zhuyin/
+  Pinyin, keyboard arrow/shift-selection, pointer click + drag, copy, paste, accessibility, large-doc
+  performance, undo/redo, source-only/source+preview regression) has now rerun against the §A mechanism,
+  plus the new layout-geometry sanity gate that closes R18.
+- **C — UX policy.** Reveal-on-touch is retained; **edge-snapping** of the caret near hidden delimiters is
+  now required for the user-facing mode (it was not needed for the dev hook); selection may still span raw
+  delimiter offsets (that is how copy stays exact raw Markdown); copy policy stays exact raw Markdown; link
+  visual folding stays deferred behind its own sub-gate.
+- **D — Mode integration.** `⌘⇧P` becomes a three-state cycle (source+preview → source-only → WYSIWYG); the
+  persisted layout value becomes a three-state enum with migration from the legacy
+  `Plainsong.preview.isVisible` boolean; a kill switch + deterministic fallback to source-only handles
+  mechanism failure/disable; WYSIWYG ships behind an off-by-default **Experimental** label until the
+  checklist is fully green.
+- **E — Construct scope.** Unchanged inline-first scope; images/fences/tables/Mermaid/math/MDX rendering
+  and link visual folding stay deferred.
+
+### Next PR recommendation (superseded by §16)
+
+The cleaner zero-width fold mechanism prototype is now complete. User-facing mode integration (§C/§D) still
+comes only after delimiter edge-snapping, the `⌘⇧P` cycle entry, persistence migration, recovery behavior,
+and Experimental labeling are implemented and tested.
+
+## 16. Zero-width fold mechanism result — 2026-06-26
+
+The replacement mechanism is a TextKit 2 `NSTextContentStorageDelegate` paragraph projection, implemented
+behind the existing non-user-facing `_developmentPresentation: .inlineFoldReveal` hook. When a paragraph
+contains folded delimiter marker attributes, EditorKit returns an `NSTextParagraph` copy for layout where
+only those delimiter characters are replaced by equal-length U+200B runs. The backing `NSTextStorage.string`
+remains exact raw Markdown, so copy, paste, undo/redo, and accessibility continue to operate on source
+offsets. No attachment path is used, so no U+FFFC can leak into copy, `AXValue`, or source text.
+
+The originally preferred `NSTextLayoutFragment` customization was prototyped but not chosen for the pinned
+STTextView 2.3.10 integration. STTextView owns `textLayoutManager.delegate` and supplies
+`STTextLayoutFragment`; taking that delegate directly would break STTextView's fragment chain. A public
+custom line-fragment prototype also did not reliably drive TextKit's segment / `firstRect` hit-testing path,
+which made native pointer placement unsafe. The content-storage projection keeps STTextView's fragment
+delegate intact and stays fully on TextKit 2.
+
+Because the layout paragraph differs from the raw backing paragraph, `MarkdownSTTextView` adds narrow
+WYSIWYG-only pointer and raw-offset keyboard adapters while the projection delegate is installed. Source-only
+and source+preview paths do not install the delegate and remain unchanged. The old `baselineOffset(-1000)` +
+0.1 pt clear-font mechanism is removed from the implementation.
+
+Checklist §A and §B are green against this mechanism: the opt-in actual Zhuyin/Pinyin IME event stream,
+keyboard arrow and reverse shift-selection gates, true pointer click/drag gates, exact raw copy, paste,
+accessibility, undo/redo, source-only/source+preview regression, and the new B13 layout-geometry sanity test
+all pass. B13 verifies folded-line height is approximately the unfolded-line height and that folded lines do
+not push sibling lines out of the viewport, so R18 is closed. The large-document WYSIWYG fold/highlight/apply
+measurement is 26.964 ms on the 1 MB fixture, recorded in `docs/perf-log.md`.
+
+User-facing WYSIWYG remains blocked. This mechanism PR does not expose WYSIWYG in `⌘⇧P`, does not add a
+persisted WYSIWYG layout mode, does not enable link visual folding, and does not add images, fenced-code
+custom fragments, tables, Mermaid/math widgets, or real MDX rendering.

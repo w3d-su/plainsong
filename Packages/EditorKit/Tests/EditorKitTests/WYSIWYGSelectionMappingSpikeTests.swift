@@ -142,7 +142,8 @@ final class WYSIWYGSelectionMappingSpikeTests: XCTestCase {
     @MainActor
     func testProductionFoldPresentationCopyUsesRawBackingString() {
         let source = "A **bold** and ~~gone~~ done"
-        let textView = STTextView(frame: .zero)
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
         textView.text = source
 
         let highlighted = MarkdownSyntaxHighlighter().highlight(

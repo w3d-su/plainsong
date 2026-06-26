@@ -21,7 +21,8 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let textView = STTextView(frame: .zero)
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
         textView.text = wysiwygIMESpikeSource
         textView.textSelection = NSRange(location: scenario.insertionLocation, length: 0)
         XCTAssertTrue(applyProductionPresentation(
