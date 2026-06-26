@@ -275,7 +275,7 @@ unchanged, and the app-level `⌘⇧P` cycle still only toggles the preview pane
   budget. A targeted EditorKit rerun measured 21.206 ms, and existing typing hot-path samples stayed below
   1 ms max for Markdown/MDX triggers.
 
-### Remaining blockers
+### Historical blockers at this point (superseded by §§12-19)
 
 - Run actual macOS Zhuyin/Pinyin input-method event streams before exposing WYSIWYG to users; current IME
   evidence is automated `setMarkedText`.
@@ -386,7 +386,7 @@ link chrome, destinations, and boundary selections have equivalent native covera
   STTextView interpretation. `MarkdownSTTextView` now reserves space, Return, and keypad Enter for the
   input context while marked text is active so commit/candidate keys cannot also insert ordinary whitespace
   or newlines.
-- **Actual Pinyin event stream — blocked by local input-source state.** TIS `includeAllInstalled=true`
+- **Historical Actual Pinyin pre-Goal-3 state — superseded.** TIS `includeAllInstalled=true`
   found `com.apple.inputmethod.SCIM.ITABC (Pinyin - Simplified)` and
   `com.apple.inputmethod.TCIM.Pinyin (Pinyin - Traditional)`, but TIS
   `includeAllInstalled=false` found no enabled/selectable Pinyin input method. Direct
@@ -394,9 +394,9 @@ link chrome, destinations, and boundary selections have equivalent native covera
   skips with manual enablement instructions. To finish the gate locally, enable Pinyin in System Settings
   > Keyboard > Text Input > Edit > + > Chinese, then rerun
   `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled`
-  from `Packages/EditorKit`.
+  from `Packages/EditorKit`. This state was superseded by §13; Pinyin is no longer an active blocker.
 
-### Remaining blockers
+### Historical blockers at this point (superseded by §§13-19)
 
 - Capture actual macOS Pinyin event-stream evidence at heading, bold/italic, and inline-code boundaries
   after enabling a Pinyin input method on the runner machine.
@@ -468,7 +468,7 @@ link visual folding remains deferred.
   `TISTypeKeyboardLayout`. This keeps Zhuyin selecting `com.apple.inputmethod.TCIM.Zhuyin` (re-verified
   passing) and makes Pinyin deterministically select the real IME instead of a same-named keyboard layout.
 
-### Remaining blockers
+### Historical blockers at this point (superseded by §§14-19)
 
 - Add true mouse hit-test / pointer selection-edge evidence against the laid-out editor before exposing
   WYSIWYG beyond tests or enabling delimiter edge-snapping/link folding.
@@ -746,3 +746,57 @@ fragments, tables, Mermaid/math widgets, or real MDX rendering. Those constructs
 - `AppStateTests.testPersistedWYSIWYGFallsBackToSourceOnlyWhenExperimentalFlagIsDisabled`
 - `AppStateTests.testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText`
 - `AppStateTests.testSourceModesNeverUseWYSIWYGPresentationEvenWhenExperimentalFlagIsEnabled`
+
+## 19. Experimental WYSIWYG manual sign-off — 2026-06-27
+
+**Recommendation: PASS for off-by-default Experimental sign-off; stable/default promotion remains
+blocked.** The Debug app was launched after PR #49 and manually verified against the release checklist
+UI gates. WYSIWYG remains available only through the Settings toggle, and turning that toggle off while
+in WYSIWYG falls back to source-only without changing the backing Markdown text.
+
+### Manual UI evidence
+
+- **Settings label/default — PASS.** Settings > Editor showed `WYSIWYG mode (Experimental)` with value `0`
+  before enabling; the `Plainsong.settings.experimentalWYSIWYGEnabled` key was absent/false.
+- **Disabled cycle — PASS.** With the flag off, `⌘⇧P` cycled only
+  `sourcePreview -> sourceOnly -> sourcePreview`. The View menu labels were `Show Source Only` and
+  `Show Preview`; toolbar labels were `Source Only` and `Preview`. Neither control landed on WYSIWYG.
+- **Enabled cycle — PASS.** With the flag on, `⌘⇧P` cycled
+  `sourcePreview -> sourceOnly -> wysiwyg -> sourcePreview`. The View menu and toolbar reflected the
+  current next action: `Show Source Only` / `Source Only`, then
+  `Show WYSIWYG (Experimental)` / `WYSIWYG`, then `Show Source + Preview` / `Source + Preview`.
+- **Inline fold/reveal — PASS.** In WYSIWYG there was no preview pane, the heading marker was folded while
+  the raw backing value still contained `# Heading`, and the link remained raw as
+  `[link](https://example.com)`. This confirms WYSIWYG is using the inline fold/reveal path and link
+  visual folding remains off.
+- **Disable fallback — PASS.** Turning the Settings toggle off while `layoutMode == .wysiwyg` changed the
+  layout to `sourceOnly`, changed labels to `Show Preview` / `Preview`, logged the deterministic fallback,
+  and preserved the raw Markdown fixture exactly:
+
+```markdown
+# Heading
+
+This is **bold**, *italic*, ~~strike~~, and `code`.
+
+- item
+> quote
+
+[link](https://example.com)
+```
+
+### Regression posture
+
+- Source-only and source+preview remain stable: the disabled cycle never enters WYSIWYG, and source modes
+  do not pass `_developmentPresentation: .inlineFoldReveal`.
+- Copy remains exact raw Markdown by policy and automated regression coverage
+  (`WYSIWYGNativeInteractionGateTests.testPartialFoldedSpanCopyPolicyUsesExactRawSelection`,
+  `...testNativeShiftSelectionAcrossFoldedBoldStrikeAndInlineCodeCopiesRawMarkdown`,
+  `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy`). A manual
+  clipboard attempt during this sign-off was discarded because focus moved to another app; it is not
+  counted as evidence.
+- Construct scope is unchanged: headings, emphasis/strong, strike, inline code, and list/quote marker
+  styling only. Link visual folding, images, fenced-code custom fragments, tables, Mermaid/math widgets,
+  and real MDX rendering remain deferred.
+
+Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`: the promotion checkbox is
+still unchecked and requires a Decision Log entry before WYSIWYG can become stable or on by default.
