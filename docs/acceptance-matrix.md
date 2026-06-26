@@ -1,6 +1,6 @@
 # Acceptance Matrix
 
-Status snapshot: 2026-06-25.
+Status snapshot: 2026-06-26.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -16,33 +16,29 @@ a milestone or gate as accepted.
 | M2 live preview | Offline WKWebView preview, GFM, KaTeX, Mermaid, checkbox writeback, scroll sync, preview toggle | Landed before current M5 work | Accepted |
 | M3 workspace | Folder workspace, sidebar, FSEvents, file operations, recents/bookmarks, LRU sessions | PR #2 merged | Accepted |
 | M4 authoring | Formatting/editing behaviors, completion, frontmatter, smart paste, image drag/drop, table helper | PR #4, #5, #6, #7 merged | Accepted |
-| M5 MDX preview | `.mdx` preview pipeline with non-executed placeholders, error liveness, sanitizer, fixtures | PR #8 merged; PR #24 hardened sanitizer policy | Accepted for feature scope and current security policy |
+| M5 MDX preview | `.mdx` preview pipeline with non-executed placeholders, error liveness, sanitizer, fixtures | PR #8 merged; PR #24 hardened sanitizer policy | Accepted |
 | M5 TSX highlighting | MDX ESM/JSX regions receive TSX injection highlighting | PR #10 merged | Accepted with documented multiline JSX limitation |
 | M5 icon/accent | App icon and accent assets exist | PR #11 merged | Accepted as first-pass art; product sign-off still subjective |
-| M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 / issue #16 | PR #26 added General, Editor, Preview, and Files settings; UserDefaults persistence; live editor/preview setting updates; and tested remote-image policy | Accepted for feature scope; manual checklist still required for M5 |
-| M5 performance infrastructure | Dedicated performance fixtures/tests and `docs/perf-log.md` measurements | PR #15 merged | Accepted as infrastructure; not full M5 completion |
-| M5 performance: typing | <16 ms typing latency | PR #15 reports 0.254 ms max | Accepted |
-| M5 performance: preview render | <100 ms after debounce for 100 KB doc | PR #15 local result bundle reports Markdown median 46.631 ms, MDX median 14.556 ms; GitHub runner timing is informational only | Accepted |
-| M5 performance: file open | <300 ms to first paint for 500 KB doc | PR #15 reports 33.765 ms | Accepted |
-| M5 performance: visible-range highlight | <50 ms visible-range highlight update after edit | PR #20 records Markdown 17.918 ms max and MDX 22.670 ms max in `docs/perf-log.md`; issue #14 closed | Accepted |
-| M5 performance: memory | <400 MB host-process RSS with 8 warm sessions + 2 live webviews | PR #21 records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews in `docs/perf-log.md`; WebKit helper RSS is diagnostic; issue #13 closed after PR #22 clarified scope | Accepted |
-| M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | PR #24 merged and closed issue #17 with no-inline-style sanitizer policy, pre-sanitize script-like element drops, bounded raster-only assets, and PR #27 SVG/path rejection | Accepted; keep as regression risk |
-| M5 CI preview typecheck | CI runs `cd preview-src && npm run typecheck` and still runs preview tests | PR #22 added the CI step; `make test` still runs preview tests only; issue #18 closed | Accepted |
-| M5 final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | PR #32 merged the broken-MDX edit/recovery evidence and MarkdownCore fenced-code suppression work; PR #33 provides the final live MDX completion-popup evidence | Accepted after PR #33 |
-| Phase 2 WYSIWYG gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | M5 is accepted; draft doc exists from PR #9 | Design only; implementation blocked until the design doc is approved |
+| M5 settings/themes | Settings scene and theme preferences from `agent.md` §11 / issue #16 | PR #26 added settings, persistence, live editor/preview updates, and remote-image policy | Accepted |
+| M5 performance gates | Typing, preview render, file open, visible-range highlight, and host RSS budgets | PR #15, #20, #21, #22, `docs/perf-log.md` | Accepted |
+| M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | PR #24 and PR #27 | Accepted; keep as regression risk |
+| M5 CI preview typecheck | CI runs preview TypeScript typecheck and tests | PR #22 | Accepted |
+| M5 final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | PR #32 and PR #33 | Accepted |
+| Phase 2 WYSIWYG design gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | This PR approves the design for Spike A/B/C only | Approved for spikes; production implementation blocked until spikes pass |
 
 ## Current release posture
 
 | Release target | Recommendation | Reason |
 |---|---|---|
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
-| Private alpha with trusted users | Maybe, for trusted local dogfood only | Performance, security, settings, content-folder, launch-stability, Open Recent, MDX error liveness, and live completion-popup checks are in place; release hardening is still not final. |
+| Private alpha with trusted users | Maybe, for trusted local dogfood only | M5 is accepted, but release hardening is still not final. |
 | Public alpha | No | License choice, signing, hardened runtime, notarization, and release packaging are still not final. |
-| Phase 2 WYSIWYG implementation | No | M5 is accepted, but `agent.md` still requires `docs/wysiwyg-design.md` approval first. |
+| Phase 2 WYSIWYG spikes | Yes | Design gate is approved for risk-reduction spikes. |
+| Phase 2 WYSIWYG implementation | No | Implementation remains blocked until IME, undo, and selection/copy spikes pass and are accepted. |
 
 ## M5 exit checklist
 
-M5 should not be called accepted until all items below are true:
+M5 accepted after PR #33 because all items below are true:
 
 - [x] PR #15 merged or superseded by equivalent performance infrastructure.
 - [x] Issue #14 closed with measured <50 ms visible-range highlighting.
@@ -51,7 +47,7 @@ M5 should not be called accepted until all items below are true:
 - [x] Security hardening PR landed for MDX sanitizer and asset handling; PR #24 closed issue #17 and PR #27 fixed SVG policy drift.
 - [x] CI/docs cleanup landed with preview TypeScript typecheck coverage.
 - [x] `docs/perf-log.md` filled with environment, commit, fixtures, values, and pass/fail results for the performance gates.
-- [x] `docs/m5-checklist.md` passes manually. The 2026-06-25 sweeps fixed and rechecked editor-to-preview scroll sync, completed the real Next.js content-folder/settings/icon/polish/switching checks, and PR #30 fixed the launch stability and optional Open Recent persistence blockers. PR #32 live-verified broken-MDX edit/recovery and added MarkdownCore regression coverage for fenced-code component completion suppression; PR #33 then live-verified the imported-component popup in tag context and no popup inside fenced code.
+- [x] `docs/m5-checklist.md` passes manually. PR #32 live-verified broken-MDX edit/recovery and added MarkdownCore regression coverage for fenced-code component completion suppression; PR #33 live-verified the imported-component popup in tag context and no popup inside fenced code.
 - [x] README, `agent.md`, and planning docs no longer contain stale PR #26/#27 milestone claims.
 
-M5 final status: **Accepted** as of 2026-06-25 after PR #33 because `docs/m5-checklist.md` fully passes.
+M5 final status: **Accepted** as of 2026-06-25 after PR #33.
