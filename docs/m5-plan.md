@@ -1,75 +1,68 @@
-# M5 Stabilization Plan & Dependency Order
+# M5 Stabilization Plan & Phase 2 Entry
 
-> Living plan for M5 (MDX + polish, `agent.md` §14). M5 is too large for one PR, so it is split
-> into PR-sized slices and follow-up gates. Status snapshot: **2026-06-25**.
+> Historical plan for M5 (MDX + polish, `agent.md` §14) and the current Phase 2 entry
+> sequence. Status snapshot: **2026-06-26**.
 
 ## Current snapshot
 
-M5 feature slices, performance gates, security hardening, Settings/themes, launch stability, and
-Open Recent failure handling are in place. PR #32 live-verified the broken-MDX edit/reintroduce
-recovery loop and fixed MarkdownCore fenced-code component completion suppression. PR #33 is the
-final M5 acceptance PR: it adds live imported-component completion popup evidence for both
-tag-context pass and fenced-code suppression in the running editor. M5 is **accepted** after PR #33
-because `docs/m5-checklist.md` now passes.
+M5 is accepted. The final acceptance path was:
+
+- PR #15, #20, #21, and #22 landed performance infrastructure and hard gates.
+- PR #24 and PR #27 landed M5 security hardening and SVG policy alignment.
+- PR #26 landed Settings/themes.
+- PR #29 and PR #30 completed most manual checklist items and fixed scroll sync, launch stability,
+  and Open Recent persistence behavior.
+- PR #32 covered the broken-MDX edit/reintroduce recovery loop and MarkdownCore fenced-code
+  component-completion suppression.
+- PR #33 supplied the final live MDX completion-popup evidence and accepted M5.
+
+This PR approves `docs/wysiwyg-design.md` for Phase 2 spikes only. It does **not** start production
+WYSIWYG implementation.
 
 | Item | Content | Status | Notes |
 |---|---|---|---|
 | Slice 1 — MDX preview | `remark-mdx`, non-executed placeholders, stale/error preview liveness | ✅ Merged PR #8 | Feature accepted; sanitizer hardening landed in PR #24 |
-| Planning docs | M5 checklist, perf log, slice plan, WYSIWYG design draft | ✅ Merged PR #9 | `docs/wysiwyg-design.md` remains draft / not approved |
+| Planning docs | M5 checklist, perf log, slice plan, WYSIWYG design | ✅ Merged PR #9 + this PR | WYSIWYG design gate is approved for spikes only |
 | Slice 2 — TSX highlighting | Vendored TSX grammar and MDX ESM/JSX injection highlighting | ✅ Merged PR #10 | Known multiline JSX limitation remains acceptable for M5 |
 | Slice 4 — App icon/accent | App icon, accent color, deterministic generator | ✅ Merged PR #11 | First-pass art; final brand sign-off remains subjective |
-| Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | ✅ Merged PR #15 | Infrastructure only; follow-up gates tracked below |
+| Slice 5 — Performance pass | Fixtures, PerformanceTests target, perf log, preview update optimization | ✅ Merged PR #15 | Infrastructure plus follow-up gates accepted |
 | Settings + themes | Settings panes and live editor/preview theme preferences from `agent.md` §11 | ✅ Merged PR #26; issue #16 closed | Custom JSON/user CSS are deferred by Decision Log |
 | Security hardening | MDX sanitizer tightening, asset size/type guards, large image copy behavior | ✅ Merged PR #24 + PR #27 follow-up; issue #17 closed | No inline `style`, script-like elements dropped before sanitize, raster assets only up to 10 MiB, SVG/path rejected |
-| Hidden perf gate — highlight | Visible-range highlight update <50 ms | ✅ Merged PR #20; issue #14 closed | Measured Markdown 17.918 ms max and MDX 22.670 ms max; not based on the 250 KB cutoff |
-| Hidden perf gate — memory | 8 warm sessions + 2 live webviews <400 MB host-process RSS | ✅ Merged PR #21 via PR #20; issue #13 closed after PR #22 scope cleanup | Measured 149.8 MB host RSS with 2 settled live webviews; WebKit helper memory remains diagnostic |
-| Final checklist blocker fixes | Workspace launch stability, Open Recent failure handling, and updated M5 checklist evidence | ✅ Merged PR #30 | Stable fixed-width `HStack` sidebar/detail shell accepted for M5; adjustable/native sidebar restoration is post-M5 polish |
-| Final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | ✅ PR #32 + final PR #33 | PR #32 covered broken-MDX edit/recovery and MarkdownCore fenced-code suppression; PR #33 provides final live popup evidence |
-
-There are no remaining M5 checklist blockers. Phase 2 implementation remains blocked until
-`docs/wysiwyg-design.md` is approved.
+| Final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | ✅ PR #32 + PR #33 | M5 accepted after PR #33 |
+| Phase 2 design gate | WYSIWYG scope, open decisions, and spike plan | ✅ This PR | Spikes may begin; implementation remains blocked until spikes pass |
 
 ## Recommended next sequence
 
 ```text
-0. PR #15, PR #20, PR #21, PR #22, PR #24, PR #26, PR #27, PR #29, PR #30, and PR #32 have merged; PR #33 is the final M5 acceptance PR; issues #13, #14, #16, #17, and #18 are closed.
-1. Keep M5 acceptance evidence synchronized with `docs/m5-checklist.md`.
-2. Move only to Phase 2 WYSIWYG design approval/spikes.
-3. Do not start Phase 2 implementation before `docs/wysiwyg-design.md` is approved.
+0. M5 is accepted after PR #33.
+1. Merge this Phase 2 design-gate PR.
+2. Run Phase 2 Spike A/B/C only:
+   - IME composition safety,
+   - undo coordination,
+   - selection/copy across folded tokens.
+3. Record spike results and decide go/no-go for production WYSIWYG v1.
+4. Do not start production WYSIWYG implementation until the spike results pass and are accepted.
 ```
-
-The ordering above is intentionally conservative. `agent.md` §13 says Phase 2 begins only when M1-M5
-are complete and a WYSIWYG design doc is approved; M5 is now complete, but the design doc is still
-draft / not approved.
 
 ## Conflict hotspots
 
 | File / area | Touched by | Handling |
 |---|---|---|
-| `project.yml` | PR #15 PerformanceTests, future test targets | Edit manifest only; run `make generate`; never commit hand-edited `.xcodeproj` |
-| `docs/perf-log.md` | PR #15, #20, #21, future final M5 state update | Keep host RSS and WebKit helper diagnostics explicit |
-| `preview-src/src/pipeline.ts` / `preview-src/src/index.ts` | MDX sanitizer hardening, theme/remote image work | Keep sanitizer and remote-image policy tests with any preview change |
-| `preview-src/src/index.ts` | Preview render caching, theme bridge, scroll sync | Require `npm run typecheck`, `npm test`, and regenerated dist when changed |
-| `MarkdownEditorView` / `MarkdownTextView` | Visible-range highlighting, IME safety, future WYSIWYG | Do not start WYSIWYG folding until M5 is accepted and the design gate is approved |
-| `agent.md` | Decision Log and milestone status | Update in the same PR when behavior or dependency policy changes |
+| `project.yml` | future spike/test targets | Edit manifest only; run `make generate`; never commit hand-edited `.xcodeproj` |
+| `MarkdownEditorView` / `MarkdownTextView` | fold/reveal spikes, IME, undo, selection | Do not mutate source text for presentation; keep visible-range-first updates |
+| `MarkdownTextViewCoordinator` | marked text, selection, completion, command routing | Preserve Phase 1 typing hot path and IME guards |
+| `MarkdownSyntaxParser` / tree-sitter ranges | fold/reveal node range mapping | Keep parser work off-main and scoped to visible/dirty ranges |
+| `docs/wysiwyg-design.md` | Phase 2 scope and spike gates | Update with actual spike results before implementation |
+| `agent.md` | Decision Log and milestone status | Update in the same PR when architectural decisions change |
 
 ## Risk notes
 
-- **PR #15 must not be treated as full M5 completion.** It landed performance infrastructure while
-  follow-up gates remained tracked separately.
-- **Visible-range highlighting has landed, but remains a regression risk.** PR #20 measured the gate
-  with visible-range-first parsing/apply; Phase 2 folding should still wait for M5 acceptance.
-- **The two-webview memory gate uses a test-only harness.** Phase 1 has shared app-scoped state, so this
-  PR #21 measured two live `PreviewController` WebViews attached to an offscreen AppKit surface. The
-  accepted M5 gate is host-process RSS; WebKit helper memory remains diagnostic.
-- **Settings + themes are implemented for the #16 scope in PR #26 and manually checked in PR #30.** Keep
-  them as regression-sensitive because they touch live editor/preview state; custom editor-theme JSON and
-  user CSS overrides are deferred by Decision Log until separate import/sanitizer designs exist.
-- **The PR #30 workspace shell uses `HStack` intentionally.** `NavigationSplitView` caused an AppKit
-  constraint-loop crash during manual launch, so the fixed-width sidebar/detail `HStack` is the accepted
-  M5 stability tradeoff. Restoring an adjustable/native sidebar is post-M5 polish, not part of PR #30.
-- **Security hardening has landed, but remains a regression risk.** MDX preview intentionally does not execute
-  components; keep sanitizer and asset policy tests with any preview-src, PreviewKit, or WorkspaceKit change.
+- **IME correctness is the top Phase 2 gate.** Zhuyin/Pinyin marked text must not corrupt composition or jump the caret.
+- **Undo must remain text-owned.** Folding/reveal attributes must not enter the undo stack.
+- **Selection/copy mapping must stay source-accurate.** Copying folded content should yield raw Markdown.
+- **Tables, Mermaid, math, images, and real MDX rendering stay deferred.** They should not block the inline-first core.
+- **The PR #30 workspace shell uses `HStack` intentionally.** Restoring adjustable/native sidebar behavior is post-M5 polish, not Phase 2 WYSIWYG scope.
+- **Public release hardening remains separate.** License, signing, hardened runtime, notarization, and release packaging are not solved by Phase 2.
 
 ## Codex dispatch map
 
@@ -77,16 +70,15 @@ Use `docs/codex-handoff.md` as the copy/paste source for Codex prompts.
 
 | Goal | Branch suggestion | Output |
 |---|---|---|
-| M5 checklist blockers | PR #33 (`m5-completion-popup-ui`) | Completes final live editor-input evidence in `docs/m5-checklist.md` after PR #32's broken-MDX/fenced-code follow-up |
-| Phase 2 design gate | `phase2-wysiwyg-design-gate` | Approves/refines design and spikes only after M5 is accepted |
+| Phase 2 spikes | `phase2-wysiwyg-spikes` | Spike A/B/C evidence and go/no-go recommendation |
+| Phase 2 v1 implementation | blocked until spikes pass | Inline-first WYSIWYG production implementation |
 
-## Beyond M5
+## Beyond the design gate
 
-There is no accepted "M6" in `agent.md`. After M5 is accepted, the roadmap is Phase 2 WYSIWYG, then unscheduled Phase 3
-candidates. Recommended order after M5 acceptance:
+After this design gate lands, the roadmap is:
 
-1. Approve `docs/wysiwyg-design.md`.
-2. Run Phase 2 spikes for IME, undo, selection, and delimiter folding.
-3. Ship inline-only WYSIWYG first: headings, emphasis, inline code, links, task checkbox.
-4. Defer images, tables, Mermaid, and embedded block widgets until the inline engine is proven.
-5. Keep two-pane source + preview mode permanently available.
+1. Run Phase 2 spikes for IME, undo, and selection/copy.
+2. If spikes pass, implement the inline-first fold/reveal model.
+3. Ship headings, emphasis/strike, inline code, lists/quotes, and links first.
+4. Defer images, fenced-code fragments, tables, Mermaid/math, and real MDX rendering until the core is proven.
+5. Keep source-only and source+preview modes permanently available.
