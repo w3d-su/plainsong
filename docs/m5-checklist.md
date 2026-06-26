@@ -4,14 +4,14 @@ Use this checklist before accepting M5 changes. Run the automated checks first, 
 manual checks in a disposable folder workspace that contains the committed fixtures and at least one
 real Astro or Next.js content directory with `.mdx` posts.
 
-Final sweep status, 2026-06-25 on `m5-completion-popup-ui`: **passed**. Automated
+Final sweep status, 2026-06-25 in PR #33 (`m5-completion-popup-ui`): **passed**. Automated
 verification passed, and current-build UI passes covered the fixture workspace, preview pane, MDX
 rendering, Markdown rendering, broken-MDX error banner display, post-error file switching, a
 representative Next.js content folder with an in-scope body image, rapid mixed-file switching,
 Settings/theme workflows, preview theme/Mermaid behavior, app icon wiring, and light/dark visual
-polish. This follow-up live-verified the broken-MDX edit/reintroduce recovery loop and fixed a
-fenced-code completion-engine regression, then live-verified the MDX completion popup UI. M5 is
-**accepted** because all checklist items below are complete.
+polish. PR #33 includes/supersedes PR #32's broken-MDX edit/reintroduce recovery loop and
+fenced-code completion-engine regression fix, then live-verified the MDX completion popup UI. M5 is
+**accepted** after PR #33 because all checklist items below are complete.
 
 Evidence from this sweep:
 
@@ -33,13 +33,14 @@ Evidence from this sweep:
   sidebar/detail `HStack` to avoid the AppKit constraint-loop crash seen during launch, and optional
   Open Recent persistence failures refresh recents without presenting a blocking error over an
   otherwise opened document. A regression test covers the Open Recent failure path.
-- Follow-up live editor-input evidence on `m5-editor-input-checklist` used the current
+- PR #32 (`m5-editor-input-checklist`) live editor-input evidence, now included/superseded by PR #33,
+  used the current
   `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`.
   Accessibility plus Quartz input focused the live STTextView and pasted through the editor UI.
   Editing `Fixtures/mdx-syntax-error.mdx` to add `</Callout>` recovered the preview without
   relaunch; pasting the original broken text back showed `MDX syntax error on line 14` while the
   previous valid render remained visible under the banner.
-- Final live completion-popup evidence on `m5-completion-popup-ui` used the current
+- Final live completion-popup evidence in PR #33 (`m5-completion-popup-ui`) used the current
   `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
   with disposable files under `/tmp/plainsong-m5-completion`. With the ABC input source selected for
   literal key synthesis, typing `<` at EOF in `tag-context.mdx` auto-paired to `<>` and opened the

@@ -57,7 +57,7 @@ raw profiler exports or screenshots outside the repo unless they are small and i
 | Date | 2026-06-25 |
 | Branch | `m5-final-checklist-docs` |
 | Commit | Working tree after the scroll-sync checklist fix on `m5-final-checklist-docs` |
-| Result | Automated performance gates passed; M5 remains feature-complete but not accepted because manual checklist blockers remain in `docs/m5-checklist.md`. |
+| Result | Automated performance gates passed. At this run, M5 remained feature-complete but not accepted because manual checklist blockers remained in `docs/m5-checklist.md`; later PR #33 supplied the final editor-input evidence and accepted M5. |
 
 Current sweep values from `make test`:
 
