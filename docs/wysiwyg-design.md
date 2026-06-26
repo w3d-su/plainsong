@@ -482,3 +482,81 @@ The next PR should add a narrow native pointer hit-testing / selection-edge gate
 development hook (click-to-caret near hidden delimiters and drag selection across folded spans). After
 that passes, a separate PR can specify the user-facing WYSIWYG release checklist. User-facing WYSIWYG
 remains blocked until both land.
+
+## 14. Native pointer hit-testing / selection-edge gate result — 2026-06-26
+
+**Recommendation: PASS for the attribute-only dev hook's reveal-on-touch policy; user-facing WYSIWYG
+remains blocked.** `WYSIWYGNativePointerGateTests` lays the production `_developmentPresentation:
+.inlineFoldReveal` editor out in a real `NSWindow`, folds the inline delimiters to ~zero width, and
+dispatches real `NSEvent` left-mouse-downs at the on-screen position of folded content. The click target
+comes from `firstRect(forCharacterRange:)` and the resulting caret comes from STTextView's own
+`mouseDown → caretLocation(interactingAt:)` hit-test, so this is true pointer hit-testing against the
+laid-out hidden delimiters — closing the PR #41 "mouse/click-to-caret PARTIAL PASS" gap. No construct
+scope changed, link folding stays deferred, and the App still never passes the hook.
+
+### Pointer hit-testing evidence
+
+- **Heading marker — PASS.** `testPointerClickOnFoldedHeadingContentRevealsMarkerWithoutTrap` clicks the
+  rendered heading text while the `# ` marker is folded: the caret lands on the heading line, the marker
+  reveals on the next presentation pass, and the caret is never inside a still-folded delimiter. Clicking
+  the body paragraph leaves the heading folded.
+- **Bold / strike / inline-code content — PASS.**
+  `testPointerClickAcrossFoldedInlineDelimitersPlacesSaneCaretAndReveals` clicks the content word between
+  each construct's folded delimiters; the span reveals and the caret is sane. Clicking the trailing word
+  leaves the span folded — the caret never gets stuck inside the now-hidden closing delimiter.
+- **Delimiter-edge boundary clicks — PASS.**
+  `testPointerBoundaryClicksAtFoldedDelimiterEdgesDoNotTrapCaret` clicks the leading edge of the first
+  content character (abuts the hidden opening delimiter) and the trailing edge of the last content
+  character (abuts the hidden closing delimiter) for bold, strike, and inline code. Each boundary click
+  reveals the span and never traps the caret inside a folded delimiter.
+- **No-trap invariant.** Every click outcome is checked against a precise invariant: for the resulting
+  caret, no still-folded region's delimiter range contains the caret offset. This holds structurally
+  (delimiters are a subset of the reveal range, so a caret inside a delimiter always reveals it) and is
+  confirmed concretely from real click results.
+
+### Drag selection evidence
+
+- **PASS.** `testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` anchors a pointer click inside
+  folded bold and pointer-extends the selection (shift-click — the same hit-test + `updateTextSelection`
+  path a drag uses) into folded inline code, crossing the hidden bold/strike/code delimiters. The selected
+  source range is sane and non-empty, copy returns the exact raw Markdown for the range (the folded `**`,
+  `~~`, and `` ` `` delimiters are included verbatim, not skipped or synthesized), every touched span
+  reveals on the next presentation pass, and re-applying that presentation preserves the pointer-extended
+  selection.
+- AppKit's raw `mouseDragged` delta plumbing is internal and was not synthesized; pointer-extend
+  (shift-click) drives the identical hit-test + selection-update path with real events, so it is a faithful
+  proxy for the drag endpoint mapping that this gate cares about. Keyboard shift-selection across the same
+  folded spans was already covered in §12.
+
+### Edge policy decision
+
+- **Reveal-on-touch is sufficient for the attribute-only development hook; no delimiter edge-snapping is
+  required at this layer.** Because a caret that touches any part of a span's reveal range reveals the
+  whole span (delimiters included), a pointer click can momentarily resolve to a hidden-delimiter offset
+  but the very next presentation pass makes that delimiter visible. There is therefore no caret trap, and
+  copy/selection always operate on raw source offsets. Adding edge-snapping now would be redundant for the
+  dev hook and would complicate the raw-offset selection model the other gates rely on.
+- **A user-facing WYSIWYG mode should still add edge-snapping and must rerun this gate**, because edge
+  snapping is a UX refinement (avoiding a one-frame reveal flicker and making arrow/click landing feel
+  intentional) rather than a correctness fix. It belongs in the user-facing PR, not the dev hook.
+- **Mechanism caveat (real finding).** The current zero-width folding uses `baselineOffset(-1000)` plus a
+  0.1 pt clear font. This makes a *single folded line* lay out as an ~1013 pt-tall text fragment. It does
+  not trap the caret, but in a multi-line document the extreme fragment geometry distorts the viewport
+  (an exhaustive every-glyph hit-test sweep was abandoned because folded lines pushed sibling lines
+  outside the visible window). A user-facing WYSIWYG should move to a cleaner zero-width mechanism
+  (`NSTextLayoutFragment` customization or attachment-based hiding) and rerun the IME, selection, and this
+  pointer gate against that mechanism, per §10/§11 constraints.
+
+### Whether user-facing WYSIWYG remains blocked
+
+Yes. This PR adds pointer-gate tests only. The App does not pass `_developmentPresentation:
+.inlineFoldReveal`, no `⌘⇧P` exposure or persisted WYSIWYG layout mode was added, construct scope is
+unchanged, and link visual folding stays deferred.
+
+### Next PR recommendation
+
+The remaining native interaction gates are complete for the attribute-only hook (IME — §12/§13, native
+keyboard selection/copy/paste/accessibility — §12, and pointer/selection-edge — §14). The next PR should
+specify the **user-facing WYSIWYG release checklist** (the cleaner zero-width fold mechanism, edge
+snapping, the `⌘⇧P` cycle entry and persisted layout mode, and a gate-rerun matrix), and only then begin
+exposing WYSIWYG. WYSIWYG stays blocked until that checklist is written and green.
