@@ -7,6 +7,16 @@ final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
 
+    override func keyDown(with event: NSEvent) {
+        if Self.shouldReserveMarkedTextKeyForInputContext(event, hasMarkedText: hasMarkedText()),
+           let inputContext {
+            _ = inputContext.handleEvent(event)
+            return
+        }
+
+        super.keyDown(with: event)
+    }
+
     @objc override func paste(_ sender: Any?) {
         if pasteHandler?(self, .general) == true {
             return
@@ -45,6 +55,18 @@ final class MarkdownSTTextView: STTextView {
 }
 
 extension MarkdownSTTextView {
+    static func shouldReserveMarkedTextKeyForInputContext(_ event: NSEvent, hasMarkedText: Bool) -> Bool {
+        guard event.type == .keyDown,
+              hasMarkedText,
+              event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        else {
+            return false
+        }
+
+        let imeSelectionKeys: Set<UInt16> = [36, 49, 76]
+        return imeSelectionKeys.contains(event.keyCode)
+    }
+
     static func imageAssets(from pasteboard: NSPasteboard) -> [EditorImageAsset] {
         let fileURLs = imageFileURLs(from: pasteboard)
         if !fileURLs.isEmpty {

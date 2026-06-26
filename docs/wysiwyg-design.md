@@ -286,10 +286,13 @@ unchanged, and the app-level `⌘⇧P` cycle still only toggles the preview pane
 
 ## 12. Native interaction gate result — 2026-06-26
 
-**Recommendation: PARTIAL PASS; user-facing WYSIWYG remains blocked.** This PR adds production-path
-STTextView tests for native selection, copy, and paste around the #38 development hook. It does not add
-WYSIWYG to the app layout cycle, does not expose a user-facing mode, and does not expand visual folding
-beyond headings, strong/emphasis, strikethrough, inline code, and list/quote marker styling.
+**Recommendation: PARTIAL PASS; user-facing WYSIWYG remains blocked.** PR #41 added production-path
+STTextView tests for native selection, copy, and paste around the #38 development hook. The follow-up
+actual-IME gate now proves macOS Traditional Chinese Zhuyin event streams through the same hook, but
+Pinyin remains unrun on this machine because the Pinyin input methods are installed but not enabled or
+selectable. No PR in this sequence adds WYSIWYG to the app layout cycle, exposes a user-facing mode, or
+expands visual folding beyond headings, strong/emphasis, strikethrough, inline code, and list/quote
+marker styling.
 
 ### Issue tracking
 
@@ -359,22 +362,43 @@ link chrome, destinations, and boundary selections have equivalent native covera
   `WYSIWYGIMESpikeTests.testZhuyinAndPinyinMarkedTextRoundTripsAtFoldBoundaries` covers Zhuyin and Pinyin
   marked text at heading marker, bold, italic, and inline-code delimiter boundaries through
   `MarkdownSyntaxHighlighter(..., developmentPresentation: .inlineFoldReveal)`.
+- A reusable opt-in actual-IME harness now exists in
+  `WYSIWYGActualIMEEventGateTests`. It is skipped during normal `make test`; run
+  `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries`
+  from `Packages/EditorKit` to open a focused AppKit editor window, select the TIS input source, and send
+  physical-key `CGEvent.postToPid` events through STTextView's `keyDown -> inputContext` path. The harness
+  keeps the input-client window alive until process exit because closing it immediately after TCIM
+  composition can crash IMK teardown under xctest.
 - Local input-source inspection found Traditional Chinese Zhuyin selected and enabled:
   `AppleSelectedInputSources` includes `com.apple.inputmethod.TCIM.Zhuyin`,
   `AppleEnabledInputSources` includes ABC plus TCIM Zhuyin, and
-  `AppleCurrentKeyboardLayoutInputSourceID` returned `com.apple.keylayout.ZhuyinBopomofo`. A TIS input
-  source query for Zhuyin/Pinyin IDs returned only `com.apple.inputmethod.TCIM.Zhuyin`; Pinyin did not
-  appear in the installed or enabled input-source list on this machine. This is environment evidence
-  only, not an actual composition-event run.
-- **Actual macOS input-method event stream gate is not complete.** No committed automated test drives
-  real TIS/input-context key events for both Zhuyin and Pinyin through the production development hook.
-  Treat this as the primary blocker before any user-facing WYSIWYG mode.
+  `AppleCurrentKeyboardLayoutInputSourceID` returned `com.apple.keylayout.ZhuyinBopomofo`. TIS enabled
+  source lookup found `com.apple.inputmethod.TCIM.Zhuyin (Zhuyin - Traditional)`.
+- **Actual Zhuyin event stream — PASS.** The opt-in command above passed on 2026-06-26 using
+  `com.apple.inputmethod.TCIM.Zhuyin (Zhuyin - Traditional)`. It drove the physical key sequence
+  `w -> 9 -> 6 -> space -> return -> return` through heading, bold, italic, and inline-code fold
+  boundaries. The run confirmed no source composition corruption, no caret escape from the marked range,
+  no premature commit, skipped fold/reveal application while marked text was active, and successful
+  presentation reapply after commit.
+- The actual Zhuyin run exposed and fixed a production-path commit corruption risk: while marked text is
+  active, TCIM Return/space selection keys can update the input context and still fall through to normal
+  STTextView interpretation. `MarkdownSTTextView` now reserves space, Return, and keypad Enter for the
+  input context while marked text is active so commit/candidate keys cannot also insert ordinary whitespace
+  or newlines.
+- **Actual Pinyin event stream — blocked by local input-source state.** TIS `includeAllInstalled=true`
+  found `com.apple.inputmethod.SCIM.ITABC (Pinyin - Simplified)` and
+  `com.apple.inputmethod.TCIM.Pinyin (Pinyin - Traditional)`, but TIS
+  `includeAllInstalled=false` found no enabled/selectable Pinyin input method. Direct
+  `TISSelectInputSource` attempts for both Pinyin input methods returned `-50`, so the opt-in Pinyin test
+  skips with manual enablement instructions. To finish the gate locally, enable Pinyin in System Settings
+  > Keyboard > Text Input > Edit > + > Chinese, then rerun
+  `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled`
+  from `Packages/EditorKit`.
 
 ### Remaining blockers
 
-- Capture actual macOS Zhuyin and Pinyin event-stream evidence at heading, bold/italic, and inline-code
-  boundaries, including composition, commit, caret stability, skipped fold attributes while marked text is
-  active, and reapply after commit.
+- Capture actual macOS Pinyin event-stream evidence at heading, bold/italic, and inline-code boundaries
+  after enabling a Pinyin input method on the runner machine.
 - Add true mouse hit-test evidence against the laid-out editor if the next PR changes delimiter hiding,
   adds edge snapping, or exposes WYSIWYG beyond tests.
 - Keep link visual folding, image thumbnails, fenced-code fragments, tables, Mermaid/math, and MDX
@@ -383,6 +407,6 @@ link chrome, destinations, and boundary selections have equivalent native covera
 
 ### Next PR recommendation
 
-The next PR should be an actual macOS IME/manual-harness gate for the existing development hook. If that
-passes for Zhuyin and Pinyin, follow with a narrow pointer hit-testing/selection-edge PR. User-facing
-WYSIWYG should remain blocked until those pass.
+The next PR should enable/run the opt-in actual Pinyin harness on a machine with Pinyin enabled. If Pinyin
+passes, follow with a narrow pointer hit-testing/selection-edge PR. User-facing WYSIWYG should remain
+blocked until those pass.

@@ -15,7 +15,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R6 | Settings/themes can regress after manual validation | Medium | PR #26 landed settings; PR #30 manually confirmed workflows | Keep Settings/theme checks as regression evidence; keep custom theme JSON and user CSS deferred | App, EditorKit, PreviewKit |
 | R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Preview still rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
 | R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | Several milestone PRs needed follow-up synchronization | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
-| R9 | Actual macOS IME event streams differ from simulated `setMarkedText` coverage | High | PR #38 automated Zhuyin/Pinyin `setMarkedText` through the production hook, but actual input-method event streams still need live evidence | Run local Zhuyin and Pinyin input-source event streams at heading, bold/italic, and inline-code fold boundaries before any user-facing WYSIWYG mode | EditorKit, manual QA |
+| R9 | Actual macOS Pinyin event streams remain unproven | High | Actual Zhuyin event streams now pass through the production development hook at heading, bold, italic, and inline-code boundaries; local Pinyin input methods are installed but not enabled/selectable, and direct TIS selection returned `-50` | Enable a macOS Pinyin input method and rerun the opt-in `WYSIWYGActualIMEEventGateTests` Pinyin harness before any user-facing WYSIWYG mode | EditorKit, manual QA |
 | R10 | Native arrow, reverse shift-selection, and mouse click-to-caret behavior can strand users near hidden delimiters | High | Attribute-only folding keeps raw source offsets; native selection can enter delimiter ranges and relies on reveal recomputation | Keep automated STTextView movement tests in place; add true mouse hit-test/manual evidence before release | EditorKit |
 | R11 | Partial folded-span copy policy is misunderstood | Medium | Attribute-only presentation means STTextView copies exact raw selection, not synthesized rendered text | Document and test policy: entire spans include Markdown delimiters, content-only selections copy content only, boundary selections copy exact selected source | EditorKit, docs |
 | R12 | User-facing WYSIWYG release checklist starts before native gates are complete | High | The production core is still behind `_developmentPresentation: .inlineFoldReveal`; App mode cycle remains unchanged | Keep WYSIWYG out of `⌘⇧P` until actual IME, native selection/mouse, copy/paste, accessibility, and release checklist evidence passes | App, EditorKit, docs |
@@ -27,7 +27,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 
 ## Immediate risk burn-down order
 
-1. Capture actual macOS Zhuyin and Pinyin event-stream evidence against the production development hook.
+1. Enable macOS Pinyin and capture actual Pinyin event-stream evidence against the production development hook.
 2. Finish native selection/caret evidence, including true mouse/click-to-caret behavior near folded delimiters.
 3. Keep partial folded-span copy/paste policy documented and covered by EditorKit tests.
 4. Keep user-facing WYSIWYG blocked until the release checklist is explicit and green.

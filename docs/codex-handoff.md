@@ -16,11 +16,15 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   production-core PR.
 - PR #38 completed issue #37 by merging the production inline fold/reveal core behind
   `MarkdownEditorView(..., _developmentPresentation: .inlineFoldReveal)`.
+- PR #41 completed native selection/copy/paste/accessibility evidence for the production development
+  hook, but left actual macOS IME event streams incomplete.
+- The actual Zhuyin follow-up gate passed through the production development hook at heading, bold,
+  italic, and inline-code boundaries. Pinyin remains unproven because the local Pinyin input methods are
+  installed but not enabled/selectable.
 - The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
   source+preview/source-only only.
-- Next active goal: Phase 2 native interaction gates for the production fold/reveal core. Prove actual
-  macOS IME streams, native selection/caret behavior, and copy/paste policy before any user-facing
-  WYSIWYG mode is considered.
+- Next active goal: enable a macOS Pinyin input method and run the opt-in actual Pinyin harness before
+  any user-facing WYSIWYG mode is considered.
 
 ## Rules for every Codex run
 
@@ -128,7 +132,7 @@ PR #38 result:
   hook.
 - User-facing WYSIWYG remains blocked.
 
-# Goal 2 — Phase 2 native interaction gates — active
+# Goal 2 — Phase 2 native interaction gates — partially complete
 
 ```text
 Goal: prove native interaction safety for the PR #38 inline fold/reveal production core.
@@ -151,4 +155,41 @@ Acceptance:
 - If all native gates pass, recommend the next narrow PR.
 - If any native gate fails or remains unproven, keep user-facing WYSIWYG blocked and document the exact
   fallback.
+```
+
+PR #41 result:
+- Native arrow movement, reverse shift-selection, raw boundary selections, copy/paste policy, and
+  accessibility evidence passed against the production development hook.
+- Actual macOS IME event streams were still incomplete.
+
+Actual Zhuyin follow-up result:
+- `WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries` is an opt-in harness:
+  run `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries`
+  from `Packages/EditorKit`.
+- The harness uses enabled TIS source `com.apple.inputmethod.TCIM.Zhuyin`, physical-key
+  `CGEvent.postToPid` events, and the production `MarkdownSTTextView`/inline fold reveal path.
+- Zhuyin passed at heading, bold, italic, and inline-code fold boundaries with no source corruption, no
+  caret escape from marked text, no premature commit, fold attributes skipped during active marked text,
+  and presentation reapply after commit.
+- A production guard now reserves space, Return, and keypad Enter for the input context while marked text
+  is active, preventing TCIM candidate/commit keys from also inserting ordinary whitespace/newlines.
+- Pinyin remains blocked on this machine: TIS sees Pinyin input methods as installed, but none are
+  enabled/selectable and direct selection returned `-50`. Keep user-facing WYSIWYG blocked.
+
+# Goal 3 — Actual Pinyin event-stream gate — active
+
+```text
+Goal: enable a macOS Pinyin input method and rerun the actual IME harness.
+
+Manual setup:
+- System Settings > Keyboard > Text Input > Edit > + > Chinese.
+- Enable Pinyin - Simplified or Pinyin - Traditional.
+
+Verification:
+- cd Packages/EditorKit
+- PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled
+
+Acceptance:
+- If Pinyin passes, recommend the next narrow pointer hit-testing/selection-edge PR.
+- If Pinyin fails, keep WYSIWYG blocked and document the exact source/caret/commit failure.
 ```
