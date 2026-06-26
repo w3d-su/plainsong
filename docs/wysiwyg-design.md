@@ -303,11 +303,11 @@ marker styling.
 
 ### Native selection/caret evidence
 
-- **Arrow movement — PASS for the current fallback policy.**
-  `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping`
-  drives STTextView's native `moveRight` into a raw folded delimiter offset. The raw selection remains
-  sane, and the next production presentation recompute reveals the touched span instead of leaving the
-  caret inside hidden delimiter attributes.
+- **Arrow movement — PASS.**
+  `WYSIWYGNativeInteractionGateTests.testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals`
+  drives STTextView's native `moveRight` toward a raw folded delimiter offset. The raw selection remains
+  sane, the touched span reveals, and the caret never rests inside hidden delimiter attributes. As of
+  2026-06-27 the caret-rest behavior is upgraded from reveal-only to delimiter edge-snapping (see §17).
 - **Reverse shift-selection — PASS.**
   `testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` uses native
   `moveLeftAndModifySelection` across `~~gone~~`, confirms the selected source range is exactly the raw
@@ -324,7 +324,8 @@ marker styling.
 The accepted fallback policy for this development hook is conservative: native selection may enter raw
 delimiter offsets, but any selection that touches a folded region reveals that region on the next
 presentation pass. A later user-facing WYSIWYG PR can add delimiter-skipping/edge snapping, but it must
-rerun these gates.
+rerun these gates. (Edge-snapping for collapsed carets landed 2026-06-27 — see §17 — and reran these
+gates; selection still enters raw delimiter offsets so copy stays exact raw Markdown.)
 
 ### Copy/paste policy
 
@@ -627,3 +628,81 @@ measurement is 26.964 ms on the 1 MB fixture, recorded in `docs/perf-log.md`.
 User-facing WYSIWYG remains blocked. This mechanism PR does not expose WYSIWYG in `⌘⇧P`, does not add a
 persisted WYSIWYG layout mode, does not enable link visual folding, and does not add images, fenced-code
 custom fragments, tables, Mermaid/math widgets, or real MDX rendering.
+
+## 17. Delimiter edge-snapping result — 2026-06-27
+
+**Recommendation: PASS for the §C.2-§C.4 edge-snapping / selection / copy gates; user-facing WYSIWYG
+remains blocked by §D mode integration.** Behind the existing `_developmentPresentation:
+.inlineFoldReveal` hook, a *collapsed* caret that would rest strictly inside a folded (zero-width)
+delimiter now snaps to the delimiter-inner boundary in the same pass, replacing the prior reveal-only
+fallback for caret rest. No construct scope changed, link visual folding stays deferred, the App still
+never passes the hook, and no persisted WYSIWYG layout mode was added.
+
+### Mechanism
+
+- `WYSIWYGCaretSnap.snap(offset:foldedDelimiterRanges:preferring:)` is a pure function: it returns the
+  offset unchanged unless it is strictly interior to a folded run, in which case it snaps to that run's
+  edge (`.forward` → trailing, `.backward` → leading, `.nearest` → nearer edge, tie → leading).
+- `MarkdownSTTextView.wysiwygFoldedDelimiterRange(containingInterior:)` reads the live
+  `foldedDelimiterAttribute` runs from the backing text storage with a bounded
+  `longestEffectiveRange` scan, so snapping reflects exactly what is currently hidden and stays O(1) on
+  the caret-movement path.
+- Keyboard: `applyWYSIWYGComposedCharacterMovement` snaps the destination of collapsed-caret
+  `moveLeft`/`moveRight` (direction-of-travel). The extending (shift-selection) branch is untouched.
+- Pointer: the non-shift `mouseDown` branch snaps the hit-test result with `.nearest`. The shift
+  (pointer-extend/drag) branch is untouched.
+
+### Why caret-only, never selection
+
+Edge-snapping only adjusts where a collapsed caret rests. Selections still span raw UTF-16 source
+offsets — that is how copy stays exact raw Markdown (entire folded spans include their delimiters,
+boundary selections copy the exact `NSRange`). Snapping reads the same fold attributes the zero-width
+projection uses, so the backing `String` is never mutated.
+
+### Asymmetry note
+
+With reveal-on-touch, a forward step toward an *opening* delimiter usually stops at the span's leading
+boundary (which reveals it) before reaching the delimiter interior, so opening-edge snapping mainly
+fires when the fold state lags the caret (the realistic async case). A leftward step from just after a
+span lands inside the *closing* delimiter first (the right reveal boundary sits outside the span), so
+closing-edge snapping fires on the natural traversal. Both directions are covered by tests.
+
+### Evidence
+
+- **Pure function — PASS.** `WYSIWYGEdgeSnappingGateTests.testSnap*` cover forward/backward/nearest
+  snapping, the even-interior tie-break, run edges and outside offsets left unchanged, and single-char
+  delimiters (no interior) left unchanged.
+- **Keyboard — PASS.** `testArrowRightIntoFoldedBoldOpeningDelimiterSnapsToContentStart`,
+  `testArrowLeftIntoFoldedBoldClosingDelimiterSnapsToContentEnd`,
+  `testArrowIntoFoldedStrikeOpeningDelimiterSnapsToContentStart`,
+  `testArrowIntoFoldedStrikeClosingDelimiterSnapsToContentEnd`,
+  `testArrowRightIntoFoldedHeadingMarkerSnapsToContentStart`, and
+  `testArrowAcrossFoldedInlineCodeSingleBacktickPlacesCaretAtContentWithoutTrap` drive real
+  `moveLeft`/`moveRight` and assert the caret lands on the content boundary and never inside a folded
+  delimiter. The repurposed
+  `WYSIWYGNativeInteractionGateTests.testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals`
+  proves the same on the bold span end-to-end with reveal.
+- **Pointer — PASS.** `testPointerCaretSnapResolvesHiddenDelimiterOffsetToVisibleBoundary` and
+  `testRealPointerClicksAtFoldedDelimiterEdgesLandOnVisibleBoundary` (real `NSEvent` left-mouse-downs at
+  the leading and trailing edges of folded bold/strike/inline-code content) confirm the click caret
+  rests on a visible boundary, never inside a folded delimiter.
+- **Selection/copy — PASS.** `testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
+  shift-selects across folded `**bold**` and copies it verbatim, and the existing
+  `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` remains
+  green, proving snapping never clamps selections.
+- **Composed characters — PASS.** `testComposedCharacterMovementStaysValidWithSnappingEnabled` and the
+  existing `WYSIWYGNativeInteractionGateTests.testWYSIWYGMoveLeftRightSkipsEmojiComposedCharacterAndCJKBoundaries`
+  confirm emoji/surrogate-pair and CJK movement endpoints stay on composed-character boundaries with
+  snapping enabled.
+- **Performance — PASS.** Snapping is on the caret-movement path, not the highlight path; the
+  large-document WYSIWYG fold/highlight/apply probe stayed at 25.348 ms on the 1 MB fixture during the
+  full `make test` run, under the §12 50 ms budget.
+
+### Remaining blockers
+
+- Implement §D mode integration: the three-state `⌘⇧P` cycle, the persisted layout enum + migration
+  from `Plainsong.preview.isVisible`, the kill switch / deterministic `.sourceOnly` recovery, and the
+  off-by-default Experimental label.
+- Keep link visual folding, image thumbnails, fenced-code fragments, tables, Mermaid/math, and MDX
+  rendering deferred.
+- Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until §D and §F are green.
