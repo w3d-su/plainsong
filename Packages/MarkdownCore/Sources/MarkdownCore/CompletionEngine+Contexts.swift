@@ -198,8 +198,7 @@ extension CompletionEngine {
                 if let currentFence = openFence {
                     if fence.character == currentFence.character,
                        fence.length >= currentFence.length,
-                       fence.canClose
-                    {
+                       fence.canClose {
                         openFence = nil
                     }
                 } else {

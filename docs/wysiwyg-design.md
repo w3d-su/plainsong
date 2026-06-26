@@ -1,12 +1,13 @@
-# Phase 2 — WYSIWYG Design (DRAFT)
+# Phase 2 — WYSIWYG Design
 
-> **Status: DRAFT — not approved.** Per agent.md §13, Phase 2 (Typora-style WYSIWYG) may begin only
-> when M1–M5 are complete **and** this document is approved by the maintainer. This draft frames the
-> architecture, the risk-reduction spikes, and the open decisions. Nothing in Phase 2 is implemented
-> until this is signed off. Update agent.md's Decision Log when a decision here is accepted.
+> **Status: DESIGN GATE APPROVED FOR INLINE-FIRST V1 — production UI not implemented.** Per agent.md
+> §13 and the 2026-06-26 Decision Log entry, Phase 2 may proceed only as a narrow inline-first
+> production implementation after the spike gates below. This spike/validation PR does not ship
+> user-facing WYSIWYG, does not add WYSIWYG to the ⌘⇧P cycle, and must not mutate source text for
+> presentation.
 >
-> Remaining prerequisite: **this design doc is not approved**. M5 is accepted, but Phase 2
-> implementation is still blocked until the maintainer approves this design gate.
+> Gate scope: headings, emphasis/strike, inline code first; links only with selection/copy safety;
+> images, fenced-code custom fragments, tables, Mermaid, math, and real MDX rendering are deferred.
 
 ## 1. Goal & non-goals
 
@@ -84,11 +85,13 @@ branch with tests, reported back before committing to the architecture.
 - Snapshot/visual tests for each rendered construct in light/dark.
 
 ## 7. Open questions (need maintainer decision)
-- [ ] "Cursor enters a node" — exact boundary semantics for links (whole `[text](url)` vs just text)?
-- [ ] Tables/mermaid/math: confirm "stay raw in first release" vs invest in custom fragments up front.
-- [ ] Image thumbnails: max size, async-load placeholder, click behavior.
-- [ ] Does WYSIWYG reuse the preview's KaTeX/mermaid output, or render natively? (reuse likely cheaper)
-- [ ] Minimum viable Phase-2 scope to ship behind the toggle (which constructs in v1)?
+- [x] "Cursor enters a node" — links reveal on the full `[text](url)` source range. Production links stay
+  gated on selection/copy safety.
+- [x] Tables/mermaid/math: defer; keep raw in inline-first v1.
+- [x] Image thumbnails: defer; no attachment work in inline-first v1.
+- [x] Real Mermaid/math/MDX rendering: defer; do not reuse preview output in inline-first v1.
+- [x] Minimum viable Phase-2 scope: headings, emphasis/strike, inline code first; links next after the
+  selection spike remains green in the production mechanism.
 
 ## 8. Acceptance criteria
 **For this design doc (the Phase-2 gate):** §7 open questions resolved; spike A/B/C plans approved;
@@ -101,3 +104,61 @@ unaffected; ⌘⇧P cycle persists.
 1. Spikes A/B/C (throwaway, gating). 2. Fold/reveal engine + low-risk constructs (headings, emphasis,
 inline code, lists/quotes). 3. Links + image attachments. 4. Framed code fences. 5. (Stretch) tables /
 mermaid / math fragments. Each is its own `phase2-*` PR; tables/mermaid only after 1–4 are solid.
+
+## 10. Spike A/B/C/D result — 2026-06-26
+
+**Recommendation: GO for the next production PR, limited to an inline-first fold/reveal engine.** The
+spike validates the core safety premise for headings, emphasis/strike, inline code, and inline links:
+source text remains canonical, fold/reveal is representable as pure source ranges, and attribute-only
+presentation can be recomputed without entering undo or corrupting automated marked-text or
+selection/copy state.
+
+This is **not approval to ship production WYSIWYG UI** and does not add WYSIWYG to the user-facing
+⌘⇧P cycle. The next PR should wire the real mechanism behind non-user-facing development plumbing and
+rerun these gates before any user-visible mode change.
+
+### Evidence
+
+- **Prototype range model — PASS.** `WYSIWYGFoldParser` / `WYSIWYGFoldPlan` model visible-range
+  fold/reveal candidates for headings, strong/emphasis/strike, inline code, and inline links without
+  mutating source text or wiring editor UI. Unit coverage includes reveal boundary decisions for every
+  inline folded kind, ATX and setext headings, adjacent spans, nested spans, visible-line scoping, and
+  CJK UTF-16 source offsets. Dirty-range support is compatible with the stateless source-range model but
+  remains a production API/performance requirement, not a separate spike API here.
+- **Spike A — CONDITIONAL PASS for attribute-only folding.** `WYSIWYGIMESpikeTests` drives Zhuyin
+  (`ㄊ` → `ㄊㄞ` → `ㄊㄞˊ` → `臺`) and Pinyin (`t` → `ta` → `tai` → `臺`) marked text at folded heading
+  plus bold, italic, and inline-code delimiter boundaries. Marked range, source text, and caret remain
+  stable; fold attributes are skipped during composition, never cover active marked text, and are reapplied
+  only after commit. This is automated `setMarkedText` evidence, not actual macOS input-method event
+  stream evidence.
+- **Spike B — CONDITIONAL PASS for attribute-only presentation.** `MarkdownEditorViewTests` verifies presentation
+  attributes do not enter undo/redo, stale presentation is rejected after undo, and a type → fold → reveal
+  → edit-inside-revealed-node → undo/redo loop repeatedly restores source text, selection, and recomputed
+  fold state. Redo selection currently follows STTextView native behavior by selecting the reinserted
+  character; confirm that UX in the production PR.
+- **Spike C/D — CONDITIONAL PASS for raw-range mapping and copy.** `WYSIWYGSelectionMappingSpikeTests` proves folded
+  bold/link selections normalize to raw Markdown ranges, visible caret offsets skip hidden delimiter
+  interiors in the pure projection, STTextView copy uses the raw backing string when delimiters are only
+  visually hidden by attributes, and the prototype link reveal range is the full `[text](url)` source span.
+  This is pure mapping plus programmatic copy evidence, not real mouse/arrow-key event evidence. Reverse
+  shift-selection, native mouse placement, and partial folded-span copy policy remain production-gate checks.
+
+### Production v1 constraints
+
+- Production should reuse the existing parser/visible-range pipeline instead of owning a new parser per
+  fold model instance.
+- Dirty-range invalidation should be layered on the source-range fold plan; the spike proves recomputation
+  from bounded visible ranges, not a final incremental cache.
+- Selection must remain raw UTF-16 source `NSRange`s. A production selection-normalization layer needs
+  explicit leading/trailing hidden-edge semantics so arrow keys, shift-selection, mouse placement, and copy
+  never stop inside hidden delimiters.
+- IME remains non-negotiable. Before shipping, repeat Spike A with actual macOS Zhuyin/Pinyin input method
+  event streams and with the real visual folding mechanism, not only `setMarkedText` plus attributes.
+- If v1 uses TextKit layout-fragment customization or attachments instead of simple attributes, rerun Spike
+  A/B/C against that mechanism. Attribute-only success does not automatically prove zero-width fragment or
+  attachment behavior.
+- Link folding must keep reveal semantics on the full `[text](url)` source range and keep copied text as
+  raw Markdown.
+- Partial folded-span copy is not specified by this spike beyond avoiding hidden delimiter caret stops;
+  production needs an explicit policy before enabling visual selection over folded tokens.
+- Defer tables, mermaid/math, image attachments, and framed code fences until inline WYSIWYG is stable.

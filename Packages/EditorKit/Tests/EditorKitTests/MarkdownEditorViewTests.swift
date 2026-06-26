@@ -114,6 +114,143 @@ final class MarkdownEditorViewTests: XCTestCase {
     }
 
     @MainActor
+    func testAttributeOnlyPresentationDoesNotEnterUndoOrRedoStack() throws {
+        let source = "Intro **bold** tail\n"
+        let insertionLocation = NSMaxRange((source as NSString).range(of: "bold"))
+        let originalSelection = NSRange(location: insertionLocation, length: 0)
+        let editedSource = "Intro **bold!** tail\n"
+        let editedSelection = NSRange(location: insertionLocation + 1, length: 0)
+        let redoSelection = NSRange(location: insertionLocation, length: 1)
+        let textView = STTextView(frame: .zero)
+        textView.text = source
+        textView.textSelection = originalSelection
+        let undoManager = try XCTUnwrap(textView.undoManager)
+        undoManager.removeAllActions()
+
+        textView.insertText("!", replacementRange: textView.selectedRange())
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, editedSource)
+        XCTAssertEqual(textView.selectedRange(), editedSelection)
+
+        let editedPresentation = Self.highlightedText(editedSource, revision: 1)
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(editedPresentation, to: textView))
+        XCTAssertEqual(textView.selectedRange(), editedSelection)
+
+        undoManager.undo()
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+        XCTAssertEqual(textView.selectedRange(), originalSelection)
+
+        XCTAssertFalse(
+            MarkdownTextView.applyHighlightedText(editedPresentation, to: textView),
+            "Presentation for stale text must be recomputed after undo instead of replayed from undo state."
+        )
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(Self.highlightedText(source, revision: 2), to: textView))
+        XCTAssertEqual(textView.selectedRange(), originalSelection)
+        XCTAssertTrue(undoManager.canRedo)
+
+        undoManager.redo()
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, editedSource)
+        XCTAssertEqual(textView.selectedRange(), redoSelection)
+
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+            Self.highlightedText(editedSource, revision: 3),
+            to: textView
+        ))
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, editedSource)
+        XCTAssertEqual(textView.selectedRange(), redoSelection)
+    }
+
+    @MainActor
+    func testWYSIWYGUndoRecomputesFoldRevealStateWithoutUndoingPresentation() throws {
+        let initialSource = "Intro **bold** tail\n"
+        let textView = STTextView(frame: .zero)
+        textView.text = initialSource
+        let undoManager = try XCTUnwrap(textView.undoManager)
+        undoManager.removeAllActions()
+
+        textView.textSelection = NSRange(location: NSMaxRange(initialSource.nsRange(of: "Intro")), length: 0)
+        textView.insertText("!", replacementRange: textView.selectedRange())
+
+        let typedSource = "Intro! **bold** tail\n"
+        let typedSelection = NSRange(location: NSMaxRange(typedSource.nsRange(of: "Intro!")), length: 0)
+        XCTAssertEqual(Self.text(in: textView), typedSource)
+        XCTAssertEqual(textView.selectedRange(), typedSelection)
+
+        let parser = try WYSIWYGFoldParser()
+        let outsideSelection = NSRange(location: 0, length: 0)
+        textView.textSelection = outsideSelection
+        let foldedPlan = Self.foldPlan(parser: parser, source: typedSource, selection: outsideSelection)
+        XCTAssertEqual(typedSource.substrings(with: foldedPlan.foldedRanges), ["**", "**"])
+        XCTAssertFalse(try foldedPlan.onlyRegion(kind: .strong).isRevealed)
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+            Self.wysiwygPresentation(typedSource, foldedRanges: foldedPlan.foldedRanges, revision: 10),
+            to: textView
+        ))
+        XCTAssertEqual(Self.text(in: textView), typedSource)
+        XCTAssertEqual(textView.selectedRange(), outsideSelection)
+        XCTAssertTrue(undoManager.canUndo)
+
+        let revealSelection = NSRange(location: NSMaxRange(typedSource.nsRange(of: "bold")), length: 0)
+        textView.textSelection = revealSelection
+        let revealedPlan = Self.foldPlan(parser: parser, source: typedSource, selection: revealSelection)
+        XCTAssertTrue(try revealedPlan.onlyRegion(kind: .strong).isRevealed)
+        XCTAssertEqual(revealedPlan.foldedRanges, [])
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+            Self.wysiwygPresentation(typedSource, foldedRanges: revealedPlan.foldedRanges, revision: 11),
+            to: textView
+        ))
+        XCTAssertEqual(textView.selectedRange(), revealSelection)
+        XCTAssertTrue(undoManager.canUndo)
+
+        textView.insertText("!", replacementRange: textView.selectedRange())
+
+        let editedSource = "Intro! **bold!** tail\n"
+        let editedSelection = NSRange(location: revealSelection.location + 1, length: 0)
+        XCTAssertEqual(Self.text(in: textView), editedSource)
+        XCTAssertEqual(textView.selectedRange(), editedSelection)
+
+        let editedPlan = Self.foldPlan(parser: parser, source: editedSource, selection: editedSelection)
+        XCTAssertTrue(try editedPlan.onlyRegion(kind: .strong).isRevealed)
+        XCTAssertEqual(editedPlan.foldedRanges, [])
+        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+            Self.wysiwygPresentation(editedSource, foldedRanges: editedPlan.foldedRanges, revision: 12),
+            to: textView
+        ))
+        XCTAssertEqual(textView.selectedRange(), editedSelection)
+
+        for revision in 13 ... 14 {
+            undoManager.undo()
+            XCTAssertEqual(Self.text(in: textView), typedSource)
+            XCTAssertEqual(textView.selectedRange(), revealSelection)
+
+            let undoPlan = Self.foldPlan(parser: parser, source: typedSource, selection: textView.selectedRange())
+            XCTAssertTrue(try undoPlan.onlyRegion(kind: .strong).isRevealed)
+            XCTAssertEqual(undoPlan.foldedRanges, [])
+            XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+                Self.wysiwygPresentation(typedSource, foldedRanges: undoPlan.foldedRanges, revision: revision),
+                to: textView
+            ))
+            XCTAssertEqual(Self.text(in: textView), typedSource)
+            XCTAssertEqual(textView.selectedRange(), revealSelection)
+            XCTAssertTrue(undoManager.canRedo)
+
+            undoManager.redo()
+            let redoSelection = NSRange(location: revealSelection.location, length: 1)
+            XCTAssertEqual(Self.text(in: textView), editedSource)
+            XCTAssertEqual(textView.selectedRange(), redoSelection)
+
+            let redoPlan = Self.foldPlan(parser: parser, source: editedSource, selection: redoSelection)
+            XCTAssertTrue(try redoPlan.onlyRegion(kind: .strong).isRevealed)
+            XCTAssertEqual(redoPlan.foldedRanges, [])
+            XCTAssertTrue(MarkdownTextView.applyHighlightedText(
+                Self.wysiwygPresentation(editedSource, foldedRanges: redoPlan.foldedRanges, revision: revision + 10),
+                to: textView
+            ))
+            XCTAssertEqual(Self.text(in: textView), editedSource)
+            XCTAssertEqual(textView.selectedRange(), redoSelection)
+        }
+    }
+
+    @MainActor
     func testPartialHighlightApplySkipsWhileMarkedTextExists() {
         let textView = STTextView(frame: .zero)
         textView.text = "# Heading\n"
@@ -250,5 +387,79 @@ private actor HighlightStartProbe {
 
     func recordedRevisions() -> [Int] {
         revisions
+    }
+}
+
+private extension MarkdownEditorViewTests {
+    static func highlightedText(_ source: String, revision: Int) -> HighlightedText {
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: source.utf16.count)
+        )
+        return HighlightedText(revision: revision, range: highlighted.range, text: highlighted.text)
+    }
+
+    static func wysiwygPresentation(_ source: String, foldedRanges: [NSRange], revision: Int) -> HighlightedText {
+        let attributed = NSMutableAttributedString(
+            string: source,
+            attributes: [.font: MarkdownSyntaxHighlighter.defaultFont]
+        )
+        for range in foldedRanges {
+            attributed.addAttributes(Self.foldedDelimiterAttributes, range: range)
+        }
+        return HighlightedText(
+            revision: revision,
+            range: NSRange(location: 0, length: attributed.length),
+            text: AttributedString(attributed)
+        )
+    }
+
+    static func foldPlan(parser: WYSIWYGFoldParser, source: String, selection: NSRange) -> WYSIWYGFoldPlan {
+        parser.foldPlan(
+            in: source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (source as NSString).length),
+            selection: selection
+        )
+    }
+
+    @MainActor
+    static func text(in textView: STTextView) -> String {
+        MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+    }
+
+    static let foldedDelimiterAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.monospacedSystemFont(ofSize: 0.1, weight: .regular),
+        .foregroundColor: NSColor.clear,
+        .baselineOffset: -1000,
+    ]
+}
+
+private extension WYSIWYGFoldPlan {
+    func onlyRegion(
+        kind: WYSIWYGFoldRegion.Kind,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> WYSIWYGFoldRegion {
+        let matchingRegions = regions.filter { $0.kind == kind }
+        XCTAssertEqual(matchingRegions.count, 1, file: file, line: line)
+        return try XCTUnwrap(matchingRegions.first, file: file, line: line)
+    }
+}
+
+private extension String {
+    func nsRange(of substring: String) -> NSRange {
+        let range = (self as NSString).range(of: substring)
+        XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
+        return range
+    }
+
+    func substring(with range: NSRange) -> String {
+        (self as NSString).substring(with: range)
+    }
+
+    func substrings(with ranges: [NSRange]) -> [String] {
+        ranges.map { substring(with: $0) }
     }
 }
