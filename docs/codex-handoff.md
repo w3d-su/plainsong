@@ -12,8 +12,15 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - M5 acceptance is complete after PR #33:
   - PR #32 supplied broken-MDX edit/recovery evidence and MarkdownCore fenced-code component-completion suppression.
   - PR #33 supplied final live STTextView MDX completion-popup evidence in tag context and fenced-code context.
-- This Phase 2 design-gate PR approves `docs/wysiwyg-design.md` for **spikes only**.
-- Phase 2 production implementation remains blocked until Spike A/B/C results are recorded and accepted.
+- PR #36 completed the Phase 2 Spike A/B/C/D evidence and recorded a GO recommendation for a narrow
+  production-core PR.
+- PR #38 completed issue #37 by merging the production inline fold/reveal core behind
+  `MarkdownEditorView(..., _developmentPresentation: .inlineFoldReveal)`.
+- The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
+  source+preview/source-only only.
+- Next active goal: Phase 2 native interaction gates for the production fold/reveal core. Prove actual
+  macOS IME streams, native selection/caret behavior, and copy/paste policy before any user-facing
+  WYSIWYG mode is considered.
 
 ## Rules for every Codex run
 
@@ -37,7 +44,7 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - PR #32 landed broken-MDX edit/recovery evidence and fenced-code completion suppression.
 - PR #33 accepted M5 with final live MDX completion-popup evidence.
 
-# Goal 0 — Phase 2 Spike A/B/C
+# Goal 0 — Phase 2 Spike A/B/C/D — completed by PR #36
 
 ```text
 You are working in w3d-su/plainsong.
@@ -85,12 +92,10 @@ Verification:
 - Add targeted EditorKit tests for any reusable spike logic.
 ```
 
-# Goal 1 — Phase 2 v1 implementation, blocked until spikes pass
+# Goal 1 — Production inline fold/reveal core — completed by PR #38
 
 ```text
-Do not start this until Spike A/B/C results are accepted.
-
-Goal: implement inline-first WYSIWYG v1 behind a non-default mode.
+Goal: implement the Phase 2 inline fold/reveal core behind non-user-facing development plumbing.
 
 Initial construct scope:
 - headings
@@ -112,4 +117,38 @@ Hard gates:
 - undo/redo correctness
 - selection/copy correctness
 - visible-range performance within §12 budgets
+```
+
+PR #38 result:
+- Production folding is attribute-only and visible-range bounded.
+- Included constructs are headings, emphasis/strong, strikethrough, inline code, and list/quote marker
+  styling only.
+- Link visual folding remains deferred, although link ranges stay in the pure model for mapping tests.
+- Automated `setMarkedText`, undo, selection/copy, and performance gates passed against the production
+  hook.
+- User-facing WYSIWYG remains blocked.
+
+# Goal 2 — Phase 2 native interaction gates — active
+
+```text
+Goal: prove native interaction safety for the PR #38 inline fold/reveal production core.
+
+Branch:
+- phase2-native-interaction-gates
+- One focused PR against main.
+- Do not expose WYSIWYG in the user-facing Command-Shift-P cycle.
+- Do not expand construct scope beyond the PR #38 development hook.
+
+Gate scope:
+- Actual macOS Zhuyin and Pinyin event streams at heading, bold/italic, and inline-code boundaries.
+- Native arrow movement, reverse shift-selection, and mouse/click-to-caret near folded delimiters.
+- Selection across folded bold, strike, and inline code.
+- Copy policy for entire folded spans, visible content only, and selections beginning/ending at fold
+  boundaries.
+- Paste into folded/revealed regions must mutate source normally and never create presentation-only text.
+
+Acceptance:
+- If all native gates pass, recommend the next narrow PR.
+- If any native gate fails or remains unproven, keep user-facing WYSIWYG blocked and document the exact
+  fallback.
 ```

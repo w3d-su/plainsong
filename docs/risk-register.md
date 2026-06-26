@@ -15,10 +15,10 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R6 | Settings/themes can regress after manual validation | Medium | PR #26 landed settings; PR #30 manually confirmed workflows | Keep Settings/theme checks as regression evidence; keep custom theme JSON and user CSS deferred | App, EditorKit, PreviewKit |
 | R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Preview still rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
 | R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | Several milestone PRs needed follow-up synchronization | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
-| R9 | Phase 2 production implementation starts before spike results are accepted | High | This design gate approves spikes only; WYSIWYG implementation remains blocked | Run Spike A/B/C first and record go/no-go results before production implementation | EditorKit, docs |
-| R10 | CJK IME correctness regresses when styling/folding increases | High | WYSIWYG folding can affect marked text ranges | Spike A must prove Zhuyin/Pinyin marked text correctness before implementation | EditorKit |
-| R11 | Undo/redo stores stale presentation state | High | Folding attributes/layout may accidentally interact with undo | Spike B must prove undo remains source-text-only and presentation recomputes | EditorKit |
-| R12 | Selection/copy across folded tokens maps to wrong source ranges | High | Hidden delimiters can confuse offset mapping and copied text | Spike C must prove arrow/shift/mouse selection and copy produce correct raw Markdown | EditorKit |
+| R9 | Actual macOS IME event streams differ from simulated `setMarkedText` coverage | High | PR #38 automated Zhuyin/Pinyin `setMarkedText` through the production hook, but actual input-method event streams still need live evidence | Run local Zhuyin and Pinyin input-source event streams at heading, bold/italic, and inline-code fold boundaries before any user-facing WYSIWYG mode | EditorKit, manual QA |
+| R10 | Native arrow, reverse shift-selection, and mouse click-to-caret behavior can strand users near hidden delimiters | High | Attribute-only folding keeps raw source offsets; native selection can enter delimiter ranges and relies on reveal recomputation | Keep automated STTextView movement tests in place; add true mouse hit-test/manual evidence before release | EditorKit |
+| R11 | Partial folded-span copy policy is misunderstood | Medium | Attribute-only presentation means STTextView copies exact raw selection, not synthesized rendered text | Document and test policy: entire spans include Markdown delimiters, content-only selections copy content only, boundary selections copy exact selected source | EditorKit, docs |
+| R12 | User-facing WYSIWYG release checklist starts before native gates are complete | High | The production core is still behind `_developmentPresentation: .inlineFoldReveal`; App mode cycle remains unchanged | Keep WYSIWYG out of `⌘⇧P` until actual IME, native selection/mouse, copy/paste, accessibility, and release checklist evidence passes | App, EditorKit, docs |
 | R13 | CI misses TypeScript type errors | Low | PR #22 added explicit preview typecheck | Keep `npm test` and `npm run typecheck` separate in CI | CI, preview-src |
 | R14 | Public alpha starts without release hardening | Medium | License, signing, hardened runtime, notarization, and packaging are not final | Keep public release blocked until release pipeline is decided | Release/docs |
 | R15 | Hosted CI runner variance can fail WebKit preview timing despite local M5 evidence | Medium | GitHub runner timings can differ from local result-bundle evidence | Keep CI preview timing informational and require local/result-bundle evidence for perf gates | PerformanceTests, docs |
@@ -27,8 +27,9 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 
 ## Immediate risk burn-down order
 
-1. Merge the Phase 2 design gate only if it stays docs/spikes-only.
-2. Run Spike A/B/C: IME, undo, selection/copy.
-3. Record go/no-go results before production WYSIWYG implementation.
-4. Keep R17 as post-M5 polish; do not fold adjustable/native sidebar work into WYSIWYG spikes.
-5. Keep release hardening separate from Phase 2 feature work.
+1. Capture actual macOS Zhuyin and Pinyin event-stream evidence against the production development hook.
+2. Finish native selection/caret evidence, including true mouse/click-to-caret behavior near folded delimiters.
+3. Keep partial folded-span copy/paste policy documented and covered by EditorKit tests.
+4. Keep user-facing WYSIWYG blocked until the release checklist is explicit and green.
+5. Keep R17 as post-M5 polish; do not fold adjustable/native sidebar work into WYSIWYG gates.
+6. Keep release hardening separate from Phase 2 feature work.
