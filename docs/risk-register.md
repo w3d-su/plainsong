@@ -1,33 +1,34 @@
 # Risk Register
 
-Status snapshot: 2026-06-25.
+Status snapshot: 2026-06-26.
 
 This register captures the risks that should drive the next roadmap decisions. Severity is based on
 impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 
 | ID | Risk | Severity | Current signal | Mitigation / next action | Owner surface |
 |---|---|---:|---|---|---|
-| R1 | M5 acceptance evidence can drift after the checklist passes | Low | `docs/m5-checklist.md` now passes, including live MDX completion-popup tag-context and fenced-code checks | Keep README, `agent.md`, and planning docs synchronized with checklist evidence; reopen only on a real regression | Docs, PerformanceTests |
-| R2 | Visible-range highlighting regresses after PR #20 | Medium | PR #20 plumbed visible-range-first request/apply, measured Markdown 17.918 ms max and MDX 22.670 ms max, and closed #14 | Keep PerformanceTests and scheduling regression coverage in place before Phase 2 folding work | EditorKit, PerformanceTests |
-| R3 | Memory gate scope is misunderstood after PR #21/#22 | Medium | PR #21 records 149.8 MB host RSS with 8 warm sessions and 2 settled live webviews; PR #22 clarified host-process RSS scope and #13 is closed | Keep M5 scoped to host-process RSS and keep helper-inclusive memory diagnostic unless a future system-footprint budget is created | App, PreviewKit, PerformanceTests |
-| R4 | MDX sanitizer schema can regress toward active/spoofing HTML | Medium | Mitigated by PR #24/#27: inline `style` is stripped, script-like elements are dropped before sanitize, inline SVG/path is dropped before sanitize, and malicious snapshot coverage exists | Keep malicious snapshot coverage; require a new Decision Log entry before allowing any user-authored inline CSS or SVG | preview-src |
-| R5 | Local asset and image import paths can read large or active files into memory | Medium | Mitigated by PR #24: preview/imported assets are limited to PNG, JPEG, GIF, or WebP up to 10 MiB and external image copies avoid whole-file `Data(contentsOf:)` reads | Keep size/type/path rejection tests; create a separate sanitizer/design before allowing SVG or larger managed assets | PreviewKit, WorkspaceKit |
-| R6 | Settings/themes can regress after manual validation | Medium | PR #26 closed #16 with Settings panes, UserDefaults persistence, live editor/preview settings, and remote-image policy tests; PR #30's 2026-06-25 sweep manually confirmed the settings workflow, theme changes, Mermaid theme behavior, and persistence | Keep Settings/theme checks in the M5 checklist as regression evidence; keep custom editor-theme JSON and user CSS deferred until separate designs exist | App, EditorKit, PreviewKit |
-| R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Current render path rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
-| R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | #17/PR #24 and PR #26/#27 status both needed follow-up synchronization after merge | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
-| R9 | Phase 2 WYSIWYG starts before the design gate is approved | High | M5 is accepted, but `docs/wysiwyg-design.md` is still draft and agent.md marks IME/undo/selection as highest risk | Only run design/spikes until `docs/wysiwyg-design.md` is approved; v1 scope should be inline-only | EditorKit, docs |
-| R10 | CJK IME correctness regresses when styling/folding increases | High | `agent.md` says IME correctness is non-negotiable; Phase 2 will stress it | Add IME marked-text regression coverage before delimiter folding or visual replacement work | EditorKit |
-| R11 | CI misses TypeScript type errors | Low | PR #22 added explicit `cd preview-src && npm run typecheck` coverage and #18 is closed | Keep `npm test` and `npm run typecheck` as separate CI commands so failures are easy to diagnose | CI, preview-src |
-| R12 | Public alpha starts without release hardening | Medium | License, signing, hardened runtime, notarization, and release packaging are not final | Keep public release blocked until license and release pipeline are decided | Release/docs |
-| R13 | Hosted CI runner variance can fail WebKit preview timing despite local M5 evidence | Medium | PR #20/#21 GitHub `macos-15` runs exceeded the 100 ms Markdown preview budget while local PR #15 evidence passed | Keep CI preview timing informational and require local/result-bundle evidence before accepting the M5 preview gate | PerformanceTests, docs |
-| R14 | Helper-inclusive WebKit memory can exceed the M5 host RSS budget | Medium | PR #21 recorded 149.8 MB host RSS but 648.3 MB host + WebKit helper aggregate | Keep M5 scoped to host RSS; open a separate system-footprint budget if Activity Monitor-style aggregate memory becomes a release requirement | PerformanceTests, PreviewKit |
-| R15 | Restoring the native adjustable sidebar can reintroduce launch instability | Medium | PR #30 replaced `NavigationSplitView` after it caused an AppKit constraint-loop crash during manual launch; a fixed-width sidebar/detail `HStack` is accepted as the M5 stability tradeoff | Keep the `HStack` shell for M5; restore an adjustable/native sidebar only as post-M5 polish after reproducing and isolating the AppKit constraint loop | App |
+| R1 | M5 acceptance evidence can drift after acceptance | Low | `docs/m5-checklist.md` passes after PR #33 | Keep README, `agent.md`, and planning docs synchronized with checklist evidence; reopen only on a real regression | Docs, PerformanceTests |
+| R2 | Visible-range highlighting regresses after PR #20 | Medium | PR #20 measured Markdown 17.918 ms max and MDX 22.670 ms max and closed #14 | Keep PerformanceTests and scheduling regression coverage in place before Phase 2 folding work | EditorKit, PerformanceTests |
+| R3 | Memory gate scope is misunderstood after PR #21/#22 | Medium | PR #21 records 149.8 MB host RSS; helper RSS is diagnostic | Keep M5 scoped to host RSS; create a separate system-footprint budget only if needed | App, PreviewKit, PerformanceTests |
+| R4 | MDX sanitizer schema can regress toward active/spoofing HTML | Medium | Mitigated by PR #24/#27 | Keep malicious snapshot coverage; require a new Decision Log entry before allowing user-authored inline CSS or SVG | preview-src |
+| R5 | Local asset and image import paths can read large or active files into memory | Medium | Mitigated by PR #24 with bounded raster-only policy | Keep size/type/path rejection tests; require a separate design before SVG or larger managed assets | PreviewKit, WorkspaceKit |
+| R6 | Settings/themes can regress after manual validation | Medium | PR #26 landed settings; PR #30 manually confirmed workflows | Keep Settings/theme checks as regression evidence; keep custom theme JSON and user CSS deferred | App, EditorKit, PreviewKit |
+| R7 | Preview render cost can grow with large DOM/code/Mermaid content | Medium | Preview still rewrites assets, highlights code, renders Mermaid, and scans line anchors | Cache code highlighting/Mermaid by source hash; measure code-heavy and Mermaid-heavy fixtures | preview-src, PerformanceTests |
+| R8 | Documentation drift causes Codex/agents to work from stale milestone assumptions | Medium | Several milestone PRs needed follow-up synchronization | Keep README, `agent.md`, `docs/m5-plan.md`, and this file synchronized per PR | Docs |
+| R9 | Phase 2 production implementation starts before spike results are accepted | High | This design gate approves spikes only; WYSIWYG implementation remains blocked | Run Spike A/B/C first and record go/no-go results before production implementation | EditorKit, docs |
+| R10 | CJK IME correctness regresses when styling/folding increases | High | WYSIWYG folding can affect marked text ranges | Spike A must prove Zhuyin/Pinyin marked text correctness before implementation | EditorKit |
+| R11 | Undo/redo stores stale presentation state | High | Folding attributes/layout may accidentally interact with undo | Spike B must prove undo remains source-text-only and presentation recomputes | EditorKit |
+| R12 | Selection/copy across folded tokens maps to wrong source ranges | High | Hidden delimiters can confuse offset mapping and copied text | Spike C must prove arrow/shift/mouse selection and copy produce correct raw Markdown | EditorKit |
+| R13 | CI misses TypeScript type errors | Low | PR #22 added explicit preview typecheck | Keep `npm test` and `npm run typecheck` separate in CI | CI, preview-src |
+| R14 | Public alpha starts without release hardening | Medium | License, signing, hardened runtime, notarization, and packaging are not final | Keep public release blocked until release pipeline is decided | Release/docs |
+| R15 | Hosted CI runner variance can fail WebKit preview timing despite local M5 evidence | Medium | GitHub runner timings can differ from local result-bundle evidence | Keep CI preview timing informational and require local/result-bundle evidence for perf gates | PerformanceTests, docs |
+| R16 | Helper-inclusive WebKit memory can exceed the M5 host RSS budget | Medium | Helper aggregate RSS is diagnostic, not an M5 gate | Open a separate system-footprint budget only if Activity Monitor-style memory becomes a release requirement | PerformanceTests, PreviewKit |
+| R17 | Restoring the native adjustable sidebar can reintroduce launch instability | Medium | PR #30 replaced `NavigationSplitView` after AppKit constraint-loop crash | Keep fixed-width `HStack` during Phase 2; restore adjustable sidebar only as post-M5 polish | App |
 
 ## Immediate risk burn-down order
 
-1. Keep M5 acceptance evidence synchronized now that `docs/m5-checklist.md` passes.
-2. Keep R15 as post-M5 polish; do not fold adjustable/native sidebar restoration into the WYSIWYG design gate.
-3. Keep R14 visible for any future helper-inclusive memory budget.
-4. Keep R13 visible whenever CI is green from informational preview timing.
-5. Keep public release hardening (license, signing, notarization, packaging) separate from the M5 feature exit.
-6. Advance the Phase 2 WYSIWYG design from draft to approved only after reviewing the design/spike risks; do not start implementation before the design gate is approved.
+1. Merge the Phase 2 design gate only if it stays docs/spikes-only.
+2. Run Spike A/B/C: IME, undo, selection/copy.
+3. Record go/no-go results before production WYSIWYG implementation.
+4. Keep R17 as post-M5 polish; do not fold adjustable/native sidebar work into WYSIWYG spikes.
+5. Keep release hardening separate from Phase 2 feature work.
