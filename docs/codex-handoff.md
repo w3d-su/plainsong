@@ -134,7 +134,7 @@ PR #38 result:
 Goal: prove native interaction safety for the PR #38 inline fold/reveal production core.
 
 Branch:
-- phase2-native-interaction-gates
+- phase2-native-input-selection-gates
 - One focused PR against main.
 - Do not expose WYSIWYG in the user-facing Command-Shift-P cycle.
 - Do not expand construct scope beyond the PR #38 development hook.

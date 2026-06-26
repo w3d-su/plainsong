@@ -242,6 +242,22 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
         XCTAssertEqual(Self.text(in: textView), "A X**bold** and `cXXe` done")
         XCTAssertFalse(Self.text(in: textView).contains("\u{fffc}"))
     }
+
+    func testAccessibilityValueRemainsRawMarkdownSource() {
+        let source = "# Heading\n\nA **bold** and `code` plus ~~gone~~."
+        let textView = STTextView(frame: .zero)
+        textView.text = source
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: textView
+        ))
+
+        XCTAssertEqual(textView.accessibilityRole(), .textArea)
+        XCTAssertEqual(textView.accessibilityValue() as? String, source)
+        XCTAssertFalse((textView.accessibilityValue() as? String)?.contains("\u{fffc}") ?? true)
+    }
 }
 
 @MainActor

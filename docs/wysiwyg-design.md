@@ -337,14 +337,35 @@ rerun these gates.
 This policy is safe for the current attribute-only dev hook. Link visual folding remains deferred until
 link chrome, destinations, and boundary selections have equivalent native coverage.
 
+### Paste, accessibility, and performance evidence
+
+- **Paste — PASS for backing-source mutation.**
+  `testPasteIntoFoldedAndRevealedRegionsMutatesBackingSourceOnly` exercises STTextView pasteboard reads
+  at a folded bold boundary and inside revealed inline-code content. Both edits mutate the raw backing
+  string only and insert no object-replacement characters or presentation-only text.
+- **Accessibility — PASS for raw value exposure in the development hook.**
+  `testAccessibilityValueRemainsRawMarkdownSource` applies production fold/reveal attributes and confirms
+  STTextView still reports `AXTextArea` with the exact raw Markdown source as its accessibility value.
+  This is attribute-only accessibility evidence; any future layout-fragment, attachment, or user-facing
+  WYSIWYG mode must rerun accessibility checks.
+- **Large-doc performance — PASS.**
+  `MarkdownEditorViewTests.testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget` ran during the
+  final `make test` pass on the 1 MB fixture and measured visible-range fold/highlight/apply at 21.468 ms,
+  under the §12 50 ms budget.
+
 ### IME evidence
 
 - Automated production-path IME coverage remains green:
   `WYSIWYGIMESpikeTests.testZhuyinAndPinyinMarkedTextRoundTripsAtFoldBoundaries` covers Zhuyin and Pinyin
   marked text at heading marker, bold, italic, and inline-code delimiter boundaries through
   `MarkdownSyntaxHighlighter(..., developmentPresentation: .inlineFoldReveal)`.
-- Local input-source inspection found Traditional Chinese Zhuyin enabled and selected, and found Pinyin
-  input sources installed but not enabled by default. This is environment evidence only.
+- Local input-source inspection found Traditional Chinese Zhuyin selected and enabled:
+  `AppleSelectedInputSources` includes `com.apple.inputmethod.TCIM.Zhuyin`,
+  `AppleEnabledInputSources` includes ABC plus TCIM Zhuyin, and
+  `AppleCurrentKeyboardLayoutInputSourceID` returned `com.apple.keylayout.ZhuyinBopomofo`. A TIS input
+  source query for Zhuyin/Pinyin IDs returned only `com.apple.inputmethod.TCIM.Zhuyin`; Pinyin did not
+  appear in the installed or enabled input-source list on this machine. This is environment evidence
+  only, not an actual composition-event run.
 - **Actual macOS input-method event stream gate is not complete.** No committed automated test drives
   real TIS/input-context key events for both Zhuyin and Pinyin through the production development hook.
   Treat this as the primary blocker before any user-facing WYSIWYG mode.
