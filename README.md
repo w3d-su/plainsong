@@ -10,8 +10,11 @@ PR #20 measured visible-range highlighting, PR #21 measured the two-webview
 host-process RSS memory gate, and PR #24/#27 closed issue #17 with the MDX
 sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
 2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness, and
-live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes. Do not
-start Phase 2 WYSIWYG implementation until the WYSIWYG design gate is approved.
+live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
+
+Phase 2 is entering the WYSIWYG design/spike gate. The approved design allows only risk-reduction
+spikes first; production WYSIWYG implementation remains blocked until IME, undo, and selection/copy
+spikes pass and their results are accepted.
 
 ## Development
 
@@ -21,10 +24,11 @@ Decision Log. Read it before writing code.
 
 Useful planning and handoff docs:
 
-- [`docs/m5-plan.md`](docs/m5-plan.md) — current M5 stabilization sequence.
+- [`docs/m5-plan.md`](docs/m5-plan.md) — M5 acceptance history and Phase 2 entry sequence.
 - [`docs/codex-handoff.md`](docs/codex-handoff.md) — Codex-ready goal/subagent prompts.
 - [`docs/acceptance-matrix.md`](docs/acceptance-matrix.md) — milestone gates and evidence.
 - [`docs/risk-register.md`](docs/risk-register.md) — current risks and mitigations.
+- [`docs/wysiwyg-design.md`](docs/wysiwyg-design.md) — approved Phase 2 WYSIWYG spike design.
 
 ```sh
 make bootstrap   # xcodegen, swiftformat, swiftlint, node + npm ci
