@@ -23,6 +23,11 @@ struct ActualIMEScript {
         acceptableCommittedTexts: ["台", "臺"]
     )
 
+    /// Toneless Pinyin "tai" + space commits the first candidate, which the macOS
+    /// Traditional Pinyin IME (`com.apple.inputmethod.TCIM.Pinyin`) ranks as 太. This is the
+    /// legitimate difference from the Zhuyin ㄊㄞˊ (tone 2) script, whose top candidates are
+    /// 台/臺. All listed candidates are single Han ideographs, so the committed selection length
+    /// stays one UTF-16 unit regardless of which candidate the IME picks.
     static let pinyin = ActualIMEScript(
         name: "Pinyin",
         compositionSteps: [
@@ -31,8 +36,8 @@ struct ActualIMEScript {
             ActualIMECompositionStep(key: .i, acceptableInsertedTexts: ["tai"]),
         ],
         commitKeys: [.space, .returnKey, .returnKey],
-        acceptableActiveCommitTexts: ["tai", "台", "臺"],
-        acceptableCommittedTexts: ["台", "臺"]
+        acceptableActiveCommitTexts: ["tai", "太", "台", "臺"],
+        acceptableCommittedTexts: ["太", "台", "臺"]
     )
 }
 
@@ -150,13 +155,26 @@ struct ActualIMEInputSource {
     let source: TISInputSource
     let identifier: String
     let localizedName: String
+    let inputSourceType: String
 
     var summary: String {
-        "\(identifier) (\(localizedName))"
+        "\(identifier) (\(localizedName)) [\(inputSourceType)]"
+    }
+
+    /// True only for composition-capable keyboard input methods/modes. Plain keyboard
+    /// layouts (e.g. `com.apple.keylayout.PinyinKeyboard`) also match the CJK name filters
+    /// but never produce marked text, so they must not be selected for the actual IME gate.
+    var isComposingInputMethod: Bool {
+        let composingTypes: Set<String> = [
+            kTISTypeKeyboardInputMode as String,
+            kTISTypeKeyboardInputMethodWithoutModes as String,
+            kTISTypeKeyboardInputMethodModeEnabled as String,
+        ]
+        return composingTypes.contains(inputSourceType)
     }
 
     static func enabled(matching kind: Kind) -> ActualIMEInputSource? {
-        inputSources(includeAllInstalled: false).first { kind.matches($0) }
+        inputSources(includeAllInstalled: false).first { kind.matches($0) && $0.isComposingInputMethod }
     }
 
     static func installed(matching kind: Kind) -> [ActualIMEInputSource] {
@@ -174,7 +192,8 @@ struct ActualIMEInputSource {
             return ActualIMEInputSource(
                 source: source,
                 identifier: propertyString(source, kTISPropertyInputSourceID) ?? "<unknown>",
-                localizedName: propertyString(source, kTISPropertyLocalizedName) ?? "<unknown>"
+                localizedName: propertyString(source, kTISPropertyLocalizedName) ?? "<unknown>",
+                inputSourceType: propertyString(source, kTISPropertyInputSourceType) ?? "<unknown>"
             )
         }
     }
