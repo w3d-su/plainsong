@@ -37,9 +37,15 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - Goal 6 replaced the `baselineOffset(-1000)` zero-width fold mechanism with a TextKit 2
   content-storage paragraph projection behind the non-user-facing hook and reran B1-B13 green. R18 is
   closed by the new B13 layout-geometry gate.
-- Next active goal: implement the **edge-snapping / mode-integration checklist** (§C/§D of
-  `docs/wysiwyg-release-checklist.md`). This is the first user-facing WYSIWYG integration work, but it
-  must still keep link visual folding and deferred constructs out of scope.
+- Goal 7 landed delimiter edge-snapping (§C.2-§C.4) behind the dev hook on branch
+  `phase2-wysiwyg-edge-snapping`: a collapsed caret that would rest inside a folded delimiter snaps to
+  the delimiter-inner boundary (`WYSIWYGCaretSnap`) for keyboard movement and non-shift pointer clicks,
+  while selections still span raw delimiter offsets so copy stays exact raw Markdown.
+  `WYSIWYGEdgeSnappingGateTests` covers it; checklist §C.2-§C.4 are green.
+- Next active goal (Goal 8): implement the **§D mode integration** — the three-state `⌘⇧P` cycle,
+  persisted layout enum + migration from `Plainsong.preview.isVisible`, the kill switch / deterministic
+  `.sourceOnly` recovery, and the off-by-default Experimental label. It must still keep link visual
+  folding and deferred constructs out of scope.
 
 ## Rules for every Codex run
 
@@ -371,31 +377,60 @@ Result:
 - R18 is closed. User-facing WYSIWYG still remains blocked: no `⌘⇧P` exposure, no persisted WYSIWYG layout
   mode, no link visual folding, and no deferred constructs were added.
 
-# Goal 7 — Edge-snapping / mode integration checklist — active
+# Goal 7 — Delimiter edge-snapping — completed by phase2-wysiwyg-edge-snapping
 
 ```text
-Goal: implement the remaining user-facing WYSIWYG checklist gates after the zero-width mechanism passed.
+Goal: implement Phase 2 WYSIWYG delimiter edge-snapping UX behind the non-user-facing dev hook.
 
 Branch:
-- phase2-wysiwyg-edge-snapping-mode-integration (suggested)
-- One focused PR against main, or split into edge-snapping and mode-integration PRs if review scope grows.
+- phase2-wysiwyg-edge-snapping
+- One focused PR against main. No ⌘⇧P exposure, no persisted WYSIWYG layout mode, no link folding,
+  no new constructs.
+```
+
+Result:
+- Added `WYSIWYGCaretSnap.snap(offset:foldedDelimiterRanges:preferring:)` (pure) plus
+  `MarkdownSTTextView.wysiwygFoldedDelimiterRange(containingInterior:)` /
+  `wysiwygSnappedCaretOffset(_:preferring:)`, which read the live `foldedDelimiterAttribute` runs from
+  the backing text storage with a bounded `longestEffectiveRange` scan.
+- Collapsed-caret keyboard movement (`moveLeft`/`moveRight` via
+  `applyWYSIWYGComposedCharacterMovement`) and non-shift `mouseDown` now snap a destination that lands
+  strictly inside a folded delimiter to the delimiter-inner boundary. The extending keyboard branch and
+  the shift `mouseDown` (pointer-extend/drag) branch are untouched, so selections still span raw
+  delimiter offsets and copy stays exact raw Markdown. Source text is never mutated.
+- Tests: `WYSIWYGEdgeSnappingGateTests` (pure function, keyboard bold/strike/heading snap + inline-code
+  no-trap, pointer snap-from-storage + real-click no-trap, shift-selection raw copy, emoji/CJK movement).
+  Repurposed `WYSIWYGNativeInteractionGateTests.testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals`
+  (was `...LandingInsideFoldedDelimiterRevealsInsteadOfTrapping`, B3). Existing native-interaction and
+  pointer gates stay green; large-doc WYSIWYG fold/highlight/apply stayed at 25.348 ms.
+- Checklist §C.2-§C.4 are green; §C.1 reveal-timing and §C.5 link-deferral confirmation land with §D.
+  User-facing WYSIWYG remains blocked: no `⌘⇧P` exposure, no persisted WYSIWYG layout mode, no link
+  visual folding, no construct-scope change.
+
+# Goal 8 — WYSIWYG mode integration — active
+
+```text
+Goal: implement the §D user-facing WYSIWYG mode-integration gates after edge-snapping passed.
+
+Branch:
+- phase2-wysiwyg-mode-integration (suggested)
+- One focused PR against main, or split if review scope grows.
 
 Read first:
-- docs/wysiwyg-release-checklist.md §C/§D/§F
-- docs/wysiwyg-design.md §16
-- docs/risk-register.md R12/R18
-- agent.md Decision Log entries dated 2026-06-26
-- Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift
-- Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift
+- docs/wysiwyg-release-checklist.md §D/§F
+- docs/wysiwyg-design.md §16/§17
+- docs/risk-register.md R12/R17/R18
+- agent.md Decision Log entries dated 2026-06-26 / 2026-06-27
 - App/AppState.swift
+- Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift
+- Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift
 
 Implement:
-- Delimiter edge-snapping for caret rest positions near hidden delimiters, while preserving raw source
-  selection/copy semantics.
 - A reviewed three-state `⌘⇧P` cycle (source+preview → source-only → WYSIWYG), persisted layout enum and
-  migration from `Plainsong.preview.isVisible`, kill switch / deterministic recovery, and Experimental
-  labeling.
-- Keep WYSIWYG off by default until all release gates are green.
+  migration from the `Plainsong.preview.isVisible` boolean, kill switch / deterministic `.sourceOnly`
+  recovery, and an off-by-default Experimental label.
+- Wire the App to pass `_developmentPresentation: .inlineFoldReveal` only when the experimental flag is
+  on; keep WYSIWYG off by default until all release gates are green.
 
 Do not:
 - Enable link visual folding.
@@ -407,5 +442,5 @@ Verification:
 - make test
 - git diff --check
 - PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests (from Packages/EditorKit)
-- Add targeted edge-snapping and mode-persistence/migration tests.
+- Add targeted mode-persistence/migration and recovery tests.
 ```

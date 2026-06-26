@@ -58,10 +58,15 @@ final class MarkdownSTTextView: STTextView {
         }
 
         if event.modifierFlags.contains(.shift) {
+            // Pointer-extend (drag/shift-click) keeps raw offsets so the selection can
+            // span folded delimiters and copy exact raw Markdown.
             let anchor = selectedRange().location
             textSelection = NSRange(location: min(anchor, caret), length: abs(caret - anchor))
         } else {
-            textSelection = NSRange(location: caret, length: 0)
+            // A plain click resolving to a hidden-delimiter offset snaps to the adjacent
+            // visible boundary in the same pass as the reveal (no one-frame jump).
+            let snappedCaret = wysiwygSnappedCaretOffset(caret, preferring: .nearest)
+            textSelection = NSRange(location: snappedCaret, length: 0)
         }
     }
 
@@ -196,13 +201,102 @@ final class MarkdownSTTextView: STTextView {
             }
         } else {
             let base = delta < 0 ? selection.location : NSMaxRange(selection)
-            let location = delta < 0
+            let movedLocation = delta < 0
                 ? text.composedCharacterBoundary(before: base)
                 : text.composedCharacterBoundary(after: base)
-            textSelection = NSRange(location: location, length: 0)
+            // Edge-snapping: a collapsed caret never rests inside a folded (zero-width)
+            // delimiter. Selections (the `extending` branch above) are left raw so copy
+            // stays exact Markdown.
+            let snappedLocation = wysiwygSnappedCaretOffset(
+                movedLocation,
+                preferring: delta < 0 ? .backward : .forward
+            )
+            textSelection = NSRange(location: snappedLocation, length: 0)
         }
 
         return true
+    }
+
+    /// Snaps a collapsed-caret offset out of any folded delimiter interior, reading the
+    /// live fold attributes so it reflects exactly what is currently hidden. Used by the
+    /// non-user-facing WYSIWYG hook for keyboard arrow and pointer click rest positions.
+    func wysiwygSnappedCaretOffset(_ offset: Int, preferring direction: WYSIWYGCaretSnap.Direction) -> Int {
+        guard let foldedRange = wysiwygFoldedDelimiterRange(containingInterior: offset) else {
+            return offset
+        }
+
+        return WYSIWYGCaretSnap.snap(
+            offset: offset,
+            foldedDelimiterRanges: [foldedRange],
+            preferring: direction
+        )
+    }
+
+    /// The folded delimiter run that strictly contains `offset` in its interior, or `nil`
+    /// when `offset` sits at a run edge, in visible content, or folding is disabled.
+    func wysiwygFoldedDelimiterRange(containingInterior offset: Int) -> NSRange? {
+        guard wysiwygZeroWidthContentStorageDelegate != nil,
+              let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage,
+              offset > 0,
+              offset < textStorage.length
+        else {
+            return nil
+        }
+
+        // Bound the longest-effective-range scan to a small window. Folded delimiters are
+        // short (heading markers and inline markers are at most a handful of characters),
+        // so this stays O(1) on the caret-movement path while still spanning the whole run.
+        let windowRadius = 16
+        let lowerBound = max(0, offset - windowRadius)
+        let upperBound = min(textStorage.length, offset + windowRadius)
+        let searchRange = NSRange(location: lowerBound, length: upperBound - lowerBound)
+
+        var effectiveRange = NSRange(location: 0, length: 0)
+        let value = textStorage.attribute(
+            WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
+            at: offset - 1,
+            longestEffectiveRange: &effectiveRange,
+            in: searchRange
+        )
+        guard (value as? Bool) == true, offset < NSMaxRange(effectiveRange) else {
+            return nil
+        }
+        return effectiveRange
+    }
+}
+
+/// Caret edge-snapping for the non-user-facing WYSIWYG development hook.
+///
+/// When a *collapsed* caret would rest strictly inside a folded (zero-width) delimiter
+/// run, it is relocated to that run's edge so it never visually sits on hidden
+/// delimiters. Selection ranges are never clamped — only the caret rest position moves,
+/// so a selection may still span raw delimiter offsets and copy stays exact raw Markdown.
+enum WYSIWYGCaretSnap {
+    enum Direction {
+        /// Keyboard movement toward higher offsets — snap to the run's trailing edge.
+        case forward
+        /// Keyboard movement toward lower offsets — snap to the run's leading edge.
+        case backward
+        /// Pointer hit-test with no travel direction — snap to the nearer edge.
+        case nearest
+    }
+
+    /// Returns `offset` unchanged unless it is strictly interior to one of
+    /// `foldedDelimiterRanges`, in which case it snaps to that run's edge per `direction`.
+    static func snap(offset: Int, foldedDelimiterRanges: [NSRange], preferring direction: Direction) -> Int {
+        for range in foldedDelimiterRanges where offset > range.location && offset < NSMaxRange(range) {
+            switch direction {
+            case .forward:
+                return NSMaxRange(range)
+            case .backward:
+                return range.location
+            case .nearest:
+                let distanceToLeading = offset - range.location
+                let distanceToTrailing = NSMaxRange(range) - offset
+                return distanceToLeading <= distanceToTrailing ? range.location : NSMaxRange(range)
+            }
+        }
+        return offset
     }
 }
 

@@ -5,7 +5,7 @@ import XCTest
 
 @MainActor
 final class WYSIWYGNativeInteractionGateTests: XCTestCase {
-    func testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping() throws {
+    func testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals() throws {
         let source = "A **bold** and `code` done"
         let textView = makeWYSIWYGTextView(source: source)
 
@@ -17,14 +17,18 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
             isFolded: true
         )
 
-        textView.textSelection = NSRange(location: source.nsRange(of: "**bold**").location, length: 0)
+        // Park the caret at the span start while the opening `**` is still folded, then
+        // move right. Native movement would land at offset+1 (inside the folded
+        // delimiter); edge-snapping relocates the caret to the delimiter-inner boundary
+        // (content start "bold") so it never rests on a hidden delimiter, and the span
+        // reveals on the next presentation pass.
+        let boldRange = source.nsRange(of: "**bold**")
+        let contentRange = source.nsRange(of: "bold")
+        textView.textSelection = NSRange(location: boldRange.location, length: 0)
         textView.moveRight(nil)
 
         let arrowSelection = textView.selectedRange()
-        XCTAssertEqual(
-            arrowSelection,
-            NSRange(location: source.nsRange(of: "**bold**").location + 1, length: 0)
-        )
+        XCTAssertEqual(arrowSelection, NSRange(location: contentRange.location, length: 0))
         let arrowPresentation = productionPresentation(source, selection: arrowSelection, revision: 2)
         XCTAssertTrue(try XCTUnwrap(arrowPresentation.foldPlan).onlyRegion(kind: .strong).isRevealed)
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(arrowPresentation, to: textView))

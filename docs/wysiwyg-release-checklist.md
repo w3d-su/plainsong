@@ -7,8 +7,9 @@
 > out of the `⌘⇧P` cycle, and out of persisted layout state.
 >
 > This checklist started as a specification and now records implementation evidence as gates
-> turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26,
-> but user-facing WYSIWYG remains blocked by the UX and mode-integration gates.
+> turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, and
+> the §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27,
+> but user-facing WYSIWYG remains blocked by the §D mode-integration gates.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
 interaction gates (IME §12/§13, keyboard selection/copy/paste/accessibility §12, pointer/
@@ -41,9 +42,10 @@ What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 
 What still blocks a user-facing mode:
 
-1. **UX and mode integration are still unimplemented.** Delimiter edge-snapping, the
-   three-state `⌘⇧P` cycle, persisted layout migration, kill switch / recovery, and
-   Experimental labeling remain unchecked (§C/§D).
+1. **Mode integration is still unimplemented.** Delimiter edge-snapping (§C.2) now snaps
+   collapsed carets out of folded delimiters behind the dev hook, but the three-state `⌘⇧P`
+   cycle, persisted layout migration, kill switch / recovery, and Experimental labeling
+   remain unchecked (§D).
 2. **The working mechanism is still behind the non-user-facing hook.** The App does not pass
    `_developmentPresentation: .inlineFoldReveal`, and no persisted WYSIWYG layout mode exists.
 3. **Link visual folding and deferred constructs remain blocked.** This checklist does not
@@ -138,7 +140,7 @@ baseline-offset mechanism.
 |---|---|---|---|---|
 | B1 | Actual Zhuyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries` (opt-in) | Re-run opt-in harness against new mechanism; no source corruption, no caret escape, no premature commit, fold attrs skipped during marked text, reapplied after commit | - [x] 2026-06-26: `PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests` passed; Zhuyin input source `com.apple.inputmethod.TCIM.Zhuyin` |
 | B2 | Actual Pinyin IME event stream | `WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtFoldBoundariesWhenEnabled` (opt-in) | Re-run opt-in harness against new mechanism; same acceptance as B1 | - [x] 2026-06-26: same opt-in command passed; Pinyin input source `com.apple.inputmethod.TCIM.Pinyin` |
-| B3 | Keyboard arrow movement near folded delimiters | `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping` | Re-run; caret stays sane, touched span reveals, no trap, composed-character endpoints stay valid | - [x] `WYSIWYGNativeInteractionGateTests.testNativeArrowLandingInsideFoldedDelimiterRevealsInsteadOfTrapping` and `...testWYSIWYGMoveLeftRightSkipsEmojiComposedCharacterAndCJKBoundaries` |
+| B3 | Keyboard arrow movement near folded delimiters | `WYSIWYGNativeInteractionGateTests.testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals` | Re-run; caret stays sane, touched span reveals, no trap, composed-character endpoints stay valid | - [x] `WYSIWYGNativeInteractionGateTests.testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals` and `...testWYSIWYGMoveLeftRightSkipsEmojiComposedCharacterAndCJKBoundaries` (caret rest upgraded from reveal-only to edge-snapping 2026-06-27, §C.2) |
 | B4 | Reverse shift-selection across folded spans | `...testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` | Re-run; selected range is exact raw Markdown, region reveals, copy is raw, composed-character endpoints stay valid | - [x] `WYSIWYGNativeInteractionGateTests.testReverseShiftSelectionAcrossFoldedStrikeKeepsRawRangeAndRevealStateSane` and `...testWYSIWYGShiftSelectionAcrossComposedCharactersAndFoldedInlineSpansCopiesExactMarkdown` |
 | B5 | True pointer click-to-caret | `WYSIWYGNativePointerGateTests.testPointerClick*` / `testPointerBoundaryClicks*` | Re-run real `NSEvent` hit-testing against new fragment geometry; sane caret, reveal-on-touch, no trap | - [x] `WYSIWYGNativePointerGateTests.testPointerClickAcrossFoldedInlineDelimitersPlacesSaneCaretAndReveals`, `...testPointerClickOnFoldedHeadingContentRevealsMarkerWithoutTrap`, `...testPointerBoundaryClicksAtFoldedDelimiterEdgesDoNotTrapCaret` |
 | B6 | Pointer drag (pointer-extend) selection across folds | `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` | Re-run; sane non-empty range, exact raw-Markdown copy, all touched spans reveal | - [x] `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy` |
@@ -168,29 +170,55 @@ Edge-snapping is a UX refinement (avoid a one-frame reveal flicker; make arrow/c
 feel intentional). It is **required for the user-facing mode** even though it was not needed
 for the dev hook.
 
-- [ ] When the caret would land inside a still-folded delimiter offset via keyboard arrow,
+- [x] When the caret would land inside a still-folded delimiter offset via keyboard arrow,
   it snaps to the nearest reveal-range edge (delimiter-inner boundary) rather than relying
   solely on the next-pass reveal.
-- [ ] When a pointer click resolves to a hidden-delimiter offset, the caret snaps to the
+  Evidence: `MarkdownSTTextView.applyWYSIWYGComposedCharacterMovement` snaps collapsed-caret
+  destinations via `WYSIWYGCaretSnap.snap`;
+  `WYSIWYGEdgeSnappingGateTests.testArrowRightIntoFoldedBoldOpeningDelimiterSnapsToContentStart`,
+  `...testArrowLeftIntoFoldedBoldClosingDelimiterSnapsToContentEnd`,
+  `...testArrowIntoFoldedStrikeOpeningDelimiterSnapsToContentStart`,
+  `...testArrowIntoFoldedStrikeClosingDelimiterSnapsToContentEnd`,
+  `...testArrowRightIntoFoldedHeadingMarkerSnapsToContentStart`, and
+  `...testArrowAcrossFoldedInlineCodeSingleBacktickPlacesCaretAtContentWithoutTrap` pass.
+- [x] When a pointer click resolves to a hidden-delimiter offset, the caret snaps to the
   adjacent visible boundary in the same pass as the reveal (no visible one-frame jump).
-- [ ] Edge-snapping never changes the **source** selection semantics: selection/copy still
+  Evidence: the non-shift `MarkdownSTTextView.mouseDown` branch snaps the hit-test result
+  with `.nearest`; `WYSIWYGEdgeSnappingGateTests.testPointerCaretSnapResolvesHiddenDelimiterOffsetToVisibleBoundary`
+  and `...testRealPointerClicksAtFoldedDelimiterEdgesLandOnVisibleBoundary` pass.
+- [x] Edge-snapping never changes the **source** selection semantics: selection/copy still
   operate on raw UTF-16 source offsets; snapping only adjusts where the caret rests, never
   what bytes a range covers.
+  Evidence: snapping only runs for collapsed carets (the extending keyboard branch and the
+  shift `mouseDown` branch are untouched);
+  `WYSIWYGEdgeSnappingGateTests.testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
+  and the existing `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy`
+  pass.
 
 ### C.3 Selection landing on delimiter offsets
 
-- [ ] Selection (not just the caret) **may** still span raw delimiter offsets — that is how
+- [x] Selection (not just the caret) **may** still span raw delimiter offsets — that is how
   copy stays exact raw Markdown. Edge-snapping applies to caret rest position, not to
   clamping selection ranges. This must be explicit so a future change does not "helpfully"
   clamp selections and break B7.
+  Evidence: `WYSIWYGCaretSnap.snap` is only invoked for collapsed carets;
+  `WYSIWYGEdgeSnappingGateTests.testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
+  builds a shift-selection that spans `**bold**` and copies it verbatim, and
+  `...testComposedCharacterMovementStaysValidWithSnappingEnabled` confirms snapping coexists
+  with composed-character movement.
 
 ### C.4 Copy policy
 
-- [ ] Copy remains **exact raw Markdown for the selected source range** (entire folded spans
+- [x] Copy remains **exact raw Markdown for the selected source range** (entire folded spans
   include their delimiters; content-only selections copy content only; boundary selections
   copy exactly the selected `NSRange`). The editor never synthesizes rendered/plaintext copy
   output from folded presentation. Any change to this policy requires its own Decision Log
   entry and re-runs B6/B7.
+  Evidence: unchanged from §B (`WYSIWYGNativeInteractionGateTests.testPartialFoldedSpanCopyPolicyUsesExactRawSelection`,
+  `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy`);
+  edge-snapping added no copy-path changes, and
+  `WYSIWYGEdgeSnappingGateTests.testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
+  re-confirms raw copy after snapping landed.
 
 ### C.5 Link visual folding stays deferred
 
@@ -273,7 +301,9 @@ WYSIWYG may be exposed to users only when **all** of the following are checked:
 - [x] **B** — Every row B1–B13 re-run and green against the §A mechanism; performance recorded in
   `docs/perf-log.md`.
 - [ ] **C** — Reveal-on-touch, edge-snapping, selection/copy, and link-deferral policies implemented
-  and tested.
+  and tested. Edge-snapping and the selection/copy gates (§C.2-§C.4) are green as of 2026-06-27
+  (`WYSIWYGEdgeSnappingGateTests`); reveal-timing (§C.1) and link-deferral (§C.5) confirmation
+  land with the §D mode-integration PR.
 - [ ] **D** — Three-state `⌘⇧P` cycle, persisted enum + migration, kill switch + recovery, and
   experimental labeling implemented and tested.
 - [ ] **E** — Construct scope unchanged; deferred constructs still deferred.
