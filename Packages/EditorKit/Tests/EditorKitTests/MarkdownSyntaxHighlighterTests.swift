@@ -40,6 +40,61 @@ final class MarkdownSyntaxHighlighterTests: XCTestCase {
         XCTAssertNotNil(linkAttributes[.underlineStyle])
     }
 
+    func testDevelopmentInlineFoldRevealFoldsIncludedConstructsAndDefersLinks() throws {
+        let source = """
+        # Heading
+
+        > Quote
+
+        - **bold** and *italic* with ~~gone~~, `code`, and [link](https://example.com)
+        """
+
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (source as NSString).length),
+            developmentPresentation: .inlineFoldReveal,
+            selection: NSRange(location: (source as NSString).length, length: 0)
+        )
+        let inspected = NSAttributedString(highlighted.text)
+
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "#")))
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "*italic*", selecting: "*")))
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "~~gone~~", selecting: "~~")))
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "`code`", selecting: "`")))
+
+        let strikeAttributes = try inspected.attributes(for: "gone")
+        XCTAssertEqual(strikeAttributes[.strikethroughStyle] as? Int, NSUnderlineStyle.single.rawValue)
+
+        let quoteAttributes = try inspected.attributes(for: ">")
+        XCTAssertNotNil(quoteAttributes[.foregroundColor])
+
+        XCTAssertFalse(
+            try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "[link]", selecting: "["))
+        )
+        XCTAssertNotNil(try inspected.attributes(for: "link")[.underlineStyle])
+    }
+
+    func testDevelopmentInlineFoldRevealRevealsTouchedRegionOnly() throws {
+        let source = "**bold** and `code`"
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (source as NSString).length),
+            developmentPresentation: .inlineFoldReveal,
+            selection: NSRange(location: source.nsRange(of: "bold").location, length: 0)
+        )
+        let inspected = NSAttributedString(highlighted.text)
+
+        XCTAssertFalse(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "**")))
+        XCTAssertTrue(try inspected.hasFoldedDelimiterAttributes(at: source.nsRange(of: "`code`", selecting: "`")))
+        let strong = try XCTUnwrap(try highlighted.foldPlan?.onlyRegion(kind: .strong))
+        let inlineCode = try XCTUnwrap(try highlighted.foldPlan?.onlyRegion(kind: .inlineCode))
+        XCTAssertTrue(strong.isRevealed)
+        XCTAssertFalse(inlineCode.isRevealed)
+    }
+
     func testStylesFrontmatterAndFencedCodeBlocks() throws {
         let source = """
         ---
@@ -357,6 +412,25 @@ private extension NSAttributedString {
         XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
         return attributes(at: range.location, effectiveRange: nil)
     }
+
+    func hasFoldedDelimiterAttributes(at range: NSRange) throws -> Bool {
+        XCTAssertNotEqual(range.location, NSNotFound)
+        return WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(
+            attributes(at: range.location, effectiveRange: nil)
+        )
+    }
+}
+
+private extension WYSIWYGFoldPlan {
+    func onlyRegion(
+        kind: WYSIWYGFoldRegion.Kind,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> WYSIWYGFoldRegion {
+        let matchingRegions = regions.filter { $0.kind == kind }
+        XCTAssertEqual(matchingRegions.count, 1, file: file, line: line)
+        return try XCTUnwrap(matchingRegions.first, file: file, line: line)
+    }
 }
 
 private extension MarkdownSyntaxHighlighterTests {
@@ -422,6 +496,24 @@ private extension XCTestCase {
 }
 
 private extension String {
+    func nsRange(of substring: String) -> NSRange {
+        let range = (self as NSString).range(of: substring)
+        XCTAssertNotEqual(range.location, NSNotFound, "Expected to find substring '\(substring)'")
+        return range
+    }
+
+    func nsRange(of containingSubstring: String, selecting selectedSubstring: String) -> NSRange {
+        let containerRange = nsRange(of: containingSubstring)
+        let container = (self as NSString).substring(with: containerRange) as NSString
+        let selectedRange = container.range(of: selectedSubstring)
+        XCTAssertNotEqual(
+            selectedRange.location,
+            NSNotFound,
+            "Expected substring '\(selectedSubstring)' in '\(containingSubstring)'"
+        )
+        return NSRange(location: containerRange.location + selectedRange.location, length: selectedRange.length)
+    }
+
     func ranges(of substring: String) -> [NSRange] {
         let nsString = self as NSString
         var ranges: [NSRange] = []

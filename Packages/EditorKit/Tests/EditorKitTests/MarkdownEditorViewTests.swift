@@ -92,6 +92,32 @@ final class MarkdownEditorViewTests: XCTestCase {
     }
 
     @MainActor
+    func testWYSIWYGVisibleRangeFoldRecomputeStaysUnderHighlightBudget() async throws {
+        let fixtureText = try String(contentsOf: Self.repoRoot.appending(path: "Fixtures/large-1mb.md"))
+        let foldedLine = "\nVisible **bold** and *italic* with ~~gone~~ plus `code`.\n"
+        let source = fixtureText + foldedLine
+        let visibleRange = (source as NSString).range(of: "Visible **bold**")
+        let editLocation = NSMaxRange((source as NSString).range(of: "Visible"))
+
+        let result = try await EditorPerformanceProbe.measureVisibleRangeHighlightUpdate(
+            fixtureText: source,
+            fileKind: .markdown,
+            visibleRange: visibleRange,
+            editLocation: editLocation,
+            insertion: "!",
+            developmentPresentation: .inlineFoldReveal
+        )
+
+        print(String(
+            format: "WYSIWYG visible-range fold highlight/apply: %.3f ms",
+            result.elapsedMilliseconds
+        ))
+        XCTAssertTrue(result.didApplyHighlight)
+        XCTAssertLessThan(result.elapsedMilliseconds, 50)
+        XCTAssertEqual(result.selectionAfterApply.location, editLocation + 1)
+    }
+
+    @MainActor
     func testPartialHighlightApplyPreservesTextAndSelection() {
         let source = "# Heading\n\nPlain **bold** text\n"
         let textView = STTextView(frame: .zero)
@@ -182,7 +208,7 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertEqual(typedSource.substrings(with: foldedPlan.foldedRanges), ["**", "**"])
         XCTAssertFalse(try foldedPlan.onlyRegion(kind: .strong).isRevealed)
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-            Self.wysiwygPresentation(typedSource, foldedRanges: foldedPlan.foldedRanges, revision: 10),
+            Self.wysiwygPresentation(typedSource, selection: outsideSelection, revision: 10),
             to: textView
         ))
         XCTAssertEqual(Self.text(in: textView), typedSource)
@@ -195,7 +221,7 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertTrue(try revealedPlan.onlyRegion(kind: .strong).isRevealed)
         XCTAssertEqual(revealedPlan.foldedRanges, [])
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-            Self.wysiwygPresentation(typedSource, foldedRanges: revealedPlan.foldedRanges, revision: 11),
+            Self.wysiwygPresentation(typedSource, selection: revealSelection, revision: 11),
             to: textView
         ))
         XCTAssertEqual(textView.selectedRange(), revealSelection)
@@ -212,7 +238,7 @@ final class MarkdownEditorViewTests: XCTestCase {
         XCTAssertTrue(try editedPlan.onlyRegion(kind: .strong).isRevealed)
         XCTAssertEqual(editedPlan.foldedRanges, [])
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-            Self.wysiwygPresentation(editedSource, foldedRanges: editedPlan.foldedRanges, revision: 12),
+            Self.wysiwygPresentation(editedSource, selection: editedSelection, revision: 12),
             to: textView
         ))
         XCTAssertEqual(textView.selectedRange(), editedSelection)
@@ -226,7 +252,7 @@ final class MarkdownEditorViewTests: XCTestCase {
             XCTAssertTrue(try undoPlan.onlyRegion(kind: .strong).isRevealed)
             XCTAssertEqual(undoPlan.foldedRanges, [])
             XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-                Self.wysiwygPresentation(typedSource, foldedRanges: undoPlan.foldedRanges, revision: revision),
+                Self.wysiwygPresentation(typedSource, selection: textView.selectedRange(), revision: revision),
                 to: textView
             ))
             XCTAssertEqual(Self.text(in: textView), typedSource)
@@ -242,7 +268,7 @@ final class MarkdownEditorViewTests: XCTestCase {
             XCTAssertTrue(try redoPlan.onlyRegion(kind: .strong).isRevealed)
             XCTAssertEqual(redoPlan.foldedRanges, [])
             XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-                Self.wysiwygPresentation(editedSource, foldedRanges: redoPlan.foldedRanges, revision: revision + 10),
+                Self.wysiwygPresentation(editedSource, selection: redoSelection, revision: revision + 10),
                 to: textView
             ))
             XCTAssertEqual(Self.text(in: textView), editedSource)
@@ -391,6 +417,15 @@ private actor HighlightStartProbe {
 }
 
 private extension MarkdownEditorViewTests {
+    static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
     static func highlightedText(_ source: String, revision: Int) -> HighlightedText {
         let highlighted = MarkdownSyntaxHighlighter().highlight(
             source,
@@ -400,18 +435,19 @@ private extension MarkdownEditorViewTests {
         return HighlightedText(revision: revision, range: highlighted.range, text: highlighted.text)
     }
 
-    static func wysiwygPresentation(_ source: String, foldedRanges: [NSRange], revision: Int) -> HighlightedText {
-        let attributed = NSMutableAttributedString(
-            string: source,
-            attributes: [.font: MarkdownSyntaxHighlighter.defaultFont]
+    static func wysiwygPresentation(_ source: String, selection: NSRange, revision: Int) -> HighlightedText {
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            source,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (source as NSString).length),
+            developmentPresentation: .inlineFoldReveal,
+            selection: selection
         )
-        for range in foldedRanges {
-            attributed.addAttributes(Self.foldedDelimiterAttributes, range: range)
-        }
         return HighlightedText(
             revision: revision,
-            range: NSRange(location: 0, length: attributed.length),
-            text: AttributedString(attributed)
+            range: highlighted.range,
+            text: highlighted.text,
+            foldPlan: highlighted.foldPlan
         )
     }
 
@@ -428,12 +464,6 @@ private extension MarkdownEditorViewTests {
     static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
-
-    static let foldedDelimiterAttributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.monospacedSystemFont(ofSize: 0.1, weight: .regular),
-        .foregroundColor: NSColor.clear,
-        .baselineOffset: -1000,
-    ]
 }
 
 private extension WYSIWYGFoldPlan {

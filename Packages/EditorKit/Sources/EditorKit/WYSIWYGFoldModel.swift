@@ -48,7 +48,7 @@ struct WYSIWYGFoldPlan: Equatable {
 }
 
 struct WYSIWYGFoldRegion: Equatable {
-    enum Kind: Equatable {
+    enum Kind: Equatable, Hashable {
         case heading(level: Int)
         case strong
         case emphasis

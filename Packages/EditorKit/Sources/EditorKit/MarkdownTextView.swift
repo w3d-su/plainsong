@@ -35,16 +35,19 @@ struct HighlightedText: Equatable {
     let revision: Int
     let range: NSRange
     let text: AttributedString
+    let foldPlan: WYSIWYGFoldPlan?
 
-    init(revision: Int, range: NSRange, text: AttributedString) {
+    init(revision: Int, range: NSRange, text: AttributedString, foldPlan: WYSIWYGFoldPlan? = nil) {
         self.revision = revision
         self.range = range
         self.text = text
+        self.foldPlan = foldPlan
     }
 
-    init(revision: Int, text: AttributedString) {
+    init(revision: Int, text: AttributedString, foldPlan: WYSIWYGFoldPlan? = nil) {
         self.revision = revision
         self.text = text
+        self.foldPlan = foldPlan
         range = NSRange(location: 0, length: NSAttributedString(text).length)
     }
 

@@ -30,6 +30,7 @@ public struct MarkdownEditorView: View {
     private let completionWorkspace: CompletionWorkspace
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
+    private let developmentPresentation: MarkdownEditorDevelopmentPresentation
 
     public init(
         text: Binding<String>,
@@ -43,7 +44,8 @@ public struct MarkdownEditorView: View {
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
         imageAssetInserter: EditorImageAssetInserter? = nil,
-        imageAssetContextID: String? = nil
+        imageAssetContextID: String? = nil,
+        _developmentPresentation developmentPresentation: MarkdownEditorDevelopmentPresentation = .source
     ) {
         _text = text
         self.fileKind = fileKind
@@ -57,6 +59,7 @@ public struct MarkdownEditorView: View {
         self.completionWorkspace = completionWorkspace
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
+        self.developmentPresentation = developmentPresentation
     }
 
     public var body: some View {
@@ -101,6 +104,10 @@ public struct MarkdownEditorView: View {
             scheduleHighlight()
         }
         .onChange(of: appearanceID) { _, _ in
+            scheduleHighlight()
+        }
+        .onChange(of: selection) { _, _ in
+            guard developmentPresentation.enablesInlineFoldReveal else { return }
             scheduleHighlight()
         }
         .onAppear {
@@ -168,7 +175,9 @@ public struct MarkdownEditorView: View {
             visibleRange: requestedRange,
             theme: editorTheme,
             fontName: fontName,
-            fontSize: fontSize
+            fontSize: fontSize,
+            developmentPresentation: developmentPresentation,
+            selection: selection
         )
 
         guard Self.shouldApplyScheduledHighlight(
@@ -179,7 +188,12 @@ public struct MarkdownEditorView: View {
             return
         }
 
-        styledText = HighlightedText(revision: revision, range: highlighted.range, text: highlighted.text)
+        styledText = HighlightedText(
+            revision: revision,
+            range: highlighted.range,
+            text: highlighted.text,
+            foldPlan: highlighted.foldPlan
+        )
     }
 
     nonisolated static func shouldApplyScheduledHighlight(

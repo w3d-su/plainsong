@@ -21,6 +21,7 @@ struct MarkdownSyntaxToken {
         case emphasis
         case linkText
         case linkDestination
+        case quoteMarker
         case tableHeader
         case tableDelimiter
         case tablePipe
@@ -42,7 +43,7 @@ final class MarkdownSyntaxParser {
     static let inlineParsingLimit = 250_000
     static let visibleHighlightMinimumLength = 4096
 
-    private let markdownParser: Parser
+    let markdownParser: Parser
     let inlineParser: Parser
     private var cachedTSXParser: Parser?
     private var cachedTSXHighlightQuery: Query?
@@ -338,6 +339,9 @@ extension MarkdownSyntaxParser {
              "task_list_marker_checked",
              "task_list_marker_unchecked":
             tokens.append(MarkdownSyntaxToken(kind: .listMarker, range: nsRange(for: node)))
+
+        case "block_quote_marker":
+            tokens.append(MarkdownSyntaxToken(kind: .quoteMarker, range: nsRange(for: node)))
 
         case "inline":
             if parsesInlineMarkup {

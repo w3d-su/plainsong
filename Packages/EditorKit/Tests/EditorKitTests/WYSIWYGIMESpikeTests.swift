@@ -24,7 +24,20 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         let textView = STTextView(frame: .zero)
         textView.text = wysiwygIMESpikeSource
         textView.textSelection = NSRange(location: scenario.insertionLocation, length: 0)
-        applyTestFoldAttributes(to: textView, ranges: scenario.foldedRanges)
+        XCTAssertTrue(applyProductionPresentation(
+            to: textView,
+            source: wysiwygIMESpikeSource,
+            selection: NSRange(location: (wysiwygIMESpikeSource as NSString).length, length: 0),
+            revision: 0
+        ))
+        assertFoldedRangesCarryProductionAttributes(
+            in: textView,
+            ranges: scenario.foldedRanges,
+            script: script,
+            scenario: scenario,
+            file: file,
+            line: line
+        )
 
         for step in script.markedSteps {
             textView.setMarkedText(
@@ -65,7 +78,11 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
             )
 
             let skippedFoldApply = MarkdownTextView.applyHighlightedText(
-                highlightedText(wysiwygIMESpikeSource, foldedRanges: scenario.foldedRanges, revision: 1),
+                productionPresentation(
+                    wysiwygIMESpikeSource,
+                    selection: textView.selectedRange(),
+                    revision: 1
+                ),
                 to: textView
             )
             XCTAssertFalse(skippedFoldApply, "Fold/reveal attributes must not apply during marked text")
@@ -108,12 +125,12 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
             line: line
         )
 
-        let committedFoldedRanges = scenario.foldedRanges.shifted(
-            afterInsertionAt: scenario.insertionLocation,
-            insertedUTF16Length: script.committedText.utf16.count
-        )
         let didApplyFoldAttributes = MarkdownTextView.applyHighlightedText(
-            highlightedText(committedText, foldedRanges: committedFoldedRanges, revision: 2),
+            productionPresentation(
+                committedText,
+                selection: textView.selectedRange(),
+                revision: 2
+            ),
             to: textView
         )
 
@@ -134,25 +151,57 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         )
     }
 
-    private func applyTestFoldAttributes(to textView: STTextView, ranges: [NSRange]) {
-        for range in ranges {
-            textView.addAttributes(Self.foldedDelimiterAttributes, range: range)
-        }
-    }
-
-    private func highlightedText(_ text: String, foldedRanges: [NSRange], revision: Int) -> HighlightedText {
-        let attributed = NSMutableAttributedString(
-            string: text,
-            attributes: [.font: MarkdownSyntaxHighlighter.defaultFont]
+    private func productionPresentation(_ text: String, selection: NSRange, revision: Int) -> HighlightedText {
+        let highlighted = MarkdownSyntaxHighlighter().highlight(
+            text,
+            fileKind: .markdown,
+            visibleRange: NSRange(location: 0, length: (text as NSString).length),
+            developmentPresentation: .inlineFoldReveal,
+            selection: selection
         )
-        for range in foldedRanges {
-            attributed.addAttributes(Self.foldedDelimiterAttributes, range: range)
-        }
         return HighlightedText(
             revision: revision,
-            range: NSRange(location: 0, length: attributed.length),
-            text: AttributedString(attributed)
+            range: highlighted.range,
+            text: highlighted.text,
+            foldPlan: highlighted.foldPlan
         )
+    }
+
+    @discardableResult
+    private func applyProductionPresentation(
+        to textView: STTextView,
+        source: String,
+        selection: NSRange,
+        revision: Int
+    ) -> Bool {
+        MarkdownTextView.applyHighlightedText(
+            productionPresentation(source, selection: selection, revision: revision),
+            to: textView
+        )
+    }
+
+    private func assertFoldedRangesCarryProductionAttributes(
+        in textView: STTextView,
+        ranges: [NSRange],
+        script: CompositionScript,
+        scenario: FoldBoundaryScenario,
+        file: StaticString,
+        line: UInt
+    ) {
+        guard let textStorage = MarkdownTextView.textStorage(of: textView) else {
+            XCTFail("Expected text storage for \(script.name) \(scenario.name)", file: file, line: line)
+            return
+        }
+
+        for range in ranges {
+            let attributes = textStorage.attributes(at: range.location, effectiveRange: nil)
+            XCTAssertTrue(
+                WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes),
+                "Production fold presentation should hide \(range) for \(script.name) \(scenario.name)",
+                file: file,
+                line: line
+            )
+        }
     }
 
     private func assertMarkedRangeDoesNotCarryFoldAttributes(
@@ -174,7 +223,7 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         }
 
         textStorage.enumerateAttributes(in: markedRange) { attributes, _, stop in
-            if Self.containsFoldedDelimiterAttributes(attributes) {
+            if WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes) {
                 XCTFail(
                     "Fold/reveal attributes must not cover active marked text for \(script.name) \(scenario.name)",
                     file: file,
@@ -188,29 +237,6 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
     private static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
-
-    private static func containsFoldedDelimiterAttributes(_ attributes: [NSAttributedString.Key: Any]) -> Bool {
-        guard let font = attributes[.font] as? NSFont,
-              let foregroundColor = attributes[.foregroundColor] as? NSColor,
-              let baselineOffset = attributes[.baselineOffset] as? CGFloat
-        else {
-            return false
-        }
-
-        return font.pointSize == foldedDelimiterFont.pointSize
-            && foregroundColor == foldedDelimiterForegroundColor
-            && baselineOffset == foldedDelimiterBaselineOffset
-    }
-
-    private static let foldedDelimiterFont = NSFont.monospacedSystemFont(ofSize: 0.1, weight: .regular)
-    private static let foldedDelimiterForegroundColor = NSColor.clear
-    private static let foldedDelimiterBaselineOffset: CGFloat = -1000
-
-    private static let foldedDelimiterAttributes: [NSAttributedString.Key: Any] = [
-        .font: foldedDelimiterFont,
-        .foregroundColor: foldedDelimiterForegroundColor,
-        .baselineOffset: foldedDelimiterBaselineOffset,
-    ]
 }
 
 private struct CompositionScript: CaseIterable {
@@ -334,15 +360,6 @@ private struct FoldBoundaryScenario: CaseIterable {
             ),
         ]
     }()
-}
-
-private extension [NSRange] {
-    func shifted(afterInsertionAt insertionLocation: Int, insertedUTF16Length: Int) -> [NSRange] {
-        map { range in
-            guard range.location >= insertionLocation else { return range }
-            return NSRange(location: range.location + insertedUTF16Length, length: range.length)
-        }
-    }
 }
 
 private extension String {
