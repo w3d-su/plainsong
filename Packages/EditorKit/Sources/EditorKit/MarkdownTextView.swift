@@ -79,6 +79,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
     private let isWYSIWYGZeroWidthFoldingEnabled: Bool
+    private let onWYSIWYGMechanismFailure: ((String) -> Void)?
     private let onVisibleRangeChange: (NSRange) -> Void
 
     init(
@@ -92,6 +93,7 @@ struct MarkdownTextView: NSViewRepresentable {
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
         isWYSIWYGZeroWidthFoldingEnabled: Bool = false,
+        onWYSIWYGMechanismFailure: ((String) -> Void)? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25,
         onVisibleRangeChange: @escaping (NSRange) -> Void = { _ in }
@@ -106,6 +108,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
         self.isWYSIWYGZeroWidthFoldingEnabled = isWYSIWYGZeroWidthFoldingEnabled
+        self.onWYSIWYGMechanismFailure = onWYSIWYGMechanismFailure
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
         self.onVisibleRangeChange = onVisibleRangeChange
@@ -138,7 +141,6 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isEditable = isEnabled
         textView.isSelectable = isEnabled
-        textView.setWYSIWYGZeroWidthFoldingEnabled(isWYSIWYGZeroWidthFoldingEnabled)
 
         context.coordinator.isUpdating = true
         textView.text = text
@@ -148,7 +150,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
-        textView.setWYSIWYGZeroWidthFoldingEnabled(isWYSIWYGZeroWidthFoldingEnabled)
+        applyWYSIWYGMechanismState(to: textView)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
 
@@ -168,6 +170,7 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+        applyWYSIWYGMechanismState(to: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -211,6 +214,15 @@ struct MarkdownTextView: NSViewRepresentable {
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.
+    }
+
+    private func applyWYSIWYGMechanismState(to textView: MarkdownSTTextView) {
+        let didApply = textView.setWYSIWYGZeroWidthFoldingEnabled(isWYSIWYGZeroWidthFoldingEnabled)
+        guard isWYSIWYGZeroWidthFoldingEnabled, !didApply else {
+            return
+        }
+
+        onWYSIWYGMechanismFailure?("TextKit 2 content storage was unavailable for WYSIWYG folding")
     }
 
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {

@@ -12,9 +12,10 @@ sanitizer/asset/SVG policy. PR #26 landed Settings/themes and closed #16. The
 2026-06-25 final sweeps fixed scroll sync, launch/Open Recent, MDX error liveness, and
 live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
 
-Phase 2 is entering the WYSIWYG design/spike gate. The approved design allows only risk-reduction
-spikes first; production WYSIWYG implementation remains blocked until IME, undo, and selection/copy
-spikes pass and their results are accepted.
+Phase 2 WYSIWYG is still experimental. The inline fold/reveal mechanism and native interaction gates
+exist behind an off-by-default **WYSIWYG mode (Experimental)** setting; source-only and source+preview
+remain the default user-facing modes. Link visual folding, image thumbnails, fenced-code custom
+fragments, tables, Mermaid/math widgets, and real MDX rendering remain deferred.
 
 ## Development
 

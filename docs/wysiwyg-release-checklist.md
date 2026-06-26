@@ -1,15 +1,15 @@
 # User-Facing WYSIWYG Release Checklist
 
-> **Status: BLOCKING CHECKLIST. WYSIWYG is not user-facing.**
-> This document defines every gate that must be green before Plainsong exposes a WYSIWYG
-> editing mode to users. Until every checkbox in this file is checked with linked evidence,
-> WYSIWYG stays behind `MarkdownEditorView(..., _developmentPresentation: .inlineFoldReveal)`,
-> out of the `⌘⇧P` cycle, and out of persisted layout state.
+> **Status: BLOCKING CHECKLIST. WYSIWYG is Experimental and off by default.**
+> This document defines every gate that must be green before Plainsong promotes WYSIWYG beyond
+> the off-by-default Experimental mode. Until every checkbox in this file is checked with linked
+> evidence, WYSIWYG stays behind the Experimental Settings flag and must not become default/stable.
 >
 > This checklist started as a specification and now records implementation evidence as gates
 > turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, and
-> the §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27,
-> but user-facing WYSIWYG remains blocked by the §D mode-integration gates.
+> the §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27.
+> §D automated AppState/persistence/recovery gates are also green as of 2026-06-27, but final
+> promotion remains blocked by unchecked manual UI/docs/sign-off gates.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
 interaction gates (IME §12/§13, keyboard selection/copy/paste/accessibility §12, pointer/
@@ -19,7 +19,7 @@ selection-edge §14 in `docs/wysiwyg-design.md`) passed for the attribute-only d
 
 ## 0. How to read this checklist
 
-- Each `- [ ]` item is a **release gate**. It blocks user-facing WYSIWYG until checked.
+- Each `- [ ]` item is a **release gate**. It blocks stable/default WYSIWYG promotion until checked.
 - A gate is checked **only** with linked evidence: a test name, a PR number, or a recorded
   measurement in `docs/perf-log.md` / a design note.
 - Gates are grouped: **A** (mechanism), **B** (gate-rerun matrix), **C** (UX policy),
@@ -40,14 +40,13 @@ What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 - True pointer click-to-caret and pointer-extend (drag) selection across folded spans, with
   reveal-on-touch and exact raw-Markdown copy.
 
-What still blocks a user-facing mode:
+What still blocks promotion beyond Experimental:
 
-1. **Mode integration is still unimplemented.** Delimiter edge-snapping (§C.2) now snaps
-   collapsed carets out of folded delimiters behind the dev hook, but the three-state `⌘⇧P`
-   cycle, persisted layout migration, kill switch / recovery, and Experimental labeling
-   remain unchecked (§D).
-2. **The working mechanism is still behind the non-user-facing hook.** The App does not pass
-   `_developmentPresentation: .inlineFoldReveal`, and no persisted WYSIWYG layout mode exists.
+1. **Manual UI/docs sign-off is still incomplete.** The automated §D mode integration gates are
+   covered, but View menu/toolbar validation and Experimental label/docs validation remain unchecked.
+2. **WYSIWYG must remain off by default.** The App may pass
+   `_developmentPresentation: .inlineFoldReveal` only when the Experimental flag is enabled, the
+   current layout mode is WYSIWYG, and the mechanism has not failed.
 3. **Link visual folding and deferred constructs remain blocked.** This checklist does not
    authorize links, images, fenced-code custom fragments, tables, Mermaid/math widgets, or real
    MDX rendering in the editor surface.
@@ -238,37 +237,52 @@ this into a **three-state** cycle per `agent.md` §13.
 
 ### D.1 `⌘⇧P` cycle
 
-- [ ] `⌘⇧P` cycles **source+preview → source-only → WYSIWYG → source+preview** when WYSIWYG is
-  enabled. The View menu and toolbar control reflect the current mode.
-- [ ] When WYSIWYG is **disabled** (experimental flag off, or mechanism unhealthy per D.3),
-  `⌘⇧P` cycles only the existing two states and never lands on WYSIWYG. No dead/disabled
-  WYSIWYG stop appears in the cycle.
+- [x] AppState's layout cycle goes **source+preview → source-only → WYSIWYG → source+preview**
+  when WYSIWYG is enabled. Evidence:
+  `AppStateTests.testLayoutModeCycleIncludesWYSIWYGWhenExperimentalFlagIsEnabled`.
+- [x] When WYSIWYG is **disabled** (experimental flag off, or mechanism unhealthy per D.3),
+  AppState cycles only the existing two states and never lands on WYSIWYG. No dead/disabled
+  WYSIWYG stop appears in the cycle. Evidence:
+  `AppStateTests.testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled` and
+  `AppStateTests.testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText`.
+- [ ] The View menu and toolbar control reflect the current mode in manual UI validation.
 
 ### D.2 Persisted layout mode
 
-- [ ] Layout mode is persisted as a **three-state enum** (e.g. `PreviewLayoutMode`:
-  `.sourcePreview` / `.sourceOnly` / `.wysiwyg`), replacing the bare boolean.
-- [ ] A **migration** maps the legacy `Plainsong.preview.isVisible` boolean to the new enum on
+- [x] Layout mode is persisted as a **three-state enum** (`EditorLayoutMode`:
+  `.sourcePreview` / `.sourceOnly` / `.wysiwyg`), replacing the bare boolean. Evidence:
+  `AppStateTests.testPreviewVisibilityPersistsThroughUserDefaults` and the enabled/disabled
+  cycle tests.
+- [x] A **migration** maps the legacy `Plainsong.preview.isVisible` boolean to the new enum on
   first launch (`true → .sourcePreview`, `false → .sourceOnly`) so existing users keep their
-  layout. Document the one-time reset behavior in the Decision Log if any preference resets.
-- [ ] `.wysiwyg` is only **persisted** when the feature is enabled; if it is read back while
-  the feature is disabled, it resolves per D.3 recovery instead of forcing WYSIWYG on.
+  layout. Evidence: `AppStateTests.testLayoutModeMigratesLegacyVisiblePreviewPreference` and
+  `AppStateTests.testLayoutModeMigratesLegacyHiddenPreviewPreference`.
+- [x] `.wysiwyg` is only **persisted** when the feature is enabled; if it is read back while
+  the feature is disabled, it resolves per D.3 recovery instead of forcing WYSIWYG on. Evidence:
+  `AppStateTests.testPersistedWYSIWYGFallsBackToSourceOnlyWhenExperimentalFlagIsDisabled`.
 
 ### D.3 Failure / disable recovery
 
-- [ ] An explicit **kill switch** exists (build flag and/or `UserDefaults` flag) that disables
-  WYSIWYG entirely without removing source-only/source+preview.
-- [ ] If the WYSIWYG mechanism fails to initialize or is disabled at launch, a persisted
+- [x] An explicit **kill switch** exists (the off-by-default
+  `Plainsong.settings.experimentalWYSIWYGEnabled` `UserDefaults` flag) that disables WYSIWYG
+  entirely without removing source-only/source+preview. Evidence:
+  `AppStateTests.testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled`.
+- [x] If the WYSIWYG mechanism fails to initialize or is disabled at launch, a persisted
   `.wysiwyg` mode **falls back deterministically** to `.sourceOnly` (safest: pure text, no
-  preview dependency) and the user is not left in a broken pane.
-- [ ] A mechanism failure mid-session degrades to `.sourceOnly` without data loss (source text
-  is canonical and untouched), and the failure is logged, not silently swallowed.
+  preview dependency) and the user is not left in a broken pane. Evidence:
+  `AppStateTests.testPersistedWYSIWYGFallsBackToSourceOnlyWhenExperimentalFlagIsDisabled`.
+- [x] A mechanism failure mid-session degrades to `.sourceOnly` without data loss (source text
+  is canonical and untouched), and the failure is logged/exposed through AppState recovery state,
+  not silently swallowed. Evidence:
+  `AppStateTests.testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText`.
 
 ### D.4 Experimental vs stable labeling
 
-- [ ] Until **every** gate in this document is green, WYSIWYG ships (if at all) behind an
-  **Experimental** Settings toggle, labeled experimental in the Settings UI and in user-facing
-  docs/README. It is **off by default**.
+- [x] Until **every** gate in this document is green, WYSIWYG ships (if at all) behind an
+  **Experimental** Settings toggle and is **off by default**. Evidence:
+  `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` verifies the preference default
+  and persistence.
+- [ ] The Experimental label is manually verified in Settings UI and user-facing docs/README.
 - [ ] Promotion from experimental to stable (on by default / no experimental label) requires
   this checklist fully green and a Decision Log entry recording the promotion.
 
@@ -294,7 +308,8 @@ copy/accessibility/performance) against the §A mechanism before it becomes user
 
 ## F. Final release sign-off
 
-WYSIWYG may be exposed to users only when **all** of the following are checked:
+WYSIWYG may be promoted beyond off-by-default Experimental only when **all** of the following are
+checked:
 
 - [x] **A** — Replacement zero-width mechanism landed; A.3 invariants proven; `baselineOffset(-1000)`
   removed/demoted; mechanism recorded in Decision Log.
@@ -311,8 +326,8 @@ WYSIWYG may be exposed to users only when **all** of the following are checked:
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
-Until then, the only valid WYSIWYG surface is the non-user-facing
-`_developmentPresentation: .inlineFoldReveal` hook.
+Until then, the only valid WYSIWYG surfaces are the off-by-default Experimental mode and the
+non-user-facing `_developmentPresentation: .inlineFoldReveal` hook.
 
 ---
 
@@ -321,11 +336,11 @@ Until then, the only valid WYSIWYG surface is the non-user-facing
 - `docs/wysiwyg-design.md` §10–§14 — spike results, production core, and native interaction gates.
 - `docs/risk-register.md` — R10 (selection/caret), R11 (copy policy), R12 (checklist-before-gates),
   R18 (zero-width mechanism distortion).
-- `docs/codex-handoff.md` — Goals 4-6 and the next active edge-snapping / mode-integration goal.
+- `docs/codex-handoff.md` — Goals 4-8 and remaining release sign-off notes.
 - `Packages/EditorKit/Sources/EditorKit/WYSIWYGZeroWidthTextContentProjection.swift` — current
   zero-width mechanism.
 - `Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativePointerGateTests.swift`,
   `WYSIWYGNativeInteractionGateTests.swift`, `WYSIWYGActualIMEEventGateTests.swift`,
   `WYSIWYGIMESpikeTests.swift`, `WYSIWYGSelectionMappingSpikeTests.swift` — gate evidence.
-- `App/AppState.swift` — current binary preview toggle to be replaced by the three-state mode.
+- `App/AppState.swift` — three-state layout mode, migration, Experimental gate, and fallback behavior.
 - `agent.md` §13, §17, Decision Log — Phase 2 scope, layering, and decision history.
