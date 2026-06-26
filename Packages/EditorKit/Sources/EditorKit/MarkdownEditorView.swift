@@ -31,6 +31,7 @@ public struct MarkdownEditorView: View {
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
     private let developmentPresentation: MarkdownEditorDevelopmentPresentation
+    private let onWYSIWYGMechanismFailure: ((String) -> Void)?
 
     public init(
         text: Binding<String>,
@@ -45,7 +46,8 @@ public struct MarkdownEditorView: View {
         completionWorkspace: CompletionWorkspace = .empty,
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
-        _developmentPresentation developmentPresentation: MarkdownEditorDevelopmentPresentation = .source
+        _developmentPresentation developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
+        onWYSIWYGMechanismFailure: ((String) -> Void)? = nil
     ) {
         _text = text
         self.fileKind = fileKind
@@ -60,6 +62,7 @@ public struct MarkdownEditorView: View {
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
         self.developmentPresentation = developmentPresentation
+        self.onWYSIWYGMechanismFailure = onWYSIWYGMechanismFailure
     }
 
     public var body: some View {
@@ -88,6 +91,7 @@ public struct MarkdownEditorView: View {
             imageAssetInserter: imageAssetInserter,
             imageAssetContextID: imageAssetContextID,
             isWYSIWYGZeroWidthFoldingEnabled: developmentPresentation.enablesInlineFoldReveal,
+            onWYSIWYGMechanismFailure: onWYSIWYGMechanismFailure,
             font: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         ) { range in
             Task { @MainActor in

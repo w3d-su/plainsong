@@ -40,7 +40,7 @@ final class AppState: ObservableObject {
 
     @Published var currentDocument: DocumentSession
     @Published var isSaving = false
-    @Published private(set) var isPreviewVisible: Bool
+    @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL?
     @Published var workspaceTree: WorkspaceFileTree?
     @Published var showAllFiles = false
@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     @Published var presentedError: UserVisibleError?
     @Published var externalChangePrompt: ExternalChangePrompt?
     @Published var missingFilePrompt: MissingFilePrompt?
+    @Published private(set) var wysiwygFallbackMessage: String?
 
     let fileStore: MarkdownFileStore
     let lastOpenedFileStore: any LastOpenedFilePersisting
@@ -72,6 +73,7 @@ final class AppState: ObservableObject {
     var pendingExternalTexts: [URL: String] = [:]
     var detachedSessionURLs: Set<URL> = []
     let preferences: PlainsongPreferences
+    private(set) var isWYSIWYGMechanismHealthy = true
 
     init(
         currentDocument: DocumentSession = DocumentSession(),
@@ -90,15 +92,64 @@ final class AppState: ObservableObject {
         self.directoryScanner = directoryScanner
         self.fileOperations = fileOperations
         self.userDefaults = userDefaults
-        isPreviewVisible = userDefaults.bool(forKey: Self.previewVisibleDefaultsKey)
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
         preferences = PlainsongPreferences(userDefaults: userDefaults)
+        let restoredLayout = Self.restoreLayoutMode(
+            from: userDefaults,
+            isExperimentalWYSIWYGEnabled: preferences.experimentalWYSIWYGEnabled
+        )
+        layoutMode = restoredLayout.mode
+        wysiwygFallbackMessage = restoredLayout.fallbackMessage
         recentItemURLs = (try? recentItemStore.restore()) ?? []
         preferences.onChange = { [weak self] in
-            self?.objectWillChange.send()
-            self?.scheduleAutosave()
+            self?.handlePreferencesChanged()
         }
         observeCurrentDocument()
+    }
+
+    var isPreviewVisible: Bool {
+        layoutMode.showsPreview
+    }
+
+    var isExperimentalWYSIWYGAvailable: Bool {
+        preferences.experimentalWYSIWYGEnabled && isWYSIWYGMechanismHealthy
+    }
+
+    var shouldUseWYSIWYGPresentation: Bool {
+        layoutMode.usesWYSIWYGPresentation && isExperimentalWYSIWYGAvailable
+    }
+
+    var layoutModeCommandTitle: String {
+        switch layoutMode {
+        case .sourcePreview:
+            "Show Source Only"
+        case .sourceOnly:
+            isExperimentalWYSIWYGAvailable ? "Show WYSIWYG (Experimental)" : "Show Preview"
+        case .wysiwyg:
+            "Show Source + Preview"
+        }
+    }
+
+    var layoutModeToolbarTitle: String {
+        switch layoutMode {
+        case .sourcePreview:
+            "Source Only"
+        case .sourceOnly:
+            isExperimentalWYSIWYGAvailable ? "WYSIWYG" : "Preview"
+        case .wysiwyg:
+            "Source + Preview"
+        }
+    }
+
+    var layoutModeToolbarSystemImage: String {
+        switch layoutMode {
+        case .sourcePreview:
+            "doc.text"
+        case .sourceOnly:
+            isExperimentalWYSIWYGAvailable ? "textformat" : "sidebar.right"
+        case .wysiwyg:
+            "sidebar.right"
+        }
     }
 
     var hasOpenDocument: Bool {
@@ -204,15 +255,34 @@ final class AppState: ObservableObject {
         scheduleAutosave()
     }
 
+    func cycleLayoutMode() {
+        setLayoutMode(layoutMode.next(isWYSIWYGAvailable: isExperimentalWYSIWYGAvailable))
+    }
+
     func togglePreview() {
-        setPreviewVisible(!isPreviewVisible)
+        cycleLayoutMode()
     }
 
     func setPreviewVisible(_ isVisible: Bool) {
-        guard isPreviewVisible != isVisible else { return }
+        setLayoutMode(isVisible ? .sourcePreview : .sourceOnly)
+    }
 
-        isPreviewVisible = isVisible
-        userDefaults.set(isVisible, forKey: Self.previewVisibleDefaultsKey)
+    func setLayoutMode(_ requestedMode: EditorLayoutMode) {
+        let resolvedMode = resolveLayoutModeForCurrentAvailability(requestedMode)
+        guard layoutMode != resolvedMode else {
+            persistLayoutMode(resolvedMode)
+            return
+        }
+
+        layoutMode = resolvedMode
+        persistLayoutMode(resolvedMode)
+    }
+
+    func handleWYSIWYGMechanismFailure(_ reason: String) {
+        guard isWYSIWYGMechanismHealthy || layoutMode == .wysiwyg else { return }
+
+        isWYSIWYGMechanismHealthy = false
+        recoverFromUnavailableWYSIWYG(reason: reason)
     }
 
     func setTaskCheckbox(line: Int, checked: Bool, version: Int) {
@@ -315,6 +385,54 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func handlePreferencesChanged() {
+        reconcileLayoutModeAvailability()
+        objectWillChange.send()
+        scheduleAutosave()
+    }
+
+    private func reconcileLayoutModeAvailability() {
+        guard layoutMode == .wysiwyg, !isExperimentalWYSIWYGAvailable else { return }
+
+        let reason = preferences.experimentalWYSIWYGEnabled
+            ? "WYSIWYG editor mechanism is unhealthy"
+            : "Experimental WYSIWYG is disabled"
+        recoverFromUnavailableWYSIWYG(reason: reason)
+    }
+
+    private func resolveLayoutModeForCurrentAvailability(_ requestedMode: EditorLayoutMode) -> EditorLayoutMode {
+        guard requestedMode == .wysiwyg, !isExperimentalWYSIWYGAvailable else {
+            return requestedMode
+        }
+
+        let reason = preferences.experimentalWYSIWYGEnabled
+            ? "WYSIWYG editor mechanism is unhealthy"
+            : "Experimental WYSIWYG is disabled"
+        recordWYSIWYGFallback(reason: reason)
+        return .sourceOnly
+    }
+
+    private func recoverFromUnavailableWYSIWYG(reason: String) {
+        recordWYSIWYGFallback(reason: reason)
+        guard layoutMode != .sourceOnly else {
+            persistLayoutMode(.sourceOnly)
+            return
+        }
+
+        layoutMode = .sourceOnly
+        persistLayoutMode(.sourceOnly)
+    }
+
+    private func recordWYSIWYGFallback(reason: String) {
+        let message = "\(reason); falling back to source-only layout without changing source text."
+        wysiwygFallbackMessage = message
+        NSLog("[Plainsong] %@", message)
+    }
+
+    private func persistLayoutMode(_ mode: EditorLayoutMode) {
+        userDefaults.set(mode.rawValue, forKey: Self.layoutModeDefaultsKey)
+    }
+
     static var supportedContentTypes: [UTType] {
         [
             UTType(filenameExtension: "md"),
@@ -327,7 +445,35 @@ final class AppState: ObservableObject {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
-    private static let previewVisibleDefaultsKey = "Plainsong.preview.isVisible"
+    static let layoutModeDefaultsKey = "Plainsong.layout.mode"
+    static let legacyPreviewVisibleDefaultsKey = "Plainsong.preview.isVisible"
+
+    private static func restoreLayoutMode(
+        from userDefaults: UserDefaults,
+        isExperimentalWYSIWYGEnabled: Bool
+    ) -> (mode: EditorLayoutMode, fallbackMessage: String?) {
+        if let rawMode = userDefaults.string(forKey: layoutModeDefaultsKey),
+           let persistedMode = EditorLayoutMode(rawValue: rawMode) {
+            guard persistedMode != .wysiwyg || isExperimentalWYSIWYGEnabled else {
+                let message = "Experimental WYSIWYG is disabled; falling back to source-only layout without changing source text."
+                userDefaults.set(EditorLayoutMode.sourceOnly.rawValue, forKey: layoutModeDefaultsKey)
+                NSLog("[Plainsong] %@", message)
+                return (.sourceOnly, message)
+            }
+
+            return (persistedMode, nil)
+        }
+
+        let migratedMode: EditorLayoutMode = if let legacyValue = userDefaults
+            .object(forKey: legacyPreviewVisibleDefaultsKey) as? Bool {
+            legacyValue ? .sourcePreview : .sourceOnly
+        } else {
+            .sourceOnly
+        }
+        userDefaults.set(migratedMode.rawValue, forKey: layoutModeDefaultsKey)
+        userDefaults.removeObject(forKey: legacyPreviewVisibleDefaultsKey)
+        return (migratedMode, nil)
+    }
 
     private static func taskCheckboxStateRange(in line: String) -> Range<String.Index>? {
         let pattern = #"^\s*(?:[-*+]|\d+[.)])\s+\[([ xX])\]"#

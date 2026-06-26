@@ -698,11 +698,51 @@ closing-edge snapping fires on the natural traversal. Both directions are covere
   large-document WYSIWYG fold/highlight/apply probe stayed at 25.348 ms on the 1 MB fixture during the
   full `make test` run, under the §12 50 ms budget.
 
-### Remaining blockers
+### Remaining blockers (superseded by §18)
 
 - Implement §D mode integration: the three-state `⌘⇧P` cycle, the persisted layout enum + migration
   from `Plainsong.preview.isVisible`, the kill switch / deterministic `.sourceOnly` recovery, and the
-  off-by-default Experimental label.
+  off-by-default Experimental label. This lands in §18.
 - Keep link visual folding, image thumbnails, fenced-code fragments, tables, Mermaid/math, and MDX
   rendering deferred.
-- Keep WYSIWYG out of persisted layout mode and the user-facing `⌘⇧P` cycle until §D and §F are green.
+- Keep WYSIWYG off by default and Experimental until §F is green.
+
+## 18. WYSIWYG mode-integration result — 2026-06-27
+
+**Recommendation: PASS for the automated §D AppState/persistence/recovery gates; WYSIWYG remains
+off by default behind an Experimental setting.** The App now has an explicit `EditorLayoutMode`
+enum with `.sourcePreview`, `.sourceOnly`, and `.wysiwyg`. The legacy
+`Plainsong.preview.isVisible` boolean migrates once to the new persisted enum
+(`true → .sourcePreview`, `false → .sourceOnly`), preserving existing layouts.
+
+### Mode and flag behavior
+
+- `⌘⇧P`/toolbar/menu plumbing uses one AppState cycle: when Experimental WYSIWYG is enabled and the
+  editor mechanism is healthy, the cycle is source+preview → source-only → WYSIWYG → source+preview.
+- When Experimental WYSIWYG is disabled (the default), the cycle stays source+preview ↔ source-only and
+  never lands on a dead WYSIWYG stop.
+- A persisted `.wysiwyg` value read while the flag is disabled resolves deterministically to
+  `.sourceOnly` and rewrites the persisted layout to `.sourceOnly`.
+- Source-only and source+preview never pass `_developmentPresentation: .inlineFoldReveal`; WYSIWYG passes
+  it only when the Experimental flag is enabled, the mode is `.wysiwyg`, and no mechanism failure has
+  been recorded.
+
+### Recovery and scope
+
+`MarkdownSTTextView` now reports whether the TextKit 2 content-storage projection could be installed.
+If enabling the WYSIWYG mechanism fails, AppState records/logs the recovery reason and falls back to
+`.sourceOnly` without changing document text. Source text remains canonical, copy remains exact raw
+Markdown, and no source mutation path was added.
+
+This PR does not enable link visual folding and does not add image thumbnails, fenced-code custom
+fragments, tables, Mermaid/math widgets, or real MDX rendering. Those constructs remain deferred.
+
+### Evidence
+
+- `AppStateTests.testLayoutModeMigratesLegacyVisiblePreviewPreference`
+- `AppStateTests.testLayoutModeMigratesLegacyHiddenPreviewPreference`
+- `AppStateTests.testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled`
+- `AppStateTests.testLayoutModeCycleIncludesWYSIWYGWhenExperimentalFlagIsEnabled`
+- `AppStateTests.testPersistedWYSIWYGFallsBackToSourceOnlyWhenExperimentalFlagIsDisabled`
+- `AppStateTests.testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText`
+- `AppStateTests.testSourceModesNeverUseWYSIWYGPresentationEvenWhenExperimentalFlagIsEnabled`

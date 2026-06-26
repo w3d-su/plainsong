@@ -58,8 +58,8 @@ struct PlainsongApp: App {
             }
 
             CommandMenu("View") {
-                Button(appState.isPreviewVisible ? "Hide Preview" : "Show Preview") {
-                    appState.togglePreview()
+                Button(appState.layoutModeCommandTitle) {
+                    appState.cycleLayoutMode()
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
                 .disabled(!appState.hasOpenDocument)

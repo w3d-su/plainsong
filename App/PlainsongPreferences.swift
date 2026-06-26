@@ -56,6 +56,7 @@ final class PlainsongPreferences: ObservableObject {
     @Published private(set) var editorTheme: MarkdownEditorTheme
     @Published private(set) var previewTheme: PreviewTheme
     @Published private(set) var allowsRemoteImages: Bool
+    @Published private(set) var experimentalWYSIWYGEnabled: Bool
     @Published private(set) var assetFolderRelativePath: String
     @Published private(set) var defaultFileExtension: DefaultFileExtension
 
@@ -83,6 +84,7 @@ final class PlainsongPreferences: ObservableObject {
         previewTheme = userDefaults.string(forKey: Keys.previewTheme)
             .flatMap(PreviewTheme.init(rawValue:)) ?? .system
         allowsRemoteImages = userDefaults.object(forKey: Keys.allowsRemoteImages) as? Bool ?? false
+        experimentalWYSIWYGEnabled = userDefaults.object(forKey: Keys.experimentalWYSIWYGEnabled) as? Bool ?? false
         assetFolderRelativePath = Self.normalizedAssetFolder(
             userDefaults.string(forKey: Keys.assetFolderRelativePath)
                 ?? Self.defaultAssetFolderRelativePath
@@ -188,6 +190,14 @@ final class PlainsongPreferences: ObservableObject {
         notifyDidChange()
     }
 
+    func setExperimentalWYSIWYGEnabled(_ isEnabled: Bool) {
+        guard experimentalWYSIWYGEnabled != isEnabled else { return }
+
+        experimentalWYSIWYGEnabled = isEnabled
+        userDefaults.set(isEnabled, forKey: Keys.experimentalWYSIWYGEnabled)
+        notifyDidChange()
+    }
+
     func setAssetFolderRelativePath(_ path: String) {
         let normalized = Self.normalizedAssetFolder(path)
         guard assetFolderRelativePath != normalized else { return }
@@ -246,6 +256,7 @@ final class PlainsongPreferences: ObservableObject {
         static let editorTheme = "Plainsong.settings.editorTheme"
         static let previewTheme = "Plainsong.settings.previewTheme"
         static let allowsRemoteImages = "Plainsong.settings.allowsRemoteImages"
+        static let experimentalWYSIWYGEnabled = "Plainsong.settings.experimentalWYSIWYGEnabled"
         static let assetFolderRelativePath = "Plainsong.settings.assetFolderRelativePath"
         static let defaultFileExtension = "Plainsong.settings.defaultFileExtension"
     }

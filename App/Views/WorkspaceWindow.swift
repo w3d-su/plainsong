@@ -41,11 +41,11 @@ struct WorkspaceWindow: View {
                 .disabled(!appState.canSave)
 
                 Button {
-                    appState.togglePreview()
+                    appState.cycleLayoutMode()
                 } label: {
                     Label(
-                        appState.isPreviewVisible ? "Hide Preview" : "Show Preview",
-                        systemImage: "sidebar.right"
+                        appState.layoutModeToolbarTitle,
+                        systemImage: appState.layoutModeToolbarSystemImage
                     )
                 }
                 .disabled(!appState.hasOpenDocument)
@@ -115,6 +115,7 @@ private struct EditorWorkspace: View {
                 DocumentEditor(
                     session: appState.currentDocument,
                     isPreviewVisible: appState.isPreviewVisible,
+                    usesWYSIWYGPresentation: appState.shouldUseWYSIWYGPresentation,
                     scrollCoordinator: scrollCoordinator
                 )
                 .environmentObject(appState)
@@ -242,6 +243,7 @@ private struct DocumentEditor: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var session: DocumentSession
     let isPreviewVisible: Bool
+    let usesWYSIWYGPresentation: Bool
     let scrollCoordinator: EditorPreviewScrollCoordinator
 
     var body: some View {
@@ -261,7 +263,11 @@ private struct DocumentEditor: View {
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
-            imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false)
+            imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false),
+            _developmentPresentation: usesWYSIWYGPresentation ? .inlineFoldReveal : .source,
+            onWYSIWYGMechanismFailure: { reason in
+                appState.handleWYSIWYGMechanismFailure(reason)
+            }
         )
         .onAppear {
             scrollCoordinator

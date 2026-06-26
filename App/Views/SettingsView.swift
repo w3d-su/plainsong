@@ -135,6 +135,11 @@ private struct EditorSettingsPane: View {
                 get: { preferences.typewriterSyncEnabled },
                 set: { preferences.setTypewriterSyncEnabled($0) }
             ))
+
+            Toggle("WYSIWYG mode (Experimental)", isOn: Binding(
+                get: { preferences.experimentalWYSIWYGEnabled },
+                set: { preferences.setExperimentalWYSIWYGEnabled($0) }
+            ))
         }
     }
 }

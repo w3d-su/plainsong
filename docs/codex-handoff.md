@@ -1,6 +1,6 @@
 # Codex Handoff — Phase 2 WYSIWYG Gate
 
-Status snapshot: 2026-06-26.
+Status snapshot: 2026-06-27.
 
 This document turns the current roadmap into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -29,8 +29,8 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   Markdown across a pointer-extended (drag) selection, and never trap the caret in a hidden delimiter.
 - All native interaction gates for the attribute-only hook are now complete: IME (Zhuyin + Pinyin),
   keyboard selection/copy/paste/accessibility, and pointer/selection-edge.
-- The App still does not pass or persist that development hook. The user-facing `⌘⇧P` cycle remains
-  source+preview/source-only only.
+- The App now passes that development hook only through the off-by-default Experimental WYSIWYG mode;
+  with the flag disabled, `⌘⇧P` remains source+preview/source-only only.
 - The user-facing WYSIWYG release checklist is now written: see `docs/wysiwyg-release-checklist.md`
   (Goal 5, branch `phase2-wysiwyg-release-checklist`). It remains blocking — WYSIWYG stays behind the
   development hook until every checkbox is green with linked evidence.
@@ -42,10 +42,12 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   the delimiter-inner boundary (`WYSIWYGCaretSnap`) for keyboard movement and non-shift pointer clicks,
   while selections still span raw delimiter offsets so copy stays exact raw Markdown.
   `WYSIWYGEdgeSnappingGateTests` covers it; checklist §C.2-§C.4 are green.
-- Next active goal (Goal 8): implement the **§D mode integration** — the three-state `⌘⇧P` cycle,
-  persisted layout enum + migration from `Plainsong.preview.isVisible`, the kill switch / deterministic
-  `.sourceOnly` recovery, and the off-by-default Experimental label. It must still keep link visual
-  folding and deferred constructs out of scope.
+- Goal 8 lands the **§D mode integration** on branch `phase2-wysiwyg-mode-integration`: the App has a
+  three-state `EditorLayoutMode`, migration from `Plainsong.preview.isVisible`, an off-by-default
+  Experimental `UserDefaults` kill switch, deterministic `.sourceOnly` recovery, and hook wiring that
+  passes `_developmentPresentation: .inlineFoldReveal` only when the flag is enabled, the mode is
+  WYSIWYG, and the mechanism has not failed. Link visual folding and deferred constructs remain out of
+  scope.
 
 ## Rules for every Codex run
 
@@ -407,7 +409,7 @@ Result:
   User-facing WYSIWYG remains blocked: no `⌘⇧P` exposure, no persisted WYSIWYG layout mode, no link
   visual folding, no construct-scope change.
 
-# Goal 8 — WYSIWYG mode integration — active
+# Goal 8 — WYSIWYG mode integration — completed by phase2-wysiwyg-mode-integration
 
 ```text
 Goal: implement the §D user-facing WYSIWYG mode-integration gates after edge-snapping passed.
@@ -444,3 +446,15 @@ Verification:
 - PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter WYSIWYGActualIMEEventGateTests (from Packages/EditorKit)
 - Add targeted mode-persistence/migration and recovery tests.
 ```
+
+Outcome:
+- Added `EditorLayoutMode.sourcePreview/sourceOnly/wysiwyg` and migrated the legacy
+  `Plainsong.preview.isVisible` key into `Plainsong.layout.mode`.
+- Added the off-by-default `Plainsong.settings.experimentalWYSIWYGEnabled` Settings toggle labeled
+  **WYSIWYG mode (Experimental)**.
+- Kept `⌘⇧P` to source+preview ↔ source-only while disabled; when enabled and healthy it cycles
+  source+preview → source-only → WYSIWYG → source+preview.
+- Added deterministic fallback to source-only for disabled persisted WYSIWYG and mechanism failure,
+  with AppState recovery state plus logging.
+- Scope stayed unchanged: no link visual folding, no images/fences/tables/Mermaid/math widgets, no real
+  MDX rendering, and source text remains canonical.

@@ -160,6 +160,148 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(second.isPreviewVisible)
     }
 
+    func testLayoutModeMigratesLegacyVisiblePreviewPreference() throws {
+        let suiteName = "PlainsongLayoutMigrationVisibleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(true, forKey: AppState.legacyPreviewVisibleDefaultsKey)
+
+        let appState = AppState(userDefaults: defaults)
+
+        XCTAssertEqual(appState.layoutMode, .sourcePreview)
+        XCTAssertTrue(appState.isPreviewVisible)
+        XCTAssertEqual(defaults.string(forKey: AppState.layoutModeDefaultsKey), EditorLayoutMode.sourcePreview.rawValue)
+        XCTAssertNil(defaults.object(forKey: AppState.legacyPreviewVisibleDefaultsKey))
+    }
+
+    func testLayoutModeMigratesLegacyHiddenPreviewPreference() throws {
+        let suiteName = "PlainsongLayoutMigrationHiddenTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(false, forKey: AppState.legacyPreviewVisibleDefaultsKey)
+
+        let appState = AppState(userDefaults: defaults)
+
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+        XCTAssertFalse(appState.isPreviewVisible)
+        XCTAssertEqual(defaults.string(forKey: AppState.layoutModeDefaultsKey), EditorLayoutMode.sourceOnly.rawValue)
+        XCTAssertNil(defaults.object(forKey: AppState.legacyPreviewVisibleDefaultsKey))
+    }
+
+    func testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled() throws {
+        let suiteName = "PlainsongLayoutCycleDisabledTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let appState = AppState(userDefaults: defaults)
+
+        XCTAssertFalse(appState.preferences.experimentalWYSIWYGEnabled)
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .sourcePreview)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .sourcePreview)
+    }
+
+    func testLayoutModeCycleIncludesWYSIWYGWhenExperimentalFlagIsEnabled() throws {
+        let suiteName = "PlainsongLayoutCycleEnabledTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let appState = AppState(userDefaults: defaults)
+        appState.preferences.setExperimentalWYSIWYGEnabled(true)
+        appState.setLayoutMode(.sourcePreview)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .wysiwyg)
+        XCTAssertTrue(appState.shouldUseWYSIWYGPresentation)
+        XCTAssertFalse(appState.isPreviewVisible)
+
+        appState.cycleLayoutMode()
+        XCTAssertEqual(appState.layoutMode, .sourcePreview)
+        XCTAssertTrue(appState.isPreviewVisible)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+    }
+
+    func testPersistedWYSIWYGFallsBackToSourceOnlyWhenExperimentalFlagIsDisabled() throws {
+        let suiteName = "PlainsongPersistedWYSIWYGFallbackTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
+
+        let appState = AppState(userDefaults: defaults)
+
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+        XCTAssertEqual(defaults.string(forKey: AppState.layoutModeDefaultsKey), EditorLayoutMode.sourceOnly.rawValue)
+        XCTAssertTrue(appState.wysiwygFallbackMessage?.contains("Experimental WYSIWYG is disabled") == true)
+    }
+
+    func testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText() throws {
+        let suiteName = "PlainsongWYSIWYGMechanismFailureTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let appState = AppState(
+            currentDocument: DocumentSession(text: "**Canonical**", fileKind: .markdown),
+            userDefaults: defaults
+        )
+        appState.preferences.setExperimentalWYSIWYGEnabled(true)
+        appState.setLayoutMode(.wysiwyg)
+
+        appState.handleWYSIWYGMechanismFailure("test failure")
+
+        XCTAssertEqual(appState.layoutMode, .sourceOnly)
+        XCTAssertFalse(appState.isExperimentalWYSIWYGAvailable)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+        XCTAssertEqual(appState.currentDocument.text, "**Canonical**")
+        XCTAssertEqual(defaults.string(forKey: AppState.layoutModeDefaultsKey), EditorLayoutMode.sourceOnly.rawValue)
+        XCTAssertTrue(appState.wysiwygFallbackMessage?.contains("test failure") == true)
+    }
+
+    func testSourceModesNeverUseWYSIWYGPresentationEvenWhenExperimentalFlagIsEnabled() throws {
+        let suiteName = "PlainsongSourceModeRegressionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let appState = AppState(userDefaults: defaults)
+        appState.preferences.setExperimentalWYSIWYGEnabled(true)
+
+        appState.setLayoutMode(.sourcePreview)
+        XCTAssertTrue(appState.isPreviewVisible)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+
+        appState.setLayoutMode(.sourceOnly)
+        XCTAssertFalse(appState.isPreviewVisible)
+        XCTAssertFalse(appState.shouldUseWYSIWYGPresentation)
+    }
+
     func testSettingsPreferencesPersistThroughUserDefaults() throws {
         let suiteName = "PlainsongSettingsTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -169,6 +311,7 @@ final class AppStateTests: XCTestCase {
         }
 
         let first = PlainsongPreferences(userDefaults: defaults)
+        XCTAssertFalse(first.experimentalWYSIWYGEnabled)
         first.setAutosaveIntervalSeconds(2.5)
         first.setEditorFontName("Menlo")
         first.setEditorFontSize(16)
@@ -177,6 +320,7 @@ final class AppStateTests: XCTestCase {
         first.setEditorTheme(.graphite)
         first.setPreviewTheme(.dark)
         first.setAllowsRemoteImages(true)
+        first.setExperimentalWYSIWYGEnabled(true)
         first.setAssetFolderRelativePath("media/images")
         first.setDefaultFileExtension(.mdx)
 
@@ -189,6 +333,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(second.editorTheme, .graphite)
         XCTAssertEqual(second.previewTheme, .dark)
         XCTAssertTrue(second.allowsRemoteImages)
+        XCTAssertTrue(second.experimentalWYSIWYGEnabled)
         XCTAssertEqual(second.assetFolderRelativePath, "media/images")
         XCTAssertEqual(second.defaultFileExtension, .mdx)
     }

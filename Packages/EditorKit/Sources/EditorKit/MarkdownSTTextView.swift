@@ -9,15 +9,16 @@ final class MarkdownSTTextView: STTextView {
     private var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     private var wysiwygPreviousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
-    func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) {
+    @discardableResult
+    func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) -> Bool {
         guard let textContentStorage = textContentManager as? NSTextContentStorage else {
-            return
+            return false
         }
 
         if isEnabled {
             if let zeroWidthDelegate = wysiwygZeroWidthContentStorageDelegate,
                textContentStorage.delegate === zeroWidthDelegate {
-                return
+                return true
             }
 
             let previousDelegate = textContentStorage.delegate
@@ -28,6 +29,7 @@ final class MarkdownSTTextView: STTextView {
             wysiwygZeroWidthContentStorageDelegate = zeroWidthDelegate
             textContentStorage.delegate = zeroWidthDelegate
             textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
+            return true
         } else {
             if textContentStorage.delegate === wysiwygZeroWidthContentStorageDelegate {
                 textContentStorage.delegate = wysiwygPreviousTextContentStorageDelegate
@@ -36,6 +38,7 @@ final class MarkdownSTTextView: STTextView {
             wysiwygZeroWidthContentStorageDelegate?.previousDelegate = nil
             wysiwygZeroWidthContentStorageDelegate = nil
             wysiwygPreviousTextContentStorageDelegate = nil
+            return true
         }
     }
 
