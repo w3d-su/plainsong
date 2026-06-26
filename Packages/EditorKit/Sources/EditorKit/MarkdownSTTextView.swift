@@ -15,19 +15,25 @@ final class MarkdownSTTextView: STTextView {
         }
 
         if isEnabled {
-            if wysiwygZeroWidthContentStorageDelegate == nil {
-                wysiwygZeroWidthContentStorageDelegate = WYSIWYGZeroWidthTextContentStorageDelegate()
+            if let zeroWidthDelegate = wysiwygZeroWidthContentStorageDelegate,
+               textContentStorage.delegate === zeroWidthDelegate {
+                return
             }
-            if textContentStorage.delegate !== wysiwygZeroWidthContentStorageDelegate {
-                wysiwygPreviousTextContentStorageDelegate = textContentStorage.delegate
-                textContentStorage.delegate = wysiwygZeroWidthContentStorageDelegate
-                textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
-            }
+
+            let previousDelegate = textContentStorage.delegate
+            let zeroWidthDelegate = WYSIWYGZeroWidthTextContentStorageDelegate(
+                previousDelegate: previousDelegate
+            )
+            wysiwygPreviousTextContentStorageDelegate = previousDelegate
+            wysiwygZeroWidthContentStorageDelegate = zeroWidthDelegate
+            textContentStorage.delegate = zeroWidthDelegate
+            textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
         } else {
             if textContentStorage.delegate === wysiwygZeroWidthContentStorageDelegate {
                 textContentStorage.delegate = wysiwygPreviousTextContentStorageDelegate
                 textLayoutManager.invalidateLayout(for: textLayoutManager.documentRange)
             }
+            wysiwygZeroWidthContentStorageDelegate?.previousDelegate = nil
             wysiwygZeroWidthContentStorageDelegate = nil
             wysiwygPreviousTextContentStorageDelegate = nil
         }
@@ -60,28 +66,28 @@ final class MarkdownSTTextView: STTextView {
     }
 
     override func moveLeft(_ sender: Any?) {
-        guard applyWYSIWYGRawCharacterMovement(delta: -1, extending: false) else {
+        guard applyWYSIWYGComposedCharacterMovement(delta: -1, extending: false) else {
             super.moveLeft(sender)
             return
         }
     }
 
     override func moveRight(_ sender: Any?) {
-        guard applyWYSIWYGRawCharacterMovement(delta: 1, extending: false) else {
+        guard applyWYSIWYGComposedCharacterMovement(delta: 1, extending: false) else {
             super.moveRight(sender)
             return
         }
     }
 
     override func moveLeftAndModifySelection(_ sender: Any?) {
-        guard applyWYSIWYGRawCharacterMovement(delta: -1, extending: true) else {
+        guard applyWYSIWYGComposedCharacterMovement(delta: -1, extending: true) else {
             super.moveLeftAndModifySelection(sender)
             return
         }
     }
 
     override func moveRightAndModifySelection(_ sender: Any?) {
-        guard applyWYSIWYGRawCharacterMovement(delta: 1, extending: true) else {
+        guard applyWYSIWYGComposedCharacterMovement(delta: 1, extending: true) else {
             super.moveRightAndModifySelection(sender)
             return
         }
@@ -168,7 +174,7 @@ final class MarkdownSTTextView: STTextView {
         return nearest?.offset
     }
 
-    private func applyWYSIWYGRawCharacterMovement(delta: Int, extending: Bool) -> Bool {
+    private func applyWYSIWYGComposedCharacterMovement(delta: Int, extending: Bool) -> Bool {
         guard wysiwygZeroWidthContentStorageDelegate != nil,
               !hasMarkedText(),
               let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage
@@ -176,20 +182,23 @@ final class MarkdownSTTextView: STTextView {
             return false
         }
 
-        let textLength = textStorage.length
+        let text = textStorage.string as NSString
+        let textLength = text.length
         let selection = selectedRange().clamped(toLength: textLength)
 
         if extending {
             if delta < 0 {
-                let location = max(0, selection.location - 1)
+                let location = text.composedCharacterBoundary(before: selection.location)
                 textSelection = NSRange(location: location, length: NSMaxRange(selection) - location)
             } else {
-                let end = min(textLength, NSMaxRange(selection) + 1)
+                let end = text.composedCharacterBoundary(after: NSMaxRange(selection))
                 textSelection = NSRange(location: selection.location, length: end - selection.location)
             }
         } else {
             let base = delta < 0 ? selection.location : NSMaxRange(selection)
-            let location = min(max(base + delta, 0), textLength)
+            let location = delta < 0
+                ? text.composedCharacterBoundary(before: base)
+                : text.composedCharacterBoundary(after: base)
             textSelection = NSRange(location: location, length: 0)
         }
 
@@ -257,4 +266,24 @@ extension MarkdownSTTextView {
     }
 
     private static let pngPasteboardType = NSPasteboard.PasteboardType("public.png")
+}
+
+private extension NSString {
+    func composedCharacterBoundary(before offset: Int) -> Int {
+        let clampedOffset = min(max(offset, 0), length)
+        guard clampedOffset > 0 else {
+            return 0
+        }
+
+        return rangeOfComposedCharacterSequence(at: clampedOffset - 1).location
+    }
+
+    func composedCharacterBoundary(after offset: Int) -> Int {
+        let clampedOffset = min(max(offset, 0), length)
+        guard clampedOffset < length else {
+            return length
+        }
+
+        return NSMaxRange(rangeOfComposedCharacterSequence(at: clampedOffset))
+    }
 }

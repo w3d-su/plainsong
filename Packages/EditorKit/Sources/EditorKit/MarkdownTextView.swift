@@ -251,7 +251,14 @@ struct MarkdownTextView: NSViewRepresentable {
             return false
         }
 
-        let incoming = NSAttributedString(styledText.text)
+        let incoming = NSMutableAttributedString(attributedString: NSAttributedString(styledText.text))
+        if let foldPlan = styledText.foldPlan {
+            WYSIWYGInlineFoldPresentation.applyFoldedDelimiterAttributes(
+                plan: foldPlan,
+                visibleRange: styledText.range,
+                to: incoming
+            )
+        }
         let targetRange = styledText.range.clamped(toLength: textStorage.length)
         guard targetRange.length == incoming.length else {
             return false

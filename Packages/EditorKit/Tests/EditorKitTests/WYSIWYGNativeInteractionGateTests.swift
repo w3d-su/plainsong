@@ -252,10 +252,206 @@ final class WYSIWYGNativeInteractionGateTests: XCTestCase {
         XCTAssertEqual(textView.accessibilityValue() as? String, source)
         XCTAssertFalse((textView.accessibilityValue() as? String)?.contains("\u{fffc}") ?? true)
     }
+
+    func testFoldedDelimiterMetadataUsesInternalAttributeInsteadOfToolTip() {
+        let source = "A **bold** and `code` done"
+        let textView = makeWYSIWYGTextView(source: source)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: textView
+        ))
+
+        guard let textStorage = MarkdownTextView.textStorage(of: textView) else {
+            XCTFail("Expected text storage")
+            return
+        }
+
+        let delimiters = Self.delimiters(in: source, span: "**bold**", marker: "**")
+            + Self.delimiters(in: source, span: "`code`", marker: "`")
+        for delimiter in delimiters {
+            let attributes = textStorage.attributes(at: delimiter.location, effectiveRange: nil)
+            XCTAssertTrue(WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes))
+            XCTAssertEqual(
+                attributes[WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute] as? Bool,
+                true
+            )
+            XCTAssertNil(attributes[.toolTip], "Fold markers must not use tooltip metadata")
+        }
+    }
+
+    func testZeroWidthDelegateRestoresPreviousDelegateWhenDisabled() throws {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = "plain paragraph"
+        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
+        let previousDelegate = ParagraphProjectionSpyDelegate()
+        textContentStorage.delegate = previousDelegate
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        XCTAssertTrue(textContentStorage.delegate is WYSIWYGZeroWidthTextContentStorageDelegate)
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(false)
+        XCTAssertTrue(textContentStorage.delegate === previousDelegate)
+    }
+
+    func testZeroWidthDelegateInstallsWithoutPreviousDelegate() throws {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = "plain paragraph"
+        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
+        XCTAssertNil(textContentStorage.delegate)
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        XCTAssertTrue(textContentStorage.delegate is WYSIWYGZeroWidthTextContentStorageDelegate)
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(false)
+        XCTAssertNil(textContentStorage.delegate)
+    }
+
+    func testZeroWidthDelegateForwardsNonFoldedParagraphRequestsToPreviousDelegate() throws {
+        let source = "plain paragraph"
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = source
+        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
+        let forwardedParagraph = NSTextParagraph(
+            attributedString: NSAttributedString(string: "previous delegate paragraph")
+        )
+        let previousDelegate = ParagraphProjectionSpyDelegate(paragraphToReturn: forwardedParagraph)
+        textContentStorage.delegate = previousDelegate
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        let zeroWidthDelegate = try XCTUnwrap(
+            textContentStorage.delegate as? WYSIWYGZeroWidthTextContentStorageDelegate
+        )
+        let range = (source as NSString).paragraphRange(for: NSRange(location: 0, length: 0))
+        let paragraph = zeroWidthDelegate.textContentStorage(textContentStorage, textParagraphWith: range)
+
+        XCTAssertEqual(previousDelegate.requestedRanges, [range])
+        XCTAssertEqual(paragraph?.attributedString.string, forwardedParagraph.attributedString.string)
+    }
+
+    func testZeroWidthDelegateOwnsFoldedParagraphProjection() throws {
+        let source = "A **bold** and `code` done"
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.font = MarkdownSyntaxHighlighter.defaultFont
+        textView.text = source
+        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
+        let previousDelegate = ParagraphProjectionSpyDelegate(
+            paragraphToReturn: NSTextParagraph(attributedString: NSAttributedString(string: "previous"))
+        )
+        textContentStorage.delegate = previousDelegate
+
+        textView.setWYSIWYGZeroWidthFoldingEnabled(true)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: textView
+        ))
+
+        let zeroWidthDelegate = try XCTUnwrap(
+            textContentStorage.delegate as? WYSIWYGZeroWidthTextContentStorageDelegate
+        )
+        let range = (source as NSString).paragraphRange(for: NSRange(location: 0, length: 0))
+        let paragraph = try XCTUnwrap(
+            zeroWidthDelegate.textContentStorage(textContentStorage, textParagraphWith: range)
+        )
+        let projected = paragraph.attributedString.string as NSString
+
+        XCTAssertTrue(previousDelegate.requestedRanges.isEmpty)
+        XCTAssertEqual(projected.length, (source as NSString).length)
+        XCTAssertEqual(MarkdownTextView.textStorage(of: textView)?.string, source)
+
+        let delimiters = Self.delimiters(in: source, span: "**bold**", marker: "**")
+            + Self.delimiters(in: source, span: "`code`", marker: "`")
+        for delimiter in delimiters {
+            XCTAssertEqual(
+                projected.substring(with: delimiter),
+                String(repeating: "\u{200B}", count: delimiter.length)
+            )
+        }
+    }
+
+    func testWYSIWYGMoveLeftRightSkipsEmojiComposedCharacterAndCJKBoundaries() {
+        let source = "A 😀漢 **bold** and `code` done"
+        let textView = makeWYSIWYGTextView(source: source)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: textView
+        ))
+
+        let emojiRange = source.nsRange(of: "😀")
+        let cjkRange = source.nsRange(of: "漢")
+        textView.textSelection = NSRange(location: emojiRange.location, length: 0)
+
+        textView.moveRight(nil)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(emojiRange), length: 0))
+        assertSelectionEndpointsOnComposedCharacterBoundaries(textView.selectedRange(), in: source)
+
+        textView.moveRight(nil)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: NSMaxRange(cjkRange), length: 0))
+        assertSelectionEndpointsOnComposedCharacterBoundaries(textView.selectedRange(), in: source)
+
+        textView.moveLeft(nil)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: cjkRange.location, length: 0))
+        assertSelectionEndpointsOnComposedCharacterBoundaries(textView.selectedRange(), in: source)
+
+        textView.moveLeft(nil)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: emojiRange.location, length: 0))
+        assertSelectionEndpointsOnComposedCharacterBoundaries(textView.selectedRange(), in: source)
+    }
+
+    func testWYSIWYGShiftSelectionAcrossComposedCharactersAndFoldedInlineSpansCopiesExactMarkdown() {
+        let source = "😀漢 **強** and `碼` done"
+        let selectedRange = NSRange(
+            location: source.nsRange(of: "😀").location,
+            length: NSMaxRange(source.nsRange(of: "`碼`")) - source.nsRange(of: "😀").location
+        )
+        let selectedSource = source.substring(with: selectedRange)
+
+        let forwardTextView = makeWYSIWYGTextView(source: source)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: forwardTextView
+        ))
+        forwardTextView.textSelection = NSRange(location: selectedRange.location, length: 0)
+        extendSelection(
+            in: forwardTextView,
+            source: source,
+            target: selectedRange,
+            direction: .right
+        )
+        assertCopy(source: source, range: selectedRange, equals: selectedSource, in: forwardTextView)
+
+        let reverseTextView = makeWYSIWYGTextView(source: source)
+        XCTAssertTrue(applyProductionPresentation(
+            source,
+            selection: NSRange(location: 0, length: 0),
+            revision: 1,
+            to: reverseTextView
+        ))
+        reverseTextView.textSelection = NSRange(location: NSMaxRange(selectedRange), length: 0)
+        extendSelection(
+            in: reverseTextView,
+            source: source,
+            target: selectedRange,
+            direction: .left
+        )
+        assertCopy(source: source, range: selectedRange, equals: selectedSource, in: reverseTextView)
+    }
 }
 
 @MainActor
 private extension WYSIWYGNativeInteractionGateTests {
+    enum SelectionExtensionDirection {
+        case left
+        case right
+    }
+
     func productionPresentation(_ source: String, selection: NSRange, revision: Int) -> HighlightedText {
         let highlighted = MarkdownSyntaxHighlighter().highlight(
             source,
@@ -342,6 +538,59 @@ private extension WYSIWYGNativeInteractionGateTests {
         XCTAssertEqual(source.substring(with: range), expected)
     }
 
+    func extendSelection(
+        in textView: MarkdownSTTextView,
+        source: String,
+        target: NSRange,
+        direction: SelectionExtensionDirection
+    ) {
+        var revision = 2
+        for _ in 0 ..< (source as NSString).length {
+            if textView.selectedRange() == target {
+                return
+            }
+
+            switch direction {
+            case .left:
+                textView.moveLeftAndModifySelection(nil)
+            case .right:
+                textView.moveRightAndModifySelection(nil)
+            }
+
+            assertSelectionEndpointsOnComposedCharacterBoundaries(textView.selectedRange(), in: source)
+            XCTAssertTrue(applyProductionPresentation(
+                source,
+                selection: textView.selectedRange(),
+                revision: revision,
+                to: textView
+            ))
+            revision += 1
+        }
+
+        XCTAssertEqual(textView.selectedRange(), target)
+    }
+
+    func assertSelectionEndpointsOnComposedCharacterBoundaries(
+        _ selection: NSRange,
+        in source: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let text = source as NSString
+        XCTAssertTrue(
+            text.isComposedCharacterBoundary(selection.location),
+            "Selection start \(selection.location) is inside a composed character",
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            text.isComposedCharacterBoundary(NSMaxRange(selection)),
+            "Selection end \(NSMaxRange(selection)) is inside a composed character",
+            file: file,
+            line: line
+        )
+    }
+
     static func delimiters(in source: String, span: String, marker: String) -> [NSRange] {
         [
             source.nsRange(of: span, selecting: marker),
@@ -373,6 +622,40 @@ private extension WYSIWYGFoldPlan {
         let matchingRegions = regions.filter { $0.kind == kind }
         XCTAssertEqual(matchingRegions.count, 1)
         return try XCTUnwrap(matchingRegions.first)
+    }
+}
+
+private final class ParagraphProjectionSpyDelegate: NSObject, NSTextContentStorageDelegate {
+    private let paragraphToReturn: NSTextParagraph?
+    private(set) var requestedRanges: [NSRange] = []
+
+    init(paragraphToReturn: NSTextParagraph? = nil) {
+        self.paragraphToReturn = paragraphToReturn
+        super.init()
+    }
+
+    func textContentStorage(
+        _: NSTextContentStorage,
+        textParagraphWith range: NSRange
+    ) -> NSTextParagraph? {
+        requestedRanges.append(range)
+        return paragraphToReturn
+    }
+}
+
+private extension NSString {
+    func isComposedCharacterBoundary(_ offset: Int) -> Bool {
+        guard offset > 0, offset < length else {
+            return offset == 0 || offset == length
+        }
+
+        let previousSequence = rangeOfComposedCharacterSequence(at: offset - 1)
+        if NSMaxRange(previousSequence) == offset {
+            return true
+        }
+
+        let nextSequence = rangeOfComposedCharacterSequence(at: offset)
+        return nextSequence.location == offset
     }
 }
 
