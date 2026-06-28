@@ -152,6 +152,12 @@ final class AppState: ObservableObject {
         }
     }
 
+    var layoutModeToolbarHelp: String {
+        isExperimentalWYSIWYGAvailable
+            ? "Cycle layout: source + preview, source only, WYSIWYG (Experimental)"
+            : "Toggle layout between source + preview and source only"
+    }
+
     var hasOpenDocument: Bool {
         currentDocument.fileURL != nil
     }
@@ -269,6 +275,11 @@ final class AppState: ObservableObject {
 
     func setLayoutMode(_ requestedMode: EditorLayoutMode) {
         let resolvedMode = resolveLayoutModeForCurrentAvailability(requestedMode)
+        // The request was honored as-is (no WYSIWYG downgrade), so any earlier
+        // fallback notice is stale — clear it once the user lands where they asked.
+        if resolvedMode == requestedMode {
+            dismissWYSIWYGFallbackMessage()
+        }
         guard layoutMode != resolvedMode else {
             persistLayoutMode(resolvedMode)
             return
@@ -276,6 +287,11 @@ final class AppState: ObservableObject {
 
         layoutMode = resolvedMode
         persistLayoutMode(resolvedMode)
+    }
+
+    func dismissWYSIWYGFallbackMessage() {
+        guard wysiwygFallbackMessage != nil else { return }
+        wysiwygFallbackMessage = nil
     }
 
     func handleWYSIWYGMechanismFailure(_ reason: String) {

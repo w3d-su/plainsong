@@ -283,6 +283,40 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(appState.wysiwygFallbackMessage?.contains("test failure") == true)
     }
 
+    func testDismissWYSIWYGFallbackMessageClearsTheNotice() throws {
+        let suiteName = "PlainsongWYSIWYGFallbackDismissTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
+
+        let appState = AppState(userDefaults: defaults)
+        XCTAssertNotNil(appState.wysiwygFallbackMessage)
+
+        appState.dismissWYSIWYGFallbackMessage()
+        XCTAssertNil(appState.wysiwygFallbackMessage)
+    }
+
+    func testHonoredLayoutChangeClearsStaleWYSIWYGFallbackMessage() throws {
+        let suiteName = "PlainsongWYSIWYGFallbackAutoClearTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(EditorLayoutMode.wysiwyg.rawValue, forKey: AppState.layoutModeDefaultsKey)
+
+        let appState = AppState(userDefaults: defaults)
+        XCTAssertNotNil(appState.wysiwygFallbackMessage)
+
+        // Picking a mode the app can honor as-is should retire the stale notice.
+        appState.setLayoutMode(.sourcePreview)
+        XCTAssertEqual(appState.layoutMode, .sourcePreview)
+        XCTAssertNil(appState.wysiwygFallbackMessage)
+    }
+
     func testSourceModesNeverUseWYSIWYGPresentationEvenWhenExperimentalFlagIsEnabled() throws {
         let suiteName = "PlainsongSourceModeRegressionTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

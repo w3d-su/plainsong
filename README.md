@@ -14,9 +14,12 @@ live MDX completion-popup checklist blockers; `docs/m5-checklist.md` now passes.
 
 Phase 2 WYSIWYG is still experimental. The inline fold/reveal mechanism and native interaction gates
 exist behind an off-by-default **WYSIWYG mode (Experimental)** setting; source-only and source+preview
-remain the default user-facing modes. Link visual folding, image thumbnails, fenced-code custom
-fragments, tables, Mermaid/math widgets, and real MDX rendering remain deferred. Stable/default
-promotion remains blocked by [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md).
+remain the default user-facing modes. To try it, enable **Settings ▸ Editor ▸ WYSIWYG mode
+(Experimental)**, then cycle layouts from the **View** menu (`⌘⇧P`); it falls back to source-only if
+the editor mechanism is unavailable, without altering source text. It stays off by default and is not
+promoted to stable until [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md) is
+fully green. Link visual folding, image thumbnails, fenced-code custom fragments, tables, Mermaid/math
+widgets, and real MDX rendering remain deferred.
 
 ## Development
 
