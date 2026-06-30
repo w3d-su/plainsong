@@ -6,10 +6,10 @@
 > evidence, WYSIWYG stays behind the Experimental Settings flag and must not become default/stable.
 >
 > This checklist started as a specification and now records implementation evidence as gates
-> turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, and
-> the §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27.
-> §D automated AppState/persistence/recovery gates are also green as of 2026-06-27, but final
-> promotion remains blocked by unchecked manual UI/docs/sign-off gates.
+> turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, the
+> §C.2-§C.5 delimiter edge-snapping / selection / copy / link-deferral gates are green as of
+> 2026-06-27, and §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27.
+> Final stable/default promotion remains blocked by the explicit unchecked promotion gate below.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
 interaction gates (IME §12/§13, keyboard selection/copy/paste/accessibility §12, pointer/
@@ -42,8 +42,8 @@ What already passed (attribute-only dev hook, see `docs/wysiwyg-design.md`):
 
 What still blocks promotion beyond Experimental:
 
-1. **Manual UI/docs sign-off is still incomplete.** The automated §D mode integration gates are
-   covered, but View menu/toolbar validation and Experimental label/docs validation remain unchecked.
+1. **Stable/default promotion has not been approved.** WYSIWYG remains Experimental until the
+   unchecked D.4 promotion gate is completed with a Decision Log entry.
 2. **WYSIWYG must remain off by default.** The App may pass
    `_developmentPresentation: .inlineFoldReveal` only when the Experimental flag is enabled, the
    current layout mode is WYSIWYG, and the mechanism has not failed.
@@ -159,9 +159,11 @@ baseline-offset mechanism.
 
 - Reveal-on-touch (any caret/selection touching a span reveals that span's delimiters on the
   next presentation pass) is the **baseline correctness guarantee** and is retained.
-- [ ] Reveal recompute remains scheduled on selection change and stays within the §12
+- [x] Reveal recompute remains scheduled on selection change and stays within the §12
   visible-range budget; it must not introduce a perceptible delay between caret landing and
-  reveal beyond one presentation pass.
+  reveal beyond one presentation pass. Evidence: the §B10 large-document visible-range probe stayed
+  under budget, §C.2 edge-snapping/reveal tests remain green, and the 2026-06-27 manual WYSIWYG
+  sign-off verified inline fold/reveal in the app.
 
 ### C.2 Delimiter edge-snapping
 
@@ -221,11 +223,14 @@ for the dev hook.
 
 ### C.5 Link visual folding stays deferred
 
-- [ ] Link visual folding remains **off** in the user-facing v1. Link ranges stay in the pure
+- [x] Link visual folding remains **off** in the user-facing v1. Link ranges stay in the pure
   fold model for offset/reveal validation, but `[text](url)` is not visually folded until link
   chrome, destination-edge selection, and partial-span copy have their own native
   selection/copy/pointer gates (a separate, explicitly approved sub-gate). Shipping the
-  user-facing mode does **not** unblock link folding.
+  user-facing mode does **not** unblock link folding. Evidence:
+  `MarkdownSyntaxHighlighterTests.testDevelopmentInlineFoldRevealFoldsIncludedConstructsAndDefersLinks`
+  and the 2026-06-27 manual
+  WYSIWYG sign-off, where `[link](https://example.com)` remained raw in the editor.
 
 ---
 
@@ -245,7 +250,13 @@ this into a **three-state** cycle per `agent.md` §13.
   WYSIWYG stop appears in the cycle. Evidence:
   `AppStateTests.testLayoutModeCycleSkipsWYSIWYGWhenExperimentalFlagIsDisabled` and
   `AppStateTests.testWYSIWYGMechanismFailureFallsBackToSourceOnlyWithoutChangingText`.
-- [ ] The View menu and toolbar control reflect the current mode in manual UI validation.
+- [x] The View menu and toolbar control reflect the current mode in manual UI validation.
+  Evidence: 2026-06-27 Debug app sign-off verified:
+  disabled flag cycle `sourcePreview -> sourceOnly -> sourcePreview` with menu/toolbar labels
+  `Show Source Only` / `Source Only` then `Show Preview` / `Preview`; enabled flag cycle
+  `sourcePreview -> sourceOnly -> wysiwyg -> sourcePreview` with labels
+  `Show Source Only` / `Source Only`, `Show WYSIWYG (Experimental)` / `WYSIWYG`, and
+  `Show Source + Preview` / `Source + Preview`.
 
 ### D.2 Persisted layout mode
 
@@ -282,7 +293,9 @@ this into a **three-state** cycle per `agent.md` §13.
   **Experimental** Settings toggle and is **off by default**. Evidence:
   `AppStateTests.testSettingsPreferencesPersistThroughUserDefaults` verifies the preference default
   and persistence.
-- [ ] The Experimental label is manually verified in Settings UI and user-facing docs/README.
+- [x] The Experimental label is manually verified in Settings UI and user-facing docs/README.
+  Evidence: 2026-06-27 Settings UI sign-off verified `WYSIWYG mode (Experimental)` with value `0`
+  by default, and README states WYSIWYG is Experimental/off by default.
 - [ ] Promotion from experimental to stable (on by default / no experimental label) requires
   this checklist fully green and a Decision Log entry recording the promotion.
 
@@ -294,12 +307,12 @@ User-facing WYSIWYG v1 stays inline-first. Included: **headings, emphasis/strong
 strikethrough, inline code, list/quote marker styling**. The following remain **deferred** and
 must not be added as part of making WYSIWYG user-facing:
 
-- [ ] Link visual folding stays deferred (see C.5).
-- [ ] Image thumbnails — deferred.
-- [ ] Fenced-code custom layout fragments — deferred.
-- [ ] Tables — stay raw; existing table helper remains.
-- [ ] Mermaid / math widgets — stay raw in editor; preview pane renders.
-- [ ] Real MDX component rendering — stays placeholder/source.
+- [x] Link visual folding stays deferred (see C.5).
+- [x] Image thumbnails — deferred.
+- [x] Fenced-code custom layout fragments — deferred.
+- [x] Tables — stay raw; existing table helper remains.
+- [x] Mermaid / math widgets — stay raw in editor; preview pane renders.
+- [x] Real MDX component rendering — stays placeholder/source.
 
 Each deferred construct, when eventually built, needs its own gate pass (IME/selection/pointer/
 copy/accessibility/performance) against the §A mechanism before it becomes user-facing.
@@ -315,19 +328,21 @@ checked:
   removed/demoted; mechanism recorded in Decision Log.
 - [x] **B** — Every row B1–B13 re-run and green against the §A mechanism; performance recorded in
   `docs/perf-log.md`.
-- [ ] **C** — Reveal-on-touch, edge-snapping, selection/copy, and link-deferral policies implemented
-  and tested. Edge-snapping and the selection/copy gates (§C.2-§C.4) are green as of 2026-06-27
-  (`WYSIWYGEdgeSnappingGateTests`); reveal-timing (§C.1) and link-deferral (§C.5) confirmation
-  land with the §D mode-integration PR.
-- [ ] **D** — Three-state `⌘⇧P` cycle, persisted enum + migration, kill switch + recovery, and
-  experimental labeling implemented and tested.
-- [ ] **E** — Construct scope unchanged; deferred constructs still deferred.
-- [ ] **Docs** — `docs/wysiwyg-design.md`, `docs/risk-register.md` (R18 closed only when B13 +
+- [x] **C** — Reveal-on-touch, edge-snapping, selection/copy, and link-deferral policies implemented
+  and tested. Edge-snapping and selection/copy gates are covered by `WYSIWYGEdgeSnappingGateTests`
+  and native interaction tests; 2026-06-27 manual sign-off confirms inline fold/reveal and raw link
+  syntax remains visible.
+- [x] **D** — Three-state `⌘⇧P` cycle, persisted enum + migration, kill switch + recovery, and
+  experimental labeling implemented and tested. Automated AppState tests cover persistence/recovery;
+  2026-06-27 manual sign-off covers Settings label/default, View menu, toolbar, enabled/disabled
+  cycles, and disable-from-WYSIWYG fallback.
+- [x] **E** — Construct scope unchanged; deferred constructs still deferred.
+- [x] **Docs** — `docs/wysiwyg-design.md`, `docs/risk-register.md` (R18 closed only when B13 +
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
-Until then, the only valid WYSIWYG surfaces are the off-by-default Experimental mode and the
-non-user-facing `_developmentPresentation: .inlineFoldReveal` hook.
+Until the stable-promotion gate is checked, the only valid WYSIWYG surfaces are the off-by-default
+Experimental mode and the non-user-facing `_developmentPresentation: .inlineFoldReveal` hook.
 
 ---
 

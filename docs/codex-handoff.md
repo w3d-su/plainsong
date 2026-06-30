@@ -42,12 +42,17 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   the delimiter-inner boundary (`WYSIWYGCaretSnap`) for keyboard movement and non-shift pointer clicks,
   while selections still span raw delimiter offsets so copy stays exact raw Markdown.
   `WYSIWYGEdgeSnappingGateTests` covers it; checklist §C.2-§C.4 are green.
-- Goal 8 lands the **§D mode integration** on branch `phase2-wysiwyg-mode-integration`: the App has a
+- Goal 8 landed the **§D mode integration** on branch `phase2-wysiwyg-mode-integration`: the App has a
   three-state `EditorLayoutMode`, migration from `Plainsong.preview.isVisible`, an off-by-default
   Experimental `UserDefaults` kill switch, deterministic `.sourceOnly` recovery, and hook wiring that
   passes `_developmentPresentation: .inlineFoldReveal` only when the flag is enabled, the mode is
   WYSIWYG, and the mechanism has not failed. Link visual folding and deferred constructs remain out of
   scope.
+- Goal 9 finishes the Experimental sign-off on branch `phase2-wysiwyg-experimental-signoff`: manual UI
+  validation confirms the Settings label/default, disabled two-state cycle, enabled three-state cycle,
+  View menu/toolbar labels, WYSIWYG inline fold/reveal, and disable-from-WYSIWYG fallback without source
+  text changes. Issue #40 is complete across PR #41-#49. Native input/selection gates are no longer
+  active blockers; stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`.
 
 ## Rules for every Codex run
 
@@ -155,7 +160,7 @@ PR #38 result:
   hook.
 - User-facing WYSIWYG remains blocked.
 
-# Goal 2 — Phase 2 native interaction gates — partially complete
+# Goal 2 — Phase 2 native interaction gates — completed by PR #41-#44 follow-ups
 
 ```text
 Goal: prove native interaction safety for the PR #38 inline fold/reveal production core.
@@ -180,10 +185,10 @@ Acceptance:
   fallback.
 ```
 
-PR #41 result:
+PR #41 historical result:
 - Native arrow movement, reverse shift-selection, raw boundary selections, copy/paste policy, and
   accessibility evidence passed against the production development hook.
-- Actual macOS IME event streams were still incomplete.
+- Actual macOS IME event streams were still incomplete at this point; Goal 3 superseded that blocker.
 
 Actual Zhuyin follow-up result:
 - `WYSIWYGActualIMEEventGateTests/testActualZhuyinEventStreamAtFoldBoundaries` is an opt-in harness:
@@ -196,8 +201,9 @@ Actual Zhuyin follow-up result:
   and presentation reapply after commit.
 - A production guard now reserves space, Return, and keypad Enter for the input context while marked text
   is active, preventing TCIM candidate/commit keys from also inserting ordinary whitespace/newlines.
-- Pinyin remains blocked on this machine: TIS sees Pinyin input methods as installed, but none are
-  enabled/selectable and direct selection returned `-50`. Keep user-facing WYSIWYG blocked.
+- Historical PR #41 state: Pinyin was blocked on this machine because TIS saw Pinyin input methods as
+  installed but not enabled/selectable and direct selection returned `-50`. Goal 3 superseded this; Pinyin
+  is no longer an active blocker.
 
 # Goal 3 — Actual Pinyin event-stream gate — completed by phase2-actual-pinyin-ime-gate
 
@@ -458,3 +464,38 @@ Outcome:
   with AppState recovery state plus logging.
 - Scope stayed unchanged: no link visual folding, no images/fences/tables/Mermaid/math widgets, no real
   MDX rendering, and source text remains canonical.
+
+# Goal 9 — Experimental WYSIWYG sign-off and docs cleanup — completed by phase2-wysiwyg-experimental-signoff
+
+```text
+Goal: finish Phase 2 WYSIWYG Experimental sign-off and docs cleanup after PR #49.
+
+Branch:
+- phase2-wysiwyg-experimental-signoff
+- One focused PR against main.
+- Do not promote WYSIWYG to stable/default.
+- Do not enable link visual folding.
+- Do not add images, fenced-code custom fragments, tables, Mermaid/math widgets, or real MDX rendering.
+
+Acceptance:
+- Close/update issue #40 as completed by PR #41-#49.
+- Manually verify Settings label/default, disabled and enabled layout cycles, View menu/toolbar labels,
+  WYSIWYG inline fold/reveal, and disable-from-WYSIWYG fallback without source mutation.
+- Mark only the verified checklist items in `docs/wysiwyg-release-checklist.md`; keep stable/default
+  promotion unchecked.
+- Keep README/design/risk/handoff docs synchronized with Experimental/off-by-default behavior.
+- Run `make format`, `make test`, and `git diff --check`.
+```
+
+Result:
+- Manual Debug app sign-off passed on 2026-06-27. With the flag off, `⌘⇧P` and toolbar/menu controls
+  cycled only `sourcePreview <-> sourceOnly`. With the flag on, they cycled
+  `sourcePreview -> sourceOnly -> wysiwyg -> sourcePreview` and labels reflected the current next mode.
+- Settings > Editor showed `WYSIWYG mode (Experimental)` with value `0` by default.
+- WYSIWYG showed the inline fold/reveal editor without a preview pane; the heading marker folded while the
+  raw source still contained `# Heading`, and `[link](https://example.com)` remained raw, confirming link
+  visual folding stayed off.
+- Turning the Settings flag off while in WYSIWYG fell back to `sourceOnly`, changed labels to
+  `Show Preview` / `Preview`, logged the deterministic fallback, and preserved the raw Markdown fixture.
+- Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`; the promotion checkbox
+  is intentionally still unchecked.

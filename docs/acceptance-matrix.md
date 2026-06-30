@@ -1,6 +1,6 @@
 # Acceptance Matrix
 
-Status snapshot: 2026-06-26.
+Status snapshot: 2026-06-27.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -24,7 +24,8 @@ a milestone or gate as accepted.
 | M5 security hardening | Sanitizer, asset scheme, remote load policy, large image handling tested | PR #24 and PR #27 | Accepted; keep as regression risk |
 | M5 CI preview typecheck | CI runs preview TypeScript typecheck and tests | PR #22 | Accepted |
 | M5 final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | PR #32 and PR #33 | Accepted |
-| Phase 2 WYSIWYG design gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | This PR approves the design for Spike A/B/C only | Approved for spikes; production implementation blocked until spikes pass |
+| Phase 2 WYSIWYG design gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | PR #36 and follow-up design notes | Accepted; superseded by the Experimental mode checklist |
+| Phase 2 WYSIWYG Experimental mode | Off-by-default Settings gate, source/source+preview regressions preserved, native gates complete, stable promotion blocked | PR #41-#49 plus 2026-06-27 manual sign-off in `docs/wysiwyg-design.md` §19 and `docs/wysiwyg-release-checklist.md` | Accepted as Experimental/off by default only |
 
 ## Current release posture
 
@@ -33,8 +34,8 @@ a milestone or gate as accepted.
 | Local dogfood | Yes | Core editor/workspace/preview features are in place. |
 | Private alpha with trusted users | Maybe, for trusted local dogfood only | M5 is accepted, but release hardening is still not final. |
 | Public alpha | No | License choice, signing, hardened runtime, notarization, and release packaging are still not final. |
-| Phase 2 WYSIWYG spikes | Yes | Design gate is approved for risk-reduction spikes. |
-| Phase 2 WYSIWYG implementation | No | Implementation remains blocked until IME, undo, and selection/copy spikes pass and are accepted. |
+| Phase 2 WYSIWYG Experimental dogfood | Yes, off by default | Native input/selection gates are complete and manual UI sign-off passed; users must opt in through `WYSIWYG mode (Experimental)`. |
+| Phase 2 WYSIWYG stable/default | No | Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`; do not remove the Experimental label or turn it on by default without the explicit promotion gate and Decision Log entry. |
 
 ## M5 exit checklist
 
