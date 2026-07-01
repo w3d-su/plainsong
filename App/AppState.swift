@@ -453,7 +453,8 @@ final class AppState: ObservableObject {
         isExperimentalWYSIWYGEnabled: Bool
     ) -> (mode: EditorLayoutMode, fallbackMessage: String?) {
         if let rawMode = userDefaults.string(forKey: layoutModeDefaultsKey),
-           let persistedMode = EditorLayoutMode(rawValue: rawMode) {
+           let persistedMode = EditorLayoutMode(rawValue: rawMode)
+        {
             guard persistedMode != .wysiwyg || isExperimentalWYSIWYGEnabled else {
                 let message = "Experimental WYSIWYG is disabled; falling back to source-only layout without changing source text."
                 userDefaults.set(EditorLayoutMode.sourceOnly.rawValue, forKey: layoutModeDefaultsKey)
@@ -465,7 +466,8 @@ final class AppState: ObservableObject {
         }
 
         let migratedMode: EditorLayoutMode = if let legacyValue = userDefaults
-            .object(forKey: legacyPreviewVisibleDefaultsKey) as? Bool {
+            .object(forKey: legacyPreviewVisibleDefaultsKey) as? Bool
+        {
             legacyValue ? .sourcePreview : .sourceOnly
         } else {
             .sourceOnly

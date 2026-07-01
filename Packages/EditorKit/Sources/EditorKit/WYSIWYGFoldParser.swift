@@ -259,7 +259,8 @@ extension MarkdownSyntaxParser {
             if type.hasPrefix("atx_h"), type.hasSuffix("_marker") {
                 var markerRange = nsRange(for: child)
                 if NSMaxRange(markerRange) < storage.length,
-                   storage.character(at: NSMaxRange(markerRange)) == 32 {
+                   storage.character(at: NSMaxRange(markerRange)) == 32
+                {
                     markerRange.length += 1
                 }
                 ranges.append(markerRange.offset(by: baseLocation))

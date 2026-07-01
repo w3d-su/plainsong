@@ -229,7 +229,8 @@ private extension WorkspaceImageAssetStore {
         }
 
         if let metadataContentType,
-           !Self.isAllowedImportedImageType(metadataContentType) {
+           !Self.isAllowedImportedImageType(metadataContentType)
+        {
             throw WorkspaceImageAssetStoreError.unsupportedImageType(filename)
         }
     }
