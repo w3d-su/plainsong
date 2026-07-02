@@ -4,7 +4,7 @@
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests Scripts
 
-.PHONY: bootstrap generate build run test format lint preview-bundle clean
+.PHONY: bootstrap generate build run test format lint preview-bundle release clean
 
 bootstrap:
 	brew install xcodegen swiftformat swiftlint node
@@ -30,6 +30,11 @@ test: generate
 
 preview-bundle:
 	cd preview-src && npm run build
+
+# Signed/notarized DMG (docs/release-engineering-plan.md P1-P3).
+# Requires PLAINSONG_SIGNING_IDENTITY and notary credentials; see Scripts/release.sh.
+release:
+	Scripts/release.sh
 
 format:
 	swiftformat $(SWIFT_FORMAT_PATHS)
