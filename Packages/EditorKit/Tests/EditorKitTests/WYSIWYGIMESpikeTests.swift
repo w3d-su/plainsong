@@ -15,6 +15,7 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func assertMarkedTextRoundTrip(
         script: CompositionScript,
         scenario: FoldBoundaryScenario,

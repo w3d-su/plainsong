@@ -21,7 +21,11 @@ final class WYSIWYGZeroWidthTextContentStorageDelegate: NSObject, NSTextContentS
             return nil
         }
 
-        let paragraph = textStorage.attributedSubstring(from: range).mutableCopy() as! NSMutableAttributedString
+        guard let paragraph = textStorage.attributedSubstring(from: range)
+            .mutableCopy() as? NSMutableAttributedString
+        else {
+            return nil
+        }
         var foldedRanges: [NSRange] = []
         paragraph.enumerateAttributes(
             in: NSRange(location: 0, length: paragraph.length)

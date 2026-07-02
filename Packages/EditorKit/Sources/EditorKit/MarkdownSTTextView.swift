@@ -17,7 +17,8 @@ final class MarkdownSTTextView: STTextView {
 
         if isEnabled {
             if let zeroWidthDelegate = wysiwygZeroWidthContentStorageDelegate,
-               textContentStorage.delegate === zeroWidthDelegate {
+               textContentStorage.delegate === zeroWidthDelegate
+            {
                 return true
             }
 
@@ -44,7 +45,8 @@ final class MarkdownSTTextView: STTextView {
 
     override func keyDown(with event: NSEvent) {
         if Self.shouldReserveMarkedTextKeyForInputContext(event, hasMarkedText: hasMarkedText()),
-           let inputContext {
+           let inputContext
+        {
             _ = inputContext.handleEvent(event)
             return
         }
