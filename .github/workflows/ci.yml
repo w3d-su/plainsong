@@ -1,12 +1,10 @@
 name: CI
 
+# No push trigger: main is protected and only receives squash merges of
+# PR-validated commits, so a push build duplicates the PR build at 10x
+# private-repo macOS pricing (this exhausted the June 2026 Actions quota).
+# Use workflow_dispatch to verify main on demand.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "agent.md"
-      - "README.md"
-      - "LICENSE"
   pull_request:
   workflow_dispatch:
 

@@ -499,3 +499,35 @@ Result:
   `Show Preview` / `Preview`, logged the deterministic fallback, and preserved the raw Markdown fixture.
 - Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`; the promotion checkbox
   is intentionally still unchecked.
+
+
+---
+
+# Next goals — post-#51 follow-ups (2026-07-02)
+
+Status update: PR #50 (Experimental sign-off) and PR #51 (dogfood polish: visible fallback
+banner, Settings caption, toolbar tooltip) are merged. CI was offline 06-24 → 07-01 (June
+Actions quota exhaustion; runner allocation failed with no runner assigned) and was
+restored by the July billing reset plus PR #52 (SwiftFormat/SwiftLint drift + outage-window
+lint debt). CI now runs on `pull_request` and `workflow_dispatch` only (Decision Log
+2026-07-02).
+
+## Goal 10 — WYSIWYG dogfood + D.4 stable-promotion evidence
+
+Owner-driven, not Codex-driven: use Experimental WYSIWYG for real authoring sessions on
+macOS. Collect fold/reveal annoyances, caret/IME surprises, and fallback-banner sightings
+as issues. The D.4 promotion gate in `docs/wysiwyg-release-checklist.md` stays unchecked
+until dogfood evidence plus a Decision Log entry justify promotion.
+
+## Goal 11 — Link visual folding sub-gate
+
+Spec: `docs/link-folding-gates.md` (L1-L9). One PR may implement fold/reveal + gates behind
+the existing Experimental flag; enabling link folding requires all L-gates green and its own
+Decision Log entry. Reference-style links, autolinks, and images stay raw/deferred.
+
+## Goal 12 — Release engineering (R14)
+
+Plan: `docs/release-engineering-plan.md`. P0 owner decisions (license — no LICENSE file
+exists today — distribution, updates, crash/feedback, versioning) block P1-P5 pipeline work
+(Developer ID signing, hardened runtime, notarization, DMG packaging, optional tag-triggered
+release CI). R14 closes when the P5 alpha checklist passes on a clean macOS VM.
