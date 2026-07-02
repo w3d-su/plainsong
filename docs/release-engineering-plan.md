@@ -1,23 +1,26 @@
 # Release Engineering Plan (R14)
 
-> **Status: PLAN. No release pipeline exists yet; public alpha stays blocked (risk R14).**
+> **Status: P0 DECIDED (2026-07-02); pipeline work P1-P5 not started. Public alpha stays blocked (risk R14).**
 > agent.md §15 locks the direction: "Sign to Run Locally" for dev; hardened runtime +
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state: no `LICENSE` file, no Developer ID signing, no
+Created 2026-07-02. Current state: MIT `LICENSE` committed; no Developer ID signing, no
 notarization, no packaging, no release CI. The app builds and runs locally with the sandbox
 and `com.apple.security.network.client` entitlements.
 
 ## P0 — Decisions before any pipeline work [owner]
 
-| # | Decision | Notes |
+**All P0 decisions were made by the owner on 2026-07-02** (Decision Log entry of the same
+date). P1 pipeline work is unblocked.
+
+| # | Decision | Decided 2026-07-02 |
 |---|---|---|
-| P0.1 | License | Repo has **no LICENSE file today** (CI's old ignore list referenced one preemptively). Closed-source freeware, source-available, or OSS all change distribution/marketing wording. Blocking for any public artifact. |
-| P0.2 | Distribution channel for alpha | §15 says direct-first. Confirm: direct download (DMG from GitHub Releases or site) now; App Store evaluated post-1.0. |
-| P0.3 | Update mechanism | Options: none for alpha (manual downloads), Sparkle 2 (adds a dependency → Decision Log + sandbox/XPC review), or App Store later. Recommendation: **none for alpha**, revisit at beta. |
-| P0.4 | Crash/feedback channel | Default: no telemetry (aligns with offline-first posture); feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
-| P0.5 | Version scheme | Recommendation: SemVer-ish marketing version (`0.x` alphas) + monotonically increasing build number stamped by the release script. |
+| P0.1 | License | **MIT**, copyright `w3d-su`. `LICENSE` file committed; README License section updated. |
+| P0.2 | Distribution channel for alpha | **Direct download** (DMG via GitHub Releases or site). App Store is deliberately left as a future decision — not scheduled, to be re-evaluated later; sandbox-on keeps it possible. |
+| P0.3 | Update mechanism | **None for alpha** (manual downloads). Sparkle or any updater needs its own Decision Log entry; revisit at beta. |
+| P0.4 | Crash/feedback channel | **No telemetry**; feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
+| P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. |
 
 ## P1 — Identity & signing
 
@@ -60,8 +63,8 @@ and `com.apple.security.network.client` entitlements.
 
 ## P5 — Alpha readiness checklist
 
-- [ ] P0 decisions recorded in the Decision Log.
-- [ ] LICENSE committed; README states license + support channel.
+- [x] P0 decisions recorded in the Decision Log (2026-07-02).
+- [x] LICENSE committed (MIT); README states license + GitHub Issues feedback channel.
 - [ ] Signed, notarized, stapled DMG from `make release` installs and launches on a clean
   macOS 14 VM (Gatekeeper-quiet), opens a workspace, edits/saves/previews offline.
 - [ ] WYSIWYG remains Experimental/off by default in the shipped build (checklist §D.4).

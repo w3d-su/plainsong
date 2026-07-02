@@ -46,5 +46,8 @@ Requires Xcode 16+ and macOS 14+.
 
 ## License
 
-Not yet licensed for redistribution; a license will be chosen before the first
-public release. All rights reserved until then.
+Plainsong is open source under the [MIT License](LICENSE).
+
+Feedback and bug reports: [GitHub Issues](https://github.com/w3d-su/plainsong/issues).
+The app collects no telemetry; alpha builds are distributed as direct downloads
+(see [`docs/release-engineering-plan.md`](docs/release-engineering-plan.md)).
