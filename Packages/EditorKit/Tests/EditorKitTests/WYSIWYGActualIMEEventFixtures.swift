@@ -188,6 +188,7 @@ struct ActualIMEInputSource {
     private static func inputSources(includeAllInstalled: Bool) -> [ActualIMEInputSource] {
         let sources = TISCreateInputSourceList(nil, includeAllInstalled).takeRetainedValue() as NSArray
         return sources.map { item in
+            // swiftlint:disable:next force_cast
             let source = item as! TISInputSource
             return ActualIMEInputSource(
                 source: source,

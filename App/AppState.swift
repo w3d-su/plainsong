@@ -21,6 +21,7 @@ extension RecentItemStore: RecentItemPersisting {}
 
 /// Top-level app state for the current editor window.
 @MainActor
+// swiftlint:disable:next type_body_length
 final class AppState: ObservableObject {
     struct UserVisibleError: Identifiable {
         let id = UUID()

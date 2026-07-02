@@ -14,5 +14,11 @@ line_length:
   warning: 120
   error: 200
 
+opening_brace:
+  # conflicts with SwiftFormat wrapMultilineStatementBraces, which wraps these
+  # braces onto their own line
+  ignore_multiline_statement_conditions: true
+  ignore_multiline_function_signatures: true
+
 identifier_name:
   min_length: 2
