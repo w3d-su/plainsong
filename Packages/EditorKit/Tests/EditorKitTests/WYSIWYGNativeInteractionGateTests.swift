@@ -4,6 +4,7 @@ import STTextView
 import XCTest
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class WYSIWYGNativeInteractionGateTests: XCTestCase {
     func testNativeArrowIntoFoldedDelimiterSnapsToInnerEdgeAndReveals() throws {
         let source = "A **bold** and `code` done"

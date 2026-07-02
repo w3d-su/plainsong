@@ -53,6 +53,7 @@ final class ActualIMEEventHarness {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func assertEventStream(
         script: ActualIMEScript,
         scenario: ActualIMEFoldBoundaryScenario,

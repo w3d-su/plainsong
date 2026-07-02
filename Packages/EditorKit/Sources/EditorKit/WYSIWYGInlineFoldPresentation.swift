@@ -37,7 +37,8 @@ struct WYSIWYGInlineFoldPresentation {
     ) {
         for range in plan.regions
             .filter({ Self.includes($0.kind) && !$0.isRevealed })
-            .flatMap(\.foldRanges) {
+            .flatMap(\.foldRanges)
+        {
             guard let localRange = range.intersection(with: visibleRange, offsetBy: -visibleRange.location),
                   NSMaxRange(localRange) <= attributed.length
             else {

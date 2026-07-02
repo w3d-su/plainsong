@@ -255,7 +255,8 @@ private extension WYSIWYGNativePointerGateTests {
     }
 
     func siblingLineDistance(from firstRange: NSRange, to secondRange: NSRange,
-                             in textView: STTextView) throws -> CGFloat {
+                             in textView: STTextView) throws -> CGFloat
+    {
         let first = try lineFragmentFrame(containing: firstRange, in: textView)
         let second = try lineFragmentFrame(containing: secondRange, in: textView)
         return abs(second.minY - first.minY)

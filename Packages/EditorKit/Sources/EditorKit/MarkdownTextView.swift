@@ -314,7 +314,8 @@ struct MarkdownTextView: NSViewRepresentable {
         }
         textStorage.endEditing()
         if styledText.foldPlan != nil,
-           let textRange = NSTextRange(targetRange, in: textView.textContentManager) {
+           let textRange = NSTextRange(targetRange, in: textView.textContentManager)
+        {
             textView.textLayoutManager.invalidateLayout(for: textRange)
         }
         textView.needsDisplay = true

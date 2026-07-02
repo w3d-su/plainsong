@@ -298,7 +298,8 @@ private struct FoldedSourceProjection {
             }
 
             if hiddenIndex < hiddenRanges.count,
-               hiddenRanges[hiddenIndex].range.location == rawOffset {
+               hiddenRanges[hiddenIndex].range.location == rawOffset
+            {
                 rawOffset = NSMaxRange(hiddenRanges[hiddenIndex].range)
                 hiddenIndex += 1
                 continue
