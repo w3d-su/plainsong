@@ -49,6 +49,7 @@ struct WorkspaceWindow: View {
                     )
                 }
                 .disabled(!appState.hasOpenDocument)
+                .help(appState.layoutModeToolbarHelp)
             }
         }
         .alert(
@@ -107,6 +108,10 @@ private struct EditorWorkspace: View {
                 MissingFileBanner()
             } else if appState.externalChangePrompt != nil {
                 ExternalChangeBanner()
+            }
+
+            if let fallbackMessage = appState.wysiwygFallbackMessage {
+                WYSIWYGFallbackBanner(message: fallbackMessage)
             }
 
             Divider()
@@ -236,6 +241,31 @@ private struct ExternalChangeBanner: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(.yellow.opacity(0.16))
+    }
+}
+
+private struct WYSIWYGFallbackBanner: View {
+    @EnvironmentObject private var appState: AppState
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "wand.and.stars")
+                .foregroundStyle(.secondary)
+
+            Text(message)
+                .font(.callout)
+                .lineLimit(2)
+
+            Spacer()
+
+            Button("Dismiss") {
+                appState.dismissWYSIWYGFallbackMessage()
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.quaternary)
     }
 }
 

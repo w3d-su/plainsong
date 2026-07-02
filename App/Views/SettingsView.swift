@@ -140,6 +140,18 @@ private struct EditorSettingsPane: View {
                 get: { preferences.experimentalWYSIWYGEnabled },
                 set: { preferences.setExperimentalWYSIWYGEnabled($0) }
             ))
+
+            Text(
+                """
+                Off by default and incomplete. Folds inline Markdown (headings, emphasis, \
+                inline code) as you type. Once enabled, cycle into it from the View menu \
+                (⌘⇧P); it falls back to source-only if the editor mechanism is unavailable. \
+                Source-only and source + preview remain the default modes.
+                """
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
