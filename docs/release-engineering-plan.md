@@ -43,6 +43,11 @@ date). P1 pipeline work is unblocked.
 
 ## P3 — Packaging
 
+Scaffolding landed 2026-07-02: `Scripts/release.sh` (build → sign → notarize → staple →
+DMG → checksum, env-driven credentials, `PLAINSONG_SKIP_NOTARIZE=1` for pre-P2 smoke runs)
+and `Scripts/make-dmg.sh`, wired to `make release`. Written on Linux; the reproducibility
+gate below still requires a first run on a Mac with P1 credentials.
+
 - DMG via a scripted `hdiutil` flow (`Scripts/make-dmg.sh`) — no new dependency needed;
   `create-dmg` would require a Decision Log entry and isn't justified for a plain
   app-plus-Applications-symlink layout.
@@ -70,6 +75,6 @@ date). P1 pipeline work is unblocked.
 - [ ] WYSIWYG remains Experimental/off by default in the shipped build (checklist §D.4).
 - [ ] `docs/perf-log.md` budgets re-verified on the Release configuration (§12 gates were
   measured on Debug; Release should only improve, but record one Release pass).
-- [ ] Known-limitations section in README (e.g., M2 single-file sibling-asset scope note).
+- [x] Known-limitations section in README (single-file sibling assets, MDX placeholders, image policy, WYSIWYG scope, no auto-update).
 
 R14 closes when P5 is fully checked; until then public distribution stays blocked.

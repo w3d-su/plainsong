@@ -12,6 +12,9 @@ App/Info.plist
 App/BlogEditor.entitlements
 App/Plainsong.entitlements
 
+# Release artifacts (make release)
+build/
+
 # Swift Package Manager
 .build/
 .swiftpm/

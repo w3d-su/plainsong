@@ -44,6 +44,21 @@ cd preview-src && npm run typecheck
 
 Requires Xcode 16+ and macOS 14+.
 
+## Known limitations (alpha)
+
+- **Single-file mode and sibling images:** the sandbox grants access only to the file you
+  opened, so relative `asset://` images next to it may not load. Open the containing folder
+  as a workspace to grant directory scope.
+- **MDX components render as placeholder cards** (imports as chips, JSX as component
+  cards); components are not executed.
+- **Preview images** are limited to PNG/JPEG/GIF/WebP up to 10 MiB; SVG is not rendered.
+  Remote images are off by default, and enabling them allows `https:` images only.
+- **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
+  list/quote styling). Links, images, tables, and code fences stay as raw Markdown in the
+  editor; the preview pane renders everything.
+- **The sidebar is fixed-width** for now.
+- **No auto-update:** alpha builds are manual downloads.
+
 ## License
 
 Plainsong is open source under the [MIT License](LICENSE).
