@@ -15,6 +15,71 @@ final class WYSIWYGIMESpikeTests: XCTestCase {
         }
     }
 
+    func testPlainInsertInEmptyDocumentRepairsMissingInsertionPoint() {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = ""
+        textView.textLayoutManager.textSelections = []
+
+        textView.insertText("a", replacementRange: .notFound)
+
+        XCTAssertEqual(Self.text(in: textView), "a")
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 1, length: 0))
+    }
+
+    func testMarkedTextCommitInEmptyDocumentSurvivesLostTextSelection() {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = ""
+        textView.textSelection = NSRange(location: 0, length: 0)
+
+        textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        XCTAssertEqual(Self.text(in: textView), "ㄊ")
+        XCTAssertTrue(textView.hasMarkedText())
+        XCTAssertEqual(textView.markedRange(), NSRange(location: 0, length: 1))
+
+        textView.textLayoutManager.textSelections = []
+        textView.insertText("台", replacementRange: .notFound)
+
+        XCTAssertEqual(Self.text(in: textView), "台")
+        XCTAssertFalse(textView.hasMarkedText())
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 1, length: 0))
+    }
+
+    func testReservedMarkedTextReturnDoesNotDiscardMarkedTextInEmptyDocument() throws {
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = ""
+        textView.textSelection = NSRange(location: 0, length: 0)
+
+        textView.setMarkedText(
+            "ab",
+            selectedRange: NSRange(location: 2, length: 0),
+            replacementRange: .notFound
+        )
+
+        XCTAssertEqual(Self.text(in: textView), "ab")
+        XCTAssertTrue(textView.hasMarkedText())
+
+        let returnEvent = try XCTUnwrap(NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "\r",
+            charactersIgnoringModifiers: "\r",
+            isARepeat: false,
+            keyCode: 36
+        ))
+        textView.keyDown(with: returnEvent)
+
+        XCTAssertEqual(Self.text(in: textView), "ab")
+    }
+
     // swiftlint:disable:next function_body_length
     private func assertMarkedTextRoundTrip(
         script: CompositionScript,

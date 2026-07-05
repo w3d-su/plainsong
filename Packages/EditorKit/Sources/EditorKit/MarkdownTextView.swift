@@ -71,6 +71,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
+    private let focusRequestID: Int
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -87,6 +88,7 @@ struct MarkdownTextView: NSViewRepresentable {
         styledText: HighlightedText?,
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
+        focusRequestID: Int = 0,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -102,6 +104,7 @@ struct MarkdownTextView: NSViewRepresentable {
         _selection = selection
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
+        self.focusRequestID = focusRequestID
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -151,8 +154,10 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
         applyWYSIWYGMechanismState(to: textView)
+        context.coordinator.attachFocusHandler(to: textView)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+        context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
 
         return scrollView
     }
@@ -163,14 +168,17 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
+        context.coordinator.updateBindings(text: $text, selection: $selection)
         context.coordinator.attachScrollProxy(scrollProxy, to: textView)
         context.coordinator.attachCommandProxy(commandProxy, to: textView)
         context.coordinator.updateCompletionWorkspace(completionWorkspace)
         context.coordinator.updateImageAssetInserter(imageAssetInserter)
         context.coordinator.updateImageAssetContextID(imageAssetContextID)
+        context.coordinator.attachFocusHandler(to: textView)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
         applyWYSIWYGMechanismState(to: textView)
+        context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
 
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: context.coordinator.isUserEditing,
@@ -227,6 +235,7 @@ struct MarkdownTextView: NSViewRepresentable {
 
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
+        coordinator.detachFocusHandler(from: textView)
         coordinator.detachPasteAndDragHandlers(from: textView)
         coordinator.detachCommandProxy(from: textView)
         coordinator.detachScrollProxy()

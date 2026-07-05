@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
+    var windowAttachmentHandler: ((MarkdownSTTextView) -> Void)?
+    private(set) var isSuppressingIntermediateMarkedTextRemoval = false
     private var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     private var wysiwygPreviousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
@@ -44,10 +46,12 @@ final class MarkdownSTTextView: STTextView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if Self.shouldReserveMarkedTextKeyForInputContext(event, hasMarkedText: hasMarkedText()),
-           let inputContext
-        {
-            _ = inputContext.handleEvent(event)
+        if Self.shouldReserveMarkedTextKeyForInputContext(event, hasMarkedText: hasMarkedText()) {
+            let markedSnapshot = markedTextSnapshot()
+            if let inputContext {
+                _ = inputContext.handleEvent(event)
+                restoreMarkedTextIfInputContextDiscarded(markedSnapshot, after: event)
+            }
             return
         }
 
@@ -55,6 +59,8 @@ final class MarkdownSTTextView: STTextView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        focusForMouseInteractionIfNeeded()
+
         guard wysiwygZeroWidthContentStorageDelegate != nil,
               let caret = wysiwygZeroWidthCharacterIndex(at: convert(event.locationInWindow, from: nil))
         else {
@@ -72,6 +78,156 @@ final class MarkdownSTTextView: STTextView {
             // visible boundary in the same pass as the reveal (no one-frame jump).
             let snappedCaret = wysiwygSnappedCaretOffset(caret, preferring: .nearest)
             textSelection = NSRange(location: snappedCaret, length: 0)
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        if window != nil {
+            windowAttachmentHandler?(self)
+        }
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        if replacementRange == .notFound, hasMarkedText() {
+            let markedRange = markedRange()
+            if markedRange.location != NSNotFound {
+                let insertionLocation = markedRange.location
+                isSuppressingIntermediateMarkedTextRemoval = true
+                unmarkText()
+                isSuppressingIntermediateMarkedTextRemoval = false
+                textSelection = NSRange(location: insertionLocation, length: 0)
+                super.insertText(string, replacementRange: NSRange(location: insertionLocation, length: 0))
+                ensureInsertionPointAfterInsertedText(string, at: insertionLocation)
+                return
+            }
+        }
+
+        if replacementRange == .notFound {
+            ensureInsertionPointIfNeeded()
+        }
+
+        super.insertText(string, replacementRange: replacementRange)
+    }
+
+    private func focusForMouseInteractionIfNeeded() {
+        guard acceptsFirstResponder,
+              window?.firstResponder !== self
+        else {
+            return
+        }
+
+        ensureInsertionPointIfNeeded()
+        window?.makeFirstResponder(self)
+    }
+
+    private func ensureInsertionPointIfNeeded() {
+        guard selectedRange().location == NSNotFound else {
+            return
+        }
+
+        textSelection = NSRange(location: 0, length: 0)
+    }
+
+    private func ensureInsertionPointAfterInsertedText(_ string: Any, at insertionLocation: Int) {
+        guard let insertedLength = Self.utf16Length(ofInsertedText: string) else {
+            return
+        }
+
+        textSelection = NSRange(location: insertionLocation + insertedLength, length: 0)
+    }
+
+    private func markedTextSnapshot() -> MarkedTextSnapshot? {
+        let range = markedRange()
+        guard range.location != NSNotFound,
+              let fullText = plainText(),
+              let markedText = markedTextPlainString(in: range)
+        else {
+            return nil
+        }
+
+        return MarkedTextSnapshot(range: range, markedText: markedText, fullText: fullText)
+    }
+
+    private func restoreMarkedTextIfInputContextDiscarded(_ snapshot: MarkedTextSnapshot?, after event: NSEvent) {
+        guard let snapshot,
+              !hasMarkedText(),
+              let currentText = plainText(),
+              let replacementLength = discardedReplacementLength(
+                  currentText: currentText,
+                  snapshot: snapshot,
+                  event: event
+              )
+        else {
+            return
+        }
+
+        let replacementRange = NSRange(location: snapshot.range.location, length: replacementLength)
+        textSelection = replacementRange
+        guard !snapshot.markedText.isEmpty else {
+            return
+        }
+
+        super.insertText(snapshot.markedText, replacementRange: replacementRange)
+    }
+
+    private func discardedReplacementLength(
+        currentText: String,
+        snapshot: MarkedTextSnapshot,
+        event: NSEvent
+    ) -> Int? {
+        if let textAfterDeletingMarkedText = snapshot.fullText.replacing(range: snapshot.range, with: ""),
+           textAfterDeletingMarkedText == currentText
+        {
+            return 0
+        }
+
+        for replacement in Self.strayReplacementStrings(forReservedMarkedTextKey: event) {
+            if let textAfterStrayReplacement = snapshot.fullText.replacing(range: snapshot.range, with: replacement),
+               textAfterStrayReplacement == currentText
+            {
+                return replacement.utf16.count
+            }
+        }
+
+        return nil
+    }
+
+    private static func strayReplacementStrings(forReservedMarkedTextKey event: NSEvent) -> [String] {
+        switch event.keyCode {
+        case 36, 76:
+            ["\n", "\r"]
+        case 49:
+            [" "]
+        default:
+            []
+        }
+    }
+
+    private func markedTextPlainString(in range: NSRange) -> String? {
+        guard let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage,
+              range.location >= 0,
+              NSMaxRange(range) <= textStorage.length
+        else {
+            return nil
+        }
+
+        return (textStorage.string as NSString).substring(with: range)
+    }
+
+    private func plainText() -> String? {
+        (textContentManager as? NSTextContentStorage)?.textStorage?.string
+    }
+
+    private static func utf16Length(ofInsertedText string: Any) -> Int? {
+        switch string {
+        case let string as String:
+            string.utf16.count
+        case let attributedString as NSAttributedString:
+            attributedString.length
+        default:
+            nil
         }
     }
 
@@ -305,6 +461,12 @@ enum WYSIWYGCaretSnap {
     }
 }
 
+private struct MarkedTextSnapshot {
+    let range: NSRange
+    let markedText: String
+    let fullText: String
+}
+
 extension MarkdownSTTextView {
     static func shouldReserveMarkedTextKeyForInputContext(_ event: NSEvent, hasMarkedText: Bool) -> Bool {
         guard event.type == .keyDown,
@@ -384,5 +546,18 @@ private extension NSString {
         }
 
         return NSMaxRange(rangeOfComposedCharacterSequence(at: clampedOffset))
+    }
+}
+
+private extension String {
+    func replacing(range: NSRange, with replacement: String) -> String? {
+        let nsString = self as NSString
+        guard range.location >= 0,
+              NSMaxRange(range) <= nsString.length
+        else {
+            return nil
+        }
+
+        return nsString.replacingCharacters(in: range, with: replacement)
     }
 }
