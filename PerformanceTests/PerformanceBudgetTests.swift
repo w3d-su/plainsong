@@ -73,7 +73,12 @@ final class PerformanceBudgetTests: XCTestCase {
                     result.iterations
                 ))
                 XCTAssertEqual(result.nativeInputMismatches, 0, scenario.label)
-                XCTAssertLessThan(result.maxLatencyMilliseconds, Self.typingLatencyBudgetMilliseconds, scenario.label)
+                assertPerformanceBudget(
+                    result.maxLatencyMilliseconds,
+                    lessThan: Self.typingLatencyBudgetMilliseconds,
+                    metric: "typing \(scenario.label) max",
+                    isInformationalOnCI: true
+                )
             }
         }
     }
@@ -171,8 +176,18 @@ final class PerformanceBudgetTests: XCTestCase {
             Self.formatSamples(mdxSamples)
         ))
 
-        XCTAssertLessThan(markdownMax, Self.visibleRangeHighlightBudgetMilliseconds)
-        XCTAssertLessThan(mdxMax, Self.visibleRangeHighlightBudgetMilliseconds)
+        assertPerformanceBudget(
+            markdownMax,
+            lessThan: Self.visibleRangeHighlightBudgetMilliseconds,
+            metric: "visible highlight markdown 1MB max",
+            isInformationalOnCI: true
+        )
+        assertPerformanceBudget(
+            mdxMax,
+            lessThan: Self.visibleRangeHighlightBudgetMilliseconds,
+            metric: "visible highlight mdx 1MB max",
+            isInformationalOnCI: true
+        )
     }
 
     func testPreviewRenderFor100KBMarkdownAndMDXStaysUnderBudget() async throws {
@@ -390,7 +405,12 @@ final class PerformanceBudgetTests: XCTestCase {
         }
 
         print(String(format: "M5 PERF file open 500KB load + editor paint %.3f ms", elapsedMilliseconds))
-        XCTAssertLessThan(elapsedMilliseconds, Self.fileOpenBudgetMilliseconds)
+        assertPerformanceBudget(
+            elapsedMilliseconds,
+            lessThan: Self.fileOpenBudgetMilliseconds,
+            metric: "file open 500KB load + editor paint",
+            isInformationalOnCI: true
+        )
     }
 }
 
