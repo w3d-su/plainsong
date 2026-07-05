@@ -23,6 +23,9 @@ widgets, and real MDX rendering remain deferred.
 
 ## Installing (alpha)
 
+Download the latest DMG from [**GitHub Releases**](https://github.com/w3d-su/plainsong/releases)
+and verify it with the attached `.sha256` (`shasum -a 256 -c Plainsong-*.dmg.sha256`).
+
 Alpha builds are **unsigned** — there is no Apple Developer Program membership yet
 (owner decision, 2026-07-02), so Gatekeeper blocks the first launch of a downloaded
 build. Either:
