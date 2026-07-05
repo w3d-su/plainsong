@@ -10,6 +10,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    private(set) var lastHandledFocusRequestID: Int?
+    private(set) var pendingFocusRequestID: Int?
+    private weak var pendingFocusTextView: STTextView?
+    private var focusRetryTask: Task<Void, Never>?
     private var scrollProxy: EditorScrollProxy?
     private var commandProxy: EditorCommandProxy?
     private let editingBehaviorGuard = EditingBehaviorGuard()
@@ -25,6 +29,14 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var lastVisibleTextRange: NSRange?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
+        _text = text
+        _selection = selection
+    }
+
+    /// SwiftUI may reuse this coordinator when the represented editor switches to
+    /// another document. Refresh the bindings so edits are written to the currently
+    /// rendered session instead of the session that originally created the view.
+    func updateBindings(text: Binding<String>, selection: Binding<NSRange?>) {
         _text = text
         _selection = selection
     }
@@ -108,6 +120,114 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         imageAssetContextID = contextID
     }
 
+    func attachFocusHandler(to textView: MarkdownSTTextView) {
+        textView.windowAttachmentHandler = { [weak self, weak textView] _ in
+            guard let self, let textView else { return }
+            focusPendingRequestIfPossible(in: textView)
+        }
+    }
+
+    func detachFocusHandler(from textView: MarkdownSTTextView) {
+        textView.windowAttachmentHandler = nil
+        if pendingFocusTextView === textView {
+            cancelPendingFocusRequest()
+        }
+    }
+
+    func cancelPendingFocusRequest() {
+        focusRetryTask?.cancel()
+        focusRetryTask = nil
+        pendingFocusRequestID = nil
+        pendingFocusTextView = nil
+    }
+
+    func focusIfNeeded(_ requestID: Int, textView: STTextView) {
+        guard requestID > 0,
+              lastHandledFocusRequestID != requestID
+        else {
+            return
+        }
+
+        if focus(requestID, textView: textView) {
+            cancelPendingFocusRequest()
+            return
+        }
+
+        pendingFocusRequestID = requestID
+        pendingFocusTextView = textView
+        scheduleFocusRetry(for: requestID, textView: textView)
+    }
+
+    private func scheduleFocusRetry(for requestID: Int, textView: STTextView) {
+        focusRetryTask?.cancel()
+        focusRetryTask = Task { @MainActor [weak self, weak textView] in
+            for _ in 0 ..< 60 {
+                do {
+                    try await Task.sleep(nanoseconds: 50_000_000)
+                } catch {
+                    return
+                }
+
+                guard let self, let textView else {
+                    return
+                }
+                if pendingFocusRequestID != requestID {
+                    return
+                }
+                if focusPendingRequestIfPossible(in: textView) {
+                    return
+                }
+            }
+        }
+    }
+
+    @discardableResult
+    private func focusPendingRequestIfPossible(in textView: STTextView) -> Bool {
+        guard let requestID = pendingFocusRequestID,
+              pendingFocusTextView === textView
+        else {
+            return false
+        }
+
+        if focus(requestID, textView: textView) {
+            cancelPendingFocusRequest()
+            return true
+        }
+
+        return false
+    }
+
+    @discardableResult
+    private func focus(_ requestID: Int, textView: STTextView) -> Bool {
+        guard textView.acceptsFirstResponder,
+              let window = textView.window
+        else {
+            return false
+        }
+
+        ensureInsertionPointIfNeeded(in: textView)
+
+        guard window.firstResponder !== textView else {
+            lastHandledFocusRequestID = requestID
+            return true
+        }
+
+        guard window.makeFirstResponder(textView) else {
+            return false
+        }
+
+        lastHandledFocusRequestID = requestID
+        return true
+    }
+
+    private func ensureInsertionPointIfNeeded(in textView: STTextView) {
+        guard textView.selectedRange().location == NSNotFound else {
+            return
+        }
+
+        textView.textSelection = NSRange(location: 0, length: 0)
+    }
+
     func attachPasteAndDragHandlers(to textView: MarkdownSTTextView) {
         textView.pasteHandler = { [weak self, weak textView] _, pasteboard in
             guard let self, let textView else { return false }
@@ -143,17 +263,21 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         )
     }
 
+    func textViewWillChangeText(_: Notification) {
+        guard !isUpdating else {
+            return
+        }
+
+        isUserEditing = true
+    }
+
     func textViewDidChangeText(_ notification: Notification) {
         guard !isUpdating, let textView = notification.object as? STTextView else {
             return
         }
 
         isUserEditing = true
-        // `textStorage.string` is a lazily bridged ("foreign") String backed by
-        // CFStorage. One eager transcode here makes later operations native-fast.
-        var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        newText.makeContiguousUTF8()
-        text = newText
+        syncTextFromTextViewIfNeeded(textView)
         reportVisibleRangeIfNeeded(in: textView)
     }
 
@@ -162,6 +286,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         shouldChangeTextIn affectedCharRange: NSTextRange,
         replacementString: String?
     ) -> Bool {
+        if !isUpdating {
+            isUserEditing = true
+        }
+
         let fileKind = commandProxy?.currentFileKind() ?? .markdown
         let selection = NSRange(affectedCharRange, in: textView.textContentManager)
         let shouldTriggerCompletion = replacementString.map {
@@ -188,6 +316,19 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         }
 
         return shouldAllowNativeInput
+    }
+
+    func textView(
+        _ textView: STTextView,
+        didChangeTextIn _: NSTextRange,
+        replacementString _: String
+    ) {
+        guard !isUpdating else {
+            return
+        }
+
+        isUserEditing = true
+        syncTextFromTextViewIfNeeded(textView)
     }
 
     func textView(
@@ -236,9 +377,39 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             return
         }
 
+        if syncTextFromTextViewIfNeeded(textView) {
+            isUserEditing = true
+        }
         selection = textView.selectedRange()
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
+    }
+
+    @discardableResult
+    private func syncTextFromTextViewIfNeeded(_ textView: STTextView) -> Bool {
+        guard !shouldDeferTextSync(from: textView) else {
+            return false
+        }
+
+        // `textStorage.string` is a lazily bridged ("foreign") String backed by
+        // CFStorage. One eager transcode here makes later operations native-fast.
+        var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        guard newText != text else {
+            return false
+        }
+        newText.makeContiguousUTF8()
+        text = newText
+        return true
+    }
+
+    private func shouldDeferTextSync(from textView: STTextView) -> Bool {
+        if let textView = textView as? MarkdownSTTextView,
+           textView.isSuppressingIntermediateMarkedTextRemoval
+        {
+            return true
+        }
+
+        return textView.hasMarkedText()
     }
 
     private func requestCompletion(afterApplyingChangeIn textView: STTextView) {

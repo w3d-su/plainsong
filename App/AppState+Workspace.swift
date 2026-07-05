@@ -204,7 +204,11 @@ extension AppState {
             options: .init(showAllFiles: showAllFiles)
         )
 
-        if tree.selectedNode == nil || selectFirstIfNeeded {
+        if !selectFirstIfNeeded,
+           let currentDocumentNode = nodeForCurrentDocument(in: tree, root: root)
+        {
+            tree.selectNode(id: currentDocumentNode.id)
+        } else if tree.selectedNode == nil || selectFirstIfNeeded {
             tree.selectNode(id: firstEditableNode(in: tree.root)?.id)
         }
 
@@ -248,6 +252,8 @@ extension AppState {
     }
 
     func setCurrentDocument(_ session: DocumentSession) {
+        requestEditorFocus()
+
         guard currentDocument !== session else {
             scheduleCompletionWorkspaceRefresh()
             return
@@ -368,6 +374,31 @@ extension AppState {
         return nil
     }
 
+    func nodeForCurrentDocument(in tree: WorkspaceFileTree, root: URL) -> WorkspaceFileNode? {
+        guard let currentURL = currentDocument.fileURL?.standardizedFileURL,
+              Self.isDescendant(currentURL, of: root),
+              let relativePath = Self.workspaceRelativePath(for: currentURL, root: root)
+        else {
+            return nil
+        }
+
+        return firstNode(in: tree.root, relativePath: relativePath)
+    }
+
+    func firstNode(in node: WorkspaceFileNode, relativePath: String) -> WorkspaceFileNode? {
+        if node.relativePath == relativePath {
+            return node
+        }
+
+        for child in node.children {
+            if let match = firstNode(in: child, relativePath: relativePath) {
+                return match
+            }
+        }
+
+        return nil
+    }
+
     static func isDirectory(_ url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.isDirectoryKey])
         return values.isDirectory == true
@@ -390,5 +421,19 @@ extension AppState {
             normalized.removeLast()
         }
         return normalized
+    }
+
+    static func workspaceRelativePath(for url: URL, root: URL) -> String? {
+        let rootPath = normalizedDirectoryPath(
+            root.standardizedFileURL.path(percentEncoded: false)
+        )
+        let filePath = url.standardizedFileURL.path(percentEncoded: false)
+        guard filePath == rootPath || filePath.hasPrefix("\(rootPath)/") else {
+            return nil
+        }
+        guard filePath != rootPath else {
+            return ""
+        }
+        return String(filePath.dropFirst(rootPath.count + 1))
     }
 }

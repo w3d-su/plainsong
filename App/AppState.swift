@@ -50,6 +50,7 @@ final class AppState: ObservableObject {
     @Published var externalChangePrompt: ExternalChangePrompt?
     @Published var missingFilePrompt: MissingFilePrompt?
     @Published private(set) var wysiwygFallbackMessage: String?
+    @Published private(set) var editorFocusRequestID = 0
 
     let fileStore: MarkdownFileStore
     let lastOpenedFileStore: any LastOpenedFilePersisting
@@ -109,6 +110,10 @@ final class AppState: ObservableObject {
 
     var isPreviewVisible: Bool {
         layoutMode.showsPreview
+    }
+
+    func requestEditorFocus() {
+        editorFocusRequestID += 1
     }
 
     var isExperimentalWYSIWYGAvailable: Bool {

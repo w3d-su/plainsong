@@ -469,6 +469,56 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    func testCreatedWorkspaceFileStaysOpenAfterTreeReload() async throws {
+        let root = try makeTemporaryDirectory()
+        let originalPost = root.appendingPathComponent("post.md")
+        try writeText("Original", to: originalPost)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("original post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == originalPost.standardizedFileURL &&
+                appState.workspaceTree?.selectedNode?.relativePath == "post.md"
+        }
+
+        let createdPost = root.appendingPathComponent("Untitled.md")
+        appState.createWorkspaceFile(named: "Untitled.md", inDirectoryID: nil)
+
+        try await waitUntil("created post selected after reload") {
+            appState.currentDocument.fileURL?.standardizedFileURL == createdPost.standardizedFileURL &&
+                appState.workspaceTree?.selectedNode?.relativePath == "Untitled.md"
+        }
+
+        appState.replaceDocumentText("Hello from the new file")
+
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, createdPost.standardizedFileURL)
+        XCTAssertEqual(appState.currentDocument.text, "Hello from the new file")
+    }
+
+    func testCreatedWorkspaceFileEditSurvivesPendingTreeReload() async throws {
+        let root = try makeTemporaryDirectory()
+        let originalPost = root.appendingPathComponent("post.md")
+        try writeText("Original", to: originalPost)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        try await waitUntil("original post selected") {
+            appState.currentDocument.fileURL?.standardizedFileURL == originalPost.standardizedFileURL
+        }
+
+        let createdPost = root.appendingPathComponent("Untitled.md")
+        appState.createWorkspaceFile(named: "Untitled.md", inDirectoryID: nil)
+
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, createdPost.standardizedFileURL)
+
+        appState.replaceDocumentText("Typed before reload settles")
+        await appState.workspaceReloadTask?.value
+
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, createdPost.standardizedFileURL)
+        XCTAssertEqual(appState.currentDocument.text, "Typed before reload settles")
+        XCTAssertNil(appState.externalChangePrompt)
+    }
+
     func testCleanOpenFileReloadsExternalChangesSilently() async throws {
         let root = try makeTemporaryDirectory()
         let post = root.appendingPathComponent("post.md")
