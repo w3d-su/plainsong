@@ -184,6 +184,27 @@ Current sweep values from `make test`:
   single-webview 149.3 MB value remains informational only and is not used to satisfy the
   Section 12 memory gate.
 
+## Release Configuration Verification (P5)
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-05 |
+| Commit | `main` after PR #59 |
+| macOS / Xcode | Build machine OS 26A5368g; Xcode beta 27A5194q (DTXcode 2700, SDK macosx27.0) |
+| Machine | Owner's Apple Silicon MacBook Pro (arm64) |
+| Build configuration | `Release` + `ENABLE_TESTABILITY=YES` override; `-only-testing:PerformanceTests` |
+| Command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-perf-release ENABLE_TESTABILITY=YES -only-testing:PerformanceTests test` |
+| Result | `** TEST SUCCEEDED **`; all budgets pass |
+| Notes | This closes the final P5 item in `docs/release-engineering-plan.md`. Pitfall recorded: pointing `-derivedDataPath` inside `~/Documents` makes the spawned xctest agent unable to read the built bundle (macOS TCC privacy protection on Documents), which surfaces as "The bundle couldn't be loaded because its executable couldn't be located" even though the binary exists — keep test DerivedData under `~/Library/Developer`. |
+
+| Metric | Budget | Release measured | Result |
+|---|---:|---:|---|
+| Typing latency | < 16 ms | 0.525 ms max (markdown pair; other samples ≤ 0.091 ms) | Pass |
+| Highlight update visible range | < 50 ms | Markdown 8.517 ms max; MDX 10.050 ms max | Pass |
+| Preview render, 100 KB document | < 100 ms after debounce | Markdown 46.680 ms median; MDX 14.721 ms median | Pass |
+| File open, 500 KB Markdown | < 300 ms to first paint | 31.977 ms | Pass |
+| Memory with 8 warm sessions + 2 webviews | < 400 MB host RSS | 149.3 MB host RSS (WebKit helpers 511.6 MB across 2, aggregate 660.9 MB diagnostic only) | Pass |
+
 ## Follow-up Actions
 
 - [x] [#14](https://github.com/w3d-su/plainsong/issues/14): land and instrument visible-range highlighting before claiming the

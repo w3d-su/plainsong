@@ -1,6 +1,6 @@
 # Release Engineering Plan (R14)
 
-> **Status: P0 DECIDED; P1/P2 DEFERRED (unsigned alpha, owner decision 2026-07-02); P3 scaffolding landed. Public alpha stays blocked on the remaining P5 items (risk R14).**
+> **Status: P5 COMPLETE (2026-07-05); R14 CLOSED. Unsigned alpha cleared for public distribution. P1/P2 signing remain DEFERRED until Apple Developer Program membership.**
 > agent.md §15 locks the direction: "Sign to Run Locally" for dev; hardened runtime +
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
@@ -88,9 +88,12 @@ hdiutil still works and stays until compatibility needs force a change.
   (owner-verified 2026-07-05 with `Plainsong-0.1.0-56-unsigned.dmg`). (Original
   signed+notarized wording resumes with P1/P2.)
 - [x] WYSIWYG remains Experimental/off by default in the shipped build (owner-verified in Settings on the second Mac, 2026-07-05; checklist §D.4 unchanged).
-- [ ] `docs/perf-log.md` budgets re-verified on the Release configuration (§12 gates were
-  measured on Debug; Release should only improve, but record one Release pass).
+- [x] `docs/perf-log.md` budgets re-verified on the Release configuration (2026-07-05,
+  owner's Mac, Xcode beta 27A5194q): all §12 budgets pass with margin — typing 0.525 ms max,
+  highlight 8.5/10.1 ms, preview medians 46.7/14.7 ms, file open 32.0 ms, 149.3 MB host RSS.
+  See "Release Configuration Verification (P5)" in `docs/perf-log.md`.
 - [x] Known-limitations section in README (single-file sibling assets, MDX placeholders, image policy, WYSIWYG scope, no auto-update).
 
-R14 closes when P5 is fully checked; until then public distribution stays blocked.
-Remaining as of 2026-07-05: only the Release-configuration performance pass.
+**P5 is fully checked as of 2026-07-05 and R14 is closed: the unsigned alpha is cleared
+for public distribution** (tag + GitHub Release with the DMG and SHA-256). P1/P2 signing
+and the P4 release-CI option remain available when membership is purchased.
