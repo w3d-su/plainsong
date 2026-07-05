@@ -1,21 +1,25 @@
 #!/bin/bash
 # Plainsong release pipeline (docs/release-engineering-plan.md P1–P3):
-# clean Release build → sign (Developer ID, hardened runtime) → notarize →
-# staple → DMG → SHA-256 checksum. Artifacts land in build/release/.
+# clean Release build → sign → notarize → staple → DMG → SHA-256 checksum.
+# Artifacts land in build/release/.
 #
-# Required environment:
+# Two modes:
+#
+# UNSIGNED alpha (P0 decision 2026-07-02: no Apple Developer Program yet):
+#   PLAINSONG_UNSIGNED=1 make release
+#   Ad-hoc signed only; Gatekeeper blocks first launch on other Macs (README
+#   "Installing" documents the bypass). DMG is suffixed "-unsigned".
+#
+# Signed + notarized (once P1/P2 credentials exist):
 #   PLAINSONG_SIGNING_IDENTITY   e.g. "Developer ID Application: Name (TEAMID)"
-#
-# Notarization (required unless PLAINSONG_SKIP_NOTARIZE=1):
 #   PLAINSONG_NOTARY_KEY_PATH    App Store Connect API key (.p8) path
 #   PLAINSONG_NOTARY_KEY_ID      API key ID
 #   PLAINSONG_NOTARY_ISSUER     API key issuer ID
+#   PLAINSONG_SKIP_NOTARIZE=1    signed-but-unnotarized smoke run (NOT distributable)
 #
-# Optional:
+# Optional (both modes):
 #   PLAINSONG_MARKETING_VERSION  default: 0.1.0 (matches project.yml)
 #   PLAINSONG_BUILD_NUMBER       default: git commit count on HEAD (monotonic, P0.5)
-#   PLAINSONG_SKIP_NOTARIZE=1    local smoke run before P2 credentials exist;
-#                                the resulting DMG is NOT distributable
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -25,14 +29,21 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 1
 fi
 
-: "${PLAINSONG_SIGNING_IDENTITY:?set PLAINSONG_SIGNING_IDENTITY to your Developer ID Application identity (see docs/release-engineering-plan.md P1)}"
+UNSIGNED="${PLAINSONG_UNSIGNED:-0}"
+if [[ "$UNSIGNED" != "1" ]]; then
+    : "${PLAINSONG_SIGNING_IDENTITY:?set PLAINSONG_SIGNING_IDENTITY to your Developer ID Application identity, or use PLAINSONG_UNSIGNED=1 for the unsigned alpha path (docs/release-engineering-plan.md P1)}"
+fi
 
 MARKETING_VERSION="${PLAINSONG_MARKETING_VERSION:-0.1.0}"
 BUILD_NUMBER="${PLAINSONG_BUILD_NUMBER:-$(git rev-list --count HEAD)}"
 OUT_DIR="build/release"
 DERIVED_DATA="$OUT_DIR/DerivedData"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/Plainsong.app"
-DMG_PATH="$OUT_DIR/Plainsong-$MARKETING_VERSION-$BUILD_NUMBER.dmg"
+if [[ "$UNSIGNED" == "1" ]]; then
+    DMG_PATH="$OUT_DIR/Plainsong-$MARKETING_VERSION-$BUILD_NUMBER-unsigned.dmg"
+else
+    DMG_PATH="$OUT_DIR/Plainsong-$MARKETING_VERSION-$BUILD_NUMBER.dmg"
+fi
 
 echo "==> Release $MARKETING_VERSION ($BUILD_NUMBER)"
 mkdir -p "$OUT_DIR"
@@ -40,21 +51,34 @@ mkdir -p "$OUT_DIR"
 echo "==> Generate project"
 xcodegen generate
 
-echo "==> Build Release (hardened runtime, Developer ID)"
+if [[ "$UNSIGNED" == "1" ]]; then
+    echo "==> Build Release (UNSIGNED alpha: ad-hoc signature, no notarization)"
+    SIGN_SETTINGS=(
+        CODE_SIGN_STYLE=Automatic
+        CODE_SIGN_IDENTITY=-
+    )
+else
+    echo "==> Build Release (hardened runtime, Developer ID)"
+    SIGN_SETTINGS=(
+        CODE_SIGN_STYLE=Manual
+        CODE_SIGN_IDENTITY="$PLAINSONG_SIGNING_IDENTITY"
+        ENABLE_HARDENED_RUNTIME=YES
+        OTHER_CODE_SIGN_FLAGS=--timestamp
+    )
+fi
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
     MARKETING_VERSION="$MARKETING_VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-    CODE_SIGN_STYLE=Manual \
-    CODE_SIGN_IDENTITY="$PLAINSONG_SIGNING_IDENTITY" \
-    ENABLE_HARDENED_RUNTIME=YES \
-    OTHER_CODE_SIGN_FLAGS=--timestamp \
+    "${SIGN_SETTINGS[@]}" \
     clean build
 
 echo "==> Verify code signature"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-if [[ "${PLAINSONG_SKIP_NOTARIZE:-0}" == "1" ]]; then
+if [[ "$UNSIGNED" == "1" ]]; then
+    echo "==> Skipping notarization (unsigned alpha); Gatekeeper will block first launch on other Macs"
+elif [[ "${PLAINSONG_SKIP_NOTARIZE:-0}" == "1" ]]; then
     echo "==> Skipping notarization (PLAINSONG_SKIP_NOTARIZE=1); artifact is NOT distributable"
 else
     : "${PLAINSONG_NOTARY_KEY_PATH:?set PLAINSONG_NOTARY_KEY_PATH to your App Store Connect API key (.p8)}"
@@ -83,3 +107,8 @@ echo "==> Checksum"
 shasum -a 256 "$DMG_PATH" | tee "$DMG_PATH.sha256"
 
 echo "==> Done: $DMG_PATH"
+if [[ "$UNSIGNED" == "1" ]]; then
+    echo "    Unsigned alpha: recipients must allow the app once via"
+    echo "    System Settings > Privacy & Security > Open Anyway, or run:"
+    echo "    xattr -d com.apple.quarantine /Applications/Plainsong.app"
+fi

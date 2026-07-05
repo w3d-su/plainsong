@@ -21,6 +21,25 @@ promoted to stable until [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-rele
 fully green. Link visual folding, image thumbnails, fenced-code custom fragments, tables, Mermaid/math
 widgets, and real MDX rendering remain deferred.
 
+## Installing (alpha)
+
+Alpha builds are **unsigned** — there is no Apple Developer Program membership yet
+(owner decision, 2026-07-02), so Gatekeeper blocks the first launch of a downloaded
+build. Either:
+
+- macOS: attempt to open the app once, then allow it via
+  **System Settings ▸ Privacy & Security ▸ Open Anyway**, or
+- Terminal: `xattr -d com.apple.quarantine /Applications/Plainsong.app`
+
+Or skip Gatekeeper entirely by building from source (Xcode 16+):
+
+```sh
+make bootstrap && make build
+```
+
+Signed + notarized builds arrive when the release plan's P1/P2 resume
+(see [`docs/release-engineering-plan.md`](docs/release-engineering-plan.md)).
+
 ## Development
 
 Everything an agent or human needs to work on this codebase lives in
