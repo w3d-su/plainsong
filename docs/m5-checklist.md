@@ -20,7 +20,7 @@ Evidence from this sweep:
 - `make test` included MarkdownCore, EditorKit, PreviewKit, WorkspaceKit, app tests,
   PerformanceTests, and preview Vitest. Current performance samples stayed under the M5 budgets.
 - Current-build UI smoke used
-  `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
+  `~/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
   with disposable fixture workspace `/tmp/plainsong-m5-checklist/Fixtures` and representative
   Next.js content folder `/tmp/plainsong-m5-real-next`.
 - UI smoke confirmed `Fixtures/kitchen-sink.mdx`, `Fixtures/kitchen-sink.md`,
@@ -34,13 +34,13 @@ Evidence from this sweep:
   Open Recent persistence failures refresh recents without presenting a blocking error over an
   otherwise opened document. A regression test covers the Open Recent failure path.
 - PR #32 (`m5-editor-input-checklist`) live editor-input evidence used the current
-  `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`.
+  `~/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`.
   Accessibility plus Quartz input focused the live STTextView and pasted through the editor UI.
   Editing `Fixtures/mdx-syntax-error.mdx` to add `</Callout>` recovered the preview without
   relaunch; pasting the original broken text back showed `MDX syntax error on line 14` while the
   previous valid render remained visible under the banner.
 - Final live completion-popup evidence in PR #33 (`m5-completion-popup-ui`) used the current
-  `/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
+  `~/Library/Developer/Xcode/DerivedData/Plainsong-dkqntqzpeifzzagftlsxiaticdze/Build/Products/Debug/Plainsong.app`
   with disposable files under `/tmp/plainsong-m5-completion`. With the ABC input source selected for
   literal key synthesis, typing `<` at EOF in `tag-context.mdx` auto-paired to `<>` and opened the
   STTextView completion window named `Untitled`; Accessibility inspection found rows for `Card` and
