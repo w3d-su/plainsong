@@ -119,7 +119,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     func updateImageAssetContextID(_ contextID: String?) {
         imageAssetContextID = contextID
     }
+}
 
+extension MarkdownTextViewCoordinator {
     func attachFocusHandler(to textView: MarkdownSTTextView) {
         textView.windowAttachmentHandler = { [weak self, weak textView] _ in
             guard let self, let textView else { return }
