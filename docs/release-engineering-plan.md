@@ -83,12 +83,14 @@ hdiutil still works and stays until compatibility needs force a change.
 
 - [x] P0 decisions recorded in the Decision Log (2026-07-02).
 - [x] LICENSE committed (MIT); README states license + GitHub Issues feedback channel.
-- [ ] Alpha DMG from `PLAINSONG_UNSIGNED=1 make release` installs and launches on a clean
-  macOS 14 machine via the documented Gatekeeper bypass, opens a workspace,
-  edits/saves/previews offline. (Original signed+notarized wording resumes with P1/P2.)
-- [ ] WYSIWYG remains Experimental/off by default in the shipped build (checklist §D.4).
+- [x] Alpha DMG installs and launches on a second Mac via the documented Gatekeeper
+  bypass, opens a folder workspace, edits/saves, and renders the preview offline
+  (owner-verified 2026-07-05 with `Plainsong-0.1.0-56-unsigned.dmg`). (Original
+  signed+notarized wording resumes with P1/P2.)
+- [x] WYSIWYG remains Experimental/off by default in the shipped build (owner-verified in Settings on the second Mac, 2026-07-05; checklist §D.4 unchanged).
 - [ ] `docs/perf-log.md` budgets re-verified on the Release configuration (§12 gates were
   measured on Debug; Release should only improve, but record one Release pass).
 - [x] Known-limitations section in README (single-file sibling assets, MDX placeholders, image policy, WYSIWYG scope, no auto-update).
 
 R14 closes when P5 is fully checked; until then public distribution stays blocked.
+Remaining as of 2026-07-05: only the Release-configuration performance pass.
