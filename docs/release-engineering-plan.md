@@ -52,16 +52,22 @@ distribution). The steps below are retained for that moment.
 
 Scaffolding landed 2026-07-02: `Scripts/release.sh` (build → sign → notarize → staple →
 DMG → checksum, env-driven credentials, `PLAINSONG_SKIP_NOTARIZE=1` for pre-P2 smoke runs)
-and `Scripts/make-dmg.sh`, wired to `make release`. Written on Linux; the reproducibility
-gate below still requires a first run on a Mac with P1 credentials.
+and `Scripts/make-dmg.sh`, wired to `make release`.
+
+First real run 2026-07-05 (owner's Mac): `PLAINSONG_UNSIGNED=1 make release` produced
+`Plainsong-0.1.0-56-unsigned.dmg` end-to-end (build number 56 from git commit count,
+SHA-256 `7ce63ecd…0153b3c`, bypass instructions printed). Known cosmetic note: newer
+macOS warns that `hdiutil create` is deprecated in favor of `diskutil image create`;
+hdiutil still works and stays until compatibility needs force a change.
 
 - DMG via a scripted `hdiutil` flow (`Scripts/make-dmg.sh`) — no new dependency needed;
   `create-dmg` would require a Decision Log entry and isn't justified for a plain
   app-plus-Applications-symlink layout.
 - `make release`: clean Release build → sign → notarize → staple → DMG → checksum
   (`shasum -a 256`), stamping P0.5 version/build numbers.
-- Gate: `make release` is reproducible on a dev machine from a clean checkout with only
-  documented secrets.
+- [x] Gate: `make release` is reproducible on a dev machine from a clean checkout with only
+  documented env (unsigned path verified 2026-07-05, build 56). The signed-path run
+  re-verifies this gate when P1/P2 resume.
 
 ## P4 — Release CI (optional for alpha)
 

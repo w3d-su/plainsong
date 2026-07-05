@@ -1,7 +1,9 @@
 #!/bin/bash
 # Build the distribution DMG: Plainsong.app + /Applications symlink, UDZO
 # compressed (docs/release-engineering-plan.md P3). Plain hdiutil on purpose —
-# adding create-dmg or similar needs a Decision Log entry.
+# adding create-dmg or similar needs a Decision Log entry. Newer macOS warns
+# that hdiutil create is deprecated in favor of 'diskutil image create'; hdiutil
+# still works and is kept for compatibility until it actually breaks.
 set -euo pipefail
 
 APP_PATH="${1:?usage: make-dmg.sh <path/to/Plainsong.app> <output.dmg>}"
