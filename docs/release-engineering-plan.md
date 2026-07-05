@@ -1,6 +1,6 @@
 # Release Engineering Plan (R14)
 
-> **Status: P0 DECIDED (2026-07-02); pipeline work P1-P5 not started. Public alpha stays blocked (risk R14).**
+> **Status: P0 DECIDED; P1/P2 DEFERRED (unsigned alpha, owner decision 2026-07-02); P3 scaffolding landed. Public alpha stays blocked on the remaining P5 items (risk R14).**
 > agent.md §15 locks the direction: "Sign to Run Locally" for dev; hardened runtime +
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
@@ -22,7 +22,14 @@ date). P1 pipeline work is unblocked.
 | P0.4 | Crash/feedback channel | **No telemetry**; feedback via GitHub Issues. Any crash reporter is a new dependency → Decision Log. |
 | P0.5 | Version scheme | **`0.x` marketing version + monotonically increasing build number** stamped by the release script. |
 
-## P1 — Identity & signing
+## P1 — Identity & signing — DEFERRED (owner decision 2026-07-02)
+
+The owner is not purchasing Apple Developer Program membership for the alpha. Alpha
+builds ship **unsigned** via `PLAINSONG_UNSIGNED=1 make release` (ad-hoc signature,
+"-unsigned" DMG suffix), with the Gatekeeper bypass documented in README "Installing
+(alpha)"; build-from-source remains the zero-friction path for the MIT-licensed repo.
+P1/P2 resume unchanged when membership is purchased (target: before any beta / wider
+distribution). The steps below are retained for that moment.
 
 - Enroll/confirm Apple Developer Program team; create **Developer ID Application**
   certificate (direct distribution does not use App Store certs).
@@ -34,7 +41,7 @@ date). P1 pipeline work is unblocked.
   environment, never a committed secret); keep "Sign to Run Locally" for Debug.
 - Gate: `codesign --verify --deep --strict` and `spctl --assess` pass on a Release build.
 
-## P2 — Notarization
+## P2 — Notarization — DEFERRED (with P1)
 
 - Script `xcrun notarytool submit … --wait` + `xcrun stapler staple` using an App Store
   Connect API key (stored outside the repo; CI secret if/when automated).
@@ -70,8 +77,9 @@ gate below still requires a first run on a Mac with P1 credentials.
 
 - [x] P0 decisions recorded in the Decision Log (2026-07-02).
 - [x] LICENSE committed (MIT); README states license + GitHub Issues feedback channel.
-- [ ] Signed, notarized, stapled DMG from `make release` installs and launches on a clean
-  macOS 14 VM (Gatekeeper-quiet), opens a workspace, edits/saves/previews offline.
+- [ ] Alpha DMG from `PLAINSONG_UNSIGNED=1 make release` installs and launches on a clean
+  macOS 14 machine via the documented Gatekeeper bypass, opens a workspace,
+  edits/saves/previews offline. (Original signed+notarized wording resumes with P1/P2.)
 - [ ] WYSIWYG remains Experimental/off by default in the shipped build (checklist §D.4).
 - [ ] `docs/perf-log.md` budgets re-verified on the Release configuration (§12 gates were
   measured on Debug; Release should only improve, but record one Release pass).
