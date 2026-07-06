@@ -1,6 +1,6 @@
 # Codex Handoff — Phase 2 WYSIWYG Gate
 
-Status snapshot: 2026-06-27.
+Status snapshot: 2026-07-06.
 
 This document turns the current roadmap into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -53,6 +53,12 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   View menu/toolbar labels, WYSIWYG inline fold/reveal, and disable-from-WYSIWYG fallback without source
   text changes. Issue #40 is complete across PR #41-#49. Native input/selection gates are no longer
   active blockers; stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`.
+- Goal 11's inline-link visual-folding sub-gate is complete across PR A (#65), PR B (#67), and
+  PR C (#68). The owner real-Mac run on 2026-07-06 passed all three new link-boundary scenarios
+  for both Zhuyin and Pinyin. Experimental WYSIWYG now uses
+  `.inlineFoldRevealWithLinkFolding`; source modes, the off-by-default flag, mechanism fallback,
+  raw-copy/selection policies, and stable/default promotion status are unchanged. Reference links,
+  autolinks, images, and all other deferred constructs stay raw/deferred.
 
 ## Rules for every Codex run
 
@@ -519,11 +525,14 @@ macOS. Collect fold/reveal annoyances, caret/IME surprises, and fallback-banner 
 as issues. The D.4 promotion gate in `docs/wysiwyg-release-checklist.md` stays unchecked
 until dogfood evidence plus a Decision Log entry justify promotion.
 
-## Goal 11 — Link visual folding sub-gate
+## Goal 11 — Link visual folding sub-gate — completed by phase2-link-folding-enable
 
-Spec: `docs/link-folding-gates.md` (L1-L9). One PR may implement fold/reveal + gates behind
-the existing Experimental flag; enabling link folding requires all L-gates green and its own
-Decision Log entry. Reference-style links, autolinks, and images stay raw/deferred.
+Spec: `docs/link-folding-gates.md` (L1-L9). PR A (#65) added the gated inline-link fold model and
+presentation; PR B (#67) added destination-edge snapping plus raw-copy/paste, real-pointer, AX,
+performance, and undo evidence; PR C (#68) extended the owner-only actual-IME harness and enabled
+the completed presentation only in Experimental WYSIWYG. The 2026-07-06 owner run passed Zhuyin
+and Pinyin at the start/end of visible link text and immediately after the hidden destination.
+Reference-style links, autolinks, and images stay raw/deferred; checklist D.4 remains open.
 
 ## Goal 12 — Release engineering (R14)
 
@@ -535,7 +544,7 @@ release CI). R14 closes when the P5 alpha checklist passes on a clean macOS VM.
 
 ---
 
-# Status snapshot — 2026-07-05 (post-launch)
+# Status snapshot — 2026-07-06 (post-link-folding gate)
 
 - **v0.1.0-alpha.1 is publicly released** (`Plainsong-0.1.0-56-unsigned.dmg` + SHA-256 on
   GitHub Releases). The repo is **public under MIT**; secret scanning + push protection,
@@ -547,11 +556,10 @@ release CI). R14 closes when the P5 alpha checklist passes on a clean macOS VM.
 - First Dependabot cycle handled: dompurify 3.4.9 → 3.4.11 (PR #63). **Pattern to keep:**
   Dependabot bumps touching `preview-src` must be superseded by a PR that also reruns
   `make preview-bundle`, because the preview ships as the committed dist bundle.
+- Goal 11 link visual folding is complete on PR #68 after the owner-run Zhuyin/Pinyin link gate.
 - Owner-driven next: WYSIWYG dogfood (Goal 10 / D.4 evidence), promotion, issue triage.
-- Next scheduled feature: **Goal 11 — link visual folding**. A copy-paste agent prompt
-  follows.
 
-## Goal 11 — copy-paste prompt for the implementing agent
+## Goal 11 — completed implementation prompt (historical reference)
 
 ```text
 You are working in w3d-su/plainsong (public repo).

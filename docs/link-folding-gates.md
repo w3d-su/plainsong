@@ -1,11 +1,10 @@
 # Link Visual Folding — Sub-Gate Specification
 
-> **Status: IMPLEMENTATION UNDER GATE. Link visual folding remains OFF in the App.**
+> **Status: COMPLETE as of 2026-07-06. Link visual folding is enabled only in Experimental WYSIWYG.**
 > `docs/wysiwyg-release-checklist.md` §C.5 defers link folding behind "a separate, explicitly
-> approved sub-gate". This document is that sub-gate. The PR A presentation path is available
-> only through a dedicated development opt-in; nothing here authorizes enabling link folding in
-> the Experimental mode. Every gate below must be checked with linked evidence, and enabling the
-> feature requires its own Decision Log entry and PR.
+> approved sub-gate". This document is that sub-gate. PR C completed every gate below, recorded
+> the enabling decision, and wired the link-folding presentation only to the off-by-default
+> Experimental WYSIWYG mode.
 
 Created 2026-07-02 as planning follow-up after PR #51 (Experimental WYSIWYG dogfood polish)
 merged. See `agent.md` §13, `docs/wysiwyg-design.md`, and checklist §C.5/§E.
@@ -52,9 +51,10 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
 - [x] Folded link text renders with a link-styled attribute (color/underline per
   `EditorTheme`); no synthetic characters are inserted (no attachments, no U+FFFC).
   Evidence: `WYSIWYGLinkFoldingGateTests.testL2FoldedLinkUsesThemeStylingWithoutSyntheticCharacters`.
-- [ ] Pointer policy decided and recorded: plain click places the caret and reveals (Typora
+- [x] Pointer policy decided and recorded: plain click places the caret and reveals (Typora
   behavior, per agent.md §17.12); a modifier (⌘-click) opening the URL is optional and, if
   added, must not navigate the editor away or mutate source.
+  Evidence: `agent.md` Decision Log 2026-07-06; v1 has no ⌘-click URL opening.
 
 ### L3 — Destination-edge selection & caret snapping
 - [x] Arrowing right past the last visible character of link text snaps/reveals per the
@@ -81,9 +81,14 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
   Evidence: `WYSIWYGLinkNativeGateTests.testL4PasteMutatesRawSourceInFoldedAndRevealedLinkRegions`.
 
 ### L5 — IME (Zhuyin + Pinyin) at link boundaries
-- [ ] Opt-in `PLAINSONG_RUN_ACTUAL_IME=1` harness extended with link-boundary scenarios:
+- [x] Opt-in `PLAINSONG_RUN_ACTUAL_IME=1` harness extended with link-boundary scenarios:
   composition at the start/end of link text and adjacent to the folded destination; no source
   corruption, no caret escape, fold attributes skipped during marked text.
+  Evidence: owner real-Mac run on 2026-07-06 passed
+  `WYSIWYGActualIMEEventGateTests.testActualZhuyinEventStreamAtLinkBoundaries` and
+  `...testActualPinyinEventStreamAtLinkBoundariesWhenEnabled`, including the start-of-text,
+  destination-edge, and immediately-after-destination scenarios for both input methods
+  (84.114 seconds total, 0 failures).
 
 ### L6 — Pointer gates
 - [x] Real `NSEvent` click/drag gates (pattern of `WYSIWYGNativePointerGateTests`) rerun with
@@ -110,7 +115,7 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
 
 ## 4. Exit criteria
 
-All L1–L9 checked with evidence → a dedicated PR may enable link folding **still behind the
-Experimental WYSIWYG flag**, with a Decision Log entry recording the pointer policy (L2) and
-any caret-snap changes. Stable/default promotion of WYSIWYG as a whole remains governed by
-`docs/wysiwyg-release-checklist.md` §F and is not affected by this sub-gate.
+All L1–L9 are checked with evidence. PR C enables link folding **only behind the Experimental
+WYSIWYG flag** and records the pointer/caret policy in the 2026-07-06 Decision Log entry.
+Stable/default promotion of WYSIWYG as a whole remains governed by
+`docs/wysiwyg-release-checklist.md` §F and is not affected by this completed sub-gate.

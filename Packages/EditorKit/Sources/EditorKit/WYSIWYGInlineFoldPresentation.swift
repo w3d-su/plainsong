@@ -2,11 +2,10 @@ import AppKit
 import Foundation
 
 /// Presentation selector used by source mode and the Experimental WYSIWYG path.
-/// Link folding remains on a separate development opt-in until its L1-L9 gates pass.
 public enum MarkdownEditorDevelopmentPresentation: Equatable, Sendable {
     case source
     case inlineFoldReveal
-    /// Link-folding sub-gate opt-in. The App must not select this case until L1-L9 pass.
+    /// Completed link-folding presentation used only by the Experimental WYSIWYG mode.
     case inlineFoldRevealWithLinkFolding
 
     var enablesInlineFoldReveal: Bool {
