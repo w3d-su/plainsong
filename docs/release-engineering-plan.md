@@ -69,15 +69,20 @@ hdiutil still works and stays until compatibility needs force a change.
   documented env (unsigned path verified 2026-07-05, build 56). The signed-path run
   re-verifies this gate when P1/P2 resume.
 
-## P4 — Release CI (optional for alpha)
+## P4 — Release CI (unsigned path implemented 2026-07-05)
 
-- Tag-triggered (`v*`) GitHub Actions workflow running `make release` and attaching the DMG
-  + checksum to a GitHub Release.
-- Mind the macOS-minutes budget (see the 2026-07-02 CI Decision Log entry — quota exhaustion
-  took CI down for a week): release builds are rare, but keep them manual-dispatch or
-  tag-only, never per-push.
-- Secrets: Developer ID cert (base64 keychain import) + notary API key as repo secrets.
-- Gate: one tagged release produced end-to-end by CI, artifact passes the P2 clean-VM test.
+`.github/workflows/release.yml` runs on `v*` tags and `workflow_dispatch` only (never
+per-push, per the 2026-07-02 CI-cost decision): macos-15 runner, full-history checkout
+(build number = commit count), `PLAINSONG_UNSIGNED=1 make release`. Tag runs upload the
+DMG + SHA-256 to the tag's GitHub Release — created as a **draft prerelease** when absent,
+so the owner still authors the notes and presses publish. Dispatch runs attach the DMG as
+a workflow artifact for pipeline verification without touching Releases. No secrets are
+required on the unsigned path, and public-repo macOS minutes are free.
+
+- Secrets (Developer ID cert keychain import + notary API key) become repo secrets only
+  when the signed path resumes with P1/P2.
+- Gate: one tagged release produced end-to-end by CI (open until the next `v*` tag, e.g.
+  v0.1.0-alpha.2), with the artifact passing the adjusted P5 clean-machine test.
 
 ## P5 — Alpha readiness checklist
 
