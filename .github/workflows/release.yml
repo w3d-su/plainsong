@@ -1,0 +1,64 @@
+# Unsigned alpha release pipeline (docs/release-engineering-plan.md P4).
+# Tag-only + manual dispatch, never per-push (2026-07-02 CI-cost Decision Log
+# entry). No secrets: the unsigned path needs none, and public-repo macOS
+# minutes are free. The signed path stays manual until P1/P2 resume.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create/upload the GitHub Release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the build number is `git rev-list --count HEAD`.
+          fetch-depth: 0
+
+      - name: Install tools
+        run: brew install xcodegen
+
+      - name: Build unsigned release DMG
+        run: PLAINSONG_UNSIGNED=1 make release
+
+      - name: Checksum summary
+        run: cat build/release/*.sha256
+
+      # Tag runs: attach the DMG + checksum to the tag's GitHub Release.
+      # Created as a DRAFT prerelease when absent so the owner still writes
+      # the notes and presses publish.
+      - name: Publish to GitHub Release (tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber \
+              build/release/Plainsong-*-unsigned.dmg build/release/*.sha256
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft --prerelease --generate-notes \
+              build/release/Plainsong-*-unsigned.dmg build/release/*.sha256
+          fi
+
+      # Dispatch runs (pipeline verification without a tag): keep the DMG as a
+      # workflow artifact instead of touching Releases.
+      - name: Upload workflow artifact (dispatch)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainsong-unsigned-dmg
+          path: |
+            build/release/*.dmg
+            build/release/*.sha256

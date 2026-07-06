@@ -531,3 +531,80 @@ Plan: `docs/release-engineering-plan.md`. P0 owner decisions (license — no LIC
 exists today — distribution, updates, crash/feedback, versioning) block P1-P5 pipeline work
 (Developer ID signing, hardened runtime, notarization, DMG packaging, optional tag-triggered
 release CI). R14 closes when the P5 alpha checklist passes on a clean macOS VM.
+
+
+---
+
+# Status snapshot — 2026-07-05 (post-launch)
+
+- **v0.1.0-alpha.1 is publicly released** (`Plainsong-0.1.0-56-unsigned.dmg` + SHA-256 on
+  GitHub Releases). The repo is **public under MIT**; secret scanning + push protection,
+  Dependabot (graph/alerts/security updates, grouped), and a `main` branch ruleset
+  (PR-only, `build-and-test` required, no bypass) are enabled.
+- R14 closed (P5 fully checked); R15 broadened (all wall-clock perf budgets are
+  CI-informational, hard locally); P4 unsigned release CI landed
+  (`.github/workflows/release.yml`, tag/dispatch-only, draft prereleases).
+- First Dependabot cycle handled: dompurify 3.4.9 → 3.4.11 (PR #63). **Pattern to keep:**
+  Dependabot bumps touching `preview-src` must be superseded by a PR that also reruns
+  `make preview-bundle`, because the preview ships as the committed dist bundle.
+- Owner-driven next: WYSIWYG dogfood (Goal 10 / D.4 evidence), promotion, issue triage.
+- Next scheduled feature: **Goal 11 — link visual folding**. A copy-paste agent prompt
+  follows.
+
+## Goal 11 — copy-paste prompt for the implementing agent
+
+```text
+You are working in w3d-su/plainsong (public repo).
+
+Goal: implement link visual folding for the Experimental WYSIWYG mode, satisfying the
+approved sub-gate spec docs/link-folding-gates.md (gates L1-L9).
+
+Read first, in this order:
+- agent.md — sections 13 and 17, plus the Decision Log entries dated 2026-06-26/27
+- docs/link-folding-gates.md — the gate list this work must satisfy
+- docs/wysiwyg-release-checklist.md — sections A and C (mechanism + UX policy)
+- Packages/EditorKit/Sources/EditorKit/WYSIWYGFoldModel.swift
+- Packages/EditorKit/Sources/EditorKit/WYSIWYGFoldParser.swift and WYSIWYGFoldParser+Inline.swift
+- Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift
+- Packages/EditorKit/Sources/EditorKit/WYSIWYGZeroWidthTextContentProjection.swift
+- Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift (WYSIWYGCaretSnap usage)
+- Packages/EditorKit/Tests/EditorKitTests/WYSIWYG*GateTests.swift — mirror these test patterns
+
+Branch and PR discipline:
+- Branches named phase2-link-folding-<slug>; PRs against main; the maintainer squash-merges.
+- Split into review-sized PRs:
+  PR A: fold model + presentation for inline links [text](url) behind the existing
+        Experimental/dev hook — fold the "[" and "](url)" chrome, keep the link text
+        visible with link styling from the theme; L1 + L2 tests.
+  PR B: destination-edge caret snapping (extend WYSIWYGCaretSnap for the asymmetric
+        hidden-URL span), plus the L3/L4/L6/L7/L9 gates (keyboard, partial-URL raw copy,
+        real-NSEvent pointer, accessibility, undo) and the L8 perf probe
+        (visible-range fold recompute on Fixtures/large-1mb.md <= 50 ms, recorded in
+        docs/perf-log.md; add a link-dense section to the fixture if needed).
+  PR C: ONLY after the owner has run the opt-in actual-IME harness (L5,
+        PLAINSONG_RUN_ACTUAL_IME=1, Zhuyin + Pinyin) on a real Mac: check the remaining
+        gates in docs/link-folding-gates.md, add the Decision Log entry recording the
+        L2 pointer policy, and turn on link folding (still inside the Experimental
+        WYSIWYG mode only).
+
+Hard rules (a violation rejects the PR regardless of features):
+- Never mutate source text for presentation. Folding is attributes/layout only, through
+  the existing NSTextContentStorage paragraph projection. No NSTextAttachment, no
+  U+FFFC, no TextKit 1 code paths, no textLayoutManager.delegate takeover.
+- Copy is exact raw Markdown for the selected NSRange (checklist C.4). Selections may
+  span hidden-URL offsets and must never be clamped (C.3).
+- Edge-snapping adjusts collapsed-caret rest only, never selection ranges (C.2).
+- Reference links [text][ref], autolinks <https://…>, and images ![alt](src) stay raw.
+- Plain click places the caret and reveals (Typora behavior, agent.md 17.12). Do not add
+  cmd-click URL opening unless separately gated and documented.
+- Fold attributes must be skipped while IME marked text exists. Do NOT claim L5 from
+  synthetic setMarkedText tests — L5 requires the real-IME harness only the owner can
+  run. Leave L5 unchecked and link folding disabled until then.
+- agent.md section 17 layering is law. make format before committing. No new
+  dependencies (Swift or npm).
+
+Verification before declaring any PR done:
+- make format && make test && git diff --check
+- Update docs/link-folding-gates.md checkboxes only with named-test evidence.
+- State in the PR body exactly which L-gates the PR closes and which remain open.
+```
