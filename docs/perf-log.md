@@ -82,6 +82,21 @@ Current sweep values from `make test`:
 | Result | Pass |
 | Notes | This run verifies B10 in `docs/wysiwyg-release-checklist.md` against the replacement zero-width mechanism. The projection keeps the backing Markdown string canonical and collapses folded delimiter layout without the old `baselineOffset(-1000)` line-height inflation. |
 
+## Phase 2 Link Folding Native Gate Verification
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-06 |
+| Branch | `phase2-link-folding-native-gates` |
+| Commit | Working tree for link-folding PR B after PR #65 merged |
+| Command | `swift test --package-path Packages/EditorKit --filter WYSIWYG` |
+| Fixture | Unmodified `Fixtures/large-1mb.md`; its existing repeated sections already contain inline links |
+| Presentation | `.inlineFoldRevealWithLinkFolding` through the TextKit 2 content-storage projection |
+| Budget | <= 50 ms |
+| Measured | `16.968 ms` max; samples `[16.968, 16.003, 16.134]` after one warm-up |
+| Result | Pass |
+| Notes | `WYSIWYGLinkPerformanceGateTests.testL8LinkFoldingVisibleRangeRecomputeStaysUnderFiftyMilliseconds` measures visible-range parse, link fold-plan/presentation, in-place attribute apply, and display. The fixture and generator were not changed. |
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`
