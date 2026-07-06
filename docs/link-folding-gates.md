@@ -1,10 +1,11 @@
 # Link Visual Folding — Sub-Gate Specification
 
-> **Status: SPEC ONLY. Link visual folding remains OFF.**
+> **Status: IMPLEMENTATION UNDER GATE. Link visual folding remains OFF in the App.**
 > `docs/wysiwyg-release-checklist.md` §C.5 defers link folding behind "a separate, explicitly
-> approved sub-gate". This document is that sub-gate. Nothing here authorizes enabling link
-> folding; every gate below must be checked with linked evidence, and enabling the feature
-> requires its own Decision Log entry and PR.
+> approved sub-gate". This document is that sub-gate. The PR A presentation path is available
+> only through a dedicated development opt-in; nothing here authorizes enabling link folding in
+> the Experimental mode. Every gate below must be checked with linked evidence, and enabling the
+> feature requires its own Decision Log entry and PR.
 
 Created 2026-07-02 as planning follow-up after PR #51 (Experimental WYSIWYG dogfood polish)
 merged. See `agent.md` §13, `docs/wysiwyg-design.md`, and checklist §C.5/§E.
@@ -40,13 +41,17 @@ Mirror of the checklist §B matrix, run against the §A content-storage projecti
 Each gate needs a named test (or recorded manual evidence) before it is checked.
 
 ### L1 — Fold/reveal model correctness
-- [ ] Folding hides exactly `[`, `](url)` (including the URL), keeps `text` visible with link
+- [x] Folding hides exactly `[`, `](url)` (including the URL), keeps `text` visible with link
   styling, and reveal-on-touch restores the full raw source for the touched link only.
-- [ ] Nested emphasis inside link text (`[**bold** link](u)`) folds/reveals without range drift.
+  Evidence: `WYSIWYGLinkFoldingGateTests.testL1InlineLinkFoldsExactChromeAndRevealTouchesOnlySelectedLink`
+  and `...testL1ReferenceLinksAutolinksAndImagesStayRaw`.
+- [x] Nested emphasis inside link text (`[**bold** link](u)`) folds/reveals without range drift.
+  Evidence: `WYSIWYGLinkFoldingGateTests.testL1NestedEmphasisInsideLinkFoldsAndRevealsWithoutRangeDrift`.
 
 ### L2 — Link chrome UX policy
-- [ ] Folded link text renders with a link-styled attribute (color/underline per
+- [x] Folded link text renders with a link-styled attribute (color/underline per
   `EditorTheme`); no synthetic characters are inserted (no attachments, no U+FFFC).
+  Evidence: `WYSIWYGLinkFoldingGateTests.testL2FoldedLinkUsesThemeStylingWithoutSyntheticCharacters`.
 - [ ] Pointer policy decided and recorded: plain click places the caret and reveals (Typora
   behavior, per agent.md §17.12); a modifier (⌘-click) opening the URL is optional and, if
   added, must not navigate the editor away or mutate source.

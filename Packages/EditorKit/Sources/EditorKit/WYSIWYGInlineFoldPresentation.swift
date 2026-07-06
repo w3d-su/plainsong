@@ -1,14 +1,20 @@
 import AppKit
 import Foundation
 
-/// Non-user-facing hook for exercising Phase 2 fold/reveal plumbing in tests and
-/// development builds. App layout modes intentionally do not persist or expose this.
+/// Presentation selector used by source mode and the Experimental WYSIWYG path.
+/// Link folding remains on a separate development opt-in until its L1-L9 gates pass.
 public enum MarkdownEditorDevelopmentPresentation: Equatable, Sendable {
     case source
     case inlineFoldReveal
+    /// Link-folding sub-gate opt-in. The App must not select this case until L1-L9 pass.
+    case inlineFoldRevealWithLinkFolding
 
     var enablesInlineFoldReveal: Bool {
-        self == .inlineFoldReveal
+        self != .source
+    }
+
+    var enablesLinkFolding: Bool {
+        self == .inlineFoldRevealWithLinkFolding
     }
 }
 
@@ -23,7 +29,7 @@ struct WYSIWYGInlineFoldPresentation {
         visibleRange: NSRange,
         to attributed: NSMutableAttributedString
     ) {
-        for region in plan.regions where Self.includes(region.kind) {
+        for region in plan.regions where Self.includes(region.kind, linkFoldingEnabled: plan.linkFoldingEnabled) {
             applyContentAttributes(for: region, visibleRange: visibleRange, to: attributed)
         }
 
@@ -36,7 +42,7 @@ struct WYSIWYGInlineFoldPresentation {
         to attributed: NSMutableAttributedString
     ) {
         for range in plan.regions
-            .filter({ Self.includes($0.kind) && !$0.isRevealed })
+            .filter({ Self.includes($0.kind, linkFoldingEnabled: plan.linkFoldingEnabled) && !$0.isRevealed })
             .flatMap(\.foldRanges)
         {
             guard let localRange = range.intersection(with: visibleRange, offsetBy: -visibleRange.location),
@@ -49,12 +55,12 @@ struct WYSIWYGInlineFoldPresentation {
         }
     }
 
-    static func includes(_ kind: WYSIWYGFoldRegion.Kind) -> Bool {
+    static func includes(_ kind: WYSIWYGFoldRegion.Kind, linkFoldingEnabled: Bool) -> Bool {
         switch kind {
         case .heading, .strong, .emphasis, .strikethrough, .inlineCode:
             true
         case .link:
-            false
+            linkFoldingEnabled
         }
     }
 
