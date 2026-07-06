@@ -1,8 +1,10 @@
 import Carbon
 import CoreGraphics
+@testable import EditorKit
 import Foundation
 
 let actualIMEGateSource = "# 標題\n\n前綴 **粗體**、*斜體*、`程式` 後綴\n"
+let actualIMELinkGateSource = "前綴 [連結文字](https://example.com/path) 後綴\n"
 
 struct ActualIMEScript {
     let name: String
@@ -62,8 +64,27 @@ struct ActualIMEKey {
 
 struct ActualIMEFoldBoundaryScenario: CaseIterable {
     let name: String
+    let source: String
     let insertionLocation: Int
     let foldedRanges: [NSRange]
+    let developmentPresentation: MarkdownEditorDevelopmentPresentation
+    let verifiesLinkFoldAfterCommit: Bool
+
+    init(
+        name: String,
+        source: String = actualIMEGateSource,
+        insertionLocation: Int,
+        foldedRanges: [NSRange],
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .inlineFoldReveal,
+        verifiesLinkFoldAfterCommit: Bool = false
+    ) {
+        self.name = name
+        self.source = source
+        self.insertionLocation = insertionLocation
+        self.foldedRanges = foldedRanges
+        self.developmentPresentation = developmentPresentation
+        self.verifiesLinkFoldAfterCommit = verifiesLinkFoldAfterCommit
+    }
 
     static let allCases: [ActualIMEFoldBoundaryScenario] = {
         let source = actualIMEGateSource
@@ -146,6 +167,45 @@ struct ActualIMEFoldBoundaryScenario: CaseIterable {
                 name: "inline code after folded closing delimiter",
                 insertionLocation: NSMaxRange(inlineCodeClosing),
                 foldedRanges: inlineCodeDelimiters
+            ),
+        ]
+    }()
+
+    static let linkBoundaryCases: [ActualIMEFoldBoundaryScenario] = {
+        let source = actualIMELinkGateSource
+        let linkSpan = (source as NSString).range(of: "[連結文字](https://example.com/path)")
+        let linkText = (source as NSString).range(of: "連結文字")
+        let opening = NSRange(location: linkSpan.location, length: 1)
+        let destination = NSRange(
+            location: NSMaxRange(linkText),
+            length: NSMaxRange(linkSpan) - NSMaxRange(linkText)
+        )
+        let foldedRanges = [opening, destination]
+
+        return [
+            ActualIMEFoldBoundaryScenario(
+                name: "link at start of visible text",
+                source: source,
+                insertionLocation: linkText.location,
+                foldedRanges: foldedRanges,
+                developmentPresentation: .inlineFoldRevealWithLinkFolding,
+                verifiesLinkFoldAfterCommit: true
+            ),
+            ActualIMEFoldBoundaryScenario(
+                name: "link at destination edge after visible text",
+                source: source,
+                insertionLocation: NSMaxRange(linkText),
+                foldedRanges: foldedRanges,
+                developmentPresentation: .inlineFoldRevealWithLinkFolding,
+                verifiesLinkFoldAfterCommit: true
+            ),
+            ActualIMEFoldBoundaryScenario(
+                name: "link immediately after folded destination",
+                source: source,
+                insertionLocation: NSMaxRange(linkSpan),
+                foldedRanges: foldedRanges,
+                developmentPresentation: .inlineFoldRevealWithLinkFolding,
+                verifiesLinkFoldAfterCommit: true
             ),
         ]
     }()

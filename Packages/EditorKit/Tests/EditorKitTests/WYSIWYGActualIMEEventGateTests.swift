@@ -4,6 +4,26 @@ import XCTest
 
 @MainActor
 final class WYSIWYGActualIMEEventGateTests: XCTestCase {
+    func testLinkBoundaryFixturesTargetLinkFoldingPresentation() throws {
+        XCTAssertEqual(ActualIMEFoldBoundaryScenario.linkBoundaryCases.count, 3)
+
+        for scenario in ActualIMEFoldBoundaryScenario.linkBoundaryCases {
+            XCTAssertEqual(scenario.developmentPresentation, .inlineFoldRevealWithLinkFolding)
+            let highlighted = MarkdownSyntaxHighlighter().highlight(
+                scenario.source,
+                fileKind: .markdown,
+                visibleRange: NSRange(location: 0, length: (scenario.source as NSString).length),
+                developmentPresentation: scenario.developmentPresentation,
+                selection: NSRange(location: (scenario.source as NSString).length, length: 0)
+            )
+            let links = try XCTUnwrap(highlighted.foldPlan).regions.filter { $0.kind == .link }
+            let link = try XCTUnwrap(links.first)
+            XCTAssertEqual(links.count, 1)
+            XCTAssertFalse(link.isRevealed)
+            XCTAssertEqual(link.foldRanges, scenario.foldedRanges)
+        }
+    }
+
     func testMarkedTextSelectionKeysAreReservedForInputContextOnlyWhileComposing() throws {
         let returnEvent = try Self.keyEvent(characters: "\r", keyCode: 36)
         let spaceEvent = try Self.keyEvent(characters: " ", keyCode: 49)
@@ -38,6 +58,22 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
         }
     }
 
+    func testActualZhuyinEventStreamAtLinkBoundaries() throws {
+        try Self.requireActualIMEOptIn()
+        let inputSource = try XCTUnwrap(
+            ActualIMEInputSource.enabled(matching: .zhuyin),
+            "Expected enabled macOS Traditional Chinese Zhuyin input source"
+        )
+
+        print("Actual IME source: \(inputSource.summary)")
+        try ActualIMEEventHarness.withSelectedInputSource(inputSource) { harness in
+            try harness.assertEventStream(
+                script: .zhuyin,
+                scenarios: ActualIMEFoldBoundaryScenario.linkBoundaryCases
+            )
+        }
+    }
+
     func testActualPinyinEventStreamAtFoldBoundariesWhenEnabled() throws {
         try Self.requireActualIMEOptIn()
         guard let inputSource = ActualIMEInputSource.enabled(matching: .pinyin) else {
@@ -58,6 +94,30 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
             try harness.assertEventStream(
                 script: .pinyin,
                 scenarios: ActualIMEFoldBoundaryScenario.allCases
+            )
+        }
+    }
+
+    func testActualPinyinEventStreamAtLinkBoundariesWhenEnabled() throws {
+        try Self.requireActualIMEOptIn()
+        guard let inputSource = ActualIMEInputSource.enabled(matching: .pinyin) else {
+            let installedPinyin = ActualIMEInputSource.installed(matching: .pinyin)
+                .map(\.summary)
+                .joined(separator: ", ")
+            throw XCTSkip("""
+            No enabled/selectable macOS Pinyin input method. Installed matches: \
+            \(installedPinyin.isEmpty ? "none" : installedPinyin). Enable Pinyin in \
+            System Settings > Keyboard > Text Input > Edit > + > Chinese, then rerun \
+            PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter \
+            WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtLinkBoundariesWhenEnabled
+            """)
+        }
+
+        print("Actual IME source: \(inputSource.summary)")
+        try ActualIMEEventHarness.withSelectedInputSource(inputSource) { harness in
+            try harness.assertEventStream(
+                script: .pinyin,
+                scenarios: ActualIMEFoldBoundaryScenario.linkBoundaryCases
             )
         }
     }
