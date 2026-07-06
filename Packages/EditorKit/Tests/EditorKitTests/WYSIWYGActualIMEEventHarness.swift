@@ -7,6 +7,22 @@ import XCTest
 
 @MainActor
 final class ActualIMEEventHarness {
+    private enum EventStreamError: LocalizedError {
+        case compositionDidNotStart(script: String, scenario: String, key: String, sourceStayedUnchanged: Bool)
+
+        var errorDescription: String? {
+            switch self {
+            case let .compositionDidNotStart(script, scenario, key, sourceStayedUnchanged):
+                let sourceState = sourceStayedUnchanged ? "source stayed unchanged" : "source changed without marked text"
+                return """
+                \(script) \(scenario) did not start marked text after \(key); \(sourceState). The synthesized key \
+                did not reach the selected IME, or composition committed prematurely. Verify Accessibility \
+                event-posting access for the terminal host and rerun; this is not passing L5 evidence.
+                """
+            }
+        }
+    }
+
     private let app: NSApplication
 
     private init(app: NSApplication) {
@@ -89,6 +105,14 @@ final class ActualIMEEventHarness {
         for step in script.compositionSteps {
             press(step.key)
             let currentText = Self.text(in: textView)
+            guard textView.hasMarkedText() else {
+                throw EventStreamError.compositionDidNotStart(
+                    script: script.name,
+                    scenario: scenario.name,
+                    key: step.key.name,
+                    sourceStayedUnchanged: currentText == scenario.source
+                )
+            }
             XCTAssertTrue(
                 step.acceptableInsertedTexts.containsInsertedText(
                     in: currentText,

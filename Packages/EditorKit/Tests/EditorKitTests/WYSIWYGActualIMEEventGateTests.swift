@@ -1,9 +1,18 @@
 import AppKit
+import CoreGraphics
 @testable import EditorKit
 import XCTest
 
 @MainActor
 final class WYSIWYGActualIMEEventGateTests: XCTestCase {
+    func testActualIMEEventPostingAccessIsGranted() throws {
+        try Self.requireActualIMEOptIn()
+        XCTAssertTrue(
+            Self.hasOrRequestsEventPostingAccess(),
+            Self.eventPostingAccessRecovery
+        )
+    }
+
     func testLinkBoundaryFixturesTargetLinkFoldingPresentation() throws {
         XCTAssertEqual(ActualIMEFoldBoundaryScenario.linkBoundaryCases.count, 3)
 
@@ -44,6 +53,7 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
 
     func testActualZhuyinEventStreamAtFoldBoundaries() throws {
         try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
         let inputSource = try XCTUnwrap(
             ActualIMEInputSource.enabled(matching: .zhuyin),
             "Expected enabled macOS Traditional Chinese Zhuyin input source"
@@ -60,6 +70,7 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
 
     func testActualZhuyinEventStreamAtLinkBoundaries() throws {
         try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
         let inputSource = try XCTUnwrap(
             ActualIMEInputSource.enabled(matching: .zhuyin),
             "Expected enabled macOS Traditional Chinese Zhuyin input source"
@@ -76,6 +87,7 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
 
     func testActualPinyinEventStreamAtFoldBoundariesWhenEnabled() throws {
         try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
         guard let inputSource = ActualIMEInputSource.enabled(matching: .pinyin) else {
             let installedPinyin = ActualIMEInputSource.installed(matching: .pinyin)
                 .map(\.summary)
@@ -100,6 +112,7 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
 
     func testActualPinyinEventStreamAtLinkBoundariesWhenEnabled() throws {
         try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
         guard let inputSource = ActualIMEInputSource.enabled(matching: .pinyin) else {
             let installedPinyin = ActualIMEInputSource.installed(matching: .pinyin)
                 .map(\.summary)
@@ -131,6 +144,22 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
             """)
         }
     }
+
+    private static func requireActualIMEEventPostingAccess() throws {
+        guard hasOrRequestsEventPostingAccess() else {
+            throw XCTSkip(eventPostingAccessRecovery)
+        }
+    }
+
+    private static func hasOrRequestsEventPostingAccess() -> Bool {
+        CGPreflightPostEventAccess() || CGRequestPostEventAccess()
+    }
+
+    private static let eventPostingAccessRecovery = """
+    The actual-IME harness cannot synthesize keyboard events. Grant Accessibility event-posting \
+    access to the terminal app that launched `swift test` in System Settings > Privacy & Security \
+    > Accessibility, quit and reopen that terminal app, then rerun the opt-in gate. L5 remains open.
+    """
 
     private static func keyEvent(
         characters: String,
