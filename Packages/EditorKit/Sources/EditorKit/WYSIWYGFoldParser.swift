@@ -38,12 +38,21 @@ extension MarkdownSyntaxParser {
         in source: String,
         fileKind: FileKind,
         visibleRange requestedRange: NSRange,
-        selection: NSRange
+        selection: NSRange,
+        linkFoldingEnabled: Bool = false
     ) -> (visibleRange: NSRange, tokens: [MarkdownSyntaxToken], foldPlan: WYSIWYGFoldPlan) {
         let sourceLength = (source as NSString).length
         guard sourceLength > 0 else {
             let emptyRange = NSRange(location: 0, length: 0)
-            return (emptyRange, [], WYSIWYGFoldPlan(visibleRange: emptyRange, regions: []))
+            return (
+                emptyRange,
+                [],
+                WYSIWYGFoldPlan(
+                    visibleRange: emptyRange,
+                    regions: [],
+                    linkFoldingEnabled: linkFoldingEnabled
+                )
+            )
         }
 
         let visibleRange = MarkdownSyntaxParser.visibleHighlightRange(
@@ -55,7 +64,15 @@ extension MarkdownSyntaxParser {
             let tree = markdownParser.parse(fragment),
             let root = tree.rootNode
         else {
-            return (visibleRange, [], WYSIWYGFoldPlan(visibleRange: visibleRange, regions: []))
+            return (
+                visibleRange,
+                [],
+                WYSIWYGFoldPlan(
+                    visibleRange: visibleRange,
+                    regions: [],
+                    linkFoldingEnabled: linkFoldingEnabled
+                )
+            )
         }
 
         var tokens: [MarkdownSyntaxToken] = []
@@ -108,7 +125,8 @@ extension MarkdownSyntaxParser {
         let foldPlan = WYSIWYGFoldResolver.resolve(
             candidates: filteredCandidates,
             visibleRange: visibleRange,
-            selection: selection.clamped(toLength: sourceLength)
+            selection: selection.clamped(toLength: sourceLength),
+            linkFoldingEnabled: linkFoldingEnabled
         )
 
         return (visibleRange, absoluteTokens, foldPlan)

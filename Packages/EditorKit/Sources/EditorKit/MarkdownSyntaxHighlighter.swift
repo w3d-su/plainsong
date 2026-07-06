@@ -121,7 +121,8 @@ public struct MarkdownSyntaxHighlighter {
             in: text,
             fileKind: fileKind,
             visibleRange: visibleRange,
-            selection: selection ?? NSRange(location: 0, length: 0)
+            selection: selection ?? NSRange(location: 0, length: 0),
+            linkFoldingEnabled: developmentPresentation.enablesLinkFolding
         ) : nil
 
         let range = visiblePlan?.visibleRange

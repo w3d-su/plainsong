@@ -3,6 +3,17 @@ import Foundation
 struct WYSIWYGFoldPlan: Equatable {
     let visibleRange: NSRange
     let regions: [WYSIWYGFoldRegion]
+    let linkFoldingEnabled: Bool
+
+    init(
+        visibleRange: NSRange,
+        regions: [WYSIWYGFoldRegion],
+        linkFoldingEnabled: Bool = false
+    ) {
+        self.visibleRange = visibleRange
+        self.regions = regions
+        self.linkFoldingEnabled = linkFoldingEnabled
+    }
 
     var foldedRanges: [NSRange] {
         Self.mergedRanges(
@@ -77,7 +88,8 @@ enum WYSIWYGFoldResolver {
     static func resolve(
         candidates: [WYSIWYGFoldCandidate],
         visibleRange: NSRange,
-        selection: NSRange
+        selection: NSRange,
+        linkFoldingEnabled: Bool = false
     ) -> WYSIWYGFoldPlan {
         let regions = candidates.map { candidate in
             WYSIWYGFoldRegion(
@@ -90,7 +102,11 @@ enum WYSIWYGFoldResolver {
             )
         }
 
-        return WYSIWYGFoldPlan(visibleRange: visibleRange, regions: regions)
+        return WYSIWYGFoldPlan(
+            visibleRange: visibleRange,
+            regions: regions,
+            linkFoldingEnabled: linkFoldingEnabled
+        )
     }
 }
 
