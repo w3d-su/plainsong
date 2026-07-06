@@ -5,9 +5,10 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state: MIT `LICENSE` committed; no Developer ID signing, no
-notarization, no packaging, no release CI. The app builds and runs locally with the sandbox
-and `com.apple.security.network.client` entitlements.
+Created 2026-07-02. Current state (2026-07-05): MIT `LICENSE` committed; packaging
+(`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
+published. Developer ID signing and notarization remain deferred with P1/P2. The app builds
+and runs locally with the sandbox and `com.apple.security.network.client` entitlements.
 
 ## P0 — Decisions before any pipeline work [owner]
 

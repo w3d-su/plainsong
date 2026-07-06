@@ -104,7 +104,9 @@ echo "==> Package DMG"
 Scripts/make-dmg.sh "$APP_PATH" "$DMG_PATH"
 
 echo "==> Checksum"
-shasum -a 256 "$DMG_PATH" | tee "$DMG_PATH.sha256"
+# Compute inside the output dir so the .sha256 records only the filename;
+# downloaders then verify with `shasum -c` next to the downloaded DMG.
+(cd "$(dirname "$DMG_PATH")" && shasum -a 256 "$(basename "$DMG_PATH")") | tee "$DMG_PATH.sha256"
 
 echo "==> Done: $DMG_PATH"
 if [[ "$UNSIGNED" == "1" ]]; then
