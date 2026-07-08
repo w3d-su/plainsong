@@ -95,6 +95,11 @@ enum EditorPerformanceProbe {
         textView.frame = scrollView.bounds
         textView.text = editedText
         textView.textSelection = selectedRange
+        if developmentPresentation.enablesInlineFoldReveal {
+            guard textView.setWYSIWYGZeroWidthFoldingEnabled(true) else {
+                throw ProbeError.missingTextView
+            }
+        }
         scrollView.layoutSubtreeIfNeeded()
 
         let requestRange = visibleRange.clamped(toLength: (editedText as NSString).length)
@@ -111,7 +116,12 @@ enum EditorPerformanceProbe {
         )
 
         let didApply = MarkdownTextView.applyHighlightedText(
-            HighlightedText(revision: 1, range: highlighted.range, text: highlighted.text),
+            HighlightedText(
+                revision: 1,
+                range: highlighted.range,
+                text: highlighted.text,
+                foldPlan: highlighted.foldPlan
+            ),
             to: textView
         )
         scrollView.displayIfNeeded()

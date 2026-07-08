@@ -404,20 +404,15 @@ final class MarkdownSTTextView: STTextView {
             return nil
         }
 
-        // Bound the longest-effective-range scan to a small window. Folded delimiters are
-        // short (heading markers and inline markers are at most a handful of characters),
-        // so this stays O(1) on the caret-movement path while still spanning the whole run.
-        let windowRadius = 16
-        let lowerBound = max(0, offset - windowRadius)
-        let upperBound = min(textStorage.length, offset + windowRadius)
-        let searchRange = NSRange(location: lowerBound, length: upperBound - lowerBound)
-
+        // Read the complete live attribute run. Link destinations can be arbitrarily long,
+        // so a bounded window could snap only partway through a hidden `](url)` span and
+        // leave the caret resting inside the remainder.
         var effectiveRange = NSRange(location: 0, length: 0)
         let value = textStorage.attribute(
             WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
             at: offset - 1,
             longestEffectiveRange: &effectiveRange,
-            in: searchRange
+            in: NSRange(location: 0, length: textStorage.length)
         )
         guard (value as? Bool) == true, offset < NSMaxRange(effectiveRange) else {
             return nil

@@ -57,19 +57,28 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
   added, must not navigate the editor away or mutate source.
 
 ### L3 — Destination-edge selection & caret snapping
-- [ ] Arrowing right past the last visible character of link text snaps/reveals per the
+- [x] Arrowing right past the last visible character of link text snaps/reveals per the
   §C.2 edge-snapping policy instead of stranding the caret inside the hidden URL.
-- [ ] `WYSIWYGCaretSnap` (or a link-aware extension of it) handles the asymmetric span:
+  Evidence: `WYSIWYGLinkNativeGateTests.testL3ArrowAcrossDestinationSnapsToVisibleBoundaryWithoutURLTrap`.
+- [x] `WYSIWYGCaretSnap` (or a link-aware extension of it) handles the asymmetric span:
   caret rest inside any hidden `](url)` offset resolves to a visible boundary.
-- [ ] Shift-selection across the destination edge keeps raw UTF-16 offsets (no clamping —
+  Evidence: `WYSIWYGLinkNativeGateTests.testL3AsymmetricDestinationSnapUsesCompleteLongHiddenRun`
+  and `...testL3ArrowAcrossDestinationSnapsToVisibleBoundaryWithoutURLTrap`.
+- [x] Shift-selection across the destination edge keeps raw UTF-16 offsets (no clamping —
   checklist §C.3 stays law).
+  Evidence: `WYSIWYGLinkNativeGateTests.testL3ShiftSelectionAcrossDestinationKeepsRawUTF16Offsets`.
 
 ### L4 — Copy/paste policy (B7 extension)
-- [ ] Selection spanning the whole link copies `[text](url)` verbatim.
-- [ ] Selection of visible text only copies the text only.
-- [ ] Selection ending *inside* the hidden URL copies exactly the selected raw `NSRange`,
+- [x] Selection spanning the whole link copies `[text](url)` verbatim.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL4WholeTextAndPartialURLSelectionsCopyExactRawRanges`.
+- [x] Selection of visible text only copies the text only.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL4WholeTextAndPartialURLSelectionsCopyExactRawRanges`.
+- [x] Selection ending *inside* the hidden URL copies exactly the selected raw `NSRange`,
   including the partial URL — never a synthesized rendered form.
-- [ ] Paste into folded/revealed link regions mutates backing source normally.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL4WholeTextAndPartialURLSelectionsCopyExactRawRanges`
+  and `...testL3ShiftSelectionAcrossDestinationKeepsRawUTF16Offsets`.
+- [x] Paste into folded/revealed link regions mutates backing source normally.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL4PasteMutatesRawSourceInFoldedAndRevealedLinkRegions`.
 
 ### L5 — IME (Zhuyin + Pinyin) at link boundaries
 - [ ] Opt-in `PLAINSONG_RUN_ACTUAL_IME=1` harness extended with link-boundary scenarios:
@@ -77,20 +86,27 @@ Each gate needs a named test (or recorded manual evidence) before it is checked.
   corruption, no caret escape, fold attributes skipped during marked text.
 
 ### L6 — Pointer gates
-- [ ] Real `NSEvent` click/drag gates (pattern of `WYSIWYGNativePointerGateTests`) rerun with
+- [x] Real `NSEvent` click/drag gates (pattern of `WYSIWYGNativePointerGateTests`) rerun with
   folded links: click-to-caret on link text, boundary clicks at both edges, drag selection
   across a folded link copies exact raw Markdown.
+  Evidence: `WYSIWYGLinkNativePointerGateTests.testL6RealPointerClicksOnFoldedLinkTextAndHiddenRunEdgesDoNotTrapCaret`
+  and `...testL6RealPointerDragAcrossFoldedLinkCopiesExactRawMarkdown`.
 
 ### L7 — Accessibility
-- [ ] `AXValue` remains the exact raw source (URL included) while folded.
+- [x] `AXValue` remains the exact raw source (URL included) while folded.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL7AccessibilityValueIncludesRawFoldedLinkDestination`.
 
 ### L8 — Performance
-- [ ] Visible-range fold recompute on `Fixtures/large-1mb.md` (which must gain a link-dense
+- [x] Visible-range fold recompute on `Fixtures/large-1mb.md` (which must gain a link-dense
   section if it lacks one) stays within the §12 50 ms budget; record in `docs/perf-log.md`.
+  Evidence: `WYSIWYGLinkPerformanceGateTests.testL8LinkFoldingVisibleRangeRecomputeStaysUnderFiftyMilliseconds`
+  and `docs/perf-log.md` (16.968 ms max on 2026-07-06; the existing fixture already contains
+  repeated inline links and was not modified).
 
 ### L9 — Undo/redo
-- [ ] Link fold presentation never enters undo; editing a URL after reveal undoes as plain
+- [x] Link fold presentation never enters undo; editing a URL after reveal undoes as plain
   text edits.
+  Evidence: `WYSIWYGLinkNativeGateTests.testL9LinkPresentationStaysOutOfUndoAndRecomputesAfterURLUndoRedo`.
 
 ## 4. Exit criteria
 

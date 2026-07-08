@@ -149,43 +149,6 @@ final class WYSIWYGLinkFoldingGateTests: XCTestCase {
 
 @MainActor
 private extension WYSIWYGLinkFoldingGateTests {
-    struct AppliedPresentation {
-        let textView: MarkdownSTTextView
-        let textStorage: NSTextStorage
-        let presentation: MarkdownHighlightResult
-    }
-
-    func applyLinkPresentation(_ source: String, selection: NSRange) throws -> AppliedPresentation {
-        let textView = MarkdownSTTextView(frame: .zero)
-        textView.font = MarkdownSyntaxHighlighter.defaultFont
-        textView.text = source
-        textView.textSelection = selection
-        XCTAssertTrue(textView.setWYSIWYGZeroWidthFoldingEnabled(true))
-
-        let presentation = MarkdownSyntaxHighlighter().highlight(
-            source,
-            fileKind: .markdown,
-            visibleRange: NSRange(location: 0, length: (source as NSString).length),
-            developmentPresentation: .inlineFoldRevealWithLinkFolding,
-            selection: selection
-        )
-        XCTAssertTrue(MarkdownTextView.applyHighlightedText(
-            HighlightedText(
-                revision: 1,
-                range: presentation.range,
-                text: presentation.text,
-                foldPlan: presentation.foldPlan
-            ),
-            to: textView
-        ))
-
-        return try AppliedPresentation(
-            textView: textView,
-            textStorage: XCTUnwrap(MarkdownTextView.textStorage(of: textView)),
-            presentation: presentation
-        )
-    }
-
     func linkRegions(in presentation: MarkdownHighlightResult) throws -> [WYSIWYGFoldRegion] {
         try XCTUnwrap(presentation.foldPlan).regions.filter { $0.kind == .link }
     }
@@ -198,14 +161,24 @@ private extension WYSIWYGLinkFoldingGateTests {
         line: UInt = #line
     ) {
         for range in ranges {
-            let attributes = attributed.attributes(at: range.location, effectiveRange: nil)
-            XCTAssertEqual(
-                WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes),
-                isFolded,
-                "Unexpected fold state for \(range)",
-                file: file,
-                line: line
-            )
+            var cursor = range.location
+            while cursor < NSMaxRange(range) {
+                var effectiveRange = NSRange(location: 0, length: 0)
+                let value = attributed.attribute(
+                    WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
+                    at: cursor,
+                    longestEffectiveRange: &effectiveRange,
+                    in: NSRange(location: 0, length: attributed.length)
+                )
+                XCTAssertEqual(
+                    value as? Bool == true,
+                    isFolded,
+                    "Unexpected fold state for \(range) at offset \(cursor)",
+                    file: file,
+                    line: line
+                )
+                cursor = max(cursor + 1, min(NSMaxRange(range), NSMaxRange(effectiveRange)))
+            }
         }
     }
 }
