@@ -7,6 +7,22 @@ import XCTest
 
 @MainActor
 final class ActualIMEEventHarness {
+    private enum EventStreamError: LocalizedError {
+        case compositionDidNotStart(script: String, scenario: String, key: String, sourceStayedUnchanged: Bool)
+
+        var errorDescription: String? {
+            switch self {
+            case let .compositionDidNotStart(script, scenario, key, sourceStayedUnchanged):
+                let sourceState = sourceStayedUnchanged ? "source stayed unchanged" : "source changed without marked text"
+                return """
+                \(script) \(scenario) did not start marked text after \(key); \(sourceState). The synthesized key \
+                did not reach the selected IME, or composition committed prematurely. Verify Accessibility \
+                event-posting access for the terminal host and rerun; this is not passing L5 evidence.
+                """
+            }
+        }
+    }
+
     private let app: NSApplication
 
     private init(app: NSApplication) {
@@ -50,6 +66,7 @@ final class ActualIMEEventHarness {
                 file: file,
                 line: line
             )
+            print("Actual IME scenario passed: \(script.name) — \(scenario.name)")
         }
     }
 
@@ -62,13 +79,14 @@ final class ActualIMEEventHarness {
         line: UInt
     ) throws {
         textView.inputContext?.discardMarkedText()
-        textView.text = actualIMEGateSource
+        textView.text = scenario.source
         textView.textSelection = NSRange(location: scenario.insertionLocation, length: 0)
         XCTAssertTrue(
             applyProductionPresentation(
-                actualIMEGateSource,
-                selection: NSRange(location: (actualIMEGateSource as NSString).length, length: 0),
+                scenario.source,
+                selection: NSRange(location: (scenario.source as NSString).length, length: 0),
                 revision: 0,
+                developmentPresentation: scenario.developmentPresentation,
                 to: textView
             ),
             "\(script.name) \(scenario.name)",
@@ -87,10 +105,18 @@ final class ActualIMEEventHarness {
         for step in script.compositionSteps {
             press(step.key)
             let currentText = Self.text(in: textView)
+            guard textView.hasMarkedText() else {
+                throw EventStreamError.compositionDidNotStart(
+                    script: script.name,
+                    scenario: scenario.name,
+                    key: step.key.name,
+                    sourceStayedUnchanged: currentText == scenario.source
+                )
+            }
             XCTAssertTrue(
                 step.acceptableInsertedTexts.containsInsertedText(
                     in: currentText,
-                    source: actualIMEGateSource,
+                    source: scenario.source,
                     at: scenario.insertionLocation
                 ),
                 "\(script.name) \(scenario.name) after \(step.key.name): \(currentText)",
@@ -127,7 +153,7 @@ final class ActualIMEEventHarness {
         let committedInsertion = try XCTUnwrap(
             script.acceptableCommittedTexts.insertedText(
                 in: committedText,
-                source: actualIMEGateSource,
+                source: scenario.source,
                 at: scenario.insertionLocation
             ),
             "\(script.name) \(scenario.name) committed unexpected text: \(committedText)",
@@ -146,10 +172,12 @@ final class ActualIMEEventHarness {
             line: line
         )
 
+        let reapplySelection = NSRange(location: (committedText as NSString).length, length: 0)
         let didReapplyPresentation = applyProductionPresentation(
             committedText,
-            selection: textView.selectedRange(),
+            selection: reapplySelection,
             revision: 100,
+            developmentPresentation: scenario.developmentPresentation,
             to: textView
         )
         XCTAssertTrue(didReapplyPresentation, "\(script.name) \(scenario.name)", file: file, line: line)
@@ -160,6 +188,17 @@ final class ActualIMEEventHarness {
             file: file,
             line: line
         )
+        if scenario.verifiesLinkFoldAfterCommit {
+            assertLinkFoldAttributesReappliedAfterCommit(
+                in: textView,
+                committedText: committedText,
+                presentationSelection: reapplySelection,
+                script: script,
+                scenario: scenario,
+                file: file,
+                line: line
+            )
+        }
         XCTAssertEqual(
             textView.selectedRange(),
             expectedSelection,
@@ -168,7 +207,10 @@ final class ActualIMEEventHarness {
             line: line
         )
     }
+}
 
+@MainActor
+private extension ActualIMEEventHarness {
     private func commitMarkedText(
         script: ActualIMEScript,
         scenario: ActualIMEFoldBoundaryScenario,
@@ -183,7 +225,7 @@ final class ActualIMEEventHarness {
                 XCTAssertTrue(
                     script.acceptableActiveCommitTexts.containsInsertedText(
                         in: currentText,
-                        source: actualIMEGateSource,
+                        source: scenario.source,
                         at: scenario.insertionLocation
                     ),
                     "\(script.name) \(scenario.name) during commit \(key.name): \(currentText)",
@@ -211,11 +253,8 @@ final class ActualIMEEventHarness {
             }
         }
 
-        XCTFail(
-            "\(script.name) \(scenario.name) did not commit after \(script.commitKeys.map(\.name).joined(separator: ", "))",
-            file: file,
-            line: line
-        )
+        let commitKeyNames = script.commitKeys.map(\.name).joined(separator: ", ")
+        XCTFail("\(script.name) \(scenario.name) did not commit after \(commitKeyNames)", file: file, line: line)
         return Self.text(in: textView)
     }
 

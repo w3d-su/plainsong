@@ -295,7 +295,9 @@ private struct DocumentEditor: View {
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
             imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false),
-            _developmentPresentation: usesWYSIWYGPresentation ? .inlineFoldReveal : .source,
+            _developmentPresentation: EditorPresentationPolicy.resolve(
+                usesWYSIWYGPresentation: usesWYSIWYGPresentation
+            ),
             onWYSIWYGMechanismFailure: { reason in
                 appState.handleWYSIWYGMechanismFailure(reason)
             }
@@ -311,6 +313,14 @@ private struct DocumentEditor: View {
             scrollCoordinator.setEditorScrollForwardingEnabled(isPreviewVisible && isEnabled)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+enum EditorPresentationPolicy {
+    static func resolve(
+        usesWYSIWYGPresentation: Bool
+    ) -> MarkdownEditorDevelopmentPresentation {
+        usesWYSIWYGPresentation ? .inlineFoldRevealWithLinkFolding : .source
     }
 }
 

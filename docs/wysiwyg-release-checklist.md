@@ -7,8 +7,9 @@
 >
 > This checklist started as a specification and now records implementation evidence as gates
 > turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, the
-> §C.2-§C.5 delimiter edge-snapping / selection / copy / link-deferral gates are green as of
-> 2026-06-27, and §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27.
+> §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27,
+> §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27, and the §C.5
+> inline-link visual-folding sub-gate is green and included in Experimental WYSIWYG as of 2026-07-06.
 > Final stable/default promotion remains blocked by the explicit unchecked promotion gate below.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
@@ -45,11 +46,11 @@ What still blocks promotion beyond Experimental:
 1. **Stable/default promotion has not been approved.** WYSIWYG remains Experimental until the
    unchecked D.4 promotion gate is completed with a Decision Log entry.
 2. **WYSIWYG must remain off by default.** The App may pass
-   `_developmentPresentation: .inlineFoldReveal` only when the Experimental flag is enabled, the
-   current layout mode is WYSIWYG, and the mechanism has not failed.
-3. **Link visual folding and deferred constructs remain blocked.** This checklist does not
-   authorize links, images, fenced-code custom fragments, tables, Mermaid/math widgets, or real
-   MDX rendering in the editor surface.
+   `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when the Experimental flag
+   is enabled, the current layout mode is WYSIWYG, and the mechanism has not failed.
+3. **Deferred constructs remain blocked.** Completing the inline-link sub-gate does not authorize
+   image thumbnails, fenced-code custom fragments, tables, Mermaid/math widgets, or real MDX
+   rendering in the editor surface; reference links and autolinks stay raw.
 
 ---
 
@@ -221,16 +222,15 @@ for the dev hook.
   `WYSIWYGEdgeSnappingGateTests.testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
   re-confirms raw copy after snapping landed.
 
-### C.5 Link visual folding stays deferred
+### C.5 Link visual folding included through its completed sub-gate
 
-- [x] Link visual folding remains **off** in the user-facing v1. Link ranges stay in the pure
-  fold model for offset/reveal validation, but `[text](url)` is not visually folded until link
-  chrome, destination-edge selection, and partial-span copy have their own native
-  selection/copy/pointer gates (a separate, explicitly approved sub-gate). Shipping the
-  user-facing mode does **not** unblock link folding. Evidence:
-  `MarkdownSyntaxHighlighterTests.testDevelopmentInlineFoldRevealFoldsIncludedConstructsAndDefersLinks`
-  and the 2026-06-27 manual
-  WYSIWYG sign-off, where `[link](https://example.com)` remained raw in the editor.
+- [x] Inline links `[text](url)` visually fold only in the off-by-default Experimental WYSIWYG
+  mode after the dedicated L1-L9 sub-gate completed. Link text remains visible and styled;
+  plain click places the caret and reveals the raw link (Typora-style), while reference links,
+  autolinks, and images stay raw. Source-only/source+preview behavior, exact-raw-copy policy,
+  selection ranges, and the kill-switch fallback are unchanged. Evidence:
+  `docs/link-folding-gates.md`, the owner real-Mac Zhuyin/Pinyin run on 2026-07-06, and the
+  `agent.md` 2026-07-06 Decision Log entry.
 
 ---
 
@@ -304,10 +304,12 @@ this into a **three-state** cycle per `agent.md` §13.
 ## E. Construct scope (unchanged; do not expand here)
 
 User-facing WYSIWYG v1 stays inline-first. Included: **headings, emphasis/strong,
-strikethrough, inline code, list/quote marker styling**. The following remain **deferred** and
-must not be added as part of making WYSIWYG user-facing:
+strikethrough, inline code, list/quote marker styling, and inline links `[text](url)`**.
+Inline-link folding completed its own L1-L9 gate (see C.5); reference-style links and autolinks
+stay raw. The following remain **deferred** and must not be added as part of this scope:
 
-- [x] Link visual folding stays deferred (see C.5).
+- [x] Inline link visual folding — included only in Experimental WYSIWYG after the completed C.5 sub-gate.
+- [x] Reference-style links and autolinks — stay raw.
 - [x] Image thumbnails — deferred.
 - [x] Fenced-code custom layout fragments — deferred.
 - [x] Tables — stay raw; existing table helper remains.
@@ -328,21 +330,22 @@ checked:
   removed/demoted; mechanism recorded in Decision Log.
 - [x] **B** — Every row B1–B13 re-run and green against the §A mechanism; performance recorded in
   `docs/perf-log.md`.
-- [x] **C** — Reveal-on-touch, edge-snapping, selection/copy, and link-deferral policies implemented
+- [x] **C** — Reveal-on-touch, edge-snapping, selection/copy, and inline-link policies implemented
   and tested. Edge-snapping and selection/copy gates are covered by `WYSIWYGEdgeSnappingGateTests`
-  and native interaction tests; 2026-06-27 manual sign-off confirms inline fold/reveal and raw link
-  syntax remains visible.
+  and native interaction tests; the completed link sub-gate and 2026-07-06 owner actual-IME run
+  cover inline-link folding in Experimental WYSIWYG.
 - [x] **D** — Three-state `⌘⇧P` cycle, persisted enum + migration, kill switch + recovery, and
   experimental labeling implemented and tested. Automated AppState tests cover persistence/recovery;
   2026-06-27 manual sign-off covers Settings label/default, View menu, toolbar, enabled/disabled
   cycles, and disable-from-WYSIWYG fallback.
-- [x] **E** — Construct scope unchanged; deferred constructs still deferred.
+- [x] **E** — Inline links are included through their completed sub-gate; all remaining deferred
+  constructs stay deferred and reference links/autolinks remain raw.
 - [x] **Docs** — `docs/wysiwyg-design.md`, `docs/risk-register.md` (R18 closed only when B13 +
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
 Until the stable-promotion gate is checked, the only valid WYSIWYG surfaces are the off-by-default
-Experimental mode and the non-user-facing `_developmentPresentation: .inlineFoldReveal` hook.
+Experimental mode (using `.inlineFoldRevealWithLinkFolding`) and non-user-facing development hooks.
 
 ---
 

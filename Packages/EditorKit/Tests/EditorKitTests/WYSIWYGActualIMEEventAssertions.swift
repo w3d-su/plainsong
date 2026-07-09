@@ -10,20 +10,31 @@ extension ActualIMEEventHarness {
         _ source: String,
         selection: NSRange,
         revision: Int,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .inlineFoldReveal,
         to textView: STTextView
     ) -> Bool {
         MarkdownTextView.applyHighlightedText(
-            productionPresentation(source, selection: selection, revision: revision),
+            productionPresentation(
+                source,
+                selection: selection,
+                revision: revision,
+                developmentPresentation: developmentPresentation
+            ),
             to: textView
         )
     }
 
-    func productionPresentation(_ text: String, selection: NSRange, revision: Int) -> HighlightedText {
+    func productionPresentation(
+        _ text: String,
+        selection: NSRange,
+        revision: Int,
+        developmentPresentation: MarkdownEditorDevelopmentPresentation = .inlineFoldReveal
+    ) -> HighlightedText {
         let highlighted = MarkdownSyntaxHighlighter().highlight(
             text,
             fileKind: .markdown,
             visibleRange: NSRange(location: 0, length: (text as NSString).length),
-            developmentPresentation: .inlineFoldReveal,
+            developmentPresentation: developmentPresentation,
             selection: selection
         )
         return HighlightedText(
@@ -48,14 +59,51 @@ extension ActualIMEEventHarness {
         }
 
         for range in ranges {
-            let attributes = textStorage.attributes(at: range.location, effectiveRange: nil)
-            XCTAssertTrue(
-                WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes),
-                "Expected folded delimiter attributes for \(script.name) \(scenario.name) at \(range)",
-                file: file,
-                line: line
-            )
+            textStorage.enumerateAttributes(in: range) { attributes, effectiveRange, _ in
+                XCTAssertTrue(
+                    WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes),
+                    "Expected folded delimiter attributes for \(script.name) \(scenario.name) at \(effectiveRange)",
+                    file: file,
+                    line: line
+                )
+            }
         }
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func assertLinkFoldAttributesReappliedAfterCommit(
+        in textView: STTextView,
+        committedText: String,
+        presentationSelection: NSRange,
+        script: ActualIMEScript,
+        scenario: ActualIMEFoldBoundaryScenario,
+        file: StaticString,
+        line: UInt
+    ) {
+        let presentation = productionPresentation(
+            committedText,
+            selection: presentationSelection,
+            revision: 101,
+            developmentPresentation: scenario.developmentPresentation
+        )
+        let foldedLinks = presentation.foldPlan?.regions.filter { region in
+            region.kind == .link && !region.isRevealed
+        } ?? []
+        XCTAssertEqual(
+            foldedLinks.count,
+            1,
+            "Expected one folded link after commit for \(script.name) \(scenario.name)",
+            file: file,
+            line: line
+        )
+        assertFoldedRangesCarryProductionAttributes(
+            in: textView,
+            ranges: foldedLinks.flatMap(\.foldRanges),
+            script: script,
+            scenario: scenario,
+            file: file,
+            line: line
+        )
     }
 
     func assertActiveMarkedText(
@@ -110,6 +158,7 @@ extension ActualIMEEventHarness {
             currentText,
             selection: textView.selectedRange(),
             revision: 1,
+            developmentPresentation: scenario.developmentPresentation,
             to: textView
         )
         XCTAssertFalse(

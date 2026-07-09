@@ -1,9 +1,21 @@
+import EditorKit
 import MarkdownCore
 @testable import Plainsong
 import XCTest
 
 @MainActor
 final class AppStateTests: XCTestCase {
+    func testEditorPresentationPolicyEnablesLinkFoldingOnlyForWYSIWYG() {
+        XCTAssertEqual(
+            EditorPresentationPolicy.resolve(usesWYSIWYGPresentation: false),
+            .source
+        )
+        XCTAssertEqual(
+            EditorPresentationPolicy.resolve(usesWYSIWYGPresentation: true),
+            .inlineFoldRevealWithLinkFolding
+        )
+    }
+
     func testEmptyStateCannotSaveAndUsesDefaultTitle() {
         let appState = AppState()
 

@@ -19,6 +19,7 @@ enum EditorPerformanceProbe {
     }
 
     enum ProbeError: Error {
+        case failedToEnableWYSIWYGZeroWidthFolding
         case missingTextRange
         case missingTextView
     }
@@ -97,7 +98,7 @@ enum EditorPerformanceProbe {
         textView.textSelection = selectedRange
         if developmentPresentation.enablesInlineFoldReveal {
             guard textView.setWYSIWYGZeroWidthFoldingEnabled(true) else {
-                throw ProbeError.missingTextView
+                throw ProbeError.failedToEnableWYSIWYGZeroWidthFolding
             }
         }
         scrollView.layoutSubtreeIfNeeded()
