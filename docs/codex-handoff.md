@@ -616,3 +616,16 @@ Verification before declaring any PR done:
 - Update docs/link-folding-gates.md checkboxes only with named-test evidence.
 - State in the PR body exactly which L-gates the PR closes and which remain open.
 ```
+
+
+---
+
+# Goal 13 — Image thumbnail sub-gate (2026-07-06)
+
+The link-folding sub-gate completed (PRs #65/#67/#68; inline links fold inside Experimental
+WYSIWYG). The next §E construct is **image thumbnails**, spec'd in
+`docs/image-thumbnail-gates.md` (I0-I10). Unlike links, it starts with a **mechanism spike
+(I0)** because the natural tool (`NSTextAttachment`) collides with the no-U+FFFC /
+canonical-source invariants; the spike must prove the projection-only attachment (option A)
+or fall back to the overlay adornment (option B) before any production PR. Same three-PR
+shape afterwards: model+presentation → native gates → owner IME run + enable.
