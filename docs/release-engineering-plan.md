@@ -5,10 +5,14 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-07-05): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-07-10): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
-published. Developer ID signing and notarization remain deferred with P1/P2. The app builds
-and runs locally with the sandbox and `com.apple.security.network.client` entitlements.
+published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
+draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`. Per-DMG
+clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
+closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
+app builds and runs locally with the sandbox and `com.apple.security.network.client`
+entitlements.
 
 ## P0 — Decisions before any pipeline work [owner]
 
@@ -87,7 +91,7 @@ required on the unsigned path, and public-repo macOS minutes are free.
   draft prerelease with the DMG + `.sha256` (filename-only format) and auto-generated
   notes; the owner reviews and publishes. The artifact family already passed the P5
   clean-machine test with alpha.1; spot-checking each published DMG on install remains
-  good practice.
+  good practice and is not a release blocker (R14/P5 closed; owner stance 2026-07-09).
 
 ## P5 — Alpha readiness checklist
 
@@ -105,5 +109,7 @@ required on the unsigned path, and public-repo macOS minutes are free.
 - [x] Known-limitations section in README (single-file sibling assets, MDX placeholders, image policy, WYSIWYG scope, no auto-update).
 
 **P5 is fully checked as of 2026-07-05 and R14 is closed: the unsigned alpha is cleared
-for public distribution** (tag + GitHub Release with the DMG and SHA-256). P1/P2 signing
-and the P4 release-CI option remain available when membership is purchased.
+for public distribution** (tag + GitHub Release with the DMG and SHA-256). The unsigned P4
+workflow and tagged CI path are verified. Spot-checking each published DMG on install remains
+good practice and is not a release blocker. P1/P2 signing and the signed CI path resume when
+Apple Developer Program membership is purchased.

@@ -1,6 +1,6 @@
 # Codex Handoff — Phase 2 WYSIWYG Gate
 
-Status snapshot: 2026-07-06.
+Status snapshot: 2026-07-10.
 
 This document turns the current roadmap into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -32,8 +32,8 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - The App now passes that development hook only through the off-by-default Experimental WYSIWYG mode;
   with the flag disabled, `⌘⇧P` remains source+preview/source-only only.
 - The user-facing WYSIWYG release checklist is now written: see `docs/wysiwyg-release-checklist.md`
-  (Goal 5, branch `phase2-wysiwyg-release-checklist`). It remains blocking — WYSIWYG stays behind the
-  development hook until every checkbox is green with linked evidence.
+  (Goal 5, branch `phase2-wysiwyg-release-checklist`). All implementation gates are green; only D.4
+  stable/default promotion remains open and requires dogfood evidence plus a Decision Log entry.
 - Goal 6 replaced the `baselineOffset(-1000)` zero-width fold mechanism with a TextKit 2
   content-storage paragraph projection behind the non-user-facing hook and reran B1-B13 green. R18 is
   closed by the new B13 layout-geometry gate.
@@ -45,9 +45,9 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
 - Goal 8 landed the **§D mode integration** on branch `phase2-wysiwyg-mode-integration`: the App has a
   three-state `EditorLayoutMode`, migration from `Plainsong.preview.isVisible`, an off-by-default
   Experimental `UserDefaults` kill switch, deterministic `.sourceOnly` recovery, and hook wiring that
-  passes `_developmentPresentation: .inlineFoldReveal` only when the flag is enabled, the mode is
-  WYSIWYG, and the mechanism has not failed. Link visual folding and deferred constructs remain out of
-  scope.
+  now passes `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when the flag is enabled,
+  the mode is WYSIWYG, and the mechanism has not failed. Goal 11 supplied the completed link-folding
+  extension; all other deferred constructs remain out of scope.
 - Goal 9 finishes the Experimental sign-off on branch `phase2-wysiwyg-experimental-signoff`: manual UI
   validation confirms the Settings label/default, disabled two-state cycle, enabled three-state cycle,
   View menu/toolbar labels, WYSIWYG inline fold/reveal, and disable-from-WYSIWYG fallback without source
@@ -509,13 +509,13 @@ Result:
 
 ---
 
-# Next goals — post-#51 follow-ups (2026-07-02)
+# Goals 10–12 status — updated 2026-07-10
 
 Status update: PR #50 (Experimental sign-off) and PR #51 (dogfood polish: visible fallback
 banner, Settings caption, toolbar tooltip) are merged. CI was offline 06-24 → 07-01 (June
 Actions quota exhaustion; runner allocation failed with no runner assigned) and was
 restored by the July billing reset plus PR #52 (SwiftFormat/SwiftLint drift + outage-window
-lint debt). CI now runs on `pull_request` and `workflow_dispatch` only (Decision Log
+lint debt). `build-and-test` now runs on `pull_request` and `workflow_dispatch` only (Decision Log
 2026-07-02).
 
 ## Goal 10 — WYSIWYG dogfood + D.4 stable-promotion evidence
@@ -534,30 +534,38 @@ the completed presentation only in Experimental WYSIWYG. The 2026-07-06 owner ru
 and Pinyin at the start/end of visible link text and immediately after the hidden destination.
 Reference-style links, autolinks, and images stay raw/deferred; checklist D.4 remains open.
 
-## Goal 12 — Release engineering (R14)
+## Goal 12 — Release engineering (R14) — completed 2026-07-05
 
-Plan: `docs/release-engineering-plan.md`. P0 owner decisions (license — no LICENSE file
-exists today — distribution, updates, crash/feedback, versioning) block P1-P5 pipeline work
-(Developer ID signing, hardened runtime, notarization, DMG packaging, optional tag-triggered
-release CI). R14 closes when the P5 alpha checklist passes on a clean macOS VM.
+Plan: `docs/release-engineering-plan.md`. P0 owner decisions, the MIT `LICENSE`, P3 packaging,
+and the P5 alpha-readiness checklist are complete; R14 closed on 2026-07-05. The unsigned P4
+release workflow has landed for `v*` tags and manual dispatch. The `v0.1.0-alpha.2` tag verified
+the CI path end to end on 2026-07-10, producing a draft prerelease with the build-67 unsigned DMG
+and checksum. Per-DMG clean-machine spot-checking remains good practice and is not a release
+blocker (artifact family already passed P5 with alpha.1). P1/P2 signing and notarization remain
+deferred until Apple Developer Program membership.
 
 
 ---
 
-# Status snapshot — 2026-07-06 (post-link-folding gate)
+# Status snapshot — 2026-07-10 (post-PR #68 merge)
 
 - **v0.1.0-alpha.1 is publicly released** (`Plainsong-0.1.0-56-unsigned.dmg` + SHA-256 on
   GitHub Releases). The repo is **public under MIT**; secret scanning + push protection,
   Dependabot (graph/alerts/security updates, grouped), and a `main` branch ruleset
   (PR-only, `build-and-test` required, no bypass) are enabled.
 - R14 closed (P5 fully checked); R15 broadened (all wall-clock perf budgets are
-  CI-informational, hard locally); P4 unsigned release CI landed
-  (`.github/workflows/release.yml`, tag/dispatch-only, draft prereleases).
+  CI-informational, hard locally); the P4 unsigned release workflow landed
+  (`.github/workflows/release.yml`, tag/dispatch-only, draft prereleases). The
+  `v0.1.0-alpha.2` tag completed the first end-to-end CI run on 2026-07-10 (draft
+  build-67 DMG + filename-only `.sha256`). Spot-checking published DMGs on install is
+  recommended practice, not a release blocker.
 - First Dependabot cycle handled: dompurify 3.4.9 → 3.4.11 (PR #63). **Pattern to keep:**
   Dependabot bumps touching `preview-src` must be superseded by a PR that also reruns
   `make preview-bundle`, because the preview ships as the committed dist bundle.
-- Goal 11 link visual folding is complete on PR #68 after the owner-run Zhuyin/Pinyin link gate.
-- Owner-driven next: WYSIWYG dogfood (Goal 10 / D.4 evidence), promotion, issue triage.
+- Goal 11 link visual folding merged via PR #68 on 2026-07-10 after the owner-run
+  Zhuyin/Pinyin link gate.
+- Owner-driven next: WYSIWYG dogfood and issue triage (Goal 10); stable/default promotion
+  remains gated on D.4 evidence plus a Decision Log entry.
 
 ## Goal 11 — completed implementation prompt (historical reference)
 
