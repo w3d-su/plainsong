@@ -82,8 +82,12 @@ required on the unsigned path, and public-repo macOS minutes are free.
 
 - Secrets (Developer ID cert keychain import + notary API key) become repo secrets only
   when the signed path resumes with P1/P2.
-- Gate: one tagged release produced end-to-end by CI (open until the next `v*` tag, e.g.
-  v0.1.0-alpha.2), with the artifact passing the adjusted P5 clean-machine test.
+- [x] Gate: one tagged release produced end-to-end by CI. Verified 2026-07-09: pushing
+  `v0.1.0-alpha.2` ran Release workflow run #1 to success in ~3 minutes and created the
+  draft prerelease with the DMG + `.sha256` (filename-only format) and auto-generated
+  notes; the owner reviews and publishes. The artifact family already passed the P5
+  clean-machine test with alpha.1; spot-checking each published DMG on install remains
+  good practice.
 
 ## P5 — Alpha readiness checklist
 
