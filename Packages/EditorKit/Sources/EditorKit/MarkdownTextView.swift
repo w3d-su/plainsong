@@ -72,6 +72,8 @@ struct MarkdownTextView: NSViewRepresentable {
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
+    private let documentIdentity: EditorDocumentIdentity?
+    private let navigationRequest: EditorNavigationRequest?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -89,6 +91,8 @@ struct MarkdownTextView: NSViewRepresentable {
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         focusRequestID: Int = 0,
+        documentIdentity: EditorDocumentIdentity? = nil,
+        navigationRequest: EditorNavigationRequest? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -105,6 +109,8 @@ struct MarkdownTextView: NSViewRepresentable {
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
+        self.documentIdentity = documentIdentity
+        self.navigationRequest = navigationRequest
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -148,16 +154,13 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
-        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
-        context.coordinator.attachCommandProxy(commandProxy, to: textView)
-        context.coordinator.updateCompletionWorkspace(completionWorkspace)
-        context.coordinator.updateImageAssetInserter(imageAssetInserter)
-        context.coordinator.updateImageAssetContextID(imageAssetContextID)
+        updateCoordinatorInputs(context.coordinator, for: textView)
         applyWYSIWYGMechanismState(to: textView)
         context.coordinator.attachFocusHandler(to: textView)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
         context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
+        context.coordinator.applyPendingNavigationIfPossible(in: textView)
 
         return scrollView
     }
@@ -168,12 +171,7 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
-        context.coordinator.updateBindings(text: $text, selection: $selection)
-        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
-        context.coordinator.attachCommandProxy(commandProxy, to: textView)
-        context.coordinator.updateCompletionWorkspace(completionWorkspace)
-        context.coordinator.updateImageAssetInserter(imageAssetInserter)
-        context.coordinator.updateImageAssetContextID(imageAssetContextID)
+        updateCoordinatorInputs(context.coordinator, for: textView)
         context.coordinator.attachFocusHandler(to: textView)
         context.coordinator.attachPasteAndDragHandlers(to: textView)
         context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
@@ -219,9 +217,23 @@ struct MarkdownTextView: NSViewRepresentable {
             textView.font = font
             textView.gutterView?.font = font
         }
+        context.coordinator.applyPendingNavigationIfPossible(in: textView)
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.
+    }
+
+    private func updateCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
+        coordinator.updateBindings(text: $text, selection: $selection)
+        coordinator.updateNavigationInputs(
+            documentIdentity: documentIdentity,
+            navigationRequest: navigationRequest
+        )
+        coordinator.attachScrollProxy(scrollProxy, to: textView)
+        coordinator.attachCommandProxy(commandProxy, to: textView)
+        coordinator.updateCompletionWorkspace(completionWorkspace)
+        coordinator.updateImageAssetInserter(imageAssetInserter)
+        coordinator.updateImageAssetContextID(imageAssetContextID)
     }
 
     private func applyWYSIWYGMechanismState(to textView: MarkdownSTTextView) {
@@ -241,6 +253,7 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.detachScrollProxy()
         coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()
+        coordinator.cancelPendingNavigationTasks()
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME

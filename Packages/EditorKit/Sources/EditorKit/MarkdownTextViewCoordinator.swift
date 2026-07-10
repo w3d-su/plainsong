@@ -10,6 +10,11 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    var currentDocumentIdentity: EditorDocumentIdentity?
+    var navigationState = EditorNavigationStateMachine()
+    var navigationRetryTask: Task<Void, Never>?
+    var navigationInputDeferralTask: Task<Void, Never>?
+    var isApplyingNavigation = false
     private(set) var lastHandledFocusRequestID: Int?
     private(set) var pendingFocusRequestID: Int?
     private weak var pendingFocusTextView: STTextView?
@@ -126,6 +131,7 @@ extension MarkdownTextViewCoordinator {
         textView.windowAttachmentHandler = { [weak self, weak textView] _ in
             guard let self, let textView else { return }
             focusPendingRequestIfPossible(in: textView)
+            applyPendingNavigationIfPossible(in: textView)
         }
     }
 
@@ -134,6 +140,7 @@ extension MarkdownTextViewCoordinator {
         if pendingFocusTextView === textView {
             cancelPendingFocusRequest()
         }
+        cancelPendingNavigationTasks()
     }
 
     func cancelPendingFocusRequest() {
@@ -281,6 +288,7 @@ extension MarkdownTextViewCoordinator {
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
         reportVisibleRangeIfNeeded(in: textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     func textView(
@@ -331,6 +339,7 @@ extension MarkdownTextViewCoordinator {
 
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     func textView(
@@ -385,6 +394,7 @@ extension MarkdownTextViewCoordinator {
         selection = textView.selectedRange()
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     @discardableResult

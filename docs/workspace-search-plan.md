@@ -321,6 +321,13 @@ may still arbitrate lifecycle elsewhere, but it is never proof of content equali
 Experimental WYSIWYG, programmatic selection must reveal the matching source region without
 mutating source text.
 
+**Implemented WS3A subset.** EditorKit now accepts an opaque document identity and a
+monotonic `EditorNavigationRequest`. A newer ID supersedes an older pending request; exact
+raw UTF-16 selection, scrolling, and focus occur only after the matching bound text is
+installed, IME composition has ended, and the editor is window-attached. Invalid ranges are
+rejected without clamping. App ownership, fingerprint arbitration, sidebar behavior, tree
+synchronization, shortcuts, and refresh lifecycle remain pending WS3 work.
+
 ## 5. Review-Sized Work Packages
 
 ### WS1 — MarkdownCore literal search
@@ -370,7 +377,7 @@ mutating source text.
 - [ ] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
 - [ ] Add keyboard and accessibility support.
-- [ ] Add document-aware, tokenized exact-range navigation in EditorKit.
+- [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [ ] Keep tree selection synchronized when a search result opens.
 - [ ] Validate source fingerprints before applying a result.
 - [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
