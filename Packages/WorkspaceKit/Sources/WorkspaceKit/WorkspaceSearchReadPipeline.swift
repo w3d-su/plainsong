@@ -65,7 +65,6 @@ extension WorkspaceSearchPipeline {
             ))
             : .content(
                 text: overlay.text,
-                sourceVersion: overlay.sourceVersion,
                 relativePath: candidate.relativePath
             )
         return WorkspaceSearchReadOutcome(planIndex: planIndex, payload: payload, diskReadByteCount: nil)
@@ -85,7 +84,6 @@ extension WorkspaceSearchPipeline {
         } else if let text = String(data: data, encoding: .utf8) {
             .content(
                 text: text,
-                sourceVersion: candidate.diskSourceVersion,
                 relativePath: candidate.relativePath
             )
         } else {

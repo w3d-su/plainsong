@@ -1,6 +1,7 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1 and WS2 are implemented and locally verified; WS3–WS4 remain pending.**
+> **Status: IN PROGRESS. WS1 and WS2 are complete and locally verified; WS3–WS4 remain
+> pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -48,8 +49,8 @@ regular-expression feature in the first release.
 - One-based line numbers in the UI and UTF-16 `NSRange` values for editor navigation.
 - LF and CRLF documents, CJK text, emoji, combining marks, and files without a trailing
   newline.
-- Search results from unsaved warm sessions. The App captures immutable text/version
-  overlays on the main actor before handing work to WorkspaceKit.
+- Search results from unsaved warm sessions. The App captures immutable text overlays on
+  the main actor before handing work to WorkspaceKit.
 - Hidden/ignored/generated path exclusion, root-containment enforcement, skipped-file
   reporting, and explicit result truncation.
 
@@ -80,9 +81,14 @@ Use named configuration values so tests can lower them without constructing huge
   as an empty-result state; raising it requires new adversarial Unicode timing evidence.
 - Maximum matches per file: 500.
 - Maximum matches per query: 10,000.
-- Bounded concurrent file reads: 4.
+- Ordered read window: 4. The configured value is clamped to at least one; the number of
+  in-flight reads plus completed read payloads buffered behind an earlier path never
+  exceeds the stored limit.
 - Ignore-rule reads are bounded to 128 files and 64 KiB per file (including one extra
   byte used to detect an over-limit file).
+- Maximum reported and retained skipped-file details: 100. The summary retains the exact
+  skipped total and reports how many details were omitted.
+- Maximum progress events: 100. The configured value is clamped to at least one.
 - Query debounce in the App: approximately 200 ms.
 
 Reaching a match-count limit is a successful but truncated search, not a fatal error. An
@@ -90,18 +96,27 @@ overlong query is a validation state; an oversized file is skipped. The sidebar 
 those states plus counts of unreadable or invalid UTF-8 files instead of presenting any of
 them as “no matches.”
 
+The service uses a lossless `.unbounded` `AsyncStream` buffer, but one request has finite
+production. Let `N` be its Markdown/MDX candidate count, `G` the effective nonnegative
+global match limit (`max(0, maximumMatchesPerQuery)`), `S` the skipped-detail cap, and `M`
+the maximum progress-event count. At most
+`min(N, G) + min(N, S) + min(max(N, 1), M) + 1` events are produced: one file-result event
+per matching file (and at least one match per such event), capped skipped details,
+coalesced progress, and one terminal event. More precisely, a successful request produces
+`R + min(K, S) + P + 1` events for `R` result files, `K` skipped files, and `P` progress
+events. Invalid requests produce one validation event. Cancellation is silent and may
+produce only a prefix of the valid-request bound.
+
 ## 3. Current Repository Constraints
 
-- `WorkspaceDirectoryScanner.snapshot(root:)` already scans off the main actor and
-  classifies workspace entries. The App currently discards its raw snapshot after
-  projecting `WorkspaceFileTree`; search needs the raw snapshot and a generation token.
-  Its detached enumeration is not currently cancellation-aware, so stale reload work
-  must either become cancellable or be rejected by generation before state application.
+- `WorkspaceDirectoryScanner.snapshot(root:)` scans off the main actor, classifies
+  workspace entries, and checks cancellation during enumeration. AppState retains the raw
+  snapshot plus a monotonic workspace generation; root and generation checks reject a
+  cancelled or stale scan before it can apply state.
 - The scanner skips hidden entries and package descendants but does not process
   `.gitignore`, `.ignore`, or common generated/vendor directories such as `node_modules`.
-- `CompletionWorkspaceProvider` already demonstrates snapshot filtering, security-scoped
-  root access, and symlink-resolving containment. Its containment logic should be extracted
-  rather than copied a third time.
+- `WorkspaceRootContainment` is the shared symlink-resolving containment boundary used by
+  completion, assets, and workspace search rather than duplicating path-prefix logic.
 - `DocumentSession` owns canonical in-memory text, while `AppState.sessionCache` retains up
   to eight warm sessions. WorkspaceKit must receive immutable overlays rather than reading
   main-actor sessions directly.
@@ -173,12 +188,29 @@ A request should contain only immutable, Sendable data:
 - immutable `WorkspaceFileSnapshot`;
 - root/workspace generation;
 - query and configurable limits;
-- dirty overlays keyed by normalized relative path, including a source version or stable
-  content fingerprint.
+- a validated `WorkspaceSearchOverlayCollection` containing canonical relative paths and
+  immutable unsaved text.
 
-The service should emit partial per-file results and a final summary. Result application
-is valid only when root identity, workspace generation, and query generation still match
-the active App state.
+The service emits partial per-file results and a final summary. Result application is valid
+only when root identity, workspace generation, and query generation still match the active
+App state.
+
+Every `WorkspaceSearchFileResult` carries a `WorkspaceSearchContentFingerprint` computed
+from the exact `String` passed to `TextSearchEngine`. Its digest is the 64-character
+lowercase hexadecimal SHA-256 of that string's UTF-8 bytes, accompanied by the exact UTF-8
+byte count. Disk text and dirty overlays use this identical algorithm. The public pure
+`WorkspaceSearchContentFingerprint(text:)` initializer lets WS3 fingerprint the activated
+`DocumentSession.text` before applying a range. Snapshot identity, modification date,
+Swift `hashValue`/`Hasher`, and caller session versions are not content identity; no session
+version is retained by the WS2 result model. If a disk file changes after the snapshot but
+before its read, its result fingerprints the newly read and searched content.
+
+Dirty overlays are validated before a request is built. `WorkspaceSearchOverlay` rejects
+empty, absolute, and traversing paths and stores a canonical workspace-relative path.
+`WorkspaceSearchOverlayCollection` rejects dictionary key/path mismatches and rejects every
+normalized collision instead of choosing a winner by input or dictionary iteration order;
+for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
+take precedence over disk content.
 
 Search reads must:
 
@@ -191,9 +223,27 @@ Search reads must:
 - check cancellation between enumeration, reads, and file-level matching;
 - sort published state deterministically even if reads complete out of order.
 
-Start with on-demand reads and instrumentation. Add a bounded actor-owned text cache only
-if measured interactive performance requires it; if added, key it by root identity,
-entry identity, modification date, and overlay version, with an explicit byte/LRU cap.
+Reads are published in path order through a bounded window whose invariant is
+`inFlightReadCount + bufferedCompletedReadCount <= maximumConcurrentReads`. Scheduling a
+replacement read waits until the ordered consumer removes a completed payload when the
+window is full. Completion instrumentation reports maximum concurrent, buffered, and total
+outstanding read counts. Once decoding returns, the ordered buffer retains only the
+`String` payload rather than a full `Data`/`String` pair, and releases that string after
+matching/publication; WS2 has no text cache.
+
+Expected file-level problems remain typed skipped-file events and do not fail a query. A
+successful valid request emits exactly one `.completed` terminal event. An unexpected
+producer fault emits exactly one
+`.failed(context, .unexpectedProducerFailure)` terminal event. Consumer cancellation emits
+neither terminal event. Security-scoped access and every structured child read are stopped
+or cancelled on all terminal paths.
+
+Skipped-file totals remain exact after detail capping. Only the first 100 path-ordered
+details under default limits are emitted and retained; `omittedSkippedFileCount` and
+`areSkippedFileDetailsTruncated` expose the remainder. Progress uses the deterministic
+stride `ceil(N / M)` for `N` candidates and a configured maximum `M >= 1`, is monotonic and
+deduplicated, and always includes the final producer progress value on successful
+completion. File-result and terminal events are never dropped.
 
 ### 4.3 Ignore policy
 
@@ -250,10 +300,12 @@ Opening a result is a two-stage action:
    document identity and UTF-16 range. EditorKit applies it only after that document's
    text is installed, sets the selection, scrolls it visible, and focuses the editor.
 
-The result carries a source version/fingerprint. If it no longer matches the activated
-session, the App refreshes the active query instead of jumping to a stale offset. In
-Experimental WYSIWYG, programmatic selection must reveal the matching source region
-without mutating source text.
+The result carries the exact searched-content fingerprint. If fingerprinting the activated
+session's current text does not produce the same digest and UTF-8 byte count, the App
+refreshes the active query instead of jumping to a stale offset. A document/session version
+may still arbitrate lifecycle elsewhere, but it is never proof of content equality. In
+Experimental WYSIWYG, programmatic selection must reveal the matching source region without
+mutating source text.
 
 ## 5. Review-Sized Work Packages
 
@@ -278,11 +330,21 @@ without mutating source text.
 - [x] Make workspace enumeration cancellation-aware and use generation checks to prevent
   stale enumeration from applying state.
 - [x] Overlay unsaved session text over disk content.
-- [x] Enforce read concurrency, byte caps, result caps, cancellation, and deterministic
-  aggregation.
+- [x] Enforce active read concurrency, byte caps, result caps, cancellation, and
+  deterministic aggregation.
 - [x] Report skipped and truncated results without failing the whole query.
 - [x] Test file deletion races, invalid UTF-8, injected read failures, symlink escapes,
   and rapid cancellation.
+- [x] Fingerprint the exact searched UTF-8 content with one stable typed algorithm for disk,
+  overlays, and activated sessions.
+- [x] Surface unexpected producer failure through a typed terminal state while keeping
+  cancellation silent and file-level skips nonfatal.
+- [x] Bound ordered-read buffering, instrument buffered/outstanding maxima, and preserve
+  path-ordered publication and cancellation cleanup.
+- [x] Bound skipped-detail and progress production while preserving exact totals, lossless
+  file results, final progress, and terminal state.
+- [x] Validate dirty overlays deterministically, rejecting invalid paths, key/path
+  mismatches, and normalized collisions before search.
 
 ### WS3 — Sidebar and exact navigation
 

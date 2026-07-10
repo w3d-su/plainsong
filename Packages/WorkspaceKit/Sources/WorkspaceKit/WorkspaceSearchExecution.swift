@@ -7,7 +7,10 @@ extension WorkspaceSearchPipeline {
         var state = WorkspaceSearchExecutionState()
 
         try await withThrowingTaskGroup(of: WorkspaceSearchReadOutcome.self) { group in
-            defer { group.cancelAll() }
+            defer {
+                group.cancelAll()
+                state.bufferedReads.removeAll(keepingCapacity: false)
+            }
             try scheduleReads(candidateLocations, group: &group, state: &state)
 
             for planIndex in plan.items.indices {
@@ -18,15 +21,17 @@ extension WorkspaceSearchPipeline {
                     group: &group,
                     state: &state
                 )
-                try emitProgress(for: plan, state: state)
+                try emitProgressIfNeeded(for: plan, state: &state)
                 if shouldStop {
                     group.cancelAll()
+                    state.bufferedReads.removeAll(keepingCapacity: false)
                     break
                 }
             }
         }
 
         try Task.checkCancellation()
+        try emitProgressIfNeeded(for: plan, state: &state, forceFinal: true)
         try yield(.completed(context, state.summary(for: plan)))
     }
 
@@ -76,12 +81,16 @@ extension WorkspaceSearchPipeline {
             try Task.checkCancellation()
             state.inFlightReads -= 1
             state.bufferedReads[outcome.planIndex] = outcome
+            state.receivedReadOutcomeCount += 1
+            state.recordReadWindowMaximums()
+            try failureInjector.checkpoint(.afterReadOutcome(state.receivedReadOutcomeCount))
             try scheduleReads(candidates, group: &group, state: &state)
         }
 
         guard let outcome = state.bufferedReads.removeValue(forKey: planIndex) else {
             throw CancellationError()
         }
+        try scheduleReads(candidates, group: &group, state: &state)
         return outcome
     }
 
@@ -91,7 +100,9 @@ extension WorkspaceSearchPipeline {
         state: inout WorkspaceSearchExecutionState
     ) throws {
         let concurrencyLimit = max(1, request.limits.maximumConcurrentReads)
-        while state.nextCandidateLocation < candidates.count, state.inFlightReads < concurrencyLimit {
+        while state.nextCandidateLocation < candidates.count,
+              state.outstandingReadCount < concurrencyLimit
+        {
             try Task.checkCancellation()
             let (planIndex, candidate) = candidates[state.nextCandidateLocation]
             group.addTask {
@@ -100,6 +111,7 @@ extension WorkspaceSearchPipeline {
             state.nextCandidateLocation += 1
             state.inFlightReads += 1
             state.maximumConcurrentReads = max(state.maximumConcurrentReads, state.inFlightReads)
+            state.recordReadWindowMaximums()
         }
     }
 
@@ -112,12 +124,11 @@ extension WorkspaceSearchPipeline {
             try recordSkippedFile(skippedFile, state: &state)
             return false
 
-        case let .content(text, sourceVersion, relativePath):
+        case let .content(text, relativePath):
             state.searchedFileCount += 1
             return try processTextMatches(
                 in: text,
                 relativePath: relativePath,
-                sourceVersion: sourceVersion,
                 state: &state
             )
         }
@@ -126,10 +137,10 @@ extension WorkspaceSearchPipeline {
     private func processTextMatches(
         in text: String,
         relativePath: String,
-        sourceVersion: String,
         state: inout WorkspaceSearchExecutionState
     ) throws -> Bool {
         try Task.checkCancellation()
+        let contentFingerprint = WorkspaceSearchContentFingerprint(text: text)
         let discoveredMatches = TextSearchEngine.matches(
             in: text,
             query: request.query,
@@ -153,7 +164,7 @@ extension WorkspaceSearchPipeline {
                 context,
                 WorkspaceSearchFileResult(
                     relativePath: relativePath,
-                    sourceVersion: sourceVersion,
+                    contentFingerprint: contentFingerprint,
                     matches: emittedMatches,
                     isTruncated: isPerFileTruncated || globalOverflow
                 )
@@ -168,21 +179,56 @@ extension WorkspaceSearchPipeline {
         _ skippedFile: WorkspaceSearchSkippedFile,
         state: inout WorkspaceSearchExecutionState
     ) throws {
+        state.skippedFileCount += 1
+        guard state.skippedFiles.count < request.limits.maximumReportedSkippedFiles else {
+            return
+        }
         state.skippedFiles.append(skippedFile)
         try yield(.skippedFile(context, skippedFile))
     }
 
-    private func emitProgress(
+    private func emitProgressIfNeeded(
         for plan: WorkspaceSearchCandidatePlan,
-        state: WorkspaceSearchExecutionState
+        state: inout WorkspaceSearchExecutionState,
+        forceFinal: Bool = false
     ) throws {
+        let completedFileCount = state.completedFileCount
+        guard state.lastProgressCompletedFileCount != completedFileCount else { return }
+
+        let maximumProgressEvents = request.limits.maximumProgressEvents
+        if forceFinal {
+            guard state.progressEventCount < maximumProgressEvents else { return }
+        } else {
+            let candidateFileCount = plan.candidateFileCount
+            guard candidateFileCount > 0 else { return }
+            let stride = progressStride(
+                candidateFileCount: candidateFileCount,
+                maximumProgressEvents: maximumProgressEvents
+            )
+            guard completedFileCount == candidateFileCount
+                || completedFileCount.isMultiple(of: stride)
+            else {
+                return
+            }
+        }
+
         try yield(.progress(
             context,
             WorkspaceSearchProgress(
-                completedFileCount: state.completedFileCount,
+                completedFileCount: completedFileCount,
                 candidateFileCount: plan.candidateFileCount
             )
         ))
+        state.progressEventCount += 1
+        state.lastProgressCompletedFileCount = completedFileCount
+    }
+
+    private func progressStride(
+        candidateFileCount: Int,
+        maximumProgressEvents: Int
+    ) -> Int {
+        let quotient = candidateFileCount / maximumProgressEvents
+        return quotient + (candidateFileCount.isMultiple(of: maximumProgressEvents) ? 0 : 1)
     }
 
     private func candidateLocations(in plan: WorkspaceSearchCandidatePlan) -> [(Int, WorkspaceSearchCandidate)] {
@@ -197,15 +243,30 @@ private struct WorkspaceSearchExecutionState {
     var nextCandidateLocation = 0
     var inFlightReads = 0
     var maximumConcurrentReads = 0
+    var maximumBufferedReadCount = 0
+    var maximumOutstandingReadCount = 0
     var bufferedReads: [Int: WorkspaceSearchReadOutcome] = [:]
+    var receivedReadOutcomeCount = 0
     var completedFileCount = 0
+    var progressEventCount = 0
+    var lastProgressCompletedFileCount: Int?
     var searchedFileCount = 0
     var totalEmittedMatchCount = 0
     var diskReadCount = 0
     var diskReadByteCount = 0
+    var skippedFileCount = 0
     var skippedFiles: [WorkspaceSearchSkippedFile] = []
     var truncatedFilePaths: [String] = []
     var isGloballyTruncated = false
+
+    var outstandingReadCount: Int {
+        inFlightReads + bufferedReads.count
+    }
+
+    mutating func recordReadWindowMaximums() {
+        maximumBufferedReadCount = max(maximumBufferedReadCount, bufferedReads.count)
+        maximumOutstandingReadCount = max(maximumOutstandingReadCount, outstandingReadCount)
+    }
 
     mutating func recordDiskRead(_ byteCount: Int?) {
         guard let byteCount else { return }
@@ -217,16 +278,19 @@ private struct WorkspaceSearchExecutionState {
         WorkspaceSearchSummary(
             candidateFileCount: plan.candidateFileCount,
             searchedFileCount: searchedFileCount,
-            skippedFileCount: skippedFiles.count,
+            skippedFileCount: skippedFileCount,
             ignoredFileCount: plan.ignoredFileCount,
             totalEmittedMatchCount: totalEmittedMatchCount,
             truncatedFilePaths: truncatedFilePaths,
             isGloballyTruncated: isGloballyTruncated,
             skippedFiles: skippedFiles,
+            omittedSkippedFileCount: skippedFileCount - skippedFiles.count,
             readInstrumentation: WorkspaceSearchReadInstrumentation(
                 diskReadCount: diskReadCount,
                 diskReadByteCount: diskReadByteCount,
-                maximumConcurrentReads: maximumConcurrentReads
+                maximumConcurrentReads: maximumConcurrentReads,
+                maximumBufferedReadCount: maximumBufferedReadCount,
+                maximumOutstandingReadCount: maximumOutstandingReadCount
             )
         )
     }
@@ -239,6 +303,6 @@ struct WorkspaceSearchReadOutcome {
 }
 
 enum WorkspaceSearchReadPayload {
-    case content(text: String, sourceVersion: String, relativePath: String)
+    case content(text: String, relativePath: String)
     case skipped(WorkspaceSearchSkippedFile)
 }

@@ -1,6 +1,24 @@
 import Foundation
 import MarkdownCore
 
+enum WorkspaceSearchPipelineFailurePoint: Equatable {
+    case afterPlanning
+    case afterReadOutcome(Int)
+}
+
+struct WorkspaceSearchPipelineFailureInjector {
+    static let disabled = WorkspaceSearchPipelineFailureInjector(failurePoint: nil)
+
+    let failurePoint: WorkspaceSearchPipelineFailurePoint?
+
+    func checkpoint(_ checkpoint: WorkspaceSearchPipelineFailurePoint) throws {
+        guard failurePoint == checkpoint else { return }
+        throw WorkspaceSearchInjectedProducerError()
+    }
+}
+
+private struct WorkspaceSearchInjectedProducerError: Error {}
+
 extension WorkspaceSearchPipeline {
     var context: WorkspaceSearchContext {
         WorkspaceSearchContext(

@@ -3,14 +3,14 @@ import MarkdownCore
 import XCTest
 
 final class WorkspaceSearchServiceTests: XCTestCase {
-    func testSearchesOnlyMarkdownSnapshotEntriesAndUsesDirtyOverlayVersion() async throws {
+    func testSearchesOnlyMarkdownSnapshotEntriesAndUsesDirtyOverlayFingerprint() async throws {
         let root = try makeTemporaryDirectory()
         let reader = ScriptedReader(responses: [
             root.appendingPathComponent("disk.md").path: .data("needle on disk"),
             root.appendingPathComponent("page.mdx").path: .data("needle in mdx"),
             root.appendingPathComponent("notes.markdown").path: .data("needle in markdown"),
         ])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [
                 entry("disk.md", kind: .markdown),
@@ -21,20 +21,22 @@ final class WorkspaceSearchServiceTests: XCTestCase {
                 entry("folder", kind: .directory),
             ],
             query: "needle",
-            overlays: [
-                "disk.md": WorkspaceSearchOverlay(
+            overlays: WorkspaceSearchOverlayCollection([
+                WorkspaceSearchOverlay(
                     relativePath: "disk.md",
-                    text: "needle from overlay",
-                    sourceVersion: "document-version-9"
+                    text: "needle from overlay"
                 ),
-            ]
+            ])
         )
 
         let events = await collectEvents(from: WorkspaceSearchService(reader: reader), request: request)
         let results = fileResults(in: events)
 
         XCTAssertEqual(results.map(\.relativePath), ["disk.md", "notes.markdown", "page.mdx"])
-        XCTAssertEqual(results.first?.sourceVersion, "document-version-9")
+        XCTAssertEqual(
+            results.first?.contentFingerprint,
+            WorkspaceSearchContentFingerprint(text: "needle from overlay")
+        )
         XCTAssertEqual(results.first?.matches.count, 1)
         XCTAssertEqual(completedSummary(in: events)?.candidateFileCount, 3)
         XCTAssertEqual(completedSummary(in: events)?.searchedFileCount, 3)
@@ -50,7 +52,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             root.appendingPathComponent("huge.md").path: .data("12345"),
             root.appendingPathComponent("unreadable.md").path: .failure(.unreadable),
         ])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [
                 entry("bad.md"),
@@ -60,13 +62,12 @@ final class WorkspaceSearchServiceTests: XCTestCase {
                 entry("unreadable.md"),
             ],
             query: "needle",
-            overlays: [
-                "overlay.md": WorkspaceSearchOverlay(
+            overlays: WorkspaceSearchOverlayCollection([
+                WorkspaceSearchOverlay(
                     relativePath: "overlay.md",
-                    text: "12345",
-                    sourceVersion: "dirty"
+                    text: "12345"
                 ),
-            ],
+            ]),
             limits: WorkspaceSearchLimits(maximumFileSizeBytes: 4)
         )
 
@@ -85,6 +86,10 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         XCTAssertEqual(summary.skippedFileCount, 5)
         XCTAssertEqual(summary.searchedFileCount, 0)
         XCTAssertEqual(summary.readInstrumentation.diskReadCount, 4)
+        XCTAssertFalse(events.contains { event in
+            if case .failed = event { return true }
+            return false
+        })
     }
 
     func testPerFileAndGlobalLimitsReportExactTruncation() async throws {
@@ -188,7 +193,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         root: URL,
         entries: [WorkspaceFileSnapshot.Entry],
         query: String,
-        overlays: [String: WorkspaceSearchOverlay] = [:],
+        overlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
     ) -> WorkspaceSearchRequest {
         WorkspaceSearchRequest(
@@ -260,6 +265,25 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+}
+
+extension WorkspaceSearchServiceTests {
+    func testEventProductionLimitsHaveFiniteSafeDefaultsAndClampUnsafeInputs() {
+        let defaults = WorkspaceSearchLimits()
+        let clamped = WorkspaceSearchLimits(
+            maximumConcurrentReads: 0,
+            maximumReportedSkippedFiles: -1,
+            maximumProgressEvents: 0
+        )
+
+        XCTAssertGreaterThan(defaults.maximumReportedSkippedFiles, 0)
+        XCTAssertLessThan(defaults.maximumReportedSkippedFiles, Int.max)
+        XCTAssertGreaterThan(defaults.maximumProgressEvents, 0)
+        XCTAssertLessThan(defaults.maximumProgressEvents, Int.max)
+        XCTAssertEqual(clamped.maximumReportedSkippedFiles, 0)
+        XCTAssertEqual(clamped.maximumProgressEvents, 1)
+        XCTAssertEqual(clamped.maximumConcurrentReads, 1)
     }
 }
 
