@@ -332,7 +332,13 @@ private extension EditingBehaviorsSupportTests {
             result.maxLatencyMilliseconds
         ))
         XCTAssertEqual(result.nativeInputMismatches, 0, file: file, line: line)
-        XCTAssertLessThan(result.maxLatencyMilliseconds, 16, file: file, line: line)
+        assertPerformanceBudget(
+            result.maxLatencyMilliseconds,
+            lessThanOrEqualTo: 16,
+            metric: "large-1mb.md '\(replacementString == "\n" ? "\\n" : replacementString)' typing hot path",
+            file: file,
+            line: line
+        )
     }
 
     static func text(in textView: STTextView) -> String {

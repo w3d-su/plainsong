@@ -113,7 +113,11 @@ final class MarkdownEditorViewTests: XCTestCase {
             result.elapsedMilliseconds
         ))
         XCTAssertTrue(result.didApplyHighlight)
-        XCTAssertLessThan(result.elapsedMilliseconds, 50)
+        assertPerformanceBudget(
+            result.elapsedMilliseconds,
+            lessThanOrEqualTo: 50,
+            metric: "WYSIWYG visible-range fold highlight/apply"
+        )
         XCTAssertEqual(result.selectionAfterApply.location, editLocation + 1)
     }
 
