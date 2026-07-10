@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 @preconcurrency import WebKit
 
 enum AssetURLPolicyError: Error, Equatable {
@@ -13,17 +14,7 @@ struct AssetURLPolicyResult: Equatable {
 }
 
 enum AssetURLPolicy {
-    /// Local preview images should stay lightweight; 10 MiB admits typical screenshots
-    /// and blog photos while bounding per-asset WebKit reads.
-    static let maxAssetBytes: Int64 = 10 * 1024 * 1024
-
-    private static let mimeTypesByExtension = [
-        "gif": "image/gif",
-        "jpeg": "image/jpeg",
-        "jpg": "image/jpeg",
-        "png": "image/png",
-        "webp": "image/webp",
-    ]
+    static let maxAssetBytes = MarkdownImageAssetPolicy.maximumFileSizeBytes
 
     static func loadAsset(at fileURL: URL) throws -> AssetURLPolicyResult {
         let mimeType = try mimeType(for: fileURL)
@@ -37,7 +28,7 @@ enum AssetURLPolicy {
 
     static func mimeType(for fileURL: URL) throws -> String {
         let pathExtension = fileURL.pathExtension.lowercased()
-        guard let mimeType = mimeTypesByExtension[pathExtension] else {
+        guard let mimeType = MarkdownImageAssetPolicy.mimeType(forPathExtension: pathExtension) else {
             throw AssetURLPolicyError.unsupportedType(pathExtension)
         }
 

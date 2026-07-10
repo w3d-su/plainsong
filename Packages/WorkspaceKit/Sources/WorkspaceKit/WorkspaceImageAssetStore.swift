@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 import UniformTypeIdentifiers
 
 public enum WorkspaceImageAssetSource: Equatable, Sendable {
@@ -38,7 +39,7 @@ public enum WorkspaceImageAssetStoreError: LocalizedError, Equatable {
 }
 
 public struct WorkspaceImageAssetStore: Sendable {
-    public static let defaultMaximumImportedImageSizeBytes: Int64 = 10 * 1024 * 1024
+    public static let defaultMaximumImportedImageSizeBytes = MarkdownImageAssetPolicy.maximumFileSizeBytes
 
     public let assetFolderRelativePath: String
     public let maximumImportedImageSizeBytes: Int64
@@ -249,7 +250,9 @@ private extension WorkspaceImageAssetStore {
     }
 
     static var allowedImportedImageTypes: [UTType] {
-        [.png, .jpeg, .gif, .webP]
+        MarkdownImageAssetPolicy.allowedPathExtensions.compactMap { pathExtension in
+            UTType(filenameExtension: pathExtension)
+        }
     }
 
     func copiedAssetRelativePath(from directoryURL: URL, to destinationURL: URL, rootURL: URL) throws -> String {

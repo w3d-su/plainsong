@@ -1,11 +1,13 @@
 import Foundation
+import MarkdownCore
 import SwiftTreeSitter
 
 extension MarkdownSyntaxParser {
     func appendInlineCandidates(
         from inlineNode: Node,
         baseLocation: Int,
-        to candidates: inout [WYSIWYGFoldCandidate]
+        to candidates: inout [WYSIWYGFoldCandidate],
+        imageRegions: inout [MarkdownInlineImageRegion]
     ) {
         guard
             let inlineSource = inlineNode.text,
@@ -20,7 +22,8 @@ extension MarkdownSyntaxParser {
             from: root,
             inlineSource: inlineSource,
             baseLocation: baseLocation + nsRange(for: inlineNode).location,
-            to: &candidates
+            to: &candidates,
+            imageRegions: &imageRegions
         )
     }
 
@@ -28,17 +31,31 @@ extension MarkdownSyntaxParser {
         from node: Node,
         inlineSource: String,
         baseLocation: Int,
-        to candidates: inout [WYSIWYGFoldCandidate]
+        to candidates: inout [WYSIWYGFoldCandidate],
+        imageRegions: inout [MarkdownInlineImageRegion]
     ) {
         if let candidate = inlineCandidate(from: node, inlineSource: inlineSource, baseLocation: baseLocation) {
             candidates.append(candidate)
+        }
+        if let imageRegion = inlineImageRegion(
+            from: node,
+            inlineSource: inlineSource,
+            baseLocation: baseLocation
+        ) {
+            imageRegions.append(imageRegion)
         }
 
         for index in 0 ..< node.childCount {
             guard let child = node.child(at: index) else {
                 continue
             }
-            appendInlineCandidates(from: child, inlineSource: inlineSource, baseLocation: baseLocation, to: &candidates)
+            appendInlineCandidates(
+                from: child,
+                inlineSource: inlineSource,
+                baseLocation: baseLocation,
+                to: &candidates,
+                imageRegions: &imageRegions
+            )
         }
     }
 
@@ -163,6 +180,35 @@ extension MarkdownSyntaxParser {
             revealRange: sourceRange,
             foldRanges: foldRanges
         )
+    }
+
+    func inlineImageRegion(
+        from node: Node,
+        inlineSource: String,
+        baseLocation: Int
+    ) -> MarkdownInlineImageRegion? {
+        guard
+            node.nodeType == "image",
+            firstChild(named: "link_label", in: node) == nil,
+            let sourcePathNode = firstChild(named: "link_destination", in: node)
+        else {
+            return nil
+        }
+
+        let sourceRange = nsRange(for: node)
+        let openingEnd = sourceRange.location + 2
+        let altTextRange = firstChild(named: "image_description", in: node)
+            .map { nsRange(for: $0) }
+            ?? NSRange(location: openingEnd, length: 0)
+        let titleRange = firstChild(named: "link_title", in: node).map { nsRange(for: $0) }
+
+        return MarkdownInlineImageRegion(
+            in: inlineSource,
+            sourceRange: sourceRange,
+            altTextRange: altTextRange,
+            sourcePathRange: nsRange(for: sourcePathNode),
+            titleRange: titleRange
+        )?.offset(by: baseLocation)
     }
 
     func linkContentRange(from linkTextRange: NSRange, inlineSource: String) -> NSRange {

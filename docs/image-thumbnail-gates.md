@@ -64,9 +64,22 @@ never touched:
   alternatives before any production PR.
 
 ### I1 — Model correctness
-- [ ] Image regions parse with exact source/reveal ranges; eligibility (local, in-workspace,
+- [x] Image regions parse with exact source/reveal ranges; eligibility (local, in-workspace,
   allowlisted raster, ≤ 10 MiB) decided per image; ineligible images provably stay raw.
-  Reference-style images and `![alt](url "title")` titles keep exact ranges or stay raw.
+  Reference-style images stay raw; double-quoted `![alt](url "title")` titles keep exact
+  ranges (including surrounding quotes). Evidence (2026-07-10):
+  - MarkdownCore: `MarkdownImageRegionsTests`
+    (`testInlineImageRegionsRoundTripExactUTF16Ranges`,
+    `testInlineImageRegionRejectsReferenceAutolinkEmptySourceAndMalformedForms`,
+    `testThumbnailEligibilityAllowsSharedRasterExtensions`,
+    `testThumbnailEligibilityRejectsIneligibleSources`,
+    `testThumbnailEligibilityIsDeterministicForIdenticalInputs`)
+  - EditorKit shared visible-range parser (no extra pass): `WYSIWYGImageRegionModelTests`
+    (`testI1SharedVisibleParserProducesExactImageRegionsWithoutPresentation`,
+    `testI1ReferenceAutolinkEmptySourceAndMalformedFormsDoNotEmitImageRegions`,
+    `testI1ImageRegionsDoNotReceiveFoldPresentationAttributes`)
+  - Policy constants centralized on `MarkdownImageAssetPolicy` and consumed by PreviewKit
+    `AssetURLPolicy` + WorkspaceKit `WorkspaceImageAssetStore` (no App/UI/load path yet).
 
 ### I2 — Render policy
 - [ ] Thumbnail is bounded (fit editor width, capped height, ~300 pt class), decoded
