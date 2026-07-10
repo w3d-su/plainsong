@@ -94,7 +94,12 @@ Use named configuration values so tests can lower them without constructing huge
 Reaching a match-count limit is a successful but truncated search, not a fatal error. An
 overlong query is a validation state; an oversized file is skipped. The sidebar must show
 those states plus counts of unreadable or invalid UTF-8 files instead of presenting any of
-them as “no matches.”
+them as “no matches.” Once a readable file proves the global match limit was exceeded, the
+producer enters an explicit accounting-only state: it emits no more file results and makes
+no more MarkdownCore matching calls, but it continues the same bounded, path-ordered read
+window through every remaining plan item. Readable, ignored, disappeared, unreadable,
+invalid-UTF8, and oversized files therefore still contribute to exact terminal counts and
+instrumentation, and successful progress still finishes at `N / N`.
 
 The service uses a lossless `.unbounded` `AsyncStream` buffer, but one request has finite
 production. Let `N` be its Markdown/MDX candidate count, `G` the effective nonnegative
@@ -139,6 +144,11 @@ produce only a prefix of the valid-request bound.
 | WorkspaceKit | Candidate selection, ignore policy, containment, reads, cancellation, streaming, limits, deterministic aggregation | `WorkspaceSearchRequest`, `WorkspaceSearchEvent`, `WorkspaceSearchSummary`, `WorkspaceSearchService` |
 | App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
 | EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationRequest` or an equivalent editor-owned proxy |
+
+The future WS3 App lifecycle must retain the `Task` that consumes each event stream and
+explicitly cancel that Task before replacing a query, closing or switching a workspace, or
+discarding search state. Merely breaking out of or abandoning `for await` iteration is not a
+supported producer-cancellation mechanism for the existing `AsyncStream` API.
 
 The dependency direction remains:
 
@@ -236,7 +246,11 @@ successful valid request emits exactly one `.completed` terminal event. An unexp
 producer fault emits exactly one
 `.failed(context, .unexpectedProducerFailure)` terminal event. Consumer cancellation emits
 neither terminal event. Security-scoped access and every structured child read are stopped
-or cancelled on all terminal paths.
+or cancelled on all terminal paths. A `CancellationError` is silent only when the producer
+Task is actually cancelled; the same error thrown independently by a reader is an unexpected
+producer failure. Early termination requires explicitly cancelling the Task consuming the
+stream. The contract does not claim that `break` invokes `onTermination` or cancels the
+producer.
 
 Skipped-file totals remain exact after detail capping. Only the first 100 path-ordered
 details under default limits are emitted and retained; `omittedSkippedFileCount` and
@@ -348,6 +362,9 @@ mutating source text.
 
 ### WS3 — Sidebar and exact navigation
 
+- [ ] Own the stream-consuming App Task and explicitly cancel it on query replacement,
+  workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
+  producer.
 - [ ] Add Files/Search sidebar modes without changing the stable `HStack` shell.
 - [ ] Add `Command-Shift-F` and search-field focus arbitration.
 - [ ] Render grouped partial results with loading, empty, skipped, error, and truncated
@@ -375,7 +392,7 @@ mutating source text.
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; cancellation; per-file/global caps; stable sorting |
+| WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting |
 | EditorKitTests | Same-file and cross-file navigation; repeated request IDs; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
 | PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; result opens correct node/session; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |

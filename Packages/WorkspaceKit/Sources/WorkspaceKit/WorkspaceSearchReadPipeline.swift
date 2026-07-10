@@ -30,8 +30,8 @@ extension WorkspaceSearchPipeline {
             )
             try Task.checkCancellation()
             return diskOutcome(candidate, data: data, limit: fileSizeLimit, planIndex: planIndex)
-        } catch is CancellationError {
-            throw CancellationError()
+        } catch let error as CancellationError {
+            throw error
         } catch {
             return failedReadOutcome(candidate, error: error, planIndex: planIndex)
         }

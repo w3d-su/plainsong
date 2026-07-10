@@ -36,8 +36,8 @@ struct WorkspaceSearchIgnorePolicy {
                 let data: Data
                 do {
                     data = try await reader.readFile(at: url, maximumByteCount: readLimit)
-                } catch is CancellationError {
-                    throw CancellationError()
+                } catch let error as CancellationError {
+                    throw error
                 } catch {
                     continue
                 }

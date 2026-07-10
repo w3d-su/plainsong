@@ -14,7 +14,7 @@ extension WorkspaceSearchPipeline {
             try scheduleReads(candidateLocations, group: &group, state: &state)
 
             for planIndex in plan.items.indices {
-                let shouldStop = try await processPlanItem(
+                try await processPlanItem(
                     plan.items[planIndex],
                     at: planIndex,
                     candidates: candidateLocations,
@@ -22,11 +22,6 @@ extension WorkspaceSearchPipeline {
                     state: &state
                 )
                 try emitProgressIfNeeded(for: plan, state: &state)
-                if shouldStop {
-                    group.cancelAll()
-                    state.bufferedReads.removeAll(keepingCapacity: false)
-                    break
-                }
             }
         }
 
@@ -41,18 +36,16 @@ extension WorkspaceSearchPipeline {
         candidates: [(Int, WorkspaceSearchCandidate)],
         group: inout ThrowingTaskGroup<WorkspaceSearchReadOutcome, any Error>,
         state: inout WorkspaceSearchExecutionState
-    ) async throws -> Bool {
+    ) async throws {
         try Task.checkCancellation()
 
         switch item {
         case .ignored:
             state.completedFileCount += 1
-            return false
 
         case let .skipped(_, skippedFile):
             try recordSkippedFile(skippedFile, state: &state)
             state.completedFileCount += 1
-            return false
 
         case .candidate:
             let outcome = try await nextReadOutcome(
@@ -62,9 +55,8 @@ extension WorkspaceSearchPipeline {
                 state: &state
             )
             state.recordDiskRead(outcome.diskReadByteCount)
-            let shouldStop = try processReadPayload(outcome.payload, state: &state)
+            try processReadPayload(outcome.payload, state: &state)
             state.completedFileCount += 1
-            return shouldStop
         }
     }
 
@@ -76,7 +68,7 @@ extension WorkspaceSearchPipeline {
     ) async throws -> WorkspaceSearchReadOutcome {
         while state.bufferedReads[planIndex] == nil {
             guard let outcome = try await group.next() else {
-                throw CancellationError()
+                try throwPipelineInvariantViolation()
             }
             try Task.checkCancellation()
             state.inFlightReads -= 1
@@ -88,7 +80,7 @@ extension WorkspaceSearchPipeline {
         }
 
         guard let outcome = state.bufferedReads.removeValue(forKey: planIndex) else {
-            throw CancellationError()
+            try throwPipelineInvariantViolation()
         }
         try scheduleReads(candidates, group: &group, state: &state)
         return outcome
@@ -118,15 +110,15 @@ extension WorkspaceSearchPipeline {
     private func processReadPayload(
         _ payload: WorkspaceSearchReadPayload,
         state: inout WorkspaceSearchExecutionState
-    ) throws -> Bool {
+    ) throws {
         switch payload {
         case let .skipped(skippedFile):
             try recordSkippedFile(skippedFile, state: &state)
-            return false
 
         case let .content(text, relativePath):
             state.searchedFileCount += 1
-            return try processTextMatches(
+            guard state.mode == .matching else { return }
+            try processTextMatches(
                 in: text,
                 relativePath: relativePath,
                 state: &state
@@ -138,9 +130,10 @@ extension WorkspaceSearchPipeline {
         in text: String,
         relativePath: String,
         state: inout WorkspaceSearchExecutionState
-    ) throws -> Bool {
+    ) throws {
         try Task.checkCancellation()
         let contentFingerprint = WorkspaceSearchContentFingerprint(text: text)
+        try failureInjector.checkpoint(.beforeMatching(relativePath))
         let discoveredMatches = TextSearchEngine.matches(
             in: text,
             query: request.query,
@@ -171,8 +164,10 @@ extension WorkspaceSearchPipeline {
             ))
             state.totalEmittedMatchCount += emittedMatches.count
         }
-        state.isGloballyTruncated = globalOverflow
-        return globalOverflow
+        if globalOverflow {
+            state.isGloballyTruncated = true
+            state.mode = .accountingOnly
+        }
     }
 
     private func recordSkippedFile(
@@ -240,6 +235,7 @@ extension WorkspaceSearchPipeline {
 }
 
 private struct WorkspaceSearchExecutionState {
+    var mode = WorkspaceSearchExecutionMode.matching
     var nextCandidateLocation = 0
     var inFlightReads = 0
     var maximumConcurrentReads = 0
@@ -294,6 +290,11 @@ private struct WorkspaceSearchExecutionState {
             )
         )
     }
+}
+
+private enum WorkspaceSearchExecutionMode {
+    case matching
+    case accountingOnly
 }
 
 struct WorkspaceSearchReadOutcome {

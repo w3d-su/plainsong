@@ -4,6 +4,7 @@ import MarkdownCore
 enum WorkspaceSearchPipelineFailurePoint: Equatable {
     case afterPlanning
     case afterReadOutcome(Int)
+    case beforeMatching(String)
 }
 
 struct WorkspaceSearchPipelineFailureInjector {
@@ -18,6 +19,7 @@ struct WorkspaceSearchPipelineFailureInjector {
 }
 
 private struct WorkspaceSearchInjectedProducerError: Error {}
+private struct WorkspaceSearchPipelineInvariantError: Error {}
 
 extension WorkspaceSearchPipeline {
     var context: WorkspaceSearchContext {
@@ -59,8 +61,12 @@ extension WorkspaceSearchPipeline {
     func yield(_ event: WorkspaceSearchEvent) throws {
         try Task.checkCancellation()
         if case .terminated = continuation.yield(event) {
-            throw CancellationError()
+            try throwPipelineInvariantViolation()
         }
         try Task.checkCancellation()
+    }
+
+    func throwPipelineInvariantViolation() throws -> Never {
+        throw WorkspaceSearchPipelineInvariantError()
     }
 }
