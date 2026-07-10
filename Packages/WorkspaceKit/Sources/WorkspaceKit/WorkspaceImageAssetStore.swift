@@ -268,9 +268,7 @@ private extension WorkspaceImageAssetStore {
     }
 
     static func isContained(_ url: URL, in rootURL: URL) -> Bool {
-        let candidatePath = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        let rootPath = normalizedDirectoryPath(rootURL)
-        return candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/")
+        WorkspaceRootContainment.isContained(url, in: rootURL)
     }
 
     static func relativePath(from directoryURL: URL, to fileURL: URL) -> String {
@@ -293,13 +291,5 @@ private extension WorkspaceImageAssetStore {
         path
             .split(separator: "/", omittingEmptySubsequences: false)
             .contains("..")
-    }
-
-    static func normalizedDirectoryPath(_ url: URL) -> String {
-        var path = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        while path.count > 1, path.hasSuffix("/") {
-            path.removeLast()
-        }
-        return path
     }
 }

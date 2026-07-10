@@ -112,36 +112,19 @@ private extension CompletionWorkspaceProvider {
     }
 
     func relativePath(for fileURL: URL, rootURL: URL) throws -> String {
-        let rootPath = normalizedDirectoryPath(rootURL)
-        let filePath = fileURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-
-        guard filePath.hasPrefix("\(rootPath)/") else {
+        do {
+            return try WorkspaceRootContainment.relativePath(for: fileURL, rootURL: rootURL)
+        } catch {
             throw CompletionWorkspaceProviderError.currentFileOutsideWorkspace
         }
-
-        return String(filePath.dropFirst(rootPath.count + 1))
     }
 
     func containedURL(rootURL: URL, relativePath: String) throws -> URL {
-        guard !relativePath.split(separator: "/").contains("..") else {
+        do {
+            return try WorkspaceRootContainment.containedURL(rootURL: rootURL, relativePath: relativePath)
+        } catch {
             throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
         }
-
-        let url = rootURL.appendingPathComponent(relativePath, isDirectory: false)
-        let rootPath = normalizedDirectoryPath(rootURL)
-        let path = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        guard path.hasPrefix("\(rootPath)/") else {
-            throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
-        }
-        return url
-    }
-
-    func normalizedDirectoryPath(_ url: URL) -> String {
-        var path = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
-        while path.count > 1, path.hasSuffix("/") {
-            path.removeLast()
-        }
-        return path
     }
 
     func headingAnchors(in text: String) -> [String] {
