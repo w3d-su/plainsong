@@ -86,6 +86,11 @@ never touched:
   **downsampled** (`CGImageSource` thumbnailing, never full-size bitmaps for huge photos);
   a deterministic placeholder shows while loading or on failure (missing/corrupt file
   never blanks or shifts unrelated lines); file change on disk refreshes the thumbnail.
+  **Partial loader evidence (2026-07-10, no presentation yet):** decode/downsample + mtime
+  cache key in `WorkspaceImageThumbnailProviderTests`
+  (`testDownsampledDimensionsAreBounded`, `testDocumentRelativePathAndGIFFirstFrame`,
+  `testJPEGAndWebPDecode`, `testCacheHitMissMtimeInvalidationAndByteBudgetEviction`).
+  Placeholder chrome and live editor refresh remain a later presentation PR.
 
 ### I3 — Caret & selection
 - [ ] Reveal-on-touch; caret snapping at both edges of the image span (the C.2 policy over
@@ -119,9 +124,17 @@ never touched:
   fold state recomputes after undo without stale attachments/adornments.
 
 ### I10 — Security & sandbox
-- [ ] Pixel loading goes through WorkspaceKit's security-scoped access and the shared
+- [x] Pixel loading goes through WorkspaceKit's security-scoped access and the shared
   raster allowlist/size/containment policy (one policy, no editor-side fork); no network
-  I/O from the editor path, asserted by test.
+  I/O from the editor path, asserted by test. Evidence (2026-07-10):
+  - `WorkspaceImageThumbnailProviderTests.testRemoteDataAndFileSourcesStayRawWithoutIO`
+  - `testParentTraversalAndSymlinkEscapeStayRaw`
+  - `testAllowlistAndOversizeRejectedBeforeRead`
+  - `testSingleFileModeHasNoDirectoryScope`
+  - `testContainedURLRejectsTraversalAndAcceptsNestedPaths`
+  Shared containment lives in `WorkspaceRootContainment` (also used by
+  `CompletionWorkspaceProvider` / `WorkspaceImageAssetStore`); eligibility is
+  `MarkdownImageThumbnailPolicy` + `MarkdownImageAssetPolicy`.
 
 ## 5. Exit criteria
 
