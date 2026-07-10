@@ -43,7 +43,7 @@ final class WYSIWYGLinkPerformanceGateTests: XCTestCase {
         assertPerformanceBudget(
             maximum,
             lessThanOrEqualTo: 50,
-            metric: "link folding visible-range highlight/apply"
+            metric: "L8 link folding visible-range highlight/apply"
         )
     }
 
@@ -64,38 +64,9 @@ final class WYSIWYGLinkPerformanceGateTests: XCTestCase {
         )
     }
 
-    private func assertPerformanceBudget(
-        _ value: Double,
-        lessThanOrEqualTo budget: Double,
-        metric: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        guard value > budget else {
-            return
-        }
-
-        let message = String(
-            format: "L8 PERF %@ %.3f ms exceeded %.3f ms budget",
-            metric,
-            value,
-            budget
-        )
-        if Self.isContinuousIntegration {
-            print("\(message) on CI; recorded as informational per risk R15")
-            return
-        }
-
-        XCTFail(message, file: file, line: line)
-    }
 }
 
 private extension WYSIWYGLinkPerformanceGateTests {
-    static var isContinuousIntegration: Bool {
-        let environment = ProcessInfo.processInfo.environment
-        return environment["CI"] != nil || environment["GITHUB_ACTIONS"] != nil
-    }
-
     static var repoRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
