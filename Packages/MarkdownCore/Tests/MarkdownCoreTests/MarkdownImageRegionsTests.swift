@@ -156,116 +156,113 @@ final class MarkdownImageRegionsTests: XCTestCase {
         }
     }
 
-    func testThumbnailEligibilityCoversTheSharedRasterPolicy() {
+    func testThumbnailEligibilityAllowsSharedRasterExtensions() {
         let maximum = MarkdownImageAssetPolicy.maximumFileSizeBytes
-        let cases: [(name: String, source: MarkdownImageWorkspaceSource, expected: MarkdownImageThumbnailEligibility)] =
-            [
-                (
-                    "allowlisted extension is lowercased",
-                    workspaceSource(source: "assets/photo.PNG", path: "assets/photo.PNG", bytes: maximum),
-                    .thumbnailEligible
-                ),
-                (
-                    "jpeg is allowlisted",
-                    workspaceSource(source: "assets/photo.jpeg", path: "assets/photo.jpeg", bytes: 1),
-                    .thumbnailEligible
-                ),
-                (
-                    "jpg is allowlisted",
-                    workspaceSource(source: "assets/photo.jpg", path: "assets/photo.jpg", bytes: 1),
-                    .thumbnailEligible
-                ),
-                (
-                    "gif is allowlisted",
-                    workspaceSource(source: "assets/photo.gif", path: "assets/photo.gif", bytes: 1),
-                    .thumbnailEligible
-                ),
-                (
-                    "webp is allowlisted",
-                    workspaceSource(source: "assets/photo.webp", path: "assets/photo.webp", bytes: 1),
-                    .thumbnailEligible
-                ),
-                (
-                    "HTTP stays raw",
-                    workspaceSource(source: "http://example.com/photo.png", path: nil, bytes: nil),
-                    .stayRaw(.remoteHTTPSource(scheme: "http"))
-                ),
-                (
-                    "HTTPS stays raw",
-                    workspaceSource(source: "https://example.com/photo.png", path: nil, bytes: nil),
-                    .stayRaw(.remoteHTTPSource(scheme: "https"))
-                ),
-                (
-                    "data stays raw",
-                    workspaceSource(source: "data:image/png;base64,AAAA", path: nil, bytes: nil),
-                    .stayRaw(.dataSource)
-                ),
-                (
-                    "file URL stays raw",
-                    workspaceSource(source: "file:///tmp/photo.png", path: nil, bytes: nil),
-                    .stayRaw(.fileSource)
-                ),
-                (
-                    "other source scheme stays raw",
-                    workspaceSource(source: "ftp://example.com/photo.png", path: nil, bytes: nil),
-                    .stayRaw(.unsupportedSourceScheme("ftp"))
-                ),
-                (
-                    "SVG stays raw",
-                    workspaceSource(source: "assets/vector.svg", path: "assets/vector.svg", bytes: 1),
-                    .stayRaw(.unsupportedPathExtension("svg"))
-                ),
-                (
-                    "oversized stays raw",
-                    workspaceSource(source: "assets/large.webp", path: "assets/large.webp", bytes: maximum + 1),
-                    .stayRaw(.fileTooLarge(actualBytes: maximum + 1, maximumBytes: maximum))
-                ),
-                (
-                    "outside workspace stays raw",
-                    MarkdownImageWorkspaceSource(
-                        source: "../outside.png",
-                        resolvedWorkspaceRelativePath: nil,
-                        fileByteCount: 1,
-                        isInsideWorkspaceRoot: false,
-                        hasDirectoryScope: true
-                    ),
-                    .stayRaw(.outsideWorkspace)
-                ),
-                (
-                    "single file mode stays raw",
-                    MarkdownImageWorkspaceSource(
-                        source: "sibling.png",
-                        resolvedWorkspaceRelativePath: nil,
-                        fileByteCount: 1,
-                        isInsideWorkspaceRoot: true,
-                        hasDirectoryScope: false
-                    ),
-                    .stayRaw(.noDirectoryScope)
-                ),
-                (
-                    "unresolved workspace path stays raw",
-                    workspaceSource(source: "missing.png", path: nil, bytes: 1),
-                    .stayRaw(.unresolvedWorkspacePath)
-                ),
-                (
-                    "missing size stays raw",
-                    workspaceSource(source: "assets/missing-size.png", path: "assets/missing-size.png", bytes: nil),
-                    .stayRaw(.missingFileSize)
-                ),
-                (
-                    "empty source stays raw",
-                    workspaceSource(source: "", path: "assets/photo.png", bytes: 1),
-                    .stayRaw(.emptySource)
-                ),
-            ]
+        assertThumbnailEligibility([
+            (
+                "allowlisted extension is lowercased",
+                workspaceSource(source: "assets/photo.PNG", path: "assets/photo.PNG", bytes: maximum),
+                .thumbnailEligible
+            ),
+            (
+                "jpeg is allowlisted",
+                workspaceSource(source: "assets/photo.jpeg", path: "assets/photo.jpeg", bytes: 1),
+                .thumbnailEligible
+            ),
+            (
+                "jpg is allowlisted",
+                workspaceSource(source: "assets/photo.jpg", path: "assets/photo.jpg", bytes: 1),
+                .thumbnailEligible
+            ),
+            (
+                "gif is allowlisted",
+                workspaceSource(source: "assets/photo.gif", path: "assets/photo.gif", bytes: 1),
+                .thumbnailEligible
+            ),
+            (
+                "webp is allowlisted",
+                workspaceSource(source: "assets/photo.webp", path: "assets/photo.webp", bytes: 1),
+                .thumbnailEligible
+            ),
+        ])
+    }
 
-        for testCase in cases {
-            XCTAssertEqual(
-                MarkdownImageThumbnailPolicy.eligibility(for: testCase.source),
-                testCase.expected,
-                testCase.name
-            )
-        }
+    func testThumbnailEligibilityRejectsIneligibleSources() {
+        let maximum = MarkdownImageAssetPolicy.maximumFileSizeBytes
+        assertThumbnailEligibility([
+            (
+                "HTTP stays raw",
+                workspaceSource(source: "http://example.com/photo.png", path: nil, bytes: nil),
+                .stayRaw(.remoteHTTPSource(scheme: "http"))
+            ),
+            (
+                "HTTPS stays raw",
+                workspaceSource(source: "https://example.com/photo.png", path: nil, bytes: nil),
+                .stayRaw(.remoteHTTPSource(scheme: "https"))
+            ),
+            (
+                "data stays raw",
+                workspaceSource(source: "data:image/png;base64,AAAA", path: nil, bytes: nil),
+                .stayRaw(.dataSource)
+            ),
+            (
+                "file URL stays raw",
+                workspaceSource(source: "file:///tmp/photo.png", path: nil, bytes: nil),
+                .stayRaw(.fileSource)
+            ),
+            (
+                "other source scheme stays raw",
+                workspaceSource(source: "ftp://example.com/photo.png", path: nil, bytes: nil),
+                .stayRaw(.unsupportedSourceScheme("ftp"))
+            ),
+            (
+                "SVG stays raw",
+                workspaceSource(source: "assets/vector.svg", path: "assets/vector.svg", bytes: 1),
+                .stayRaw(.unsupportedPathExtension("svg"))
+            ),
+            (
+                "oversized stays raw",
+                workspaceSource(source: "assets/large.webp", path: "assets/large.webp", bytes: maximum + 1),
+                .stayRaw(.fileTooLarge(actualBytes: maximum + 1, maximumBytes: maximum))
+            ),
+            (
+                "outside workspace stays raw",
+                MarkdownImageWorkspaceSource(
+                    source: "../outside.png",
+                    resolvedWorkspaceRelativePath: nil,
+                    fileByteCount: 1,
+                    isInsideWorkspaceRoot: false,
+                    hasDirectoryScope: true
+                ),
+                .stayRaw(.outsideWorkspace)
+            ),
+            (
+                "single file mode stays raw",
+                MarkdownImageWorkspaceSource(
+                    source: "sibling.png",
+                    resolvedWorkspaceRelativePath: nil,
+                    fileByteCount: 1,
+                    isInsideWorkspaceRoot: true,
+                    hasDirectoryScope: false
+                ),
+                .stayRaw(.noDirectoryScope)
+            ),
+            (
+                "unresolved workspace path stays raw",
+                workspaceSource(source: "missing.png", path: nil, bytes: 1),
+                .stayRaw(.unresolvedWorkspacePath)
+            ),
+            (
+                "missing size stays raw",
+                workspaceSource(source: "assets/missing-size.png", path: "assets/missing-size.png", bytes: nil),
+                .stayRaw(.missingFileSize)
+            ),
+            (
+                "empty source stays raw",
+                workspaceSource(source: "", path: "assets/photo.png", bytes: 1),
+                .stayRaw(.emptySource)
+            ),
+        ])
     }
 
     func testThumbnailEligibilityIsDeterministicForIdenticalInputs() {
@@ -334,5 +331,17 @@ private extension MarkdownImageRegionsTests {
             isInsideWorkspaceRoot: true,
             hasDirectoryScope: true
         )
+    }
+
+    func assertThumbnailEligibility(
+        _ cases: [(name: String, source: MarkdownImageWorkspaceSource, expected: MarkdownImageThumbnailEligibility)]
+    ) {
+        for testCase in cases {
+            XCTAssertEqual(
+                MarkdownImageThumbnailPolicy.eligibility(for: testCase.source),
+                testCase.expected,
+                testCase.name
+            )
+        }
     }
 }

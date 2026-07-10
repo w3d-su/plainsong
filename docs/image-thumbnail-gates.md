@@ -71,7 +71,8 @@ never touched:
   - MarkdownCore: `MarkdownImageRegionsTests`
     (`testInlineImageRegionsRoundTripExactUTF16Ranges`,
     `testInlineImageRegionRejectsReferenceAutolinkEmptySourceAndMalformedForms`,
-    `testThumbnailEligibilityCoversTheSharedRasterPolicy`,
+    `testThumbnailEligibilityAllowsSharedRasterExtensions`,
+    `testThumbnailEligibilityRejectsIneligibleSources`,
     `testThumbnailEligibilityIsDeterministicForIdenticalInputs`)
   - EditorKit shared visible-range parser (no extra pass): `WYSIWYGImageRegionModelTests`
     (`testI1SharedVisibleParserProducesExactImageRegionsWithoutPresentation`,
