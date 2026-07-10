@@ -57,7 +57,7 @@ never touched:
 ## 4. Gates
 
 ### I0 — Mechanism spike (blocks everything, mirrors checklist §A)
-- [ ] A spike PR proves the chosen mechanism on one hardcoded image: geometry sane
+- [x] A spike PR proves the chosen mechanism on one hardcoded image: geometry sane
   (no phantom line inflation), backing string byte-identical, copy/paste/AX/undo raw,
   reveal-on-touch restores raw text, and — decisive for option A — **no U+FFFC anywhere**
   in pasteboard or `AXValue` output. Decision Log entry records the choice and rejected

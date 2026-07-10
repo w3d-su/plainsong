@@ -155,6 +155,22 @@ final class WYSIWYGLinkNativeGateTests: XCTestCase {
         XCTAssertFalse((result.textView.accessibilityValue() as? String)?.contains("\u{FFFC}") ?? true)
     }
 
+    func testL7AccessibilitySelectedTextAcrossFoldedLinkReturnsExactRawMarkdown() throws {
+        let source = "Before [visible link](https://example.com/private/path) after."
+        let result = try applyLinkPresentation(source, selection: NSRange(location: 0, length: 0))
+        let prefix = source.nsRange(of: "Before ")
+        let suffix = source.nsRange(of: " after.")
+        let selection = NSRange(
+            location: prefix.location,
+            length: NSMaxRange(suffix) - prefix.location
+        )
+        result.textView.textSelection = selection
+
+        let selectedText = try XCTUnwrap(result.textView.accessibilitySelectedText())
+        let expected = (source as NSString).substring(with: selection)
+        XCTAssertEqual(Data(selectedText.utf8), Data(expected.utf8))
+    }
+
     func testL9LinkPresentationStaysOutOfUndoAndRecomputesAfterURLUndoRedo() throws {
         let source = "Read [docs](https://example.com/path) after."
         let (textView, undoManager) = try makeUndoReadyLinkTextView(source: source)
