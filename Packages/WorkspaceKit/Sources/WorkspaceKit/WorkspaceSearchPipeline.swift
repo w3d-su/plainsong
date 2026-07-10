@@ -5,6 +5,7 @@ struct WorkspaceSearchPipeline {
     let request: WorkspaceSearchRequest
     let reader: any WorkspaceSearchFileReading
     let continuation: AsyncStream<WorkspaceSearchEvent>.Continuation
+    let failureInjector: WorkspaceSearchPipelineFailureInjector
 
     func run() async throws {
         if let validationError = validationError(for: request.query) {
@@ -13,6 +14,7 @@ struct WorkspaceSearchPipeline {
         }
 
         let plan = try await WorkspaceSearchCandidatePlanner.makePlan(request: request, reader: reader)
+        try failureInjector.checkpoint(.afterPlanning)
         try await execute(plan: plan)
     }
 }

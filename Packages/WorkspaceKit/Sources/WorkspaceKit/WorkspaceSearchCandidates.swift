@@ -22,7 +22,6 @@ enum WorkspaceSearchCandidatePlanItem {
 struct WorkspaceSearchCandidate {
     let relativePath: String
     let overlay: WorkspaceSearchOverlay?
-    let diskSourceVersion: String
 }
 
 enum WorkspaceSearchCandidatePlanner {
@@ -120,8 +119,7 @@ enum WorkspaceSearchCandidatePlanner {
         }
         return .candidate(WorkspaceSearchCandidate(
             relativePath: relativePath,
-            overlay: request.dirtyOverlays[relativePath],
-            diskSourceVersion: diskSourceVersion(for: entry)
+            overlay: request.dirtyOverlays[relativePath]
         ))
     }
 
@@ -144,14 +142,6 @@ enum WorkspaceSearchCandidatePlanner {
         case .ignored:
             2
         }
-    }
-
-    private static func diskSourceVersion(for entry: WorkspaceFileSnapshot.Entry) -> String {
-        let identity = entry.identity ?? entry.relativePath
-        let modification = entry.contentModificationDate?
-            .timeIntervalSinceReferenceDate
-            .description ?? "unknown"
-        return "\(identity)@\(modification)"
     }
 
     private static func skipReason(for error: Error) -> WorkspaceSearchSkipReason {

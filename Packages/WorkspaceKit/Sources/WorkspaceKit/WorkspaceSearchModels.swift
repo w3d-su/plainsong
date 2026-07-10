@@ -9,6 +9,8 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
     public static let defaultMaximumConcurrentReads = 4
     public static let defaultMaximumIgnoreFileSizeBytes = 64 * 1024
     public static let defaultMaximumIgnoreFiles = 128
+    public static let defaultMaximumReportedSkippedFiles = 100
+    public static let defaultMaximumProgressEvents = 100
 
     public let maximumFileSizeBytes: Int
     public let maximumMatchesPerFile: Int
@@ -16,6 +18,8 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
     public let maximumConcurrentReads: Int
     public let maximumIgnoreFileSizeBytes: Int
     public let maximumIgnoreFiles: Int
+    public let maximumReportedSkippedFiles: Int
+    public let maximumProgressEvents: Int
 
     public init(
         maximumFileSizeBytes: Int = WorkspaceSearchLimits.defaultMaximumFileSizeBytes,
@@ -23,36 +27,18 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
         maximumMatchesPerQuery: Int = WorkspaceSearchLimits.defaultMaximumMatchesPerQuery,
         maximumConcurrentReads: Int = WorkspaceSearchLimits.defaultMaximumConcurrentReads,
         maximumIgnoreFileSizeBytes: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFileSizeBytes,
-        maximumIgnoreFiles: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFiles
+        maximumIgnoreFiles: Int = WorkspaceSearchLimits.defaultMaximumIgnoreFiles,
+        maximumReportedSkippedFiles: Int = WorkspaceSearchLimits.defaultMaximumReportedSkippedFiles,
+        maximumProgressEvents: Int = WorkspaceSearchLimits.defaultMaximumProgressEvents
     ) {
         self.maximumFileSizeBytes = maximumFileSizeBytes
         self.maximumMatchesPerFile = maximumMatchesPerFile
         self.maximumMatchesPerQuery = maximumMatchesPerQuery
-        self.maximumConcurrentReads = maximumConcurrentReads
+        self.maximumConcurrentReads = max(1, maximumConcurrentReads)
         self.maximumIgnoreFileSizeBytes = maximumIgnoreFileSizeBytes
         self.maximumIgnoreFiles = maximumIgnoreFiles
-    }
-}
-
-/// Immutable unsaved text that takes precedence over on-disk workspace content.
-public struct WorkspaceSearchOverlay: Sendable, Equatable {
-    public let relativePath: String
-    public let text: String
-    /// Caller-provided document version or stable content fingerprint.
-    public let sourceVersion: String
-
-    public init(relativePath: String, text: String, sourceVersion: String) {
-        self.relativePath = Self.preservedPath(relativePath)
-        self.text = text
-        self.sourceVersion = sourceVersion
-    }
-
-    private static func preservedPath(_ path: String) -> String {
-        guard !path.hasPrefix("/") else { return path }
-        return path
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .filter { $0 != "." }
-            .joined(separator: "/")
+        self.maximumReportedSkippedFiles = max(0, maximumReportedSkippedFiles)
+        self.maximumProgressEvents = max(1, maximumProgressEvents)
     }
 }
 
@@ -64,7 +50,7 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     public let workspaceGeneration: UInt64
     public let queryGeneration: UInt64
     public let query: TextSearchQuery
-    public let dirtyOverlays: [String: WorkspaceSearchOverlay]
+    public let dirtyOverlays: WorkspaceSearchOverlayCollection
     public let limits: WorkspaceSearchLimits
 
     public init(
@@ -74,7 +60,7 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         workspaceGeneration: UInt64,
         queryGeneration: UInt64,
         query: TextSearchQuery,
-        dirtyOverlays: [String: WorkspaceSearchOverlay] = [:],
+        dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
     ) {
         let standardizedRoot = rootURL.standardizedFileURL
@@ -85,20 +71,8 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         self.workspaceGeneration = workspaceGeneration
         self.queryGeneration = queryGeneration
         self.query = query
-        self.dirtyOverlays = Self.normalizedOverlays(dirtyOverlays)
+        self.dirtyOverlays = dirtyOverlays
         self.limits = limits
-    }
-
-    private static func normalizedOverlays(
-        _ overlays: [String: WorkspaceSearchOverlay]
-    ) -> [String: WorkspaceSearchOverlay] {
-        var result: [String: WorkspaceSearchOverlay] = [:]
-        for overlay in overlays.values {
-            let key = (try? WorkspaceRootContainment.normalizedRelativePath(overlay.relativePath))
-                ?? overlay.relativePath
-            result[key] = overlay
-        }
-        return result
     }
 }
 
@@ -117,18 +91,18 @@ public struct WorkspaceSearchContext: Sendable, Equatable {
 
 public struct WorkspaceSearchFileResult: Sendable, Equatable {
     public let relativePath: String
-    public let sourceVersion: String
+    public let contentFingerprint: WorkspaceSearchContentFingerprint
     public let matches: [TextSearchMatch]
     public let isTruncated: Bool
 
     public init(
         relativePath: String,
-        sourceVersion: String,
+        contentFingerprint: WorkspaceSearchContentFingerprint,
         matches: [TextSearchMatch],
         isTruncated: Bool
     ) {
         self.relativePath = relativePath
-        self.sourceVersion = sourceVersion
+        self.contentFingerprint = contentFingerprint
         self.matches = matches
         self.isTruncated = isTruncated
     }
@@ -171,11 +145,21 @@ public struct WorkspaceSearchReadInstrumentation: Sendable, Equatable {
     public let diskReadCount: Int
     public let diskReadByteCount: Int
     public let maximumConcurrentReads: Int
+    public let maximumBufferedReadCount: Int
+    public let maximumOutstandingReadCount: Int
 
-    public init(diskReadCount: Int, diskReadByteCount: Int, maximumConcurrentReads: Int) {
+    public init(
+        diskReadCount: Int,
+        diskReadByteCount: Int,
+        maximumConcurrentReads: Int,
+        maximumBufferedReadCount: Int,
+        maximumOutstandingReadCount: Int
+    ) {
         self.diskReadCount = diskReadCount
         self.diskReadByteCount = diskReadByteCount
         self.maximumConcurrentReads = maximumConcurrentReads
+        self.maximumBufferedReadCount = maximumBufferedReadCount
+        self.maximumOutstandingReadCount = maximumOutstandingReadCount
     }
 }
 
@@ -188,6 +172,7 @@ public struct WorkspaceSearchSummary: Sendable, Equatable {
     public let truncatedFilePaths: [String]
     public let isGloballyTruncated: Bool
     public let skippedFiles: [WorkspaceSearchSkippedFile]
+    public let omittedSkippedFileCount: Int
     public let readInstrumentation: WorkspaceSearchReadInstrumentation
 
     public init(
@@ -199,6 +184,7 @@ public struct WorkspaceSearchSummary: Sendable, Equatable {
         truncatedFilePaths: [String],
         isGloballyTruncated: Bool,
         skippedFiles: [WorkspaceSearchSkippedFile],
+        omittedSkippedFileCount: Int,
         readInstrumentation: WorkspaceSearchReadInstrumentation
     ) {
         self.candidateFileCount = candidateFileCount
@@ -209,6 +195,7 @@ public struct WorkspaceSearchSummary: Sendable, Equatable {
         self.truncatedFilePaths = truncatedFilePaths
         self.isGloballyTruncated = isGloballyTruncated
         self.skippedFiles = skippedFiles
+        self.omittedSkippedFileCount = omittedSkippedFileCount
         self.readInstrumentation = readInstrumentation
     }
 
@@ -219,6 +206,10 @@ public struct WorkspaceSearchSummary: Sendable, Equatable {
     public var isTruncated: Bool {
         hasPerFileTruncation || isGloballyTruncated
     }
+
+    public var areSkippedFileDetailsTruncated: Bool {
+        omittedSkippedFileCount > 0
+    }
 }
 
 public enum WorkspaceSearchValidationError: Sendable, Equatable {
@@ -227,11 +218,17 @@ public enum WorkspaceSearchValidationError: Sendable, Equatable {
     case overlongQuery(maximumUTF16Length: Int)
 }
 
+/// Typed terminal failure for an unexpected producer-level fault.
+public enum WorkspaceSearchServiceFailure: Error, Sendable, Equatable {
+    case unexpectedProducerFailure
+}
+
 /// Ordered events from a cancellable workspace-search request.
 public enum WorkspaceSearchEvent: Sendable, Equatable {
     case fileResult(WorkspaceSearchContext, WorkspaceSearchFileResult)
     case skippedFile(WorkspaceSearchContext, WorkspaceSearchSkippedFile)
     case progress(WorkspaceSearchContext, WorkspaceSearchProgress)
     case completed(WorkspaceSearchContext, WorkspaceSearchSummary)
+    case failed(WorkspaceSearchContext, WorkspaceSearchServiceFailure)
     case validationFailure(WorkspaceSearchContext, WorkspaceSearchValidationError)
 }
