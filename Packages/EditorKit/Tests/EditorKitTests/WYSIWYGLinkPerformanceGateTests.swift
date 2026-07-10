@@ -63,7 +63,6 @@ final class WYSIWYGLinkPerformanceGateTests: XCTestCase {
             highlightService: highlightService
         )
     }
-
 }
 
 private extension WYSIWYGLinkPerformanceGateTests {
