@@ -1,6 +1,7 @@
 import EditorKit
 import MarkdownCore
 @testable import Plainsong
+import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -650,6 +651,120 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: post.path))
     }
 
+    func testWorkspaceReloadKeepsLatestSnapshotWhenOlderScanFinishesLast() async throws {
+        let root = try makeTemporaryDirectory()
+        try writeText("Old", to: root.appendingPathComponent("old.md"))
+        try writeText("New", to: root.appendingPathComponent("new.md"))
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        await scanner.waitForRequestCount(1)
+        let firstReloadTask = appState.workspaceReloadTask
+        let firstGeneration = appState.workspaceGeneration
+
+        appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(2)
+        XCTAssertGreaterThan(appState.workspaceGeneration, firstGeneration)
+
+        await scanner.completeRequest(at: 1, with: snapshot("new.md"))
+        try await waitUntil("new snapshot applied") {
+            appState.workspaceSnapshot?.entries.map(\.relativePath) == ["new.md"] &&
+                appState.workspaceTree?.selectedNode?.relativePath == "new.md"
+        }
+        await scanner.completeRequest(at: 0, with: snapshot("old.md"))
+        await firstReloadTask?.value
+
+        XCTAssertEqual(appState.workspaceSnapshot?.entries.map(\.relativePath), ["new.md"])
+        XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "new.md")
+    }
+
+    func testWorkspaceClosePreventsOlderScanFromRestoringSnapshotOrTree() async throws {
+        let root = try makeTemporaryDirectory()
+        try writeText("Old", to: root.appendingPathComponent("old.md"))
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        await scanner.waitForRequestCount(1)
+        let firstReloadTask = appState.workspaceReloadTask
+        appState.closeWorkspace()
+        await scanner.completeRequest(at: 0, with: snapshot("old.md"))
+        await firstReloadTask?.value
+
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertNil(appState.workspaceSnapshot)
+        XCTAssertNil(appState.workspaceTree)
+    }
+
+    func testWorkspaceSwitchPreventsOlderRootFromRestoringSnapshotOrTree() async throws {
+        let rootA = try makeTemporaryDirectory()
+        let rootB = try makeTemporaryDirectory()
+        try writeText("A", to: rootA.appendingPathComponent("a.md"))
+        try writeText("B", to: rootB.appendingPathComponent("b.md"))
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(rootA)
+        await scanner.waitForRequestCount(1)
+        let firstReloadTask = appState.workspaceReloadTask
+        appState.openExternalFile(rootB)
+        await scanner.waitForRequestCount(2)
+
+        await scanner.completeRequest(at: 1, with: snapshot("b.md"))
+        try await waitUntil("second workspace applied") {
+            appState.workspaceRootURL?.standardizedFileURL == rootB.standardizedFileURL &&
+                appState.workspaceSnapshot?.entries.map(\.relativePath) == ["b.md"]
+        }
+        await scanner.completeRequest(at: 0, with: snapshot("a.md"))
+        await firstReloadTask?.value
+
+        XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootB.standardizedFileURL)
+        XCTAssertEqual(appState.workspaceSnapshot?.entries.map(\.relativePath), ["b.md"])
+        XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "b.md")
+    }
+
+    func testWorkspaceRetainsRawSnapshotIndependentOfTreeFilter() async throws {
+        let root = try makeTemporaryDirectory()
+        try writeText("Post", to: root.appendingPathComponent("post.md"))
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(root)
+        await scanner.waitForRequestCount(1)
+        await scanner.completeRequest(at: 0, with: WorkspaceFileSnapshot(entries: [
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "post.md",
+                kind: .markdown,
+                identity: "post",
+                contentModificationDate: nil
+            ),
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "metadata.json",
+                kind: .other,
+                identity: "metadata",
+                contentModificationDate: nil
+            ),
+        ]))
+        try await waitUntil("raw snapshot applied") {
+            appState.workspaceSnapshot?.entries.count == 2
+        }
+
+        XCTAssertEqual(appState.workspaceSnapshot?.entries.map(\.relativePath), ["post.md", "metadata.json"])
+        XCTAssertEqual(appState.workspaceTree?.root.children.map(\.relativePath), ["post.md"])
+    }
+
+    private func snapshot(_ path: String) -> WorkspaceFileSnapshot {
+        WorkspaceFileSnapshot(entries: [
+            WorkspaceFileSnapshot.Entry(
+                relativePath: path,
+                kind: .markdown,
+                identity: path,
+                contentModificationDate: nil
+            ),
+        ])
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("PlainsongAppStateTests")
@@ -698,6 +813,41 @@ final class AppStateTests: XCTestCase {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
+    }
+}
+
+private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
+    private var continuations: [CheckedContinuation<WorkspaceFileSnapshot, Error>?] = []
+    private var requestCount = 0
+    private var requestWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func snapshot(root _: URL) async throws -> WorkspaceFileSnapshot {
+        requestCount += 1
+        let waiters = requestWaiters
+        requestWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume()
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func waitForRequestCount(_ expectedCount: Int) async {
+        while requestCount < expectedCount {
+            await withCheckedContinuation { continuation in
+                requestWaiters.append(continuation)
+            }
+        }
+    }
+
+    func completeRequest(at index: Int, with snapshot: WorkspaceFileSnapshot) {
+        guard continuations.indices.contains(index), let continuation = continuations[index] else {
+            return
+        }
+        continuations[index] = nil
+        continuation.resume(returning: snapshot)
     }
 }
 

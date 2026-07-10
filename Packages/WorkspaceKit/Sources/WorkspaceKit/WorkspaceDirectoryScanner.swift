@@ -15,16 +15,39 @@ public enum WorkspaceDirectoryScannerError: LocalizedError, Equatable {
 }
 
 public struct WorkspaceDirectoryScanner: Sendable {
-    public init() {}
+    private let entryVisitHook: @Sendable (URL) -> Void
+
+    public init() {
+        entryVisitHook = { _ in }
+    }
+
+    init(entryVisitHook: @escaping @Sendable (URL) -> Void) {
+        self.entryVisitHook = entryVisitHook
+    }
 
     public func snapshot(root: URL) async throws -> WorkspaceFileSnapshot {
         let root = root.standardizedFileURL
-        return try await Task.detached(priority: .utility) {
-            try Self.makeSnapshot(root: root)
-        }.value
+        try Task.checkCancellation()
+
+        return try await withThrowingTaskGroup(of: WorkspaceFileSnapshot.self) { group in
+            group.addTask(priority: .utility) {
+                try Self.makeSnapshot(root: root, entryVisitHook: entryVisitHook)
+            }
+            defer { group.cancelAll() }
+
+            guard let snapshot = try await group.next() else {
+                throw CancellationError()
+            }
+            try Task.checkCancellation()
+            return snapshot
+        }
     }
 
-    private static func makeSnapshot(root: URL) throws -> WorkspaceFileSnapshot {
+    private static func makeSnapshot(
+        root: URL,
+        entryVisitHook: @escaping @Sendable (URL) -> Void
+    ) throws -> WorkspaceFileSnapshot {
+        try Task.checkCancellation()
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDirectory),
               isDirectory.boolValue
@@ -49,7 +72,11 @@ public struct WorkspaceDirectoryScanner: Sendable {
 
         var entries: [WorkspaceFileSnapshot.Entry] = []
         for case let url as URL in enumerator {
+            try Task.checkCancellation()
+            entryVisitHook(url)
+            try Task.checkCancellation()
             let values = try url.resourceValues(forKeys: Set(keys))
+            try Task.checkCancellation()
             if values.isHidden == true {
                 if values.isDirectory == true {
                     enumerator.skipDescendants()
@@ -70,6 +97,7 @@ public struct WorkspaceDirectoryScanner: Sendable {
             )
         }
 
+        try Task.checkCancellation()
         return WorkspaceFileSnapshot(entries: entries)
     }
 
