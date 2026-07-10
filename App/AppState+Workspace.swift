@@ -15,16 +15,12 @@ extension AppState {
             return
         }
 
-        workspaceReloadTask?.cancel()
-        workspaceReloadTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                try await reloadWorkspaceTree(root: workspaceRootURL, selectFirstIfNeeded: false)
-                handleCurrentDocumentExternalChange()
-            } catch {
-                present(error, title: "Could Not Refresh Workspace")
-            }
-        }
+        scheduleWorkspaceReload(
+            root: workspaceRootURL,
+            selectFirstIfNeeded: false,
+            errorTitle: "Could Not Refresh Workspace",
+            handlesExternalChanges: true
+        )
     }
 
     func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID) {
@@ -149,25 +145,27 @@ extension AppState {
             rememberRecentItem(root)
         }
 
-        workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self] in
+        workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
             Task { @MainActor [weak self] in
-                self?.refreshWorkspaceAfterFileSystemChange()
+                guard let self,
+                      workspaceRootURL?.standardizedFileURL == root
+                else {
+                    return
+                }
+                refreshWorkspaceAfterFileSystemChange()
             }
         }
         workspaceWatcher?.start()
 
-        workspaceReloadTask?.cancel()
-        workspaceReloadTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            do {
-                try await reloadWorkspaceTree(root: root, selectFirstIfNeeded: true)
-            } catch {
-                present(error, title: "Could Not Open Workspace")
-            }
-        }
+        scheduleWorkspaceReload(
+            root: root,
+            selectFirstIfNeeded: true,
+            errorTitle: "Could Not Open Workspace"
+        )
     }
 
     func closeWorkspace() {
+        _ = advanceWorkspaceGeneration()
         workspaceReloadTask?.cancel()
         workspaceReloadTask = nil
         completionWorkspaceTask?.cancel()
@@ -185,6 +183,7 @@ extension AppState {
         workspaceAccess = nil
         workspaceRootURL = nil
         workspaceTree = nil
+        workspaceSnapshot = nil
         completionWorkspace = .empty
         sessionCache.removeAll()
         sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
@@ -194,32 +193,6 @@ extension AppState {
         detachedSessionURLs.removeAll()
         externalChangePrompt = nil
         missingFilePrompt = nil
-    }
-
-    func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
-        let snapshot = try await directoryScanner.snapshot(root: root)
-        var tree = WorkspaceFileTree.reconcile(
-            previous: workspaceTree,
-            snapshot: snapshot,
-            options: .init(showAllFiles: showAllFiles)
-        )
-
-        if !selectFirstIfNeeded,
-           let currentDocumentNode = nodeForCurrentDocument(in: tree, root: root)
-        {
-            tree.selectNode(id: currentDocumentNode.id)
-        } else if tree.selectedNode == nil || selectFirstIfNeeded {
-            tree.selectNode(id: firstEditableNode(in: tree.root)?.id)
-        }
-
-        workspaceTree = tree
-        scheduleCompletionWorkspaceRefresh()
-
-        if let selectedNode = tree.selectedNode, selectedNode.isEditableMarkdown {
-            try activateFileSession(
-                url: root.appendingPathComponent(selectedNode.relativePath, isDirectory: false)
-            )
-        }
     }
 
     func activateFileSession(url: URL) throws {

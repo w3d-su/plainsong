@@ -19,6 +19,12 @@ protocol RecentItemPersisting: AnyObject {
 
 extension RecentItemStore: RecentItemPersisting {}
 
+protocol WorkspaceDirectoryScanning: Sendable {
+    func snapshot(root: URL) async throws -> WorkspaceFileSnapshot
+}
+
+extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
+
 /// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
@@ -43,6 +49,8 @@ final class AppState: ObservableObject {
     @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL?
     @Published var workspaceTree: WorkspaceFileTree?
+    var workspaceSnapshot: WorkspaceFileSnapshot?
+    var workspaceGeneration: UInt64 = 0
     @Published var showAllFiles = false
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
@@ -55,7 +63,7 @@ final class AppState: ObservableObject {
     let fileStore: MarkdownFileStore
     let lastOpenedFileStore: any LastOpenedFilePersisting
     let recentItemStore: any RecentItemPersisting
-    let directoryScanner: WorkspaceDirectoryScanner
+    let directoryScanner: any WorkspaceDirectoryScanning
     let fileOperations: WorkspaceFileOperations
     let userDefaults: UserDefaults
     var autosaveTask: Task<Void, Never>?
@@ -81,7 +89,7 @@ final class AppState: ObservableObject {
         fileStore: MarkdownFileStore = MarkdownFileStore(),
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
         recentItemStore: any RecentItemPersisting = RecentItemStore(),
-        directoryScanner: WorkspaceDirectoryScanner = WorkspaceDirectoryScanner(),
+        directoryScanner: any WorkspaceDirectoryScanning = WorkspaceDirectoryScanner(),
         fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard

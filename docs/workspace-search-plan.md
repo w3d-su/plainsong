@@ -1,9 +1,11 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1 is implemented and locally verified; WS2–WS4 remain pending.**
+> **Status: IN PROGRESS. WS1 and WS2 are implemented and locally verified; WS3–WS4 remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
+> WS2 is a package and AppState orchestration layer only; workspace search is not yet
+> user-facing until WS3 adds the sidebar and navigation integration.
 
 Created 2026-07-10. This is a Phase 3 candidate from `agent.md` section 14. It does not
 change the accepted M0-M5 or Experimental WYSIWYG status.
@@ -79,6 +81,8 @@ Use named configuration values so tests can lower them without constructing huge
 - Maximum matches per file: 500.
 - Maximum matches per query: 10,000.
 - Bounded concurrent file reads: 4.
+- Ignore-rule reads are bounded to 128 files and 64 KiB per file (including one extra
+  byte used to detect an over-limit file).
 - Query debounce in the App: approximately 200 ms.
 
 Reaching a match-count limit is a successful but truncated search, not a fatal error. An
@@ -205,6 +209,26 @@ default. The policy should cover:
 The supported rule subset must be documented and tested. Do not silently claim complete
 Git ignore compatibility if edge cases remain unsupported.
 
+**Implemented WS2 subset.** Search first applies hard, non-negatable exclusions for hidden
+path components, package descendants, and `.git`, `node_modules`, `.build`, `.next`,
+`.astro`, `DerivedData`, `dist`, and `build`. It then loads relevant ignore files from the
+workspace root through each candidate's parent directory, in deterministic directory order,
+reading `.gitignore` before `.ignore` within one directory. At most 128 ignore files are
+attempted and each read is capped at 64 KiB plus one detection byte; unavailable, invalid
+UTF-8, oversized, or escaped ignore files contribute no rules.
+
+Candidate paths are containment-checked during planning and revalidated immediately before a
+disk open. Empty, absolute, traversing, or escaping paths are reported as typed skipped files
+rather than being read.
+
+Rules support blank lines, `#` comments, leading `/` rooted patterns, trailing `/`
+directory-only patterns, `*`, `?`, `**`, `!` negation, nested base directories, and
+last-matching-rule-wins behavior. `*` and `?` never span `/`; `**` spans zero or more path
+components. This is deliberately not complete Git ignore compatibility: bracket classes,
+backslash escaping, global/exclude files, and Git's traversal rule that prevents a child from
+being re-included beneath an ignored parent are unsupported. Because WS2 filters an immutable
+snapshot rather than pruning a filesystem walk, a later negation may re-include a child.
+
 ### 4.4 App and editor navigation
 
 The sidebar gains two modes inside the existing stable shell:
@@ -247,17 +271,17 @@ without mutating source text.
 
 ### WS2 — WorkspaceKit orchestration
 
-- [ ] Retain the raw workspace snapshot and generation in AppState.
-- [ ] Extract shared URL containment logic.
-- [ ] Add and test the ignore policy.
-- [ ] Add the async search request/event/summary service.
-- [ ] Make workspace enumeration cancellation-aware, or prove that generation checks
-  prevent detached stale enumeration from applying state.
-- [ ] Overlay unsaved session text over disk content.
-- [ ] Enforce read concurrency, byte caps, result caps, cancellation, and deterministic
+- [x] Retain the raw workspace snapshot and generation in AppState.
+- [x] Extract shared URL containment logic.
+- [x] Add and test the ignore policy.
+- [x] Add the async search request/event/summary service.
+- [x] Make workspace enumeration cancellation-aware and use generation checks to prevent
+  stale enumeration from applying state.
+- [x] Overlay unsaved session text over disk content.
+- [x] Enforce read concurrency, byte caps, result caps, cancellation, and deterministic
   aggregation.
-- [ ] Report skipped and truncated results without failing the whole query.
-- [ ] Test file deletion races, invalid UTF-8, injected read failures, symlink escapes,
+- [x] Report skipped and truncated results without failing the whole query.
+- [x] Test file deletion races, invalid UTF-8, injected read failures, symlink escapes,
   and rapid cancellation.
 
 ### WS3 — Sidebar and exact navigation
