@@ -1,17 +1,23 @@
 import Foundation
+import MarkdownCore
 
 struct WYSIWYGFoldPlan: Equatable {
     let visibleRange: NSRange
     let regions: [WYSIWYGFoldRegion]
+    /// Syntax-only image metadata. Presentation deliberately ignores these regions until
+    /// the later image-thumbnail render-policy gates are complete.
+    let imageRegions: [MarkdownInlineImageRegion]
     let linkFoldingEnabled: Bool
 
     init(
         visibleRange: NSRange,
         regions: [WYSIWYGFoldRegion],
+        imageRegions: [MarkdownInlineImageRegion] = [],
         linkFoldingEnabled: Bool = false
     ) {
         self.visibleRange = visibleRange
         self.regions = regions
+        self.imageRegions = imageRegions
         self.linkFoldingEnabled = linkFoldingEnabled
     }
 

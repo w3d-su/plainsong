@@ -106,11 +106,13 @@ extension MarkdownSyntaxParser {
             }
 
         var candidates: [WYSIWYGFoldCandidate] = []
+        var imageRegions: [MarkdownInlineImageRegion] = []
         appendBlockCandidates(
             from: root,
             fragment: fragment,
             baseLocation: visibleRange.location,
-            to: &candidates
+            to: &candidates,
+            imageRegions: &imageRegions
         )
 
         let filteredCandidates = uniqueCandidates(candidates)
@@ -129,7 +131,14 @@ extension MarkdownSyntaxParser {
             linkFoldingEnabled: linkFoldingEnabled
         )
 
-        return (visibleRange, absoluteTokens, foldPlan)
+        let planWithImageRegions = WYSIWYGFoldPlan(
+            visibleRange: foldPlan.visibleRange,
+            regions: foldPlan.regions,
+            imageRegions: imageRegions,
+            linkFoldingEnabled: foldPlan.linkFoldingEnabled
+        )
+
+        return (visibleRange, absoluteTokens, planWithImageRegions)
     }
 
     func foldPlan(
@@ -156,11 +165,13 @@ extension MarkdownSyntaxParser {
         }
 
         var candidates: [WYSIWYGFoldCandidate] = []
+        var imageRegions: [MarkdownInlineImageRegion] = []
         appendBlockCandidates(
             from: root,
             fragment: fragment,
             baseLocation: visibleRange.location,
-            to: &candidates
+            to: &candidates,
+            imageRegions: &imageRegions
         )
 
         let filteredCandidates = uniqueCandidates(candidates)
@@ -172,10 +183,16 @@ extension MarkdownSyntaxParser {
                 return lhs.sourceRange.length > rhs.sourceRange.length
             }
 
-        return WYSIWYGFoldResolver.resolve(
+        let foldPlan = WYSIWYGFoldResolver.resolve(
             candidates: filteredCandidates,
             visibleRange: visibleRange,
             selection: selection.clamped(toLength: sourceLength)
+        )
+        return WYSIWYGFoldPlan(
+            visibleRange: foldPlan.visibleRange,
+            regions: foldPlan.regions,
+            imageRegions: imageRegions,
+            linkFoldingEnabled: foldPlan.linkFoldingEnabled
         )
     }
 
@@ -193,7 +210,8 @@ extension MarkdownSyntaxParser {
         from node: Node,
         fragment: String,
         baseLocation: Int,
-        to candidates: inout [WYSIWYGFoldCandidate]
+        to candidates: inout [WYSIWYGFoldCandidate],
+        imageRegions: inout [MarkdownInlineImageRegion]
     ) {
         switch node.nodeType {
         case "minus_metadata", "plus_metadata", "fenced_code_block", "indented_code_block":
@@ -205,7 +223,12 @@ extension MarkdownSyntaxParser {
             }
 
         case "inline":
-            appendInlineCandidates(from: node, baseLocation: baseLocation, to: &candidates)
+            appendInlineCandidates(
+                from: node,
+                baseLocation: baseLocation,
+                to: &candidates,
+                imageRegions: &imageRegions
+            )
             return
 
         default:
@@ -216,7 +239,13 @@ extension MarkdownSyntaxParser {
             guard let child = node.child(at: index) else {
                 continue
             }
-            appendBlockCandidates(from: child, fragment: fragment, baseLocation: baseLocation, to: &candidates)
+            appendBlockCandidates(
+                from: child,
+                fragment: fragment,
+                baseLocation: baseLocation,
+                to: &candidates,
+                imageRegions: &imageRegions
+            )
         }
     }
 
