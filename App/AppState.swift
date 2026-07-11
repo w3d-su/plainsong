@@ -80,7 +80,9 @@ final class AppState: ObservableObject {
     var workspaceSearchQueryGeneration: UInt64 = 0
     var editorNavigationGeneration: UInt64 = 0
     var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
+    var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]
     var installedEditorDocumentBindingLease: InstalledEditorDocumentBindingLease?
+    var retiredEditorDocumentBindings: [EditorDocumentBindingID: RetiredEditorDocumentBinding] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
@@ -144,6 +146,9 @@ final class AppState: ObservableObject {
         for task in sessionStatisticsTasks.values {
             task.task.cancel()
         }
+        for retirement in retiredEditorDocumentBindings.values {
+            retirement.securityScopedAuthority?.stop()
+        }
     }
 
     var isPreviewVisible: Bool {
@@ -206,9 +211,12 @@ final class AppState: ObservableObject {
     }
 
     var canSave: Bool {
-        guard let url = currentDocument.fileURL?.standardizedFileURL else { return false }
+        guard let url = currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else {
+            return false
+        }
         return !isSaving &&
             !detachedSessionURLs.contains(url) &&
+            pendingExternalTexts[url] == nil &&
             externalChangePrompt?.fileURL.standardizedFileURL != url &&
             missingFilePrompt?.fileURL.standardizedFileURL != url
     }
@@ -423,6 +431,13 @@ struct InstalledEditorDocumentBindingLease {
     let session: DocumentSession
 }
 
+struct RetiredEditorDocumentBinding {
+    let id: EditorDocumentBindingID
+    let session: DocumentSession
+    let securityScopedAuthority: SecurityScopedResourceAccess?
+    var isAwaitingBindingEnd: Bool
+}
+
 struct SessionBackgroundTask {
     let token: UUID
     let task: Task<Void, Never>
@@ -432,6 +447,7 @@ enum AppStateError: LocalizedError {
     case unsupportedFile(URL)
     case missingFile(URL)
     case unresolvedExternalChange(URL)
+    case invalidSessionIdentity(URL)
 
     var errorDescription: String? {
         switch self {
@@ -441,6 +457,8 @@ enum AppStateError: LocalizedError {
             "\(url.lastPathComponent) is no longer on disk. Save a copy or close it."
         case let .unresolvedExternalChange(url):
             "\(url.lastPathComponent) changed on disk. Choose Reload or Keep mine before saving."
+        case let .invalidSessionIdentity(url):
+            "The cached editor session for \(url.lastPathComponent) no longer matches that file."
         }
     }
 }

@@ -230,7 +230,12 @@ tree selection, and editor document identity all derive from that value. Snapsho
 that resolve to the same target collapse to one path-ordered search candidate, so an unsaved
 edit opened through `alias.md -> target.md` overrides disk content and activates the same
 session as `target.md`. A link resolving outside the root remains a typed symlink escape;
-this policy does not relax `WorkspaceRootContainment`.
+this policy does not relax `WorkspaceRootContainment`. Candidate planning and the immediate
+pre-read race check revalidate the resolved physical target's file kind after containment:
+only `.md`, `.markdown`, and `.mdx` targets remain searchable. Thus
+`alias.md -> target.txt` is a typed skipped candidate rather than an unopenable result, while
+`alias.md -> target.md` still deduplicates to `target.md`. Candidate, skipped, progress, and
+terminal counts use the post-deduplication plan and remain internally consistent.
 
 Search reads must:
 
@@ -333,6 +338,11 @@ before resolving a node, opening a file, checking document identity or fingerpri
 validating the final UTF-16 range. Success emits an even newer navigation. Missing nodes,
 open/detach/identity failures, fingerprint mismatch, and invalid ranges leave the cancellation
 as the latest command, so an older pending navigation cannot execute afterward.
+Destination lookup/readability and cached-session identity are validated before committing a
+document switch. A missing or unreadable destination therefore leaves the current document's
+autosave, statistics, completion work, prompts, and editor state intact. Reactivating the
+already-current session is a document-transition no-op; successful result navigation still
+uses the newer exact-range command.
 
 The result carries the exact searched-content fingerprint. If fingerprinting the activated
 session's current text does not produce the same digest and UTF-8 byte count, the App
@@ -367,12 +377,25 @@ immutable dirty overlays from current and warm Markdown/MDX sessions on the main
 The App/editor bridge also carries an opaque binding ID distinct from optional navigation
 identity. EditorKit reports installation only from a successful `finishDocumentTransition`
 after marked text ends and exact candidate source is live, does not transfer during prepare,
-and revokes on dismantle. App generic writes remain current-session-only. The installed
-binding may commit to a non-current session only while that exact lease remains live and the
-session is App-managed; LRU protection keeps it tracked through handoff. Such a commit updates
-that session's exact text/version/dirty policy, computes statistics for it, and schedules a
-session-specific autosave without cancelling or saving the current document or rebuilding the
-current completion workspace.
+and revokes on dismantle. If workspace/file retirement occurs first, App transfers only that
+exact binding's session, registration, session-specific autosave/statistics work, and old
+security-scoped authority into a binding-ID-keyed retirement. Unrelated sessions close
+normally. The old authority is released only after the binding is replaced or revoked and its
+latest source has been saved; an unresolved external conflict or save failure keeps the exact
+session recoverable instead of discarding it. App generic writes remain current-session-only.
+The installed binding may commit to its exact non-current active or retired session only while
+the registration and lease both match. Such a commit updates that session's raw source,
+version, and dirty state once without touching the current document's text or tasks.
+
+External-change conflicts are session-scoped by the canonical URL entry in
+`pendingExternalTexts`, not by whichever banner is currently visible. Autosave and explicit
+`save(session:)` reject that exact session even while another document is current. LRU
+eviction, workspace retirement, and close paths retain or block on the dirty conflict rather
+than overwriting disk or silently dropping the session. Reload restores the external text as
+clean; Keep Mine clears the conflict and restores save/autosave eligibility. Binding
+registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
+registration, while a matching revoke can still clear the installed lease after registration
+cleanup; unrelated or stale revokes cannot clear a newer lease.
 
 Workspace aliases use the one physical-target policy above. Activation accepts only a retained
 active result/match, emits a newer cancellation before every fallible execution step, selects
@@ -454,9 +477,9 @@ edit/FSEvent auto-refresh remain pending.
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting |
+| WorkspaceKitTests | Markdown candidate filtering before and after symlink resolution; alias deduplication; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; installed-binding IME handoff/teardown; symlink alias session reuse; result opens correct node/session; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; session-scoped external conflicts; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens correct node/session; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

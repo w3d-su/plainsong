@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 
 struct WorkspaceSearchCandidatePlan {
     let items: [WorkspaceSearchCandidatePlanItem]
@@ -103,8 +104,9 @@ enum WorkspaceSearchCandidatePlanner {
         }
 
         let canonicalRelativePath: String
+        let containedURL: URL
         do {
-            let containedURL = try WorkspaceRootContainment.containedURL(
+            containedURL = try WorkspaceRootContainment.containedURL(
                 rootURL: request.rootURL,
                 relativePath: relativePath
             )
@@ -118,6 +120,16 @@ enum WorkspaceSearchCandidatePlanner {
                 skippedFile: WorkspaceSearchSkippedFile(
                     relativePath: relativePath,
                     reason: skipReason(for: error)
+                )
+            ))
+        }
+
+        guard FileKind(url: containedURL) != nil else {
+            return .invalid(.skipped(
+                sortKey: relativePath,
+                skippedFile: WorkspaceSearchSkippedFile(
+                    relativePath: relativePath,
+                    reason: .unsupportedPhysicalFileKind
                 )
             ))
         }

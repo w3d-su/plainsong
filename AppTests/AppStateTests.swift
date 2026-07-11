@@ -1001,6 +1001,610 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentBURL), false)
     }
 
+    // swiftlint:disable:next function_body_length
+    func testSessionScopedExternalConflictBlocksNonCurrentIMEAutosaveAndLeavesCurrentTasksIntact() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let dirtySourceA = "A draft composition: "
+        let sourceB = "# B Original\nB disk body"
+        let externalSourceA = "A changed externally"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.5, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: sessionA,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA
+        )
+        appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
+        appState.replaceDocumentText(dirtySourceA, in: sessionA)
+
+        var selectionA: NSRange? = NSRange(location: (dirtySourceA as NSString).length, length: 0)
+        var selectionB: NSRange? = NSRange(location: 2, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let documentAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle
+        )
+        let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: dirtySourceA)
+        defer {
+            editorFixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                editorFixture.scrollView,
+                coordinator: editorFixture.coordinator
+            )
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(editorFixture.window.makeFirstResponder(editorFixture.textView))
+        editorFixture.textView.textSelection = selectionA ?? .notFound
+        editorFixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.activateFileSession(url: documentBURL)
+        let sessionB = appState.currentDocument
+        let dirtySourceB = "# B Unique\nB dirty body"
+        appState.replaceDocumentText(dirtySourceB, in: sessionB)
+        let documentBAutosave = try XCTUnwrap(appState.autosaveTask)
+        let documentBStatistics = try XCTUnwrap(appState.statisticsTask)
+        let documentBCompletion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let documentBView = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle
+        )
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+
+        try externalSourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[documentAURL.standardizedFileURL] = .distantPast
+        appState.handleExternalChange(for: sessionA)
+
+        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertTrue(appState.currentDocument === sessionB)
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentAURL)
+        appState.reloadExternallyChangedFile()
+        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentAURL)
+        appState.keepMineForExternallyChangedFile()
+        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
+        XCTAssertNil(appState.externalChangePrompt)
+
+        let committedText = "臺e\u{0301}🧪"
+        editorFixture.textView.insertText(committedText, replacementRange: .notFound)
+        let committedSourceA = dirtySourceA + committedText
+        XCTAssertFalse(documentBAutosave.isCancelled)
+        XCTAssertFalse(documentBStatistics.isCancelled)
+        XCTAssertFalse(documentBCompletion.isCancelled)
+        try await Task.sleep(nanoseconds: 750_000_000)
+
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
+        XCTAssertEqual(sessionA.version, 2)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertThrowsError(try appState.save(session: sessionA)) { error in
+            guard case AppStateError.unresolvedExternalChange = error else {
+                return XCTFail("Expected the session-scoped external conflict")
+            }
+        }
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalSourceA)
+        XCTAssertEqual(sessionB.text, dirtySourceB)
+        XCTAssertFalse(sessionB.isDirty)
+        XCTAssertEqual(sessionB.statistics, TextStatistics(text: dirtySourceB))
+        XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b-unique"])
+        XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), dirtySourceB)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.missingFilePrompt)
+
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        XCTAssertTrue(appState.sessionCache[documentAURL.standardizedFileURL] === sessionA)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalSourceA)
+
+        try appState.activateFileSession(url: documentAURL)
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL.standardizedFileURL, documentAURL.standardizedFileURL)
+        appState.keepMineForExternallyChangedFile()
+        XCTAssertNil(appState.pendingExternalTexts[documentAURL.standardizedFileURL])
+        XCTAssertTrue(appState.canAutosave(session: sessionA))
+        try appState.save(session: sessionA)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
+        XCTAssertFalse(sessionA.isDirty)
+    }
+
+    func testReloadClearsSessionConflictAndRestoresSaveEligibility() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "Original"
+        let local = "Local dirty text"
+        let external = "External disk text"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        appState.replaceDocumentText(local, in: session)
+        try external.write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.handleExternalChange(for: session)
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertThrowsError(try appState.save(session: session))
+
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertEqual(session.text, external)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertTrue(appState.canAutosave(session: session))
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentURL), false)
+        XCTAssertNoThrow(try appState.save(session: session))
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+    }
+
+    func testUnretirableExternalConflictBlocksWorkspaceCloseWithoutDiscardingSession() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        try "Original".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Original", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        defer {
+            appState.pendingExternalTexts[documentURL.standardizedFileURL] = nil
+            appState.externalChangePrompt = nil
+            appState.closeWorkspace()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        appState.replaceDocumentText("Local dirty text", in: session)
+        try "External disk text".write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.handleExternalChange(for: session)
+
+        appState.removeEditorDocumentBindingRegistration(for: session)
+        appState.installedEditorDocumentBindingLease = nil
+        appState.closeWorkspace()
+
+        XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootURL.standardizedFileURL)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[documentURL.standardizedFileURL] === session)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(session.text, "Local dirty text")
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "External disk text")
+        XCTAssertNotNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
+        XCTAssertNotNil(appState.presentedError)
+    }
+
+    func testWorkspaceCloseRemovesUninstalledSessionBindingRegistration() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        try "Source".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Source", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let binding = appState.editorDocumentBinding(for: session)
+
+        appState.closeWorkspace()
+
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertTrue(appState.sessionCache.isEmpty)
+        XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
+        XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
+        XCTAssertTrue(appState.retiredEditorDocumentBindings.isEmpty)
+    }
+
+    func testRetiredInstalledConflictStaysRecoverableAfterRevocationUntilReload() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "Original"
+        let local = "Local dirty text"
+        let external = "External disk text"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        let binding = appState.editorDocumentBinding(for: session)
+        binding.onLifecycle(.installed(binding.id))
+        appState.replaceDocumentText(local, in: session)
+        try external.write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.handleExternalChange(for: session)
+
+        try appState.closeWorkspaceForReplacement()
+        binding.onLifecycle(.revoked(binding.id))
+
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[binding.id])
+        XCTAssertFalse(retirement.isAwaitingBindingEnd)
+        XCTAssertTrue(retirement.session === session)
+        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, rootURL.standardizedFileURL)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(session.text, local)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+        XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
+        XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
+
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentURL)
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertEqual(session.text, external)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[binding.id])
+        XCTAssertNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testWorkspaceToStandaloneRetainsExactBindingAuthorityUntilSuccessfulHandoff() throws {
+        let workspaceRoot = try makeTemporaryDirectory()
+        let standaloneRoot = try makeTemporaryDirectory()
+        let documentAURL = workspaceRoot.appendingPathComponent("a.md")
+        let documentBURL = standaloneRoot.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "B destination"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: workspaceRoot,
+            paths: ["a.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let documentAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle
+        )
+        let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
+        defer {
+            editorFixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                editorFixture.scrollView,
+                coordinator: editorFixture.coordinator
+            )
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: workspaceRoot)
+            try? FileManager.default.removeItem(at: standaloneRoot)
+        }
+
+        XCTAssertTrue(editorFixture.window.makeFirstResponder(editorFixture.textView))
+        editorFixture.textView.textSelection = selectionA ?? .notFound
+        editorFixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.open(url: documentBURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        let sessionB = appState.currentDocument
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let documentBView = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle
+        )
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertTrue(retirement.session === sessionA)
+        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceRoot.standardizedFileURL)
+        XCTAssertTrue(retirement.isAwaitingBindingEnd)
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertNil(appState.workspaceRootURL)
+
+        editorFixture.textView.insertText("臺", replacementRange: .notFound)
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+
+        XCTAssertEqual(sessionA.text, sourceA + "臺")
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertFalse(sessionA.isDirty)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertEqual(sessionB.version, 0)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.editorDocumentBindingSessions[bindingA.id])
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        bindingA.onLifecycle(.revoked(bindingA.id))
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testWorkspaceToWorkspaceRetainsExactBindingUntilDestinationInstalls() async throws {
+        let workspaceA = try makeTemporaryDirectory()
+        let workspaceB = try makeTemporaryDirectory()
+        let documentAURL = workspaceA.appendingPathComponent("a.md")
+        let documentBURL = workspaceB.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "B workspace"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let scanner = ImmediateWorkspaceDirectoryScanner(
+            snapshot: snapshot(paths: ["b.md"], rootURL: workspaceB)
+        )
+        let appState = AppState(
+            currentDocument: sessionA,
+            directoryScanner: scanner,
+            shouldRestoreLastOpenedFile: false
+        )
+        configureWorkspace(
+            appState,
+            rootURL: workspaceA,
+            paths: ["a.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let documentAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle
+        )
+        let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
+        defer {
+            editorFixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                editorFixture.scrollView,
+                coordinator: editorFixture.coordinator
+            )
+            appState.workspaceWatcher?.stop()
+            try? FileManager.default.removeItem(at: workspaceA)
+            try? FileManager.default.removeItem(at: workspaceB)
+        }
+
+        XCTAssertTrue(editorFixture.window.makeFirstResponder(editorFixture.textView))
+        editorFixture.textView.textSelection = selectionA ?? .notFound
+        editorFixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.openWorkspace(url: workspaceB, rememberAsLastOpened: false)
+        await appState.workspaceReloadTask?.value
+        let sessionB = appState.currentDocument
+        XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceA.standardizedFileURL)
+        XCTAssertEqual(appState.workspaceAccess?.url.standardizedFileURL, workspaceB.standardizedFileURL)
+
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let documentBView = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle
+        )
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+
+        editorFixture.textView.insertText("臺", replacementRange: .notFound)
+        documentBView.updateRepresentedTextView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+
+        XCTAssertEqual(sessionA.text, sourceA + "臺")
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testDestinationOpenFailureKeepsRetiredAuthorityUntilTeardownCompletesSave() async throws {
+        let workspaceA = try makeTemporaryDirectory()
+        let workspaceB = try makeTemporaryDirectory()
+        let documentAURL = workspaceA.appendingPathComponent("a.md")
+        let missingDestinationURL = workspaceB.appendingPathComponent("missing.md")
+        let sourceA = "A composition: "
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let scanner = ImmediateWorkspaceDirectoryScanner(
+            snapshot: snapshot(paths: ["missing.md"], rootURL: workspaceB)
+        )
+        let appState = AppState(
+            currentDocument: sessionA,
+            directoryScanner: scanner,
+            shouldRestoreLastOpenedFile: false
+        )
+        configureWorkspace(
+            appState,
+            rootURL: workspaceA,
+            paths: ["a.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let documentAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle
+        )
+        let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
+        defer {
+            editorFixture.window.orderOut(nil)
+            appState.workspaceWatcher?.stop()
+            try? FileManager.default.removeItem(at: workspaceA)
+            try? FileManager.default.removeItem(at: workspaceB)
+        }
+
+        XCTAssertTrue(editorFixture.window.makeFirstResponder(editorFixture.textView))
+        editorFixture.textView.textSelection = selectionA ?? .notFound
+        editorFixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.openWorkspace(url: workspaceB, rememberAsLastOpened: false)
+        await appState.workspaceReloadTask?.value
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missingDestinationURL.path))
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceA.standardizedFileURL)
+        XCTAssertTrue(retirement.isAwaitingBindingEnd)
+
+        try Data([0xFF]).write(to: missingDestinationURL)
+        XCTAssertThrowsError(
+            try appState.open(
+                url: missingDestinationURL,
+                rememberAsLastOpened: false,
+                preserveWorkspace: false
+            )
+        )
+        let retirementAfterRepeatedFailure = try XCTUnwrap(
+            appState.retiredEditorDocumentBindings[bindingA.id]
+        )
+        XCTAssertTrue(retirementAfterRepeatedFailure.session === sessionA)
+        XCTAssertEqual(
+            retirementAfterRepeatedFailure.securityScopedAuthority?.url.standardizedFileURL,
+            workspaceA.standardizedFileURL
+        )
+        XCTAssertTrue(retirementAfterRepeatedFailure.isAwaitingBindingEnd)
+        XCTAssertNil(appState.workspaceRootURL)
+
+        editorFixture.textView.insertText("臺", replacementRange: .notFound)
+        XCTAssertEqual(sessionA.text, sourceA + "臺")
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertNotNil(appState.retiredEditorDocumentBindings[bindingA.id])
+
+        MarkdownTextView.dismantleNSView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.editorDocumentBindingSessions[bindingA.id])
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
+        XCTAssertFalse(sessionA.isDirty)
+    }
+
     func testDebounceStartsOnlyLatestQueryWithIncreasingGeneration() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
@@ -1658,6 +2262,140 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
     }
 
+    func testUnreadableAcceptedActivationPreservesCurrentWorkAndLeavesCancellationLatest() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let appState = scenario.fixture.appState
+        let currentSession = appState.currentDocument
+        let currentURL = try XCTUnwrap(currentSession.fileURL?.standardizedFileURL)
+        appState.replaceDocumentText("alpha current work", in: currentSession)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let currentPrompt = AppState.ExternalChangePrompt(fileURL: currentURL)
+        appState.externalChangePrompt = currentPrompt
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+        let destinationURL = scenario.fixture.rootURL.appendingPathComponent("b.md")
+        try FileManager.default.removeItem(at: destinationURL)
+        try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: false)
+
+        scenario.fixture.appState.activateWorkspaceSearchResult(
+            context: scenario.context,
+            fileResult: scenario.fileResult,
+            match: scenario.match
+        )
+
+        XCTAssertTrue(appState.currentDocument === currentSession)
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, currentURL)
+        XCTAssertEqual(appState.currentDocument.text, "alpha current work")
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.completionWorkspaceTask)
+        XCTAssertEqual(appState.externalChangePrompt, currentPrompt)
+        XCTAssertNil(appState.missingFilePrompt)
+        guard case let .cancel(cancellationID)? = appState.editorNavigationCommand else {
+            return XCTFail("Unreadable activation must leave cancellation latest")
+        }
+        XCTAssertGreaterThan(cancellationID, olderNavigation.id)
+    }
+
+    func testAlreadyCurrentActivationPreservesWorkAndPromptsBeforeExactNavigation() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let currentURL = try XCTUnwrap(session.fileURL?.standardizedFileURL)
+        let dirtyText = "alpha current work"
+        appState.replaceDocumentText(dirtyText, in: session)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let currentPrompt = AppState.ExternalChangePrompt(fileURL: currentURL)
+        appState.externalChangePrompt = currentPrompt
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("current-session search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(path: "a.md", text: dirtyText, needle: "alpha")
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("current-session result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(appState.currentDocument.text, dirtyText)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertEqual(appState.externalChangePrompt, currentPrompt)
+        let navigation = try navigationRequest(from: appState.editorNavigationCommand)
+        XCTAssertEqual(navigation.documentIdentity, appState.activeEditorDocumentIdentity)
+        XCTAssertEqual(navigation.selection, match.range)
+    }
+
+    func testCloseMissingFileRegistrationRemovalThenDismantleRevokesExactLeaseIdempotently() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("missing.md")
+        let source = "Unsaved missing source"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[documentURL.standardizedFileURL] = session
+        var selection: NSRange? = NSRange(location: 0, length: 0)
+        let binding = appState.editorDocumentBinding(for: session)
+        let representable = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle
+        )
+        let editorFixture = try makeEditorBridgeFixture(representable: representable, source: source)
+        defer {
+            editorFixture.window.orderOut(nil)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
+
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: documentURL)
+        appState.closeMissingFile()
+
+        XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
+        XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
+        binding.onLifecycle(.revoked(EditorDocumentBindingID()))
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
+
+        MarkdownTextView.dismantleNSView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        MarkdownTextView.dismantleNSView(
+            editorFixture.scrollView,
+            coordinator: editorFixture.coordinator
+        )
+        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        XCTAssertTrue(appState.editorDocumentBindingIDs.isEmpty)
+        XCTAssertTrue(appState.editorDocumentBindingSessions.isEmpty)
+    }
+
     private struct AcceptedActivationScenario {
         let fixture: Fixture
         let context: WorkspaceSearchContext
@@ -1764,6 +2502,31 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
     private enum TestError: Error {
         case expectedEditorNavigation
+    }
+
+    private func configureWorkspace(
+        _ appState: AppState,
+        rootURL: URL,
+        paths: [String],
+        currentSession: DocumentSession,
+        retainSecurityScope: Bool = false
+    ) {
+        let workspaceSnapshot = snapshot(paths: paths, rootURL: rootURL)
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceGeneration = 1
+        appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: workspaceSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        if retainSecurityScope {
+            appState.workspaceAccess = SecurityScopedAccess.startAccessing(rootURL)
+        }
+        if let fileURL = currentSession.fileURL?.standardizedFileURL.resolvingSymlinksInPath() {
+            appState.sessionCache[fileURL] = currentSession
+            _ = appState.sessionPolicy.access(fileURL, isDirty: currentSession.isDirty)
+        }
     }
 
     private func makeFixture(

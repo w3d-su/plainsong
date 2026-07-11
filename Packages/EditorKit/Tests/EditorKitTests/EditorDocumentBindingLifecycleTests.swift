@@ -50,6 +50,10 @@ final class EditorDocumentBindingLifecycleTests: XCTestCase {
 
         MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
         XCTAssertEqual(model.lifecycle.last, .revoked(bindingB))
+        let lifecycleAfterFirstRevocation = model.lifecycle
+        fixture.coordinator.revokeInstalledDocumentBinding()
+        MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        XCTAssertEqual(model.lifecycle, lifecycleAfterFirstRevocation)
     }
 }
 

@@ -41,6 +41,19 @@ extension AppState {
             return
         }
 
+        scheduleBackgroundAutosave(for: session)
+    }
+
+    func moveCurrentAutosaveToBackground(for session: DocumentSession) {
+        guard session === currentDocument else { return }
+        let shouldReschedule = autosaveTask != nil && session.isDirty
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        guard shouldReschedule else { return }
+        scheduleBackgroundAutosave(for: session)
+    }
+
+    private func scheduleBackgroundAutosave(for session: DocumentSession) {
         cancelBackgroundAutosave(for: session)
         guard canAutosave(session: session) else { return }
 
@@ -105,8 +118,11 @@ extension AppState {
 
     func canAutosave(session: DocumentSession) -> Bool {
         guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return false }
-        guard session === currentDocument || sessionCache[url] === session else { return false }
+        guard session === currentDocument || sessionCache[url] === session || isRetiredEditorSession(session) else {
+            return false
+        }
         return !detachedSessionURLs.contains(url) &&
+            pendingExternalTexts[url] == nil &&
             externalChangePrompt?.fileURL.standardizedFileURL != url &&
             missingFilePrompt?.fileURL.standardizedFileURL != url
     }

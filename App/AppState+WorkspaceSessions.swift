@@ -1,3 +1,4 @@
+import EditorKit
 import Foundation
 import MarkdownCore
 import WorkspaceKit
@@ -34,6 +35,136 @@ extension AppState {
 
         tree.selectNode(id: node.id)
         workspaceTree = tree
+    }
+
+    func editorDocumentBindingLeaseEligibleForRetirement() -> InstalledEditorDocumentBindingLease? {
+        guard let lease = installedEditorDocumentBindingLease,
+              editorDocumentBindingIDs[ObjectIdentifier(lease.session)] == lease.id,
+              editorDocumentBindingSessions[lease.id] === lease.session
+        else {
+            return nil
+        }
+
+        if lease.session === currentDocument {
+            return lease
+        }
+        guard let fileURL = lease.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath(),
+              sessionCache[fileURL] === lease.session
+        else {
+            return nil
+        }
+        return lease
+    }
+
+    func beginEditorDocumentBindingRetirement(
+        _ lease: InstalledEditorDocumentBindingLease,
+        securityScopedAuthority: SecurityScopedResourceAccess?
+    ) {
+        if let existing = retiredEditorDocumentBindings[lease.id],
+           existing.session === lease.session
+        {
+            if let existingAuthority = existing.securityScopedAuthority {
+                if let securityScopedAuthority,
+                   securityScopedAuthority !== existingAuthority
+                {
+                    securityScopedAuthority.stop()
+                }
+            } else if let securityScopedAuthority {
+                retiredEditorDocumentBindings[lease.id] = RetiredEditorDocumentBinding(
+                    id: existing.id,
+                    session: existing.session,
+                    securityScopedAuthority: securityScopedAuthority,
+                    isAwaitingBindingEnd: existing.isAwaitingBindingEnd
+                )
+            }
+            moveCurrentAutosaveToBackground(for: lease.session)
+            moveCurrentStatisticsToBackground(for: lease.session)
+            return
+        }
+
+        retiredEditorDocumentBindings[lease.id] = RetiredEditorDocumentBinding(
+            id: lease.id,
+            session: lease.session,
+            securityScopedAuthority: securityScopedAuthority,
+            isAwaitingBindingEnd: true
+        )
+        moveCurrentAutosaveToBackground(for: lease.session)
+        moveCurrentStatisticsToBackground(for: lease.session)
+    }
+
+    func firstUnretirableExternalConflict(
+        excluding retiredSession: DocumentSession?
+    ) -> URL? {
+        var sessions = Array(sessionCache.values)
+        if currentDocument.fileURL != nil {
+            sessions.append(currentDocument)
+        }
+        var seen: Set<ObjectIdentifier> = []
+        return sessions
+            .filter { session in
+                session !== retiredSession && seen.insert(ObjectIdentifier(session)).inserted
+            }
+            .compactMap { session -> URL? in
+                guard session.isDirty,
+                      let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath(),
+                      pendingExternalTexts[url] != nil
+                else {
+                    return nil
+                }
+                return url
+            }
+            .sorted { $0.absoluteString < $1.absoluteString }
+            .first
+    }
+
+    func recoverRetiredSession(for canonicalURL: URL) -> DocumentSession? {
+        var matches: [(EditorDocumentBindingID, RetiredEditorDocumentBinding)] = []
+        for (bindingID, retirement) in retiredEditorDocumentBindings {
+            if !retirement.isAwaitingBindingEnd,
+               retirement.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == canonicalURL
+            {
+                matches.append((bindingID, retirement))
+            }
+        }
+        guard matches.count == 1, let match = matches.first else { return nil }
+
+        retiredEditorDocumentBindings[match.0] = nil
+        match.1.securityScopedAuthority?.stop()
+        return match.1.session
+    }
+
+    func cancelWorkspaceSessionTasks(except retainedSession: DocumentSession?) {
+        let retainedIdentity = retainedSession.map(ObjectIdentifier.init)
+        for (identity, task) in sessionAutosaveTasks {
+            guard retainedIdentity != identity else { continue }
+            task.task.cancel()
+        }
+        if let retainedIdentity {
+            sessionAutosaveTasks = sessionAutosaveTasks.filter { $0.key == retainedIdentity }
+        } else {
+            sessionAutosaveTasks.removeAll()
+        }
+        for (identity, task) in sessionStatisticsTasks {
+            guard retainedIdentity != identity else { continue }
+            task.task.cancel()
+        }
+        if let retainedIdentity {
+            sessionStatisticsTasks = sessionStatisticsTasks.filter { $0.key == retainedIdentity }
+        } else {
+            sessionStatisticsTasks.removeAll()
+        }
+    }
+
+    func retainMetadataOnlyForRetiredEditorSessions() {
+        let retainedURLs = Set(retiredEditorDocumentBindings.values.compactMap { retirement in
+            retirement.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
+        })
+        pendingExternalTexts = pendingExternalTexts.filter { retainedURLs.contains($0.key) }
+        lastKnownDiskHashes = lastKnownDiskHashes.filter { retainedURLs.contains($0.key) }
+        lastKnownDiskModificationDates = lastKnownDiskModificationDates.filter {
+            retainedURLs.contains($0.key)
+        }
+        detachedSessionURLs = Set(detachedSessionURLs.filter(retainedURLs.contains))
     }
 
     func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {

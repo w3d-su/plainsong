@@ -262,6 +262,15 @@ extension AppState {
         return range.length <= textUTF16Length - range.location
     }
 
+    func moveCurrentStatisticsToBackground(for session: DocumentSession) {
+        guard session === currentDocument else { return }
+        let shouldReschedule = statisticsTask != nil
+        statisticsTask?.cancel()
+        statisticsTask = nil
+        guard shouldReschedule else { return }
+        scheduleBackgroundStatisticsRefresh(for: session)
+    }
+
     private func scheduleStatisticsRefresh(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
         if session === currentDocument {
@@ -272,6 +281,11 @@ extension AppState {
             return
         }
 
+        scheduleBackgroundStatisticsRefresh(for: session)
+    }
+
+    private func scheduleBackgroundStatisticsRefresh(for session: DocumentSession) {
+        let sessionIdentity = ObjectIdentifier(session)
         sessionStatisticsTasks[sessionIdentity]?.task.cancel()
         let token = UUID()
         let task = makeStatisticsTask(for: session) { [weak self] in

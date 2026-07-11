@@ -101,7 +101,7 @@ extension AppState {
         }
 
         if !preserveWorkspace {
-            closeWorkspace()
+            try closeWorkspaceForReplacement()
         }
         try activateFileSession(url: url)
 
@@ -127,7 +127,7 @@ extension AppState {
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
         let root = url.standardizedFileURL
-        closeWorkspace()
+        try closeWorkspaceForReplacement()
         workspaceAccess = SecurityScopedAccess.startAccessing(root)
         workspaceRootURL = root
         workspaceTree = WorkspaceFileTree(
@@ -164,53 +164,24 @@ extension AppState {
         )
     }
 
-    func closeWorkspace() {
-        _ = advanceWorkspaceGeneration()
-        workspaceReloadTask?.cancel()
-        workspaceReloadTask = nil
-        completionWorkspaceTask?.cancel()
-        completionWorkspaceTask = nil
-        workspaceWatcher?.stop()
-        workspaceWatcher = nil
-        for session in sessionCache.values where session.isDirty {
-            do {
-                try save(session: session)
-            } catch {
-                present(error, title: "Could Not Save Workspace File")
-            }
-        }
-        workspaceAccess?.stop()
-        workspaceAccess = nil
-        workspaceRootURL = nil
-        workspaceTree = nil
-        workspaceSnapshot = nil
-        completionWorkspace = .empty
-        for task in sessionAutosaveTasks.values {
-            task.task.cancel()
-        }
-        sessionAutosaveTasks.removeAll()
-        for task in sessionStatisticsTasks.values {
-            task.task.cancel()
-        }
-        sessionStatisticsTasks.removeAll()
-        sessionCache.removeAll()
-        sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
-        pendingExternalTexts.removeAll()
-        lastKnownDiskHashes.removeAll()
-        lastKnownDiskModificationDates.removeAll()
-        detachedSessionURLs.removeAll()
-        externalChangePrompt = nil
-        missingFilePrompt = nil
-    }
-
     func activateFileSession(url: URL) throws {
         let key = try canonicalSessionURL(for: url)
-        autosaveTask?.cancel()
-        autosaveTask = nil
-        statisticsTask?.cancel()
-        statisticsTask = nil
-
         if let cachedSession = sessionCache[key] {
+            if cachedSession === currentDocument {
+                synchronizeWorkspaceTreeSelection(for: cachedSession)
+                handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
+                return
+            }
+            guard let cachedURL = cachedSession.fileURL,
+                  try canonicalSessionURL(for: cachedURL) == key
+            else {
+                throw AppStateError.invalidSessionIdentity(key)
+            }
+            guard !detachedSessionURLs.contains(key) else {
+                throw AppStateError.missingFile(key)
+            }
+            _ = try fileStore.load(url: key)
+            cancelForegroundDocumentTasks()
             setCurrentDocument(cachedSession)
             handleExternalChange(for: cachedSession)
             handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
@@ -218,30 +189,33 @@ extension AppState {
         }
 
         let file = try fileStore.load(url: key)
-        let session = DocumentSession(
+        let recoveredSession = recoverRetiredSession(for: key)
+        let session = recoveredSession ?? DocumentSession(
             text: file.text,
             url: file.url,
             fileKind: file.fileKind,
             isDirty: false
         )
+        cancelForegroundDocumentTasks()
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
         if missingFilePrompt?.fileURL.standardizedFileURL == key {
             missingFilePrompt = nil
         }
-        recordKnownDiskText(file.text, for: key)
+        if recoveredSession == nil {
+            recordKnownDiskText(file.text, for: key)
+        }
         setCurrentDocument(session)
-        handleSessionAccess(url: key, isDirty: false)
+        if recoveredSession != nil {
+            handleExternalChange(for: session)
+        }
+        handleSessionAccess(url: key, isDirty: session.isDirty)
     }
 
     func setCurrentDocument(_ session: DocumentSession) {
+        guard currentDocument !== session else { return }
         requestEditorFocus()
         synchronizeWorkspaceTreeSelection(for: session)
-
-        guard currentDocument !== session else {
-            scheduleCompletionWorkspaceRefresh()
-            return
-        }
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
@@ -259,13 +233,15 @@ extension AppState {
     }
 
     func save(session: DocumentSession) throws {
-        guard let url = session.fileURL?.standardizedFileURL else { return }
+        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
         guard !detachedSessionURLs.contains(url),
               missingFilePrompt?.fileURL.standardizedFileURL != url
         else {
             throw AppStateError.missingFile(url)
         }
-        guard externalChangePrompt?.fileURL.standardizedFileURL != url else {
+        guard pendingExternalTexts[url] == nil,
+              externalChangePrompt?.fileURL.standardizedFileURL != url
+        else {
             throw AppStateError.unresolvedExternalChange(url)
         }
 
@@ -281,6 +257,13 @@ extension AppState {
         sessionPolicy.updateDirtyState(for: url, isDirty: false)
         detachedSessionURLs.remove(url)
         recordKnownDiskText(text, for: url)
+    }
+
+    private func cancelForegroundDocumentTasks() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        statisticsTask?.cancel()
+        statisticsTask = nil
     }
 
     func rememberLastOpenedFile(_ url: URL) {
