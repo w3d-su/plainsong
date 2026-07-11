@@ -68,7 +68,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
 
         switch outcome {
         case let .ready(thumbnail):
-            let proposedContentRect = Self.contentRect(
+            let proposedContentRect = WYSIWYGImagePresentationMetrics.contentRect(
                 pixelWidth: thumbnail.pixelWidth,
                 pixelHeight: thumbnail.pixelHeight,
                 canvasSize: canvasSize
@@ -151,9 +151,7 @@ enum WYSIWYGImagePresentationMetrics {
         let height = floor(min(max(width * 2 / 3, 24), maximumDisplayHeight))
         return NSSize(width: max(width, 1), height: max(height, 1))
     }
-}
 
-private extension WYSIWYGImagePresentationMarker {
     static func contentRect(pixelWidth: Int, pixelHeight: Int, canvasSize: NSSize) -> NSRect {
         guard pixelWidth > 0, pixelHeight > 0 else {
             return .zero
@@ -178,7 +176,9 @@ private extension WYSIWYGImagePresentationMarker {
             height: size.height
         )
     }
+}
 
+private extension WYSIWYGImagePresentationMarker {
     static func makeThumbnailImage(
         _ thumbnail: NSImage,
         contentRect: NSRect,

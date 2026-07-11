@@ -133,14 +133,18 @@ extension WYSIWYGImageThumbnailPresentationTests {
     }
 
     func testReadyThumbnailFitsEditorAndUsesPixelAspectInsideThreeHundredPointCap() async throws {
+        let pixelWidth = 1200
+        let pixelHeight = 200
+        let pinnedTextContainerWidth: CGFloat = 240
         let outcome = Self.readyOutcome(
             source: "fixture.png",
             resolvedPath: "posts/fixture.png",
-            pixelWidth: 1200,
-            pixelHeight: 200
+            pixelWidth: pixelWidth,
+            pixelHeight: pixelHeight
         )
         let fixture = try makeWindowedEditor(
             frame: NSRect(x: 0, y: 0, width: 250, height: 360),
+            pinnedTextContainerWidth: pinnedTextContainerWidth,
             outcomes: ["fixture.png": outcome]
         )
         let marker = try await waitForMarker(
@@ -148,9 +152,20 @@ extension WYSIWYGImageThumbnailPresentationTests {
             range: Self.imageRange,
             matching: { if case .ready = $0.visualState { true } else { false } }
         )
-        let availableWidth = fixture.textView.textContainer.size.width
+        let availableWidth = pinnedTextContainerWidth
             - fixture.textView.textContainer.lineFragmentPadding * 2
+        let expectedCanvasSize = WYSIWYGImagePresentationMetrics.canvasSize(
+            availableWidth: availableWidth,
+            imageCountInParagraph: 1
+        )
+        let expectedContentRect = WYSIWYGImagePresentationMetrics.contentRect(
+            pixelWidth: pixelWidth,
+            pixelHeight: pixelHeight,
+            canvasSize: expectedCanvasSize
+        )
 
+        XCTAssertEqual(marker.canvasSize, expectedCanvasSize)
+        XCTAssertEqual(marker.contentRect, expectedContentRect)
         XCTAssertLessThanOrEqual(marker.canvasSize.width, availableWidth)
         XCTAssertLessThanOrEqual(
             marker.canvasSize.height,
@@ -158,7 +173,6 @@ extension WYSIWYGImageThumbnailPresentationTests {
         )
         XCTAssertGreaterThan(marker.contentRect.width, 0)
         XCTAssertGreaterThan(marker.contentRect.height, 0)
-        XCTAssertEqual(marker.contentRect.width / marker.contentRect.height, 6, accuracy: 0.1)
         XCTAssertTrue(NSRect(origin: .zero, size: marker.canvasSize).contains(marker.contentRect))
     }
 

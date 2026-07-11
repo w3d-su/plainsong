@@ -248,18 +248,6 @@ struct MarkdownTextView: NSViewRepresentable {
         onWYSIWYGMechanismFailure?("TextKit 2 content storage was unavailable for WYSIWYG folding")
     }
 
-    private func updateImageThumbnailConfiguration(
-        _ coordinator: Coordinator,
-        for textView: MarkdownSTTextView
-    ) {
-        coordinator.updateImageThumbnailPresentationConfiguration(
-            imageThumbnailPresentationConfiguration,
-            documentIdentity: documentIdentity,
-            isPresentationEnabled: isWYSIWYGZeroWidthFoldingEnabled,
-            in: textView
-        )
-    }
-
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
         coordinator.detachFocusHandler(from: textView)
@@ -416,5 +404,19 @@ struct MarkdownTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, selection: $selection)
+    }
+}
+
+private extension MarkdownTextView {
+    func updateImageThumbnailConfiguration(
+        _ coordinator: Coordinator,
+        for textView: MarkdownSTTextView
+    ) {
+        coordinator.updateImageThumbnailPresentationConfiguration(
+            imageThumbnailPresentationConfiguration,
+            documentIdentity: documentIdentity,
+            isPresentationEnabled: isWYSIWYGZeroWidthFoldingEnabled,
+            in: textView
+        )
     }
 }

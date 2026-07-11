@@ -75,6 +75,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         source: String? = nil,
         selection: NSRange = NSRange(location: 0, length: 0),
         frame: NSRect = NSRect(x: 0, y: 0, width: 760, height: 420),
+        pinnedTextContainerWidth: CGFloat? = nil,
         outcomes: [String: EditorImageThumbnailOutcome]? = nil,
         delayNanoseconds: UInt64 = 0,
         linkFoldingEnabled: Bool = true,
@@ -128,6 +129,10 @@ extension WYSIWYGImageThumbnailPresentationTests {
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(textView)
         textView.layoutSubtreeIfNeeded()
+        if let pinnedTextContainerWidth {
+            textView.textContainer.size.width = pinnedTextContainerWidth
+            XCTAssertEqual(textView.textContainer.size.width, pinnedTextContainerWidth)
+        }
         applyPresentation(
             source: source,
             selection: selection,
