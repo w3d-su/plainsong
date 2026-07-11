@@ -123,8 +123,9 @@ produce only a prefix of the valid-request bound.
 - `WorkspaceRootContainment` is the shared symlink-resolving containment boundary used by
   completion, assets, and workspace search rather than duplicating path-prefix logic.
 - `DocumentSession` owns canonical in-memory text, while `AppState.sessionCache` retains up
-  to eight warm sessions. WorkspaceKit must receive immutable overlays rather than reading
-  main-actor sessions directly.
+  to eight warm sessions keyed by the contained, symlink-resolved physical target URL.
+  WorkspaceKit must receive immutable overlays rather than reading main-actor sessions
+  directly.
 - `WorkspaceSidebar` is a fixed-width view inside an `HStack`. Risk R17 prohibits casually
   restoring the `NavigationSplitView` path that previously caused an AppKit constraint
   loop. Search should keep the stable shell and may increase the fixed width from 220 to
@@ -222,6 +223,15 @@ normalized collision instead of choosing a winner by input or dictionary iterati
 for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
 take precedence over disk content.
 
+Workspace document identity follows one physical-target policy. An in-root file URL is
+standardized, symlink-resolved, containment-checked, and then expressed relative to the
+resolved root. Session-cache keys, overlay paths, search candidate/result paths, activation,
+tree selection, and editor document identity all derive from that value. Snapshot aliases
+that resolve to the same target collapse to one path-ordered search candidate, so an unsaved
+edit opened through `alias.md -> target.md` overrides disk content and activates the same
+session as `target.md`. A link resolving outside the root remains a typed symlink escape;
+this policy does not relax `WorkspaceRootContainment`.
+
 Search reads must:
 
 - accept only snapshot entries classified as editable Markdown;
@@ -316,6 +326,14 @@ Opening a result is a two-stage action:
    cancellation command in the same `UInt64` ordering domain clears older pending work;
    older or repeated navigation and cancellation commands are ignored.
 
+Acceptance and execution are separate. A stale root/workspace/query context or an event that
+is not the retained result/match is ignored without disturbing unrelated navigation. Once an
+active retained result and match are accepted as a new intent, App emits a newer cancellation
+before resolving a node, opening a file, checking document identity or fingerprint, or
+validating the final UTF-16 range. Success emits an even newer navigation. Missing nodes,
+open/detach/identity failures, fingerprint mismatch, and invalid ranges leave the cancellation
+as the latest command, so an older pending navigation cannot execute afterward.
+
 The result carries the exact searched-content fingerprint. If fingerprinting the activated
 session's current text does not produce the same digest and UTF-8 byte count, the App
 refreshes the active query instead of jumping to a stale offset. A document/session version
@@ -336,21 +354,34 @@ the WS3A landing point, App ownership, fingerprint arbitration, sidebar behavior
 synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B closes
 only the headless App subset below.
 
-**Implemented WS3B subset.** MarkdownCore now exposes one allocation-free exact UTF-16
-source comparison used by every `DocumentSession`/App text gate, so canonically equivalent
-but raw-different edits advance versions, dirty state, and text delivery. AppState owns a
-focused headless `WorkspaceSearchState`, an injected stream provider, the approximately
-200 ms debounce, and the exact Task consuming each stream. Query replacement, workspace
-generation changes, close/switch, empty-query clear, and teardown explicitly cancel that
-Task; root/workspace/query context checks gate every event, and task-token checks prevent an
-older cleanup from touching newer state. Requests capture a retained snapshot plus validated
+**Implemented WS3B subset.** MarkdownCore exposes one allocation-free exact UTF-16 source
+comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
+raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
+headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
+debounce, and the exact Task consuming each stream. Query replacement, workspace generation
+changes, close/switch, empty-query clear, and teardown explicitly cancel that Task;
+root/workspace/query context checks gate every event, and task-token checks prevent an older
+cleanup from touching newer state. Requests capture a retained snapshot plus validated
 immutable dirty overlays from current and warm Markdown/MDX sessions on the main actor.
-Result activation resolves and selects the exact tree node, activates its session, compares
-both SHA-256 and UTF-8 byte count, and only then emits a newer URL-identified exact-range
-editor command. A stale fingerprint emits a newer editor cancellation and restarts the
-active query with fresh overlays. The command is passed through `WorkspaceWindow`; sidebar
-UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh remain
-pending.
+
+The App/editor bridge also carries an opaque binding ID distinct from optional navigation
+identity. EditorKit reports installation only from a successful `finishDocumentTransition`
+after marked text ends and exact candidate source is live, does not transfer during prepare,
+and revokes on dismantle. App generic writes remain current-session-only. The installed
+binding may commit to a non-current session only while that exact lease remains live and the
+session is App-managed; LRU protection keeps it tracked through handoff. Such a commit updates
+that session's exact text/version/dirty policy, computes statistics for it, and schedules a
+session-specific autosave without cancelling or saving the current document or rebuilding the
+current completion workspace.
+
+Workspace aliases use the one physical-target policy above. Activation accepts only a retained
+active result/match, emits a newer cancellation before every fallible execution step, selects
+and activates the canonical contained target, compares SHA-256 plus UTF-8 byte count, validates
+the raw range without clamping, then emits a newer URL-identified navigation. Fingerprint
+mismatch restarts with fresh overlays while leaving cancellation latest; every other accepted
+failure also leaves that cancellation latest. The command and binding lifecycle pass through
+`WorkspaceWindow`; sidebar UI, shortcuts/focus, rendering/accessibility, and general
+edit/FSEvent auto-refresh remain pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -425,7 +456,7 @@ pending.
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
 | WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; result opens correct node/session; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; installed-binding IME handoff/teardown; symlink alias session reuse; result opens correct node/session; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

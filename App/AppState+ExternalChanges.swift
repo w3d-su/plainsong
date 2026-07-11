@@ -87,6 +87,11 @@ extension AppState {
 
     func clearSessionState(for url: URL) {
         let key = url.standardizedFileURL
+        if let session = sessionCache[key] {
+            cancelAutosave(for: session)
+            cancelStatisticsRefresh(for: session)
+            removeEditorDocumentBindingRegistration(for: session)
+        }
         sessionCache[key] = nil
         sessionPolicy.remove(key)
         lastKnownDiskHashes[key] = nil

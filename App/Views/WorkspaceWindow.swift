@@ -277,13 +277,10 @@ private struct DocumentEditor: View {
     let scrollCoordinator: EditorPreviewScrollCoordinator
 
     var body: some View {
+        let editorBinding = appState.editorDocumentBinding(for: session)
+
         MarkdownEditorView(
-            text: Binding(
-                get: { session.text },
-                set: { newText in
-                    appState.replaceDocumentText(newText, in: session)
-                }
-            ),
+            text: editorBinding.text,
             fileKind: session.fileKind,
             fontName: appState.preferences.editorFontName,
             fontSize: CGFloat(appState.preferences.editorFontSize),
@@ -292,6 +289,8 @@ private struct DocumentEditor: View {
             showsLineNumbers: appState.preferences.showsLineNumbers,
             focusRequestID: appState.editorFocusRequestID,
             documentIdentity: appState.activeEditorDocumentIdentity,
+            documentBindingID: editorBinding.id,
+            onDocumentBindingLifecycle: editorBinding.onLifecycle,
             navigationCommand: appState.editorNavigationCommand,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,

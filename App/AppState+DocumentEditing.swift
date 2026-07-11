@@ -16,13 +16,31 @@ extension AppState {
             return
         }
 
+        applyDocumentText(newText, to: session)
+    }
+
+    func cancelStatisticsRefresh(for session: DocumentSession) {
+        if session === currentDocument {
+            statisticsTask?.cancel()
+            statisticsTask = nil
+        }
+        let sessionIdentity = ObjectIdentifier(session)
+        sessionStatisticsTasks[sessionIdentity]?.task.cancel()
+        sessionStatisticsTasks[sessionIdentity] = nil
+    }
+
+    func applyDocumentText(_ newText: String, to session: DocumentSession) {
         session.replaceText(newText, refreshStatistics: false)
-        if let url = session.fileURL?.standardizedFileURL {
+        if let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
-        scheduleStatisticsRefresh()
-        scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
-        scheduleAutosave()
+        scheduleStatisticsRefresh(for: session)
+        if session === currentDocument {
+            scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
+            scheduleAutosave()
+        } else {
+            scheduleAutosave(for: session)
+        }
     }
 
     func setTaskCheckbox(line: Int, checked: Bool, version: Int) {
@@ -72,14 +90,37 @@ extension AppState {
         fileResult: WorkspaceSearchFileResult,
         match: TextSearchMatch
     ) {
-        guard let target = workspaceSearchActivationTarget(
+        guard isAcceptedWorkspaceSearchActivation(
             context: context,
             fileResult: fileResult,
             match: match
-        ), var tree = workspaceTree
+        ) else {
+            return
+        }
+
+        cancelPendingEditorNavigationIfNeeded(force: true)
+
+        guard let target = workspaceSearchActivationTarget(
+            fileResult: fileResult,
+            match: match
+        )
         else {
             return
         }
+
+        executeWorkspaceSearchActivation(
+            target,
+            fileResult: fileResult,
+            match: match
+        )
+    }
+
+    private func executeWorkspaceSearchActivation(
+        _ target: WorkspaceSearchActivationTarget,
+        fileResult: WorkspaceSearchFileResult,
+        match: TextSearchMatch
+    ) {
+        guard var tree = workspaceTree else { return }
 
         let previousTree = tree
         tree.selectNode(id: target.nodeID)
@@ -110,7 +151,6 @@ extension AppState {
         guard activeFingerprint.sha256Digest == fileResult.contentFingerprint.sha256Digest,
               activeFingerprint.utf8ByteCount == fileResult.contentFingerprint.utf8ByteCount
         else {
-            cancelPendingEditorNavigationIfNeeded(force: true)
             restartActiveWorkspaceSearchWithFreshOverlays()
             return
         }
@@ -128,21 +168,35 @@ extension AppState {
         )
     }
 
-    private func workspaceSearchActivationTarget(
+    private func isAcceptedWorkspaceSearchActivation(
         context: WorkspaceSearchContext,
         fileResult: WorkspaceSearchFileResult,
         match: TextSearchMatch
-    ) -> WorkspaceSearchActivationTarget? {
+    ) -> Bool {
         guard isActiveWorkspaceSearchContext(context),
               let storedResult = workspaceSearchState.fileResults.first(where: {
                   ExactSourceText.matches($0.relativePath, fileResult.relativePath)
               }),
               storedResult == fileResult,
-              storedResult.matches.contains(match),
-              Self.isStructurallyValidEditorRange(match.range),
+              storedResult.matches.contains(match)
+        else {
+            return false
+        }
+        return true
+    }
+
+    private func workspaceSearchActivationTarget(
+        fileResult: WorkspaceSearchFileResult,
+        match: TextSearchMatch
+    ) -> WorkspaceSearchActivationTarget? {
+        guard Self.isStructurallyValidEditorRange(match.range),
               let rootURL = workspaceRootURL?.standardizedFileURL,
               let tree = workspaceTree,
-              let node = firstNode(in: tree.root, relativePath: fileResult.relativePath),
+              let node = firstNode(
+                  in: tree.root,
+                  canonicalRelativePath: fileResult.relativePath,
+                  rootURL: rootURL
+              ),
               node.isEditableMarkdown,
               let fileURL = try? WorkspaceRootContainment.containedURL(
                   rootURL: rootURL,
@@ -208,24 +262,54 @@ extension AppState {
         return range.length <= textUTF16Length - range.location
     }
 
-    private func scheduleStatisticsRefresh() {
-        statisticsTask?.cancel()
-        statisticsTask = Task { @MainActor [weak self] in
+    private func scheduleStatisticsRefresh(for session: DocumentSession) {
+        let sessionIdentity = ObjectIdentifier(session)
+        if session === currentDocument {
+            sessionStatisticsTasks[sessionIdentity]?.task.cancel()
+            sessionStatisticsTasks[sessionIdentity] = nil
+            statisticsTask?.cancel()
+            statisticsTask = makeStatisticsTask(for: session)
+            return
+        }
+
+        sessionStatisticsTasks[sessionIdentity]?.task.cancel()
+        let token = UUID()
+        let task = makeStatisticsTask(for: session) { [weak self] in
+            guard let self,
+                  sessionStatisticsTasks[sessionIdentity]?.token == token
+            else {
+                return
+            }
+            sessionStatisticsTasks[sessionIdentity] = nil
+        }
+        sessionStatisticsTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)
+    }
+
+    private func makeStatisticsTask(
+        for session: DocumentSession,
+        onCompletion: (@MainActor () -> Void)? = nil
+    ) -> Task<Void, Never> {
+        Task { @MainActor [weak session] in
+            defer { onCompletion?() }
             do {
                 try await Task.sleep(nanoseconds: 300_000_000)
             } catch {
                 return
             }
-            guard let self, !Task.isCancelled else { return }
+            guard let session, !Task.isCancelled else { return }
 
             // Counting a large document is O(n); keep it off the main thread.
-            let text = currentDocument.text
+            let text = session.text
             let statistics = await Task.detached(priority: .utility) {
                 TextStatistics(text: text)
             }.value
 
-            guard !Task.isCancelled else { return }
-            currentDocument.applyStatistics(statistics)
+            guard !Task.isCancelled,
+                  ExactSourceText.matches(session.text, text)
+            else {
+                return
+            }
+            session.applyStatistics(statistics)
         }
     }
 

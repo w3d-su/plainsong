@@ -26,11 +26,15 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
     }
 
     @discardableResult
-    public mutating func access(_ url: URL, isDirty: Bool) -> [WorkspaceSessionEviction] {
+    public mutating func access(
+        _ url: URL,
+        isDirty: Bool,
+        protectedURLs: Set<URL> = []
+    ) -> [WorkspaceSessionEviction] {
         let key = url.standardizedFileURL
         entries[key] = Entry(isDirty: isDirty)
         refreshRecency(for: key)
-        return enforceLimit()
+        return enforceLimit(protectedURLs: protectedURLs)
     }
 
     public mutating func updateDirtyState(for url: URL, isDirty: Bool) {
@@ -39,10 +43,18 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         entries[key] = Entry(isDirty: isDirty)
     }
 
+    public func dirtyState(for url: URL) -> Bool? {
+        entries[url.standardizedFileURL]?.isDirty
+    }
+
     public mutating func remove(_ url: URL) {
         let key = url.standardizedFileURL
         entries[key] = nil
         leastRecentURLs.removeAll { $0 == key }
+    }
+
+    public mutating func trim(protectedURLs: Set<URL> = []) -> [WorkspaceSessionEviction] {
+        enforceLimit(protectedURLs: protectedURLs)
     }
 
     private mutating func refreshRecency(for url: URL) {
@@ -50,11 +62,17 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         leastRecentURLs.append(url)
     }
 
-    private mutating func enforceLimit() -> [WorkspaceSessionEviction] {
+    private mutating func enforceLimit(protectedURLs: Set<URL>) -> [WorkspaceSessionEviction] {
         var evictions: [WorkspaceSessionEviction] = []
+        let protectedURLs = Set(protectedURLs.map(\.standardizedFileURL))
 
-        while leastRecentURLs.count > limit, let evicted = leastRecentURLs.first {
-            leastRecentURLs.removeFirst()
+        while leastRecentURLs.count > limit {
+            guard let evictionIndex = leastRecentURLs.firstIndex(where: {
+                !protectedURLs.contains($0)
+            }) else {
+                break
+            }
+            let evicted = leastRecentURLs.remove(at: evictionIndex)
             let entry = entries.removeValue(forKey: evicted)
             evictions.append(
                 WorkspaceSessionEviction(

@@ -79,7 +79,11 @@ final class AppState: ObservableObject {
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
     var editorNavigationGeneration: UInt64 = 0
+    var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
+    var installedEditorDocumentBindingLease: InstalledEditorDocumentBindingLease?
     var completionWorkspaceTask: Task<Void, Never>?
+    var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
+    var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var documentChangeCancellable: AnyCancellable?
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
@@ -134,6 +138,12 @@ final class AppState: ObservableObject {
 
     deinit {
         workspaceSearchTask?.cancel()
+        for task in sessionAutosaveTasks.values {
+            task.task.cancel()
+        }
+        for task in sessionStatisticsTasks.values {
+            task.task.cancel()
+        }
     }
 
     var isPreviewVisible: Bool {
@@ -406,6 +416,16 @@ final class AppState: ObservableObject {
         userDefaults.removeObject(forKey: legacyPreviewVisibleDefaultsKey)
         return (migratedMode, nil)
     }
+}
+
+struct InstalledEditorDocumentBindingLease {
+    let id: EditorDocumentBindingID
+    let session: DocumentSession
+}
+
+struct SessionBackgroundTask {
+    let token: UUID
+    let task: Task<Void, Never>
 }
 
 enum AppStateError: LocalizedError {

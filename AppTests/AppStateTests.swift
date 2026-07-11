@@ -1,9 +1,11 @@
 // The generated project fixes App test source membership; keep the WS3B matrix in this
 // existing source without regenerating the out-of-scope project file.
 // swiftlint:disable file_length type_body_length
-import EditorKit
+import AppKit
+@testable import EditorKit
 import MarkdownCore
 @testable import Plainsong
+import SwiftUI
 import WorkspaceKit
 import XCTest
 
@@ -840,6 +842,165 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.statisticsTask?.cancel()
     }
 
+    // swiftlint:disable:next function_body_length
+    func testInstalledEditorLeaseRetainsExactCrossDocumentIMECommitUntilHandoffAndTeardown() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "# B Original\nB disk body"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.5, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(
+            text: sourceA,
+            url: documentAURL,
+            fileKind: .markdown
+        )
+        let appState = AppState(
+            currentDocument: sessionA,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        let workspaceSnapshot = snapshot(paths: ["a.md", "b.md"], rootURL: rootURL)
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceGeneration = 1
+        appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: workspaceSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
+        appState.sessionCache[documentAURL.standardizedFileURL] = sessionA
+        _ = appState.sessionPolicy.access(documentAURL, isDirty: false)
+
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        var selectionB: NSRange? = NSRange(location: 2, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let documentAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle
+        )
+        let fixture = try makeEditorBridgeFixture(
+            representable: documentAView,
+            source: sourceA
+        )
+        defer {
+            fixture.window.orderOut(nil)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            try? FileManager.default.removeItem(at: rootURL)
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selectionA ?? .notFound
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(fixture.textView.hasMarkedText())
+
+        try appState.activateFileSession(url: documentBURL)
+        let sessionB = appState.currentDocument
+        let dirtySourceB = "# B Unique\nB dirty body"
+        appState.replaceDocumentText(dirtySourceB, in: sessionB)
+        let pendingDocumentBAutosave = try XCTUnwrap(appState.autosaveTask)
+        let pendingDocumentBStatistics = try XCTUnwrap(appState.statisticsTask)
+        let pendingDocumentBCompletion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let documentBView = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle
+        )
+        documentBView.updateRepresentedTextView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+
+        XCTAssertTrue(fixture.textView.hasMarkedText())
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(appState.sessionCache[documentAURL.standardizedFileURL] === sessionA)
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentAURL))
+        XCTAssertEqual(Data(sessionB.text.utf8), Data(dirtySourceB.utf8))
+        XCTAssertEqual(sessionB.version, 1)
+        XCTAssertEqual(selectionB, NSRange(location: 2, length: 0))
+
+        let committedText = "臺e\u{0301}🧪"
+        fixture.textView.insertText(committedText, replacementRange: .notFound)
+        let committedSourceA = sourceA + committedText
+
+        XCTAssertEqual(Data(sessionA.text.utf8), Data(committedSourceA.utf8))
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentAURL), true)
+        XCTAssertFalse(pendingDocumentBAutosave.isCancelled)
+        XCTAssertFalse(pendingDocumentBStatistics.isCancelled)
+        XCTAssertFalse(pendingDocumentBCompletion.isCancelled)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertEqual(Data(sessionB.text.utf8), Data(dirtySourceB.utf8))
+        XCTAssertEqual(sessionB.version, 1)
+        XCTAssertEqual(selectionB, NSRange(location: 2, length: 0))
+        XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), sourceB)
+
+        documentBView.updateRepresentedTextView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        XCTAssertNil(appState.sessionCache[documentAURL.standardizedFileURL])
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
+
+        bindingA.text.wrappedValue = committedSourceA + " rejected"
+        XCTAssertEqual(Data(sessionA.text.utf8), Data(committedSourceA.utf8))
+        let finalSourceB = "# B Unique\nB editor write succeeds"
+        bindingB.text.wrappedValue = finalSourceB
+        XCTAssertEqual(Data(sessionB.text.utf8), Data(finalSourceB.utf8))
+
+        MarkdownTextView.dismantleNSView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        bindingB.text.wrappedValue = finalSourceB + " rejected after teardown"
+        XCTAssertEqual(Data(sessionB.text.utf8), Data(finalSourceB.utf8))
+
+        try await Task.sleep(nanoseconds: 750_000_000)
+        XCTAssertEqual(sessionA.statistics, TextStatistics(text: committedSourceA))
+        XCTAssertEqual(sessionB.statistics, TextStatistics(text: finalSourceB))
+        XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b-unique"])
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
+        XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), finalSourceB)
+        XCTAssertFalse(sessionA.isDirty)
+        XCTAssertFalse(sessionB.isDirty)
+        XCTAssertNil(appState.sessionPolicy.dirtyState(for: documentAURL))
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentBURL), false)
+    }
+
     func testDebounceStartsOnlyLatestQueryWithIncreasingGeneration() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
@@ -1191,6 +1352,100 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(singleFileState.workspaceSearchState.phase, .idle)
     }
 
+    // swiftlint:disable:next function_body_length
+    func testCanonicalSymlinkIdentityReusesDirtySessionAcrossSearchTreeAndActivation() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let outsideRoot = try makeTemporaryDirectory()
+        let targetURL = rootURL.appendingPathComponent("target.md")
+        let aliasURL = rootURL.appendingPathComponent("alias.md")
+        let outsideURL = outsideRoot.appendingPathComponent("outside.md")
+        let escapeURL = rootURL.appendingPathComponent("escape.md")
+        try "stale disk text".write(to: targetURL, atomically: true, encoding: .utf8)
+        try "outside needle".write(to: outsideURL, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: aliasURL, withDestinationURL: targetURL)
+        try FileManager.default.createSymbolicLink(at: escapeURL, withDestinationURL: outsideURL)
+        let workspaceSnapshot = snapshot(
+            paths: ["alias.md", "escape.md", "target.md"],
+            rootURL: rootURL
+        )
+        let provider = RecordingWorkspaceSearchStreamProvider()
+        let appState = AppState(
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: 0,
+            shouldRestoreLastOpenedFile: false
+        )
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceGeneration = 1
+        appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: workspaceSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            appState.teardownWorkspaceSearch()
+            try? FileManager.default.removeItem(at: rootURL)
+            try? FileManager.default.removeItem(at: outsideRoot)
+        }
+
+        try appState.activateFileSession(url: aliasURL)
+        let aliasedSession = appState.currentDocument
+        let canonicalTargetURL = targetURL.standardizedFileURL.resolvingSymlinksInPath()
+        XCTAssertEqual(aliasedSession.fileURL, canonicalTargetURL)
+        XCTAssertTrue(appState.sessionCache[canonicalTargetURL] === aliasedSession)
+        XCTAssertNil(appState.sessionCache[aliasURL.standardizedFileURL])
+        XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "target.md")
+        XCTAssertEqual(
+            appState.activeEditorDocumentIdentity,
+            AppState.editorDocumentIdentity(for: canonicalTargetURL)
+        )
+
+        let dirtyText = "# Dirty Alias\nunsaved needle 🧪"
+        appState.replaceDocumentText(dirtyText, in: aliasedSession)
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("canonical symlink search completes") {
+            appState.workspaceSearchState.phase == .completed
+        }
+
+        let request = try XCTUnwrap(provider.requests.first)
+        XCTAssertEqual(provider.requests.count, 1)
+        XCTAssertEqual(request.dirtyOverlays.overlays.map(\.relativePath), ["target.md"])
+        XCTAssertEqual(request.dirtyOverlays.overlays.map(\.text), [dirtyText])
+        let fileResult = try XCTUnwrap(appState.workspaceSearchState.fileResults.first)
+        XCTAssertEqual(appState.workspaceSearchState.fileResults.map(\.relativePath), ["target.md"])
+        XCTAssertEqual(
+            fileResult.contentFingerprint,
+            WorkspaceSearchContentFingerprint(text: dirtyText)
+        )
+        XCTAssertEqual(
+            appState.workspaceSearchState.skippedFiles,
+            [WorkspaceSearchSkippedFile(relativePath: "escape.md", reason: .symlinkEscape)]
+        )
+        XCTAssertEqual(appState.workspaceSearchState.summary?.candidateFileCount, 2)
+
+        let match = try XCTUnwrap(fileResult.matches.first)
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+        let navigation = try navigationRequest(from: appState.editorNavigationCommand)
+        XCTAssertTrue(appState.currentDocument === aliasedSession)
+        XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "target.md")
+        XCTAssertEqual(navigation.documentIdentity, appState.activeEditorDocumentIdentity)
+        XCTAssertEqual(navigation.selection, match.range)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(provider.requests.count, 1, "fingerprint arbitration must not restart")
+
+        try appState.activateFileSession(url: targetURL)
+        XCTAssertTrue(appState.currentDocument === aliasedSession)
+        XCTAssertThrowsError(try appState.activateFileSession(url: escapeURL))
+        XCTAssertTrue(appState.currentDocument === aliasedSession)
+    }
+
     func testMatchingFingerprintSelectsActivatesAndEmitsIncreasingExactNavigation() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
@@ -1280,87 +1535,225 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
     }
 
-    // swiftlint:disable:next function_body_length
-    func testStaleContextMissingNodeActivationFailureAndInvalidRangeEmitNoNavigation() async throws {
+    func testStaleActivationContextDoesNotCancelUnrelatedPendingNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let staleContext = WorkspaceSearchContext(
+            rootIdentity: scenario.context.rootIdentity,
+            workspaceGeneration: scenario.context.workspaceGeneration,
+            queryGeneration: scenario.context.queryGeneration + 1
+        )
+
+        scenario.fixture.appState.activateWorkspaceSearchResult(
+            context: staleContext,
+            fileResult: scenario.fileResult,
+            match: scenario.match
+        )
+
+        XCTAssertEqual(
+            scenario.fixture.appState.editorNavigationCommand,
+            .navigate(olderNavigation)
+        )
+        XCTAssertEqual(scenario.fixture.appState.currentDocument.fileURL?.lastPathComponent, "a.md")
+    }
+
+    func testAcceptedActivationMissingNodeSupersedesOlderNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let currentOnly = snapshot(paths: ["a.md"], rootURL: scenario.fixture.rootURL)
+        scenario.fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: currentOnly,
+            options: .init(showAllFiles: false)
+        )
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    func testAcceptedActivationOpenFailureSupersedesOlderNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        try FileManager.default.removeItem(
+            at: scenario.fixture.rootURL.appendingPathComponent("b.md")
+        )
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    func testAcceptedActivationDetachedTargetSupersedesOlderNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let targetURL = scenario.fixture.rootURL
+            .appendingPathComponent("b.md")
+            .standardizedFileURL
+        let detachedSession = DocumentSession(
+            text: "beta",
+            url: targetURL,
+            fileKind: .markdown
+        )
+        scenario.fixture.appState.sessionCache[targetURL] = detachedSession
+        scenario.fixture.appState.recordKnownDiskText("beta", for: targetURL)
+        scenario.fixture.appState.detachedSessionURLs.insert(targetURL)
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    func testAcceptedActivationIdentityMismatchSupersedesOlderNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let targetURL = scenario.fixture.rootURL
+            .appendingPathComponent("b.md")
+            .standardizedFileURL
+        let mismatchedURL = scenario.fixture.rootURL
+            .appendingPathComponent("a.md")
+            .standardizedFileURL
+        let mismatchedSession = DocumentSession(
+            text: "alpha",
+            url: mismatchedURL,
+            fileKind: .markdown
+        )
+        scenario.fixture.appState.sessionCache[targetURL] = mismatchedSession
+        scenario.fixture.appState.recordKnownDiskText("alpha", for: mismatchedURL)
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    func testAcceptedActivationFingerprintMismatchSupersedesOlderNavigation() async throws {
+        let scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        try "changed beta".write(
+            to: scenario.fixture.rootURL.appendingPathComponent("b.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    func testAcceptedActivationInvalidRangeSupersedesOlderNavigation() async throws {
+        var scenario = try await makeAcceptedActivationScenario()
+        defer { cleanUp(scenario.fixture) }
+        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let invalidMatch = TextSearchMatch(
+            range: NSRange(location: 999, length: 1),
+            line: 1,
+            preview: "beta",
+            previewMatchRange: NSRange(location: 0, length: 4)
+        )
+        scenario.fileResult = WorkspaceSearchFileResult(
+            relativePath: "b.md",
+            contentFingerprint: WorkspaceSearchContentFingerprint(text: "beta"),
+            matches: [invalidMatch],
+            isTruncated: false
+        )
+        scenario.match = invalidMatch
+        scenario.fixture.appState.workspaceSearchState.fileResults = [scenario.fileResult]
+
+        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+    }
+
+    private struct AcceptedActivationScenario {
+        let fixture: Fixture
+        let context: WorkspaceSearchContext
+        var fileResult: WorkspaceSearchFileResult
+        var match: TextSearchMatch
+    }
+
+    private func makeAcceptedActivationScenario() async throws -> AcceptedActivationScenario {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
             provider: provider,
             files: ["a.md": "alpha", "b.md": "beta"],
             currentPath: "a.md"
         )
-        defer { cleanUp(fixture) }
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
-        try await waitUntil("search starts") { provider.requests.count == 1 }
+        try await waitUntil("accepted activation search starts") { provider.requests.count == 1 }
         let request = provider.requests[0]
         let activeContext = context(for: request)
-        let validResult = result(path: "b.md", text: "beta", needle: "beta")
-        let validMatch = try XCTUnwrap(validResult.matches.first)
-        provider.yield(.fileResult(activeContext, validResult), to: 0)
-        try await waitUntil("result applies") {
-            fixture.appState.workspaceSearchState.fileResults == [validResult]
+        let fileResult = result(path: "b.md", text: "beta", needle: "beta")
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(activeContext, fileResult), to: 0)
+        try await waitUntil("accepted activation result applies") {
+            fixture.appState.workspaceSearchState.fileResults == [fileResult]
         }
-
-        let staleContext = WorkspaceSearchContext(
-            rootIdentity: activeContext.rootIdentity,
-            workspaceGeneration: activeContext.workspaceGeneration,
-            queryGeneration: activeContext.queryGeneration + 1
-        )
-        fixture.appState.activateWorkspaceSearchResult(
-            context: staleContext,
-            fileResult: validResult,
-            match: validMatch
-        )
-        XCTAssertNil(fixture.appState.editorNavigationCommand)
-        XCTAssertEqual(fixture.appState.currentDocument.fileURL?.lastPathComponent, "a.md")
-
-        let onlyCurrentSnapshot = snapshot(paths: ["a.md"], rootURL: fixture.rootURL)
-        fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
-            previous: nil,
-            snapshot: onlyCurrentSnapshot,
-            options: .init(showAllFiles: false)
-        )
-        fixture.appState.activateWorkspaceSearchResult(
+        return AcceptedActivationScenario(
+            fixture: fixture,
             context: activeContext,
-            fileResult: validResult,
-            match: validMatch
+            fileResult: fileResult,
+            match: match
         )
-        XCTAssertNil(fixture.appState.editorNavigationCommand)
+    }
 
-        fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
-            previous: nil,
-            snapshot: fixture.snapshot,
-            options: .init(showAllFiles: false)
+    private func seedOlderPendingNavigation(in appState: AppState) -> EditorNavigationRequest {
+        let request = EditorNavigationRequest(
+            id: 40,
+            documentIdentity: AppState.editorDocumentIdentity(
+                for: appState.currentDocument.fileURL ?? URL(fileURLWithPath: "/a.md")
+            ),
+            selection: NSRange(location: 0, length: 1)
         )
-        try FileManager.default.removeItem(at: fixture.rootURL.appendingPathComponent("b.md"))
-        fixture.appState.activateWorkspaceSearchResult(
-            context: activeContext,
-            fileResult: validResult,
-            match: validMatch
-        )
-        XCTAssertNil(fixture.appState.editorNavigationCommand)
+        appState.editorNavigationGeneration = request.id
+        appState.editorNavigationCommand = .navigate(request)
+        return request
+    }
 
-        let invalidMatch = TextSearchMatch(
-            range: NSRange(location: NSNotFound, length: 1),
-            line: 1,
-            preview: "beta",
-            previewMatchRange: NSRange(location: 0, length: 1)
+    private func activateAndAssertNewerCancellation(
+        _ scenario: AcceptedActivationScenario,
+        olderThan requestID: UInt64
+    ) {
+        scenario.fixture.appState.activateWorkspaceSearchResult(
+            context: scenario.context,
+            fileResult: scenario.fileResult,
+            match: scenario.match
         )
-        let invalidResult = WorkspaceSearchFileResult(
-            relativePath: "b.md",
-            contentFingerprint: WorkspaceSearchContentFingerprint(text: "beta"),
-            matches: [invalidMatch],
-            isTruncated: false
-        )
-        provider.yield(.fileResult(activeContext, invalidResult), to: 0)
-        try await waitUntil("invalid result replaces prior value") {
-            fixture.appState.workspaceSearchState.fileResults == [invalidResult]
+        guard case let .cancel(cancellationID)? = scenario.fixture.appState.editorNavigationCommand else {
+            return XCTFail("Accepted activation failure must leave a cancellation command latest")
         }
-        fixture.appState.activateWorkspaceSearchResult(
-            context: activeContext,
-            fileResult: invalidResult,
-            match: invalidMatch
+        XCTAssertGreaterThan(cancellationID, requestID)
+    }
+
+    private struct EditorBridgeFixture {
+        let window: NSWindow
+        let scrollView: NSScrollView
+        let textView: MarkdownSTTextView
+        let coordinator: MarkdownTextViewCoordinator
+    }
+
+    private func makeEditorBridgeFixture(
+        representable: MarkdownTextView,
+        source: String
+    ) throws -> EditorBridgeFixture {
+        let frame = NSRect(x: 0, y: 0, width: 560, height: 120)
+        let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
+        let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.showsLineNumbers = false
+        textView.text = source
+        textView.textSelection = NSRange(location: 0, length: 0)
+        let coordinator = representable.makeCoordinator()
+        textView.textDelegate = coordinator
+        let window = NSWindow(
+            contentRect: frame,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
         )
-        XCTAssertNil(fixture.appState.editorNavigationCommand)
+        window.contentView = scrollView
+        window.makeKeyAndOrderFront(nil)
+        representable.updateRepresentedTextView(scrollView, coordinator: coordinator)
+        return EditorBridgeFixture(
+            window: window,
+            scrollView: scrollView,
+            textView: textView,
+            coordinator: coordinator
+        )
     }
 
     private struct Fixture {
@@ -1534,6 +1927,17 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 }
 
 // swiftlint:enable type_body_length
+
+@MainActor
+private final class RecordingWorkspaceSearchStreamProvider: WorkspaceSearchStreamProviding {
+    private let service = WorkspaceSearchService()
+    private(set) var requests: [WorkspaceSearchRequest] = []
+
+    func events(for request: WorkspaceSearchRequest) -> AsyncStream<WorkspaceSearchEvent> {
+        requests.append(request)
+        return service.events(for: request)
+    }
+}
 
 @MainActor
 private final class ControlledWorkspaceSearchStreamProvider: WorkspaceSearchStreamProviding {

@@ -20,6 +20,8 @@ struct MarkdownTextView: NSViewRepresentable {
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
     private let documentIdentity: EditorDocumentIdentity?
+    private let documentBindingID: EditorDocumentBindingID?
+    private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
     private let navigationCommand: EditorNavigationCommand?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
@@ -39,6 +41,8 @@ struct MarkdownTextView: NSViewRepresentable {
         showsLineNumbers: Bool,
         focusRequestID: Int = 0,
         documentIdentity: EditorDocumentIdentity? = nil,
+        documentBindingID: EditorDocumentBindingID? = nil,
+        onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
@@ -57,6 +61,8 @@ struct MarkdownTextView: NSViewRepresentable {
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
         self.documentIdentity = documentIdentity
+        self.documentBindingID = documentBindingID
+        self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
         self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
@@ -206,6 +212,8 @@ struct MarkdownTextView: NSViewRepresentable {
             text: $text,
             selection: $selection,
             documentIdentity: documentIdentity,
+            documentBindingID: documentBindingID,
+            onDocumentBindingLifecycle: onDocumentBindingLifecycle,
             navigationCommand: navigationCommand,
             in: textView
         )
@@ -237,6 +245,7 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()
         coordinator.cancelPendingNavigationTasks()
+        coordinator.revokeInstalledDocumentBinding()
         textView.textDelegate = nil
     }
 
