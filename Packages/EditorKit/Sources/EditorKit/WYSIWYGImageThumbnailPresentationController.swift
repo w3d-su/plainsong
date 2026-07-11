@@ -53,6 +53,8 @@ final class WYSIWYGImagePresentationController {
     private var configuration: EditorImageThumbnailConfiguration?
     private var context: Context?
     private var documentSource: String?
+    /// UTF-16 length of `documentSource` — used to skip O(n) equality scans on the apply path.
+    private var documentSourceUTF16Length: Int = 0
     private var generation: UInt64 = 0
     private var activePlan: ActivePlan?
     private var outcomes: [LoadKey: EditorImageThumbnailOutcome] = [:]
@@ -119,12 +121,15 @@ final class WYSIWYGImagePresentationController {
 
     func documentTextDidChange(in textView: MarkdownSTTextView) {
         guard configuration != nil,
-              let source = MarkdownTextView.textStorage(of: textView)?.string,
-              documentSource.map({ !ExactUTF16Text.matches($0, source) }) ?? true
+              let source = MarkdownTextView.textStorage(of: textView)?.string
         else {
             return
         }
-
+        // Text-view change notifications are authoritative. Avoid full-document equality scans
+        // (ExactUTF16Text was ~35 ms on large-1mb.md and blew the I8 recompute budget).
+        if isSameRecordedSource(source) {
+            return
+        }
         beginNewSource(source, in: textView)
     }
 
@@ -152,6 +157,7 @@ final class WYSIWYGImagePresentationController {
         outcomes.removeAll()
         activePlan = nil
         documentSource = nil
+        documentSourceUTF16Length = 0
         appliedMarkers.removeAll()
         textView.removeAllWYSIWYGImagePresentationMarkers()
         textView.setWYSIWYGImagePresentationGeneration(nil, invalidating: [])
@@ -159,10 +165,36 @@ final class WYSIWYGImagePresentationController {
     }
 
     private func beginSourceIfNeeded(_ source: String, in textView: MarkdownSTTextView) {
-        guard documentSource.map({ !ExactUTF16Text.matches($0, source) }) ?? true else {
+        if isSameRecordedSource(source) {
             return
         }
         beginNewSource(source, in: textView)
+    }
+
+    /// O(1)/O(k) identity check — length plus endpoint samples. Full UTF-16 equality is too
+    /// expensive on the apply hot path for multi-megabyte documents.
+    private func isSameRecordedSource(_ source: String) -> Bool {
+        guard documentSource != nil else {
+            return false
+        }
+        let sourceLength = source.utf16.count
+        guard documentSourceUTF16Length == sourceLength else {
+            return false
+        }
+        guard sourceLength > 0, let documentSource else {
+            return true
+        }
+        let sample = min(64, sourceLength)
+        let previous = documentSource as NSString
+        let next = source as NSString
+        if previous.substring(with: NSRange(location: 0, length: sample))
+            != next.substring(with: NSRange(location: 0, length: sample))
+        {
+            return false
+        }
+        let suffixStart = sourceLength - sample
+        return previous.substring(with: NSRange(location: suffixStart, length: sample))
+            == next.substring(with: NSRange(location: suffixStart, length: sample))
     }
 
     private func beginNewSource(_ source: String, in textView: MarkdownSTTextView) {
@@ -170,6 +202,7 @@ final class WYSIWYGImagePresentationController {
         cancelAllRequests()
         activePlan = nil
         documentSource = source
+        documentSourceUTF16Length = source.utf16.count
         let oldRanges = appliedMarkers.values.map(\.sourceRange)
         appliedMarkers.removeAll()
         textView.setWYSIWYGImagePresentationGeneration(nil, invalidating: oldRanges)
@@ -197,6 +230,7 @@ final class WYSIWYGImagePresentationController {
         configuration = nil
         context = nil
         documentSource = nil
+        documentSourceUTF16Length = 0
         activePlan = nil
         outcomes.removeAll()
         appliedMarkers.removeAll()

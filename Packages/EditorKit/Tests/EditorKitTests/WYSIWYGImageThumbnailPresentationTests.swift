@@ -7,9 +7,6 @@ import XCTest
 /// EditorKit loader seam. The hook remains internal and is never selected by App code.
 @MainActor
 final class WYSIWYGImageThumbnailPresentationTests: XCTestCase {
-    static let imageSource = "![alt](fixture.png)"
-    static let source = "Top sibling line\n\(imageSource)\nBottom sibling line\n"
-
     func testProjectedRegionUsesOneAttachmentAndEqualLengthZeroWidthPadding() async throws {
         let fixture = try makeWindowedEditor()
         let marker = try await waitForMarker(

@@ -157,10 +157,12 @@ struct MarkdownTextView: NSViewRepresentable {
             coordinator.focusIfNeeded(focusRequestID, textView: textView)
             let didApplyStyledText = applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
             if didApplyStyledText, let styledText {
+                // Markers are preserved across highlight setAttributes; only force a rewrite
+                // when the plan/outcomes change (handled inside the presentation controller).
                 coordinator.applyImageThumbnailPresentation(
                     foldPlan: styledText.foldPlan,
                     in: textView,
-                    forceReapply: true
+                    forceReapply: false
                 )
             }
 
@@ -287,72 +289,7 @@ struct MarkdownTextView: NSViewRepresentable {
     @MainActor
     @discardableResult
     static func applyHighlightedText(_ styledText: HighlightedText, to textView: STTextView) -> Bool {
-        guard
-            !textView.hasMarkedText(),
-            let textStorage = textStorage(of: textView)
-        else {
-            return false
-        }
-
-        let incoming = NSMutableAttributedString(attributedString: NSAttributedString(styledText.text))
-        if let foldPlan = styledText.foldPlan {
-            WYSIWYGInlineFoldPresentation.applyFoldedDelimiterAttributes(
-                plan: foldPlan,
-                visibleRange: styledText.range,
-                to: incoming
-            )
-        }
-        let targetRange = styledText.range.clamped(toLength: textStorage.length)
-        guard targetRange.length == incoming.length else {
-            return false
-        }
-
-        if incoming.length > 0 {
-            let currentText = (textStorage.string as NSString).substring(with: targetRange)
-            guard currentText == incoming.string else {
-                return false
-            }
-        }
-
-        let selectedRange = textView.selectedRange()
-        let clipView = textView.enclosingScrollView?.contentView
-        let visibleOrigin = clipView?.bounds.origin
-        let undoManager = textView.undoManager
-        let shouldRestoreUndoRegistration = undoManager?.isUndoRegistrationEnabled == true
-        if shouldRestoreUndoRegistration {
-            undoManager?.disableUndoRegistration()
-        }
-        defer {
-            if shouldRestoreUndoRegistration {
-                undoManager?.enableUndoRegistration()
-            }
-            if textView.selectedRange() != selectedRange {
-                textView.textSelection = selectedRange.clamped(toLength: textStorage.length)
-            }
-            if let clipView, let visibleOrigin {
-                clipView.scroll(to: visibleOrigin)
-                textView.enclosingScrollView?.reflectScrolledClipView(clipView)
-            }
-        }
-
-        textStorage.beginEditing()
-        incoming.enumerateAttributes(
-            in: NSRange(location: 0, length: incoming.length)
-        ) { attributes, range, _ in
-            let destinationRange = NSRange(
-                location: targetRange.location + range.location,
-                length: range.length
-            )
-            textStorage.setAttributes(attributes, range: destinationRange)
-        }
-        textStorage.endEditing()
-        if styledText.foldPlan != nil,
-           let textRange = NSTextRange(targetRange, in: textView.textContentManager)
-        {
-            textView.textLayoutManager.invalidateLayout(for: textRange)
-        }
-        textView.needsDisplay = true
-        return true
+        applyHighlightedTextPreservingImageMarkers(styledText, to: textView)
     }
 
     @MainActor
