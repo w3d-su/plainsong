@@ -8,10 +8,11 @@
 > Scope discipline: Phase 2 stays native TextKit 2. Source text remains the only model.
 > The two-pane source+preview mode remains available indefinitely.
 >
-> Current note (2026-06-27): §§12-14 are historical gate records. Native input,
-> selection, and pointer gates are complete as of §§16-19; WYSIWYG is available only as an
+> Current note (2026-07-12): §§3-19 are historical core/gate records. Native input,
+> selection, and pointer gates are complete; §20 records the separately gated inline-link and
+> folder-workspace image-thumbnail extensions. WYSIWYG remains available only as an
 > off-by-default Experimental mode, and stable/default promotion remains blocked by
-> `docs/wysiwyg-release-checklist.md`.
+> `docs/wysiwyg-release-checklist.md` D.4.
 
 ## 1. Goal & non-goals
 
@@ -807,3 +808,23 @@ This is **bold**, *italic*, ~~strike~~, and `code`.
 
 Stable/default promotion remains blocked by `docs/wysiwyg-release-checklist.md`: the promotion checkbox is
 still unchecked and requires a Decision Log entry before WYSIWYG can become stable or on by default.
+
+## 20. Gated inline-link and image-thumbnail extensions — 2026-07-12
+
+The original inline-first core scope above remains the architectural baseline. Two constructs later
+completed dedicated native-safety sub-gates and joined only the off-by-default Experimental mode:
+
+- Inline links completed `docs/link-folding-gates.md` L1-L9 in PRs #65/#67/#68. The App selects
+  `.inlineFoldRevealWithLinkFolding` only when the Experimental flag, WYSIWYG layout, and mechanism
+  health permit it; reference links and autolinks stay raw.
+- Image thumbnails completed `docs/image-thumbnail-gates.md` I0-I10 in PR #83. Eligible local
+  PNG/JPEG/GIF/WebP files (≤ 10 MiB) render through a projection-only attachment backed by
+  WorkspaceKit downsampling/cache only for contained folder-workspace documents. Remote/SVG/
+  reference/outside-root/oversized and single-file images stay raw; GIF is first-frame-only.
+
+The 2026-07-12 owner-run `WYSIWYGActualIMEEventGateTests` selected Traditional Pinyin and Zhuyin
+input methods and passed ready-thumbnail/loading-placeholder composition immediately before and
+after the image span (10 tests, 0 failures, 106.508 seconds). Source text, raw copy/AX, selection,
+undo, source-only/source+preview behavior, and kill-switch fallback remain unchanged. Animation
+playback, drag-resize, open-in-Preview, and stable/default promotion remain out of scope; D.4 is
+still unchecked.

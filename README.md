@@ -18,8 +18,9 @@ remain the default user-facing modes. To try it, enable **Settings ▸ Editor �
 (Experimental)**, then cycle layouts from the **View** menu (`⌘⇧P`); it falls back to source-only if
 the editor mechanism is unavailable, without altering source text. It stays off by default and is not
 promoted to stable until [`docs/wysiwyg-release-checklist.md`](docs/wysiwyg-release-checklist.md) is
-fully green. Link visual folding, image thumbnails, fenced-code custom fragments, tables, Mermaid/math
-widgets, and real MDX rendering remain deferred.
+fully green. Inline-link folding and eligible local image thumbnails in folder workspaces are available
+only inside that Experimental mode; reference links, autolinks, ineligible/single-file images,
+fenced-code custom fragments, tables, Mermaid/math widgets, and real MDX rendering remain raw/deferred.
 
 ## Installing (alpha)
 
