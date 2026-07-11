@@ -168,6 +168,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var completionWorkspace: CompletionWorkspace = .empty
     private var imageAssetInserter: EditorImageAssetInserter?
     private var imageAssetContextID: String?
+    let imageThumbnailPresentationController = WYSIWYGImagePresentationController()
     private var recentCompletionIDs: [String] = []
     private var completionRequestID = 0
     private var completionTask: Task<[Completion], Never>?
@@ -480,6 +481,9 @@ extension MarkdownTextViewCoordinator {
 
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
+        if let textView = textView as? MarkdownSTTextView {
+            imageThumbnailPresentationController.documentTextDidChange(in: textView)
+        }
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)
     }
@@ -532,6 +536,9 @@ extension MarkdownTextViewCoordinator {
 
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
+        if let textView = textView as? MarkdownSTTextView {
+            imageThumbnailPresentationController.documentTextDidChange(in: textView)
+        }
         schedulePendingNavigationAfterInput(in: textView)
     }
 
@@ -583,6 +590,9 @@ extension MarkdownTextViewCoordinator {
 
         if syncTextFromTextViewIfNeeded(textView) {
             isUserEditing = true
+            if let textView = textView as? MarkdownSTTextView {
+                imageThumbnailPresentationController.documentTextDidChange(in: textView)
+            }
         }
         selection = textView.selectedRange()
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)

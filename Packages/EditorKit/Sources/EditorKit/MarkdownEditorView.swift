@@ -36,6 +36,7 @@ public struct MarkdownEditorView: View {
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
     private let developmentPresentation: MarkdownEditorDevelopmentPresentation
+    private let developmentImageThumbnails: EditorImageThumbnailConfiguration?
     private let onWYSIWYGMechanismFailure: ((String) -> Void)?
 
     public init(
@@ -57,6 +58,7 @@ public struct MarkdownEditorView: View {
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
         _developmentPresentation developmentPresentation: MarkdownEditorDevelopmentPresentation = .source,
+        _developmentImageThumbnails developmentImageThumbnails: EditorImageThumbnailConfiguration? = nil,
         onWYSIWYGMechanismFailure: ((String) -> Void)? = nil
     ) {
         _text = text
@@ -77,6 +79,7 @@ public struct MarkdownEditorView: View {
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
         self.developmentPresentation = developmentPresentation
+        self.developmentImageThumbnails = developmentImageThumbnails
         self.onWYSIWYGMechanismFailure = onWYSIWYGMechanismFailure
     }
 
@@ -111,6 +114,7 @@ public struct MarkdownEditorView: View {
             imageAssetInserter: imageAssetInserter,
             imageAssetContextID: imageAssetContextID,
             isWYSIWYGZeroWidthFoldingEnabled: developmentPresentation.enablesInlineFoldReveal,
+            imageThumbnailPresentationConfiguration: developmentImageThumbnails,
             onWYSIWYGMechanismFailure: onWYSIWYGMechanismFailure,
             font: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         ) { range in

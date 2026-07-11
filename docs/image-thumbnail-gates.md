@@ -1,10 +1,11 @@
 # Image Thumbnails — Sub-Gate Specification
 
-> **Status: SPEC ONLY. Images stay raw in the editor.**
+> **Status: I2 INTERNAL DEVELOPMENT HOOK ONLY. No App wiring or user-facing exposure.**
 > `docs/wysiwyg-release-checklist.md` §E defers image thumbnails. This document is the
 > dedicated sub-gate (the link-folding pattern, `docs/link-folding-gates.md`, applied to the
-> next construct). Nothing here authorizes rendering images in the editor; every gate below
-> must be checked with linked evidence, and enabling requires its own Decision Log entry.
+> next construct). The I2 presentation path requires an explicit EditorKit-only hook; the
+> public presentation cases remain unchanged and App supplies no loader. User-facing
+> enablement still requires every gate below plus its own Decision Log entry.
 
 Created 2026-07-06 after the link-folding sub-gate completed (PRs #65/#67/#68).
 See `agent.md` §13, `docs/wysiwyg-release-checklist.md` §A/§E, and the 2026-06-26
@@ -82,15 +83,29 @@ never touched:
     `AssetURLPolicy` + WorkspaceKit `WorkspaceImageAssetStore` (no App/UI/load path yet).
 
 ### I2 — Render policy
-- [ ] Thumbnail is bounded (fit editor width, capped height, ~300 pt class), decoded
+- [x] Thumbnail is bounded (fit editor width, capped height, ~300 pt class), decoded
   **downsampled** (`CGImageSource` thumbnailing, never full-size bitmaps for huge photos);
   a deterministic placeholder shows while loading or on failure (missing/corrupt file
   never blanks or shifts unrelated lines); file change on disk refreshes the thumbnail.
-  **Partial loader evidence (2026-07-10, no presentation yet):** decode/downsample + mtime
+  **Loader evidence (2026-07-10):** decode/downsample + mtime
   cache key in `WorkspaceImageThumbnailProviderTests`
   (`testDownsampledDimensionsAreBounded`, `testDocumentRelativePathAndGIFFirstFrame`,
   `testJPEGAndWebPDecode`, `testCacheHitMissMtimeInvalidationAndByteBudgetEviction`).
-  Placeholder chrome and live editor refresh remain a later presentation PR.
+  **Presentation evidence (2026-07-11, internal hook only):**
+  - `WYSIWYGImageThumbnailPresentationTests`
+    (`testProjectedRegionUsesOneAttachmentAndEqualLengthZeroWidthPadding`,
+    `testStandaloneGeometryReservesOnlyImageLineAndPreservesViewport`,
+    `testInlineImageDoesNotInflateOtherWrappedVisualLines`).
+  - `testReadyThumbnailFitsEditorAndUsesPixelAspectInsideThreeHundredPointCap` proves the
+    fixed canvas fits the editor and the decoded pixels aspect-fit within the 300 pt cap.
+  - `testLoadingPlaceholderAndReadyThumbnailShareGeometrySelectionAndScroll` and
+    `testMissingFailureAndCorruptReadyDataKeepDeterministicAltPlaceholder` prove loading,
+    missing, failed, and corrupt paths never blank or reflow unrelated lines.
+  - `testMultipleImagesShareOneLineWithFoldedLinkAndCoalesceDuplicateLoad` covers multiple
+    image regions in one paragraph alongside the existing folded-link projection.
+  - `testRefreshProxyReloadsOnlyAffectedPathAndPreservesSelectionAndScroll` proves the
+    EditorKit refresh entry point reloads and reprojects only matching workspace paths;
+    FSEvents-to-proxy wiring remains the later enablement PR.
 
 ### I3 — Caret & selection
 - [ ] Reveal-on-touch; caret snapping at both edges of the image span (the C.2 policy over
@@ -112,12 +127,24 @@ never touched:
 ### I7 — Accessibility
 - [ ] `AXValue` is the exact raw source; the thumbnail exposes the alt text as its
   accessibility description.
+  **Partial evidence (2026-07-11):**
+  `testAccessibilityKeepsRawValueAndSelectedTextAndExposesAltDescription` keeps `AXValue`,
+  `accessibilitySelectedText()`, range strings, and attributed AX output exact raw Markdown
+  while the projected attachment image carries the exact alt-text accessibility description.
+  I7 remains open pending the complete user-facing accessibility gate.
 
 ### I8 — Performance & memory
 - [ ] Visible-range recompute on `Fixtures/large-1mb.md` stays ≤ 50 ms with image folding
   active (CI-informational per R15, hard locally); typing latency stays < 16 ms **while
   thumbnails are loading**; decode is off-main; cache is keyed by path+mtime with a bounded
   memory budget recorded in `docs/perf-log.md`.
+  **Partial evidence (2026-07-11):**
+  `testTextChangeCancelsAndDropsStaleLoadBeforeNewPlanApplies`,
+  `testDocumentChangeCancelsOldGenerationAndStartsFreshRequest`, and
+  `testTypingOnLargeFixtureStaysUnderBudgetWhileThumbnailLoadsAreInFlight` cover EditorKit
+  coalescing/stale-drop and assert the in-flight `large-1mb.md` typing hot path through the
+  shared R15 `assertPerformanceBudget` helper. The remaining I8 recompute/memory/perf-log
+  clauses stay open.
 
 ### I9 — Undo/redo
 - [ ] Presentation never enters undo; editing alt/path after reveal undoes as plain text;
