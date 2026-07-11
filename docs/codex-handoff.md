@@ -1,6 +1,6 @@
 # Codex Handoff — Phase 2 WYSIWYG Gate
 
-Status snapshot: 2026-07-10.
+Status snapshot: 2026-07-12.
 
 This document turns the current roadmap into Codex-ready work packages. It is intentionally
 operational: each section can be copied into Codex as a single goal, or split into subagents when the
@@ -47,7 +47,8 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   Experimental `UserDefaults` kill switch, deterministic `.sourceOnly` recovery, and hook wiring that
   now passes `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when the flag is enabled,
   the mode is WYSIWYG, and the mechanism has not failed. Goal 11 supplied the completed link-folding
-  extension; all other deferred constructs remain out of scope.
+  extension, and Goal 13 supplied the completed folder-workspace image-thumbnail extension; all other
+  deferred constructs remain out of scope.
 - Goal 9 finishes the Experimental sign-off on branch `phase2-wysiwyg-experimental-signoff`: manual UI
   validation confirms the Settings label/default, disabled two-state cycle, enabled three-state cycle,
   View menu/toolbar labels, WYSIWYG inline fold/reveal, and disable-from-WYSIWYG fallback without source
@@ -58,7 +59,13 @@ work crosses EditorKit, MarkdownCore, PreviewKit, and app-level mode handling.
   for both Zhuyin and Pinyin. Experimental WYSIWYG now uses
   `.inlineFoldRevealWithLinkFolding`; source modes, the off-by-default flag, mechanism fallback,
   raw-copy/selection policies, and stable/default promotion status are unchanged. Reference links,
-  autolinks, images, and all other deferred constructs stay raw/deferred.
+  autolinks, and all constructs not separately gated remain raw/deferred.
+- Goal 13's image-thumbnail I0-I10 sub-gate is complete on PR #83. The owner real-Mac run on
+  2026-07-12 passed ready-thumbnail and loading-placeholder composition immediately before and after
+  the image span for both Traditional Pinyin and Zhuyin (10 tests, 0 failures, 106.508 seconds).
+  `_developmentImageThumbnails` is supplied only under the same Experimental WYSIWYG gates and only
+  for contained folder-workspace documents; source modes, kill-switch fallback, single-file mode,
+  remote/SVG/reference images, and stable/default promotion are unchanged.
 
 ## Rules for every Codex run
 
@@ -532,7 +539,8 @@ presentation; PR B (#67) added destination-edge snapping plus raw-copy/paste, re
 performance, and undo evidence; PR C (#68) extended the owner-only actual-IME harness and enabled
 the completed presentation only in Experimental WYSIWYG. The 2026-07-06 owner run passed Zhuyin
 and Pinyin at the start/end of visible link text and immediately after the hidden destination.
-Reference-style links, autolinks, and images stay raw/deferred; checklist D.4 remains open.
+At Goal 11 completion, reference-style links, autolinks, and images stayed raw/deferred. Goal 13
+later admitted only its gated folder-workspace image-thumbnail subset; checklist D.4 remains open.
 
 ## Goal 12 — Release engineering (R14) — completed 2026-07-05
 
@@ -547,7 +555,7 @@ deferred until Apple Developer Program membership.
 
 ---
 
-# Status snapshot — 2026-07-10 (post-PR #68 merge)
+# Status snapshot — 2026-07-12 (PR #83 image-thumbnail enablement)
 
 - **v0.1.0-alpha.1 is publicly released** (`Plainsong-0.1.0-56-unsigned.dmg` + SHA-256 on
   GitHub Releases). The repo is **public under MIT**; secret scanning + push protection,
@@ -564,6 +572,9 @@ deferred until Apple Developer Program membership.
   `make preview-bundle`, because the preview ships as the committed dist bundle.
 - Goal 11 link visual folding merged via PR #68 on 2026-07-10 after the owner-run
   Zhuyin/Pinyin link gate.
+- Goal 13 image thumbnails completed I0-I10 on PR #83 after the 2026-07-12 owner-run
+  Traditional Pinyin/Zhuyin image-boundary gate (10 tests, 0 failures, 106.508 seconds).
+  Enablement is folder-workspace-only inside off-by-default Experimental WYSIWYG.
 - Owner-driven next: WYSIWYG dogfood and issue triage (Goal 10); stable/default promotion
   remains gated on D.4 evidence plus a Decision Log entry.
 
@@ -628,12 +639,22 @@ Verification before declaring any PR done:
 
 ---
 
-# Goal 13 — Image thumbnail sub-gate (2026-07-06)
+# Goal 13 — Image thumbnail sub-gate — completed by phase2-image-thumbnail-enable
 
-The link-folding sub-gate completed (PRs #65/#67/#68; inline links fold inside Experimental
-WYSIWYG). The next §E construct is **image thumbnails**, spec'd in
-`docs/image-thumbnail-gates.md` (I0-I10). Unlike links, it starts with a **mechanism spike
-(I0)** because the natural tool (`NSTextAttachment`) collides with the no-U+FFFC /
-canonical-source invariants; the spike must prove the projection-only attachment (option A)
-or fall back to the overlay adornment (option B) before any production PR. Same three-PR
-shape afterwards: model+presentation → native gates → owner IME run + enable.
+`docs/image-thumbnail-gates.md` I0-I10 are complete. The chosen mechanism is a projection-only
+`NSTextAttachment`: the ephemeral paragraph receives one U+FFFC plus equal-length U+200B padding,
+while the backing source, copy, accessibility value, selection offsets, and undo history remain raw.
+WorkspaceKit owns contained, downsampled, cached raster loading; EditorKit exposes only its loader seam.
+
+PR #83 adds the final owner-only image-boundary scenarios and App adapter. The 2026-07-12 real-Mac
+run selected `com.apple.inputmethod.TCIM.Pinyin` (`Pinyin – Traditional`) and
+`com.apple.inputmethod.TCIM.Zhuyin` (`Zhuyin – Traditional`), passing ready-thumbnail and
+loading-placeholder composition immediately before and after the image for both sources. The complete
+suite executed 10 tests with 0 failures in 106.508 seconds.
+
+The App supplies `_developmentImageThumbnails` only when the off-by-default Experimental flag,
+WYSIWYG layout, mechanism health, `.inlineFoldRevealWithLinkFolding`, and contained folder-workspace
+document all agree. The existing external workspace-reload path invalidates changed raster paths.
+Source-only/source+preview, kill-switch fallback, and single-file mode stay raw. Remote/SVG/reference/
+outside-root/oversized images stay raw; GIF is first-frame-only; resize, animation playback,
+open-in-Preview, dependencies, and stable/default promotion remain out of scope. D.4 stays unchecked.

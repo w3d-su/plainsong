@@ -1,12 +1,12 @@
 # Image Thumbnails — Sub-Gate Specification
 
-> **Status: I0–I4, I6–I10 checked behind the INTERNAL DEVELOPMENT HOOK ONLY.
-> I5 (owner-run actual IME) remains open. No App wiring or user-facing exposure.**
-> `docs/wysiwyg-release-checklist.md` §E defers image thumbnails. This document is the
+> **Status: I0–I10 checked with evidence. PR #83 wires image thumbnails only into the
+> off-by-default Experimental WYSIWYG mode for folder workspaces.**
+> `docs/wysiwyg-release-checklist.md` §E records that narrow inclusion. This document is the
 > dedicated sub-gate (the link-folding pattern, `docs/link-folding-gates.md`, applied to the
-> next construct). The presentation path requires an explicit EditorKit-only hook; the
-> public presentation cases remain unchanged and App supplies no loader. User-facing
-> enablement still requires every gate below plus its own Decision Log entry.
+> next construct). The App supplies the WorkspaceKit-backed loader only when the Experimental
+> flag, WYSIWYG layout, and mechanism-health gates already permit WYSIWYG; source modes,
+> kill-switch fallback, single-file mode, and stable/default promotion remain unchanged.
 
 Created 2026-07-06 after the link-folding sub-gate completed (PRs #65/#67/#68).
 See `agent.md` §13, `docs/wysiwyg-release-checklist.md` §A/§E, and the 2026-06-26
@@ -105,8 +105,11 @@ never touched:
   - `testMultipleImagesShareOneLineWithFoldedLinkAndCoalesceDuplicateLoad` covers multiple
     image regions in one paragraph alongside the existing folded-link projection.
   - `testRefreshProxyReloadsOnlyAffectedPathAndPreservesSelectionAndScroll` proves the
-    EditorKit refresh entry point reloads and reprojects only matching workspace paths;
-    FSEvents-to-proxy wiring remains the later enablement PR.
+    EditorKit refresh entry point reloads and reprojects only matching workspace paths.
+  - **App/FSEvents evidence (2026-07-12, PR #83):**
+    `AppStateTests.testWorkspaceReloadInvalidatesOnlyChangedAllowlistedRasterPaths` wires the
+    existing external workspace-reload path to that proxy for changed, added, and removed
+    allowlisted raster paths while excluding unchanged and SVG paths.
 
 ### I3 — Caret & selection
 - [x] Reveal-on-touch; caret snapping at both edges of the image span (the C.2 policy over
@@ -132,9 +135,18 @@ never touched:
   `testRawPasteMutatesOnlyBackingSource` without duplicating those I0 invariants.
 
 ### I5 — IME (owner-run)
-- [ ] `PLAINSONG_RUN_ACTUAL_IME=1` Zhuyin + Pinyin composition immediately before/after an
-  image span: no corruption, no caret escape, presentation skipped during marked text.
-  **Not this PR** — owner-run actual IME remains a separate gate (link-folding L5 precedent).
+- [x] `PLAINSONG_RUN_ACTUAL_IME=1` Zhuyin + Pinyin composition immediately before/after an
+  image span: no corruption, no caret escape, no premature commit, image presentation skipped
+  during marked text, and the ready thumbnail/loading placeholder presentation reapplied after
+  commit. **Owner evidence (2026-07-12, PR #83):**
+  - `com.apple.inputmethod.TCIM.Pinyin` (`Pinyin – Traditional`,
+    `TISTypeKeyboardInputMode`) passed all four image-boundary scenarios: immediately before
+    and after the image with a ready thumbnail, then immediately before and after with a
+    loading placeholder.
+  - `com.apple.inputmethod.TCIM.Zhuyin` (`Zhuyin – Traditional`,
+    `TISTypeKeyboardInputMode`) passed the same four scenarios.
+  - The complete `WYSIWYGActualIMEEventGateTests` owner run executed 10 tests with 0 failures
+    in 106.508 seconds; neither input method was skipped.
 
 ### I6 — Pointer
 - [x] Real-`NSEvent` click on the thumbnail places the caret and reveals (no drag-resize,
@@ -195,8 +207,14 @@ never touched:
 
 ## 5. Exit criteria
 
-I0–I10 checked with evidence → a dedicated PR may enable image thumbnails **only inside the
-off-by-default Experimental WYSIWYG mode**, with a Decision Log entry. Stable/default
-promotion of WYSIWYG remains governed by `docs/wysiwyg-release-checklist.md` §F. Remote
-image fetching, SVG, playback, and resize handles are explicitly out of scope for v1 and
-each need their own future gate.
+I0–I10 are checked with named automated and owner-run evidence. PR #83 supplies the
+WorkspaceKit-to-EditorKit adapter and `_developmentImageThumbnails` only when the existing
+Experimental flag, WYSIWYG layout, and mechanism-health gates select
+`.inlineFoldRevealWithLinkFolding`, and only when a folder workspace provides contained
+directory scope. The existing FSEvents/external-reload path invalidates changed raster paths;
+single-file mode provably supplies no loader and stays raw. This enables image thumbnails
+**only inside the off-by-default Experimental WYSIWYG mode** and is recorded in the 2026-07-12
+Decision Log entry. Stable/default promotion remains governed by
+`docs/wysiwyg-release-checklist.md` §F/D.4 and is not claimed. Remote image fetching, SVG,
+reference images, animation playback, resize handles, and open-in-Preview behavior are out of
+scope for v1 and each needs its own future gate.

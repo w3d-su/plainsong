@@ -5,6 +5,8 @@ import Foundation
 
 let actualIMEGateSource = "# 標題\n\n前綴 **粗體**、*斜體*、`程式` 後綴\n"
 let actualIMELinkGateSource = "前綴 [連結文字](https://example.com/path) 後綴\n"
+let actualIMEImageGateLiteral = "![縮圖](fixture.png)"
+let actualIMEImageGateSource = "前綴 \(actualIMEImageGateLiteral) 後綴\n"
 
 struct ActualIMEScript {
     let name: String
@@ -69,6 +71,7 @@ struct ActualIMEFoldBoundaryScenario: CaseIterable {
     let foldedRanges: [NSRange]
     let developmentPresentation: MarkdownEditorDevelopmentPresentation
     let verifiesLinkFoldAfterCommit: Bool
+    let imagePresentationState: ActualIMEImagePresentationState?
 
     init(
         name: String,
@@ -76,7 +79,8 @@ struct ActualIMEFoldBoundaryScenario: CaseIterable {
         insertionLocation: Int,
         foldedRanges: [NSRange],
         developmentPresentation: MarkdownEditorDevelopmentPresentation = .inlineFoldReveal,
-        verifiesLinkFoldAfterCommit: Bool = false
+        verifiesLinkFoldAfterCommit: Bool = false,
+        imagePresentationState: ActualIMEImagePresentationState? = nil
     ) {
         self.name = name
         self.source = source
@@ -84,6 +88,7 @@ struct ActualIMEFoldBoundaryScenario: CaseIterable {
         self.foldedRanges = foldedRanges
         self.developmentPresentation = developmentPresentation
         self.verifiesLinkFoldAfterCommit = verifiesLinkFoldAfterCommit
+        self.imagePresentationState = imagePresentationState
     }
 
     static let allCases: [ActualIMEFoldBoundaryScenario] = {
@@ -209,6 +214,47 @@ struct ActualIMEFoldBoundaryScenario: CaseIterable {
             ),
         ]
     }()
+
+    static let imageBoundaryCases: [ActualIMEFoldBoundaryScenario] = {
+        let source = actualIMEImageGateSource
+        let imageSpan = (source as NSString).range(of: actualIMEImageGateLiteral)
+        precondition(imageSpan.location != NSNotFound)
+
+        return ActualIMEImagePresentationState.allCases.flatMap { state in
+            [
+                ActualIMEFoldBoundaryScenario(
+                    name: "image immediately before \(state.scenarioName)",
+                    source: source,
+                    insertionLocation: imageSpan.location,
+                    foldedRanges: [],
+                    developmentPresentation: .inlineFoldRevealWithLinkFolding,
+                    imagePresentationState: state
+                ),
+                ActualIMEFoldBoundaryScenario(
+                    name: "image immediately after \(state.scenarioName)",
+                    source: source,
+                    insertionLocation: NSMaxRange(imageSpan),
+                    foldedRanges: [],
+                    developmentPresentation: .inlineFoldRevealWithLinkFolding,
+                    imagePresentationState: state
+                ),
+            ]
+        }
+    }()
+}
+
+enum ActualIMEImagePresentationState: CaseIterable, Equatable {
+    case readyThumbnail
+    case loadingPlaceholder
+
+    var scenarioName: String {
+        switch self {
+        case .readyThumbnail:
+            "with ready thumbnail"
+        case .loadingPlaceholder:
+            "with loading placeholder"
+        }
+    }
 }
 
 struct ActualIMEInputSource {

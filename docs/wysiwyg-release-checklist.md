@@ -8,8 +8,9 @@
 > This checklist started as a specification and now records implementation evidence as gates
 > turn green. The zero-width mechanism and B1-B13 rerun gates are green as of 2026-06-26, the
 > §C.2-§C.4 delimiter edge-snapping / selection / copy gates are green as of 2026-06-27,
-> §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27, and the §C.5
-> inline-link visual-folding sub-gate is green and included in Experimental WYSIWYG as of 2026-07-06.
+> §D AppState/persistence/recovery/manual UI gates are green as of 2026-06-27, the §C.5
+> inline-link visual-folding sub-gate is green and included in Experimental WYSIWYG as of
+> 2026-07-06, and image-thumbnail gates I0–I10 joined that Experimental mode as of 2026-07-12.
 > Final stable/default promotion remains blocked by the explicit unchecked promotion gate below.
 
 Created 2026-06-26 as the deliverable for `docs/codex-handoff.md` Goal 5, after the native
@@ -47,10 +48,13 @@ What still blocks promotion beyond Experimental:
    unchecked D.4 promotion gate is completed with a Decision Log entry.
 2. **WYSIWYG must remain off by default.** The App may pass
    `_developmentPresentation: .inlineFoldRevealWithLinkFolding` only when the Experimental flag
-   is enabled, the current layout mode is WYSIWYG, and the mechanism has not failed.
-3. **Deferred constructs remain blocked.** Completing the inline-link sub-gate does not authorize
-   image thumbnails, fenced-code custom fragments, tables, Mermaid/math widgets, or real MDX
-   rendering in the editor surface; reference links and autolinks stay raw.
+   is enabled, the current layout mode is WYSIWYG, and the mechanism has not failed. The App may
+   additionally supply `_developmentImageThumbnails` only under those same gates and only for a
+   contained document in an open folder workspace.
+3. **Remaining deferred constructs stay blocked.** Completing the inline-link and image-thumbnail
+   sub-gates does not authorize fenced-code custom fragments, tables, Mermaid/math widgets, or
+   real MDX rendering in the editor surface. Reference links, autolinks, remote/SVG/reference
+   images, and images in single-file mode without directory scope stay raw.
 
 ---
 
@@ -225,10 +229,11 @@ for the dev hook.
 ### C.5 Link visual folding included through its completed sub-gate
 
 - [x] Inline links `[text](url)` visually fold only in the off-by-default Experimental WYSIWYG
-  mode after the dedicated L1-L9 sub-gate completed. Link text remains visible and styled;
-  plain click places the caret and reveals the raw link (Typora-style), while reference links,
-  autolinks, and images stay raw. Source-only/source+preview behavior, exact-raw-copy policy,
-  selection ranges, and the kill-switch fallback are unchanged. Evidence:
+   mode after the dedicated L1-L9 sub-gate completed. Link text remains visible and styled;
+   plain click places the caret and reveals the raw link (Typora-style), while reference links
+   and autolinks stay raw. Image thumbnails are governed separately by the completed §E/I0-I10
+   sub-gate. Source-only/source+preview behavior, exact-raw-copy policy, selection ranges, and
+   the kill-switch fallback are unchanged. Evidence:
   `docs/link-folding-gates.md`, the owner real-Mac Zhuyin/Pinyin run on 2026-07-06, and the
   `agent.md` 2026-07-06 Decision Log entry.
 
@@ -301,16 +306,21 @@ this into a **three-state** cycle per `agent.md` §13.
 
 ---
 
-## E. Construct scope (unchanged; do not expand here)
+## E. Construct scope (gated additions only; do not expand casually)
 
 User-facing WYSIWYG v1 stays inline-first. Included: **headings, emphasis/strong,
-strikethrough, inline code, list/quote marker styling, and inline links `[text](url)`**.
-Inline-link folding completed its own L1-L9 gate (see C.5); reference-style links and autolinks
-stay raw. The following remain **deferred** and must not be added as part of this scope:
+strikethrough, inline code, list/quote marker styling, inline links `[text](url)`, and bounded
+thumbnails for eligible local raster images in folder workspaces**. Inline-link folding completed
+its L1-L9 gate (see C.5), and image thumbnails completed I0-I10 in
+`docs/image-thumbnail-gates.md`; both are available only in off-by-default Experimental WYSIWYG.
+Reference-style links, autolinks, and ineligible images stay raw. The remaining constructs are
+**deferred** and must not be added as part of this scope:
 
 - [x] Inline link visual folding — included only in Experimental WYSIWYG after the completed C.5 sub-gate.
 - [x] Reference-style links and autolinks — stay raw.
-- [x] Image thumbnails — deferred.
+- [x] Image thumbnails — included only in Experimental WYSIWYG after I0-I10 passed. Limited to
+  PNG/JPEG/GIF/WebP ≤ 10 MiB inside an open folder workspace; remote/SVG/reference/outside-root/
+  single-file images stay raw, and animated GIF is first-frame-only with no playback.
 - [x] Fenced-code custom layout fragments — deferred.
 - [x] Tables — stay raw; existing table helper remains.
 - [x] Mermaid / math widgets — stay raw in editor; preview pane renders.
@@ -338,14 +348,16 @@ checked:
   experimental labeling implemented and tested. Automated AppState tests cover persistence/recovery;
   2026-06-27 manual sign-off covers Settings label/default, View menu, toolbar, enabled/disabled
   cycles, and disable-from-WYSIWYG fallback.
-- [x] **E** — Inline links are included through their completed sub-gate; all remaining deferred
-  constructs stay deferred and reference links/autolinks remain raw.
+- [x] **E** — Inline links and eligible folder-workspace image thumbnails are included through
+  their completed sub-gates only in Experimental WYSIWYG; all remaining deferred constructs stay
+  deferred, and reference links/autolinks plus ineligible/single-file images remain raw.
 - [x] **Docs** — `docs/wysiwyg-design.md`, `docs/risk-register.md` (R18 closed only when B13 +
   A complete), `docs/codex-handoff.md`, README/Settings copy, and `agent.md` Decision Log all
   synchronized with the shipped behavior.
 
 Until the stable-promotion gate is checked, the only valid WYSIWYG surfaces are the off-by-default
-Experimental mode (using `.inlineFoldRevealWithLinkFolding`) and non-user-facing development hooks.
+Experimental mode (using `.inlineFoldRevealWithLinkFolding`, with the folder-scoped thumbnail
+loader supplied only under the same App gates) and non-user-facing development hooks.
 
 ---
 
@@ -355,6 +367,7 @@ Experimental mode (using `.inlineFoldRevealWithLinkFolding`) and non-user-facing
 - `docs/risk-register.md` — R10 (selection/caret), R11 (copy policy), R12 (checklist-before-gates),
   R18 (zero-width mechanism distortion).
 - `docs/codex-handoff.md` — Goals 4-8 and remaining release sign-off notes.
+- `docs/image-thumbnail-gates.md` — I0-I10 image-thumbnail scope and evidence.
 - `Packages/EditorKit/Sources/EditorKit/WYSIWYGZeroWidthTextContentProjection.swift` — current
   zero-width mechanism.
 - `Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativePointerGateTests.swift`,

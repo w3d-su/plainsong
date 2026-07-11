@@ -285,6 +285,9 @@ private extension WYSIWYGImagePresentationController {
     }
 
     func rebuildPresentation(forceReapply: Bool, in textView: MarkdownSTTextView) {
+        guard !textView.hasMarkedText() else {
+            return
+        }
         guard let activePlan else {
             clearActivePresentation(in: textView)
             return

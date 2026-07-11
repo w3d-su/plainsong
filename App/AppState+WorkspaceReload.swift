@@ -120,7 +120,12 @@ extension AppState {
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
+        let previousSnapshot = workspaceSnapshot
         workspaceSnapshot = snapshot
+        refreshEditorImageThumbnails(
+            previousSnapshot: previousSnapshot,
+            currentSnapshot: snapshot
+        )
         workspaceTree = tree
         scheduleCompletionWorkspaceRefresh(workspaceGeneration: generation)
 
