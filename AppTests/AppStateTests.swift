@@ -1,3 +1,6 @@
+// The generated project fixes App test source membership; keep the WS3B matrix in this
+// existing source without regenerating the out-of-scope project file.
+// swiftlint:disable file_length type_body_length
 import EditorKit
 import MarkdownCore
 @testable import Plainsong
@@ -813,6 +816,760 @@ final class AppStateTests: XCTestCase {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
+    }
+}
+
+@MainActor
+final class WorkspaceSearchAppStateTests: XCTestCase {
+    func testAppBindingPropagatesCanonicalEquivalentRawDifferentText() async throws {
+        let original = "cafe\u{0301}"
+        let replacement = "caf\u{00E9}"
+        let session = DocumentSession(text: original, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        var iterator = session.textChanges(includeCurrent: false).makeAsyncIterator()
+
+        appState.replaceDocumentText(replacement)
+
+        let nextChange = await iterator.next()
+        let change = try XCTUnwrap(nextChange)
+        XCTAssertEqual(Array(session.text.utf16), Array(replacement.utf16))
+        XCTAssertEqual(Array(change.text.utf16), Array(replacement.utf16))
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+        appState.completionWorkspaceTask?.cancel()
+        appState.statisticsTask?.cancel()
+    }
+
+    func testDebounceStartsOnlyLatestQueryWithIncreasingGeneration() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "first second"],
+            debounceNanoseconds: 50_000_000
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "first"))
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(
+            pattern: "second",
+            caseSensitivity: .sensitive,
+            wholeWord: true
+        ))
+
+        try await waitUntil("latest debounced search starts") { provider.requests.count == 1 }
+        let request = try XCTUnwrap(provider.requests.first)
+        XCTAssertEqual(request.query.pattern, "second")
+        XCTAssertEqual(request.query.caseSensitivity, .sensitive)
+        XCTAssertTrue(request.query.wholeWord)
+        XCTAssertEqual(request.queryGeneration, 2)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .searching)
+    }
+
+    func testReplacementCancelsConsumingTaskTerminatesProducerAndOldCleanupCannotClearNewResults() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "beta"]
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("first search starts") { provider.requests.count == 1 }
+        let firstRequest = provider.requests[0]
+        provider.yield(
+            .fileResult(context(for: firstRequest), result(path: "a.md", text: "alpha", needle: "alpha")),
+            to: 0
+        )
+        try await waitUntil("first partial result applies") {
+            fixture.appState.workspaceSearchState.fileResults.map(\.relativePath) == ["a.md"]
+        }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
+        try await waitUntil("first producer terminates and replacement starts") {
+            provider.terminatedSubscriptionIndices.contains(0) && provider.requests.count == 2
+        }
+        let secondRequest = provider.requests[1]
+        provider.yield(
+            .fileResult(context(for: secondRequest), result(path: "b.md", text: "beta", needle: "beta")),
+            to: 1
+        )
+        try await waitUntil("replacement partial result applies") {
+            fixture.appState.workspaceSearchState.fileResults.map(\.relativePath) == ["b.md"]
+        }
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(fixture.appState.workspaceSearchState.activeQuery?.pattern, "beta")
+        XCTAssertEqual(fixture.appState.workspaceSearchState.queryGeneration, secondRequest.queryGeneration)
+        XCTAssertNotNil(fixture.appState.workspaceSearchTask)
+    }
+
+    func testWorkspaceCloseCancelsActiveSearch() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(provider: provider, files: ["a.md": "alpha"])
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+
+        fixture.appState.closeWorkspace()
+
+        try await waitUntil("close terminates producer") {
+            provider.terminatedSubscriptionIndices.contains(0)
+        }
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(fixture.appState.workspaceRootURL)
+    }
+
+    func testWorkspaceSwitchCancelsActiveSearch() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let scanner = ImmediateWorkspaceDirectoryScanner(snapshot: WorkspaceFileSnapshot(entries: []))
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"],
+            directoryScanner: scanner
+        )
+        let secondRoot = try makeTemporaryDirectory()
+        defer {
+            fixture.appState.closeWorkspace()
+            cleanUp(fixture)
+            try? FileManager.default.removeItem(at: secondRoot)
+        }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+
+        try fixture.appState.openWorkspace(url: secondRoot, rememberAsLastOpened: false)
+
+        try await waitUntil("switch terminates producer") {
+            provider.terminatedSubscriptionIndices.contains(0)
+        }
+        XCTAssertEqual(
+            fixture.appState.workspaceRootURL?.standardizedFileURL,
+            secondRoot.standardizedFileURL
+        )
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+    }
+
+    func testGenerationAdvanceAndTeardownCancelActiveWork() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(provider: provider, files: ["a.md": "alpha"])
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("first search starts") { provider.requests.count == 1 }
+
+        _ = fixture.appState.advanceWorkspaceGeneration()
+
+        try await waitUntil("generation advance terminates producer") {
+            provider.terminatedSubscriptionIndices.contains(0)
+        }
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("second search starts") { provider.requests.count == 2 }
+        fixture.appState.teardownWorkspaceSearch()
+        try await waitUntil("teardown terminates producer") {
+            provider.terminatedSubscriptionIndices.contains(1)
+        }
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
+    }
+
+    func testEmptyQueryCancelsActiveSearchAndReturnsToIdle() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(provider: provider, files: ["a.md": "alpha"])
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: ""))
+
+        try await waitUntil("empty query terminates producer") {
+            provider.terminatedSubscriptionIndices.contains(0)
+        }
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
+        XCTAssertTrue(fixture.appState.workspaceSearchState.fileResults.isEmpty)
+    }
+
+    func testLateEventsFromStaleRootWorkspaceAndQueryContextsCannotMutateState() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(provider: provider, files: ["a.md": "alpha"])
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let activeContext = context(for: request)
+        let staleRoot = WorkspaceSearchContext(
+            rootIdentity: "\(activeContext.rootIdentity)-stale",
+            workspaceGeneration: activeContext.workspaceGeneration,
+            queryGeneration: activeContext.queryGeneration
+        )
+        let staleWorkspace = WorkspaceSearchContext(
+            rootIdentity: activeContext.rootIdentity,
+            workspaceGeneration: activeContext.workspaceGeneration + 1,
+            queryGeneration: activeContext.queryGeneration
+        )
+        let staleQuery = WorkspaceSearchContext(
+            rootIdentity: activeContext.rootIdentity,
+            workspaceGeneration: activeContext.workspaceGeneration,
+            queryGeneration: activeContext.queryGeneration + 1
+        )
+
+        provider.yield(.fileResult(staleRoot, result(path: "a.md", text: "alpha", needle: "alpha")), to: 0)
+        provider.yield(
+            .progress(staleWorkspace, WorkspaceSearchProgress(completedFileCount: 1, candidateFileCount: 1)),
+            to: 0
+        )
+        provider.yield(
+            .skippedFile(staleQuery, WorkspaceSearchSkippedFile(relativePath: "a.md", reason: .unreadable)),
+            to: 0
+        )
+        provider.yield(.completed(staleQuery, summary()), to: 0)
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertTrue(fixture.appState.workspaceSearchState.fileResults.isEmpty)
+        XCTAssertTrue(fixture.appState.workspaceSearchState.skippedFiles.isEmpty)
+        XCTAssertNil(fixture.appState.workspaceSearchState.progress)
+        XCTAssertNil(fixture.appState.workspaceSearchState.summary)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .searching)
+
+        let progress = WorkspaceSearchProgress(completedFileCount: 1, candidateFileCount: 1)
+        provider.yield(.progress(activeContext, progress), to: 0)
+        try await waitUntil("active progress applies") {
+            fixture.appState.workspaceSearchState.progress == progress
+        }
+    }
+
+    func testPartialProgressSkippedCompletionAndTruncationMapDeterministically() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "beta"]
+        )
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "a"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        let activeContext = context(for: provider.requests[0])
+        let skipped = WorkspaceSearchSkippedFile(relativePath: "z.md", reason: .unreadable)
+        let progress = WorkspaceSearchProgress(completedFileCount: 2, candidateFileCount: 2)
+        let completedSummary = summary(
+            candidateFileCount: 2,
+            searchedFileCount: 2,
+            skippedFileCount: 1,
+            totalMatchCount: 2,
+            truncatedFilePaths: ["b.md"],
+            isGloballyTruncated: true,
+            skippedFiles: [skipped],
+            omittedSkippedFileCount: 2
+        )
+
+        provider.yield(
+            .fileResult(activeContext, result(path: "b.md", text: "beta", needle: "a", truncated: true)),
+            to: 0
+        )
+        provider.yield(.fileResult(activeContext, result(path: "a.md", text: "alpha", needle: "a")), to: 0)
+        provider.yield(.skippedFile(activeContext, skipped), to: 0)
+        provider.yield(.progress(activeContext, progress), to: 0)
+        provider.yield(.completed(activeContext, completedSummary), to: 0)
+        provider.finish(0)
+
+        try await waitUntil("completion maps") {
+            fixture.appState.workspaceSearchState.phase == .completed
+        }
+        let state = fixture.appState.workspaceSearchState
+        XCTAssertEqual(state.fileResults.map(\.relativePath), ["a.md", "b.md"])
+        XCTAssertEqual(state.skippedFiles, [skipped])
+        XCTAssertEqual(state.progress, progress)
+        XCTAssertEqual(state.summary, completedSummary)
+        XCTAssertTrue(state.isTruncated)
+        XCTAssertTrue(state.isGloballyTruncated)
+        XCTAssertEqual(state.truncatedFilePaths, ["b.md"])
+    }
+
+    func testValidationAndServiceFailureRemainDistinctAndFailureKeepsPartialResults() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(provider: provider, files: ["a.md": "alpha"])
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "bad\nquery"))
+        try await waitUntil("validation search starts") { provider.requests.count == 1 }
+        provider.yield(
+            .validationFailure(context(for: provider.requests[0]), .newlineInQuery),
+            to: 0
+        )
+        provider.finish(0)
+        try await waitUntil("validation maps") {
+            fixture.appState.workspaceSearchState.phase == .validationFailure(.newlineInQuery)
+        }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("failure search starts") { provider.requests.count == 2 }
+        let activeContext = context(for: provider.requests[1])
+        provider.yield(
+            .fileResult(activeContext, result(path: "a.md", text: "alpha", needle: "alpha")),
+            to: 1
+        )
+        provider.yield(.failed(activeContext, .unexpectedProducerFailure), to: 1)
+        provider.finish(1)
+        try await waitUntil("service failure maps") {
+            fixture.appState.workspaceSearchState.phase == .serviceFailure(.unexpectedProducerFailure)
+        }
+
+        XCTAssertEqual(fixture.appState.workspaceSearchState.fileResults.map(\.relativePath), ["a.md"])
+        XCTAssertNil(fixture.appState.workspaceSearchState.summary)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testDirtyOverlayCaptureIsImmutableDeduplicatedAndExcludesIneligibleSessions() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: [
+                "clean.md": "clean",
+                "current.md": "current disk",
+                "detached.md": "detached disk",
+                "warm.mdx": "warm disk",
+            ],
+            currentPath: "current.md"
+        )
+        let outsideRoot = try makeTemporaryDirectory()
+        defer {
+            cleanUp(fixture)
+            try? FileManager.default.removeItem(at: outsideRoot)
+        }
+        let appState = fixture.appState
+        let currentURL = fixture.rootURL.appendingPathComponent("current.md")
+        let warmURL = fixture.rootURL.appendingPathComponent("warm.mdx")
+        let cleanURL = fixture.rootURL.appendingPathComponent("clean.md")
+        let detachedURL = fixture.rootURL.appendingPathComponent("detached.md")
+        let nonMarkdownURL = fixture.rootURL.appendingPathComponent("notes.txt")
+        let outsideURL = outsideRoot.appendingPathComponent("outside.md")
+        try "outside".write(to: outsideURL, atomically: true, encoding: .utf8)
+        try "notes".write(to: nonMarkdownURL, atomically: true, encoding: .utf8)
+
+        appState.replaceDocumentText("current dirty")
+        let warm = DocumentSession(text: "warm disk", url: warmURL, fileKind: .mdx)
+        warm.replaceText("warm dirty")
+        let clean = DocumentSession(text: "clean", url: cleanURL, fileKind: .markdown)
+        let detached = DocumentSession(text: "detached disk", url: detachedURL, fileKind: .markdown)
+        detached.replaceText("detached dirty")
+        let nonMarkdown = DocumentSession(text: "notes", url: nonMarkdownURL, fileKind: .markdown)
+        nonMarkdown.replaceText("notes dirty")
+        let outside = DocumentSession(text: "outside", url: outsideURL, fileKind: .markdown)
+        outside.replaceText("outside dirty")
+        let aliasURL = fixture.rootURL.appendingPathComponent("current-alias.md")
+        try FileManager.default.createSymbolicLink(at: aliasURL, withDestinationURL: currentURL)
+        let duplicatePath = DocumentSession(text: "duplicate", url: aliasURL, fileKind: .markdown)
+        duplicatePath.replaceText("duplicate dirty")
+
+        appState.sessionCache[warmURL] = warm
+        appState.sessionCache[cleanURL] = clean
+        appState.sessionCache[detachedURL] = detached
+        appState.sessionCache[nonMarkdownURL] = nonMarkdown
+        appState.sessionCache[outsideURL] = outside
+        appState.sessionCache[aliasURL] = duplicatePath
+        appState.sessionCache[currentURL] = appState.currentDocument
+        appState.detachedSessionURLs.insert(detachedURL.standardizedFileURL)
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "dirty"))
+        try await waitUntil("overlay request starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        XCTAssertEqual(request.dirtyOverlays.overlays.map(\.relativePath), ["current.md", "warm.mdx"])
+        XCTAssertEqual(request.dirtyOverlays.overlays.map(\.text), ["current dirty", "warm dirty"])
+
+        appState.replaceDocumentText("current changed later")
+        warm.replaceText("warm changed later")
+        XCTAssertEqual(request.dirtyOverlays.overlays.map(\.text), ["current dirty", "warm dirty"])
+
+        let singleFileProvider = ControlledWorkspaceSearchStreamProvider()
+        let singleFile = DocumentSession(text: "single", url: outsideURL, fileKind: .markdown)
+        singleFile.replaceText("single dirty")
+        let singleFileState = AppState(
+            currentDocument: singleFile,
+            workspaceSearchStreamProvider: singleFileProvider,
+            workspaceSearchDebounceNanoseconds: 0
+        )
+        singleFileState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "dirty"))
+        XCTAssertTrue(singleFileProvider.requests.isEmpty)
+        XCTAssertEqual(singleFileState.workspaceSearchState.phase, .idle)
+    }
+
+    func testMatchingFingerprintSelectsActivatesAndEmitsIncreasingExactNavigation() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "before needle after"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(path: "b.md", text: "before needle after", needle: "needle")
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("result applies") {
+            fixture.appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        fixture.appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+        let firstRequest = try navigationRequest(from: fixture.appState.editorNavigationCommand)
+        XCTAssertEqual(fixture.appState.workspaceTree?.selectedNode?.relativePath, "b.md")
+        XCTAssertEqual(
+            fixture.appState.currentDocument.fileURL?.standardizedFileURL,
+            fixture.rootURL.appendingPathComponent("b.md").standardizedFileURL
+        )
+        XCTAssertEqual(firstRequest.selection, match.range)
+        XCTAssertEqual(firstRequest.documentIdentity, fixture.appState.activeEditorDocumentIdentity)
+
+        fixture.appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+        let secondRequest = try navigationRequest(from: fixture.appState.editorNavigationCommand)
+        XCTAssertGreaterThan(secondRequest.id, firstRequest.id)
+        XCTAssertEqual(secondRequest.selection, match.range)
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "other"))
+        guard case let .cancel(cancellationID)? = fixture.appState.editorNavigationCommand else {
+            return XCTFail("Expected query replacement to cancel pending editor navigation")
+        }
+        XCTAssertGreaterThan(cancellationID, secondRequest.id)
+    }
+
+    func testByteDifferentCanonicalEquivalentFingerprintCancelsNavigationAndRefreshesFreshOverlay() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let diskText = "cafe\u{0301} needle"
+        let liveText = "caf\u{00E9} needle"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["post.md": diskText],
+            currentPath: "post.md"
+        )
+        defer { cleanUp(fixture) }
+        fixture.appState.replaceDocumentText(liveText)
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("stale-result search starts") { provider.requests.count == 1 }
+        let firstRequest = provider.requests[0]
+        let staleResult = result(path: "post.md", text: diskText, needle: "needle")
+        let staleMatch = try XCTUnwrap(staleResult.matches.first)
+        provider.yield(.fileResult(context(for: firstRequest), staleResult), to: 0)
+        try await waitUntil("stale result applies") {
+            fixture.appState.workspaceSearchState.fileResults == [staleResult]
+        }
+
+        fixture.appState.activateWorkspaceSearchResult(
+            context: context(for: firstRequest),
+            fileResult: staleResult,
+            match: staleMatch
+        )
+
+        guard case .cancel? = fixture.appState.editorNavigationCommand else {
+            return XCTFail("Expected stale fingerprint to emit editor cancellation")
+        }
+        try await waitUntil("fresh-overlay search restarts") { provider.requests.count == 2 }
+        let refreshedRequest = provider.requests[1]
+        XCTAssertGreaterThan(refreshedRequest.queryGeneration, firstRequest.queryGeneration)
+        let refreshedOverlay = try XCTUnwrap(refreshedRequest.dirtyOverlays.overlays.first)
+        XCTAssertEqual(Array(refreshedOverlay.text.utf8), Array(liveText.utf8))
+        XCTAssertNotEqual(
+            WorkspaceSearchContentFingerprint(text: diskText).utf8ByteCount,
+            WorkspaceSearchContentFingerprint(text: liveText).utf8ByteCount
+        )
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testStaleContextMissingNodeActivationFailureAndInvalidRangeEmitNoNavigation() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "beta"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let activeContext = context(for: request)
+        let validResult = result(path: "b.md", text: "beta", needle: "beta")
+        let validMatch = try XCTUnwrap(validResult.matches.first)
+        provider.yield(.fileResult(activeContext, validResult), to: 0)
+        try await waitUntil("result applies") {
+            fixture.appState.workspaceSearchState.fileResults == [validResult]
+        }
+
+        let staleContext = WorkspaceSearchContext(
+            rootIdentity: activeContext.rootIdentity,
+            workspaceGeneration: activeContext.workspaceGeneration,
+            queryGeneration: activeContext.queryGeneration + 1
+        )
+        fixture.appState.activateWorkspaceSearchResult(
+            context: staleContext,
+            fileResult: validResult,
+            match: validMatch
+        )
+        XCTAssertNil(fixture.appState.editorNavigationCommand)
+        XCTAssertEqual(fixture.appState.currentDocument.fileURL?.lastPathComponent, "a.md")
+
+        let onlyCurrentSnapshot = snapshot(paths: ["a.md"], rootURL: fixture.rootURL)
+        fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: onlyCurrentSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        fixture.appState.activateWorkspaceSearchResult(
+            context: activeContext,
+            fileResult: validResult,
+            match: validMatch
+        )
+        XCTAssertNil(fixture.appState.editorNavigationCommand)
+
+        fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: fixture.snapshot,
+            options: .init(showAllFiles: false)
+        )
+        try FileManager.default.removeItem(at: fixture.rootURL.appendingPathComponent("b.md"))
+        fixture.appState.activateWorkspaceSearchResult(
+            context: activeContext,
+            fileResult: validResult,
+            match: validMatch
+        )
+        XCTAssertNil(fixture.appState.editorNavigationCommand)
+
+        let invalidMatch = TextSearchMatch(
+            range: NSRange(location: NSNotFound, length: 1),
+            line: 1,
+            preview: "beta",
+            previewMatchRange: NSRange(location: 0, length: 1)
+        )
+        let invalidResult = WorkspaceSearchFileResult(
+            relativePath: "b.md",
+            contentFingerprint: WorkspaceSearchContentFingerprint(text: "beta"),
+            matches: [invalidMatch],
+            isTruncated: false
+        )
+        provider.yield(.fileResult(activeContext, invalidResult), to: 0)
+        try await waitUntil("invalid result replaces prior value") {
+            fixture.appState.workspaceSearchState.fileResults == [invalidResult]
+        }
+        fixture.appState.activateWorkspaceSearchResult(
+            context: activeContext,
+            fileResult: invalidResult,
+            match: invalidMatch
+        )
+        XCTAssertNil(fixture.appState.editorNavigationCommand)
+    }
+
+    private struct Fixture {
+        let appState: AppState
+        let rootURL: URL
+        let snapshot: WorkspaceFileSnapshot
+    }
+
+    private enum TestError: Error {
+        case expectedEditorNavigation
+    }
+
+    private func makeFixture(
+        provider: ControlledWorkspaceSearchStreamProvider,
+        files: [String: String],
+        currentPath: String? = nil,
+        debounceNanoseconds: UInt64 = 0,
+        directoryScanner: any WorkspaceDirectoryScanning = ImmediateWorkspaceDirectoryScanner(
+            snapshot: WorkspaceFileSnapshot(entries: [])
+        )
+    ) throws -> Fixture {
+        let rootURL = try makeTemporaryDirectory()
+        for (path, text) in files {
+            let fileURL = rootURL.appendingPathComponent(path)
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+        let workspaceSnapshot = snapshot(paths: files.keys.sorted(), rootURL: rootURL)
+        let currentDocument: DocumentSession
+        if let currentPath, let text = files[currentPath] {
+            let fileURL = rootURL.appendingPathComponent(currentPath)
+            currentDocument = DocumentSession(
+                text: text,
+                url: fileURL,
+                fileKind: FileKind(url: fileURL)
+            )
+        } else {
+            currentDocument = DocumentSession()
+        }
+        let appState = AppState(
+            currentDocument: currentDocument,
+            directoryScanner: directoryScanner,
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: debounceNanoseconds,
+            shouldRestoreLastOpenedFile: false
+        )
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceGeneration = 1
+        appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: workspaceSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        if let fileURL = currentDocument.fileURL?.standardizedFileURL {
+            appState.sessionCache[fileURL] = currentDocument
+        }
+        return Fixture(appState: appState, rootURL: rootURL, snapshot: workspaceSnapshot)
+    }
+
+    private func cleanUp(_ fixture: Fixture) {
+        fixture.appState.autosaveTask?.cancel()
+        fixture.appState.statisticsTask?.cancel()
+        fixture.appState.completionWorkspaceTask?.cancel()
+        fixture.appState.teardownWorkspaceSearch()
+        fixture.appState.workspaceWatcher?.stop()
+        try? FileManager.default.removeItem(at: fixture.rootURL)
+    }
+
+    private func snapshot(paths: some Sequence<String>, rootURL: URL) -> WorkspaceFileSnapshot {
+        WorkspaceFileSnapshot(entries: paths.map { path in
+            let fileURL = rootURL.appendingPathComponent(path)
+            return WorkspaceFileSnapshot.Entry(
+                relativePath: path,
+                kind: WorkspaceFileKind(url: fileURL, isDirectory: false),
+                identity: "id:\(path)",
+                contentModificationDate: nil
+            )
+        })
+    }
+
+    private func context(for request: WorkspaceSearchRequest) -> WorkspaceSearchContext {
+        WorkspaceSearchContext(
+            rootIdentity: request.rootIdentity,
+            workspaceGeneration: request.workspaceGeneration,
+            queryGeneration: request.queryGeneration
+        )
+    }
+
+    private func result(
+        path: String,
+        text: String,
+        needle: String,
+        truncated: Bool = false
+    ) -> WorkspaceSearchFileResult {
+        let range = (text as NSString).range(of: needle)
+        return WorkspaceSearchFileResult(
+            relativePath: path,
+            contentFingerprint: WorkspaceSearchContentFingerprint(text: text),
+            matches: [TextSearchMatch(
+                range: range,
+                line: 1,
+                preview: text,
+                previewMatchRange: range
+            )],
+            isTruncated: truncated
+        )
+    }
+
+    private func summary(
+        candidateFileCount: Int = 0,
+        searchedFileCount: Int = 0,
+        skippedFileCount: Int = 0,
+        totalMatchCount: Int = 0,
+        truncatedFilePaths: [String] = [],
+        isGloballyTruncated: Bool = false,
+        skippedFiles: [WorkspaceSearchSkippedFile] = [],
+        omittedSkippedFileCount: Int = 0
+    ) -> WorkspaceSearchSummary {
+        WorkspaceSearchSummary(
+            candidateFileCount: candidateFileCount,
+            searchedFileCount: searchedFileCount,
+            skippedFileCount: skippedFileCount,
+            ignoredFileCount: 0,
+            totalEmittedMatchCount: totalMatchCount,
+            truncatedFilePaths: truncatedFilePaths,
+            isGloballyTruncated: isGloballyTruncated,
+            skippedFiles: skippedFiles,
+            omittedSkippedFileCount: omittedSkippedFileCount,
+            readInstrumentation: WorkspaceSearchReadInstrumentation(
+                diskReadCount: 0,
+                diskReadByteCount: 0,
+                maximumConcurrentReads: 0,
+                maximumBufferedReadCount: 0,
+                maximumOutstandingReadCount: 0
+            )
+        )
+    }
+
+    private func navigationRequest(from command: EditorNavigationCommand?) throws -> EditorNavigationRequest {
+        guard case let .navigate(request)? = command else {
+            XCTFail("Expected an editor navigation request")
+            throw TestError.expectedEditorNavigation
+        }
+        return request
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WorkspaceSearchAppStateTests")
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func waitUntil(
+        _ description: String,
+        timeoutNanoseconds: UInt64 = 3_000_000_000,
+        condition: @escaping @MainActor () -> Bool
+    ) async throws {
+        let start = DispatchTime.now().uptimeNanoseconds
+        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
+            if condition() { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
+    }
+}
+
+// swiftlint:enable type_body_length
+
+@MainActor
+private final class ControlledWorkspaceSearchStreamProvider: WorkspaceSearchStreamProviding {
+    private(set) var requests: [WorkspaceSearchRequest] = []
+    private(set) var terminatedSubscriptionIndices: Set<Int> = []
+    private var continuations: [AsyncStream<WorkspaceSearchEvent>.Continuation] = []
+
+    func events(for request: WorkspaceSearchRequest) -> AsyncStream<WorkspaceSearchEvent> {
+        let pair = AsyncStream<WorkspaceSearchEvent>.makeStream(bufferingPolicy: .unbounded)
+        let index = requests.count
+        requests.append(request)
+        continuations.append(pair.continuation)
+        pair.continuation.onTermination = { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.terminatedSubscriptionIndices.insert(index)
+            }
+        }
+        return pair.stream
+    }
+
+    func yield(_ event: WorkspaceSearchEvent, to index: Int) {
+        guard continuations.indices.contains(index) else { return }
+        continuations[index].yield(event)
+    }
+
+    func finish(_ index: Int) {
+        guard continuations.indices.contains(index) else { return }
+        continuations[index].finish()
+    }
+}
+
+private struct ImmediateWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
+    let snapshot: WorkspaceFileSnapshot
+
+    func snapshot(root _: URL) async throws -> WorkspaceFileSnapshot {
+        snapshot
     }
 }
 

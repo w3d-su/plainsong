@@ -291,6 +291,8 @@ private struct DocumentEditor: View {
             appearanceID: appState.preferences.editorAppearanceID,
             showsLineNumbers: appState.preferences.showsLineNumbers,
             focusRequestID: appState.editorFocusRequestID,
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            navigationCommand: appState.editorNavigationCommand,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,

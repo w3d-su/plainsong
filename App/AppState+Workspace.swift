@@ -231,6 +231,7 @@ extension AppState {
             scheduleCompletionWorkspaceRefresh()
             return
         }
+        cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
         observeCurrentDocument()
@@ -359,7 +360,7 @@ extension AppState {
     }
 
     func firstNode(in node: WorkspaceFileNode, relativePath: String) -> WorkspaceFileNode? {
-        if node.relativePath == relativePath {
+        if ExactSourceText.matches(node.relativePath, relativePath) {
             return node
         }
 

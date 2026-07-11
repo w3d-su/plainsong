@@ -1,7 +1,7 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1 and WS2 are complete and locally verified; WS3–WS4 remain
-> pending.**
+> **Status: IN PROGRESS. WS1, WS2, WS3A, and the headless WS3B App lifecycle are
+> complete and locally verified; visible WS3 sidebar work and WS4 remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -331,9 +331,26 @@ ignored. Per-update candidate generations, not optional-identity equality, keep 
 model bindings pinned through IME composition and replace the binding, identity, and installed
 generation together only after the candidate's literal UTF-16 text is present. Exact raw
 UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
-ended and the editor is window-attached. Invalid ranges are rejected without clamping. App
-ownership, fingerprint arbitration, sidebar behavior, tree synchronization, shortcuts, and
-refresh lifecycle remain pending WS3 work.
+ended and the editor is window-attached. Invalid ranges are rejected without clamping. At
+the WS3A landing point, App ownership, fingerprint arbitration, sidebar behavior, tree
+synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B closes
+only the headless App subset below.
+
+**Implemented WS3B subset.** MarkdownCore now exposes one allocation-free exact UTF-16
+source comparison used by every `DocumentSession`/App text gate, so canonically equivalent
+but raw-different edits advance versions, dirty state, and text delivery. AppState owns a
+focused headless `WorkspaceSearchState`, an injected stream provider, the approximately
+200 ms debounce, and the exact Task consuming each stream. Query replacement, workspace
+generation changes, close/switch, empty-query clear, and teardown explicitly cancel that
+Task; root/workspace/query context checks gate every event, and task-token checks prevent an
+older cleanup from touching newer state. Requests capture a retained snapshot plus validated
+immutable dirty overlays from current and warm Markdown/MDX sessions on the main actor.
+Result activation resolves and selects the exact tree node, activates its session, compares
+both SHA-256 and UTF-8 byte count, and only then emits a newer URL-identified exact-range
+editor command. A stale fingerprint emits a newer editor cancellation and restarts the
+active query with fresh overlays. The command is passed through `WorkspaceWindow`; sidebar
+UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh remain
+pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -376,7 +393,7 @@ refresh lifecycle remain pending WS3 work.
 
 ### WS3 — Sidebar and exact navigation
 
-- [ ] Own the stream-consuming App Task and explicitly cancel it on query replacement,
+- [x] Own the stream-consuming App Task and explicitly cancel it on query replacement,
   workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
   producer.
 - [ ] Add Files/Search sidebar modes without changing the stable `HStack` shell.
@@ -385,8 +402,8 @@ refresh lifecycle remain pending WS3 work.
   states.
 - [ ] Add keyboard and accessibility support.
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
-- [ ] Keep tree selection synchronized when a search result opens.
-- [ ] Validate source fingerprints before applying a result.
+- [x] Keep tree selection synchronized when a search result opens.
+- [x] Validate source fingerprints before applying a result.
 - [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
 
 ### WS4 — CI, performance, and acceptance

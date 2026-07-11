@@ -3,6 +3,65 @@ import MarkdownCore
 import WorkspaceKit
 
 @MainActor
+protocol WorkspaceSearchStreamProviding {
+    func events(for request: WorkspaceSearchRequest) -> AsyncStream<WorkspaceSearchEvent>
+}
+
+extension WorkspaceSearchService: WorkspaceSearchStreamProviding {}
+
+struct WorkspaceSearchState: Equatable {
+    enum Phase: Equatable {
+        case idle
+        case debouncing
+        case searching
+        case completed
+        case validationFailure(WorkspaceSearchValidationError)
+        case serviceFailure(WorkspaceSearchServiceFailure)
+    }
+
+    var activeQuery: TextSearchQuery?
+    var queryGeneration: UInt64
+    var activeContext: WorkspaceSearchContext?
+    var phase: Phase
+    var fileResults: [WorkspaceSearchFileResult]
+    var skippedFiles: [WorkspaceSearchSkippedFile]
+    var progress: WorkspaceSearchProgress?
+    var summary: WorkspaceSearchSummary?
+
+    init(
+        activeQuery: TextSearchQuery? = nil,
+        queryGeneration: UInt64 = 0,
+        activeContext: WorkspaceSearchContext? = nil,
+        phase: Phase = .idle,
+        fileResults: [WorkspaceSearchFileResult] = [],
+        skippedFiles: [WorkspaceSearchSkippedFile] = [],
+        progress: WorkspaceSearchProgress? = nil,
+        summary: WorkspaceSearchSummary? = nil
+    ) {
+        self.activeQuery = activeQuery
+        self.queryGeneration = queryGeneration
+        self.activeContext = activeContext
+        self.phase = phase
+        self.fileResults = fileResults
+        self.skippedFiles = skippedFiles
+        self.progress = progress
+        self.summary = summary
+    }
+
+    var isTruncated: Bool {
+        summary?.isTruncated == true || fileResults.contains(where: \.isTruncated)
+    }
+
+    var isGloballyTruncated: Bool {
+        summary?.isGloballyTruncated == true
+    }
+
+    var truncatedFilePaths: [String] {
+        summary?.truncatedFilePaths ?? fileResults.filter(\.isTruncated).map(\.relativePath)
+    }
+}
+
+@MainActor
 extension AppState {
     func scheduleCompletionWorkspaceRefresh(
         debounceNanoseconds: UInt64 = 0,
@@ -64,6 +123,125 @@ extension AppState {
                 return
             }
             completionWorkspace = workspace
+        }
+    }
+
+    func workspaceSearchDirtyOverlays(rootURL: URL) throws -> WorkspaceSearchOverlayCollection {
+        let cachedSessions = sessionCache
+            .sorted { first, second in
+                Self.workspaceSearchPathLessThan(
+                    first.key.absoluteString,
+                    second.key.absoluteString
+                )
+            }
+            .map(\.value)
+        let candidateSessions = [currentDocument] + cachedSessions
+        var seenSessions: Set<ObjectIdentifier> = []
+        var seenRelativePaths: [String] = []
+        var overlays: [WorkspaceSearchOverlay] = []
+
+        for session in candidateSessions where session.isDirty {
+            let sessionIdentity = ObjectIdentifier(session)
+            guard seenSessions.insert(sessionIdentity).inserted,
+                  let fileURL = session.fileURL?.standardizedFileURL,
+                  !detachedSessionURLs.contains(fileURL),
+                  let inferredKind = FileKind(url: fileURL),
+                  inferredKind == session.fileKind,
+                  let relativePath = try? WorkspaceRootContainment.relativePath(
+                      for: fileURL,
+                      rootURL: rootURL
+                  ),
+                  !seenRelativePaths.contains(where: {
+                      ExactSourceText.matches($0, relativePath)
+                  })
+            else {
+                continue
+            }
+
+            seenRelativePaths.append(relativePath)
+            try overlays.append(WorkspaceSearchOverlay(
+                relativePath: relativePath,
+                text: session.text
+            ))
+        }
+
+        return try WorkspaceSearchOverlayCollection(overlays)
+    }
+
+    func applyWorkspaceSearchEvent(
+        _ event: WorkspaceSearchEvent,
+        expectedContext: WorkspaceSearchContext,
+        taskToken: UUID
+    ) {
+        guard workspaceSearchTaskToken == taskToken,
+              workspaceSearchContextsMatch(event.context, expectedContext),
+              isActiveWorkspaceSearchContext(event.context),
+              workspaceSearchState.phase == .searching
+        else {
+            return
+        }
+
+        switch event {
+        case let .fileResult(_, result):
+            applyWorkspaceSearchFileResult(result)
+        case let .skippedFile(_, skippedFile):
+            applyWorkspaceSearchSkippedFile(skippedFile)
+        case let .progress(_, progress):
+            workspaceSearchState.progress = progress
+        case let .completed(_, summary):
+            workspaceSearchState.summary = summary
+            workspaceSearchState.skippedFiles = summary.skippedFiles.sorted {
+                Self.workspaceSearchPathLessThan($0.relativePath, $1.relativePath)
+            }
+            workspaceSearchState.phase = .completed
+        case let .failed(_, failure):
+            workspaceSearchState.phase = .serviceFailure(failure)
+        case let .validationFailure(_, validationError):
+            workspaceSearchState.phase = .validationFailure(validationError)
+        }
+    }
+
+    func applyWorkspaceSearchFileResult(_ result: WorkspaceSearchFileResult) {
+        if let existingIndex = workspaceSearchState.fileResults.firstIndex(where: {
+            ExactSourceText.matches($0.relativePath, result.relativePath)
+        }) {
+            workspaceSearchState.fileResults[existingIndex] = result
+        } else {
+            workspaceSearchState.fileResults.append(result)
+        }
+        workspaceSearchState.fileResults.sort {
+            Self.workspaceSearchPathLessThan($0.relativePath, $1.relativePath)
+        }
+    }
+
+    func applyWorkspaceSearchSkippedFile(_ skippedFile: WorkspaceSearchSkippedFile) {
+        if let existingIndex = workspaceSearchState.skippedFiles.firstIndex(where: {
+            ExactSourceText.matches($0.relativePath, skippedFile.relativePath)
+        }) {
+            workspaceSearchState.skippedFiles[existingIndex] = skippedFile
+        } else {
+            workspaceSearchState.skippedFiles.append(skippedFile)
+        }
+        workspaceSearchState.skippedFiles.sort {
+            Self.workspaceSearchPathLessThan($0.relativePath, $1.relativePath)
+        }
+    }
+
+    static func workspaceSearchPathLessThan(_ first: String, _ second: String) -> Bool {
+        first.utf8.lexicographicallyPrecedes(second.utf8)
+    }
+}
+
+private extension WorkspaceSearchEvent {
+    var context: WorkspaceSearchContext {
+        switch self {
+        case let .fileResult(context, _),
+             let .skippedFile(context, _),
+             let .progress(context, _),
+             let .completed(context, _),
+             let .failed(context, _),
+             let .validationFailure(context, _):
+            context
         }
     }
 }

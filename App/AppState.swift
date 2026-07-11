@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import EditorKit
 import MarkdownCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -51,6 +52,8 @@ final class AppState: ObservableObject {
     @Published var workspaceTree: WorkspaceFileTree?
     var workspaceSnapshot: WorkspaceFileSnapshot?
     var workspaceGeneration: UInt64 = 0
+    @Published var workspaceSearchState = WorkspaceSearchState()
+    @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
@@ -64,11 +67,18 @@ final class AppState: ObservableObject {
     let lastOpenedFileStore: any LastOpenedFilePersisting
     let recentItemStore: any RecentItemPersisting
     let directoryScanner: any WorkspaceDirectoryScanning
+    let workspaceSearchStreamProvider: any WorkspaceSearchStreamProviding
+    let workspaceSearchLimits: WorkspaceSearchLimits
+    let workspaceSearchDebounceNanoseconds: UInt64
     let fileOperations: WorkspaceFileOperations
     let userDefaults: UserDefaults
     var autosaveTask: Task<Void, Never>?
     var statisticsTask: Task<Void, Never>?
     var workspaceReloadTask: Task<Void, Never>?
+    var workspaceSearchTask: Task<Void, Never>?
+    var workspaceSearchTaskToken: UUID?
+    var workspaceSearchQueryGeneration: UInt64 = 0
+    var editorNavigationGeneration: UInt64 = 0
     var completionWorkspaceTask: Task<Void, Never>?
     var documentChangeCancellable: AnyCancellable?
     let shouldRestoreLastOpenedFile: Bool
@@ -90,6 +100,9 @@ final class AppState: ObservableObject {
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
         recentItemStore: any RecentItemPersisting = RecentItemStore(),
         directoryScanner: any WorkspaceDirectoryScanning = WorkspaceDirectoryScanner(),
+        workspaceSearchStreamProvider: any WorkspaceSearchStreamProviding = WorkspaceSearchService(),
+        workspaceSearchLimits: WorkspaceSearchLimits = .init(),
+        workspaceSearchDebounceNanoseconds: UInt64 = 200_000_000,
         fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard
@@ -99,6 +112,9 @@ final class AppState: ObservableObject {
         self.lastOpenedFileStore = lastOpenedFileStore
         self.recentItemStore = recentItemStore
         self.directoryScanner = directoryScanner
+        self.workspaceSearchStreamProvider = workspaceSearchStreamProvider
+        self.workspaceSearchLimits = workspaceSearchLimits
+        self.workspaceSearchDebounceNanoseconds = workspaceSearchDebounceNanoseconds
         self.fileOperations = fileOperations
         self.userDefaults = userDefaults
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
@@ -114,6 +130,10 @@ final class AppState: ObservableObject {
             self?.handlePreferencesChanged()
         }
         observeCurrentDocument()
+    }
+
+    deinit {
+        workspaceSearchTask?.cancel()
     }
 
     var isPreviewVisible: Bool {

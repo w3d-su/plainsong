@@ -77,9 +77,9 @@ public final class DocumentSession: ObservableObject {
         }
     }
 
-    /// Applies editor text replacement. Equal text is a no-op to avoid false versions.
+    /// Applies editor text replacement. Literally identical text is a no-op to avoid false versions.
     public func replaceText(_ newText: String, refreshStatistics: Bool = true) {
-        guard newText != text else {
+        guard !ExactSourceText.matches(newText, text) else {
             return
         }
 
@@ -89,7 +89,7 @@ public final class DocumentSession: ObservableObject {
         }
         // Dedupe the assignment: `isDirty` is @Published, and republishing the same
         // value on every keystroke would re-render observers needlessly.
-        let newIsDirty = savedText.map { $0 != newText } ?? true
+        let newIsDirty = savedText.map { !ExactSourceText.matches($0, newText) } ?? true
         if isDirty != newIsDirty {
             isDirty = newIsDirty
         }
@@ -143,12 +143,13 @@ public final class DocumentSession: ObservableObject {
         fileKind newFileKind: FileKind,
         isDirty newIsDirty: Bool
     ) {
-        let renderableStateChanged = text != newText || fileURL != newURL || fileKind != newFileKind
+        let textChanged = !ExactSourceText.matches(text, newText)
+        let renderableStateChanged = textChanged || fileURL != newURL || fileKind != newFileKind
         if renderableStateChanged {
             version += 1
         }
 
-        if text != newText {
+        if textChanged {
             text = newText
             statistics = TextStatistics(text: newText)
         }
