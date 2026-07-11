@@ -4,12 +4,107 @@ import STTextView
 import SwiftUI
 
 @MainActor
+struct EditorDocumentTransitionCandidate {
+    let generation: UInt64
+    let sourceText: String
+    let requestedSelection: NSRange?
+    fileprivate let text: Binding<String>
+    fileprivate let selection: Binding<NSRange?>
+    fileprivate let documentIdentity: EditorDocumentIdentity?
+}
+
+struct EditorDocumentInstallation: Equatable {
+    let generation: UInt64
+}
+
+@MainActor
+private struct EditorInstalledDocumentState {
+    private var textBinding: Binding<String>
+    private var selectionBinding: Binding<NSRange?>
+    private(set) var identity: EditorDocumentIdentity?
+    private(set) var isInstalled = false
+    private var nextCandidateGeneration: UInt64 = 0
+    private(set) var preparedCandidateGeneration: UInt64?
+    private(set) var installedCandidateGeneration: UInt64?
+
+    init(text: Binding<String>, selection: Binding<NSRange?>) {
+        textBinding = text
+        selectionBinding = selection
+    }
+
+    var text: String {
+        get { textBinding.wrappedValue }
+        set { textBinding.wrappedValue = newValue }
+    }
+
+    var selection: NSRange? {
+        get { selectionBinding.wrappedValue }
+        set { selectionBinding.wrappedValue = newValue }
+    }
+
+    var isPreparedCandidateInstalled: Bool {
+        isInstalled && preparedCandidateGeneration == installedCandidateGeneration
+    }
+
+    mutating func prepare(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        documentIdentity: EditorDocumentIdentity?
+    ) -> EditorDocumentTransitionCandidate {
+        nextCandidateGeneration += 1
+        preparedCandidateGeneration = nextCandidateGeneration
+
+        // Before the first installation there is no live document to protect. Once
+        // installed, bindings change only in `install`, after exact text validation.
+        if !isInstalled {
+            textBinding = text
+            selectionBinding = selection
+        }
+
+        return EditorDocumentTransitionCandidate(
+            generation: nextCandidateGeneration,
+            sourceText: text.wrappedValue,
+            requestedSelection: selection.wrappedValue,
+            text: text,
+            selection: selection,
+            documentIdentity: documentIdentity
+        )
+    }
+
+    mutating func install(_ candidate: EditorDocumentTransitionCandidate) -> EditorDocumentInstallation {
+        textBinding = candidate.text
+        selectionBinding = candidate.selection
+        identity = candidate.documentIdentity
+        isInstalled = true
+        installedCandidateGeneration = candidate.generation
+        return EditorDocumentInstallation(generation: candidate.generation)
+    }
+}
+
+@MainActor
 final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
-    @Binding var text: String
-    @Binding var selection: NSRange?
+    private var installedDocument: EditorInstalledDocumentState
+    var text: String {
+        get { installedDocument.text }
+        set { installedDocument.text = newValue }
+    }
+
+    var selection: NSRange? {
+        get { installedDocument.selection }
+        set { installedDocument.selection = newValue }
+    }
+
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    var currentDocumentIdentity: EditorDocumentIdentity? {
+        installedDocument.identity
+    }
+
+    var navigationState = EditorNavigationStateMachine()
+    var navigationRetryTask: Task<Void, Never>?
+    var navigationInputDeferralTask: Task<Void, Never>?
+    var isApplyingNavigation = false
     private(set) var lastHandledFocusRequestID: Int?
     private(set) var pendingFocusRequestID: Int?
     private weak var pendingFocusTextView: STTextView?
@@ -29,16 +124,56 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var lastVisibleTextRange: NSRange?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
-        _text = text
-        _selection = selection
+        installedDocument = EditorInstalledDocumentState(text: text, selection: selection)
     }
 
-    /// SwiftUI may reuse this coordinator when the represented editor switches to
-    /// another document. Refresh the bindings so edits are written to the currently
-    /// rendered session instead of the session that originally created the view.
-    func updateBindings(text: Binding<String>, selection: Binding<NSRange?>) {
-        _text = text
-        _selection = selection
+    func prepareDocumentTransition(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        documentIdentity: EditorDocumentIdentity?,
+        navigationCommand: EditorNavigationCommand?,
+        in textView: STTextView
+    ) -> EditorDocumentTransitionCandidate {
+        observeNavigationCommand(navigationCommand)
+
+        let candidate = installedDocument.prepare(
+            text: text,
+            selection: selection,
+            documentIdentity: documentIdentity
+        )
+
+        guard installedDocument.isInstalled,
+              !textView.hasMarkedText(),
+              !MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
+        else {
+            return candidate
+        }
+
+        // A mismatching candidate cannot be the live installed document. Allow the
+        // normal external-text update even when both optional identities are nil.
+        isUserEditing = false
+        return candidate
+    }
+
+    @discardableResult
+    func finishDocumentTransition(
+        _ candidate: EditorDocumentTransitionCandidate,
+        in textView: STTextView
+    ) -> EditorDocumentInstallation? {
+        guard candidate.generation == installedDocument.preparedCandidateGeneration,
+              !textView.hasMarkedText(),
+              MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
+        else {
+            return nil
+        }
+
+        let installation = installedDocument.install(candidate)
+        cancelPendingNavigationTasks()
+        return installation
+    }
+
+    var isPreparedDocumentInstalled: Bool {
+        installedDocument.isPreparedCandidateInstalled
     }
 
     func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {
@@ -126,6 +261,7 @@ extension MarkdownTextViewCoordinator {
         textView.windowAttachmentHandler = { [weak self, weak textView] _ in
             guard let self, let textView else { return }
             focusPendingRequestIfPossible(in: textView)
+            applyPendingNavigationIfPossible(in: textView)
         }
     }
 
@@ -134,6 +270,7 @@ extension MarkdownTextViewCoordinator {
         if pendingFocusTextView === textView {
             cancelPendingFocusRequest()
         }
+        cancelPendingNavigationTasks()
     }
 
     func cancelPendingFocusRequest() {
@@ -281,6 +418,7 @@ extension MarkdownTextViewCoordinator {
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
         reportVisibleRangeIfNeeded(in: textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     func textView(
@@ -331,6 +469,7 @@ extension MarkdownTextViewCoordinator {
 
         isUserEditing = true
         syncTextFromTextViewIfNeeded(textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     func textView(
@@ -385,6 +524,7 @@ extension MarkdownTextViewCoordinator {
         selection = textView.selectedRange()
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
+        schedulePendingNavigationAfterInput(in: textView)
     }
 
     @discardableResult
@@ -396,7 +536,7 @@ extension MarkdownTextViewCoordinator {
         // `textStorage.string` is a lazily bridged ("foreign") String backed by
         // CFStorage. One eager transcode here makes later operations native-fast.
         var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        guard newText != text else {
+        guard !ExactUTF16Text.matches(newText, text) else {
             return false
         }
         newText.makeContiguousUTF8()

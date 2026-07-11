@@ -52,36 +52,52 @@ final class MarkdownEditorInputTests: XCTestCase {
         var currentDocumentText = ""
         var originalSelection: NSRange?
         var currentSelection: NSRange?
-        let coordinator = MarkdownTextViewCoordinator(
-            text: Binding(
-                get: { originalDocumentText },
-                set: { originalDocumentText = $0 }
-            ),
-            selection: Binding(
-                get: { originalSelection },
-                set: { originalSelection = $0 }
-            )
+        let originalTextBinding = Binding(
+            get: { originalDocumentText },
+            set: { originalDocumentText = $0 }
         )
-        coordinator.updateBindings(
-            text: Binding(
-                get: { currentDocumentText },
-                set: { currentDocumentText = $0 }
-            ),
-            selection: Binding(
-                get: { currentSelection },
-                set: { currentSelection = $0 }
-            )
+        let originalSelectionBinding = Binding(
+            get: { originalSelection },
+            set: { originalSelection = $0 }
+        )
+        let coordinator = MarkdownTextViewCoordinator(
+            text: originalTextBinding,
+            selection: originalSelectionBinding
+        )
+        let currentTextBinding = Binding(
+            get: { currentDocumentText },
+            set: { currentDocumentText = $0 }
+        )
+        let currentSelectionBinding = Binding(
+            get: { currentSelection },
+            set: { currentSelection = $0 }
         )
 
         let textView = MarkdownSTTextView(frame: .zero)
-        textView.text = "a"
+        textView.text = originalDocumentText
+        installDocument(
+            text: originalTextBinding,
+            selection: originalSelectionBinding,
+            coordinator: coordinator,
+            textView: textView
+        )
+
+        currentDocumentText = "a"
+        textView.text = currentDocumentText
+        installDocument(
+            text: currentTextBinding,
+            selection: currentSelectionBinding,
+            coordinator: coordinator,
+            textView: textView
+        )
+        textView.text = "ab"
         coordinator.textViewDidChangeText(Notification(
             name: STTextView.textDidChangeNotification,
             object: textView
         ))
 
         XCTAssertEqual(originalDocumentText, "Original")
-        XCTAssertEqual(currentDocumentText, "a")
+        XCTAssertEqual(currentDocumentText, "ab")
     }
 
     @MainActor
@@ -122,6 +138,35 @@ final class MarkdownEditorInputTests: XCTestCase {
     }
 
     @MainActor
+    func testNativeEditPublishesCanonicalEquivalentRawUTF16Sequence() {
+        let boundSource = "a\u{301}\u{327}"
+        let liveSource = "a\u{327}\u{301}"
+        var modelText = boundSource
+        var publishedUTF16: [[UInt16]] = []
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: {
+                    modelText = $0
+                    publishedUTF16.append(Array($0.utf16))
+                }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = liveSource
+
+        coordinator.textViewDidChangeText(Notification(
+            name: STTextView.textDidChangeNotification,
+            object: textView
+        ))
+
+        XCTAssertEqual(Array(modelText.utf16), Array(liveSource.utf16))
+        XCTAssertEqual(Data(modelText.utf8), Data(liveSource.utf8))
+        XCTAssertEqual(publishedUTF16, [Array(liveSource.utf16)])
+    }
+
+    @MainActor
     func testFocusRequestRemainsPendingUntilTextViewCanFocus() {
         let coordinator = MarkdownTextViewCoordinator(text: .constant(""), selection: .constant(nil))
         let textView = MarkdownSTTextView(frame: .zero)
@@ -142,6 +187,23 @@ final class MarkdownEditorInputTests: XCTestCase {
 
         coordinator.cancelPendingFocusRequest()
         XCTAssertNil(coordinator.pendingFocusRequestID)
+    }
+
+    @MainActor
+    private func installDocument(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        coordinator: MarkdownTextViewCoordinator,
+        textView: MarkdownSTTextView
+    ) {
+        let candidate = coordinator.prepareDocumentTransition(
+            text: text,
+            selection: selection,
+            documentIdentity: nil,
+            navigationCommand: nil,
+            in: textView
+        )
+        coordinator.finishDocumentTransition(candidate, in: textView)
     }
 
     @MainActor

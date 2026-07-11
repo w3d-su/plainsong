@@ -3,59 +3,6 @@ import MarkdownCore
 import STTextView
 import SwiftUI
 
-struct MarkdownTextViewUpdatePolicy {
-    let isUserEditing: Bool
-    let hasMarkedText: Bool
-    private let incomingTextEqualsCurrentText: () -> Bool
-
-    /// `incomingTextEqualsCurrentText` is an autoclosure so the O(n) comparison is
-    /// skipped entirely on the typing hot path, where `isUserEditing` already decides.
-    init(
-        isUserEditing: Bool,
-        hasMarkedText: Bool,
-        incomingTextEqualsCurrentText: @escaping @autoclosure () -> Bool
-    ) {
-        self.isUserEditing = isUserEditing
-        self.hasMarkedText = hasMarkedText
-        self.incomingTextEqualsCurrentText = incomingTextEqualsCurrentText
-    }
-
-    var shouldApplyIncomingText: Bool {
-        guard !isUserEditing, !hasMarkedText else {
-            return false
-        }
-
-        return !incomingTextEqualsCurrentText()
-    }
-}
-
-/// Debounced highlighter output. Equality is by revision so SwiftUI prop diffing
-/// never compares whole attributed strings (O(n)).
-struct HighlightedText: Equatable {
-    let revision: Int
-    let range: NSRange
-    let text: AttributedString
-    let foldPlan: WYSIWYGFoldPlan?
-
-    init(revision: Int, range: NSRange, text: AttributedString, foldPlan: WYSIWYGFoldPlan? = nil) {
-        self.revision = revision
-        self.range = range
-        self.text = text
-        self.foldPlan = foldPlan
-    }
-
-    init(revision: Int, text: AttributedString, foldPlan: WYSIWYGFoldPlan? = nil) {
-        self.revision = revision
-        self.text = text
-        self.foldPlan = foldPlan
-        range = NSRange(location: 0, length: NSAttributedString(text).length)
-    }
-
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.revision == rhs.revision
-    }
-}
-
 /// STTextView wrapper with a String-only typing hot path.
 ///
 /// Per-keystroke work must never convert the whole document between
@@ -72,6 +19,8 @@ struct MarkdownTextView: NSViewRepresentable {
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
+    private let documentIdentity: EditorDocumentIdentity?
+    private let navigationCommand: EditorNavigationCommand?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -89,6 +38,8 @@ struct MarkdownTextView: NSViewRepresentable {
         selection: Binding<NSRange?>,
         showsLineNumbers: Bool,
         focusRequestID: Int = 0,
+        documentIdentity: EditorDocumentIdentity? = nil,
+        navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -105,6 +56,8 @@ struct MarkdownTextView: NSViewRepresentable {
         self.styledText = styledText
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
+        self.documentIdentity = documentIdentity
+        self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -148,80 +101,122 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
-        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
-        context.coordinator.attachCommandProxy(commandProxy, to: textView)
-        context.coordinator.updateCompletionWorkspace(completionWorkspace)
-        context.coordinator.updateImageAssetInserter(imageAssetInserter)
-        context.coordinator.updateImageAssetContextID(imageAssetContextID)
-        applyWYSIWYGMechanismState(to: textView)
+        let candidate = prepareCoordinatorInputs(context.coordinator, for: textView)
+        let installation = context.coordinator.finishDocumentTransition(candidate, in: textView)
         context.coordinator.attachFocusHandler(to: textView)
-        context.coordinator.attachPasteAndDragHandlers(to: textView)
-        context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
-        context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
+        if installation != nil {
+            updateNonDocumentCoordinatorInputs(context.coordinator, for: textView)
+            applyWYSIWYGMechanismState(to: textView)
+            context.coordinator.attachPasteAndDragHandlers(to: textView)
+            context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+            context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
+            context.coordinator.applyPendingNavigationIfPossible(in: textView)
+        }
 
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        updateRepresentedTextView(scrollView, coordinator: context.coordinator)
+    }
+
+    /// Shared implementation kept internal so coordinator-reuse regressions exercise
+    /// the same ordering as `NSViewRepresentable.updateNSView`.
+    func updateRepresentedTextView(
+        _ scrollView: NSScrollView,
+        coordinator: Coordinator
+    ) {
         guard let textView = scrollView.documentView as? MarkdownSTTextView else {
             assertionFailure("Expected MarkdownTextView to update a MarkdownSTTextView-backed scroll view")
             return
         }
 
-        context.coordinator.updateBindings(text: $text, selection: $selection)
-        context.coordinator.attachScrollProxy(scrollProxy, to: textView)
-        context.coordinator.attachCommandProxy(commandProxy, to: textView)
-        context.coordinator.updateCompletionWorkspace(completionWorkspace)
-        context.coordinator.updateImageAssetInserter(imageAssetInserter)
-        context.coordinator.updateImageAssetContextID(imageAssetContextID)
-        context.coordinator.attachFocusHandler(to: textView)
-        context.coordinator.attachPasteAndDragHandlers(to: textView)
-        context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
-        applyWYSIWYGMechanismState(to: textView)
-        context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
+        let candidate = prepareCoordinatorInputs(coordinator, for: textView)
+        coordinator.attachFocusHandler(to: textView)
 
-        let policy = MarkdownTextViewUpdatePolicy(
-            isUserEditing: context.coordinator.isUserEditing,
-            hasMarkedText: textView.hasMarkedText(),
-            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, text)
-        )
+        applyIncomingTextIfNeeded(candidate.sourceText, to: textView, coordinator: coordinator)
 
-        if policy.shouldApplyIncomingText {
-            context.coordinator.isUpdating = true
-            let currentSelection = textView.selectedRange()
-            textView.text = text
-            textView.textSelection = currentSelection.clamped(toLength: (text as NSString).length)
-            context.coordinator.isUpdating = false
-        }
+        let installation = coordinator.finishDocumentTransition(candidate, in: textView)
 
-        applyStyledTextIfNeeded(to: textView, coordinator: context.coordinator)
-        context.coordinator.isUserEditing = false
+        if installation != nil {
+            updateNonDocumentCoordinatorInputs(coordinator, for: textView)
+            coordinator.attachPasteAndDragHandlers(to: textView)
+            coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+            applyWYSIWYGMechanismState(to: textView)
+            coordinator.focusIfNeeded(focusRequestID, textView: textView)
+            applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
 
-        let shouldApplySelection = selection.map { proposedSelection in
-            !textView.hasMarkedText() && textView.textSelection != proposedSelection
-        } ?? false
+            let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
+                !textView.hasMarkedText()
+                    && textView.textSelection != proposedSelection
+            } ?? false
 
-        if shouldApplySelection, let selection {
-            let textLength = Self.textStorage(of: textView)?.length ?? 0
-            textView.textSelection = selection.clamped(toLength: textLength)
-        }
+            if shouldApplySelection, let selection = candidate.requestedSelection {
+                let textLength = Self.textStorage(of: textView)?.length ?? 0
+                textView.textSelection = selection.clamped(toLength: textLength)
+            }
 
-        if textView.isEditable != isEnabled {
-            textView.isEditable = isEnabled
+            if textView.isEditable != isEnabled {
+                textView.isEditable = isEnabled
+            }
+            if textView.isSelectable != isEnabled {
+                textView.isSelectable = isEnabled
+            }
+            if textView.showsLineNumbers != showsLineNumbers {
+                textView.showsLineNumbers = showsLineNumbers
+            }
+            if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
+                textView.font = font
+                textView.gutterView?.font = font
+            }
+            coordinator.applyPendingNavigationIfPossible(in: textView)
         }
-        if textView.isSelectable != isEnabled {
-            textView.isSelectable = isEnabled
-        }
-        if textView.showsLineNumbers != showsLineNumbers {
-            textView.showsLineNumbers = showsLineNumbers
-        }
-        if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
-            textView.font = font
-            textView.gutterView?.font = font
-        }
+        coordinator.isUserEditing = false
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.
+    }
+
+    private func applyIncomingTextIfNeeded(
+        _ incomingText: String,
+        to textView: MarkdownSTTextView,
+        coordinator: Coordinator
+    ) {
+        let policy = MarkdownTextViewUpdatePolicy(
+            isUserEditing: coordinator.isUserEditing,
+            hasMarkedText: textView.hasMarkedText(),
+            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, incomingText)
+        )
+        guard policy.shouldApplyIncomingText else {
+            return
+        }
+
+        coordinator.isUpdating = true
+        let currentSelection = textView.selectedRange()
+        textView.text = incomingText
+        textView.textSelection = currentSelection.clamped(toLength: (incomingText as NSString).length)
+        coordinator.isUpdating = false
+    }
+
+    private func prepareCoordinatorInputs(
+        _ coordinator: Coordinator,
+        for textView: MarkdownSTTextView
+    ) -> EditorDocumentTransitionCandidate {
+        coordinator.prepareDocumentTransition(
+            text: $text,
+            selection: $selection,
+            documentIdentity: documentIdentity,
+            navigationCommand: navigationCommand,
+            in: textView
+        )
+    }
+
+    private func updateNonDocumentCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
+        coordinator.attachScrollProxy(scrollProxy, to: textView)
+        coordinator.attachCommandProxy(commandProxy, to: textView)
+        coordinator.updateCompletionWorkspace(completionWorkspace)
+        coordinator.updateImageAssetInserter(imageAssetInserter)
+        coordinator.updateImageAssetContextID(imageAssetContextID)
     }
 
     private func applyWYSIWYGMechanismState(to textView: MarkdownSTTextView) {
@@ -241,6 +236,8 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.detachScrollProxy()
         coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()
+        coordinator.cancelPendingNavigationTasks()
+        textView.textDelegate = nil
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
@@ -375,7 +372,7 @@ struct MarkdownTextView: NSViewRepresentable {
         guard textStorage.length == candidate.utf16.count else {
             return false
         }
-        return textStorage.string == candidate
+        return ExactUTF16Text.matches(textStorage.string, candidate)
     }
 
     func makeCoordinator() -> Coordinator {
