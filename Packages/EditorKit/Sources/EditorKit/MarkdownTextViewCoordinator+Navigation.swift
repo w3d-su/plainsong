@@ -2,11 +2,12 @@ import AppKit
 import STTextView
 
 extension MarkdownTextViewCoordinator {
-    func observeNavigationRequest(_ navigationRequest: EditorNavigationRequest?) {
-        let previousHighestRequestID = navigationState.highestObservedRequestID
-        navigationState.observe(navigationRequest)
-        if previousHighestRequestID != navigationState.highestObservedRequestID {
+    func observeNavigationCommand(_ command: EditorNavigationCommand?) {
+        switch navigationState.observe(command) {
+        case .acceptedNavigation, .acceptedCancellation:
             cancelPendingNavigationTasks()
+        case .ignored:
+            break
         }
     }
 
@@ -27,6 +28,7 @@ extension MarkdownTextViewCoordinator {
         // runs only for a pending request that targets the currently bound document.
         if let request = navigationState.pendingRequest,
            request.documentIdentity == currentDocumentIdentity,
+           isPreparedDocumentInstalled,
            !hasMarkedText,
            MarkdownTextView.plainTextMatches(textView, text),
            let textStorage = MarkdownTextView.textStorage(of: textView)

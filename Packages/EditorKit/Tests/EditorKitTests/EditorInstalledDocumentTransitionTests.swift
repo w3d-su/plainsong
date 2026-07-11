@@ -33,6 +33,64 @@ final class EditorInstalledDocumentTransitionTests: XCTestCase {
         assertDocumentBIsInstalledAndNavigated(in: scenario, originalOrigin: originalOrigin)
     }
 
+    func testNilDocumentIdentitiesKeepBindingsPinnedUntilExactCandidateInstallation() throws {
+        let sourceA = "Nil identity A composition: "
+        let sourceB = "Nil identity B a\u{301}\u{327} 中文 🧪 destination"
+        let sourceBBytes = Data(sourceB.utf8)
+        let sourceBUTF16 = Array(sourceB.utf16)
+        let model = TransitionModel(sourceA: sourceA, sourceB: sourceB)
+        let documentAView = makeNilIdentityRepresentable(model: model, document: .documentA)
+        let documentBView = makeNilIdentityRepresentable(model: model, document: .documentB)
+        let fixture = try makeWindowedFixture(representable: documentAView, source: sourceA)
+
+        fixture.textView.textSelection = NSRange(location: (sourceA as NSString).length, length: 0)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(fixture.textView.hasMarkedText())
+
+        documentBView.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        XCTAssertTrue(fixture.textView.hasMarkedText())
+        XCTAssertEqual(Data(model.sourceB.utf8), sourceBBytes)
+        XCTAssertEqual(Array(model.sourceB.utf16), sourceBUTF16)
+        XCTAssertTrue(model.documentBTextWrites.isEmpty)
+        XCTAssertTrue(model.documentBSelectionWrites.isEmpty)
+        XCTAssertNotEqual(Array(Self.text(in: fixture.textView).utf16), sourceBUTF16)
+
+        fixture.textView.insertText("台", replacementRange: .notFound)
+
+        let committedSourceA = sourceA + "台"
+        XCTAssertFalse(fixture.textView.hasMarkedText())
+        XCTAssertEqual(Data(model.sourceA.utf8), Data(committedSourceA.utf8))
+        XCTAssertEqual(Array(model.sourceA.utf16), Array(committedSourceA.utf16))
+        XCTAssertEqual(model.documentATextWrites, [Data(committedSourceA.utf8)])
+        XCTAssertEqual(Data(model.sourceB.utf8), sourceBBytes)
+        XCTAssertEqual(Array(model.sourceB.utf16), sourceBUTF16)
+        XCTAssertTrue(model.documentBTextWrites.isEmpty)
+        XCTAssertTrue(model.documentBSelectionWrites.isEmpty)
+
+        documentBView.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        XCTAssertEqual(Data(Self.text(in: fixture.textView).utf8), sourceBBytes)
+        XCTAssertEqual(Array(Self.text(in: fixture.textView).utf16), sourceBUTF16)
+        XCTAssertTrue(fixture.coordinator.isPreparedDocumentInstalled)
+        XCTAssertTrue(model.documentBTextWrites.isEmpty)
+        XCTAssertTrue(model.documentBSelectionWrites.isEmpty)
+
+        fixture.textView.textSelection = NSRange(location: sourceBUTF16.count, length: 0)
+        fixture.textView.insertText("!", replacementRange: .notFound)
+
+        let editedSourceB = sourceB + "!"
+        XCTAssertEqual(Data(model.sourceA.utf8), Data(committedSourceA.utf8))
+        XCTAssertEqual(Data(model.sourceB.utf8), Data(editedSourceB.utf8))
+        XCTAssertEqual(Array(model.sourceB.utf16), Array(editedSourceB.utf16))
+        XCTAssertEqual(model.documentBTextWrites, [Data(editedSourceB.utf8)])
+    }
+
     func testDismantleCancelsNavigationTasksAndDetachesTheInstalledBinding() throws {
         var modelText = "installed"
         var writes: [Data] = []
@@ -80,6 +138,8 @@ private final class TransitionModel {
     var selectionB: NSRange?
     private(set) var documentATextWrites: [Data] = []
     private(set) var documentBTextWrites: [Data] = []
+    private(set) var documentASelectionWrites: [NSRange?] = []
+    private(set) var documentBSelectionWrites: [NSRange?] = []
 
     init(sourceA: String, sourceB: String) {
         self.sourceA = sourceA
@@ -117,8 +177,12 @@ private final class TransitionModel {
             },
             set: { [self] newValue in
                 switch document {
-                case .documentA: selectionA = newValue
-                case .documentB: selectionB = newValue
+                case .documentA:
+                    selectionA = newValue
+                    documentASelectionWrites.append(newValue)
+                case .documentB:
+                    selectionB = newValue
+                    documentBSelectionWrites.append(newValue)
                 }
             }
         )
@@ -260,7 +324,19 @@ private extension EditorInstalledDocumentTransitionTests {
             selection: model.selectionBinding(for: document),
             showsLineNumbers: false,
             documentIdentity: identity,
-            navigationRequest: request
+            navigationCommand: request.map(EditorNavigationCommand.navigate)
+        )
+    }
+
+    func makeNilIdentityRepresentable(
+        model: TransitionModel,
+        document: TransitionModel.Document
+    ) -> MarkdownTextView {
+        MarkdownTextView(
+            text: model.textBinding(for: document),
+            styledText: nil,
+            selection: model.selectionBinding(for: document),
+            showsLineNumbers: false
         )
     }
 

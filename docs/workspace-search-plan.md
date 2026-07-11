@@ -143,7 +143,7 @@ produce only a prefix of the valid-request bound.
 | MarkdownCore | Pure query semantics, text matching, UTF-16 ranges, line mapping, bounded snippets | `TextSearchQuery`, `TextSearchMatch`, `TextSearchEngine` |
 | WorkspaceKit | Candidate selection, ignore policy, containment, reads, cancellation, streaming, limits, deterministic aggregation | `WorkspaceSearchRequest`, `WorkspaceSearchEvent`, `WorkspaceSearchSummary`, `WorkspaceSearchService` |
 | App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
-| EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationRequest` or an equivalent editor-owned proxy |
+| EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationCommand`, `EditorNavigationRequest` |
 
 The future WS3 App lifecycle must retain the `Task` that consumes each event stream and
 explicitly cancel that Task before replacing a query, closing or switching a workspace, or
@@ -310,9 +310,11 @@ Opening a result is a two-stage action:
 
 1. Find the relative-path node, update `WorkspaceFileTree.selectedNodeID`, and activate
    the corresponding session.
-2. Send a monotonically identified editor navigation request containing the target
+2. Send a monotonically identified editor navigation command containing the target
    document identity and UTF-16 range. EditorKit applies it only after that document's
-   text is installed, sets the selection, scrolls it visible, and focuses the editor.
+   text is installed, sets the selection, scrolls it visible, and focuses the editor. A
+   cancellation command in the same `UInt64` ordering domain clears older pending work;
+   older or repeated navigation and cancellation commands are ignored.
 
 The result carries the exact searched-content fingerprint. If fingerprinting the activated
 session's current text does not produce the same digest and UTF-8 byte count, the App
@@ -321,12 +323,17 @@ may still arbitrate lifecycle elsewhere, but it is never proof of content equali
 Experimental WYSIWYG, programmatic selection must reveal the matching source region without
 mutating source text.
 
-**Implemented WS3A subset.** EditorKit now accepts an opaque document identity and a
-monotonic `EditorNavigationRequest`. A newer ID supersedes an older pending request; exact
-raw UTF-16 selection, scrolling, and focus occur only after the matching bound text is
-installed, IME composition has ended, and the editor is window-attached. Invalid ranges are
-rejected without clamping. App ownership, fingerprint arbitration, sidebar behavior, tree
-synchronization, shortcuts, and refresh lifecycle remain pending WS3 work.
+**Implemented WS3A subset.** EditorKit now accepts an optional opaque document identity and
+a monotonic `EditorNavigationCommand` carrying either an `EditorNavigationRequest` or a
+cancellation ID. A newer command supersedes older pending work; cancellation clears pending
+navigation and coordinator retry/deferral tasks, while older and repeated commands are idempotently
+ignored. Per-update candidate generations, not optional-identity equality, keep the installed
+model bindings pinned through IME composition and replace the binding, identity, and installed
+generation together only after the candidate's literal UTF-16 text is present. Exact raw
+UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
+ended and the editor is window-attached. Invalid ranges are rejected without clamping. App
+ownership, fingerprint arbitration, sidebar behavior, tree synchronization, shortcuts, and
+refresh lifecycle remain pending WS3 work.
 
 ## 5. Review-Sized Work Packages
 
@@ -400,7 +407,7 @@ synchronization, shortcuts, and refresh lifecycle remain pending WS3 work.
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
 | WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting |
-| EditorKitTests | Same-file and cross-file navigation; repeated request IDs; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
+| EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
 | PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; result opens correct node/session; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |

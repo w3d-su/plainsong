@@ -4,11 +4,28 @@ import STTextView
 import SwiftUI
 
 @MainActor
+struct EditorDocumentTransitionCandidate {
+    let generation: UInt64
+    let sourceText: String
+    let requestedSelection: NSRange?
+    fileprivate let text: Binding<String>
+    fileprivate let selection: Binding<NSRange?>
+    fileprivate let documentIdentity: EditorDocumentIdentity?
+}
+
+struct EditorDocumentInstallation: Equatable {
+    let generation: UInt64
+}
+
+@MainActor
 private struct EditorInstalledDocumentState {
     private var textBinding: Binding<String>
     private var selectionBinding: Binding<NSRange?>
     private(set) var identity: EditorDocumentIdentity?
     private(set) var isInstalled = false
+    private var nextCandidateGeneration: UInt64 = 0
+    private(set) var preparedCandidateGeneration: UInt64?
+    private(set) var installedCandidateGeneration: UInt64?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
         textBinding = text
@@ -25,32 +42,42 @@ private struct EditorInstalledDocumentState {
         set { selectionBinding.wrappedValue = newValue }
     }
 
-    func isInstalledDocument(_ candidateIdentity: EditorDocumentIdentity?) -> Bool {
-        isInstalled && identity == candidateIdentity
+    var isPreparedCandidateInstalled: Bool {
+        isInstalled && preparedCandidateGeneration == installedCandidateGeneration
     }
 
-    mutating func stageBindings(
+    mutating func prepare(
         text: Binding<String>,
         selection: Binding<NSRange?>,
-        for candidateIdentity: EditorDocumentIdentity?
-    ) {
-        guard !isInstalled || identity == candidateIdentity else {
-            return
+        documentIdentity: EditorDocumentIdentity?
+    ) -> EditorDocumentTransitionCandidate {
+        nextCandidateGeneration += 1
+        preparedCandidateGeneration = nextCandidateGeneration
+
+        // Before the first installation there is no live document to protect. Once
+        // installed, bindings change only in `install`, after exact text validation.
+        if !isInstalled {
+            textBinding = text
+            selectionBinding = selection
         }
 
-        textBinding = text
-        selectionBinding = selection
+        return EditorDocumentTransitionCandidate(
+            generation: nextCandidateGeneration,
+            sourceText: text.wrappedValue,
+            requestedSelection: selection.wrappedValue,
+            text: text,
+            selection: selection,
+            documentIdentity: documentIdentity
+        )
     }
 
-    mutating func install(
-        text: Binding<String>,
-        selection: Binding<NSRange?>,
-        identity: EditorDocumentIdentity?
-    ) {
-        textBinding = text
-        selectionBinding = selection
-        self.identity = identity
+    mutating func install(_ candidate: EditorDocumentTransitionCandidate) -> EditorDocumentInstallation {
+        textBinding = candidate.text
+        selectionBinding = candidate.selection
+        identity = candidate.documentIdentity
         isInstalled = true
+        installedCandidateGeneration = candidate.generation
+        return EditorDocumentInstallation(generation: candidate.generation)
     }
 }
 
@@ -104,54 +131,49 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         text: Binding<String>,
         selection: Binding<NSRange?>,
         documentIdentity: EditorDocumentIdentity?,
-        navigationRequest: EditorNavigationRequest?,
+        navigationCommand: EditorNavigationCommand?,
         in textView: STTextView
-    ) {
-        observeNavigationRequest(navigationRequest)
+    ) -> EditorDocumentTransitionCandidate {
+        observeNavigationCommand(navigationCommand)
 
-        installedDocument.stageBindings(
+        let candidate = installedDocument.prepare(
             text: text,
             selection: selection,
-            for: documentIdentity
+            documentIdentity: documentIdentity
         )
 
         guard installedDocument.isInstalled,
-              !installedDocument.isInstalledDocument(documentIdentity),
-              !textView.hasMarkedText()
+              !textView.hasMarkedText(),
+              !MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
         else {
-            return
+            return candidate
         }
 
-        // The installed document's final native edit has already been published.
-        // Clear its per-update edit flag so the destination can now be installed.
+        // A mismatching candidate cannot be the live installed document. Allow the
+        // normal external-text update even when both optional identities are nil.
         isUserEditing = false
+        return candidate
     }
 
+    @discardableResult
     func finishDocumentTransition(
-        text: Binding<String>,
-        selection: Binding<NSRange?>,
-        documentIdentity: EditorDocumentIdentity?,
+        _ candidate: EditorDocumentTransitionCandidate,
         in textView: STTextView
-    ) {
-        guard !textView.hasMarkedText(),
-              MarkdownTextView.plainTextMatches(textView, text.wrappedValue)
+    ) -> EditorDocumentInstallation? {
+        guard candidate.generation == installedDocument.preparedCandidateGeneration,
+              !textView.hasMarkedText(),
+              MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
         else {
-            return
+            return nil
         }
 
-        let previousDocumentIdentity = installedDocument.identity
-        installedDocument.install(
-            text: text,
-            selection: selection,
-            identity: documentIdentity
-        )
-        if previousDocumentIdentity != documentIdentity {
-            cancelPendingNavigationTasks()
-        }
+        let installation = installedDocument.install(candidate)
+        cancelPendingNavigationTasks()
+        return installation
     }
 
-    func isInstalledDocument(_ documentIdentity: EditorDocumentIdentity?) -> Bool {
-        installedDocument.isInstalledDocument(documentIdentity)
+    var isPreparedDocumentInstalled: Bool {
+        installedDocument.isPreparedCandidateInstalled
     }
 
     func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {

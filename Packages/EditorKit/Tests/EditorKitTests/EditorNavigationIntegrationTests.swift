@@ -27,7 +27,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
             documentIdentity: documentA,
             selection: target
         )
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
         XCTAssertEqual(fixture.textView.selectedRange(), target)
@@ -51,11 +51,11 @@ final class EditorNavigationIntegrationTests: XCTestCase {
 
         model.text = sourceB
         let request = EditorNavigationRequest(id: 2, documentIdentity: documentB, selection: target)
-        fixture.coordinator.prepareDocumentTransition(
+        let candidate = fixture.coordinator.prepareDocumentTransition(
             text: fixture.textBinding,
             selection: fixture.selectionBinding,
             documentIdentity: documentB,
-            navigationRequest: request,
+            navigationCommand: .navigate(request),
             in: fixture.textView
         )
 
@@ -67,12 +67,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(fixture.textView.selectedRange(), originalSelection)
 
         install(sourceB, in: fixture)
-        fixture.coordinator.finishDocumentTransition(
-            text: fixture.textBinding,
-            selection: fixture.selectionBinding,
-            documentIdentity: documentB,
-            in: fixture.textView
-        )
+        fixture.coordinator.finishDocumentTransition(candidate, in: fixture.textView)
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
         XCTAssertEqual(Self.text(in: fixture.textView), sourceB)
@@ -88,7 +83,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let fixture = try makeWindowedFixture(model: model, source: placeholder)
         model.text = targetSource
         let request = EditorNavigationRequest(id: 3, documentIdentity: documentA, selection: target)
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -114,7 +109,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
             documentIdentity: documentB,
             selection: NSRange(location: 0, length: 7)
         )
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -138,7 +133,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
                 documentIdentity: documentA,
                 selection: exactRange
             )
-            fixture.coordinator.observeNavigationRequest(request)
+            fixture.coordinator.observeNavigationCommand(.navigate(request))
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
             XCTAssertEqual(fixture.textView.selectedRange(), exactRange)
@@ -163,7 +158,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
             documentIdentity: documentA,
             selection: target
         )
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -204,7 +199,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(fixture.textView.hasMarkedText())
         let request = EditorNavigationRequest(id: 5, documentIdentity: documentA, selection: target)
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -228,7 +223,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let model = NavigationModel(text: source, selection: NSRange(location: 0, length: 0))
         let fixture = try makeDetachedFixture(model: model, source: source)
         let request = EditorNavigationRequest(id: 6, documentIdentity: documentA, selection: target)
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -267,7 +262,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let sourceBytes = Data(source.utf8)
 
         let request = EditorNavigationRequest(id: 7, documentIdentity: documentA, selection: target)
-        fixture.coordinator.observeNavigationRequest(request)
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
         let revealed = editorNavigationWYSIWYGPresentation(source, selection: target, revision: 2)
@@ -364,12 +359,14 @@ private extension EditorNavigationIntegrationTests {
         )
         textView.textDelegate = coordinator
         coordinator.attachFocusHandler(to: textView)
-        coordinator.finishDocumentTransition(
+        let candidate = coordinator.prepareDocumentTransition(
             text: textBinding,
             selection: selectionBinding,
             documentIdentity: documentA,
+            navigationCommand: nil,
             in: textView
         )
+        coordinator.finishDocumentTransition(candidate, in: textView)
         return DetachedFixture(
             scrollView: scrollView,
             textView: textView,

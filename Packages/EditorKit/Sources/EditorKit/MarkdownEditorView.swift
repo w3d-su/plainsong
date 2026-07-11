@@ -27,7 +27,7 @@ public struct MarkdownEditorView: View {
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
     private let documentIdentity: EditorDocumentIdentity?
-    private let navigationRequest: EditorNavigationRequest?
+    private let navigationCommand: EditorNavigationCommand?
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
     private let completionWorkspace: CompletionWorkspace
@@ -46,7 +46,7 @@ public struct MarkdownEditorView: View {
         showsLineNumbers: Bool = true,
         focusRequestID: Int = 0,
         documentIdentity: EditorDocumentIdentity? = nil,
-        navigationRequest: EditorNavigationRequest? = nil,
+        navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -64,7 +64,7 @@ public struct MarkdownEditorView: View {
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
         self.documentIdentity = documentIdentity
-        self.navigationRequest = navigationRequest
+        self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -96,7 +96,7 @@ public struct MarkdownEditorView: View {
             showsLineNumbers: showsLineNumbers,
             focusRequestID: focusRequestID,
             documentIdentity: documentIdentity,
-            navigationRequest: navigationRequest,
+            navigationCommand: navigationCommand,
             scrollProxy: scrollProxy,
             commandProxy: activeCommandProxy,
             completionWorkspace: completionWorkspace,

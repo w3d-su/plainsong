@@ -25,7 +25,7 @@ final class EditorNavigationStateMachineTests: XCTestCase {
         let range = NSRange(location: 9, length: 5)
         let request = request(id: 1, document: documentA, range: range)
         var state = EditorNavigationStateMachine()
-        state.observe(request)
+        state.observe(.navigate(request))
         var effectsInOrder: [String] = []
         var appliedSelection: NSRange?
         var scrolledRange: NSRange?
@@ -62,7 +62,7 @@ final class EditorNavigationStateMachineTests: XCTestCase {
     func testWrongDocumentIdentityLeavesRequestPendingWithoutEffects() {
         let request = request(id: 1, document: documentB, range: NSRange(location: 2, length: 3))
         var state = EditorNavigationStateMachine()
-        state.observe(request)
+        state.observe(.navigate(request))
 
         XCTAssertEqual(
             state.nextDecision(in: readyContext(document: documentA, textLength: 20)),
@@ -75,10 +75,10 @@ final class EditorNavigationStateMachineTests: XCTestCase {
     func testSameRequestIDIsIdempotentAfterItIsHandled() {
         let request = request(id: 7, document: documentA, range: NSRange(location: 2, length: 3))
         var state = EditorNavigationStateMachine()
-        state.observe(request)
+        state.observe(.navigate(request))
         state.markHandled(readyRequest(from: &state, textLength: 20))
 
-        state.observe(request)
+        state.observe(.navigate(request))
 
         XCTAssertEqual(state.nextDecision(in: readyContext(document: documentA, textLength: 20)), .noRequest)
         XCTAssertEqual(state.lastHandledRequestID, 7)
@@ -88,11 +88,11 @@ final class EditorNavigationStateMachineTests: XCTestCase {
         let range = NSRange(location: 4, length: 6)
         var state = EditorNavigationStateMachine()
         let first = request(id: 10, document: documentA, range: range)
-        state.observe(first)
+        state.observe(.navigate(first))
         state.markHandled(readyRequest(from: &state, textLength: 20))
 
         let replay = request(id: 11, document: documentA, range: range)
-        state.observe(replay)
+        state.observe(.navigate(replay))
 
         XCTAssertEqual(
             state.nextDecision(in: readyContext(document: documentA, textLength: 20)),
@@ -103,12 +103,16 @@ final class EditorNavigationStateMachineTests: XCTestCase {
     func testOlderIDCannotOverwriteANewerHandledRequest() {
         var state = EditorNavigationStateMachine()
         let newer = request(id: 20, document: documentA, range: NSRange(location: 8, length: 2))
-        state.observe(newer)
+        state.observe(.navigate(newer))
         state.markHandled(readyRequest(from: &state, textLength: 20))
 
-        state.observe(request(id: 19, document: documentA, range: NSRange(location: 1, length: 1)))
+        state.observe(.navigate(request(
+            id: 19,
+            document: documentA,
+            range: NSRange(location: 1, length: 1)
+        )))
 
-        XCTAssertEqual(state.highestObservedRequestID, 20)
+        XCTAssertEqual(state.highestObservedCommandID, 20)
         XCTAssertEqual(state.lastHandledRequestID, 20)
         XCTAssertNil(state.pendingRequest)
     }
@@ -116,14 +120,14 @@ final class EditorNavigationStateMachineTests: XCTestCase {
     func testNewerPendingRequestSupersedesOlderPendingRequest() {
         var state = EditorNavigationStateMachine()
         let older = request(id: 30, document: documentB, range: NSRange(location: 1, length: 2))
-        state.observe(older)
+        state.observe(.navigate(older))
         XCTAssertEqual(
             state.nextDecision(in: readyContext(document: documentA, textLength: 20)),
             .pending(.documentMismatch)
         )
 
         let newer = request(id: 31, document: documentA, range: NSRange(location: 7, length: 3))
-        state.observe(newer)
+        state.observe(.navigate(newer))
 
         XCTAssertEqual(state.pendingRequest, newer)
         XCTAssertEqual(
@@ -146,7 +150,7 @@ final class EditorNavigationStateMachineTests: XCTestCase {
             let id = UInt64(index + 1)
             let request = request(id: id, document: documentA, range: range)
             var state = EditorNavigationStateMachine()
-            state.observe(request)
+            state.observe(.navigate(request))
 
             XCTAssertEqual(
                 state.nextDecision(in: readyContext(document: documentA, textLength: 10)),
@@ -170,7 +174,7 @@ final class EditorNavigationStateMachineTests: XCTestCase {
             range: NSRange(location: NSNotFound, length: 0)
         )
         var state = EditorNavigationStateMachine()
-        state.observe(request)
+        state.observe(.navigate(request))
         let unrelatedContext = EditorNavigationContext(
             documentIdentity: documentA,
             isDocumentTextInstalled: false,
@@ -196,7 +200,7 @@ final class EditorNavigationStateMachineTests: XCTestCase {
                 document: documentA,
                 range: expectedRange
             )
-            state.observe(request)
+            state.observe(.navigate(request))
             let ready = readyRequest(from: &state, textLength: (source as NSString).length)
 
             XCTAssertEqual(ready.selection, expectedRange)

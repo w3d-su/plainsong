@@ -20,7 +20,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
     private let documentIdentity: EditorDocumentIdentity?
-    private let navigationRequest: EditorNavigationRequest?
+    private let navigationCommand: EditorNavigationCommand?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -39,7 +39,7 @@ struct MarkdownTextView: NSViewRepresentable {
         showsLineNumbers: Bool,
         focusRequestID: Int = 0,
         documentIdentity: EditorDocumentIdentity? = nil,
-        navigationRequest: EditorNavigationRequest? = nil,
+        navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -57,7 +57,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.showsLineNumbers = showsLineNumbers
         self.focusRequestID = focusRequestID
         self.documentIdentity = documentIdentity
-        self.navigationRequest = navigationRequest
+        self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -101,20 +101,17 @@ struct MarkdownTextView: NSViewRepresentable {
         context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
-        prepareCoordinatorInputs(context.coordinator, for: textView)
-        context.coordinator.finishDocumentTransition(
-            text: $text,
-            selection: $selection,
-            documentIdentity: documentIdentity,
-            in: textView
-        )
-        updateNonDocumentCoordinatorInputs(context.coordinator, for: textView)
-        applyWYSIWYGMechanismState(to: textView)
+        let candidate = prepareCoordinatorInputs(context.coordinator, for: textView)
+        let installation = context.coordinator.finishDocumentTransition(candidate, in: textView)
         context.coordinator.attachFocusHandler(to: textView)
-        context.coordinator.attachPasteAndDragHandlers(to: textView)
-        context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
-        context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
-        context.coordinator.applyPendingNavigationIfPossible(in: textView)
+        if installation != nil {
+            updateNonDocumentCoordinatorInputs(context.coordinator, for: textView)
+            applyWYSIWYGMechanismState(to: textView)
+            context.coordinator.attachPasteAndDragHandlers(to: textView)
+            context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+            context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
+            context.coordinator.applyPendingNavigationIfPossible(in: textView)
+        }
 
         return scrollView
     }
@@ -134,64 +131,61 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
-        prepareCoordinatorInputs(coordinator, for: textView)
-        updateNonDocumentCoordinatorInputs(coordinator, for: textView)
+        let candidate = prepareCoordinatorInputs(coordinator, for: textView)
         coordinator.attachFocusHandler(to: textView)
-        coordinator.attachPasteAndDragHandlers(to: textView)
-        coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
-        applyWYSIWYGMechanismState(to: textView)
-        coordinator.focusIfNeeded(focusRequestID, textView: textView)
 
-        applyIncomingTextIfNeeded(to: textView, coordinator: coordinator)
+        applyIncomingTextIfNeeded(candidate.sourceText, to: textView, coordinator: coordinator)
 
-        coordinator.finishDocumentTransition(
-            text: $text,
-            selection: $selection,
-            documentIdentity: documentIdentity,
-            in: textView
-        )
+        let installation = coordinator.finishDocumentTransition(candidate, in: textView)
 
-        applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
+        if installation != nil {
+            updateNonDocumentCoordinatorInputs(coordinator, for: textView)
+            coordinator.attachPasteAndDragHandlers(to: textView)
+            coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+            applyWYSIWYGMechanismState(to: textView)
+            coordinator.focusIfNeeded(focusRequestID, textView: textView)
+            applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
+
+            let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
+                !textView.hasMarkedText()
+                    && textView.textSelection != proposedSelection
+            } ?? false
+
+            if shouldApplySelection, let selection = candidate.requestedSelection {
+                let textLength = Self.textStorage(of: textView)?.length ?? 0
+                textView.textSelection = selection.clamped(toLength: textLength)
+            }
+
+            if textView.isEditable != isEnabled {
+                textView.isEditable = isEnabled
+            }
+            if textView.isSelectable != isEnabled {
+                textView.isSelectable = isEnabled
+            }
+            if textView.showsLineNumbers != showsLineNumbers {
+                textView.showsLineNumbers = showsLineNumbers
+            }
+            if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
+                textView.font = font
+                textView.gutterView?.font = font
+            }
+            coordinator.applyPendingNavigationIfPossible(in: textView)
+        }
         coordinator.isUserEditing = false
-
-        let shouldApplySelection = selection.map { proposedSelection in
-            coordinator.isInstalledDocument(documentIdentity)
-                && !textView.hasMarkedText()
-                && textView.textSelection != proposedSelection
-        } ?? false
-
-        if shouldApplySelection, let selection {
-            let textLength = Self.textStorage(of: textView)?.length ?? 0
-            textView.textSelection = selection.clamped(toLength: textLength)
-        }
-
-        if textView.isEditable != isEnabled {
-            textView.isEditable = isEnabled
-        }
-        if textView.isSelectable != isEnabled {
-            textView.isSelectable = isEnabled
-        }
-        if textView.showsLineNumbers != showsLineNumbers {
-            textView.showsLineNumbers = showsLineNumbers
-        }
-        if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
-            textView.font = font
-            textView.gutterView?.font = font
-        }
-        coordinator.applyPendingNavigationIfPossible(in: textView)
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
         // every SwiftUI update (i.e. every keystroke) is wasted work — text and
         // attribute edits already invalidate exactly what changed.
     }
 
     private func applyIncomingTextIfNeeded(
+        _ incomingText: String,
         to textView: MarkdownSTTextView,
         coordinator: Coordinator
     ) {
         let policy = MarkdownTextViewUpdatePolicy(
             isUserEditing: coordinator.isUserEditing,
             hasMarkedText: textView.hasMarkedText(),
-            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, text)
+            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, incomingText)
         )
         guard policy.shouldApplyIncomingText else {
             return
@@ -199,17 +193,20 @@ struct MarkdownTextView: NSViewRepresentable {
 
         coordinator.isUpdating = true
         let currentSelection = textView.selectedRange()
-        textView.text = text
-        textView.textSelection = currentSelection.clamped(toLength: (text as NSString).length)
+        textView.text = incomingText
+        textView.textSelection = currentSelection.clamped(toLength: (incomingText as NSString).length)
         coordinator.isUpdating = false
     }
 
-    private func prepareCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
+    private func prepareCoordinatorInputs(
+        _ coordinator: Coordinator,
+        for textView: MarkdownSTTextView
+    ) -> EditorDocumentTransitionCandidate {
         coordinator.prepareDocumentTransition(
             text: $text,
             selection: $selection,
             documentIdentity: documentIdentity,
-            navigationRequest: navigationRequest,
+            navigationCommand: navigationCommand,
             in: textView
         )
     }

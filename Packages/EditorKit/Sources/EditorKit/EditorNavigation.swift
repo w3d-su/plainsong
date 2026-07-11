@@ -26,6 +26,20 @@ public struct EditorNavigationRequest: Identifiable, Equatable, Sendable {
     }
 }
 
+/// A monotonic editor navigation command. Cancellation shares the same ID ordering
+/// domain as navigation so an obsolete request can never be resurrected.
+public enum EditorNavigationCommand: Identifiable, Equatable, Sendable {
+    case navigate(EditorNavigationRequest)
+    case cancel(id: UInt64)
+
+    public var id: UInt64 {
+        switch self {
+        case let .navigate(request): request.id
+        case let .cancel(id): id
+        }
+    }
+}
+
 struct EditorNavigationContext {
     let documentIdentity: EditorDocumentIdentity?
     let isDocumentTextInstalled: Bool
@@ -48,23 +62,39 @@ enum EditorNavigationDecision: Equatable {
     case ready(EditorNavigationRequest)
 }
 
+enum EditorNavigationCommandObservation: Equatable {
+    case ignored
+    case acceptedNavigation
+    case acceptedCancellation
+}
+
 /// Keeps request ordering and range validation independent from AppKit effects.
 struct EditorNavigationStateMachine {
-    private(set) var highestObservedRequestID: UInt64?
+    private(set) var highestObservedCommandID: UInt64?
     private(set) var pendingRequest: EditorNavigationRequest?
     private(set) var lastHandledRequestID: UInt64?
     private(set) var lastRejectedRequestID: UInt64?
+    private(set) var lastCancellationID: UInt64?
 
-    mutating func observe(_ request: EditorNavigationRequest?) {
-        guard let request else { return }
-        if let highestObservedRequestID,
-           request.id <= highestObservedRequestID
+    @discardableResult
+    mutating func observe(_ command: EditorNavigationCommand?) -> EditorNavigationCommandObservation {
+        guard let command else { return .ignored }
+        if let highestObservedCommandID,
+           command.id <= highestObservedCommandID
         {
-            return
+            return .ignored
         }
 
-        highestObservedRequestID = request.id
-        pendingRequest = request
+        highestObservedCommandID = command.id
+        switch command {
+        case let .navigate(request):
+            pendingRequest = request
+            return .acceptedNavigation
+        case let .cancel(id):
+            pendingRequest = nil
+            lastCancellationID = id
+            return .acceptedCancellation
+        }
     }
 
     mutating func nextDecision(in context: EditorNavigationContext) -> EditorNavigationDecision {
