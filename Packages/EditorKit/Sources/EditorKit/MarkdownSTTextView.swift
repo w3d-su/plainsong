@@ -10,7 +10,6 @@ final class MarkdownSTTextView: STTextView {
     private(set) var isSuppressingIntermediateMarkedTextRemoval = false
     var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
-    var isI0SpikeProjectionOwner = false
 
     @discardableResult
     func setWYSIWYGZeroWidthFoldingEnabled(_ isEnabled: Bool) -> Bool {
@@ -79,7 +78,7 @@ final class MarkdownSTTextView: STTextView {
             // visible boundary in the same pass as the reveal (no one-frame jump).
             let snappedCaret = wysiwygSnappedCaretOffset(caret, preferring: .nearest)
             textSelection = NSRange(location: snappedCaret, length: 0)
-            revealWYSIWYGImageAttachmentI0SpikeIfNeeded(at: caret)
+            revealWYSIWYGImagePresentationIfNeeded(at: caret)
         }
     }
 

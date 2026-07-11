@@ -31,6 +31,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let imageAssetInserter: EditorImageAssetInserter?
     private let imageAssetContextID: String?
     private let isWYSIWYGZeroWidthFoldingEnabled: Bool
+    private let imageThumbnailPresentationConfiguration: EditorImageThumbnailConfiguration?
     private let onWYSIWYGMechanismFailure: ((String) -> Void)?
     private let onVisibleRangeChange: (NSRange) -> Void
 
@@ -50,6 +51,7 @@ struct MarkdownTextView: NSViewRepresentable {
         imageAssetInserter: EditorImageAssetInserter? = nil,
         imageAssetContextID: String? = nil,
         isWYSIWYGZeroWidthFoldingEnabled: Bool = false,
+        imageThumbnailPresentationConfiguration: EditorImageThumbnailConfiguration? = nil,
         onWYSIWYGMechanismFailure: ((String) -> Void)? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25,
@@ -70,6 +72,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.imageAssetInserter = imageAssetInserter
         self.imageAssetContextID = imageAssetContextID
         self.isWYSIWYGZeroWidthFoldingEnabled = isWYSIWYGZeroWidthFoldingEnabled
+        self.imageThumbnailPresentationConfiguration = imageThumbnailPresentationConfiguration
         self.onWYSIWYGMechanismFailure = onWYSIWYGMechanismFailure
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
@@ -113,6 +116,7 @@ struct MarkdownTextView: NSViewRepresentable {
         if installation != nil {
             updateNonDocumentCoordinatorInputs(context.coordinator, for: textView)
             applyWYSIWYGMechanismState(to: textView)
+            updateImageThumbnailConfiguration(context.coordinator, for: textView)
             context.coordinator.attachPasteAndDragHandlers(to: textView)
             context.coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
             context.coordinator.focusIfNeeded(focusRequestID, textView: textView)
@@ -149,8 +153,16 @@ struct MarkdownTextView: NSViewRepresentable {
             coordinator.attachPasteAndDragHandlers(to: textView)
             coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
             applyWYSIWYGMechanismState(to: textView)
+            updateImageThumbnailConfiguration(coordinator, for: textView)
             coordinator.focusIfNeeded(focusRequestID, textView: textView)
-            applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
+            let didApplyStyledText = applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
+            if didApplyStyledText, let styledText {
+                coordinator.applyImageThumbnailPresentation(
+                    foldPlan: styledText.foldPlan,
+                    in: textView,
+                    forceReapply: true
+                )
+            }
 
             let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
                 !textView.hasMarkedText()
@@ -236,6 +248,18 @@ struct MarkdownTextView: NSViewRepresentable {
         onWYSIWYGMechanismFailure?("TextKit 2 content storage was unavailable for WYSIWYG folding")
     }
 
+    private func updateImageThumbnailConfiguration(
+        _ coordinator: Coordinator,
+        for textView: MarkdownSTTextView
+    ) {
+        coordinator.updateImageThumbnailPresentationConfiguration(
+            imageThumbnailPresentationConfiguration,
+            documentIdentity: documentIdentity,
+            isPresentationEnabled: isWYSIWYGZeroWidthFoldingEnabled,
+            in: textView
+        )
+    }
+
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
         coordinator.detachFocusHandler(from: textView)
@@ -246,26 +270,30 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.cancelCompletionRequest()
         coordinator.cancelPendingNavigationTasks()
         coordinator.revokeInstalledDocumentBinding()
+        coordinator.detachImageThumbnailPresentation(from: textView)
         textView.textDelegate = nil
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
     /// state, and scroll position survive because the characters never change. Stale
     /// styling (the text moved on) is dropped — a newer revision is already scheduled.
-    private func applyStyledTextIfNeeded(to textView: STTextView, coordinator: Coordinator) {
+    @discardableResult
+    private func applyStyledTextIfNeeded(to textView: STTextView, coordinator: Coordinator) -> Bool {
         guard let styledText,
               styledText.revision != coordinator.lastAppliedHighlightRevision,
               !coordinator.isUserEditing,
               !textView.hasMarkedText()
         else {
-            return
+            return false
         }
 
         coordinator.isUpdating = true
-        if Self.applyHighlightedText(styledText, to: textView) {
+        let didApply = Self.applyHighlightedText(styledText, to: textView)
+        if didApply {
             coordinator.lastAppliedHighlightRevision = styledText.revision
         }
         coordinator.isUpdating = false
+        return didApply
     }
 
     @MainActor
@@ -303,7 +331,9 @@ struct MarkdownTextView: NSViewRepresentable {
         let visibleOrigin = clipView?.bounds.origin
         let undoManager = textView.undoManager
         let shouldRestoreUndoRegistration = undoManager?.isUndoRegistrationEnabled == true
-        undoManager?.disableUndoRegistration()
+        if shouldRestoreUndoRegistration {
+            undoManager?.disableUndoRegistration()
+        }
         defer {
             if shouldRestoreUndoRegistration {
                 undoManager?.enableUndoRegistration()

@@ -5,7 +5,7 @@ extension MarkdownSTTextView {
     /// live fold attributes so it reflects exactly what is currently hidden. Used by the
     /// non-user-facing WYSIWYG hook for keyboard arrow and pointer click rest positions.
     func wysiwygSnappedCaretOffset(_ offset: Int, preferring direction: WYSIWYGCaretSnap.Direction) -> Int {
-        if let imageSnappedOffset = wysiwygImageAttachmentI0SpikeSnappedCaretOffset(
+        if let imageSnappedOffset = wysiwygImagePresentationSnappedCaretOffset(
             offset,
             preferring: direction
         ) {
