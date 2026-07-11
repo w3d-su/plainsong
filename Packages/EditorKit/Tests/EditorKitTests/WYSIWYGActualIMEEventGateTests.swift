@@ -33,6 +33,39 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
         }
     }
 
+    func testImageBoundaryFixturesTargetReadyAndLoadingThumbnailPresentation() throws {
+        let scenarios = ActualIMEFoldBoundaryScenario.imageBoundaryCases
+        XCTAssertEqual(scenarios.count, 4)
+        XCTAssertEqual(
+            scenarios.filter { $0.imagePresentationState == .readyThumbnail }.count,
+            2
+        )
+        XCTAssertEqual(
+            scenarios.filter { $0.imagePresentationState == .loadingPlaceholder }.count,
+            2
+        )
+
+        let source = actualIMEImageGateSource
+        let imageRange = (source as NSString).range(of: actualIMEImageGateLiteral)
+        for scenario in scenarios {
+            XCTAssertEqual(scenario.developmentPresentation, .inlineFoldRevealWithLinkFolding)
+            XCTAssertTrue(
+                scenario.insertionLocation == imageRange.location
+                    || scenario.insertionLocation == NSMaxRange(imageRange)
+            )
+            let highlighted = MarkdownSyntaxHighlighter().highlight(
+                scenario.source,
+                fileKind: .markdown,
+                visibleRange: NSRange(location: 0, length: (scenario.source as NSString).length),
+                developmentPresentation: scenario.developmentPresentation,
+                selection: NSRange(location: (scenario.source as NSString).length, length: 0)
+            )
+            let imageRegion = try XCTUnwrap(highlighted.foldPlan?.imageRegions.first)
+            XCTAssertEqual(highlighted.foldPlan?.imageRegions.count, 1)
+            XCTAssertEqual(imageRegion.sourceRange, imageRange)
+        }
+    }
+
     func testMarkedTextSelectionKeysAreReservedForInputContextOnlyWhileComposing() throws {
         let returnEvent = try Self.keyEvent(characters: "\r", keyCode: 36)
         let spaceEvent = try Self.keyEvent(characters: " ", keyCode: 49)
@@ -85,6 +118,23 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
         }
     }
 
+    func testActualZhuyinEventStreamAtImageBoundaries() throws {
+        try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
+        let inputSource = try XCTUnwrap(
+            ActualIMEInputSource.enabled(matching: .zhuyin),
+            "Expected enabled macOS Traditional Chinese Zhuyin input source"
+        )
+
+        print("Actual IME source: \(inputSource.summary)")
+        try ActualIMEEventHarness.withSelectedInputSource(inputSource) { harness in
+            try harness.assertEventStream(
+                script: .zhuyin,
+                scenarios: ActualIMEFoldBoundaryScenario.imageBoundaryCases
+            )
+        }
+    }
+
     func testActualPinyinEventStreamAtFoldBoundariesWhenEnabled() throws {
         try Self.requireActualIMEOptIn()
         try Self.requireActualIMEEventPostingAccess()
@@ -131,6 +181,31 @@ final class WYSIWYGActualIMEEventGateTests: XCTestCase {
             try harness.assertEventStream(
                 script: .pinyin,
                 scenarios: ActualIMEFoldBoundaryScenario.linkBoundaryCases
+            )
+        }
+    }
+
+    func testActualPinyinEventStreamAtImageBoundariesWhenEnabled() throws {
+        try Self.requireActualIMEOptIn()
+        try Self.requireActualIMEEventPostingAccess()
+        guard let inputSource = ActualIMEInputSource.enabled(matching: .pinyin) else {
+            let installedPinyin = ActualIMEInputSource.installed(matching: .pinyin)
+                .map(\.summary)
+                .joined(separator: ", ")
+            throw XCTSkip("""
+            No enabled/selectable macOS Pinyin input method. Installed matches: \
+            \(installedPinyin.isEmpty ? "none" : installedPinyin). Enable Pinyin in \
+            System Settings > Keyboard > Text Input > Edit > + > Chinese, then rerun \
+            PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter \
+            WYSIWYGActualIMEEventGateTests/testActualPinyinEventStreamAtImageBoundariesWhenEnabled
+            """)
+        }
+
+        print("Actual IME source: \(inputSource.summary)")
+        try ActualIMEEventHarness.withSelectedInputSource(inputSource) { harness in
+            try harness.assertEventStream(
+                script: .pinyin,
+                scenarios: ActualIMEFoldBoundaryScenario.imageBoundaryCases
             )
         }
     }

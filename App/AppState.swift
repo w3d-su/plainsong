@@ -72,6 +72,8 @@ final class AppState: ObservableObject {
     let workspaceSearchDebounceNanoseconds: UInt64
     let fileOperations: WorkspaceFileOperations
     let userDefaults: UserDefaults
+    let editorImageThumbnailAdapter: WorkspaceEditorImageThumbnailAdapter
+    let editorImageThumbnailRefreshProxy: EditorImageThumbnailRefreshProxy
     var autosaveTask: Task<Void, Never>?
     var statisticsTask: Task<Void, Never>?
     var workspaceReloadTask: Task<Void, Never>?
@@ -109,6 +111,7 @@ final class AppState: ObservableObject {
         workspaceSearchStreamProvider: any WorkspaceSearchStreamProviding = WorkspaceSearchService(),
         workspaceSearchLimits: WorkspaceSearchLimits = .init(),
         workspaceSearchDebounceNanoseconds: UInt64 = 200_000_000,
+        workspaceImageThumbnailProvider: any WorkspaceImageThumbnailLoading = WorkspaceImageThumbnailProvider(),
         fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard
@@ -121,6 +124,10 @@ final class AppState: ObservableObject {
         self.workspaceSearchStreamProvider = workspaceSearchStreamProvider
         self.workspaceSearchLimits = workspaceSearchLimits
         self.workspaceSearchDebounceNanoseconds = workspaceSearchDebounceNanoseconds
+        editorImageThumbnailAdapter = WorkspaceEditorImageThumbnailAdapter(
+            provider: workspaceImageThumbnailProvider
+        )
+        editorImageThumbnailRefreshProxy = EditorImageThumbnailRefreshProxy()
         self.fileOperations = fileOperations
         self.userDefaults = userDefaults
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile

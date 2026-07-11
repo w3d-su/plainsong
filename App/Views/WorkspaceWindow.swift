@@ -278,6 +278,9 @@ private struct DocumentEditor: View {
 
     var body: some View {
         let editorBinding = appState.editorDocumentBinding(for: session)
+        let presentation = EditorPresentationPolicy.resolve(
+            usesWYSIWYGPresentation: usesWYSIWYGPresentation
+        )
 
         MarkdownEditorView(
             text: editorBinding.text,
@@ -296,8 +299,10 @@ private struct DocumentEditor: View {
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
             imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false),
-            _developmentPresentation: EditorPresentationPolicy.resolve(
-                usesWYSIWYGPresentation: usesWYSIWYGPresentation
+            _developmentPresentation: presentation,
+            _developmentImageThumbnails: appState.editorImageThumbnailConfiguration(
+                for: session,
+                presentation: presentation
             ),
             onWYSIWYGMechanismFailure: { reason in
                 appState.handleWYSIWYGMechanismFailure(reason)

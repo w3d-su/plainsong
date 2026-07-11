@@ -11,17 +11,24 @@ extension ActualIMEEventHarness {
         selection: NSRange,
         revision: Int,
         developmentPresentation: MarkdownEditorDevelopmentPresentation = .inlineFoldReveal,
-        to textView: STTextView
+        to textView: STTextView,
+        coordinator: MarkdownTextViewCoordinator? = nil
     ) -> Bool {
-        MarkdownTextView.applyHighlightedText(
-            productionPresentation(
-                source,
-                selection: selection,
-                revision: revision,
-                developmentPresentation: developmentPresentation
-            ),
-            to: textView
+        let presentation = productionPresentation(
+            source,
+            selection: selection,
+            revision: revision,
+            developmentPresentation: developmentPresentation
         )
+        let didApply = MarkdownTextView.applyHighlightedText(presentation, to: textView)
+        if didApply, let coordinator, let imageTextView = textView as? MarkdownSTTextView {
+            coordinator.applyImageThumbnailPresentation(
+                foldPlan: presentation.foldPlan,
+                in: imageTextView,
+                forceReapply: true
+            )
+        }
+        return didApply
     }
 
     func productionPresentation(
@@ -146,6 +153,46 @@ extension ActualIMEEventHarness {
         )
     }
 
+    func assertImagePresentationSkippedDuringMarkedText(
+        in textView: STTextView,
+        currentText: String,
+        script: ActualIMEScript,
+        scenario: ActualIMEFoldBoundaryScenario
+    ) {
+        guard scenario.imagePresentationState != nil else {
+            return
+        }
+        guard let imageTextView = textView as? MarkdownSTTextView else {
+            XCTFail("Expected MarkdownSTTextView for \(script.name) \(scenario.name)")
+            return
+        }
+        let imageRange = (currentText as NSString).range(of: actualIMEImageGateLiteral)
+        guard imageRange.location != NSNotFound else {
+            XCTFail("Expected image source for \(script.name) \(scenario.name)")
+            return
+        }
+
+        do {
+            WYSIWYGImageThumbnailGateSupport.ensureLayout(in: imageTextView)
+            let projected = try WYSIWYGImageThumbnailGateSupport.lineFragment(
+                containing: imageRange,
+                in: imageTextView
+            ).attributedString.string
+            XCTAssertTrue(
+                projected.contains(actualIMEImageGateLiteral),
+                "Image source must stay raw during marked text for \(script.name) \(scenario.name)"
+            )
+            XCTAssertFalse(
+                projected.contains("\u{FFFC}"),
+                "Image presentation must be skipped during marked text for \(script.name) \(scenario.name)"
+            )
+        } catch {
+            XCTFail(
+                "Could not inspect image projection for \(script.name) \(scenario.name): \(error)"
+            )
+        }
+    }
+
     func assertFoldApplySkippedDuringMarkedText(
         in textView: STTextView,
         currentText: String,
@@ -174,6 +221,12 @@ extension ActualIMEEventHarness {
             scenario: scenario,
             file: file,
             line: line
+        )
+        assertImagePresentationSkippedDuringMarkedText(
+            in: textView,
+            currentText: currentText,
+            script: script,
+            scenario: scenario
         )
     }
 

@@ -22,6 +22,225 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testWorkspaceThumbnailAdapterMapsProviderOutcomesAndRequestExactly() async {
+        let modificationDate = Date(timeIntervalSinceReferenceDate: 42)
+        let workspaceThumbnail = WorkspaceImageThumbnail(
+            pngData: Data([1, 2, 3]),
+            pixelWidth: 320,
+            pixelHeight: 180,
+            resolvedWorkspaceRelativePath: "posts/assets/fixture.png",
+            contentModificationDate: modificationDate,
+            sourceByteCount: 123,
+            decodedByteCost: 456
+        )
+        let provider = StubWorkspaceImageThumbnailProvider(outcomes: [
+            "ready.png": .ready(workspaceThumbnail),
+            "remote.png": .stayRaw(.remoteHTTPSource(scheme: "https")),
+            "missing.png": .failed(.missingFile),
+            "unreadable.png": .failed(.unreadableFile),
+            "decode.png": .failed(.decodeFailed),
+            "empty.png": .failed(.emptyImage),
+        ])
+        let adapter = WorkspaceEditorImageThumbnailAdapter(provider: provider)
+        let rootURL = URL(fileURLWithPath: "/tmp/PlainsongAdapterTests", isDirectory: true)
+
+        let ready = await adapter.loadThumbnail(
+            rootURL: rootURL,
+            documentDirectoryRelativePath: "posts",
+            source: "ready.png",
+            maxPixelSize: 600
+        )
+        XCTAssertEqual(ready, .ready(EditorImageThumbnail(
+            pngData: workspaceThumbnail.pngData,
+            pixelWidth: workspaceThumbnail.pixelWidth,
+            pixelHeight: workspaceThumbnail.pixelHeight,
+            resolvedWorkspaceRelativePath: workspaceThumbnail.resolvedWorkspaceRelativePath,
+            contentModificationDate: modificationDate
+        )))
+        let stayedRaw = await adapter.loadThumbnail(
+            rootURL: rootURL,
+            documentDirectoryRelativePath: "posts",
+            source: "remote.png",
+            maxPixelSize: 600
+        )
+        XCTAssertEqual(
+            stayedRaw,
+            .stayRaw(.remoteHTTPSource(scheme: "https"))
+        )
+
+        let failures: [(String, EditorImageThumbnailFailure)] = [
+            ("missing.png", .missingFile),
+            ("unreadable.png", .unreadableFile),
+            ("decode.png", .decodeFailed),
+            ("empty.png", .emptyImage),
+        ]
+        for (source, expectedFailure) in failures {
+            let outcome = await adapter.loadThumbnail(
+                rootURL: rootURL,
+                documentDirectoryRelativePath: "posts",
+                source: source,
+                maxPixelSize: 600
+            )
+            XCTAssertEqual(outcome, .failed(expectedFailure))
+        }
+
+        let firstRequest = await provider.recordedRequests().first
+        XCTAssertEqual(firstRequest?.rootURL, rootURL)
+        XCTAssertEqual(firstRequest?.documentDirectoryRelativePath, "posts")
+        XCTAssertEqual(firstRequest?.source, "ready.png")
+        XCTAssertEqual(firstRequest?.maxPixelSize, 600)
+    }
+
+    func testImageThumbnailConfigurationRequiresGatedFolderWYSIWYG() throws {
+        let suiteName = "PlainsongImageThumbnailConfigurationTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let rootURL = try makeTemporaryDirectory()
+        let postsURL = rootURL.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(at: postsURL, withIntermediateDirectories: true)
+        let documentURL = postsURL.appendingPathComponent("post.md")
+        let session = DocumentSession(text: "![alt](fixture.png)", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, userDefaults: defaults)
+        appState.workspaceRootURL = rootURL
+        let wysiwygPresentation = MarkdownEditorDevelopmentPresentation.inlineFoldRevealWithLinkFolding
+
+        appState.setLayoutMode(.wysiwyg)
+        XCTAssertNil(appState.editorImageThumbnailConfiguration(
+            for: session,
+            presentation: wysiwygPresentation
+        ))
+
+        appState.preferences.setExperimentalWYSIWYGEnabled(true)
+        appState.setLayoutMode(.sourceOnly)
+        XCTAssertNil(appState.editorImageThumbnailConfiguration(
+            for: session,
+            presentation: wysiwygPresentation
+        ))
+
+        appState.setLayoutMode(.wysiwyg)
+        XCTAssertNil(appState.editorImageThumbnailConfiguration(for: session, presentation: .source))
+        let configuration = try XCTUnwrap(appState.editorImageThumbnailConfiguration(
+            for: session,
+            presentation: wysiwygPresentation
+        ))
+        XCTAssertEqual(configuration.rootURL, rootURL)
+        XCTAssertEqual(configuration.documentDirectoryRelativePath, "posts")
+        XCTAssertTrue(configuration.loader === appState.editorImageThumbnailAdapter)
+        XCTAssertTrue(configuration.refreshProxy === appState.editorImageThumbnailRefreshProxy)
+
+        appState.handleWYSIWYGMechanismFailure("test failure")
+        XCTAssertNil(appState.editorImageThumbnailConfiguration(
+            for: session,
+            presentation: wysiwygPresentation
+        ))
+    }
+
+    func testSingleFileModeProvablyKeepsImageThumbnailsRawAtAppBoundary() async throws {
+        let suiteName = "PlainsongSingleFileImageThumbnailTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let provider = StubWorkspaceImageThumbnailProvider(outcomes: [:])
+        let session = DocumentSession(
+            text: "![alt](sibling.png)",
+            url: URL(fileURLWithPath: "/tmp/SingleFile/post.md"),
+            fileKind: .markdown
+        )
+        let appState = AppState(
+            currentDocument: session,
+            workspaceImageThumbnailProvider: provider,
+            userDefaults: defaults
+        )
+        appState.preferences.setExperimentalWYSIWYGEnabled(true)
+        appState.setLayoutMode(.wysiwyg)
+
+        XCTAssertTrue(appState.shouldUseWYSIWYGPresentation)
+        XCTAssertNil(appState.editorImageThumbnailConfiguration(
+            for: session,
+            presentation: .inlineFoldRevealWithLinkFolding
+        ))
+        let requests = await provider.recordedRequests()
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testWorkspaceReloadInvalidatesOnlyChangedAllowlistedRasterPaths() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let firstDate = Date(timeIntervalSinceReferenceDate: 1)
+        let secondDate = Date(timeIntervalSinceReferenceDate: 2)
+        let previous = WorkspaceFileSnapshot(entries: [
+            .init(
+                relativePath: "assets/unchanged.png",
+                kind: .image,
+                identity: "unchanged",
+                contentModificationDate: firstDate
+            ),
+            .init(
+                relativePath: "assets/changed.png",
+                kind: .image,
+                identity: "changed",
+                contentModificationDate: firstDate
+            ),
+            .init(
+                relativePath: "assets/removed.jpg",
+                kind: .image,
+                identity: "removed",
+                contentModificationDate: firstDate
+            ),
+            .init(
+                relativePath: "assets/vector.svg",
+                kind: .image,
+                identity: "vector",
+                contentModificationDate: firstDate
+            ),
+        ])
+        let current = WorkspaceFileSnapshot(entries: [
+            .init(
+                relativePath: "assets/unchanged.png",
+                kind: .image,
+                identity: "unchanged",
+                contentModificationDate: firstDate
+            ),
+            .init(
+                relativePath: "assets/changed.png",
+                kind: .image,
+                identity: "changed",
+                contentModificationDate: secondDate
+            ),
+            .init(
+                relativePath: "assets/added.webp",
+                kind: .image,
+                identity: "added",
+                contentModificationDate: secondDate
+            ),
+            .init(
+                relativePath: "assets/vector.svg",
+                kind: .image,
+                identity: "vector",
+                contentModificationDate: secondDate
+            ),
+        ])
+        let appState = AppState(directoryScanner: ImmediateWorkspaceDirectoryScanner(snapshot: current))
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSnapshot = previous
+        var invalidatedPaths: Set<String> = []
+        let attachmentID = UUID()
+        appState.editorImageThumbnailRefreshProxy.attach(id: attachmentID) { paths in
+            invalidatedPaths.formUnion(paths)
+        }
+        defer { appState.editorImageThumbnailRefreshProxy.detach(id: attachmentID) }
+
+        try await appState.reloadWorkspaceTree(root: rootURL, selectFirstIfNeeded: false)
+
+        XCTAssertEqual(invalidatedPaths, [
+            "assets/added.webp",
+            "assets/changed.png",
+            "assets/removed.jpg",
+        ])
+    }
+
     func testEmptyStateCannotSaveAndUsesDefaultTitle() {
         let appState = AppState()
 
@@ -2690,6 +2909,41 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 }
 
 // swiftlint:enable type_body_length
+
+private actor StubWorkspaceImageThumbnailProvider: WorkspaceImageThumbnailLoading {
+    struct Request: Equatable {
+        let rootURL: URL
+        let documentDirectoryRelativePath: String
+        let source: String
+        let maxPixelSize: Int
+    }
+
+    private let outcomes: [String: WorkspaceImageThumbnailOutcome]
+    private var requests: [Request] = []
+
+    init(outcomes: [String: WorkspaceImageThumbnailOutcome]) {
+        self.outcomes = outcomes
+    }
+
+    func loadThumbnail(
+        rootURL: URL,
+        documentDirectoryRelativePath: String,
+        source: String,
+        maxPixelSize: Int
+    ) async -> WorkspaceImageThumbnailOutcome {
+        requests.append(Request(
+            rootURL: rootURL,
+            documentDirectoryRelativePath: documentDirectoryRelativePath,
+            source: source,
+            maxPixelSize: maxPixelSize
+        ))
+        return outcomes[source] ?? .failed(.missingFile)
+    }
+
+    func recordedRequests() -> [Request] {
+        requests
+    }
+}
 
 @MainActor
 private final class RecordingWorkspaceSearchStreamProvider: WorkspaceSearchStreamProviding {
