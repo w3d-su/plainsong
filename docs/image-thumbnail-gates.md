@@ -1,9 +1,10 @@
 # Image Thumbnails — Sub-Gate Specification
 
-> **Status: I2 INTERNAL DEVELOPMENT HOOK ONLY. No App wiring or user-facing exposure.**
+> **Status: I0–I4, I6–I10 checked behind the INTERNAL DEVELOPMENT HOOK ONLY.
+> I5 (owner-run actual IME) remains open. No App wiring or user-facing exposure.**
 > `docs/wysiwyg-release-checklist.md` §E defers image thumbnails. This document is the
 > dedicated sub-gate (the link-folding pattern, `docs/link-folding-gates.md`, applied to the
-> next construct). The I2 presentation path requires an explicit EditorKit-only hook; the
+> next construct). The presentation path requires an explicit EditorKit-only hook; the
 > public presentation cases remain unchanged and App supplies no loader. User-facing
 > enablement still requires every gate below plus its own Decision Log entry.
 
@@ -108,47 +109,76 @@ never touched:
     FSEvents-to-proxy wiring remains the later enablement PR.
 
 ### I3 — Caret & selection
-- [ ] Reveal-on-touch; caret snapping at both edges of the image span (the C.2 policy over
+- [x] Reveal-on-touch; caret snapping at both edges of the image span (the C.2 policy over
   a non-zero-width visual); selections keep raw UTF-16 offsets, never clamped (C.3).
+  **Evidence (2026-07-11):** `WYSIWYGImageThumbnailNativeGateTests`
+  (`testI3ArrowTraversalSnapsAcrossReadyThumbnailInBothDirections`,
+  `testI3ArrowTraversalSnapsAcrossPlaceholderInBothDirections`,
+  `testI3InteriorCaretSnapsByTravelDirectionAndNearestOnClick`,
+  `testI3ShiftSelectionEnteringLeavingAndSpanningImageKeepsRawOffsets`,
+  `testI3EmojiAndCJKInAltAndPathAtEdgesDoNotTrapCaret`,
+  `testI3ImageAdjacentToFoldedLinkOnSameLineKeepsIndependentSnapping`,
+  `testI3RevealOnTouchClearsImagePresentationMarker`).
 
 ### I4 — Copy/paste
-- [ ] Whole/partial/boundary selections copy exact raw `![alt](src)` bytes (B7); paste into
+- [x] Whole/partial/boundary selections copy exact raw `![alt](src)` bytes (B7); paste into
   folded/revealed image regions mutates source normally; copy never emits U+FFFC.
+  **Evidence (2026-07-11):** `WYSIWYGImageThumbnailNativeGateTests`
+  (`testI4WholePartialBoundaryAndAltToPathSelectionsCopyExactRawPlainAndRTF` — whole,
+  partial, leading/trailing boundary, and alt→path partial; plain + RTF; zero U+FFFC and
+  zero U+200B;
+  `testI4PasteIntoFoldedAndRevealedImageRegionsMutatesSourceNormally`).
+  Builds on #80 `testWholePartialAndBoundaryCopiesStayRawForPlainAndRTF` /
+  `testRawPasteMutatesOnlyBackingSource` without duplicating those I0 invariants.
 
 ### I5 — IME (owner-run)
 - [ ] `PLAINSONG_RUN_ACTUAL_IME=1` Zhuyin + Pinyin composition immediately before/after an
   image span: no corruption, no caret escape, presentation skipped during marked text.
+  **Not this PR** — owner-run actual IME remains a separate gate (link-folding L5 precedent).
 
 ### I6 — Pointer
-- [ ] Real-`NSEvent` click on the thumbnail places the caret and reveals (no drag-resize,
+- [x] Real-`NSEvent` click on the thumbnail places the caret and reveals (no drag-resize,
   no open-in-Preview in v1); boundary clicks don't trap; drag selection across the image
   copies raw Markdown.
+  **Evidence (2026-07-11):** `WYSIWYGImageThumbnailNativePointerGateTests`
+  (`testI6RealPointerClickOnThumbnailBodyPlacesCaretRevealsAndDoesNotOpenPreview`,
+  `testI6RealPointerClicksAtBothVisualBoundariesDoNotTrapCaret`,
+  `testI6RealPointerDragSelectionAcrossImageCopiesExactRawMarkdown`,
+  `testI6ShiftClickExtensionAcrossImageKeepsRawOffsets`).
 
 ### I7 — Accessibility
-- [ ] `AXValue` is the exact raw source; the thumbnail exposes the alt text as its
+- [x] `AXValue` is the exact raw source; the thumbnail exposes the alt text as its
   accessibility description.
-  **Partial evidence (2026-07-11):**
-  `testAccessibilityKeepsRawValueAndSelectedTextAndExposesAltDescription` keeps `AXValue`,
-  `accessibilitySelectedText()`, range strings, and attributed AX output exact raw Markdown
-  while the projected attachment image carries the exact alt-text accessibility description.
-  I7 remains open pending the complete user-facing accessibility gate.
+  **Evidence (2026-07-11):** #80
+  `testAccessibilityKeepsRawValueAndSelectedTextAndExposesAltDescription` plus
+  `WYSIWYGImageThumbnailNativeGateTests`
+  (`testI7AXValueAndSelectedTextStayExactRawWithThumbnailPresent`,
+  `testI7AttachmentExposesAltTextAndEmptyAltUsesImageFallback` — empty alt uses the
+  deterministic `"Image"` accessibility fallback matching the placeholder chip label).
 
 ### I8 — Performance & memory
-- [ ] Visible-range recompute on `Fixtures/large-1mb.md` stays ≤ 50 ms with image folding
+- [x] Visible-range recompute on `Fixtures/large-1mb.md` stays ≤ 50 ms with image folding
   active (CI-informational per R15, hard locally); typing latency stays < 16 ms **while
   thumbnails are loading**; decode is off-main; cache is keyed by path+mtime with a bounded
   memory budget recorded in `docs/perf-log.md`.
-  **Partial evidence (2026-07-11):**
-  `testTextChangeCancelsAndDropsStaleLoadBeforeNewPlanApplies`,
-  `testDocumentChangeCancelsOldGenerationAndStartsFreshRequest`, and
-  `testTypingOnLargeFixtureStaysUnderBudgetWhileThumbnailLoadsAreInFlight` cover EditorKit
-  coalescing/stale-drop and assert the in-flight `large-1mb.md` typing hot path through the
-  shared R15 `assertPerformanceBudget` helper. The remaining I8 recompute/memory/perf-log
-  clauses stay open.
+  **Evidence (2026-07-11):**
+  - `WYSIWYGImageThumbnailI8PerformanceGateTests.testI8VisibleRangeRecomputeWithImageFoldingStaysUnderFiftyMilliseconds`
+    (uses existing `Fixtures/large-1mb.md` image syntax; no fixture generator change)
+  - `testTypingOnLargeFixtureStaysUnderBudgetWhileThumbnailLoadsAreInFlight` (kept green)
+  - `testTextChangeCancelsAndDropsStaleLoadBeforeNewPlanApplies`,
+    `testDocumentChangeCancelsOldGenerationAndStartsFreshRequest` (coalescing)
+  - `testI8LoaderDecodePathRunsOffMainThread`
+  - `testI8CacheByteBudgetIsThirtyTwoMebibytes` + `docs/perf-log.md` (32 MiB =
+    `WorkspaceImageThumbnailProvider.defaultCacheByteBudget`)
 
 ### I9 — Undo/redo
-- [ ] Presentation never enters undo; editing alt/path after reveal undoes as plain text;
+- [x] Presentation never enters undo; editing alt/path after reveal undoes as plain text;
   fold state recomputes after undo without stale attachments/adornments.
+  **Evidence (2026-07-11):** `WYSIWYGImageThumbnailNativeGateTests`
+  (`testI9PresentationNeverRegistersUndoIncludingPlaceholderReadyAndRefresh`,
+  `testI9EditingAltAndPathAfterRevealUndoRedoAndRebuildProjection`,
+  `testI9NestedUndoIsolationFromPresentationTestsStaysGreen` — keeps #80 nested isolation
+  green as a named I9 reference).
 
 ### I10 — Security & sandbox
 - [x] Pixel loading goes through WorkspaceKit's security-scoped access and the shared

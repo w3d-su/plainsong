@@ -15,6 +15,7 @@ actor TestEditorImageThumbnailLoader: EditorImageThumbnailLoading {
     private var outcomes: [String: EditorImageThumbnailOutcome]
     private var delayNanoseconds: UInt64
     private var requests: [Request] = []
+    private(set) var loadThreadWasMain = false
 
     init(
         outcomes: [String: EditorImageThumbnailOutcome],
@@ -30,6 +31,8 @@ actor TestEditorImageThumbnailLoader: EditorImageThumbnailLoading {
         source: String,
         maxPixelSize: Int
     ) async -> EditorImageThumbnailOutcome {
+        // Actor-isolated loader bodies run off MainActor; record via pthread for Swift 6 safety.
+        loadThreadWasMain = pthread_main_np() != 0
         requests.append(Request(
             rootURL: rootURL,
             documentDirectoryRelativePath: documentDirectoryRelativePath,
@@ -53,10 +56,18 @@ actor TestEditorImageThumbnailLoader: EditorImageThumbnailLoading {
     func recordedRequests() -> [Request] {
         requests
     }
+
+    func didLoadOnMainThread() -> Bool {
+        loadThreadWasMain
+    }
 }
 
+/// Shared windowed-editor fixtures for image-thumbnail presentation and native-gate suites.
 @MainActor
-extension WYSIWYGImageThumbnailPresentationTests {
+enum WYSIWYGImageThumbnailGateSupport {
+    static let imageSource = "![alt](fixture.png)"
+    static let source = "Top sibling line\n\(imageSource)\nBottom sibling line\n"
+
     struct WindowedEditor {
         let window: NSWindow
         let textView: MarkdownSTTextView
@@ -71,7 +82,16 @@ extension WYSIWYGImageThumbnailPresentationTests {
         return range
     }
 
-    func makeWindowedEditor(
+    static var repoRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    static func makeWindowedEditor(
         source: String? = nil,
         selection: NSRange = NSRange(location: 0, length: 0),
         frame: NSRect = NSRect(x: 0, y: 0, width: 760, height: 420),
@@ -79,10 +99,12 @@ extension WYSIWYGImageThumbnailPresentationTests {
         outcomes: [String: EditorImageThumbnailOutcome]? = nil,
         delayNanoseconds: UInt64 = 0,
         linkFoldingEnabled: Bool = true,
-        refreshProxy: EditorImageThumbnailRefreshProxy? = nil
+        refreshProxy: EditorImageThumbnailRefreshProxy? = nil,
+        file: StaticString = #filePath,
+        line: UInt = #line
     ) throws -> WindowedEditor {
         let source = source ?? Self.source
-        let defaultOutcome = Self.readyOutcome(
+        let defaultOutcome = readyOutcome(
             source: "fixture.png",
             resolvedPath: "posts/fixture.png"
         )
@@ -98,7 +120,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         )
 
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
-        let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
+        let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView, file: file, line: line)
         textView.isEditable = true
         textView.isSelectable = true
         textView.isHorizontallyResizable = false
@@ -111,7 +133,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
             selection: .constant(selection)
         )
         textView.textDelegate = coordinator
-        XCTAssertTrue(textView.setWYSIWYGZeroWidthFoldingEnabled(true))
+        XCTAssertTrue(textView.setWYSIWYGZeroWidthFoldingEnabled(true), file: file, line: line)
         coordinator.updateImageThumbnailPresentationConfiguration(
             configuration,
             documentIdentity: EditorDocumentIdentity(rawValue: "test-document"),
@@ -131,7 +153,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         textView.layoutSubtreeIfNeeded()
         if let pinnedTextContainerWidth {
             textView.textContainer.size.width = pinnedTextContainerWidth
-            XCTAssertEqual(textView.textContainer.size.width, pinnedTextContainerWidth)
+            XCTAssertEqual(textView.textContainer.size.width, pinnedTextContainerWidth, file: file, line: line)
         }
         applyPresentation(
             source: source,
@@ -150,7 +172,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         )
     }
 
-    func applyPresentation(
+    static func applyPresentation(
         source: String,
         selection: NSRange,
         linkFoldingEnabled: Bool = true,
@@ -184,7 +206,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         )
     }
 
-    func waitForMarker(
+    static func waitForMarker(
         in textView: MarkdownSTTextView,
         range: NSRange,
         matching predicate: @escaping (WYSIWYGImagePresentationMarker) -> Bool = { _ in true },
@@ -201,7 +223,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         throw TestError.timeout
     }
 
-    func waitForRequestCount(
+    static func waitForRequestCount(
         _ expectedCount: Int,
         loader: TestEditorImageThumbnailLoader,
         timeoutNanoseconds: UInt64 = 2_000_000_000
@@ -217,7 +239,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
         throw TestError.timeout
     }
 
-    func imageMarker(
+    static func imageMarker(
         in textView: MarkdownSTTextView,
         range: NSRange
     ) -> WYSIWYGImagePresentationMarker? {
@@ -235,7 +257,7 @@ extension WYSIWYGImageThumbnailPresentationTests {
     }
 
     @discardableResult
-    func assertLiveAttachment(
+    static func assertLiveAttachment(
         in textView: STTextView,
         imageRange: NSRange,
         expectedSize: NSSize? = nil,
@@ -269,134 +291,5 @@ extension WYSIWYGImageThumbnailPresentationTests {
             }
         }
         return projectedLine
-    }
-
-    func clickAttachment(in fixture: WindowedEditor, imageRange: NSRange) throws -> Int {
-        _ = try assertLiveAttachment(in: fixture.textView, imageRange: imageRange)
-        let attachmentRect = try lineFragmentFrame(containing: imageRange, in: fixture.textView)
-        let windowPoint = fixture.textView.convert(
-            CGPoint(x: attachmentRect.midX, y: attachmentRect.midY),
-            to: nil
-        )
-        let event = try XCTUnwrap(NSEvent.mouseEvent(
-            with: .leftMouseDown,
-            location: windowPoint,
-            modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime,
-            windowNumber: fixture.window.windowNumber,
-            context: nil,
-            eventNumber: 0,
-            clickCount: 1,
-            pressure: 1
-        ))
-
-        fixture.textView.mouseDown(with: event)
-        return fixture.textView.selectedRange().location
-    }
-
-    func projectedImageParagraph(
-        in textView: MarkdownSTTextView,
-        imageRange: NSRange
-    ) throws -> (NSTextParagraph, NSRange) {
-        let textContentStorage = try XCTUnwrap(textView.textContentManager as? NSTextContentStorage)
-        let delegate = try XCTUnwrap(
-            textContentStorage.delegate as? WYSIWYGZeroWidthTextContentStorageDelegate
-        )
-        let paragraphRange = (textContentStorage.textStorage?.string as NSString?)?
-            .paragraphRange(for: imageRange) ?? imageRange
-        let paragraph = try XCTUnwrap(
-            delegate.textContentStorage(textContentStorage, textParagraphWith: paragraphRange)
-        )
-        return (paragraph, paragraphRange)
-    }
-
-    func ensureLayout(in textView: STTextView) {
-        textView.textLayoutManager.ensureLayout(for: textView.textLayoutManager.documentRange)
-        textView.layoutSubtreeIfNeeded()
-    }
-
-    func lineFragmentFrame(containing range: NSRange, in textView: STTextView) throws -> CGRect {
-        try lineFragment(containing: range, in: textView).typographicBounds.offsetBy(
-            dx: layoutFragment(containing: range, in: textView).layoutFragmentFrame.minX,
-            dy: layoutFragment(containing: range, in: textView).layoutFragmentFrame.minY
-        )
-    }
-
-    func lineFragment(containing range: NSRange, in textView: STTextView) throws -> NSTextLineFragment {
-        let fragment = try layoutFragment(containing: range, in: textView)
-        let elementRange = NSRange(fragment.rangeInElement, in: textView.textContentManager)
-        return try XCTUnwrap(fragment.textLineFragments.first { lineFragment in
-            let lineRange = NSRange(
-                location: elementRange.location + lineFragment.characterRange.location,
-                length: lineFragment.characterRange.length
-            )
-            return NSLocationInRange(range.location, lineRange)
-        })
-    }
-
-    func layoutFragment(containing range: NSRange, in textView: STTextView) throws -> NSTextLayoutFragment {
-        ensureLayout(in: textView)
-        let textRange = try XCTUnwrap(NSTextRange(range, in: textView.textContentManager))
-        return try XCTUnwrap(textView.textLayoutManager.textLayoutFragment(for: textRange.location))
-    }
-
-    func uniquePasteboard() -> NSPasteboard {
-        let pasteboard = NSPasteboard(
-            name: NSPasteboard.Name("PlainsongImagePresentation.\(UUID().uuidString)")
-        )
-        pasteboard.clearContents()
-        return pasteboard
-    }
-
-    static func readyOutcome(
-        source _: String,
-        resolvedPath: String,
-        pixelWidth: Int = 320,
-        pixelHeight: Int = 180,
-        modificationDate: Date = Date(timeIntervalSinceReferenceDate: 1)
-    ) -> EditorImageThumbnailOutcome {
-        .ready(EditorImageThumbnail(
-            pngData: validPNGData,
-            pixelWidth: pixelWidth,
-            pixelHeight: pixelHeight,
-            resolvedWorkspaceRelativePath: resolvedPath,
-            contentModificationDate: modificationDate
-        ))
-    }
-
-    static func imageRegion(in source: String, literal: String) -> MarkdownInlineImageRegion {
-        let storage = source as NSString
-        let sourceRange = storage.range(of: literal)
-        precondition(sourceRange.location != NSNotFound)
-        let altTextRange = storage.range(of: "alt", options: [], range: sourceRange)
-        let sourcePathRange = storage.range(of: "fixture.png", options: [], range: sourceRange)
-        guard let region = MarkdownInlineImageRegion(
-            in: source,
-            sourceRange: sourceRange,
-            altTextRange: altTextRange,
-            sourcePathRange: sourcePathRange
-        ) else {
-            preconditionFailure("Could not build test image region")
-        }
-        return region
-    }
-
-    private static var validPNGData: Data {
-        let image = NSImage(size: NSSize(width: 8, height: 8), flipped: false) { bounds in
-            NSColor.systemOrange.setFill()
-            NSBezierPath(rect: bounds).fill()
-            return true
-        }
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let data = bitmap.representation(using: .png, properties: [:])
-        else {
-            preconditionFailure("Could not make test PNG")
-        }
-        return data
-    }
-
-    enum TestError: Error {
-        case timeout
     }
 }

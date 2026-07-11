@@ -97,6 +97,26 @@ Current sweep values from `make test`:
 | Result | Pass |
 | Notes | `WYSIWYGLinkPerformanceGateTests.testL8LinkFoldingVisibleRangeRecomputeStaysUnderFiftyMilliseconds` measures visible-range parse, link fold-plan/presentation, in-place attribute apply, and display. The fixture and generator were not changed. |
 
+## Phase 2 Image Thumbnail Native Gate Verification (I8)
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-11 |
+| Branch | `phase2-image-thumbnail-gates` |
+| Commit | Working tree for image-thumbnail native gates (I3/I4/I6/I7/I8/I9) after PR #80 |
+| Command | `swift test --package-path Packages/EditorKit --filter WYSIWYGImageThumbnail` |
+| macOS | macOS 27.0 (26A5378j) |
+| Xcode | Xcode 27.0 (27A5194q) |
+| Machine | Apple silicon arm64, 16 GB RAM |
+| Fixture | Unmodified `Fixtures/large-1mb.md` (already contains `![sample](./assets/image-NNNNN.png)` per section; no fixture generator change) |
+| Presentation | Internal `_developmentImageThumbnails` hook + `.inlineFoldRevealWithLinkFolding` |
+| Budget | Visible-range recompute ≤ 50 ms (hard locally, CI-informational per R15); typing < 16 ms while loads in flight |
+| Measured recompute | `15.234 ms` max; samples `[14.806, 14.815, 14.711, 14.985, 15.234]` after two warm-ups |
+| Measured typing | `0.002 ms` max in-flight typing hot path on large-1mb.md |
+| Loader cache budget | `32 MiB` (`WorkspaceImageThumbnailProvider.defaultCacheByteBudget = 32 * 1024 * 1024`) |
+| Result | Pass |
+| Notes | `WYSIWYGImageThumbnailI8PerformanceGateTests.testI8VisibleRangeRecomputeWithImageFoldingStaysUnderFiftyMilliseconds` measures post-edit visible-range parse/fold (incl. image regions), highlight attribute apply (preserving image markers), image-marker presentation apply, and display. Decode isolation asserted by `testI8LoaderDecodePathRunsOffMainThread`. Production fix: image presentation source identity no longer walks full UTF-16 of multi-MB documents on every apply. |
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`

@@ -66,6 +66,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
         self.altText = altText
         self.canvasSize = canvasSize
 
+        let accessibilityDescription = Self.accessibilityDescription(forAltText: altText)
         switch outcome {
         case let .ready(thumbnail):
             let proposedContentRect = WYSIWYGImagePresentationMetrics.contentRect(
@@ -89,7 +90,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
                     thumbnailImage,
                     contentRect: proposedContentRect,
                     canvasSize: canvasSize,
-                    accessibilityDescription: altText
+                    accessibilityDescription: accessibilityDescription
                 )
             } else {
                 contentRect = .zero
@@ -97,7 +98,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
                 image = Self.makePlaceholderImage(
                     altText: altText,
                     canvasSize: canvasSize,
-                    accessibilityDescription: altText
+                    accessibilityDescription: accessibilityDescription
                 )
             }
 
@@ -107,7 +108,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
             image = Self.makePlaceholderImage(
                 altText: altText,
                 canvasSize: canvasSize,
-                accessibilityDescription: altText
+                accessibilityDescription: accessibilityDescription
             )
 
         case .none:
@@ -116,7 +117,7 @@ final class WYSIWYGImagePresentationMarker: NSObject {
             image = Self.makePlaceholderImage(
                 altText: altText,
                 canvasSize: canvasSize,
-                accessibilityDescription: altText
+                accessibilityDescription: accessibilityDescription
             )
 
         case .stayRaw:
@@ -179,6 +180,11 @@ enum WYSIWYGImagePresentationMetrics {
 }
 
 private extension WYSIWYGImagePresentationMarker {
+    /// Empty alt falls back to the same deterministic label used by the visual placeholder chip.
+    static func accessibilityDescription(forAltText altText: String) -> String {
+        altText.isEmpty ? "Image" : altText
+    }
+
     static func makeThumbnailImage(
         _ thumbnail: NSImage,
         contentRect: NSRect,
