@@ -1,7 +1,7 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1 and WS2 are complete and locally verified; WS3–WS4 remain
-> pending.**
+> **Status: IN PROGRESS. WS1, WS2, WS3A, and the headless WS3B App lifecycle are
+> complete and locally verified; visible WS3 sidebar work and WS4 remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -123,8 +123,9 @@ produce only a prefix of the valid-request bound.
 - `WorkspaceRootContainment` is the shared symlink-resolving containment boundary used by
   completion, assets, and workspace search rather than duplicating path-prefix logic.
 - `DocumentSession` owns canonical in-memory text, while `AppState.sessionCache` retains up
-  to eight warm sessions. WorkspaceKit must receive immutable overlays rather than reading
-  main-actor sessions directly.
+  to eight warm sessions keyed by the contained, symlink-resolved physical target URL.
+  WorkspaceKit must receive immutable overlays rather than reading main-actor sessions
+  directly.
 - `WorkspaceSidebar` is a fixed-width view inside an `HStack`. Risk R17 prohibits casually
   restoring the `NavigationSplitView` path that previously caused an AppKit constraint
   loop. Search should keep the stable shell and may increase the fixed width from 220 to
@@ -222,6 +223,20 @@ normalized collision instead of choosing a winner by input or dictionary iterati
 for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
 take precedence over disk content.
 
+Workspace document identity follows one physical-target policy. An in-root file URL is
+standardized, symlink-resolved, containment-checked, and then expressed relative to the
+resolved root. Session-cache keys, overlay paths, search candidate/result paths, activation,
+tree selection, and editor document identity all derive from that value. Snapshot aliases
+that resolve to the same target collapse to one path-ordered search candidate, so an unsaved
+edit opened through `alias.md -> target.md` overrides disk content and activates the same
+session as `target.md`. A link resolving outside the root remains a typed symlink escape;
+this policy does not relax `WorkspaceRootContainment`. Candidate planning and the immediate
+pre-read race check revalidate the resolved physical target's file kind after containment:
+only `.md`, `.markdown`, and `.mdx` targets remain searchable. Thus
+`alias.md -> target.txt` is a typed skipped candidate rather than an unopenable result, while
+`alias.md -> target.md` still deduplicates to `target.md`. Candidate, skipped, progress, and
+terminal counts use the post-deduplication plan and remain internally consistent.
+
 Search reads must:
 
 - accept only snapshot entries classified as editable Markdown;
@@ -316,6 +331,19 @@ Opening a result is a two-stage action:
    cancellation command in the same `UInt64` ordering domain clears older pending work;
    older or repeated navigation and cancellation commands are ignored.
 
+Acceptance and execution are separate. A stale root/workspace/query context or an event that
+is not the retained result/match is ignored without disturbing unrelated navigation. Once an
+active retained result and match are accepted as a new intent, App emits a newer cancellation
+before resolving a node, opening a file, checking document identity or fingerprint, or
+validating the final UTF-16 range. Success emits an even newer navigation. Missing nodes,
+open/detach/identity failures, fingerprint mismatch, and invalid ranges leave the cancellation
+as the latest command, so an older pending navigation cannot execute afterward.
+Destination lookup/readability and cached-session identity are validated before committing a
+document switch. A missing or unreadable destination therefore leaves the current document's
+autosave, statistics, completion work, prompts, and editor state intact. Reactivating the
+already-current session is a document-transition no-op; successful result navigation still
+uses the newer exact-range command.
+
 The result carries the exact searched-content fingerprint. If fingerprinting the activated
 session's current text does not produce the same digest and UTF-8 byte count, the App
 refreshes the active query instead of jumping to a stale offset. A document/session version
@@ -331,9 +359,52 @@ ignored. Per-update candidate generations, not optional-identity equality, keep 
 model bindings pinned through IME composition and replace the binding, identity, and installed
 generation together only after the candidate's literal UTF-16 text is present. Exact raw
 UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
-ended and the editor is window-attached. Invalid ranges are rejected without clamping. App
-ownership, fingerprint arbitration, sidebar behavior, tree synchronization, shortcuts, and
-refresh lifecycle remain pending WS3 work.
+ended and the editor is window-attached. Invalid ranges are rejected without clamping. At
+the WS3A landing point, App ownership, fingerprint arbitration, sidebar behavior, tree
+synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B closes
+only the headless App subset below.
+
+**Implemented WS3B subset.** MarkdownCore exposes one allocation-free exact UTF-16 source
+comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
+raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
+headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
+debounce, and the exact Task consuming each stream. Query replacement, workspace generation
+changes, close/switch, empty-query clear, and teardown explicitly cancel that Task;
+root/workspace/query context checks gate every event, and task-token checks prevent an older
+cleanup from touching newer state. Requests capture a retained snapshot plus validated
+immutable dirty overlays from current and warm Markdown/MDX sessions on the main actor.
+
+The App/editor bridge also carries an opaque binding ID distinct from optional navigation
+identity. EditorKit reports installation only from a successful `finishDocumentTransition`
+after marked text ends and exact candidate source is live, does not transfer during prepare,
+and revokes on dismantle. If workspace/file retirement occurs first, App transfers only that
+exact binding's session, registration, session-specific autosave/statistics work, and old
+security-scoped authority into a binding-ID-keyed retirement. Unrelated sessions close
+normally. The old authority is released only after the binding is replaced or revoked and its
+latest source has been saved; an unresolved external conflict or save failure keeps the exact
+session recoverable instead of discarding it. App generic writes remain current-session-only.
+The installed binding may commit to its exact non-current active or retired session only while
+the registration and lease both match. Such a commit updates that session's raw source,
+version, and dirty state once without touching the current document's text or tasks.
+
+External-change conflicts are session-scoped by the canonical URL entry in
+`pendingExternalTexts`, not by whichever banner is currently visible. Autosave and explicit
+`save(session:)` reject that exact session even while another document is current. LRU
+eviction, workspace retirement, and close paths retain or block on the dirty conflict rather
+than overwriting disk or silently dropping the session. Reload restores the external text as
+clean; Keep Mine clears the conflict and restores save/autosave eligibility. Binding
+registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
+registration, while a matching revoke can still clear the installed lease after registration
+cleanup; unrelated or stale revokes cannot clear a newer lease.
+
+Workspace aliases use the one physical-target policy above. Activation accepts only a retained
+active result/match, emits a newer cancellation before every fallible execution step, selects
+and activates the canonical contained target, compares SHA-256 plus UTF-8 byte count, validates
+the raw range without clamping, then emits a newer URL-identified navigation. Fingerprint
+mismatch restarts with fresh overlays while leaving cancellation latest; every other accepted
+failure also leaves that cancellation latest. The command and binding lifecycle pass through
+`WorkspaceWindow`; sidebar UI, shortcuts/focus, rendering/accessibility, and general
+edit/FSEvent auto-refresh remain pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -376,7 +447,7 @@ refresh lifecycle remain pending WS3 work.
 
 ### WS3 — Sidebar and exact navigation
 
-- [ ] Own the stream-consuming App Task and explicitly cancel it on query replacement,
+- [x] Own the stream-consuming App Task and explicitly cancel it on query replacement,
   workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
   producer.
 - [ ] Add Files/Search sidebar modes without changing the stable `HStack` shell.
@@ -385,8 +456,8 @@ refresh lifecycle remain pending WS3 work.
   states.
 - [ ] Add keyboard and accessibility support.
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
-- [ ] Keep tree selection synchronized when a search result opens.
-- [ ] Validate source fingerprints before applying a result.
+- [x] Keep tree selection synchronized when a search result opens.
+- [x] Validate source fingerprints before applying a result.
 - [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
 
 ### WS4 — CI, performance, and acceptance
@@ -406,9 +477,9 @@ refresh lifecycle remain pending WS3 work.
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting |
+| WorkspaceKitTests | Markdown candidate filtering before and after symlink resolution; alias deduplication; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; dirty-session refresh; result opens correct node/session; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; session-scoped external conflicts; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens correct node/session; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

@@ -3,6 +3,15 @@ import XCTest
 
 @MainActor
 final class DocumentSessionTests: XCTestCase {
+    func testExactSourceTextMatchesOnlyLiteralCodeUnitIdentity() {
+        let composed = "caf\u{00E9}"
+        let decomposed = "cafe\u{0301}"
+
+        XCTAssertTrue(composed == decomposed)
+        XCTAssertTrue(ExactSourceText.matches(composed, composed))
+        XCTAssertFalse(ExactSourceText.matches(composed, decomposed))
+    }
+
     func testInitialSnapshotReflectsSessionState() {
         let fileURL = URL(fileURLWithPath: "/tmp/post.md")
         let session = DocumentSession(
@@ -45,6 +54,28 @@ final class DocumentSessionTests: XCTestCase {
 
         XCTAssertEqual(session.version, 1)
         XCTAssertTrue(session.isDirty)
+    }
+
+    func testCanonicalEquivalentRawDifferentTextPropagatesVersionDirtyStateAndTextChange() async throws {
+        let savedText = "cafe\u{0301}"
+        let editedText = "caf\u{00E9}"
+        let session = DocumentSession(text: savedText, fileKind: .markdown)
+        var iterator = session.textChanges(includeCurrent: false).makeAsyncIterator()
+
+        session.replaceText(editedText)
+
+        let nextChange = await iterator.next()
+        let change = try XCTUnwrap(nextChange)
+        XCTAssertEqual(Array(session.text.utf16), Array(editedText.utf16))
+        XCTAssertEqual(Array(change.text.utf16), Array(editedText.utf16))
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+
+        session.replaceText(savedText)
+
+        XCTAssertEqual(Array(session.text.utf16), Array(savedText.utf16))
+        XCTAssertEqual(session.version, 2)
+        XCTAssertFalse(session.isDirty)
     }
 
     func testReplaceTextCanDeferStatisticsUntilExplicitRefresh() {
@@ -145,6 +176,28 @@ final class DocumentSessionTests: XCTestCase {
 
         XCTAssertEqual(session.version, 1)
         XCTAssertTrue(session.isDirty)
+    }
+
+    func testResetPropagatesCanonicalEquivalentRawDifferentText() async throws {
+        let original = "cafe\u{0301}"
+        let replacement = "caf\u{00E9}"
+        let fileURL = URL(fileURLWithPath: "/tmp/post.md")
+        let session = DocumentSession(text: original, url: fileURL, fileKind: .markdown)
+        var iterator = session.textChanges(includeCurrent: false).makeAsyncIterator()
+
+        session.reset(
+            text: replacement,
+            url: fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+
+        let nextChange = await iterator.next()
+        let change = try XCTUnwrap(nextChange)
+        XCTAssertEqual(Array(session.text.utf16), Array(replacement.utf16))
+        XCTAssertEqual(Array(change.text.utf16), Array(replacement.utf16))
+        XCTAssertEqual(session.version, 1)
+        XCTAssertFalse(session.isDirty)
     }
 
     func testTextChangesStreamYieldsInitialReplaceAndMarkSavedChanges() async {

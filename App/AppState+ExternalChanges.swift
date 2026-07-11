@@ -5,9 +5,8 @@ import MarkdownCore
 extension AppState {
     func reloadExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL
-        guard currentDocument.fileURL?.standardizedFileURL == key else {
-            pendingExternalTexts[key] = nil
+        let key = prompt.fileURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == key else {
             externalChangePrompt = nil
             return
         }
@@ -28,16 +27,25 @@ extension AppState {
         recordKnownDiskText(text, for: key)
         pendingExternalTexts[key] = nil
         externalChangePrompt = nil
+        sessionPolicy.updateDirtyState(for: key, isDirty: false)
+        cancelAutosave(for: currentDocument)
+        finishRetiredEditorDocumentBindingsIfPossible(for: currentDocument)
     }
 
     func keepMineForExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL
+        let key = prompt.fileURL.standardizedFileURL.resolvingSymlinksInPath()
+        guard currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == key else {
+            externalChangePrompt = nil
+            return
+        }
         pendingExternalTexts[key] = nil
         if let diskText = try? fileStore.load(url: prompt.fileURL).text {
             recordKnownDiskText(diskText, for: key)
         }
         externalChangePrompt = nil
+        scheduleAutosave(for: currentDocument)
+        finishRetiredEditorDocumentBindingsIfPossible(for: currentDocument)
     }
 
     func handleCurrentDocumentExternalChange() {
@@ -45,7 +53,7 @@ extension AppState {
     }
 
     func handleExternalChange(for session: DocumentSession) {
-        guard let url = session.fileURL?.standardizedFileURL else { return }
+        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
 
         switch diskDocumentState(for: url) {
         case .missing:
@@ -55,8 +63,8 @@ extension AppState {
         case let .changed(diskText, diskHash, modificationDate):
             if session.isDirty {
                 pendingExternalTexts[url] = diskText
+                cancelAutosave(for: session)
                 if session === currentDocument {
-                    autosaveTask?.cancel()
                     missingFilePrompt = nil
                     externalChangePrompt = ExternalChangePrompt(fileURL: url)
                 }
@@ -64,6 +72,7 @@ extension AppState {
             }
 
             guard let fileKind = FileKind(url: url) else { return }
+            pendingExternalTexts[url] = nil
             session.reset(
                 text: diskText,
                 url: url,
@@ -80,13 +89,18 @@ extension AppState {
     }
 
     func recordKnownDiskText(_ text: String, for url: URL, modificationDate: Date? = nil) {
-        let key = url.standardizedFileURL
+        let key = url.standardizedFileURL.resolvingSymlinksInPath()
         lastKnownDiskHashes[key] = Self.contentHash(text)
         recordKnownDiskModificationDate(modificationDate ?? Self.contentModificationDate(for: key), for: key)
     }
 
     func clearSessionState(for url: URL) {
-        let key = url.standardizedFileURL
+        let key = url.standardizedFileURL.resolvingSymlinksInPath()
+        if let session = sessionCache[key] {
+            cancelAutosave(for: session)
+            cancelStatisticsRefresh(for: session)
+            removeEditorDocumentBindingRegistration(for: session)
+        }
         sessionCache[key] = nil
         sessionPolicy.remove(key)
         lastKnownDiskHashes[key] = nil
@@ -171,7 +185,7 @@ private extension AppState {
     }
 
     func recordKnownDiskModificationDate(_ modificationDate: Date?, for url: URL) {
-        let key = url.standardizedFileURL
+        let key = url.standardizedFileURL.resolvingSymlinksInPath()
         if let modificationDate {
             lastKnownDiskModificationDates[key] = modificationDate
         } else {

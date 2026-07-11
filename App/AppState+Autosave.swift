@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 
 @MainActor
 extension AppState {
@@ -13,19 +14,88 @@ extension AppState {
     }
 
     func scheduleAutosave() {
+        let session = currentDocument
+        cancelBackgroundAutosave(for: session)
         autosaveTask?.cancel()
         guard canAutosaveCurrentDocument else { return }
 
         let delayNanoseconds = UInt64(preferences.autosaveIntervalSeconds * 1_000_000_000)
-        autosaveTask = Task { [weak self] in
+        autosaveTask = Task { @MainActor [weak self, weak session] in
             do {
                 try await Task.sleep(nanoseconds: delayNanoseconds)
-                guard !Task.isCancelled else { return }
-                self?.autosaveIfNeeded()
+                guard !Task.isCancelled, let self, let session,
+                      currentDocument === session
+                else {
+                    return
+                }
+                autosaveIfNeeded()
             } catch {
                 return
             }
         }
+    }
+
+    func scheduleAutosave(for session: DocumentSession) {
+        guard session !== currentDocument else {
+            scheduleAutosave()
+            return
+        }
+
+        scheduleBackgroundAutosave(for: session)
+    }
+
+    func moveCurrentAutosaveToBackground(for session: DocumentSession) {
+        guard session === currentDocument else { return }
+        let shouldReschedule = autosaveTask != nil && session.isDirty
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        guard shouldReschedule else { return }
+        scheduleBackgroundAutosave(for: session)
+    }
+
+    private func scheduleBackgroundAutosave(for session: DocumentSession) {
+        cancelBackgroundAutosave(for: session)
+        guard canAutosave(session: session) else { return }
+
+        let sessionIdentity = ObjectIdentifier(session)
+        let token = UUID()
+        let delayNanoseconds = UInt64(preferences.autosaveIntervalSeconds * 1_000_000_000)
+        let task = Task { @MainActor [weak self, weak session] in
+            do {
+                try await Task.sleep(nanoseconds: delayNanoseconds)
+            } catch {
+                return
+            }
+            guard let self, let session,
+                  !Task.isCancelled,
+                  sessionAutosaveTasks[sessionIdentity]?.token == token
+            else {
+                return
+            }
+
+            sessionAutosaveTasks[sessionIdentity] = nil
+            guard session.isDirty, canAutosave(session: session) else { return }
+            do {
+                try save(session: session)
+            } catch {
+                present(error, title: "Autosave Failed")
+            }
+        }
+        sessionAutosaveTasks[sessionIdentity] = SessionBackgroundTask(token: token, task: task)
+    }
+
+    func cancelAutosave(for session: DocumentSession) {
+        if session === currentDocument {
+            autosaveTask?.cancel()
+            autosaveTask = nil
+        }
+        cancelBackgroundAutosave(for: session)
+    }
+
+    func cancelBackgroundAutosave(for session: DocumentSession) {
+        let sessionIdentity = ObjectIdentifier(session)
+        sessionAutosaveTasks[sessionIdentity]?.task.cancel()
+        sessionAutosaveTasks[sessionIdentity] = nil
     }
 
     /// Synchronous by design: a background write can race an explicit ⌘S or a
@@ -43,8 +113,16 @@ extension AppState {
     }
 
     private var canAutosaveCurrentDocument: Bool {
-        guard let url = currentDocument.fileURL?.standardizedFileURL else { return false }
+        canAutosave(session: currentDocument)
+    }
+
+    func canAutosave(session: DocumentSession) -> Bool {
+        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return false }
+        guard session === currentDocument || sessionCache[url] === session || isRetiredEditorSession(session) else {
+            return false
+        }
         return !detachedSessionURLs.contains(url) &&
+            pendingExternalTexts[url] == nil &&
             externalChangePrompt?.fileURL.standardizedFileURL != url &&
             missingFilePrompt?.fileURL.standardizedFileURL != url
     }

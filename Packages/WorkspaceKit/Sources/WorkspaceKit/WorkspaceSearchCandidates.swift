@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 
 struct WorkspaceSearchCandidatePlan {
     let items: [WorkspaceSearchCandidatePlanItem]
@@ -35,6 +36,7 @@ enum WorkspaceSearchCandidatePlanner {
         var invalidItems: [WorkspaceSearchCandidatePlanItem] = []
         var validEntries: [WorkspaceSearchCandidate] = []
         var hardIgnoredItems: [WorkspaceSearchCandidatePlanItem] = []
+        var seenCanonicalCandidatePaths: Set<String> = []
 
         for entry in entries {
             switch try classify(entry, request: request) {
@@ -43,7 +45,9 @@ enum WorkspaceSearchCandidatePlanner {
             case let .hardIgnored(item):
                 hardIgnoredItems.append(item)
             case let .candidate(candidate):
-                validEntries.append(candidate)
+                if seenCanonicalCandidatePaths.insert(candidate.relativePath).inserted {
+                    validEntries.append(candidate)
+                }
             }
         }
 
@@ -71,7 +75,7 @@ enum WorkspaceSearchCandidatePlanner {
 
         return WorkspaceSearchCandidatePlan(
             items: items,
-            candidateFileCount: entries.count,
+            candidateFileCount: items.count,
             ignoredFileCount: items.reduce(into: 0) { count, item in
                 if case .ignored = item {
                     count += 1
@@ -99,10 +103,16 @@ enum WorkspaceSearchCandidatePlanner {
             ))
         }
 
+        let canonicalRelativePath: String
+        let containedURL: URL
         do {
-            _ = try WorkspaceRootContainment.containedURL(
+            containedURL = try WorkspaceRootContainment.containedURL(
                 rootURL: request.rootURL,
                 relativePath: relativePath
+            )
+            canonicalRelativePath = try WorkspaceRootContainment.relativePath(
+                for: containedURL,
+                rootURL: request.rootURL
             )
         } catch {
             return .invalid(.skipped(
@@ -114,12 +124,22 @@ enum WorkspaceSearchCandidatePlanner {
             ))
         }
 
-        if isAlwaysIgnored(relativePath) {
-            return .hardIgnored(.ignored(sortKey: relativePath))
+        guard FileKind(url: containedURL) != nil else {
+            return .invalid(.skipped(
+                sortKey: relativePath,
+                skippedFile: WorkspaceSearchSkippedFile(
+                    relativePath: relativePath,
+                    reason: .unsupportedPhysicalFileKind
+                )
+            ))
+        }
+
+        if isAlwaysIgnored(canonicalRelativePath) {
+            return .hardIgnored(.ignored(sortKey: canonicalRelativePath))
         }
         return .candidate(WorkspaceSearchCandidate(
-            relativePath: relativePath,
-            overlay: request.dirtyOverlays[relativePath]
+            relativePath: canonicalRelativePath,
+            overlay: request.dirtyOverlays[canonicalRelativePath]
         ))
     }
 

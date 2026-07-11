@@ -67,4 +67,27 @@ final class WorkspaceSessionLRUPolicyTests: XCTestCase {
             WorkspaceSessionEviction(url: firstURL, requiresSave: true),
         ])
     }
+
+    func testProtectedInstalledSessionStaysTrackedUntilHandoffThenEvictsWithLatestDirtyState() {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let installedURL = URL(fileURLWithPath: "/tmp/installed.md")
+        let candidateURL = URL(fileURLWithPath: "/tmp/candidate.md")
+
+        _ = policy.access(installedURL, isDirty: false)
+        let prematureEvictions = policy.access(
+            candidateURL,
+            isDirty: false,
+            protectedURLs: [installedURL, candidateURL]
+        )
+        policy.updateDirtyState(for: installedURL, isDirty: true)
+
+        XCTAssertTrue(prematureEvictions.isEmpty)
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [installedURL, candidateURL])
+        XCTAssertEqual(policy.dirtyState(for: installedURL), true)
+        XCTAssertEqual(
+            policy.trim(protectedURLs: [candidateURL]),
+            [WorkspaceSessionEviction(url: installedURL, requiresSave: true)]
+        )
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [candidateURL])
+    }
 }

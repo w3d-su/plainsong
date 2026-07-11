@@ -101,7 +101,7 @@ extension AppState {
         }
 
         if !preserveWorkspace {
-            closeWorkspace()
+            try closeWorkspaceForReplacement()
         }
         try activateFileSession(url: url)
 
@@ -127,7 +127,7 @@ extension AppState {
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
         let root = url.standardizedFileURL
-        closeWorkspace()
+        try closeWorkspaceForReplacement()
         workspaceAccess = SecurityScopedAccess.startAccessing(root)
         workspaceRootURL = root
         workspaceTree = WorkspaceFileTree(
@@ -164,43 +164,24 @@ extension AppState {
         )
     }
 
-    func closeWorkspace() {
-        _ = advanceWorkspaceGeneration()
-        workspaceReloadTask?.cancel()
-        workspaceReloadTask = nil
-        completionWorkspaceTask?.cancel()
-        completionWorkspaceTask = nil
-        workspaceWatcher?.stop()
-        workspaceWatcher = nil
-        for session in sessionCache.values where session.isDirty {
-            do {
-                try save(session: session)
-            } catch {
-                present(error, title: "Could Not Save Workspace File")
-            }
-        }
-        workspaceAccess?.stop()
-        workspaceAccess = nil
-        workspaceRootURL = nil
-        workspaceTree = nil
-        workspaceSnapshot = nil
-        completionWorkspace = .empty
-        sessionCache.removeAll()
-        sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
-        pendingExternalTexts.removeAll()
-        lastKnownDiskHashes.removeAll()
-        lastKnownDiskModificationDates.removeAll()
-        detachedSessionURLs.removeAll()
-        externalChangePrompt = nil
-        missingFilePrompt = nil
-    }
-
     func activateFileSession(url: URL) throws {
-        let key = url.standardizedFileURL
-        autosaveTask?.cancel()
-        statisticsTask?.cancel()
-
+        let key = try canonicalSessionURL(for: url)
         if let cachedSession = sessionCache[key] {
+            if cachedSession === currentDocument {
+                synchronizeWorkspaceTreeSelection(for: cachedSession)
+                handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
+                return
+            }
+            guard let cachedURL = cachedSession.fileURL,
+                  try canonicalSessionURL(for: cachedURL) == key
+            else {
+                throw AppStateError.invalidSessionIdentity(key)
+            }
+            guard !detachedSessionURLs.contains(key) else {
+                throw AppStateError.missingFile(key)
+            }
+            _ = try fileStore.load(url: key)
+            cancelForegroundDocumentTasks()
             setCurrentDocument(cachedSession)
             handleExternalChange(for: cachedSession)
             handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
@@ -208,29 +189,34 @@ extension AppState {
         }
 
         let file = try fileStore.load(url: key)
-        let session = DocumentSession(
+        let recoveredSession = recoverRetiredSession(for: key)
+        let session = recoveredSession ?? DocumentSession(
             text: file.text,
             url: file.url,
             fileKind: file.fileKind,
             isDirty: false
         )
+        cancelForegroundDocumentTasks()
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
         if missingFilePrompt?.fileURL.standardizedFileURL == key {
             missingFilePrompt = nil
         }
-        recordKnownDiskText(file.text, for: key)
+        if recoveredSession == nil {
+            recordKnownDiskText(file.text, for: key)
+        }
         setCurrentDocument(session)
-        handleSessionAccess(url: key, isDirty: false)
+        if recoveredSession != nil {
+            handleExternalChange(for: session)
+        }
+        handleSessionAccess(url: key, isDirty: session.isDirty)
     }
 
     func setCurrentDocument(_ session: DocumentSession) {
+        guard currentDocument !== session else { return }
         requestEditorFocus()
-
-        guard currentDocument !== session else {
-            scheduleCompletionWorkspaceRefresh()
-            return
-        }
+        synchronizeWorkspaceTreeSelection(for: session)
+        cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
         observeCurrentDocument()
@@ -238,38 +224,28 @@ extension AppState {
     }
 
     func handleSessionAccess(url: URL, isDirty: Bool) {
-        let evictions = sessionPolicy.access(url, isDirty: isDirty)
+        let evictions = sessionPolicy.access(
+            url,
+            isDirty: isDirty,
+            protectedURLs: protectedSessionURLs()
+        )
         handleSessionEvictions(evictions)
     }
 
-    func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {
-        for eviction in evictions {
-            guard let session = sessionCache[eviction.url] else { continue }
-            if eviction.requiresSave {
-                do {
-                    try save(session: session)
-                } catch {
-                    present(error, title: "Could Not Save Warm File")
-                    handleSessionEvictions(sessionPolicy.access(eviction.url, isDirty: session.isDirty))
-                    continue
-                }
-            }
-            sessionCache[eviction.url] = nil
-        }
-    }
-
     func save(session: DocumentSession) throws {
-        guard let url = session.fileURL?.standardizedFileURL else { return }
+        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
         guard !detachedSessionURLs.contains(url),
               missingFilePrompt?.fileURL.standardizedFileURL != url
         else {
             throw AppStateError.missingFile(url)
         }
-        guard externalChangePrompt?.fileURL.standardizedFileURL != url else {
+        guard pendingExternalTexts[url] == nil,
+              externalChangePrompt?.fileURL.standardizedFileURL != url
+        else {
             throw AppStateError.unresolvedExternalChange(url)
         }
 
-        autosaveTask?.cancel()
+        cancelAutosave(for: session)
         isSaving = true
         defer { isSaving = false }
 
@@ -281,6 +257,13 @@ extension AppState {
         sessionPolicy.updateDirtyState(for: url, isDirty: false)
         detachedSessionURLs.remove(url)
         recordKnownDiskText(text, for: url)
+    }
+
+    private func cancelForegroundDocumentTasks() {
+        autosaveTask?.cancel()
+        autosaveTask = nil
+        statisticsTask?.cancel()
+        statisticsTask = nil
     }
 
     func rememberLastOpenedFile(_ url: URL) {
@@ -347,31 +330,6 @@ extension AppState {
         return nil
     }
 
-    func nodeForCurrentDocument(in tree: WorkspaceFileTree, root: URL) -> WorkspaceFileNode? {
-        guard let currentURL = currentDocument.fileURL?.standardizedFileURL,
-              Self.isDescendant(currentURL, of: root),
-              let relativePath = Self.workspaceRelativePath(for: currentURL, root: root)
-        else {
-            return nil
-        }
-
-        return firstNode(in: tree.root, relativePath: relativePath)
-    }
-
-    func firstNode(in node: WorkspaceFileNode, relativePath: String) -> WorkspaceFileNode? {
-        if node.relativePath == relativePath {
-            return node
-        }
-
-        for child in node.children {
-            if let match = firstNode(in: child, relativePath: relativePath) {
-                return match
-            }
-        }
-
-        return nil
-    }
-
     static func isDirectory(_ url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.isDirectoryKey])
         return values.isDirectory == true
@@ -397,16 +355,6 @@ extension AppState {
     }
 
     static func workspaceRelativePath(for url: URL, root: URL) -> String? {
-        let rootPath = normalizedDirectoryPath(
-            root.standardizedFileURL.path(percentEncoded: false)
-        )
-        let filePath = url.standardizedFileURL.path(percentEncoded: false)
-        guard filePath == rootPath || filePath.hasPrefix("\(rootPath)/") else {
-            return nil
-        }
-        guard filePath != rootPath else {
-            return ""
-        }
-        return String(filePath.dropFirst(rootPath.count + 1))
+        try? WorkspaceRootContainment.relativePath(for: url, rootURL: root)
     }
 }

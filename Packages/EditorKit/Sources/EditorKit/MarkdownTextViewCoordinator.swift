@@ -11,6 +11,7 @@ struct EditorDocumentTransitionCandidate {
     fileprivate let text: Binding<String>
     fileprivate let selection: Binding<NSRange?>
     fileprivate let documentIdentity: EditorDocumentIdentity?
+    fileprivate let documentBinding: EditorDocumentBindingRegistration?
 }
 
 struct EditorDocumentInstallation: Equatable {
@@ -18,9 +19,31 @@ struct EditorDocumentInstallation: Equatable {
 }
 
 @MainActor
+private struct EditorDocumentBindingRegistration {
+    let id: EditorDocumentBindingID
+    let lifecycle: (EditorDocumentBindingLifecycleEvent) -> Void
+}
+
+@MainActor
+private struct EditorDocumentBindingTransition {
+    let revoked: EditorDocumentBindingRegistration?
+    let installed: EditorDocumentBindingRegistration?
+
+    func notify() {
+        if let installed {
+            installed.lifecycle(.installed(installed.id))
+        }
+        if let revoked {
+            revoked.lifecycle(.revoked(revoked.id))
+        }
+    }
+}
+
+@MainActor
 private struct EditorInstalledDocumentState {
     private var textBinding: Binding<String>
     private var selectionBinding: Binding<NSRange?>
+    private var documentBinding: EditorDocumentBindingRegistration?
     private(set) var identity: EditorDocumentIdentity?
     private(set) var isInstalled = false
     private var nextCandidateGeneration: UInt64 = 0
@@ -49,7 +72,9 @@ private struct EditorInstalledDocumentState {
     mutating func prepare(
         text: Binding<String>,
         selection: Binding<NSRange?>,
-        documentIdentity: EditorDocumentIdentity?
+        documentIdentity: EditorDocumentIdentity?,
+        documentBindingID: EditorDocumentBindingID?,
+        onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
     ) -> EditorDocumentTransitionCandidate {
         nextCandidateGeneration += 1
         preparedCandidateGeneration = nextCandidateGeneration
@@ -61,23 +86,51 @@ private struct EditorInstalledDocumentState {
             selectionBinding = selection
         }
 
+        let documentBinding: EditorDocumentBindingRegistration? = if let documentBindingID,
+                                                                     let onDocumentBindingLifecycle
+        {
+            EditorDocumentBindingRegistration(
+                id: documentBindingID,
+                lifecycle: onDocumentBindingLifecycle
+            )
+        } else {
+            nil
+        }
+
         return EditorDocumentTransitionCandidate(
             generation: nextCandidateGeneration,
             sourceText: text.wrappedValue,
             requestedSelection: selection.wrappedValue,
             text: text,
             selection: selection,
-            documentIdentity: documentIdentity
+            documentIdentity: documentIdentity,
+            documentBinding: documentBinding
         )
     }
 
-    mutating func install(_ candidate: EditorDocumentTransitionCandidate) -> EditorDocumentInstallation {
+    mutating func install(
+        _ candidate: EditorDocumentTransitionCandidate
+    ) -> (EditorDocumentInstallation, EditorDocumentBindingTransition) {
+        let previousBinding = documentBinding
         textBinding = candidate.text
         selectionBinding = candidate.selection
         identity = candidate.documentIdentity
+        documentBinding = candidate.documentBinding
         isInstalled = true
         installedCandidateGeneration = candidate.generation
-        return EditorDocumentInstallation(generation: candidate.generation)
+        let bindingChanged = previousBinding?.id != candidate.documentBinding?.id
+        return (
+            EditorDocumentInstallation(generation: candidate.generation),
+            EditorDocumentBindingTransition(
+                revoked: bindingChanged ? previousBinding : nil,
+                installed: bindingChanged ? candidate.documentBinding : nil
+            )
+        )
+    }
+
+    mutating func revokeDocumentBinding() -> EditorDocumentBindingRegistration? {
+        defer { documentBinding = nil }
+        return documentBinding
     }
 }
 
@@ -131,6 +184,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         text: Binding<String>,
         selection: Binding<NSRange?>,
         documentIdentity: EditorDocumentIdentity?,
+        documentBindingID: EditorDocumentBindingID? = nil,
+        onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
         navigationCommand: EditorNavigationCommand?,
         in textView: STTextView
     ) -> EditorDocumentTransitionCandidate {
@@ -139,7 +194,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         let candidate = installedDocument.prepare(
             text: text,
             selection: selection,
-            documentIdentity: documentIdentity
+            documentIdentity: documentIdentity,
+            documentBindingID: documentBindingID,
+            onDocumentBindingLifecycle: onDocumentBindingLifecycle
         )
 
         guard installedDocument.isInstalled,
@@ -167,9 +224,15 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             return nil
         }
 
-        let installation = installedDocument.install(candidate)
+        let (installation, bindingTransition) = installedDocument.install(candidate)
+        bindingTransition.notify()
         cancelPendingNavigationTasks()
         return installation
+    }
+
+    func revokeInstalledDocumentBinding() {
+        guard let registration = installedDocument.revokeDocumentBinding() else { return }
+        registration.lifecycle(.revoked(registration.id))
     }
 
     var isPreparedDocumentInstalled: Bool {

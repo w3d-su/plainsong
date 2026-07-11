@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownCore
 
 extension WorkspaceSearchPipeline {
     func read(
@@ -21,6 +22,9 @@ extension WorkspaceSearchPipeline {
             )
         } catch {
             return containmentFailureOutcome(candidate, planIndex: planIndex)
+        }
+        guard FileKind(url: url) != nil else {
+            return unsupportedPhysicalFileKindOutcome(candidate, planIndex: planIndex)
         }
 
         do {
@@ -46,6 +50,20 @@ extension WorkspaceSearchPipeline {
             payload: .skipped(WorkspaceSearchSkippedFile(
                 relativePath: candidate.relativePath,
                 reason: .symlinkEscape
+            )),
+            diskReadByteCount: nil
+        )
+    }
+
+    func unsupportedPhysicalFileKindOutcome(
+        _ candidate: WorkspaceSearchCandidate,
+        planIndex: Int
+    ) -> WorkspaceSearchReadOutcome {
+        WorkspaceSearchReadOutcome(
+            planIndex: planIndex,
+            payload: .skipped(WorkspaceSearchSkippedFile(
+                relativePath: candidate.relativePath,
+                reason: .unsupportedPhysicalFileKind
             )),
             diskReadByteCount: nil
         )

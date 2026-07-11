@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import EditorKit
 import MarkdownCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -51,6 +52,8 @@ final class AppState: ObservableObject {
     @Published var workspaceTree: WorkspaceFileTree?
     var workspaceSnapshot: WorkspaceFileSnapshot?
     var workspaceGeneration: UInt64 = 0
+    @Published var workspaceSearchState = WorkspaceSearchState()
+    @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
@@ -64,12 +67,25 @@ final class AppState: ObservableObject {
     let lastOpenedFileStore: any LastOpenedFilePersisting
     let recentItemStore: any RecentItemPersisting
     let directoryScanner: any WorkspaceDirectoryScanning
+    let workspaceSearchStreamProvider: any WorkspaceSearchStreamProviding
+    let workspaceSearchLimits: WorkspaceSearchLimits
+    let workspaceSearchDebounceNanoseconds: UInt64
     let fileOperations: WorkspaceFileOperations
     let userDefaults: UserDefaults
     var autosaveTask: Task<Void, Never>?
     var statisticsTask: Task<Void, Never>?
     var workspaceReloadTask: Task<Void, Never>?
+    var workspaceSearchTask: Task<Void, Never>?
+    var workspaceSearchTaskToken: UUID?
+    var workspaceSearchQueryGeneration: UInt64 = 0
+    var editorNavigationGeneration: UInt64 = 0
+    var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
+    var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]
+    var installedEditorDocumentBindingLease: InstalledEditorDocumentBindingLease?
+    var retiredEditorDocumentBindings: [EditorDocumentBindingID: RetiredEditorDocumentBinding] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
+    var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
+    var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var documentChangeCancellable: AnyCancellable?
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
@@ -90,6 +106,9 @@ final class AppState: ObservableObject {
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
         recentItemStore: any RecentItemPersisting = RecentItemStore(),
         directoryScanner: any WorkspaceDirectoryScanning = WorkspaceDirectoryScanner(),
+        workspaceSearchStreamProvider: any WorkspaceSearchStreamProviding = WorkspaceSearchService(),
+        workspaceSearchLimits: WorkspaceSearchLimits = .init(),
+        workspaceSearchDebounceNanoseconds: UInt64 = 200_000_000,
         fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard
@@ -99,6 +118,9 @@ final class AppState: ObservableObject {
         self.lastOpenedFileStore = lastOpenedFileStore
         self.recentItemStore = recentItemStore
         self.directoryScanner = directoryScanner
+        self.workspaceSearchStreamProvider = workspaceSearchStreamProvider
+        self.workspaceSearchLimits = workspaceSearchLimits
+        self.workspaceSearchDebounceNanoseconds = workspaceSearchDebounceNanoseconds
         self.fileOperations = fileOperations
         self.userDefaults = userDefaults
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
@@ -114,6 +136,19 @@ final class AppState: ObservableObject {
             self?.handlePreferencesChanged()
         }
         observeCurrentDocument()
+    }
+
+    deinit {
+        workspaceSearchTask?.cancel()
+        for task in sessionAutosaveTasks.values {
+            task.task.cancel()
+        }
+        for task in sessionStatisticsTasks.values {
+            task.task.cancel()
+        }
+        for retirement in retiredEditorDocumentBindings.values {
+            retirement.securityScopedAuthority?.stop()
+        }
     }
 
     var isPreviewVisible: Bool {
@@ -176,9 +211,12 @@ final class AppState: ObservableObject {
     }
 
     var canSave: Bool {
-        guard let url = currentDocument.fileURL?.standardizedFileURL else { return false }
+        guard let url = currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else {
+            return false
+        }
         return !isSaving &&
             !detachedSessionURLs.contains(url) &&
+            pendingExternalTexts[url] == nil &&
             externalChangePrompt?.fileURL.standardizedFileURL != url &&
             missingFilePrompt?.fileURL.standardizedFileURL != url
     }
@@ -388,10 +426,28 @@ final class AppState: ObservableObject {
     }
 }
 
+struct InstalledEditorDocumentBindingLease {
+    let id: EditorDocumentBindingID
+    let session: DocumentSession
+}
+
+struct RetiredEditorDocumentBinding {
+    let id: EditorDocumentBindingID
+    let session: DocumentSession
+    let securityScopedAuthority: SecurityScopedResourceAccess?
+    var isAwaitingBindingEnd: Bool
+}
+
+struct SessionBackgroundTask {
+    let token: UUID
+    let task: Task<Void, Never>
+}
+
 enum AppStateError: LocalizedError {
     case unsupportedFile(URL)
     case missingFile(URL)
     case unresolvedExternalChange(URL)
+    case invalidSessionIdentity(URL)
 
     var errorDescription: String? {
         switch self {
@@ -401,6 +457,8 @@ enum AppStateError: LocalizedError {
             "\(url.lastPathComponent) is no longer on disk. Save a copy or close it."
         case let .unresolvedExternalChange(url):
             "\(url.lastPathComponent) changed on disk. Choose Reload or Keep mine before saving."
+        case let .invalidSessionIdentity(url):
+            "The cached editor session for \(url.lastPathComponent) no longer matches that file."
         }
     }
 }

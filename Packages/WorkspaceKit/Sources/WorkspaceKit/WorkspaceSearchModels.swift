@@ -117,6 +117,7 @@ public enum WorkspaceSearchSkipReason: Sendable, Equatable {
     case absolutePath
     case pathTraversal
     case symlinkEscape
+    case unsupportedPhysicalFileKind
 }
 
 /// A nonfatal file-level failure. Search continues after every skipped file.
