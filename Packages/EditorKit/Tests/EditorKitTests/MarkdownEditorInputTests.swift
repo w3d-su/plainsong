@@ -62,26 +62,32 @@ final class MarkdownEditorInputTests: XCTestCase {
                 set: { originalSelection = $0 }
             )
         )
-        coordinator.updateBindings(
-            text: Binding(
-                get: { currentDocumentText },
-                set: { currentDocumentText = $0 }
-            ),
-            selection: Binding(
-                get: { currentSelection },
-                set: { currentSelection = $0 }
-            )
+        let currentTextBinding = Binding(
+            get: { currentDocumentText },
+            set: { currentDocumentText = $0 }
+        )
+        let currentSelectionBinding = Binding(
+            get: { currentSelection },
+            set: { currentSelection = $0 }
         )
 
         let textView = MarkdownSTTextView(frame: .zero)
         textView.text = "a"
+        currentDocumentText = "a"
+        coordinator.finishDocumentTransition(
+            text: currentTextBinding,
+            selection: currentSelectionBinding,
+            documentIdentity: nil,
+            in: textView
+        )
+        textView.text = "ab"
         coordinator.textViewDidChangeText(Notification(
             name: STTextView.textDidChangeNotification,
             object: textView
         ))
 
         XCTAssertEqual(originalDocumentText, "Original")
-        XCTAssertEqual(currentDocumentText, "a")
+        XCTAssertEqual(currentDocumentText, "ab")
     }
 
     @MainActor
@@ -119,6 +125,35 @@ final class MarkdownEditorInputTests: XCTestCase {
         XCTAssertEqual(Self.text(in: textView), "台")
         XCTAssertEqual(modelText, "台")
         XCTAssertEqual(writes, ["台"])
+    }
+
+    @MainActor
+    func testNativeEditPublishesCanonicalEquivalentRawUTF16Sequence() {
+        let boundSource = "a\u{301}\u{327}"
+        let liveSource = "a\u{327}\u{301}"
+        var modelText = boundSource
+        var publishedUTF16: [[UInt16]] = []
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: {
+                    modelText = $0
+                    publishedUTF16.append(Array($0.utf16))
+                }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.text = liveSource
+
+        coordinator.textViewDidChangeText(Notification(
+            name: STTextView.textDidChangeNotification,
+            object: textView
+        ))
+
+        XCTAssertEqual(Array(modelText.utf16), Array(liveSource.utf16))
+        XCTAssertEqual(Data(modelText.utf8), Data(liveSource.utf8))
+        XCTAssertEqual(publishedUTF16, [Array(liveSource.utf16)])
     }
 
     @MainActor

@@ -2,22 +2,10 @@ import AppKit
 import STTextView
 
 extension MarkdownTextViewCoordinator {
-    func updateNavigationInputs(
-        documentIdentity: EditorDocumentIdentity?,
-        navigationRequest: EditorNavigationRequest?
-    ) {
-        let previousDocumentIdentity = currentDocumentIdentity
+    func observeNavigationRequest(_ navigationRequest: EditorNavigationRequest?) {
         let previousHighestRequestID = navigationState.highestObservedRequestID
-        currentDocumentIdentity = documentIdentity
         navigationState.observe(navigationRequest)
-        if previousDocumentIdentity != documentIdentity {
-            // A user edit flag belongs to the previously rendered document and must
-            // not prevent the newly bound document text from being installed.
-            isUserEditing = false
-        }
-        if previousDocumentIdentity != documentIdentity
-            || previousHighestRequestID != navigationState.highestObservedRequestID
-        {
+        if previousHighestRequestID != navigationState.highestObservedRequestID {
             cancelPendingNavigationTasks()
         }
     }

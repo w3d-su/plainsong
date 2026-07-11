@@ -4,13 +4,76 @@ import STTextView
 import SwiftUI
 
 @MainActor
+private struct EditorInstalledDocumentState {
+    private var textBinding: Binding<String>
+    private var selectionBinding: Binding<NSRange?>
+    private(set) var identity: EditorDocumentIdentity?
+    private(set) var isInstalled = false
+
+    init(text: Binding<String>, selection: Binding<NSRange?>) {
+        textBinding = text
+        selectionBinding = selection
+    }
+
+    var text: String {
+        get { textBinding.wrappedValue }
+        set { textBinding.wrappedValue = newValue }
+    }
+
+    var selection: NSRange? {
+        get { selectionBinding.wrappedValue }
+        set { selectionBinding.wrappedValue = newValue }
+    }
+
+    func isInstalledDocument(_ candidateIdentity: EditorDocumentIdentity?) -> Bool {
+        isInstalled && identity == candidateIdentity
+    }
+
+    mutating func stageBindings(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        for candidateIdentity: EditorDocumentIdentity?
+    ) {
+        guard !isInstalled || identity == candidateIdentity else {
+            return
+        }
+
+        textBinding = text
+        selectionBinding = selection
+    }
+
+    mutating func install(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        identity: EditorDocumentIdentity?
+    ) {
+        textBinding = text
+        selectionBinding = selection
+        self.identity = identity
+        isInstalled = true
+    }
+}
+
+@MainActor
 final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
-    @Binding var text: String
-    @Binding var selection: NSRange?
+    private var installedDocument: EditorInstalledDocumentState
+    var text: String {
+        get { installedDocument.text }
+        set { installedDocument.text = newValue }
+    }
+
+    var selection: NSRange? {
+        get { installedDocument.selection }
+        set { installedDocument.selection = newValue }
+    }
+
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
-    var currentDocumentIdentity: EditorDocumentIdentity?
+    var currentDocumentIdentity: EditorDocumentIdentity? {
+        installedDocument.identity
+    }
+
     var navigationState = EditorNavigationStateMachine()
     var navigationRetryTask: Task<Void, Never>?
     var navigationInputDeferralTask: Task<Void, Never>?
@@ -34,16 +97,61 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var lastVisibleTextRange: NSRange?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
-        _text = text
-        _selection = selection
+        installedDocument = EditorInstalledDocumentState(text: text, selection: selection)
     }
 
-    /// SwiftUI may reuse this coordinator when the represented editor switches to
-    /// another document. Refresh the bindings so edits are written to the currently
-    /// rendered session instead of the session that originally created the view.
-    func updateBindings(text: Binding<String>, selection: Binding<NSRange?>) {
-        _text = text
-        _selection = selection
+    func prepareDocumentTransition(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        documentIdentity: EditorDocumentIdentity?,
+        navigationRequest: EditorNavigationRequest?,
+        in textView: STTextView
+    ) {
+        observeNavigationRequest(navigationRequest)
+
+        installedDocument.stageBindings(
+            text: text,
+            selection: selection,
+            for: documentIdentity
+        )
+
+        guard installedDocument.isInstalled,
+              !installedDocument.isInstalledDocument(documentIdentity),
+              !textView.hasMarkedText()
+        else {
+            return
+        }
+
+        // The installed document's final native edit has already been published.
+        // Clear its per-update edit flag so the destination can now be installed.
+        isUserEditing = false
+    }
+
+    func finishDocumentTransition(
+        text: Binding<String>,
+        selection: Binding<NSRange?>,
+        documentIdentity: EditorDocumentIdentity?,
+        in textView: STTextView
+    ) {
+        guard !textView.hasMarkedText(),
+              MarkdownTextView.plainTextMatches(textView, text.wrappedValue)
+        else {
+            return
+        }
+
+        let previousDocumentIdentity = installedDocument.identity
+        installedDocument.install(
+            text: text,
+            selection: selection,
+            identity: documentIdentity
+        )
+        if previousDocumentIdentity != documentIdentity {
+            cancelPendingNavigationTasks()
+        }
+    }
+
+    func isInstalledDocument(_ documentIdentity: EditorDocumentIdentity?) -> Bool {
+        installedDocument.isInstalledDocument(documentIdentity)
     }
 
     func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {
@@ -406,7 +514,7 @@ extension MarkdownTextViewCoordinator {
         // `textStorage.string` is a lazily bridged ("foreign") String backed by
         // CFStorage. One eager transcode here makes later operations native-fast.
         var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        guard newText != text else {
+        guard !ExactUTF16Text.matches(newText, text) else {
             return false
         }
         newText.makeContiguousUTF8()

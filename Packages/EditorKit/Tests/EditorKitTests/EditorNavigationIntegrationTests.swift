@@ -27,10 +27,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
             documentIdentity: documentA,
             selection: target
         )
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
         XCTAssertEqual(fixture.textView.selectedRange(), target)
@@ -54,18 +51,28 @@ final class EditorNavigationIntegrationTests: XCTestCase {
 
         model.text = sourceB
         let request = EditorNavigationRequest(id: 2, documentIdentity: documentB, selection: target)
-        fixture.coordinator.updateNavigationInputs(
+        fixture.coordinator.prepareDocumentTransition(
+            text: fixture.textBinding,
+            selection: fixture.selectionBinding,
             documentIdentity: documentB,
-            navigationRequest: request
+            navigationRequest: request,
+            in: fixture.textView
         )
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
-            .pending(.documentTextNotInstalled)
+            .pending(.documentMismatch)
         )
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, documentA)
         XCTAssertEqual(fixture.textView.selectedRange(), originalSelection)
 
         install(sourceB, in: fixture)
+        fixture.coordinator.finishDocumentTransition(
+            text: fixture.textBinding,
+            selection: fixture.selectionBinding,
+            documentIdentity: documentB,
+            in: fixture.textView
+        )
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
         XCTAssertEqual(Self.text(in: fixture.textView), sourceB)
@@ -74,15 +81,14 @@ final class EditorNavigationIntegrationTests: XCTestCase {
     }
 
     func testRequestBeforeTargetTextInstallationRemainsPending() throws {
+        let placeholder = "placeholder"
         let targetSource = "prefix 待安装 target suffix"
         let target = (targetSource as NSString).range(of: "待安装 target")
-        let model = NavigationModel(text: targetSource, selection: NSRange(location: 0, length: 0))
-        let fixture = try makeWindowedFixture(model: model, source: "placeholder")
+        let model = NavigationModel(text: placeholder, selection: NSRange(location: 0, length: 0))
+        let fixture = try makeWindowedFixture(model: model, source: placeholder)
+        model.text = targetSource
         let request = EditorNavigationRequest(id: 3, documentIdentity: documentA, selection: target)
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -108,10 +114,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
             documentIdentity: documentB,
             selection: NSRange(location: 0, length: 7)
         )
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -135,15 +138,57 @@ final class EditorNavigationIntegrationTests: XCTestCase {
                 documentIdentity: documentA,
                 selection: exactRange
             )
-            fixture.coordinator.updateNavigationInputs(
-                documentIdentity: documentA,
-                navigationRequest: request
-            )
+            fixture.coordinator.observeNavigationRequest(request)
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
             XCTAssertEqual(fixture.textView.selectedRange(), exactRange)
             XCTAssertEqual(model.selection, exactRange)
         }
+    }
+
+    func testCanonicalEquivalentRawTextDefersUntilExactUTF16SequenceIsInstalled() throws {
+        let boundSource = "a\u{301}\u{327}"
+        let liveSource = "a\u{327}\u{301}"
+        let originalSelection = NSRange(location: 0, length: 0)
+        let target = NSRange(location: 1, length: 1)
+        let model = NavigationModel(text: boundSource, selection: originalSelection)
+        let fixture = try makeWindowedFixture(model: model, source: boundSource)
+        fixture.coordinator.isUpdating = true
+        fixture.textView.text = liveSource
+        fixture.textView.textSelection = originalSelection
+        fixture.coordinator.isUpdating = false
+        fixture.window.makeFirstResponder(nil)
+        let request = EditorNavigationRequest(
+            id: 40,
+            documentIdentity: documentA,
+            selection: target
+        )
+        fixture.coordinator.observeNavigationRequest(request)
+
+        XCTAssertEqual(
+            fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
+            .pending(.documentTextNotInstalled)
+        )
+        XCTAssertEqual(fixture.textView.selectedRange(), originalSelection)
+        XCTAssertFalse(fixture.window.firstResponder === fixture.textView)
+        XCTAssertNil(fixture.coordinator.navigationState.lastHandledRequestID)
+        XCTAssertEqual(Array(Self.text(in: fixture.textView).utf16), Array(liveSource.utf16))
+        XCTAssertEqual(
+            Array((Self.text(in: fixture.textView) as NSString).substring(with: target).utf16),
+            [0x0327]
+        )
+
+        install(boundSource, in: fixture)
+        fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
+
+        XCTAssertEqual(Array(Self.text(in: fixture.textView).utf16), Array(boundSource.utf16))
+        XCTAssertEqual(
+            Array((Self.text(in: fixture.textView) as NSString).substring(with: target).utf16),
+            [0x0301]
+        )
+        XCTAssertEqual(fixture.textView.selectedRange(), target)
+        XCTAssertTrue(fixture.window.firstResponder === fixture.textView)
+        XCTAssertEqual(fixture.coordinator.navigationState.lastHandledRequestID, 40)
     }
 
     func testMarkedTextDefersNavigationUntilCompositionEnds() throws {
@@ -159,10 +204,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         )
         XCTAssertTrue(fixture.textView.hasMarkedText())
         let request = EditorNavigationRequest(id: 5, documentIdentity: documentA, selection: target)
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -186,10 +228,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let model = NavigationModel(text: source, selection: NSRange(location: 0, length: 0))
         let fixture = try makeDetachedFixture(model: model, source: source)
         let request = EditorNavigationRequest(id: 6, documentIdentity: documentA, selection: target)
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
 
         XCTAssertEqual(
             fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView),
@@ -220,7 +259,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let fixture = try makeWindowedFixture(model: model, source: source)
         XCTAssertTrue(fixture.textView.setWYSIWYGZeroWidthFoldingEnabled(true))
         fixture.textView.textSelection = outsideSelection
-        let folded = wysiwygPresentation(source, selection: outsideSelection, revision: 1)
+        let folded = editorNavigationWYSIWYGPresentation(source, selection: outsideSelection, revision: 1)
         let foldedRegion = try XCTUnwrap(folded.foldPlan?.regions.first { $0.kind == .strong })
         XCTAssertFalse(foldedRegion.isRevealed)
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(folded, to: fixture.textView))
@@ -228,13 +267,10 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let sourceBytes = Data(source.utf8)
 
         let request = EditorNavigationRequest(id: 7, documentIdentity: documentA, selection: target)
-        fixture.coordinator.updateNavigationInputs(
-            documentIdentity: documentA,
-            navigationRequest: request
-        )
+        fixture.coordinator.observeNavigationRequest(request)
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
 
-        let revealed = wysiwygPresentation(source, selection: target, revision: 2)
+        let revealed = editorNavigationWYSIWYGPresentation(source, selection: target, revision: 2)
         let revealedRegion = try XCTUnwrap(revealed.foldPlan?.regions.first { $0.kind == .strong })
         XCTAssertTrue(revealedRegion.isRevealed)
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(revealed, to: fixture.textView))
@@ -261,6 +297,8 @@ private extension EditorNavigationIntegrationTests {
         let scrollView: NSScrollView
         let textView: MarkdownSTTextView
         let coordinator: MarkdownTextViewCoordinator
+        let textBinding: Binding<String>
+        let selectionBinding: Binding<NSRange?>
     }
 
     struct WindowedFixture {
@@ -268,6 +306,8 @@ private extension EditorNavigationIntegrationTests {
         let scrollView: NSScrollView
         let textView: MarkdownSTTextView
         let coordinator: MarkdownTextViewCoordinator
+        let textBinding: Binding<String>
+        let selectionBinding: Binding<NSRange?>
     }
 
     func makeWindowedFixture(
@@ -290,7 +330,9 @@ private extension EditorNavigationIntegrationTests {
             window: window,
             scrollView: detached.scrollView,
             textView: detached.textView,
-            coordinator: detached.coordinator
+            coordinator: detached.coordinator,
+            textBinding: detached.textBinding,
+            selectionBinding: detached.selectionBinding
         )
     }
 
@@ -308,22 +350,32 @@ private extension EditorNavigationIntegrationTests {
         textView.font = MarkdownSyntaxHighlighter.defaultFont
         textView.text = source
         textView.textSelection = NSRange(location: 0, length: 0)
+        let textBinding = Binding(
+            get: { model.text },
+            set: { model.text = $0 }
+        )
+        let selectionBinding = Binding(
+            get: { model.selection },
+            set: { model.selection = $0 }
+        )
         let coordinator = MarkdownTextViewCoordinator(
-            text: Binding(
-                get: { model.text },
-                set: { model.text = $0 }
-            ),
-            selection: Binding(
-                get: { model.selection },
-                set: { model.selection = $0 }
-            )
+            text: textBinding,
+            selection: selectionBinding
         )
         textView.textDelegate = coordinator
         coordinator.attachFocusHandler(to: textView)
+        coordinator.finishDocumentTransition(
+            text: textBinding,
+            selection: selectionBinding,
+            documentIdentity: documentA,
+            in: textView
+        )
         return DetachedFixture(
             scrollView: scrollView,
             textView: textView,
-            coordinator: coordinator
+            coordinator: coordinator,
+            textBinding: textBinding,
+            selectionBinding: selectionBinding
         )
     }
 
@@ -336,22 +388,6 @@ private extension EditorNavigationIntegrationTests {
         fixture.coordinator.isUpdating = false
         fixture.textView.layoutSubtreeIfNeeded()
         fixture.textView.textLayoutManager.ensureLayout(for: fixture.textView.textLayoutManager.documentRange)
-    }
-
-    func wysiwygPresentation(_ source: String, selection: NSRange, revision: Int) -> HighlightedText {
-        let highlighted = MarkdownSyntaxHighlighter().highlight(
-            source,
-            fileKind: .markdown,
-            visibleRange: NSRange(location: 0, length: (source as NSString).length),
-            developmentPresentation: .inlineFoldRevealWithLinkFolding,
-            selection: selection
-        )
-        return HighlightedText(
-            revision: revision,
-            range: highlighted.range,
-            text: highlighted.text,
-            foldPlan: highlighted.foldPlan
-        )
     }
 
     static func text(in textView: STTextView) -> String {
