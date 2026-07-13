@@ -8,7 +8,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         let fixture = GlobalOverflowFixture()
         let reader = GlobalTruncationAccountingReader()
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: fixture.paths.reversed(),
             limits: fixture.limits
@@ -27,7 +27,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
 
     func testReaderCancellationErrorWithoutTaskCancellationEmitsExactlyOneFailure() async throws {
         let root = try makeTemporaryDirectory()
-        let request = makeRequest(root: root, paths: ["post.md"])
+        let request = try makeRequest(root: root, paths: ["post.md"])
 
         let events = await collectEvents(
             WorkspaceSearchService(reader: UnexpectedCancellationErrorReader()),
@@ -49,7 +49,7 @@ final class WorkspaceSearchHardeningTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         let paths = (0 ..< 8).map { String(format: "%04d.md", $0) }
         let reader = BlockingCancellationReader()
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: paths,
             limits: WorkspaceSearchLimits(maximumConcurrentReads: 4)
@@ -141,9 +141,9 @@ extension WorkspaceSearchHardeningTests {
         root: URL,
         paths: some Sequence<String>,
         limits: WorkspaceSearchLimits = .init()
-    ) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    ) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "hardening-root",
             snapshot: WorkspaceFileSnapshot(entries: paths.map { path in
                 WorkspaceFileSnapshot.Entry(
@@ -222,7 +222,7 @@ extension WorkspaceSearchHardeningTests {
             .appendingPathComponent("WorkspaceSearchHardeningTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

@@ -37,7 +37,7 @@ final class WorkspaceAnchoredFileSystemTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: parent) }
 
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let reader = WorkspaceCoherentFileReader()
         let insideOutcome = try await reader.readCoherentFile(
             at: authority.location(relativePath: "inside-alias.md")
@@ -94,7 +94,7 @@ final class WorkspaceAnchoredFileSystemTests: XCTestCase {
         )
         defer { try? FileManager.default.removeItem(at: parent) }
 
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let insideLocation = try authority.location(relativePath: "inside-link/post.md")
         let outsideLocation = try authority.location(relativePath: "outside-link/post.md")
         XCTAssertEqual(
@@ -184,7 +184,7 @@ final class WorkspaceAnchoredFileSystemTests: XCTestCase {
             encoding: .utf8
         )
         defer { try? FileManager.default.removeItem(at: parent) }
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let location = try authority.location(relativePath: "post.md")
 
         try FileManager.default.moveItem(

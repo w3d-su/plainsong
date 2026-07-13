@@ -61,6 +61,12 @@ struct WorkspaceSearchState: Equatable {
     }
 }
 
+private struct WorkspaceSearchDirtyOverlayInput {
+    let fileURL: URL
+    let fileKind: FileKind
+    let text: String
+}
+
 @MainActor
 extension AppState {
     func scheduleCompletionWorkspaceRefresh(
@@ -126,7 +132,9 @@ extension AppState {
         }
     }
 
-    func workspaceSearchDirtyOverlays(rootURL: URL) throws -> WorkspaceSearchOverlayCollection {
+    func workspaceSearchDirtyOverlays(
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) async throws -> WorkspaceSearchOverlayCollection {
         let cachedSessions = sessionCache
             .sorted { first, second in
                 Self.workspaceSearchPathLessThan(
@@ -137,8 +145,7 @@ extension AppState {
             .map(\.value)
         let candidateSessions = [currentDocument] + cachedSessions
         var seenSessions: Set<ObjectIdentifier> = []
-        var seenRelativePaths: [String] = []
-        var overlays: [WorkspaceSearchOverlay] = []
+        var inputs: [WorkspaceSearchDirtyOverlayInput] = []
 
         for session in candidateSessions where session.isDirty {
             let sessionIdentity = ObjectIdentifier(session)
@@ -146,26 +153,53 @@ extension AppState {
                   let fileURL = session.fileURL?.standardizedFileURL,
                   !detachedSessionURLs.contains(fileURL),
                   let inferredKind = FileKind(url: fileURL),
-                  inferredKind == session.fileKind,
-                  let relativePath = try? WorkspaceRootContainment.relativePath(
-                      for: fileURL,
-                      rootURL: rootURL
-                  ),
-                  !seenRelativePaths.contains(where: {
-                      ExactSourceText.matches($0, relativePath)
-                  })
+                  inferredKind == session.fileKind
             else {
                 continue
             }
 
-            seenRelativePaths.append(relativePath)
-            try overlays.append(WorkspaceSearchOverlay(
-                relativePath: relativePath,
+            inputs.append(WorkspaceSearchDirtyOverlayInput(
+                fileURL: fileURL,
+                fileKind: session.fileKind,
                 text: session.text
             ))
         }
 
-        return try WorkspaceSearchOverlayCollection(overlays)
+        return try await withThrowingTaskGroup(
+            of: WorkspaceSearchOverlayCollection.self
+        ) { group in
+            group.addTask(priority: .utility) {
+                var seenRelativePaths: [String] = []
+                var overlays: [WorkspaceSearchOverlay] = []
+
+                for input in inputs {
+                    try Task.checkCancellation()
+                    guard let location = try? rootAuthority.canonicalizedLocation(
+                        forFileURL: input.fileURL
+                    ),
+                        FileKind(url: location.fileURL) == input.fileKind,
+                        !seenRelativePaths.contains(where: {
+                            ExactSourceText.matches($0, location.relativePath)
+                        })
+                    else {
+                        continue
+                    }
+
+                    seenRelativePaths.append(location.relativePath)
+                    try overlays.append(WorkspaceSearchOverlay(
+                        relativePath: location.relativePath,
+                        text: input.text
+                    ))
+                }
+
+                return try WorkspaceSearchOverlayCollection(overlays)
+            }
+            defer { group.cancelAll() }
+            guard let overlays = try await group.next() else {
+                throw CancellationError()
+            }
+            return overlays
+        }
     }
 
     func applyWorkspaceSearchEvent(

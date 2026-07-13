@@ -1,7 +1,8 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, WS3A, and the headless WS3B App lifecycle are
-> complete and locally verified; visible WS3 sidebar work and WS4 remain pending.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. The headless WS3B lifecycle
+> foundation is implemented, but WS3B remains open until retained-authority activation is
+> integrated and PR #82 is restacked; visible WS3 sidebar work and WS4 also remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -196,10 +197,12 @@ must not be enumerated one UTF-16 unit at a time.
 
 A request should contain only immutable, Sendable data:
 
-- one immutable `WorkspaceFileSystemRootAuthority` captured when the request is built, plus
-  the standardized root URL retained as request context;
+- one immutable `WorkspaceFileSystemRootAuthority` as the sole filesystem root; its captured
+  original URL may supply security-scoped access, but the request accepts no independent root
+  URL for candidate planning, ignore files, overlays, or reads;
 - immutable `WorkspaceFileSnapshot`;
-- root/workspace generation;
+- a root identity string plus workspace/query generations used only as App lifecycle tokens,
+  never as filesystem authority;
 - query and configurable limits;
 - a validated `WorkspaceSearchOverlayCollection` containing canonical relative paths and
   immutable unsaved text.
@@ -209,11 +212,14 @@ only when root identity, workspace generation, and query generation still match 
 App state.
 
 The reusable WorkspaceKit filesystem foundation is specified in
-`docs/workspace-filesystem-contract.md`. A request creates its root authority once; production
-reads walk lexical root-relative paths through a retained no-follow descriptor chain and
-validate the root, every ancestor, the final parent, and the leaf before publishing bytes.
-Root or ancestor replacement is a typed `namespaceChanged` failure, not a reason to continue
-through a detached descriptor or to resolve the mutable root URL again.
+`docs/workspace-filesystem-contract.md`. Workspace reload captures one descriptor-backed root
+authority together with its snapshot off the main actor, then installs that pair only if its
+workspace generation is still current. Main-actor request construction is pure and retains
+that captured value. Production reads walk lexical root-relative paths through a retained
+no-follow descriptor chain and validate the root, every ancestor, the final parent, and the
+leaf before publishing bytes. Root or ancestor replacement is a typed `namespaceChanged`
+failure, not a reason to continue through a detached descriptor or resolve a mutable root URL
+again.
 
 Each production disk result, and each overlay result whose physical destination was
 validated, carries `WorkspaceSearchFileAuthority`: the same retained location plus the file
@@ -371,18 +377,22 @@ generation together only after the candidate's literal UTF-16 text is present. E
 UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
 ended and the editor is window-attached. Invalid ranges are rejected without clamping. At
 the WS3A landing point, App ownership, fingerprint arbitration, sidebar behavior, tree
-synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B closes
-only the headless App subset below.
+synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B advances
+only the headless App subset below and remains open at this landing point.
 
-**Implemented WS3B subset.** MarkdownCore exposes one allocation-free exact UTF-16 source
+**Implemented WS3B lifecycle foundation (gate still open).** MarkdownCore exposes one
+allocation-free exact UTF-16 source
 comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
 raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
 headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
 debounce, and the exact Task consuming each stream. Query replacement, workspace generation
 changes, close/switch, empty-query clear, and teardown explicitly cancel that Task;
 root/workspace/query context checks gate every event, and task-token checks prevent an older
-cleanup from touching newer state. Requests capture a retained snapshot plus validated
-immutable dirty overlays from current and warm Markdown/MDX sessions on the main actor.
+cleanup from touching newer state. Workspace reload captures the retained snapshot and its
+single descriptor-backed filesystem authority together off the main actor, generation-fences
+installation, and makes request construction on the main actor filesystem-free. Requests add
+validated immutable dirty overlays from current and warm Markdown/MDX sessions without
+selecting another root.
 
 The App/editor bridge also carries an opaque binding ID distinct from optional navigation
 identity. EditorKit reports installation only from a successful `finishDocumentTransition`
@@ -409,10 +419,12 @@ cleanup; unrelated or stale revokes cannot clear a newer lease.
 
 Activation must consume a retained `WorkspaceSearchFileAuthority` instead of deriving fresh
 authority from a result URL. Initial alias/session canonicalization remains unchanged, but the
-restacked #82 App workline must consume that retained authority; this WorkspaceKit-only change
-does not edit App activation. Its cancellation, fingerprint, exact range, command, and
-binding-lifecycle requirements otherwise remain unchanged. Sidebar UI, shortcuts/focus,
-rendering/accessibility, and general edit/FSEvent auto-refresh remain pending.
+restacked #82 App workline must consume that retained authority; the minimal App plumbing here
+only retains the off-main root capture and does not edit activation. Until that activation work
+is integrated and #82 is restacked, headless WS3B is not complete. Its cancellation,
+fingerprint, exact range, command, and binding-lifecycle requirements otherwise remain
+unchanged. Sidebar UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent
+auto-refresh remain pending.
 
 ## 5. Review-Sized Work Packages
 

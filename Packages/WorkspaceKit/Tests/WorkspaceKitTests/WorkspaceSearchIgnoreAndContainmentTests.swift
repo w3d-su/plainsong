@@ -35,7 +35,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             await reader.set(.data("needle \(path)"), at: root.appendingPathComponent(path).path)
         }
 
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -72,7 +72,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             root.appendingPathComponent("visible.md").path: .data("needle"),
         ])
 
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -92,8 +92,8 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             nestedIgnorePath: .data("*.md\n"),
             root.appendingPathComponent("nested/post.md").path: .data("needle"),
         ])
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("nested/post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -137,10 +137,10 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             entry("../workspace-other/outside.md", kind: .markdown),
             entry("escape.md", kind: .markdown),
         ])
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: WorkspaceSearchRequest(
-                rootURL: root,
+                rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
                 snapshot: snapshot,
                 workspaceGeneration: 1,
                 queryGeneration: 1,
@@ -183,8 +183,8 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         try "needle outside".write(to: outside, atomically: true, encoding: .utf8)
 
         let reader = ContainmentSwapReader()
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -207,9 +207,9 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         XCTAssertEqual(candidateReadCount, 0)
     }
 
-    private func request(root: URL, paths: [String]) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    private func request(root: URL, paths: [String]) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "ignore-root",
             snapshot: WorkspaceFileSnapshot(entries: paths.map { entry($0) }),
             workspaceGeneration: 2,
@@ -267,7 +267,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             .appendingPathComponent("WorkspaceSearchIgnoreAndContainmentTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

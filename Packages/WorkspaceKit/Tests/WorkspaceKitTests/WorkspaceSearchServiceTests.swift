@@ -98,7 +98,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             root.appendingPathComponent("many.md").path: .data("needle needle needle needle"),
             root.appendingPathComponent("second.md").path: .data("needle needle"),
         ])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [entry("many.md"), entry("second.md")],
             query: "needle",
@@ -129,7 +129,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             root.appendingPathComponent("b.md").path: .delayed("needle b", nanoseconds: 1_000_000),
             root.appendingPathComponent("c.md").path: .delayed("needle c", nanoseconds: 1_000_000),
         ])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [entry("c.md"), entry("a.md"), entry("b.md")],
             query: "needle",
@@ -148,14 +148,14 @@ final class WorkspaceSearchServiceTests: XCTestCase {
 
     func testInvalidQueriesAreExplicitAndDoNotEmitCompletedSummary() async throws {
         let root = try makeTemporaryDirectory()
-        let request = makeRequest(root: root, entries: [entry("post.md")], query: "")
+        let request = try makeRequest(root: root, entries: [entry("post.md")], query: "")
         let service = WorkspaceSearchService(reader: ScriptedReader(responses: [:]))
 
         let emptyEvents = await collectEvents(from: service, request: request)
         XCTAssertEqual(validationErrors(in: emptyEvents), [.emptyQuery])
         XCTAssertNil(completedSummary(in: emptyEvents))
 
-        let overlong = makeRequest(
+        let overlong = try makeRequest(
             root: root,
             entries: [entry("post.md")],
             query: String(repeating: "a", count: TextSearchEngine.maximumPatternUTF16Length + 1)
@@ -173,7 +173,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         let reader = ScriptedReader(responses: [
             root.appendingPathComponent("slow.md").path: .delayed("needle", nanoseconds: 5_000_000_000),
         ])
-        let request = makeRequest(root: root, entries: [entry("slow.md")], query: "needle")
+        let request = try makeRequest(root: root, entries: [entry("slow.md")], query: "needle")
         let service = WorkspaceSearchService(reader: reader)
 
         let consumer = Task { () -> [WorkspaceSearchEvent] in
@@ -195,9 +195,9 @@ final class WorkspaceSearchServiceTests: XCTestCase {
         query: String,
         overlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
-    ) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    ) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "workspace-test-root",
             snapshot: WorkspaceFileSnapshot(entries: entries),
             workspaceGeneration: 7,
@@ -264,7 +264,7 @@ final class WorkspaceSearchServiceTests: XCTestCase {
             .appendingPathComponent("WorkspaceSearchServiceTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

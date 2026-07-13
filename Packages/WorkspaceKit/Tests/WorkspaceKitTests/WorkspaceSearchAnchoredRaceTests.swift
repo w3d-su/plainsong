@@ -26,7 +26,7 @@ final class WorkspaceSearchAnchoredRaceTests: XCTestCase {
                     mutation.run()
                 }
             }
-            let request = request(root: root, relativePath: "post.md", pattern: "needle")
+            let request = try request(root: root, relativePath: "post.md", pattern: "needle")
 
             let events = await collectEvents(WorkspaceSearchService(reader: reader), request: request)
             try mutation.rethrowIfFailed()
@@ -70,7 +70,7 @@ final class WorkspaceSearchAnchoredRaceTests: XCTestCase {
                     mutation.run()
                 }
             }
-            let request = request(root: root, relativePath: "nested/post.md", pattern: "needle")
+            let request = try request(root: root, relativePath: "nested/post.md", pattern: "needle")
 
             let events = await collectEvents(WorkspaceSearchService(reader: reader), request: request)
             try mutation.rethrowIfFailed()
@@ -118,7 +118,7 @@ final class WorkspaceSearchAnchoredRaceTests: XCTestCase {
                 }
             }
             let request = try WorkspaceSearchRequest(
-                rootURL: root,
+                rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
                 snapshot: WorkspaceFileSnapshot(entries: [entry("nested/post.md")]),
                 workspaceGeneration: 1,
                 queryGeneration: 1,
@@ -148,9 +148,9 @@ private extension WorkspaceSearchAnchoredRaceTests {
         root: URL,
         relativePath: String,
         pattern: String
-    ) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    ) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry(relativePath)]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -204,7 +204,7 @@ private extension WorkspaceSearchAnchoredRaceTests {
             .appendingPathComponent("WorkspaceSearchAnchoredRaceTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

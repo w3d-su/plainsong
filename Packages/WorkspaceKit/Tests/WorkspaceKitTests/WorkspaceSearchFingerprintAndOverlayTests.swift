@@ -63,7 +63,7 @@ final class WorkspaceSearchContractTests: XCTestCase {
         let overlays = try WorkspaceSearchOverlayCollection([
             WorkspaceSearchOverlay(relativePath: "overlay.md", text: searchedText),
         ])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [
                 entry("disk.md", identity: "disk-identity", modificationDate: .distantPast),
@@ -90,11 +90,11 @@ final class WorkspaceSearchContractTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         let path = root.appendingPathComponent("post.md").path
         let reader = FingerprintReader(contents: [path: Data("needle unchanged".utf8)])
-        let firstRequest = makeRequest(
+        let firstRequest = try makeRequest(
             root: root,
             entries: [entry("post.md", identity: "old-identity", modificationDate: .distantPast)]
         )
-        let secondRequest = makeRequest(
+        let secondRequest = try makeRequest(
             root: root,
             entries: [entry("post.md", identity: "new-identity", modificationDate: .distantFuture)]
         )
@@ -120,7 +120,7 @@ final class WorkspaceSearchContractTests: XCTestCase {
         let newText = "needle from newly read content 你好"
         try oldText.write(to: fileURL, atomically: true, encoding: .utf8)
         let metadata = try fileURL.resourceValues(forKeys: [.contentModificationDateKey])
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             entries: [entry(
                 "post.md",
@@ -256,7 +256,7 @@ extension WorkspaceSearchContractTests {
         let overlays = try WorkspaceSearchOverlayCollection([
             WorkspaceSearchOverlay(relativePath: "./post.md", text: "needle from overlay"),
         ])
-        let request = makeRequest(root: root, entries: [entry("post.md")], overlays: overlays)
+        let request = try makeRequest(root: root, entries: [entry("post.md")], overlays: overlays)
 
         let events = await collectEvents(
             WorkspaceSearchService(reader: reader),
@@ -273,9 +273,9 @@ extension WorkspaceSearchContractTests {
         root: URL,
         entries: [WorkspaceFileSnapshot.Entry],
         overlays: WorkspaceSearchOverlayCollection = .empty
-    ) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    ) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "fingerprint-test-root",
             snapshot: WorkspaceFileSnapshot(entries: entries),
             workspaceGeneration: 3,
@@ -333,7 +333,7 @@ extension WorkspaceSearchContractTests {
             .appendingPathComponent("WorkspaceSearchFingerprintAndOverlayTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

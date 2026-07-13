@@ -107,6 +107,7 @@ private extension AppState {
         workspaceRootURL = nil
         workspaceTree = nil
         workspaceSnapshot = nil
+        workspaceSearchRootAuthority = nil
         completionWorkspace = .empty
         if retirementLease?.session !== currentDocument {
             autosaveTask?.cancel()

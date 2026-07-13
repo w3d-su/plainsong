@@ -87,8 +87,8 @@ final class WorkspaceSearchSymlinkEligibilityTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let reader = PhysicalKindSwapReader()
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -142,8 +142,8 @@ final class WorkspaceSearchSymlinkEligibilityTests: XCTestCase {
         )
 
         let snapshot = try await WorkspaceDirectoryScanner().snapshot(root: root)
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "real-symlink-root",
             snapshot: snapshot,
             workspaceGeneration: 4,
@@ -237,7 +237,7 @@ private extension WorkspaceSearchSymlinkEligibilityTests {
     ) async throws -> DirtyOverlayRaceResult {
         let reader = PhysicalKindSwapReader()
         let request = try WorkspaceSearchRequest(
-            rootURL: root,
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -291,7 +291,7 @@ private extension WorkspaceSearchSymlinkEligibilityTests {
             .appendingPathComponent("WorkspaceSearchSymlinkEligibilityTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

@@ -68,7 +68,7 @@ extension WorkspaceAnchoredFileSystemTests {
         try "original".write(to: original, atomically: true, encoding: .utf8)
         try "outside sentinel".write(to: outside, atomically: true, encoding: .utf8)
         let originalIdentity = try fileIdentity(at: original)
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let mutation = SynchronousMutation {
             try FileManager.default.moveItem(at: root, to: movedRoot)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

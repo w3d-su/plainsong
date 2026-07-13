@@ -1,61 +1,6 @@
 import Darwin
 import Foundation
 
-/// One immutable filesystem namespace authority captured before an operation begins.
-///
-/// The canonical spelling and physical identity are sampled once. Operations later walk
-/// that spelling from `/` with retained directory descriptors; they never call `realpath`
-/// or rebuild authority from `originalRootURL`.
-public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
-    public let canonicalRootURL: URL
-    public let originalRootURL: URL
-    public let securityScopedURL: URL
-    let physicalIdentity: WorkspaceFileSystemIdentity?
-
-    public init(rootURL: URL, securityScopedURL: URL? = nil) {
-        originalRootURL = rootURL.standardizedFileURL
-        let scopedURL = (securityScopedURL ?? rootURL).standardizedFileURL
-        self.securityScopedURL = scopedURL
-        let captured = SecurityScopedAccess.withAccess(to: scopedURL) {
-            let canonicalURL = Self.canonicalURL(for: rootURL)
-            return (canonicalURL, Self.directoryIdentity(for: canonicalURL))
-        }
-        canonicalRootURL = captured.0
-        physicalIdentity = captured.1
-    }
-
-    public func location(relativePath: String) throws -> WorkspaceFileSystemLocation {
-        try WorkspaceFileSystemLocation(rootAuthority: self, relativePath: relativePath)
-    }
-
-    private static func canonicalURL(for rootURL: URL) -> URL {
-        let standardizedRoot = rootURL.standardizedFileURL
-        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
-        let resolved = standardizedRoot.withUnsafeFileSystemRepresentation { path -> String? in
-            guard let path, Darwin.realpath(path, &buffer) != nil else { return nil }
-            return String(cString: buffer)
-        }
-        guard let resolved else {
-            return standardizedRoot.resolvingSymlinksInPath()
-        }
-        // Foundation rewrites canonical `/private/var` back through the `/var` symlink.
-        return URL(fileURLWithPath: resolved, isDirectory: true)
-    }
-
-    private static func directoryIdentity(for url: URL) -> WorkspaceFileSystemIdentity? {
-        var status = stat()
-        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
-            return Darwin.lstat(path, &status)
-        }
-        guard result == 0, (status.st_mode & S_IFMT) == S_IFDIR else { return nil }
-        return WorkspaceFileSystemIdentity(
-            device: UInt64(status.st_dev),
-            inode: UInt64(status.st_ino)
-        )
-    }
-}
-
 /// A lexical root-relative location permanently bound to one root authority.
 public struct WorkspaceFileSystemLocation: Sendable, Hashable {
     public let rootAuthority: WorkspaceFileSystemRootAuthority
@@ -70,7 +15,7 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
     }
 
     public var fileURL: URL {
-        rootAuthority.originalRootURL
+        rootAuthority.canonicalRootURL
             .appendingPathComponent(relativePath, isDirectory: false)
             .standardizedFileURL
     }
@@ -103,7 +48,7 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
         )
     }
 
-    fileprivate init(
+    init(
         rootAuthority: WorkspaceFileSystemRootAuthority,
         relativePath: String
     ) throws {
@@ -256,6 +201,8 @@ enum WorkspaceAnchoredFileSystem {
         case unlinkCreatedDestination
         case syncRollbackDirectory
         case cleanupTemporary
+        case unlinkQuarantinedArtifact
+        case restoreQuarantinedArtifact
     }
 
     struct Hooks {

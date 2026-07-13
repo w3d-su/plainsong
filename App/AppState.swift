@@ -21,7 +21,7 @@ protocol RecentItemPersisting: AnyObject {
 extension RecentItemStore: RecentItemPersisting {}
 
 protocol WorkspaceDirectoryScanning: Sendable {
-    func snapshot(root: URL) async throws -> WorkspaceFileSnapshot
+    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture
 }
 
 extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
@@ -51,6 +51,7 @@ final class AppState: ObservableObject {
     @Published var workspaceRootURL: URL?
     @Published var workspaceTree: WorkspaceFileTree?
     var workspaceSnapshot: WorkspaceFileSnapshot?
+    var workspaceSearchRootAuthority: WorkspaceFileSystemRootAuthority?
     var workspaceGeneration: UInt64 = 0
     @Published var workspaceSearchState = WorkspaceSearchState()
     @Published var editorNavigationCommand: EditorNavigationCommand?

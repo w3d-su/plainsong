@@ -13,7 +13,10 @@ extension WorkspaceAnchoredFileSystemTests {
         let durable = try XCTUnwrap(requireDurable(outcome))
         XCTAssertEqual(durable.cleanupState, .none)
         XCTAssertEqual(try writeText(at: fixture.destination), "replacement bytes")
-        XCTAssertEqual(durable.metadata.identity, try writeFileIdentity(at: fixture.destination))
+        XCTAssertEqual(
+            durable.metadata,
+            try WorkspaceAnchoredFileSystem.validate(fixture.location)
+        )
         XCTAssertNotEqual(durable.metadata.identity, originalIdentity)
         try assertNoWriteArtifacts(for: fixture)
         try assertFixtureSentinel(fixture)
@@ -28,7 +31,10 @@ extension WorkspaceAnchoredFileSystemTests {
         let durable = try XCTUnwrap(requireDurable(outcome))
         XCTAssertEqual(durable.cleanupState, .none)
         XCTAssertEqual(try writeText(at: fixture.destination), "replacement bytes")
-        XCTAssertEqual(durable.metadata.identity, try writeFileIdentity(at: fixture.destination))
+        XCTAssertEqual(
+            durable.metadata,
+            try WorkspaceAnchoredFileSystem.validate(fixture.location)
+        )
         try assertNoWriteArtifacts(for: fixture)
         try assertFixtureSentinel(fixture)
     }

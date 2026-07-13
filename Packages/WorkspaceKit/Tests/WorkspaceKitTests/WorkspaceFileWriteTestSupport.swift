@@ -59,7 +59,7 @@ extension WorkspaceAnchoredFileSystemTests {
             try originalText.write(to: destination, atomically: true, encoding: .utf8)
         }
         try "outside sentinel".write(to: outsideFile, atomically: true, encoding: .utf8)
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let originalIdentity: WorkspaceFileSystemIdentity? = if originalText == nil {
             nil
         } else {
@@ -152,11 +152,24 @@ extension WorkspaceAnchoredFileSystemTests {
             file: file,
             line: line
         )
+        XCTAssertTrue(
+            try writeCleanupURLs(
+                in: fixture.destination.deletingLastPathComponent()
+            ).isEmpty,
+            file: file,
+            line: line
+        )
     }
 
     func writeTemporaryURLs(in directory: URL) throws -> [URL] {
         try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix(".plainsong-write-") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    func writeCleanupURLs(in directory: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(".plainsong-cleanup-") }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 

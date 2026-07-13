@@ -1,3 +1,4 @@
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -17,12 +18,39 @@ extension WorkspaceAnchoredFileSystem {
         let name: String
         let location: WorkspaceFileSystemLocation
         let metadata: WorkspaceCoherentFileMetadata
+        let expectedByteCount: Int64
+        let expectedSHA256Digest: String
     }
 
     struct ArtifactRemovalContext {
         let chain: DirectoryDescriptorChain
         let parentDescriptor: Int32
         let hooks: Hooks
+    }
+
+    struct ArtifactRemovalResult {
+        let state: WorkspaceFileWriteArtifactState
+        let failureReason: WorkspaceAnchoredFileSystemError?
+    }
+
+    struct ArtifactCleanupRequest {
+        let name: String
+        let location: WorkspaceFileSystemLocation
+        let expectedIdentity: WorkspaceFileSystemIdentity
+        let context: ArtifactRemovalContext
+        let unlinkCall: InjectedCall
+        let syncCall: InjectedCall
+    }
+
+    struct QuarantinedArtifact {
+        let request: ArtifactCleanupRequest
+        let name: String
+        let location: WorkspaceFileSystemLocation
+    }
+
+    enum ArtifactQuarantineOutcome {
+        case quarantined(QuarantinedArtifact)
+        case failed(ArtifactRemovalResult)
     }
 
     struct WriteCommitContext {
@@ -180,8 +208,8 @@ extension WorkspaceAnchoredFileSystem {
             Darwin.openat(
                 parentDescriptor,
                 $0,
-                O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-                mode_t(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+                O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+                mode_t(S_IRUSR | S_IWUSR)
             )
         }
         guard descriptor >= 0,
@@ -190,18 +218,50 @@ extension WorkspaceAnchoredFileSystem {
             if descriptor >= 0 { Darwin.close(descriptor) }
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
+        let createdMetadata: WorkspaceCoherentFileMetadata
+        do {
+            createdMetadata = try regularFileMetadata(descriptor: descriptor)
+        } catch {
+            Darwin.close(descriptor)
+            throw TemporaryPreparationError(
+                reason: normalizedError(error),
+                name: name,
+                location: artifactLocation,
+                expectedIdentity: nil
+            )
+        }
         hooks.emit(.temporaryFileCreated)
 
+        let expectedByteCount = Int64(data.count)
+        let expectedDigest = sha256Digest(data)
         do {
-            if case let .existing(_, _, permissions, _) = target,
-               Darwin.fchmod(descriptor, permissions) != 0
-            {
+            guard Darwin.ftruncate(descriptor, 0) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
             try writeAllBytes(data, descriptor: descriptor)
             guard Darwin.fsync(descriptor) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.durabilityFailed
             }
+            try validatePreparedContent(
+                descriptor: descriptor,
+                identity: createdMetadata.identity,
+                expectedByteCount: expectedByteCount,
+                expectedDigest: expectedDigest
+            )
+            if case let .existing(_, _, permissions, _) = target,
+               Darwin.fchmod(descriptor, permissions) != 0
+            {
+                throw WorkspaceAnchoredFileSystemError.unreadable
+            }
+            guard Darwin.fsync(descriptor) == 0 else {
+                throw WorkspaceAnchoredFileSystemError.durabilityFailed
+            }
+            try validatePreparedContent(
+                descriptor: descriptor,
+                identity: createdMetadata.identity,
+                expectedByteCount: expectedByteCount,
+                expectedDigest: expectedDigest
+            )
             try checkCancellation()
             let metadata = try regularFileMetadata(descriptor: descriptor)
             hooks.emit(.temporaryFilePrepared)
@@ -209,14 +269,17 @@ extension WorkspaceAnchoredFileSystem {
                 descriptor: descriptor,
                 name: name,
                 location: artifactLocation,
-                metadata: metadata
+                metadata: metadata,
+                expectedByteCount: expectedByteCount,
+                expectedSHA256Digest: expectedDigest
             )
         } catch {
             Darwin.close(descriptor)
             throw TemporaryPreparationError(
                 reason: normalizedError(error),
                 name: name,
-                location: artifactLocation
+                location: artifactLocation,
+                expectedIdentity: createdMetadata.identity
             )
         }
     }
@@ -225,6 +288,43 @@ extension WorkspaceAnchoredFileSystem {
         let reason: WorkspaceAnchoredFileSystemError
         let name: String
         let location: WorkspaceFileSystemLocation
+        let expectedIdentity: WorkspaceFileSystemIdentity?
+    }
+
+    static func validatePreparedContent(_ prepared: PreparedWrite) throws {
+        try validatePreparedContent(
+            descriptor: prepared.descriptor,
+            identity: prepared.metadata.identity,
+            expectedByteCount: prepared.expectedByteCount,
+            expectedDigest: prepared.expectedSHA256Digest
+        )
+    }
+
+    static func validatePreparedContent(
+        descriptor: Int32,
+        identity: WorkspaceFileSystemIdentity,
+        expectedByteCount: Int64,
+        expectedDigest: String
+    ) throws {
+        let before = try regularFileMetadata(descriptor: descriptor)
+        guard before.identity == identity else {
+            throw WorkspaceAnchoredFileSystemError.changedIdentity
+        }
+        guard before.byteCount == expectedByteCount else {
+            throw WorkspaceAnchoredFileSystemError.changedContent
+        }
+        let digest = try sha256Digest(descriptor: descriptor)
+        let after = try regularFileMetadata(descriptor: descriptor)
+        guard before == after else {
+            throw WorkspaceAnchoredFileSystemError.unstable
+        }
+        guard digest == expectedDigest else {
+            throw WorkspaceAnchoredFileSystemError.changedContent
+        }
+    }
+
+    static func sha256Digest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     static func validateExpectedContent(

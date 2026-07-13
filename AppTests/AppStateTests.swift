@@ -945,6 +945,10 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootB.standardizedFileURL)
         XCTAssertEqual(appState.workspaceSnapshot?.entries.map(\.relativePath), ["b.md"])
+        XCTAssertEqual(
+            appState.workspaceSearchRootAuthority?.canonicalRootURL,
+            try WorkspaceFileSystemRootAuthority(rootURL: rootB).canonicalRootURL
+        )
         XCTAssertEqual(appState.workspaceTree?.selectedNode?.relativePath, "b.md")
     }
 
@@ -1086,6 +1090,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let workspaceSnapshot = snapshot(paths: ["a.md", "b.md"], rootURL: rootURL)
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceSearchRootAuthority = try WorkspaceFileSystemRootAuthority(
+            rootURL: rootURL
+        )
         appState.workspaceGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
@@ -1849,6 +1856,32 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .searching)
     }
 
+    func testSearchDoesNotPrepareRequestWithAuthorityFromAnotherWorkspace() throws {
+        let rootA = try makeTemporaryDirectory()
+        let rootB = try makeTemporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: rootA)
+            try? FileManager.default.removeItem(at: rootB)
+        }
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let appState = AppState(
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: 0,
+            shouldRestoreLastOpenedFile: false
+        )
+        appState.workspaceRootURL = rootB
+        appState.workspaceSnapshot = snapshot(paths: ["a.md"], rootURL: rootA)
+        appState.workspaceSearchRootAuthority = try WorkspaceFileSystemRootAuthority(
+            rootURL: rootA
+        )
+        appState.workspaceGeneration = 1
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+
+        XCTAssertTrue(provider.requests.isEmpty)
+        XCTAssertEqual(appState.workspaceSearchState.phase, .idle)
+    }
+
     func testReplacementCancelsConsumingTaskTerminatesProducerAndOldCleanupCannotClearNewResults() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
@@ -2199,6 +2232,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceSearchRootAuthority = try WorkspaceFileSystemRootAuthority(
+            rootURL: rootURL
+        )
         appState.workspaceGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
@@ -2733,6 +2769,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let workspaceSnapshot = snapshot(paths: paths, rootURL: rootURL)
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceSearchRootAuthority = try? WorkspaceFileSystemRootAuthority(
+            rootURL: rootURL
+        )
         appState.workspaceGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
@@ -2787,6 +2826,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
+        appState.workspaceSearchRootAuthority = try WorkspaceFileSystemRootAuthority(
+            rootURL: rootURL
+        )
         appState.workspaceGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
@@ -2989,8 +3031,12 @@ private final class ControlledWorkspaceSearchStreamProvider: WorkspaceSearchStre
 private struct ImmediateWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
     let snapshot: WorkspaceFileSnapshot
 
-    func snapshot(root _: URL) async throws -> WorkspaceFileSnapshot {
-        snapshot
+    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        let rootAuthority = try await WorkspaceFileSystemRootAuthority.capture(rootURL: root)
+        return WorkspaceDirectorySnapshotCapture(
+            snapshot: snapshot,
+            rootAuthority: rootAuthority
+        )
     }
 }
 
@@ -2999,7 +3045,8 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
     private var requestCount = 0
     private var requestWaiters: [CheckedContinuation<Void, Never>] = []
 
-    func snapshot(root _: URL) async throws -> WorkspaceFileSnapshot {
+    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        let rootAuthority = try await WorkspaceFileSystemRootAuthority.capture(rootURL: root)
         requestCount += 1
         let waiters = requestWaiters
         requestWaiters.removeAll()
@@ -3007,9 +3054,13 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
             waiter.resume()
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let snapshot = try await withCheckedThrowingContinuation { continuation in
             continuations.append(continuation)
         }
+        return WorkspaceDirectorySnapshotCapture(
+            snapshot: snapshot,
+            rootAuthority: rootAuthority
+        )
     }
 
     func waitForRequestCount(_ expectedCount: Int) async {

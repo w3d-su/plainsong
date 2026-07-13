@@ -44,7 +44,7 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
 
 /// Immutable input for one workspace search.
 public struct WorkspaceSearchRequest: Sendable, Equatable {
-    public let rootURL: URL
+    public let rootAuthority: WorkspaceFileSystemRootAuthority
     public let rootIdentity: String
     public let snapshot: WorkspaceFileSnapshot
     public let workspaceGeneration: UInt64
@@ -52,11 +52,15 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     public let query: TextSearchQuery
     public let dirtyOverlays: WorkspaceSearchOverlayCollection
     public let limits: WorkspaceSearchLimits
-    let rootAuthority: WorkspaceFileSystemRootAuthority
+
+    /// The only root URL exposed by a request is the canonical spelling captured by
+    /// `rootAuthority`; no caller-supplied URL can select a second namespace.
+    public var rootURL: URL {
+        rootAuthority.canonicalRootURL
+    }
 
     public init(
-        rootURL: URL,
-        rootAuthority: WorkspaceFileSystemRootAuthority? = nil,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         rootIdentity: String? = nil,
         snapshot: WorkspaceFileSnapshot,
         workspaceGeneration: UInt64,
@@ -65,11 +69,6 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
     ) {
-        let standardizedRoot = rootURL.standardizedFileURL
-        self.rootURL = standardizedRoot
-        let rootAuthority = rootAuthority ?? WorkspaceFileSystemRootAuthority(
-            rootURL: standardizedRoot
-        )
         self.rootAuthority = rootAuthority
         self.rootIdentity = rootIdentity
             ?? rootAuthority.canonicalRootURL.path(percentEncoded: false)
@@ -80,6 +79,42 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         self.dirtyOverlays = dirtyOverlays
         self.limits = limits
     }
+
+    /// Compatibility boundary for callers that still carry a selected root URL. The URL
+    /// is accepted only when it is the exact selected or canonical spelling captured by
+    /// `rootAuthority`; mismatch rejection is pure and happens before a request exists.
+    public init(
+        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        rootIdentity: String? = nil,
+        snapshot: WorkspaceFileSnapshot,
+        workspaceGeneration: UInt64,
+        queryGeneration: UInt64,
+        query: TextSearchQuery,
+        dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
+        limits: WorkspaceSearchLimits = .init()
+    ) throws {
+        let standardizedRoot = rootURL.standardizedFileURL
+        guard standardizedRoot == rootAuthority.originalRootURL
+            || standardizedRoot == rootAuthority.canonicalRootURL
+        else {
+            throw WorkspaceSearchRequestError.rootAuthorityMismatch
+        }
+        self.init(
+            rootAuthority: rootAuthority,
+            rootIdentity: rootIdentity,
+            snapshot: snapshot,
+            workspaceGeneration: workspaceGeneration,
+            queryGeneration: queryGeneration,
+            query: query,
+            dirtyOverlays: dirtyOverlays,
+            limits: limits
+        )
+    }
+}
+
+public enum WorkspaceSearchRequestError: Error, Sendable, Equatable {
+    case rootAuthorityMismatch
 }
 
 /// Stable identity attached to every event from a search request.

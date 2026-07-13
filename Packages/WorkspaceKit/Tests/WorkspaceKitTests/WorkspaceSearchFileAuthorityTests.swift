@@ -116,7 +116,7 @@ final class WorkspaceSearchFileAuthorityTests: XCTestCase {
             atomically: true,
             encoding: .utf8
         )
-        let authority = WorkspaceFileSystemRootAuthority(rootURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         try FileManager.default.moveItem(at: root, to: movedRoot)
         try FileManager.default.createSymbolicLink(at: root, withDestinationURL: outsideRoot)
         defer {
@@ -125,7 +125,7 @@ final class WorkspaceSearchFileAuthorityTests: XCTestCase {
             try? FileManager.default.removeItem(at: outsideRoot)
         }
 
-        let request = WorkspaceSearchRequest(
+        let request = try WorkspaceSearchRequest(
             rootURL: root,
             rootAuthority: authority,
             snapshot: WorkspaceFileSnapshot(entries: [
@@ -159,8 +159,8 @@ private extension WorkspaceSearchFileAuthorityTests {
         } else {
             WorkspaceSearchOverlayCollection.empty
         }
-        return WorkspaceSearchRequest(
-            rootURL: root,
+        return try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [
                 WorkspaceFileSnapshot.Entry(
                     relativePath: "post.md",
@@ -228,7 +228,7 @@ private extension WorkspaceSearchFileAuthorityTests {
             .appendingPathComponent("WorkspaceSearchFileAuthorityTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 

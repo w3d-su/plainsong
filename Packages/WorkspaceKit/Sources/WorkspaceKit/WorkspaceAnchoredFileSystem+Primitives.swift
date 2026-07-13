@@ -104,9 +104,8 @@ extension WorkspaceAnchoredFileSystem {
         _ body: (DirectoryDescriptorChain, Int32, String) throws -> T
     ) throws -> T {
         try checkCancellation()
-        guard let expectedRootIdentity = location.rootAuthority.physicalIdentity else {
-            throw WorkspaceAnchoredFileSystemError.unreadable
-        }
+        try location.rootAuthority.validateCanonicalBinding()
+        let expectedRootIdentity = location.rootAuthority.physicalIdentity
 
         let slashDescriptor = Darwin.open(
             "/",

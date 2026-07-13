@@ -80,6 +80,7 @@ extension WorkspaceAnchoredFileSystem {
         let artifactState = removeArtifact(
             named: prepared.name,
             location: prepared.location,
+            expectedIdentity: prepared.metadata.identity,
             context: context.commit.artifactRemovalContext,
             unlinkCall: .cleanupTemporary
         )
@@ -91,39 +92,30 @@ extension WorkspaceAnchoredFileSystem {
         context: WriteCommitContext
     ) -> WorkspaceFileWriteOutcome {
         context.hooks.emit(.willRollback)
-        do {
-            try context.chain.validateNamespace()
-            try validateNameStillReferencesDescriptor(
-                parentDescriptor: context.parentDescriptor,
-                leaf: context.leaf,
-                metadata: context.prepared.metadata
-            )
-            try context.hooks.check(.unlinkCreatedDestination)
-            try context.chain.validateNamespace()
-            try validateNameStillReferencesDescriptor(
-                parentDescriptor: context.parentDescriptor,
-                leaf: context.leaf,
-                metadata: context.prepared.metadata
-            )
-            try context.chain.validateNamespace()
-            guard unlink(parentDescriptor: context.parentDescriptor, name: context.leaf) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.cleanupFailed
-            }
-            context.hooks.emit(.didRollback)
-            try context.chain.validateNamespace()
-            try context.hooks.check(.syncRollbackDirectory)
-            try syncDirectory(context.parentDescriptor)
-            try context.chain.validateNamespace()
-            try validateMissingName(parentDescriptor: context.parentDescriptor, leaf: context.leaf)
-            try context.chain.validateNamespace()
-            return notCommitted(reason: reason, artifactState: .none)
-        } catch {
+        guard let destinationLocation = context.prepared.location.sibling(named: context.leaf) else {
             return indeterminate(
-                reason: normalizedError(error),
+                reason: .cleanupFailed,
                 preparedMetadata: context.prepared.metadata,
-                artifactState: .none
+                artifactState: .removalIndeterminate(context.prepared.location)
             )
         }
+        let removal = removeArtifactResult(
+            named: context.leaf,
+            location: destinationLocation,
+            expectedIdentity: context.prepared.metadata.identity,
+            context: context.artifactRemovalContext,
+            unlinkCall: .unlinkCreatedDestination,
+            syncCall: .syncRollbackDirectory
+        )
+        if removal.state == .none {
+            context.hooks.emit(.didRollback)
+            return notCommitted(reason: reason, artifactState: .none)
+        }
+        return indeterminate(
+            reason: removal.failureReason ?? .cleanupFailed,
+            preparedMetadata: context.prepared.metadata,
+            artifactState: removal.state
+        )
     }
 
     static func finishDurableExistingWrite(
@@ -131,7 +123,6 @@ extension WorkspaceAnchoredFileSystem {
         context: ExistingWriteContext
     ) -> WorkspaceFileWriteOutcome {
         let prepared = context.commit.prepared
-        let parentDescriptor = context.commit.parentDescriptor
         let hooks = context.commit.hooks
         do {
             try validateExistingCommit(displacedEntry: displacedEntry, context: context)
@@ -143,62 +134,25 @@ extension WorkspaceAnchoredFileSystem {
             )
         }
 
-        do {
-            try hooks.check(.unlinkRollbackArtifact)
-            try validateExistingCommit(displacedEntry: displacedEntry, context: context)
-            guard unlink(parentDescriptor: parentDescriptor, name: prepared.name) == 0 else {
-                throw WorkspaceAnchoredFileSystemError.cleanupFailed
-            }
-        } catch {
-            do {
-                try validateCommittedDestination(context: context.commit)
-                hooks.emit(.postflight)
-                try validateCommittedDestination(context: context.commit)
-                return durable(
-                    metadata: prepared.metadata,
-                    cleanupState: .retained(prepared.location)
-                )
-            } catch {
-                return rollbackExistingWrite(
-                    reason: normalizedError(error),
-                    displacedEntry: displacedEntry,
-                    context: context
-                )
-            }
-        }
-
-        do {
-            try hooks.check(.syncCleanupDirectory)
-            try validateCommittedDestination(context: context.commit)
-            try syncDirectory(parentDescriptor)
-        } catch {
-            do {
-                try validateCommittedDestination(context: context.commit)
-                hooks.emit(.postflight)
-                try validateCommittedDestination(context: context.commit)
-                return durable(
-                    metadata: prepared.metadata,
-                    cleanupState: .removalIndeterminate(prepared.location)
-                )
-            } catch {
-                return indeterminate(
-                    reason: normalizedError(error),
-                    preparedMetadata: prepared.metadata,
-                    artifactState: .removalIndeterminate(prepared.location)
-                )
-            }
-        }
+        let cleanup = removeArtifactResult(
+            named: prepared.name,
+            location: prepared.location,
+            expectedIdentity: displacedEntry.identity,
+            context: context.commit.artifactRemovalContext,
+            unlinkCall: .unlinkRollbackArtifact,
+            syncCall: .syncCleanupDirectory
+        )
 
         do {
             try validateCommittedDestination(context: context.commit)
             hooks.emit(.postflight)
-            try validateCommittedDestination(context: context.commit)
-            return durable(metadata: prepared.metadata, cleanupState: .none)
+            let finalMetadata = try finalCommittedMetadata(context: context.commit)
+            return durable(metadata: finalMetadata, cleanupState: cleanup.state)
         } catch {
             return indeterminate(
                 reason: normalizedError(error),
                 preparedMetadata: prepared.metadata,
-                artifactState: .none
+                artifactState: cleanup.state
             )
         }
     }
@@ -230,34 +184,6 @@ extension WorkspaceAnchoredFileSystem {
             metadata: context.prepared.metadata
         )
         try context.chain.validateNamespace()
-    }
-
-    static func removeArtifact(
-        named name: String,
-        location: WorkspaceFileSystemLocation,
-        context: ArtifactRemovalContext,
-        unlinkCall: InjectedCall
-    ) -> WorkspaceFileWriteArtifactState {
-        do {
-            try context.chain.validateNamespace()
-            try context.hooks.check(unlinkCall)
-            try context.chain.validateNamespace()
-            guard unlink(parentDescriptor: context.parentDescriptor, name: name) == 0 else {
-                return .retained(location)
-            }
-        } catch {
-            return .retained(location)
-        }
-
-        do {
-            try context.chain.validateNamespace()
-            try context.hooks.check(.syncCleanupDirectory)
-            try syncDirectory(context.parentDescriptor)
-            try context.chain.validateNamespace()
-            return .none
-        } catch {
-            return .removalIndeterminate(location)
-        }
     }
 }
 

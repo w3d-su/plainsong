@@ -66,7 +66,9 @@ extension WorkspaceAnchoredFileSystemTests {
         try mutation.rethrowIfFailed()
         let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .namespaceChanged))
         let preparedMetadata = try XCTUnwrap(result.preparedMetadata)
-        XCTAssertEqual(result.recoveryArtifact, .none)
+        guard case .removalIndeterminate = result.recoveryArtifact else {
+            return XCTFail("Expected indeterminate identity-bound rollback cleanup")
+        }
         XCTAssertEqual(try writeText(at: fixture.destination), "canonical replacement")
         let movedDestination = movedRoot.appendingPathComponent("post.md")
         XCTAssertEqual(try writeText(at: movedDestination), "replacement bytes")

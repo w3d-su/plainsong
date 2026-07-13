@@ -39,6 +39,10 @@ extension WorkspaceAnchoredFileSystem {
         commit.hooks.emit(.willCommit(.swap))
         try commit.hooks.check(.renameSwap)
         try commit.chain.validateNamespace()
+        try validatePreparedWrite(
+            commit.prepared,
+            parentDescriptor: commit.parentDescriptor
+        )
         try validateNameStillReferencesDescriptor(
             parentDescriptor: commit.parentDescriptor,
             leaf: commit.leaf,
@@ -78,6 +82,7 @@ extension WorkspaceAnchoredFileSystem {
             leaf: commit.leaf,
             metadata: commit.prepared.metadata
         )
+        try validatePreparedContent(commit.prepared)
         try validateNameStillReferencesEntry(
             parentDescriptor: commit.parentDescriptor,
             leaf: commit.prepared.name,
@@ -101,7 +106,37 @@ extension WorkspaceAnchoredFileSystem {
             leaf: context.leaf,
             metadata: context.prepared.metadata
         )
+        try validatePreparedContent(context.prepared)
         try context.chain.validateNamespace()
+    }
+
+    static func finalCommittedMetadata(
+        context: WriteCommitContext
+    ) throws -> WorkspaceCoherentFileMetadata {
+        try validateCommittedDestination(context: context)
+        try validatePreparedContent(context.prepared)
+        let finalMetadata = try regularFileMetadata(descriptor: context.prepared.descriptor)
+        try context.chain.validateNamespace()
+        try validateNameStillReferencesDescriptor(
+            parentDescriptor: context.parentDescriptor,
+            leaf: context.leaf,
+            metadata: finalMetadata
+        )
+        try validatePreparedContent(context.prepared)
+        try context.chain.validateNamespace()
+        return finalMetadata
+    }
+
+    static func validatePreparedWrite(
+        _ prepared: PreparedWrite,
+        parentDescriptor: Int32
+    ) throws {
+        try validateNameStillReferencesDescriptor(
+            parentDescriptor: parentDescriptor,
+            leaf: prepared.name,
+            metadata: prepared.metadata
+        )
+        try validatePreparedContent(prepared)
     }
 
     static func errorForUnexpectedDisplacedEntry(

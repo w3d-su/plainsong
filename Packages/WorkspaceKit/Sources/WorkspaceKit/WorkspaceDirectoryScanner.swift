@@ -14,6 +14,20 @@ public enum WorkspaceDirectoryScannerError: LocalizedError, Equatable {
     }
 }
 
+/// One off-main reload result whose snapshot and filesystem authority are installed together.
+public struct WorkspaceDirectorySnapshotCapture: Sendable {
+    public let snapshot: WorkspaceFileSnapshot
+    public let rootAuthority: WorkspaceFileSystemRootAuthority
+
+    public init(
+        snapshot: WorkspaceFileSnapshot,
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) {
+        self.snapshot = snapshot
+        self.rootAuthority = rootAuthority
+    }
+}
+
 public struct WorkspaceDirectoryScanner: Sendable {
     private let entryVisitHook: @Sendable (URL) -> Void
 
@@ -40,6 +54,36 @@ public struct WorkspaceDirectoryScanner: Sendable {
             }
             try Task.checkCancellation()
             return snapshot
+        }
+    }
+
+    /// Captures root authority and enumerates its canonical spelling on the same utility task.
+    /// Namespace replacement during enumeration rejects the whole capture.
+    public func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        let root = root.standardizedFileURL
+        try Task.checkCancellation()
+
+        return try await withThrowingTaskGroup(of: WorkspaceDirectorySnapshotCapture.self) { group in
+            group.addTask(priority: .utility) {
+                let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+                try authority.validateCanonicalBinding()
+                let snapshot = try Self.makeSnapshot(
+                    root: authority.canonicalRootURL,
+                    entryVisitHook: entryVisitHook
+                )
+                try authority.validateCanonicalBinding()
+                return WorkspaceDirectorySnapshotCapture(
+                    snapshot: snapshot,
+                    rootAuthority: authority
+                )
+            }
+            defer { group.cancelAll() }
+
+            guard let capture = try await group.next() else {
+                throw CancellationError()
+            }
+            try Task.checkCancellation()
+            return capture
         }
     }
 

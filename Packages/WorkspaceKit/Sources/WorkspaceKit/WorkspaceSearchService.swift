@@ -26,7 +26,9 @@ public struct WorkspaceSearchService: Sendable {
             // This is the single controlled stream producer. Read work stays structured inside
             // the pipeline task group; no detached matching tasks are created.
             let producer = Task(priority: .utility) {
-                let access = SecurityScopedAccess.startAccessing(request.rootURL)
+                let access = SecurityScopedAccess.startAccessing(
+                    request.rootAuthority.securityScopedURL
+                )
                 defer {
                     access.stop()
                     continuation.finish()

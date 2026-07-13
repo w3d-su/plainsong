@@ -97,7 +97,8 @@ extension AppState {
         selectFirstIfNeeded: Bool
     ) async throws {
         try Task.checkCancellation()
-        let snapshot = try await directoryScanner.snapshot(root: root)
+        let capture = try await directoryScanner.snapshotCapture(root: root)
+        let snapshot = capture.snapshot
         try Task.checkCancellation()
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
@@ -122,6 +123,7 @@ extension AppState {
         }
         let previousSnapshot = workspaceSnapshot
         workspaceSnapshot = snapshot
+        workspaceSearchRootAuthority = capture.rootAuthority
         refreshEditorImageThumbnails(
             previousSnapshot: previousSnapshot,
             currentSnapshot: snapshot
@@ -154,8 +156,9 @@ extension AppState {
             cancelPendingEditorNavigationIfNeeded()
         }
 
-        guard let rootURL = workspaceRootURL?.standardizedFileURL,
-              workspaceSnapshot != nil
+        guard workspaceSnapshot != nil,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority)
         else {
             workspaceSearchState = WorkspaceSearchState(
                 queryGeneration: workspaceSearchQueryGeneration
@@ -163,17 +166,17 @@ extension AppState {
             return
         }
 
-        let context = beginWorkspaceSearch(query: query, rootURL: rootURL)
+        let context = beginWorkspaceSearch(query: query, rootAuthority: rootAuthority)
         installWorkspaceSearchTask(query: query, context: context)
     }
 
     func beginWorkspaceSearch(
         query: TextSearchQuery,
-        rootURL: URL
+        rootAuthority: WorkspaceFileSystemRootAuthority
     ) -> WorkspaceSearchContext {
         let queryGeneration = advanceWorkspaceSearchQueryGeneration()
         let context = WorkspaceSearchContext(
-            rootIdentity: Self.workspaceSearchRootIdentity(for: rootURL),
+            rootIdentity: Self.workspaceSearchRootIdentity(for: rootAuthority),
             workspaceGeneration: workspaceGeneration,
             queryGeneration: queryGeneration
         )
@@ -206,10 +209,41 @@ extension AppState {
             }
 
             guard !Task.isCancelled,
+                  let rootAuthority = self?.workspaceSearchRootAuthority,
+                  self?.workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority) == true
+            else {
+                self?.finishWorkspaceSearchTask(
+                    token: taskToken,
+                    context: context,
+                    wasCancelled: Task.isCancelled
+                )
+                return
+            }
+
+            let dirtyOverlays: WorkspaceSearchOverlayCollection
+            do {
+                guard let overlays = try await self?.workspaceSearchDirtyOverlays(
+                    rootAuthority: rootAuthority
+                ) else {
+                    throw CancellationError()
+                }
+                dirtyOverlays = overlays
+            } catch {
+                self?.failWorkspaceSearchPreparation(
+                    context: context,
+                    taskToken: taskToken,
+                    wasCancelled: Task.isCancelled || error is CancellationError
+                )
+                return
+            }
+
+            guard !Task.isCancelled,
                   let request = self?.prepareWorkspaceSearchRequest(
                       query: query,
                       context: context,
-                      taskToken: taskToken
+                      taskToken: taskToken,
+                      rootAuthority: rootAuthority,
+                      dirtyOverlays: dirtyOverlays
                   )
             else {
                 self?.finishWorkspaceSearchTask(
@@ -250,36 +284,53 @@ extension AppState {
     func prepareWorkspaceSearchRequest(
         query: TextSearchQuery,
         context: WorkspaceSearchContext,
-        taskToken: UUID
+        taskToken: UUID,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        dirtyOverlays: WorkspaceSearchOverlayCollection
     ) -> WorkspaceSearchRequest? {
         guard workspaceSearchTaskToken == taskToken,
               workspaceSearchQueriesMatch(workspaceSearchState.activeQuery, query),
               workspaceSearchContextsMatch(workspaceSearchState.activeContext, context),
               isActiveWorkspaceSearchContext(context),
               workspaceSearchState.phase == .debouncing,
-              let rootURL = workspaceRootURL?.standardizedFileURL,
+              workspaceSearchRootAuthority == rootAuthority,
+              workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
               let snapshot = workspaceSnapshot
         else {
             return nil
         }
 
-        do {
-            let dirtyOverlays = try workspaceSearchDirtyOverlays(rootURL: rootURL)
-            workspaceSearchState.phase = .searching
-            return WorkspaceSearchRequest(
-                rootURL: rootURL,
-                rootIdentity: context.rootIdentity,
-                snapshot: snapshot,
-                workspaceGeneration: context.workspaceGeneration,
-                queryGeneration: context.queryGeneration,
-                query: query,
-                dirtyOverlays: dirtyOverlays,
-                limits: workspaceSearchLimits
-            )
-        } catch {
-            workspaceSearchState.phase = .serviceFailure(.unexpectedProducerFailure)
-            return nil
+        workspaceSearchState.phase = .searching
+        return WorkspaceSearchRequest(
+            rootAuthority: rootAuthority,
+            rootIdentity: context.rootIdentity,
+            snapshot: snapshot,
+            workspaceGeneration: context.workspaceGeneration,
+            queryGeneration: context.queryGeneration,
+            query: query,
+            dirtyOverlays: dirtyOverlays,
+            limits: workspaceSearchLimits
+        )
+    }
+
+    func failWorkspaceSearchPreparation(
+        context: WorkspaceSearchContext,
+        taskToken: UUID,
+        wasCancelled: Bool
+    ) {
+        guard workspaceSearchTaskToken == taskToken,
+              workspaceSearchContextsMatch(workspaceSearchState.activeContext, context)
+        else {
+            return
         }
+        if !wasCancelled, workspaceSearchState.phase == .debouncing {
+            workspaceSearchState.phase = .serviceFailure(.unexpectedProducerFailure)
+        }
+        finishWorkspaceSearchTask(
+            token: taskToken,
+            context: context,
+            wasCancelled: wasCancelled
+        )
     }
 
     func finishWorkspaceSearchTask(
@@ -315,12 +366,13 @@ extension AppState {
     }
 
     func isActiveWorkspaceSearchContext(_ context: WorkspaceSearchContext) -> Bool {
-        guard let rootURL = workspaceRootURL?.standardizedFileURL,
+        guard let rootAuthority = workspaceSearchRootAuthority,
+              workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
               workspaceSearchContextsMatch(workspaceSearchState.activeContext, context),
               workspaceSearchState.queryGeneration == context.queryGeneration,
               workspaceGeneration == context.workspaceGeneration,
               ExactSourceText.matches(
-                  Self.workspaceSearchRootIdentity(for: rootURL),
+                  Self.workspaceSearchRootIdentity(for: rootAuthority),
                   context.rootIdentity
               )
         else {
@@ -350,7 +402,15 @@ extension AppState {
             && first.wholeWord == second.wholeWord
     }
 
-    static func workspaceSearchRootIdentity(for rootURL: URL) -> String {
-        rootURL.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+    static func workspaceSearchRootIdentity(
+        for rootAuthority: WorkspaceFileSystemRootAuthority
+    ) -> String {
+        rootAuthority.canonicalRootURL.path(percentEncoded: false)
+    }
+
+    func workspaceSearchAuthorityMatchesCurrentRoot(
+        _ rootAuthority: WorkspaceFileSystemRootAuthority
+    ) -> Bool {
+        workspaceRootURL?.standardizedFileURL == rootAuthority.originalRootURL
     }
 }

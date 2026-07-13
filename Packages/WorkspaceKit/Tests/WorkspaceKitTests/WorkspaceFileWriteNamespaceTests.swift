@@ -237,8 +237,8 @@ extension WorkspaceAnchoredFileSystemTests {
 
         try mutation.rethrowIfFailed()
         let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .namespaceChanged))
-        guard case let .retained(artifact) = result.artifactState else {
-            return XCTFail("Expected retained prepared bytes, got \(result.artifactState)")
+        guard case let .removalIndeterminate(artifact) = result.artifactState else {
+            return XCTFail("Expected indeterminate prepared cleanup, got \(result.artifactState)")
         }
         try assertReplacementRace(
             fixture: fixture,

@@ -64,6 +64,7 @@ extension WorkspaceAnchoredFileSystem {
             let artifactState = removeArtifact(
                 named: error.name,
                 location: error.location,
+                expectedIdentity: error.expectedIdentity,
                 context: artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
@@ -76,6 +77,7 @@ extension WorkspaceAnchoredFileSystem {
         do {
             try chain.validateNamespace()
             hooks.emit(.namespaceValidated)
+            try validatePreparedWrite(prepared, parentDescriptor: parentDescriptor)
             try revalidateTarget(
                 target,
                 parentDescriptor: parentDescriptor,
@@ -87,6 +89,7 @@ extension WorkspaceAnchoredFileSystem {
             let artifactState = removeArtifact(
                 named: prepared.name,
                 location: prepared.location,
+                expectedIdentity: prepared.metadata.identity,
                 context: artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
@@ -126,6 +129,7 @@ extension WorkspaceAnchoredFileSystem {
             let artifactState = removeArtifact(
                 named: commit.prepared.name,
                 location: commit.prepared.location,
+                expectedIdentity: commit.prepared.metadata.identity,
                 context: commit.artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
@@ -173,6 +177,16 @@ extension WorkspaceAnchoredFileSystem {
         }
 
         do {
+            try validatePreparedContent(commit.prepared)
+        } catch {
+            return rollbackExistingWrite(
+                reason: normalizedError(error),
+                displacedEntry: displacedEntry,
+                context: context
+            )
+        }
+
+        do {
             try validateAndSyncCommittedExistingWrite(context, displacedEntry: displacedEntry)
         } catch {
             return rollbackExistingWrite(
@@ -198,6 +212,10 @@ extension WorkspaceAnchoredFileSystem {
             context.hooks.emit(.willCommit(.exclusiveCreate))
             try context.hooks.check(.renameExclusive)
             try context.chain.validateNamespace()
+            try validatePreparedWrite(
+                context.prepared,
+                parentDescriptor: context.parentDescriptor
+            )
             try validateMissingName(
                 parentDescriptor: context.parentDescriptor,
                 leaf: context.leaf
@@ -216,6 +234,7 @@ extension WorkspaceAnchoredFileSystem {
             let artifactState = removeArtifact(
                 named: context.prepared.name,
                 location: context.prepared.location,
+                expectedIdentity: context.prepared.metadata.identity,
                 context: context.artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
@@ -227,12 +246,14 @@ extension WorkspaceAnchoredFileSystem {
             try context.hooks.check(.afterRenameExclusive)
             try context.hooks.check(.validateCommittedLeaf)
             try validateCommittedLeaf(context)
+            try validatePreparedContent(context.prepared)
             try context.hooks.check(.syncCommittedDirectory)
             try syncDirectory(context.parentDescriptor)
             try validateCommittedLeaf(context)
+            try validatePreparedContent(context.prepared)
             context.hooks.emit(.postflight)
-            try validateCommittedLeaf(context)
-            return durable(metadata: context.prepared.metadata, cleanupState: .none)
+            let finalMetadata = try finalCommittedMetadata(context: context)
+            return durable(metadata: finalMetadata, cleanupState: .none)
         } catch {
             return rollbackMissingWrite(
                 reason: normalizedError(error),
