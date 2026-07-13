@@ -161,7 +161,7 @@ extension WorkspaceAnchoredFileSystemTests {
             return XCTFail("Expected quarantine identity-conflict state")
         }
         XCTAssertEqual(try writeText(at: savedPrepared), "replacement bytes")
-        // Post-validation mismatch refuses restore, so the racer remains at the quarantine name.
+        // Post-validation mismatch leaves the racer at the quarantine name without republication.
         XCTAssertEqual(
             try writeText(at: onlyArtifact(in: directory, cleanup: true)),
             "quarantine racer"
@@ -203,8 +203,8 @@ extension WorkspaceAnchoredFileSystemTests {
         guard case let .committedButIndeterminate(result) = outcome else {
             return XCTFail("Expected committedButIndeterminate, got \(outcome)")
         }
-        guard case .retained = result.recoveryArtifact else {
-            return XCTFail("Expected retained recovery artifact for unexpected displaced entry")
+        guard case .removalIndeterminate = result.recoveryArtifact else {
+            return XCTFail("Expected indeterminate recovery state for unexpected displaced entry")
         }
         XCTAssertEqual(try writeText(at: fixture.destination), "replacement bytes")
         XCTAssertEqual(try writeText(at: savedOriginal), "original")
@@ -229,14 +229,14 @@ extension WorkspaceAnchoredFileSystemTests {
                 encoding: .utf8
             )
         }
-        // Hook fires after open-fd identity validation and before name removal.
+        // Hook fires after the final fd/name identity rebind and immediately before unlinkat.
         let hooks = WorkspaceAnchoredFileSystem.Hooks(injectedFailure: { call in
             switch call {
             case .renameSwap:
                 return .unreadable
-            case .unlinkQuarantinedArtifact:
+            case .unlinkQuarantinedArtifactAfterValidation:
                 mutation.run()
-                return nil
+                return .namespaceChanged
             default:
                 return nil
             }
@@ -259,13 +259,15 @@ extension WorkspaceAnchoredFileSystemTests {
             "post-validation racer"
         )
         XCTAssertEqual(try writeText(at: fixture.destination), "original")
+        XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
+        try assertFixtureSentinel(fixture)
     }
 
-    func testQuarantineRestoreNeverMovesUnrelatedReplacementWhenDestinationAbsent() throws {
+    func testQuarantineMismatchNeverRepublishesRacerWhenDestinationAbsent() throws {
         let fixture = try makeWriteFixture(originalText: nil)
         defer { try? FileManager.default.removeItem(at: fixture.parent) }
         let directory = fixture.destination.deletingLastPathComponent()
-        let savedPrepared = directory.appendingPathComponent("saved-absent-restore.md")
+        let savedPrepared = directory.appendingPathComponent("saved-absent-quarantine.md")
         let mutation = SynchronousMutation {
             let quarantine = try self.onlyArtifact(in: directory, cleanup: true)
             try FileManager.default.moveItem(at: quarantine, to: savedPrepared)
@@ -294,7 +296,7 @@ extension WorkspaceAnchoredFileSystemTests {
             return XCTFail("Expected committedButIndeterminate, got \(outcome)")
         }
         guard case .removalIndeterminate = result.recoveryArtifact else {
-            return XCTFail("Expected quarantine restore identity-conflict state")
+            return XCTFail("Expected quarantine identity-conflict state")
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.destination.path))
         XCTAssertEqual(try writeText(at: savedPrepared), "replacement bytes")
@@ -304,28 +306,26 @@ extension WorkspaceAnchoredFileSystemTests {
         )
     }
 
-    func testQuarantineRestoreNeverReplacesRacingDestination() throws {
+    func testQuarantineFailureNeverRepublishesArtifactOverRacingDestination() throws {
         let fixture = try makeWriteFixture(originalText: nil)
         defer { try? FileManager.default.removeItem(at: fixture.parent) }
         let directory = fixture.destination.deletingLastPathComponent()
         let destinationMutation = SynchronousMutation {
-            try "restore-boundary racer".write(
+            try "destination-boundary racer".write(
                 to: fixture.destination,
                 atomically: false,
                 encoding: .utf8
             )
         }
-        // Inject a pre-removal fault while the quarantine still holds writer-owned material so
-        // restore runs; the destination racer is installed at the restore boundary.
+        // Install a racing destination while quarantine still holds the writer-owned artifact.
+        // Cleanup failure must retain that quarantine and never republish through its mutable name.
         let hooks = WorkspaceAnchoredFileSystem.Hooks(injectedFailure: { call in
             switch call {
             case .afterRenameExclusive:
                 return .unreadable
             case .unlinkQuarantinedArtifact:
-                return .unreadable
-            case .restoreQuarantinedArtifact:
                 destinationMutation.run()
-                return nil
+                return .unreadable
             default:
                 return nil
             }
@@ -338,16 +338,16 @@ extension WorkspaceAnchoredFileSystemTests {
             return XCTFail("Expected committedButIndeterminate, got \(outcome)")
         }
         guard case .retained = result.recoveryArtifact else {
-            return XCTFail("Expected retained quarantine after restore destination conflict")
+            return XCTFail("Expected retained quarantine after destination conflict")
         }
-        XCTAssertEqual(try writeText(at: fixture.destination), "restore-boundary racer")
+        XCTAssertEqual(try writeText(at: fixture.destination), "destination-boundary racer")
         XCTAssertEqual(
             try writeText(at: onlyArtifact(in: directory, cleanup: true)),
             "replacement bytes"
         )
     }
 
-    private func onlyArtifact(in directory: URL, cleanup: Bool) throws -> URL {
+    func onlyArtifact(in directory: URL, cleanup: Bool) throws -> URL {
         let urls = try cleanup
             ? writeCleanupURLs(in: directory)
             : writeTemporaryURLs(in: directory)

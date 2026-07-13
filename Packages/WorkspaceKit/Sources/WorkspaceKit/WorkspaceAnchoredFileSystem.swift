@@ -198,11 +198,13 @@ enum WorkspaceAnchoredFileSystem {
         case unlinkRollbackArtifact
         case syncCleanupDirectory
         case renameRollback
+        case renameRollbackAfterValidation
         case unlinkCreatedDestination
         case syncRollbackDirectory
         case cleanupTemporary
+        case renameQuarantinedArtifactAfterValidation
         case unlinkQuarantinedArtifact
-        case restoreQuarantinedArtifact
+        case unlinkQuarantinedArtifactAfterValidation
     }
 
     struct Hooks {

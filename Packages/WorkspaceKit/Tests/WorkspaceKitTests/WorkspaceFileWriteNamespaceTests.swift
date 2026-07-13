@@ -197,8 +197,8 @@ extension WorkspaceAnchoredFileSystemTests {
         try mutation.rethrowIfFailed()
         let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .namespaceChanged))
         let preparedMetadata = try XCTUnwrap(result.preparedMetadata)
-        guard case let .retained(artifact) = result.recoveryArtifact else {
-            return XCTFail("Expected retained rollback material, got \(result.recoveryArtifact)")
+        guard case let .removalIndeterminate(artifact) = result.recoveryArtifact else {
+            return XCTFail("Expected indeterminate rollback material, got \(result.recoveryArtifact)")
         }
         let movedDestination = movedRoot.appendingPathComponent("post.md")
         let movedArtifact = movedRoot.appendingPathComponent(artifact.relativePath)
@@ -291,8 +291,8 @@ extension WorkspaceAnchoredFileSystemTests {
         try mutation.rethrowIfFailed()
         let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .namespaceChanged))
         let preparedMetadata = try XCTUnwrap(result.preparedMetadata)
-        guard case let .retained(artifact) = result.recoveryArtifact else {
-            return XCTFail("Expected retained rollback material, got \(result.recoveryArtifact)")
+        guard case let .removalIndeterminate(artifact) = result.recoveryArtifact else {
+            return XCTFail("Expected indeterminate rollback material, got \(result.recoveryArtifact)")
         }
         let movedDestination = movedRoot.appendingPathComponent("post.md")
         let movedArtifact = movedRoot.appendingPathComponent(artifact.relativePath)

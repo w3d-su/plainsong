@@ -12,7 +12,16 @@ extension WorkspaceAnchoredFileSystem {
         let parentDescriptor = context.commit.parentDescriptor
         let leaf = context.commit.leaf
         let hooks = context.commit.hooks
+        guard isWriterOwnedOriginal(displacedEntry, context: context) else {
+            return indeterminate(
+                reason: reason,
+                preparedMetadata: prepared.metadata,
+                artifactState: .removalIndeterminate(prepared.location)
+            )
+        }
+
         hooks.emit(.willRollback)
+        var didReverseSwap = false
         do {
             try chain.validateNamespace()
             try validateNameStillReferencesEntry(
@@ -38,6 +47,10 @@ extension WorkspaceAnchoredFileSystem {
                 metadata: prepared.metadata
             )
             try chain.validateNamespace()
+            // macOS cannot condition RENAME_SWAP on the two validated inode identities. This
+            // hook is the final instrumented boundary; an injected race fails before the swap.
+            // Production still has an honest residual last-check-to-syscall name race.
+            try hooks.check(.renameRollbackAfterValidation)
             guard secureRename(
                 parentDescriptor: parentDescriptor,
                 from: prepared.name,
@@ -46,6 +59,7 @@ extension WorkspaceAnchoredFileSystem {
             ) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
+            didReverseSwap = true
             hooks.emit(.didRollback)
             try chain.validateNamespace()
             try validateNameStillReferencesEntry(
@@ -70,10 +84,18 @@ extension WorkspaceAnchoredFileSystem {
             )
             try chain.validateNamespace()
         } catch {
+            let expectedArtifactIdentity = didReverseSwap
+                ? prepared.metadata.identity
+                : displacedEntry.identity
             return indeterminate(
                 reason: normalizedError(error),
                 preparedMetadata: prepared.metadata,
-                artifactState: .retained(prepared.location)
+                artifactState: artifactState(
+                    named: prepared.name,
+                    location: prepared.location,
+                    expectedIdentity: expectedArtifactIdentity,
+                    context: context.commit.artifactRemovalContext
+                )
             )
         }
 

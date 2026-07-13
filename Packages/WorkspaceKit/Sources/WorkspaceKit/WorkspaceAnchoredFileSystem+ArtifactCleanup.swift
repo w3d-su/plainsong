@@ -70,7 +70,12 @@ extension WorkspaceAnchoredFileSystem {
         let quarantineName = ".plainsong-cleanup-\(UUID().uuidString).tmp"
         guard let quarantineLocation = request.location.sibling(named: quarantineName) else {
             return .failed(ArtifactRemovalResult(
-                state: .retained(request.location),
+                state: artifactState(
+                    named: request.name,
+                    location: request.location,
+                    expectedIdentity: request.expectedIdentity,
+                    context: request.context
+                ),
                 failureReason: .cleanupFailed
             ))
         }
@@ -90,13 +95,18 @@ extension WorkspaceAnchoredFileSystem {
                 name: request.name,
                 expectedIdentity: request.expectedIdentity
             )
+            // RENAME_EXCL protects only the random sibling destination. macOS cannot condition
+            // this rename on the validated source inode. This is the final instrumented
+            // boundary; an injected race fails closed before the syscall, while production
+            // retains an honest last-check-to-rename name race.
+            try request.context.hooks.check(.renameQuarantinedArtifactAfterValidation)
         } catch {
             return .failed(ArtifactRemovalResult(
-                state: artifactStateAfterFailedQuarantine(
-                    parentDescriptor: request.context.parentDescriptor,
-                    name: request.name,
+                state: artifactState(
+                    named: request.name,
                     location: request.location,
-                    expectedIdentity: request.expectedIdentity
+                    expectedIdentity: request.expectedIdentity,
+                    context: request.context
                 ),
                 failureReason: normalizedError(error)
             ))
@@ -108,11 +118,11 @@ extension WorkspaceAnchoredFileSystem {
             flags: UInt32(RENAME_EXCL)
         ) == 0 else {
             return .failed(ArtifactRemovalResult(
-                state: artifactStateAfterFailedQuarantine(
-                    parentDescriptor: request.context.parentDescriptor,
-                    name: request.name,
+                state: artifactState(
+                    named: request.name,
                     location: request.location,
-                    expectedIdentity: request.expectedIdentity
+                    expectedIdentity: request.expectedIdentity,
+                    context: request.context
                 ),
                 failureReason: .cleanupFailed
             ))
@@ -126,16 +136,16 @@ extension WorkspaceAnchoredFileSystem {
                 expectedIdentity: request.expectedIdentity
             )
         } catch {
-            let retainedLocation = restoreQuarantinedEntry(
-                quarantineName: quarantineName,
-                originalName: request.name,
-                originalLocation: request.location,
-                quarantineLocation: quarantineLocation,
-                expectedIdentity: request.expectedIdentity,
-                context: request.context
-            )
             return .failed(ArtifactRemovalResult(
-                state: .removalIndeterminate(retainedLocation),
+                state: artifactState(
+                    candidates: [
+                        (quarantineName, quarantineLocation),
+                        (request.name, request.location),
+                    ],
+                    fallbackLocation: quarantineLocation,
+                    expectedIdentity: request.expectedIdentity,
+                    context: request.context
+                ),
                 failureReason: normalizedError(error)
             ))
         }
@@ -155,15 +165,13 @@ extension WorkspaceAnchoredFileSystem {
         let expectedIdentity = request.expectedIdentity
 
         // Bind an open descriptor to the writer-owned inode before any destructive name op.
-        // macOS has no funlinkat/fd-unlink for regular files, so name removal is only attempted
-        // while this open identity still matches the directory entry after the final hook.
         let openedDescriptor: Int32
         do {
             try request.context.chain.validateNamespace()
             try validateArtifactIdentity(
                 parentDescriptor: parentDescriptor,
                 name: artifact.name,
-                expectedIdentity: expectedIdentity
+                expectedIdentity: request.expectedIdentity
             )
             openedDescriptor = try openFile(
                 parentDescriptor: parentDescriptor,
@@ -178,8 +186,7 @@ extension WorkspaceAnchoredFileSystem {
         } catch {
             return quarantineRemovalFailure(
                 artifact: artifact,
-                error: error,
-                allowRestore: true
+                error: error
             )
         }
         defer { Darwin.close(openedDescriptor) }
@@ -190,16 +197,13 @@ extension WorkspaceAnchoredFileSystem {
         } catch {
             return quarantineRemovalFailure(
                 artifact: artifact,
-                error: error,
-                allowRestore: true
+                error: error
             )
         }
 
-        // Rebind the name to the open-fd identity. A replacement must survive untouched;
-        // refuse destructive removal rather than unlinking an unrelated entry. A residual
-        // TOCTOU remains between this check and unlinkat on platforms without fd-unlink;
-        // the contract claims refusal-on-mismatch plus private quarantine isolation, not
-        // absolute atomicity of the final name removal.
+        // Rebind the name to the open-fd identity. macOS has no regular-file fd unlink or
+        // identity-conditional unlink. The final hook exposes the last validation-to-unlinkat
+        // boundary; an injected race fails closed. Production retains that residual name race.
         do {
             try request.context.chain.validateNamespace()
             let entry = try directoryEntryIdentity(
@@ -213,21 +217,22 @@ extension WorkspaceAnchoredFileSystem {
             else {
                 throw WorkspaceAnchoredFileSystemError.namespaceChanged
             }
+            try request.context.hooks.check(.unlinkQuarantinedArtifactAfterValidation)
         } catch {
             return quarantineRemovalFailure(
                 artifact: artifact,
-                error: error,
-                allowRestore: false
+                error: error
             )
         }
 
         guard unlink(parentDescriptor: parentDescriptor, name: artifact.name) == 0 else {
             return ArtifactRemovalResult(
-                state: artifactReferencesIdentity(
-                    parentDescriptor: parentDescriptor,
-                    name: artifact.name,
-                    expectedIdentity: expectedIdentity
-                ) ? .retained(artifact.location) : .removalIndeterminate(artifact.location),
+                state: artifactState(
+                    named: artifact.name,
+                    location: artifact.location,
+                    expectedIdentity: expectedIdentity,
+                    context: request.context
+                ),
                 failureReason: .cleanupFailed
             )
         }
@@ -257,45 +262,24 @@ extension WorkspaceAnchoredFileSystem {
         }
     }
 
-    /// Handles a failed quarantine removal. `allowRestore` is true only when the writer still
-    /// believes the quarantine name may hold writer-owned material (validation/open failure or
-    /// injected pre-removal fault). After a post-hook rebind mismatch, restore is forbidden so
-    /// an unrelated replacement is never published back to the original name.
+    /// Quarantined material is never republished through a mutable source name. A failure leaves
+    /// the current names untouched and reports retained only when the exact expected identity is
+    /// proven at the returned location.
     private static func quarantineRemovalFailure(
         artifact: QuarantinedArtifact,
-        error: Error,
-        allowRestore: Bool
+        error: Error
     ) -> ArtifactRemovalResult {
         let request = artifact.request
-        let retainedLocation: WorkspaceFileSystemLocation = if allowRestore {
-            restoreQuarantinedEntry(
-                quarantineName: artifact.name,
-                originalName: request.name,
-                originalLocation: request.location,
-                quarantineLocation: artifact.location,
+        return ArtifactRemovalResult(
+            state: artifactState(
+                candidates: [
+                    (artifact.name, artifact.location),
+                    (request.name, request.location),
+                ],
+                fallbackLocation: artifact.location,
                 expectedIdentity: request.expectedIdentity,
                 context: request.context
-            )
-        } else {
-            artifactReferencesIdentity(
-                parentDescriptor: request.context.parentDescriptor,
-                name: artifact.name,
-                expectedIdentity: request.expectedIdentity
-            ) ? artifact.location : request.location
-        }
-        let expectedArtifactSurvived = artifactReferencesIdentity(
-            parentDescriptor: request.context.parentDescriptor,
-            name: artifact.name,
-            expectedIdentity: request.expectedIdentity
-        ) || artifactReferencesIdentity(
-            parentDescriptor: request.context.parentDescriptor,
-            name: request.name,
-            expectedIdentity: request.expectedIdentity
-        )
-        return ArtifactRemovalResult(
-            state: expectedArtifactSurvived
-                ? .retained(retainedLocation)
-                : .removalIndeterminate(retainedLocation),
+            ),
             failureReason: normalizedError(error)
         )
     }
@@ -328,68 +312,38 @@ extension WorkspaceAnchoredFileSystem {
         return entry.isRegularFile && entry.identity == expectedIdentity
     }
 
-    static func artifactStateAfterFailedQuarantine(
-        parentDescriptor: Int32,
-        name: String,
+    static func artifactState(
+        named name: String,
         location: WorkspaceFileSystemLocation,
-        expectedIdentity: WorkspaceFileSystemIdentity
-    ) -> WorkspaceFileWriteArtifactState {
-        artifactReferencesIdentity(
-            parentDescriptor: parentDescriptor,
-            name: name,
-            expectedIdentity: expectedIdentity
-        ) ? .retained(location) : .removalIndeterminate(location)
-    }
-
-    static func restoreQuarantinedEntry(
-        quarantineName: String,
-        originalName: String,
-        originalLocation: WorkspaceFileSystemLocation,
-        quarantineLocation: WorkspaceFileSystemLocation,
         expectedIdentity: WorkspaceFileSystemIdentity,
         context: ArtifactRemovalContext
-    ) -> WorkspaceFileSystemLocation {
+    ) -> WorkspaceFileWriteArtifactState {
+        artifactState(
+            candidates: [(name, location)],
+            fallbackLocation: location,
+            expectedIdentity: expectedIdentity,
+            context: context
+        )
+    }
+
+    static func artifactState(
+        candidates: [(name: String, location: WorkspaceFileSystemLocation)],
+        fallbackLocation: WorkspaceFileSystemLocation,
+        expectedIdentity: WorkspaceFileSystemIdentity,
+        context: ArtifactRemovalContext
+    ) -> WorkspaceFileWriteArtifactState {
         do {
-            try context.hooks.check(.restoreQuarantinedArtifact)
             try context.chain.validateNamespace()
-            // Only restore writer-owned material. An unrelated replacement at the quarantine
-            // name must stay put, including when the original destination name is absent.
-            try validateArtifactIdentity(
-                parentDescriptor: context.parentDescriptor,
-                name: quarantineName,
-                expectedIdentity: expectedIdentity
-            )
-            try validateMissingName(
-                parentDescriptor: context.parentDescriptor,
-                leaf: originalName
-            )
-            guard secureRename(
-                parentDescriptor: context.parentDescriptor,
-                from: quarantineName,
-                to: originalName,
-                flags: UInt32(RENAME_EXCL)
-            ) == 0 else {
-                return artifactReferencesIdentity(
-                    parentDescriptor: context.parentDescriptor,
-                    name: quarantineName,
-                    expectedIdentity: expectedIdentity
-                ) ? quarantineLocation : originalLocation
-            }
-            try context.chain.validateNamespace()
-            guard artifactReferencesIdentity(
-                parentDescriptor: context.parentDescriptor,
-                name: originalName,
-                expectedIdentity: expectedIdentity
-            ) else {
-                return quarantineLocation
-            }
-            return originalLocation
         } catch {
-            return artifactReferencesIdentity(
-                parentDescriptor: context.parentDescriptor,
-                name: quarantineName,
-                expectedIdentity: expectedIdentity
-            ) ? quarantineLocation : originalLocation
+            return .removalIndeterminate(fallbackLocation)
         }
+        for candidate in candidates where artifactReferencesIdentity(
+            parentDescriptor: context.parentDescriptor,
+            name: candidate.name,
+            expectedIdentity: expectedIdentity
+        ) {
+            return .retained(candidate.location)
+        }
+        return .removalIndeterminate(fallbackLocation)
     }
 }

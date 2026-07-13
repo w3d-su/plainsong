@@ -1,3 +1,4 @@
+import EditorKit
 import Foundation
 import MarkdownCore
 import WorkspaceKit
@@ -212,10 +213,15 @@ extension AppState {
         handleSessionAccess(url: key, isDirty: session.isDirty)
     }
 
-    func setCurrentDocument(_ session: DocumentSession) {
+    func setCurrentDocument(
+        _ session: DocumentSession,
+        synchronizingWorkspaceTree: Bool = true
+    ) {
         guard currentDocument !== session else { return }
         requestEditorFocus()
-        synchronizeWorkspaceTreeSelection(for: session)
+        if synchronizingWorkspaceTree {
+            synchronizeWorkspaceTreeSelection(for: session)
+        }
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
@@ -259,7 +265,7 @@ extension AppState {
         recordKnownDiskText(text, for: url)
     }
 
-    private func cancelForegroundDocumentTasks() {
+    func cancelForegroundDocumentTasks() {
         autosaveTask?.cancel()
         autosaveTask = nil
         statisticsTask?.cancel()

@@ -143,6 +143,25 @@ extension AppState {
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
+
+        let preparedActivation = try await prepareWorkspaceReloadActivation(
+            selectedNode: tree.selectedNode,
+            rootAuthority: capture.rootAuthority,
+            activationRoot: activationRoot,
+            selectedRoot: root,
+            generation: generation
+        )
+
+        guard isCurrentWorkspaceReload(root: root, generation: generation) else {
+            throw CancellationError()
+        }
+
+        // Every throwing filesystem and cache validation is complete. From here through capture
+        // installation there is no suspension and no throwing operation, so activation and the
+        // snapshot/authority/tree become visible as one main-actor transaction.
+        if let preparedActivation {
+            commitAnchoredFileSessionActivation(preparedActivation)
+        }
         let previousSnapshot = workspaceSnapshot
         workspaceSnapshot = snapshot
         workspaceSearchRootAuthority = capture.rootAuthority
@@ -153,30 +172,41 @@ extension AppState {
         )
         workspaceTree = tree
         scheduleCompletionWorkspaceRefresh(workspaceGeneration: generation)
-
-        if let selectedNode = tree.selectedNode, selectedNode.isEditableMarkdown {
-            try activateFileSession(
-                url: activationRoot.appendingPathComponent(
-                    selectedNode.relativePath,
-                    isDirectory: false
-                )
-            )
-        }
     }
 
-    /// Runs the selected-spelling identity proof off the main actor.
-    private func proveSelectedRootStillNamesCapture(
+    private func prepareWorkspaceReloadActivation(
+        selectedNode: WorkspaceFileNode?,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        activationRoot: URL,
         selectedRoot: URL,
-        rootAuthority: WorkspaceFileSystemRootAuthority
-    ) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask(priority: .utility) {
-                try rootAuthority.proveSelectedSpellingNamesCapturedIdentity(
-                    selectedRootURL: selectedRoot
-                )
-            }
-            try await group.next()
+        generation: UInt64
+    ) async throws -> PreparedAnchoredFileSessionActivation? {
+        guard let selectedNode, selectedNode.isEditableMarkdown else { return nil }
+
+        // This is the exact post-proof/pre-activation boundary. The production hook is nil;
+        // tests replace the selected spelling here to prove the anchored activation fails
+        // without installing any part of this capture.
+        try workspaceReloadPostProofHook?()
+        try Task.checkCancellation()
+        guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
+            throw CancellationError()
         }
+
+        let preparedFile = try await prepareAnchoredWorkspaceReloadFile(
+            rootAuthority: rootAuthority,
+            candidateURL: activationRoot.appendingPathComponent(
+                selectedNode.relativePath,
+                isDirectory: false
+            )
+        )
+        try Task.checkCancellation()
+        guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
+            throw CancellationError()
+        }
+        return try prepareAnchoredFileSessionActivation(
+            file: preparedFile.file,
+            at: preparedFile.location
+        )
     }
 
     private func isCurrentWorkspaceReload(root: URL, generation: UInt64) -> Bool {

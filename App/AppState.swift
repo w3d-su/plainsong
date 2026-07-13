@@ -82,6 +82,8 @@ final class AppState: ObservableObject {
     var autosaveTask: Task<Void, Never>?
     var statisticsTask: Task<Void, Never>?
     var workspaceReloadTask: Task<Void, Never>?
+    /// Deterministic test seam at the final root-proof -> reload-activation boundary.
+    var workspaceReloadPostProofHook: (@MainActor () throws -> Void)?
     var workspaceSearchTask: Task<Void, Never>?
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0

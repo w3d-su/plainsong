@@ -149,6 +149,13 @@ extension WorkspaceAnchoredFileSystem {
         }
     }
 
+    static func isWriterOwnedOriginal(
+        _ entry: DirectoryEntryIdentity,
+        context: ExistingWriteContext
+    ) -> Bool {
+        entry.isRegularFile && entry.identity == context.originalMetadata.identity
+    }
+
     static func injectedError(
         from hooks: Hooks,
         at call: InjectedCall

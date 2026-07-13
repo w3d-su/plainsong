@@ -1,8 +1,9 @@
 # Phase 3 Workspace Search Plan
 
 > **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. The headless WS3B lifecycle
-> foundation is implemented, but WS3B remains open until retained-authority activation is
-> integrated and PR #82 is restacked; visible WS3 sidebar work and WS4 also remain pending.**
+> foundation and authority-bound reload auto-open are implemented, but WS3B remains open until
+> workspace-search-result activation consumes retained result authority and PR #82 is restacked;
+> visible WS3 sidebar work and WS4 also remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -213,18 +214,19 @@ App state.
 
 The reusable WorkspaceKit filesystem foundation is specified in
 `docs/workspace-filesystem-contract.md`. Workspace reload captures one descriptor-backed root
-authority together with its snapshot off the main actor, then installs that pair only if its
-workspace generation is still current. Main-actor request construction is pure and retains
-that captured value. Production reads walk lexical root-relative paths through a retained
-no-follow descriptor chain and validate the root, every ancestor, the final parent, and the
-leaf before publishing bytes. Root or ancestor replacement is a typed `namespaceChanged`
-failure, not a reason to continue through a detached descriptor or resolve a mutable root URL
-again.
+authority together with its snapshot off the main actor. When reload auto-opens a selected
+document, location construction, anchored loading, and cache/session validation remain rooted
+in `capture.rootAuthority`; all throwing preparation completes before the capture and prepared
+activation are committed without a main-actor suspension and only while the workspace
+generation is current. A post-proof replacement or activation mismatch installs none of the
+stale capture. Main-actor search-request construction remains filesystem-free. Production reads
+walk lexical root-relative paths through a retained no-follow descriptor chain and validate the
+root, every ancestor, the final parent, and the leaf before publishing bytes.
 
-Each production disk result, and each overlay result whose physical destination was
-validated, carries `WorkspaceSearchFileAuthority`: the same retained location plus the file
-identity sampled from the exact read/validation descriptor. App activation remains a later
-consumer of this foundation; this WorkspaceKit change does not add App or UI behavior.
+Each production disk result, and each overlay result whose physical destination was validated,
+carries `WorkspaceSearchFileAuthority`: the same retained location plus identity sampled from
+the exact read/validation descriptor. Workspace-search-result activation remains a later
+consumer of that result authority; reload auto-open does not close that gate.
 
 Every `WorkspaceSearchFileResult` carries a `WorkspaceSearchContentFingerprint` computed
 from the exact `String` passed to `TextSearchEngine`. Its digest is the 64-character
@@ -390,7 +392,8 @@ changes, close/switch, empty-query clear, and teardown explicitly cancel that Ta
 root/workspace/query context checks gate every event, and task-token checks prevent an older
 cleanup from touching newer state. Workspace reload captures the retained snapshot and its
 single descriptor-backed filesystem authority together off the main actor, generation-fences
-installation, and makes request construction on the main actor filesystem-free. Requests add
+installation, prepares optional auto-open through that same authority (including cache/session
+validation), and makes request construction on the main actor filesystem-free. Requests add
 validated immutable dirty overlays from current and warm Markdown/MDX sessions without
 selecting another root.
 
@@ -417,14 +420,15 @@ registration cleanup is exact and idempotent: retired, evicted, and closed sessi
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
-Activation must consume a retained `WorkspaceSearchFileAuthority` instead of deriving fresh
-authority from a result URL. Initial alias/session canonicalization remains unchanged, but the
-restacked #82 App workline must consume that retained authority; the minimal App plumbing here
-only retains the off-main root capture and does not edit activation. Until that activation work
-is integrated and #82 is restacked, headless WS3B is not complete. Its cancellation,
-fingerprint, exact range, command, and binding-lifecycle requirements otherwise remain
-unchanged. Sidebar UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent
-auto-refresh remain pending.
+The two activation paths are deliberately distinct. Reload auto-open is implemented here: after
+selected-root proof, selected-node location, anchored loading, and cache/session validation
+consume `capture.rootAuthority` end-to-end, and failed or mismatched auto-open cannot leave the
+new capture installed. Workspace-search-result activation is still deferred: the restacked #82
+App workline must consume the selected result's retained `WorkspaceSearchFileAuthority` instead
+of deriving fresh authority from its URL. Until that search-result activation work is integrated
+and #82 is restacked, headless WS3B is not complete. Its cancellation, fingerprint, exact range,
+command, and binding-lifecycle requirements otherwise remain unchanged. Sidebar UI,
+shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh remain pending.
 
 ## 5. Review-Sized Work Packages
 

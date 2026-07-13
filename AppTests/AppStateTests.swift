@@ -1080,6 +1080,83 @@ final class AppStateTests: XCTestCase {
         XCTAssertNotEqual(appState.currentDocument.text, "replacement B")
     }
 
+    // swiftlint:disable:next function_body_length
+    func testWorkspaceReloadReplacementAfterProofPreservesInstalledStateAndDoesNotActivateB() async throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        let moved = parent.appendingPathComponent("moved-workspace", isDirectory: true)
+        let documentURL = root.appendingPathComponent("a.md")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try writeText("captured A", to: documentURL)
+
+        let currentSession = DocumentSession(
+            text: "captured A",
+            url: documentURL,
+            fileKind: .markdown
+        )
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(
+            currentDocument: currentSession,
+            directoryScanner: scanner,
+            shouldRestoreLastOpenedFile: false
+        )
+        let previousSnapshot = snapshot("previous.md")
+        let previousAuthority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let previousTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: previousSnapshot,
+            options: .init(showAllFiles: false)
+        )
+        let previousInstalledGeneration: UInt64 = 7
+        appState.workspaceRootURL = root
+        appState.workspaceSnapshot = previousSnapshot
+        appState.workspaceSearchRootAuthority = previousAuthority
+        appState.workspaceGeneration = previousInstalledGeneration
+        appState.workspaceInstalledCaptureGeneration = previousInstalledGeneration
+        appState.workspaceTree = previousTree
+        appState.sessionCache[documentURL.standardizedFileURL] = currentSession
+        appState.workspaceReloadPostProofHook = {
+            try FileManager.default.moveItem(at: root, to: moved)
+            try FileManager.default.createDirectory(
+                at: root,
+                withIntermediateDirectories: true
+            )
+            try "replacement B".write(
+                to: root.appendingPathComponent("a.md"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        let reloadTask = Task {
+            try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: true)
+        }
+        await scanner.waitForRequestCount(1)
+        await scanner.completeRequest(at: 0, with: snapshot("a.md"))
+        do {
+            try await reloadTask.value
+            XCTFail("Expected anchored reload activation to reject replacement B")
+        } catch WorkspaceAnchoredFileSystemError.namespaceChanged {
+            // The post-proof replacement must fail before any new App state is committed.
+        } catch {
+            XCTFail("Expected namespaceChanged, got \(error)")
+        }
+
+        XCTAssertEqual(appState.workspaceGeneration, previousInstalledGeneration + 1)
+        XCTAssertEqual(appState.workspaceSnapshot, previousSnapshot)
+        XCTAssertEqual(appState.workspaceSearchRootAuthority, previousAuthority)
+        XCTAssertEqual(
+            appState.workspaceInstalledCaptureGeneration,
+            previousInstalledGeneration
+        )
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertTrue(appState.currentDocument === currentSession)
+        XCTAssertTrue(appState.sessionCache[documentURL.standardizedFileURL] === currentSession)
+        XCTAssertEqual(appState.currentDocument.text, "captured A")
+        XCTAssertNotEqual(appState.currentDocument.text, "replacement B")
+    }
+
     func testSuspendedSameRootReloadDoesNotLabelOldCaptureWithNewGeneration() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
