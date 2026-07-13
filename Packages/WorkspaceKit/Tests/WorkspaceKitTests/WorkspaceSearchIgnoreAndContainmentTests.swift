@@ -130,7 +130,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         XCTAssertThrowsError(try WorkspaceRootContainment.relativePath(for: outside, rootURL: root))
         XCTAssertThrowsError(try WorkspaceRootContainment.containedURL(rootURL: root, relativePath: "escape.md"))
 
-        let reader = IgnoreReader(responses: [:])
+        let reader = WorkspaceSearchDiskFileReader()
         let snapshot = WorkspaceFileSnapshot(entries: [
             entry("", kind: .markdown),
             entry("/outside.md", kind: .markdown),
@@ -271,7 +271,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
     }
 }
 
-private actor IgnoreReader: WorkspaceSearchFileReading {
+private actor IgnoreReader: SyntheticWorkspaceSearchFileReading {
     enum Response {
         case data(String)
     }
@@ -329,6 +329,24 @@ private actor ContainmentSwapReader: WorkspaceSearchFileReading {
 
         candidateReads += 1
         return Data("needle".utf8.prefix(maximumByteCount))
+    }
+
+    func readFile(
+        at location: WorkspaceFileSystemLocation,
+        maximumByteCount: Int
+    ) async throws -> Data {
+        if location.fileURL.lastPathComponent.hasPrefix(".") {
+            return try await readFile(
+                at: location.fileURL,
+                maximumByteCount: maximumByteCount
+            )
+        }
+        let data = try await WorkspaceSearchDiskFileReader().readFile(
+            at: location,
+            maximumByteCount: maximumByteCount
+        )
+        candidateReads += 1
+        return data
     }
 
     func waitUntilIgnoreRead() async {

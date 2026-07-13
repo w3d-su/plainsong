@@ -52,7 +52,7 @@ enum WorkspaceSearchCandidatePlanner {
         }
 
         let ignorePolicy = try await WorkspaceSearchIgnorePolicy.load(
-            rootURL: request.rootURL,
+            rootAuthority: request.rootAuthority,
             candidatePaths: validEntries.map(\.relativePath),
             limits: request.limits,
             reader: reader

@@ -28,6 +28,35 @@ final class WorkspaceKitTests: XCTestCase {
         XCTAssertEqual(savedText, "# Title\n\n<Component />\n")
     }
 
+    func testSaveReplacesExistingUTF8MarkdownFile() throws {
+        let directory = try makeTemporaryDirectory()
+        let url = directory.appendingPathComponent("post.md")
+        try "Original".write(to: url, atomically: true, encoding: .utf8)
+
+        try MarkdownFileStore().save(text: "Changed", to: url)
+
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "Changed")
+    }
+
+    func testLegacyURLSaveFinishesWhenSchedulingTaskCancelsItself() async throws {
+        let directory = try makeTemporaryDirectory()
+        let url = directory.appendingPathComponent("post.md")
+        try "Original".write(to: url, atomically: true, encoding: .utf8)
+
+        let error = await Task.detached { () -> Error? in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                try MarkdownFileStore().save(text: "Changed", to: url)
+                return nil
+            } catch {
+                return error
+            }
+        }.value
+
+        XCTAssertNil(error)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "Changed")
+    }
+
     func testRejectsUnsupportedExtensions() throws {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("notes.txt")

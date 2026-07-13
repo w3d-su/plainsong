@@ -52,9 +52,11 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     public let query: TextSearchQuery
     public let dirtyOverlays: WorkspaceSearchOverlayCollection
     public let limits: WorkspaceSearchLimits
+    let rootAuthority: WorkspaceFileSystemRootAuthority
 
     public init(
         rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority? = nil,
         rootIdentity: String? = nil,
         snapshot: WorkspaceFileSnapshot,
         workspaceGeneration: UInt64,
@@ -65,8 +67,12 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     ) {
         let standardizedRoot = rootURL.standardizedFileURL
         self.rootURL = standardizedRoot
+        let rootAuthority = rootAuthority ?? WorkspaceFileSystemRootAuthority(
+            rootURL: standardizedRoot
+        )
+        self.rootAuthority = rootAuthority
         self.rootIdentity = rootIdentity
-            ?? standardizedRoot.resolvingSymlinksInPath().path(percentEncoded: false)
+            ?? rootAuthority.canonicalRootURL.path(percentEncoded: false)
         self.snapshot = snapshot
         self.workspaceGeneration = workspaceGeneration
         self.queryGeneration = queryGeneration
@@ -89,22 +95,43 @@ public struct WorkspaceSearchContext: Sendable, Equatable {
     }
 }
 
+/// Exact physical file searched beneath an immutable root authority.
+///
+/// Activation must use `location` together with `identity` rather than deriving a new
+/// path authority from `relativePath`. The identity is sampled from the same descriptor
+/// used for the production bounded read or overlay eligibility validation.
+public struct WorkspaceSearchFileAuthority: Sendable, Equatable {
+    public let location: WorkspaceFileSystemLocation
+    public let identity: WorkspaceFileSystemIdentity
+
+    public init(
+        location: WorkspaceFileSystemLocation,
+        identity: WorkspaceFileSystemIdentity
+    ) {
+        self.location = location
+        self.identity = identity
+    }
+}
+
 public struct WorkspaceSearchFileResult: Sendable, Equatable {
     public let relativePath: String
     public let contentFingerprint: WorkspaceSearchContentFingerprint
     public let matches: [TextSearchMatch]
     public let isTruncated: Bool
+    public let fileAuthority: WorkspaceSearchFileAuthority?
 
     public init(
         relativePath: String,
         contentFingerprint: WorkspaceSearchContentFingerprint,
         matches: [TextSearchMatch],
-        isTruncated: Bool
+        isTruncated: Bool,
+        fileAuthority: WorkspaceSearchFileAuthority? = nil
     ) {
         self.relativePath = relativePath
         self.contentFingerprint = contentFingerprint
         self.matches = matches
         self.isTruncated = isTruncated
+        self.fileAuthority = fileAuthority
     }
 }
 

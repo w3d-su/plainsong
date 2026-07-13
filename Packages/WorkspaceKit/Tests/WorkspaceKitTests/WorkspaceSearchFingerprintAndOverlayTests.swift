@@ -78,6 +78,7 @@ final class WorkspaceSearchContractTests: XCTestCase {
         ))
 
         XCTAssertEqual(results.map(\.relativePath), ["disk.md", "overlay.md"])
+        guard results.count == 2 else { return }
         XCTAssertEqual(results[0].contentFingerprint, results[1].contentFingerprint)
         XCTAssertEqual(
             results[0].contentFingerprint,
@@ -336,7 +337,7 @@ extension WorkspaceSearchContractTests {
     }
 }
 
-private actor FingerprintReader: WorkspaceSearchFileReading {
+private actor FingerprintReader: SyntheticWorkspaceSearchFileReading {
     private let contents: [String: Data]
     private var readCounts: [String: Int] = [:]
 

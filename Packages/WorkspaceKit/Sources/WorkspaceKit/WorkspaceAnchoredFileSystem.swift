@@ -1,0 +1,389 @@
+import Darwin
+import Foundation
+
+/// One immutable filesystem namespace authority captured before an operation begins.
+///
+/// The canonical spelling and physical identity are sampled once. Operations later walk
+/// that spelling from `/` with retained directory descriptors; they never call `realpath`
+/// or rebuild authority from `originalRootURL`.
+public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
+    public let canonicalRootURL: URL
+    public let originalRootURL: URL
+    public let securityScopedURL: URL
+    let physicalIdentity: WorkspaceFileSystemIdentity?
+
+    public init(rootURL: URL, securityScopedURL: URL? = nil) {
+        originalRootURL = rootURL.standardizedFileURL
+        let scopedURL = (securityScopedURL ?? rootURL).standardizedFileURL
+        self.securityScopedURL = scopedURL
+        let captured = SecurityScopedAccess.withAccess(to: scopedURL) {
+            let canonicalURL = Self.canonicalURL(for: rootURL)
+            return (canonicalURL, Self.directoryIdentity(for: canonicalURL))
+        }
+        canonicalRootURL = captured.0
+        physicalIdentity = captured.1
+    }
+
+    public func location(relativePath: String) throws -> WorkspaceFileSystemLocation {
+        try WorkspaceFileSystemLocation(rootAuthority: self, relativePath: relativePath)
+    }
+
+    private static func canonicalURL(for rootURL: URL) -> URL {
+        let standardizedRoot = rootURL.standardizedFileURL
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let resolved = standardizedRoot.withUnsafeFileSystemRepresentation { path -> String? in
+            guard let path, Darwin.realpath(path, &buffer) != nil else { return nil }
+            return String(cString: buffer)
+        }
+        guard let resolved else {
+            return standardizedRoot.resolvingSymlinksInPath()
+        }
+        // Foundation rewrites canonical `/private/var` back through the `/var` symlink.
+        return URL(fileURLWithPath: resolved, isDirectory: true)
+    }
+
+    private static func directoryIdentity(for url: URL) -> WorkspaceFileSystemIdentity? {
+        var status = stat()
+        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return Darwin.lstat(path, &status)
+        }
+        guard result == 0, (status.st_mode & S_IFMT) == S_IFDIR else { return nil }
+        return WorkspaceFileSystemIdentity(
+            device: UInt64(status.st_dev),
+            inode: UInt64(status.st_ino)
+        )
+    }
+}
+
+/// A lexical root-relative location permanently bound to one root authority.
+public struct WorkspaceFileSystemLocation: Sendable, Hashable {
+    public let rootAuthority: WorkspaceFileSystemRootAuthority
+    public let relativePath: String
+
+    public var rootURL: URL {
+        rootAuthority.canonicalRootURL
+    }
+
+    public var securityScopedURL: URL {
+        rootAuthority.securityScopedURL
+    }
+
+    public var fileURL: URL {
+        rootAuthority.originalRootURL
+            .appendingPathComponent(relativePath, isDirectory: false)
+            .standardizedFileURL
+    }
+
+    public init(
+        rootURL: URL,
+        relativePath: String,
+        securityScopedURL: URL? = nil
+    ) throws {
+        try self.init(
+            rootAuthority: WorkspaceFileSystemRootAuthority(
+                rootURL: rootURL,
+                securityScopedURL: securityScopedURL
+            ),
+            relativePath: relativePath
+        )
+    }
+
+    /// Establishes standalone authority before the operation by anchoring the canonical
+    /// parent and retaining the final filename as a no-follow lexical component.
+    public init(fileURL: URL) throws {
+        let fileURL = fileURL.standardizedFileURL
+        let parentURL = fileURL.deletingLastPathComponent().resolvingSymlinksInPath()
+        try self.init(
+            rootAuthority: WorkspaceFileSystemRootAuthority(
+                rootURL: parentURL,
+                securityScopedURL: fileURL
+            ),
+            relativePath: fileURL.lastPathComponent
+        )
+    }
+
+    fileprivate init(
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        relativePath: String
+    ) throws {
+        self.rootAuthority = rootAuthority
+        self.relativePath = try WorkspaceRootContainment.normalizedRelativePath(relativePath)
+    }
+
+    func sibling(named name: String) -> WorkspaceFileSystemLocation? {
+        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
+        guard !components.isEmpty else { return nil }
+        let parent = components.dropLast().map(String.init)
+        return try? WorkspaceFileSystemLocation(
+            rootAuthority: rootAuthority,
+            relativePath: (parent + [name]).joined(separator: "/")
+        )
+    }
+}
+
+public enum WorkspaceAnchoredFileSystemError: Error, Sendable, Equatable {
+    case missing
+    case symbolicLink
+    case notRegularFile
+    case unreadable
+    case changedIdentity
+    case changedContent
+    case namespaceChanged
+    case unstable
+    case durabilityFailed
+    case cleanupFailed
+    case cancelled
+}
+
+public enum WorkspaceNoFollowFileWriteExpectation: Sendable, Equatable {
+    case existing(WorkspaceFileSystemIdentity)
+    case existingContent(WorkspaceFileSystemIdentity, sha256Digest: String)
+    case missing
+    case existingOrMissing
+}
+
+public enum WorkspaceFileWriteArtifactState: Sendable, Equatable {
+    case none
+    case retained(WorkspaceFileSystemLocation)
+    case removalIndeterminate(WorkspaceFileSystemLocation)
+}
+
+public struct WorkspaceNotCommittedFileWrite: Sendable, Equatable {
+    public let reason: WorkspaceAnchoredFileSystemError
+    public let artifactState: WorkspaceFileWriteArtifactState
+}
+
+public struct WorkspaceDurableFileWrite: Sendable, Equatable {
+    public let metadata: WorkspaceCoherentFileMetadata
+    public let cleanupState: WorkspaceFileWriteArtifactState
+}
+
+public struct WorkspaceIndeterminateFileWrite: Sendable, Equatable {
+    public let reason: WorkspaceAnchoredFileSystemError
+    public let preparedMetadata: WorkspaceCoherentFileMetadata?
+    public let recoveryArtifact: WorkspaceFileWriteArtifactState
+}
+
+/// The three states callers must arbitrate explicitly after a transactional write.
+public enum WorkspaceFileWriteOutcome: Sendable, Equatable {
+    case notCommitted(WorkspaceNotCommittedFileWrite)
+    case committedAndDurable(WorkspaceDurableFileWrite)
+    case committedButIndeterminate(WorkspaceIndeterminateFileWrite)
+}
+
+public enum WorkspaceNoFollowFileWriter {
+    @discardableResult
+    public static func write(
+        _ data: Data,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) -> WorkspaceFileWriteOutcome {
+        WorkspaceAnchoredFileSystem.withSecurityScopedAccess(to: location) {
+            WorkspaceAnchoredFileSystem.write(
+                data,
+                to: location,
+                expecting: expectation,
+                hooks: .production
+            )
+        }
+    }
+
+    @discardableResult
+    public static func write(
+        text: String,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) -> WorkspaceFileWriteOutcome {
+        write(Data(text.utf8), to: location, expecting: expectation)
+    }
+
+    @discardableResult
+    static func write(
+        _ data: Data,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation,
+        hooks: WorkspaceAnchoredFileSystem.Hooks
+    ) -> WorkspaceFileWriteOutcome {
+        WorkspaceAnchoredFileSystem.withSecurityScopedAccess(to: location) {
+            WorkspaceAnchoredFileSystem.write(
+                data,
+                to: location,
+                expecting: expectation,
+                hooks: hooks
+            )
+        }
+    }
+}
+
+enum WorkspaceAnchoredFileSystem {
+    @TaskLocal static var ignoresInheritedTaskCancellation = false
+
+    enum CommitKind: Equatable {
+        case swap
+        case exclusiveCreate
+    }
+
+    enum Event: Equatable {
+        case rootAnchored
+        case componentOpened(String)
+        case parentAnchored
+        case namespaceValidated
+        case fileOpened
+        case temporaryFileCreated
+        case temporaryFilePrepared
+        case willCommit(CommitKind)
+        case didCommit(CommitKind)
+        case displacedEntryCaptured
+        case willRollback
+        case didRollback
+        case readChunk(Int)
+        case bytesRead
+        case postflight
+    }
+
+    enum InjectedCall: Hashable {
+        case renameSwap
+        case renameExclusive
+        case afterRenameSwap
+        case afterRenameExclusive
+        case captureDisplacedEntry
+        case validateCommittedLeaf
+        case syncCommittedDirectory
+        case unlinkRollbackArtifact
+        case syncCleanupDirectory
+        case renameRollback
+        case unlinkCreatedDestination
+        case syncRollbackDirectory
+        case cleanupTemporary
+    }
+
+    struct Hooks {
+        static let production = Hooks()
+
+        let eventHandler: (@Sendable (Event) -> Void)?
+        let injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)?
+
+        init(
+            eventHandler: (@Sendable (Event) -> Void)? = nil,
+            injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil
+        ) {
+            self.eventHandler = eventHandler
+            self.injectedFailure = injectedFailure
+        }
+
+        func emit(_ event: Event) {
+            eventHandler?(event)
+        }
+
+        func check(_ call: InjectedCall) throws {
+            if let error = injectedFailure?(call) {
+                throw error
+            }
+        }
+    }
+
+    struct ReadResult {
+        let data: Data
+        let metadata: WorkspaceCoherentFileMetadata
+    }
+
+    static func withSecurityScopedAccess<T>(
+        to location: WorkspaceFileSystemLocation,
+        _ body: () throws -> T
+    ) rethrows -> T {
+        try SecurityScopedAccess.withAccess(to: location.securityScopedURL, body)
+    }
+
+    static func validate(
+        _ location: WorkspaceFileSystemLocation,
+        hooks: Hooks = .production
+    ) throws -> WorkspaceCoherentFileMetadata {
+        try withAnchoredParent(at: location, hooks: hooks) { chain, parentDescriptor, leaf in
+            try checkCancellation()
+            let descriptor = try openFile(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                flags: O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+            )
+            hooks.emit(.fileOpened)
+            defer { Darwin.close(descriptor) }
+            let metadata = try regularFileMetadata(descriptor: descriptor)
+            try chain.validateNamespace()
+            hooks.emit(.namespaceValidated)
+            try validateNameStillReferencesDescriptor(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                metadata: metadata
+            )
+            try chain.validateNamespace()
+            hooks.emit(.postflight)
+            let finalMetadata = try regularFileMetadata(descriptor: descriptor)
+            try chain.validateNamespace()
+            try validateNameStillReferencesDescriptor(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                metadata: finalMetadata
+            )
+            try chain.validateNamespace()
+            return finalMetadata
+        }
+    }
+
+    static func read(
+        _ location: WorkspaceFileSystemLocation,
+        maximumByteCount: Int?,
+        hooks: Hooks = .production
+    ) throws -> ReadResult {
+        try withAnchoredParent(at: location, hooks: hooks) { chain, parentDescriptor, leaf in
+            try checkCancellation()
+            let descriptor = try openFile(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                flags: O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+            )
+            hooks.emit(.fileOpened)
+            defer { Darwin.close(descriptor) }
+
+            let before = try regularFileMetadata(descriptor: descriptor)
+            let data = try readAllBytes(
+                descriptor: descriptor,
+                maximumByteCount: maximumByteCount,
+                hooks: hooks
+            )
+            hooks.emit(.bytesRead)
+            let after = try regularFileMetadata(descriptor: descriptor)
+            try chain.validateNamespace()
+            hooks.emit(.namespaceValidated)
+            try validateNameStillReferencesDescriptor(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                metadata: after
+            )
+            try chain.validateNamespace()
+
+            guard before == after else { throw WorkspaceAnchoredFileSystemError.unstable }
+            if maximumByteCount == nil, after.byteCount != Int64(data.count) {
+                throw WorkspaceAnchoredFileSystemError.unstable
+            }
+            hooks.emit(.postflight)
+            try chain.validateNamespace()
+            try validateNameStillReferencesDescriptor(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                metadata: after
+            )
+            try chain.validateNamespace()
+            let finalMetadata = try regularFileMetadata(descriptor: descriptor)
+            guard after == finalMetadata else { throw WorkspaceAnchoredFileSystemError.unstable }
+            try chain.validateNamespace()
+            try validateNameStillReferencesDescriptor(
+                parentDescriptor: parentDescriptor,
+                leaf: leaf,
+                metadata: finalMetadata
+            )
+            try chain.validateNamespace()
+            return ReadResult(data: data, metadata: finalMetadata)
+        }
+    }
+}

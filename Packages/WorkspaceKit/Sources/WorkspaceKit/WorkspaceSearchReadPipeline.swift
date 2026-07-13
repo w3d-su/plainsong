@@ -8,36 +8,79 @@ extension WorkspaceSearchPipeline {
     ) async throws -> WorkspaceSearchReadOutcome {
         try Task.checkCancellation()
         let fileSizeLimit = max(0, request.limits.maximumFileSizeBytes)
-        if let overlay = candidate.overlay {
-            return overlayOutcome(candidate, overlay: overlay, limit: fileSizeLimit, planIndex: planIndex)
-        }
-
-        let url: URL
+        let location: WorkspaceFileSystemLocation
         do {
-            // Planning can race with an on-disk symlink replacement. Resolve containment again
-            // immediately before opening the file rather than retaining an earlier URL.
-            url = try WorkspaceRootContainment.containedURL(
-                rootURL: request.rootURL,
-                relativePath: candidate.relativePath
-            )
+            location = try request.rootAuthority.location(relativePath: candidate.relativePath)
         } catch {
             return containmentFailureOutcome(candidate, planIndex: planIndex)
         }
-        guard FileKind(url: url) != nil else {
+        guard FileKind(url: location.fileURL) != nil else {
             return unsupportedPhysicalFileKindOutcome(candidate, planIndex: planIndex)
+        }
+        if let overlay = candidate.overlay {
+            do {
+                let fileAuthority = try await reader.validateFileAuthority(at: location)
+                try Task.checkCancellation()
+                return overlayOutcome(
+                    candidate,
+                    overlay: overlay,
+                    limit: fileSizeLimit,
+                    planIndex: planIndex,
+                    fileAuthority: fileAuthority
+                )
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                return failedReadOutcome(candidate, error: error, planIndex: planIndex, didReadDisk: false)
+            }
         }
 
         do {
-            let data = try await reader.readFile(
-                at: url,
+            let readResult = try await reader.readFileWithAuthority(
+                at: location,
                 maximumByteCount: inclusiveLimit(for: fileSizeLimit)
             )
             try Task.checkCancellation()
-            return diskOutcome(candidate, data: data, limit: fileSizeLimit, planIndex: planIndex)
+            return diskOutcome(
+                candidate,
+                readResult: readResult,
+                limit: fileSizeLimit,
+                planIndex: planIndex
+            )
         } catch let error as CancellationError {
             throw error
         } catch {
             return failedReadOutcome(candidate, error: error, planIndex: planIndex)
+        }
+    }
+
+    func physicalPreflightFailureOutcome(
+        _ candidate: WorkspaceSearchCandidate,
+        reason: WorkspaceSearchSkipReason,
+        planIndex: Int
+    ) -> WorkspaceSearchReadOutcome {
+        WorkspaceSearchReadOutcome(
+            planIndex: planIndex,
+            payload: .skipped(WorkspaceSearchSkippedFile(
+                relativePath: candidate.relativePath,
+                reason: reason
+            )),
+            diskReadByteCount: nil
+        )
+    }
+
+    func skipReason(
+        for error: WorkspaceSearchFileReadError
+    ) -> WorkspaceSearchSkipReason {
+        switch error {
+        case .disappeared:
+            .disappeared
+        case .unreadable:
+            .unreadable
+        case .symbolicLink:
+            .symlinkEscape
+        case .notRegularFile:
+            .unreadable
         }
     }
 
@@ -73,7 +116,8 @@ extension WorkspaceSearchPipeline {
         _ candidate: WorkspaceSearchCandidate,
         overlay: WorkspaceSearchOverlay,
         limit: Int,
-        planIndex: Int
+        planIndex: Int,
+        fileAuthority: WorkspaceSearchFileAuthority?
     ) -> WorkspaceSearchReadOutcome {
         let byteCount = overlay.text.lengthOfBytes(using: .utf8)
         let payload: WorkspaceSearchReadPayload = byteCount > limit
@@ -83,17 +127,19 @@ extension WorkspaceSearchPipeline {
             ))
             : .content(
                 text: overlay.text,
-                relativePath: candidate.relativePath
+                relativePath: candidate.relativePath,
+                fileAuthority: fileAuthority
             )
         return WorkspaceSearchReadOutcome(planIndex: planIndex, payload: payload, diskReadByteCount: nil)
     }
 
     func diskOutcome(
         _ candidate: WorkspaceSearchCandidate,
-        data: Data,
+        readResult: WorkspaceSearchFileReadResult,
         limit: Int,
         planIndex: Int
     ) -> WorkspaceSearchReadOutcome {
+        let data = readResult.data
         let payload: WorkspaceSearchReadPayload = if data.count > limit {
             .skipped(WorkspaceSearchSkippedFile(
                 relativePath: candidate.relativePath,
@@ -102,7 +148,8 @@ extension WorkspaceSearchPipeline {
         } else if let text = String(data: data, encoding: .utf8) {
             .content(
                 text: text,
-                relativePath: candidate.relativePath
+                relativePath: candidate.relativePath,
+                fileAuthority: readResult.fileAuthority
             )
         } else {
             .skipped(WorkspaceSearchSkippedFile(
@@ -120,17 +167,18 @@ extension WorkspaceSearchPipeline {
     func failedReadOutcome(
         _ candidate: WorkspaceSearchCandidate,
         error: Error,
-        planIndex: Int
+        planIndex: Int,
+        didReadDisk: Bool = true
     ) -> WorkspaceSearchReadOutcome {
         let reason: WorkspaceSearchSkipReason = if let error = error as? WorkspaceSearchFileReadError {
-            error == .disappeared ? .disappeared : .unreadable
+            skipReason(for: error)
         } else {
             isMissingFileError(error) ? .disappeared : .unreadable
         }
         return WorkspaceSearchReadOutcome(
             planIndex: planIndex,
             payload: .skipped(WorkspaceSearchSkippedFile(relativePath: candidate.relativePath, reason: reason)),
-            diskReadByteCount: 0
+            diskReadByteCount: didReadDisk ? 0 : nil
         )
     }
 }

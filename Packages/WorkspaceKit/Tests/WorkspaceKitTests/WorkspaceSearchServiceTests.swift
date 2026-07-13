@@ -287,7 +287,7 @@ extension WorkspaceSearchServiceTests {
     }
 }
 
-private actor ScriptedReader: WorkspaceSearchFileReading {
+private actor ScriptedReader: SyntheticWorkspaceSearchFileReading {
     enum Response {
         case bytes([UInt8])
         case data(String)

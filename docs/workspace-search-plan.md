@@ -120,8 +120,9 @@ produce only a prefix of the valid-request bound.
   cancelled or stale scan before it can apply state.
 - The scanner skips hidden entries and package descendants but does not process
   `.gitignore`, `.ignore`, or common generated/vendor directories such as `node_modules`.
-- `WorkspaceRootContainment` is the shared symlink-resolving containment boundary used by
-  completion, assets, and workspace search rather than duplicating path-prefix logic.
+- `WorkspaceRootContainment` remains the shared symlink-resolving containment boundary for
+  completion, assets, and initial workspace-search candidate canonicalization. Search then
+  binds the canonical lexical path to the request's immutable no-follow filesystem authority.
 - `DocumentSession` owns canonical in-memory text, while `AppState.sessionCache` retains up
   to eight warm sessions keyed by the contained, symlink-resolved physical target URL.
   WorkspaceKit must receive immutable overlays rather than reading main-actor sessions
@@ -195,7 +196,8 @@ must not be enumerated one UTF-16 unit at a time.
 
 A request should contain only immutable, Sendable data:
 
-- standardized root URL;
+- one immutable `WorkspaceFileSystemRootAuthority` captured when the request is built, plus
+  the standardized root URL retained as request context;
 - immutable `WorkspaceFileSnapshot`;
 - root/workspace generation;
 - query and configurable limits;
@@ -205,6 +207,18 @@ A request should contain only immutable, Sendable data:
 The service emits partial per-file results and a final summary. Result application is valid
 only when root identity, workspace generation, and query generation still match the active
 App state.
+
+The reusable WorkspaceKit filesystem foundation is specified in
+`docs/workspace-filesystem-contract.md`. A request creates its root authority once; production
+reads walk lexical root-relative paths through a retained no-follow descriptor chain and
+validate the root, every ancestor, the final parent, and the leaf before publishing bytes.
+Root or ancestor replacement is a typed `namespaceChanged` failure, not a reason to continue
+through a detached descriptor or to resolve the mutable root URL again.
+
+Each production disk result, and each overlay result whose physical destination was
+validated, carries `WorkspaceSearchFileAuthority`: the same retained location plus the file
+identity sampled from the exact read/validation descriptor. App activation remains a later
+consumer of this foundation; this WorkspaceKit change does not add App or UI behavior.
 
 Every `WorkspaceSearchFileResult` carries a `WorkspaceSearchContentFingerprint` computed
 from the exact `String` passed to `TextSearchEngine`. Its digest is the 64-character
@@ -223,25 +237,21 @@ normalized collision instead of choosing a winner by input or dictionary iterati
 for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
 take precedence over disk content.
 
-Workspace document identity follows one physical-target policy. An in-root file URL is
-standardized, symlink-resolved, containment-checked, and then expressed relative to the
-resolved root. Session-cache keys, overlay paths, search candidate/result paths, activation,
-tree selection, and editor document identity all derive from that value. Snapshot aliases
-that resolve to the same target collapse to one path-ordered search candidate, so an unsaved
-edit opened through `alias.md -> target.md` overrides disk content and activates the same
-session as `target.md`. A link resolving outside the root remains a typed symlink escape;
-this policy does not relax `WorkspaceRootContainment`. Candidate planning and the immediate
-pre-read race check revalidate the resolved physical target's file kind after containment:
-only `.md`, `.markdown`, and `.mdx` targets remain searchable. Thus
-`alias.md -> target.txt` is a typed skipped candidate rather than an unopenable result, while
-`alias.md -> target.md` still deduplicates to `target.md`. Candidate, skipped, progress, and
-terminal counts use the post-deduplication plan and remain internally consistent.
+Workspace document identity keeps one physical-target policy. Initial in-root aliases are
+resolved and containment-checked during candidate planning, then expressed as one canonical
+lexical root-relative path; aliases to the same target collapse to that candidate, and an
+outside-root target remains a typed `symlinkEscape`. Once the canonical path is bound to the
+request's captured root authority, production reads never resolve the alias or another mutable
+URL again. Every component is opened no-follow through retained descriptors, so a symlink,
+rename, or replacement introduced after planning fails closed. Dirty overlays use the same
+canonical candidate key and are accepted only after the exact physical leaf is validated.
+Candidate, skipped, progress, and terminal counts remain internally consistent.
 
 Search reads must:
 
 - accept only snapshot entries classified as editable Markdown;
 - resolve every candidate against the real workspace root;
-- reject `..` components and symlinks escaping the root;
+- reject `..`, outside-root alias targets, and any symlink substitution after authority binding;
 - prefer a dirty overlay to disk;
 - skip a file that disappears, becomes unreadable, is invalid UTF-8, or exceeds the byte
   cap while continuing other files;
@@ -397,14 +407,12 @@ registration cleanup is exact and idempotent: retired, evicted, and closed sessi
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
-Workspace aliases use the one physical-target policy above. Activation accepts only a retained
-active result/match, emits a newer cancellation before every fallible execution step, selects
-and activates the canonical contained target, compares SHA-256 plus UTF-8 byte count, validates
-the raw range without clamping, then emits a newer URL-identified navigation. Fingerprint
-mismatch restarts with fresh overlays while leaving cancellation latest; every other accepted
-failure also leaves that cancellation latest. The command and binding lifecycle pass through
-`WorkspaceWindow`; sidebar UI, shortcuts/focus, rendering/accessibility, and general
-edit/FSEvent auto-refresh remain pending.
+Activation must consume a retained `WorkspaceSearchFileAuthority` instead of deriving fresh
+authority from a result URL. Initial alias/session canonicalization remains unchanged, but the
+restacked #82 App workline must consume that retained authority; this WorkspaceKit-only change
+does not edit App activation. Its cancellation, fingerprint, exact range, command, and
+binding-lifecycle requirements otherwise remain unchanged. Sidebar UI, shortcuts/focus,
+rendering/accessibility, and general edit/FSEvent auto-refresh remain pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -477,7 +485,7 @@ edit/FSEvent auto-refresh remain pending.
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering before and after symlink resolution; alias deduplication; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
+| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
 | PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; session-scoped external conflicts; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens correct node/session; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |

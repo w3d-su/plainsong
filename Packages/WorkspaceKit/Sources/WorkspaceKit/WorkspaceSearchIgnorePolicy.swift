@@ -5,7 +5,7 @@ struct WorkspaceSearchIgnorePolicy {
     private let rules: [WorkspaceSearchIgnoreRule]
 
     static func load(
-        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         candidatePaths: [String],
         limits: WorkspaceSearchLimits,
         reader: any WorkspaceSearchFileReading
@@ -25,17 +25,17 @@ struct WorkspaceSearchIgnorePolicy {
                 try Task.checkCancellation()
 
                 let relativePath = directory.isEmpty ? filename : "\(directory)/\(filename)"
-                guard let url = try? WorkspaceRootContainment.containedURL(
-                    rootURL: rootURL,
-                    relativePath: relativePath
-                ) else {
+                guard let location = try? rootAuthority.location(relativePath: relativePath) else {
                     continue
                 }
 
                 reads += 1
                 let data: Data
                 do {
-                    data = try await reader.readFile(at: url, maximumByteCount: readLimit)
+                    data = try await reader.readFile(
+                        at: location,
+                        maximumByteCount: readLimit
+                    )
                 } catch let error as CancellationError {
                     throw error
                 } catch {
