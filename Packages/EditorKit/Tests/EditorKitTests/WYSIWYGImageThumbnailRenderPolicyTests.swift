@@ -235,8 +235,16 @@ extension WYSIWYGImageThumbnailPresentationTests {
             range: imageRange,
             matching: { $0.visualState == .loading }
         )
-        try await Task.sleep(nanoseconds: 100_000_000)
-        XCTAssertNil(imageMarker(in: fixture.textView, range: imageRange))
+        // stayRaw must clear the placeholder after the delayed load completes. Poll instead of a
+        // fixed sleep so cold CI runs are not flaky when the 60 ms loader lag finishes late.
+        let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+        while imageMarker(in: fixture.textView, range: imageRange) != nil {
+            if DispatchTime.now().uptimeNanoseconds >= deadline {
+                XCTFail("Timed out waiting for stayRaw to remove the image presentation marker")
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         let line = try lineFragment(containing: imageRange, in: fixture.textView)
         XCTAssertTrue(line.attributedString.string.contains("![alt](art.svg)"))
         XCTAssertFalse(line.attributedString.string.contains("\u{FFFC}"))
