@@ -52,6 +52,10 @@ final class AppState: ObservableObject {
     @Published var workspaceTree: WorkspaceFileTree?
     var workspaceSnapshot: WorkspaceFileSnapshot?
     var workspaceSearchRootAuthority: WorkspaceFileSystemRootAuthority?
+    /// Generation that installed the current snapshot/authority pair. Search requires this to
+    /// equal `workspaceGeneration` so a reload that has advanced generation cannot label an
+    /// old capture as the new generation while the replacement scan is still in flight.
+    var workspaceInstalledCaptureGeneration: UInt64?
     var workspaceGeneration: UInt64 = 0
     @Published var workspaceSearchState = WorkspaceSearchState()
     @Published var editorNavigationCommand: EditorNavigationCommand?

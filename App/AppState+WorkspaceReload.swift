@@ -104,6 +104,28 @@ extension AppState {
             throw CancellationError()
         }
 
+        // Off-main proof that the currently selected root spelling still names the captured
+        // physical root. Reject stale captures rather than installing authority A while the
+        // mutable selected spelling now opens B (and auto-activation would follow B).
+        do {
+            try await proveSelectedRootStillNamesCapture(
+                selectedRoot: root,
+                rootAuthority: capture.rootAuthority
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CancellationError()
+        }
+        try Task.checkCancellation()
+        guard isCurrentWorkspaceReload(root: root, generation: generation) else {
+            throw CancellationError()
+        }
+
+        // Activation paths use the captured authority's canonical spelling, never a retargeted
+        // selected symlink that slipped past a failed proof.
+        let activationRoot = capture.rootAuthority.canonicalRootURL
+
         var tree = WorkspaceFileTree.reconcile(
             previous: workspaceTree,
             snapshot: snapshot,
@@ -111,7 +133,7 @@ extension AppState {
         )
 
         if !selectFirstIfNeeded,
-           let currentDocumentNode = nodeForCurrentDocument(in: tree, root: root)
+           let currentDocumentNode = nodeForCurrentDocument(in: tree, root: activationRoot)
         {
             tree.selectNode(id: currentDocumentNode.id)
         } else if tree.selectedNode == nil || selectFirstIfNeeded {
@@ -124,6 +146,7 @@ extension AppState {
         let previousSnapshot = workspaceSnapshot
         workspaceSnapshot = snapshot
         workspaceSearchRootAuthority = capture.rootAuthority
+        workspaceInstalledCaptureGeneration = generation
         refreshEditorImageThumbnails(
             previousSnapshot: previousSnapshot,
             currentSnapshot: snapshot
@@ -133,8 +156,26 @@ extension AppState {
 
         if let selectedNode = tree.selectedNode, selectedNode.isEditableMarkdown {
             try activateFileSession(
-                url: root.appendingPathComponent(selectedNode.relativePath, isDirectory: false)
+                url: activationRoot.appendingPathComponent(
+                    selectedNode.relativePath,
+                    isDirectory: false
+                )
             )
+        }
+    }
+
+    /// Runs the selected-spelling identity proof off the main actor.
+    private func proveSelectedRootStillNamesCapture(
+        selectedRoot: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask(priority: .utility) {
+                try rootAuthority.proveSelectedSpellingNamesCapturedIdentity(
+                    selectedRootURL: selectedRoot
+                )
+            }
+            try await group.next()
         }
     }
 
@@ -412,5 +453,7 @@ extension AppState {
         _ rootAuthority: WorkspaceFileSystemRootAuthority
     ) -> Bool {
         workspaceRootURL?.standardizedFileURL == rootAuthority.originalRootURL
+            && workspaceInstalledCaptureGeneration == workspaceGeneration
+            && workspaceSearchRootAuthority == rootAuthority
     }
 }

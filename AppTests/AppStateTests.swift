@@ -982,6 +982,169 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.workspaceTree?.root.children.map(\.relativePath), ["post.md"])
     }
 
+    func testWorkspaceReloadRejectsSelectedSymlinkRetargetAfterCapture() async throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let rootA = parent.appendingPathComponent("A", isDirectory: true)
+        let rootB = parent.appendingPathComponent("B", isDirectory: true)
+        let selected = parent.appendingPathComponent("selected", isDirectory: true)
+        try FileManager.default.createDirectory(at: rootA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: rootB, withIntermediateDirectories: true)
+        try writeText("needle A only", to: rootA.appendingPathComponent("a.md"))
+        try writeText("needle B only", to: rootB.appendingPathComponent("b.md"))
+        try FileManager.default.createSymbolicLink(at: selected, withDestinationURL: rootA)
+
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+        // Avoid FSEvents watcher: install only the selected root spelling under test.
+        appState.workspaceRootURL = selected
+        let reloadTask = Task {
+            try await appState.reloadWorkspaceTree(root: selected, selectFirstIfNeeded: true)
+        }
+        await scanner.waitForRequestCount(1)
+        await scanner.completeRequest(
+            at: 0,
+            with: snapshot("a.md"),
+            afterCapture: {
+                try FileManager.default.removeItem(at: selected)
+                try FileManager.default.createSymbolicLink(
+                    at: selected,
+                    withDestinationURL: rootB
+                )
+            }
+        )
+        do {
+            try await reloadTask.value
+            XCTFail("Expected stale capture rejection")
+        } catch is CancellationError {
+            // Reject/retry path: do not install mixed A/B roots.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        // Stale capture for A must not install while selected spelling now names B.
+        XCTAssertNil(appState.workspaceSnapshot)
+        XCTAssertNil(appState.workspaceSearchRootAuthority)
+        XCTAssertNil(appState.workspaceInstalledCaptureGeneration)
+        XCTAssertNotEqual(appState.currentDocument.fileURL?.lastPathComponent, "a.md")
+        XCTAssertNotEqual(appState.currentDocument.fileURL?.lastPathComponent, "b.md")
+    }
+
+    func testWorkspaceReloadRejectsCapturedDirectoryMovedAndReplacedAtSameSpelling() async throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        let moved = parent.appendingPathComponent("moved-workspace", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try writeText("captured A", to: root.appendingPathComponent("a.md"))
+
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        let reloadTask = Task {
+            try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: true)
+        }
+        await scanner.waitForRequestCount(1)
+        await scanner.completeRequest(
+            at: 0,
+            with: snapshot("a.md"),
+            afterCapture: {
+                try FileManager.default.moveItem(at: root, to: moved)
+                try FileManager.default.createDirectory(
+                    at: root,
+                    withIntermediateDirectories: true
+                )
+                try "replacement B".write(
+                    to: root.appendingPathComponent("b.md"),
+                    atomically: true,
+                    encoding: .utf8
+                )
+            }
+        )
+        do {
+            try await reloadTask.value
+            XCTFail("Expected stale capture rejection")
+        } catch is CancellationError {
+            // Reject/retry path: no A snapshot with B editor activation.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+
+        XCTAssertNil(appState.workspaceSnapshot)
+        XCTAssertNil(appState.workspaceSearchRootAuthority)
+        XCTAssertNil(appState.workspaceInstalledCaptureGeneration)
+        // No A snapshot/search authority alongside B editor activation.
+        XCTAssertNotEqual(appState.currentDocument.fileURL?.lastPathComponent, "a.md")
+        XCTAssertNotEqual(appState.currentDocument.fileURL?.lastPathComponent, "b.md")
+        XCTAssertNotEqual(appState.currentDocument.text, "captured A")
+        XCTAssertNotEqual(appState.currentDocument.text, "replacement B")
+    }
+
+    func testSuspendedSameRootReloadDoesNotLabelOldCaptureWithNewGeneration() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeText("old alpha", to: root.appendingPathComponent("old.md"))
+        try writeText("new beta", to: root.appendingPathComponent("new.md"))
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let appState = AppState(
+            directoryScanner: scanner,
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: 0,
+            shouldRestoreLastOpenedFile: false
+        )
+
+        appState.openExternalFile(root)
+        await scanner.waitForRequestCount(1)
+        let oldAuthority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        await scanner.completeRequest(at: 0, with: snapshot("old.md"))
+        try await waitUntil("initial snapshot installed") {
+            appState.workspaceSnapshot?.entries.map(\.relativePath) == ["old.md"]
+                && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+        }
+        let oldGeneration = appState.workspaceGeneration
+        let oldInstalled = try XCTUnwrap(appState.workspaceInstalledCaptureGeneration)
+
+        // Start a same-root reload; generation advances while the replacement scan is suspended.
+        appState.scheduleWorkspaceReload(
+            root: root,
+            selectFirstIfNeeded: false,
+            errorTitle: "Could Not Reload Workspace"
+        )
+        await scanner.waitForRequestCount(2)
+        XCTAssertEqual(appState.workspaceGeneration, oldGeneration + 1)
+        XCTAssertEqual(appState.workspaceInstalledCaptureGeneration, oldInstalled)
+        XCTAssertEqual(appState.workspaceSnapshot?.entries.map(\.relativePath), ["old.md"])
+
+        // A query started while suspended must not use the old pair labeled as the new generation.
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "old"))
+        XCTAssertTrue(provider.requests.isEmpty)
+        XCTAssertNil(appState.workspaceSearchState.activeContext)
+
+        await scanner.completeRequest(at: 1, with: snapshot("new.md"))
+        try await waitUntil("replacement snapshot installed") {
+            appState.workspaceSnapshot?.entries.map(\.relativePath) == ["new.md"]
+                && appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+        }
+
+        XCTAssertNotEqual(
+            appState.workspaceInstalledCaptureGeneration,
+            oldInstalled
+        )
+        XCTAssertEqual(
+            appState.workspaceSearchRootAuthority?.canonicalRootURL,
+            oldAuthority.canonicalRootURL
+        )
+        // Still no request/result that paired the old snapshot with the new generation.
+        XCTAssertTrue(provider.requests.isEmpty)
+        XCTAssertFalse(
+            provider.requests.contains {
+                $0.workspaceGeneration == appState.workspaceGeneration
+                    && $0.snapshot.entries.map(\.relativePath) == ["old.md"]
+            }
+        )
+    }
+
     private func snapshot(_ path: String) -> WorkspaceFileSnapshot {
         WorkspaceFileSnapshot(entries: [
             WorkspaceFileSnapshot.Entry(
@@ -1094,6 +1257,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             rootURL: rootURL
         )
         appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
             snapshot: workspaceSnapshot,
@@ -1875,6 +2039,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             rootURL: rootA
         )
         appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
 
         appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
 
@@ -1979,8 +2144,18 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         }
         XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
 
+        // Until a new snapshot/authority pair is installed for the advanced generation, search
+        // must not reuse the old capture labeled as the new generation.
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
-        try await waitUntil("second search starts") { provider.requests.count == 2 }
+        XCTAssertTrue(provider.requests.count == 1)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
+
+        fixture.appState.workspaceInstalledCaptureGeneration = fixture.appState.workspaceGeneration
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("second search starts after capture reinstall") {
+            provider.requests.count == 2
+        }
         fixture.appState.teardownWorkspaceSearch()
         try await waitUntil("teardown terminates producer") {
             provider.terminatedSubscriptionIndices.contains(1)
@@ -2236,6 +2411,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             rootURL: rootURL
         )
         appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
             snapshot: workspaceSnapshot,
@@ -2773,6 +2949,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             rootURL: rootURL
         )
         appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
             snapshot: workspaceSnapshot,
@@ -2830,6 +3007,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             rootURL: rootURL
         )
         appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
             previous: nil,
             snapshot: workspaceSnapshot,
@@ -3044,6 +3222,9 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
     private var continuations: [CheckedContinuation<WorkspaceFileSnapshot, Error>?] = []
     private var requestCount = 0
     private var requestWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Runs after authority+snapshot are ready and before `snapshotCapture` returns, so App
+    /// install proof can observe a retargeted selected root.
+    private var afterCaptureHandlers: [(@Sendable () async throws -> Void)?] = []
 
     func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
         let rootAuthority = try await WorkspaceFileSystemRootAuthority.capture(rootURL: root)
@@ -3056,6 +3237,13 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
 
         let snapshot = try await withCheckedThrowingContinuation { continuation in
             continuations.append(continuation)
+            afterCaptureHandlers.append(nil)
+        }
+        let index = requestCount - 1
+        if afterCaptureHandlers.indices.contains(index),
+           let handler = afterCaptureHandlers[index]
+        {
+            try await handler()
         }
         return WorkspaceDirectorySnapshotCapture(
             snapshot: snapshot,
@@ -3071,9 +3259,16 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
         }
     }
 
-    func completeRequest(at index: Int, with snapshot: WorkspaceFileSnapshot) {
+    func completeRequest(
+        at index: Int,
+        with snapshot: WorkspaceFileSnapshot,
+        afterCapture: (@Sendable () async throws -> Void)? = nil
+    ) {
         guard continuations.indices.contains(index), let continuation = continuations[index] else {
             return
+        }
+        if afterCaptureHandlers.indices.contains(index) {
+            afterCaptureHandlers[index] = afterCapture
         }
         continuations[index] = nil
         continuation.resume(returning: snapshot)

@@ -114,13 +114,14 @@ public struct MarkdownFileStore: Sendable {
         _ = try Self.validatedFileKind(for: url)
 
         do {
-            let location = try WorkspaceFileSystemLocation(fileURL: url)
             // The synchronous URL facade predates typed cancellation outcomes. Existing
             // callers can cancel their scheduling task while entering save, so finish this
-            // transaction and map its proven outcome instead of misreporting non-commit.
+            // transaction—including authority capture for the location—and map its proven
+            // outcome instead of misreporting non-commit.
             let outcome = try WorkspaceAnchoredFileSystem.$ignoresInheritedTaskCancellation
                 .withValue(true) {
-                    try save(
+                    let location = try WorkspaceFileSystemLocation(fileURL: url)
+                    return try save(
                         text: text,
                         at: location,
                         expecting: .existingOrMissing

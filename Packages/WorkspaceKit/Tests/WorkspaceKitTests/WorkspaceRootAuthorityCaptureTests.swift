@@ -113,6 +113,85 @@ extension WorkspaceAnchoredFileSystemTests {
         try mutation.rethrowIfFailed()
     }
 
+    func testValidateCanonicalBindingNormalizesMovedRootWithoutReplacementToNamespaceChanged() throws {
+        let fixture = try makeAuthorityCaptureFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: fixture.rootA)
+        let moved = fixture.parent.appendingPathComponent("moved-away-A", isDirectory: true)
+        try FileManager.default.moveItem(at: fixture.rootA, to: moved)
+
+        XCTAssertThrowsError(try authority.validateCanonicalBinding()) { error in
+            XCTAssertEqual(error as? WorkspaceAnchoredFileSystemError, .namespaceChanged)
+        }
+    }
+
+    func testValidateCanonicalBindingNormalizesSymlinkReplacementToNamespaceChanged() throws {
+        let fixture = try makeAuthorityCaptureFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: fixture.rootA)
+        try FileManager.default.removeItem(at: fixture.rootA)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.rootA,
+            withDestinationURL: fixture.rootB
+        )
+
+        XCTAssertThrowsError(try authority.validateCanonicalBinding()) { error in
+            XCTAssertEqual(error as? WorkspaceAnchoredFileSystemError, .namespaceChanged)
+        }
+    }
+
+    func testValidateCanonicalBindingNormalizesDirectoryReplacementToNamespaceChanged() throws {
+        let fixture = try makeAuthorityCaptureFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: fixture.rootA)
+        let moved = fixture.parent.appendingPathComponent("original-A", isDirectory: true)
+        try FileManager.default.moveItem(at: fixture.rootA, to: moved)
+        try FileManager.default.createDirectory(
+            at: fixture.rootA,
+            withIntermediateDirectories: true
+        )
+        try "replacement root".write(
+            to: fixture.rootA.appendingPathComponent("post.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        XCTAssertThrowsError(try authority.validateCanonicalBinding()) { error in
+            XCTAssertEqual(error as? WorkspaceAnchoredFileSystemError, .namespaceChanged)
+        }
+    }
+
+    func testAsyncAuthorityCaptureHonorsCancellationBeforeReturningLiveAuthority() async throws {
+        let fixture = try makeAuthorityCaptureFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let gate = CaptureCancellationGate()
+
+        let task = Task {
+            try await WorkspaceFileSystemRootAuthority.capture(
+                rootURL: fixture.rootA,
+                hooks: .init(eventHandler: { event in
+                    if event == .selectedRootOpened {
+                        gate.markOpened()
+                        gate.waitForContinue()
+                    }
+                })
+            )
+        }
+
+        await gate.waitUntilOpened()
+        task.cancel()
+        gate.allowContinue()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation to reject a live authority")
+        } catch is CancellationError {
+            // Expected: cancellation wins over a successfully opened descriptor.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
     private struct AuthorityCaptureFixture {
         let parent: URL
         let rootA: URL
@@ -151,5 +230,49 @@ extension WorkspaceAnchoredFileSystemTests {
             maximumByteCount: nil
         )
         return try XCTUnwrap(String(data: result.data, encoding: .utf8))
+    }
+}
+
+/// Deterministic cancellation gate for authority capture tests — condition waits only, no
+/// timing sleeps.
+private final class CaptureCancellationGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var opened = false
+    private var shouldContinue = false
+
+    func markOpened() {
+        condition.lock()
+        opened = true
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    func waitUntilOpened() async {
+        await withCheckedContinuation { continuation in
+            // Condition wait only (no timing sleep). Safe if opened already flipped.
+            Thread.detachNewThread {
+                self.condition.lock()
+                while !self.opened {
+                    self.condition.wait()
+                }
+                self.condition.unlock()
+                continuation.resume()
+            }
+        }
+    }
+
+    func waitForContinue() {
+        condition.lock()
+        while !shouldContinue {
+            condition.wait()
+        }
+        condition.unlock()
+    }
+
+    func allowContinue() {
+        condition.lock()
+        shouldContinue = true
+        condition.broadcast()
+        condition.unlock()
     }
 }

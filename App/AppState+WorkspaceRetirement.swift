@@ -108,6 +108,7 @@ private extension AppState {
         workspaceTree = nil
         workspaceSnapshot = nil
         workspaceSearchRootAuthority = nil
+        workspaceInstalledCaptureGeneration = nil
         completionWorkspace = .empty
         if retirementLease?.session !== currentDocument {
             autosaveTask?.cancel()

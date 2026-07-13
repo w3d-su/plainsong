@@ -1,9 +1,9 @@
 # WorkspaceKit filesystem authority contract
 
-> **Status:** implemented as a Phase 3 WS3B WorkspaceKit foundation with only the minimal App
-> plumbing needed to retain an off-main snapshot/authority capture. App activation, EditorKit
-> ownership, sidebar/UI work, workspace item rename/move/Trash, and session relocation are
-> follow-ups, not part of this contract.
+> **Status:** implemented as a Phase 3 WS3B WorkspaceKit foundation plus the App reload capture
+> install path that generation-fences a proven snapshot/authority pair. Retained-result
+> activation, EditorKit ownership, sidebar/UI work, workspace item rename/move/Trash, and
+> session relocation remain follow-ups, not part of this contract.
 
 ## Authority
 
@@ -23,7 +23,11 @@ identity and spelling before capture succeeds. The original descriptor is retain
 reference-backed `Sendable` lifetime token so moves or symlink retargets cannot redirect the
 authority; construction throws on disagreement instead of storing a partial identity. Value
 equality and hashing use the stable canonical spelling and physical identity, never the
-descriptor integer.
+descriptor integer. Async capture checks cancellation before starting, after the child task
+constructs an authority, and before returning; a successfully constructed authority is released
+(via deinit) when cancellation wins. Post-capture revalidation of the canonical root spelling
+normalizes missing, symlink, unreadable, or replaced roots to `namespaceChanged` rather than
+leaking leaf-level errors.
 
 Each operation opens `/`, walks every canonical-root component, then walks every relative
 parent component with `openat(..., O_DIRECTORY | O_NOFOLLOW)`. It retains that complete
@@ -61,10 +65,17 @@ existing physical-target policy through the request's one captured authority, th
 canonical location from that same request-owned root. Candidate planning, ignore files,
 overlays, reads, security-scoped access, and result authority cannot supply an independent root
 URL. App workspace reload captures the snapshot and root authority together off the main actor,
-generation-fences their installation, and constructs requests without filesystem calls. Disk
-results and eligible overlays carry `WorkspaceSearchFileAuthority`: the location plus the
-identity sampled from the exact read/validation descriptor. Later activation work must use that
-pair rather than derive new authority from the result path.
+proves off-main that the currently selected root spelling still names the captured physical
+identity (not a lexical URL comparison and not a fresh unrelated `realpath` authority), then
+generation-fences installation of that pair and auto-activates only through the captured
+authority's canonical spelling. A retargeted selected symlink or same-spelling replacement
+rejects the stale capture rather than installing authority A beside editor activation of B.
+The installed capture generation must equal the current workspace generation before search may
+use the pair, so a reload that has advanced generation cannot label an old snapshot/authority
+as the new generation while the replacement scan is suspended. Main-actor request construction
+is pure. Disk results and eligible overlays carry `WorkspaceSearchFileAuthority`: the location
+plus the identity sampled from the exact read/validation descriptor. Later activation work must
+use that pair rather than derive new authority from the result path.
 
 ## Transactional writes
 
@@ -88,19 +99,27 @@ For a missing destination, commit uses
 The new leaf, complete chain, and parent-directory sync must all pass before the create is
 durable.
 
-Any post-rename failure attempts rollback through the same retained authority. Existing-file
-rollback performs the reverse swap; missing-file rollback unlinks the created destination.
-Rollback is validated and its parent directory is synced before the writer may report that
-the write was not committed. If commit or rollback state cannot be proven, the writer keeps
-available recovery material and reports an indeterminate outcome. Cancellation follows the
-same rule and cannot turn a possibly visible commit into an ordinary failure.
+Any post-rename failure attempts rollback through the same retained authority only when the
+displaced temporary name still references the writer-owned original identity. If that name holds
+an unrelated entry, the writer does not reverse-swap, unlink, or otherwise mutate through it: it
+returns `committedButIndeterminate` and retains known recovery state. Missing-file rollback
+unlinks the created destination only through identity-bound cleanup. Rollback is validated and
+its parent directory is synced before the writer may report that the write was not committed. If
+commit or rollback state cannot be proven, the writer keeps available recovery material and
+reports an indeterminate outcome. Cancellation follows the same rule and cannot turn a possibly
+visible commit into an ordinary failure.
 
 Every destructive cleanup carries the writer-owned artifact identity. The named entry is
-atomically moved with `RENAME_EXCL` to a private `.plainsong-cleanup-*.tmp` quarantine, validated
-against that identity immediately before unlink, then removed and directory-`fsync`ed under the
-same namespace postflight. If the name was replaced, or a racer occupies the restore name, the
-writer preserves the unrelated entry and returns `retained` or `removalIndeterminate`; it never
-blindly unlinks by name. This protocol covers prepared temporaries, displaced rollback material,
+atomically moved with `RENAME_EXCL` to a private `.plainsong-cleanup-*.tmp` quarantine. Removal
+then opens that quarantine name, binds an open-descriptor identity, fires the
+post-validation/pre-removal test hook, rebinds the directory entry to that open identity, and
+only then attempts `unlinkat` by name. A replacement observed after validation is left untouched
+(`retained` / `removalIndeterminate`). The implementation does not claim that a final name-only
+`lstat`+`unlink` closes TOCTOU on macOS (no `funlinkat`); it claims refusal-on-mismatch plus
+private quarantine isolation, proven by the post-validation hook. Quarantine restore proves the
+quarantine name still references the expected identity before any `RENAME_EXCL` back to the
+original name, so an unrelated racer is never published to the destination—including when the
+original name is absent. This protocol covers prepared temporaries, displaced rollback material,
 and a newly created destination during rollback. `none` means the expected artifact is proven
 absent after the durable cleanup boundary.
 
@@ -144,7 +163,10 @@ timing sleeps—to cover:
 - root symlink retarget/move/replacement at every authority-capture phase;
 - longer, same-size, pre-rename, and post-rename prepared-byte mutation plus exact empty writes;
 - racing replacement names at temporary, rollback-artifact, quarantine-unlink,
-  quarantine-restore, and created-destination cleanup boundaries;
+  post-validation/pre-removal unlink, quarantine-restore (including absent destination),
+  unexpected displaced-entry after swap, and created-destination cleanup boundaries;
+- async authority capture cancellation that releases a live descriptor-backed authority;
+- post-capture root moved/symlink-replaced/directory-replaced normalized to `namespaceChanged`;
 - complete returned-metadata equality for existing replacement and missing creation;
 - mismatched request roots and A/B root, ignore-rule, overlay, and result separation;
 - durable rollback versus typed indeterminate rollback;

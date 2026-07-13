@@ -78,20 +78,60 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         securityScopedURL: URL? = nil,
         hooks: CaptureHooks
     ) async throws -> WorkspaceFileSystemRootAuthority {
-        try await withThrowingTaskGroup(of: WorkspaceFileSystemRootAuthority.self) { group in
+        try Task.checkCancellation()
+        return try await withThrowingTaskGroup(of: WorkspaceFileSystemRootAuthority.self) { group in
             group.addTask(priority: .utility) {
-                try WorkspaceFileSystemRootAuthority(
-                    rootURL: rootURL,
-                    securityScopedURL: securityScopedURL,
-                    hooks: hooks
-                )
+                try Task.checkCancellation()
+                do {
+                    let authority = try WorkspaceFileSystemRootAuthority(
+                        rootURL: rootURL,
+                        securityScopedURL: securityScopedURL,
+                        hooks: hooks
+                    )
+                    try Task.checkCancellation()
+                    return authority
+                } catch WorkspaceAnchoredFileSystemError.cancelled {
+                    throw CancellationError()
+                }
             }
             defer { group.cancelAll() }
-            guard let authority = try await group.next() else {
+            do {
+                guard let authority = try await group.next() else {
+                    throw CancellationError()
+                }
+                // If cancellation wins after construction, drop the live descriptor-backed value
+                // by throwing instead of returning it; deinit closes the retained descriptor.
+                try Task.checkCancellation()
+                return authority
+            } catch WorkspaceAnchoredFileSystemError.cancelled {
                 throw CancellationError()
             }
-            return authority
         }
+    }
+
+    /// Proves that `selectedRootURL` still names this capture's physical root identity.
+    ///
+    /// Opens the selected spelling under the same follow policy as capture (not a fresh
+    /// unrelated `realpath` authority and not a lexical URL comparison) and requires the
+    /// opened identity to equal the retained physical identity. Also revalidates the
+    /// canonical binding of the retained descriptor.
+    public func proveSelectedSpellingNamesCapturedIdentity(
+        selectedRootURL: URL
+    ) throws {
+        try WorkspaceAnchoredFileSystem.checkCancellation()
+        let selectedRootURL = selectedRootURL.standardizedFileURL
+        try validateCanonicalBinding()
+        try WorkspaceAnchoredFileSystem.checkCancellation()
+
+        let descriptor = try Self.openDirectory(at: selectedRootURL, noFollow: false)
+        defer { Darwin.close(descriptor) }
+        let selectedIdentity = try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(
+            descriptor
+        )
+        guard selectedIdentity == physicalIdentity else {
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
+        }
+        try WorkspaceAnchoredFileSystem.checkCancellation()
     }
 
     public func location(relativePath: String) throws -> WorkspaceFileSystemLocation {
@@ -186,6 +226,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
     }
 
     func validateCanonicalBinding() throws {
+        try WorkspaceAnchoredFileSystem.checkCancellation()
         let retainedIdentity = try descriptorLifetime.withDescriptor { descriptor in
             try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(descriptor)
         }
@@ -193,17 +234,31 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
 
-        let verificationDescriptor = try Self.openDirectory(
-            at: canonicalRootURL,
-            noFollow: true
-        )
-        defer { Darwin.close(verificationDescriptor) }
-        let verificationIdentity = try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(
-            verificationDescriptor
-        )
-        guard verificationIdentity == physicalIdentity,
-              try Self.descriptorURL(verificationDescriptor, isDirectory: true) == canonicalRootURL
-        else {
+        // Post-capture root-binding loss/replacement is always namespaceChanged. Leaf-level
+        // missing/symlink/unreadable must not leak from reopening the canonical root spelling.
+        do {
+            try WorkspaceAnchoredFileSystem.checkCancellation()
+            let verificationDescriptor = try Self.openDirectory(
+                at: canonicalRootURL,
+                noFollow: true
+            )
+            defer { Darwin.close(verificationDescriptor) }
+            let verificationIdentity = try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(
+                verificationDescriptor
+            )
+            guard verificationIdentity == physicalIdentity,
+                  try Self.descriptorURL(verificationDescriptor, isDirectory: true)
+                  == canonicalRootURL
+            else {
+                throw WorkspaceAnchoredFileSystemError.namespaceChanged
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch WorkspaceAnchoredFileSystemError.cancelled {
+            throw WorkspaceAnchoredFileSystemError.cancelled
+        } catch WorkspaceAnchoredFileSystemError.namespaceChanged {
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
+        } catch {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
     }
@@ -218,6 +273,10 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         rootURL: URL,
         hooks: CaptureHooks
     ) throws -> DescriptorCapture {
+        // Respects `ignoresInheritedTaskCancellation` so the legacy URL save facade can finish
+        // a transaction when its scheduling task is already cancelled. Async `capture(...)`
+        // still cancels cooperatively via explicit `Task.checkCancellation` around the group.
+        try WorkspaceAnchoredFileSystem.checkCancellation()
         let descriptor = try openDirectory(at: rootURL, noFollow: false)
         var shouldCloseDescriptor = true
         defer {
@@ -226,11 +285,14 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
             }
         }
         hooks.emit(.selectedRootOpened)
+        try WorkspaceAnchoredFileSystem.checkCancellation()
 
         let identity = try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(descriptor)
         hooks.emit(.identitySampled)
+        try WorkspaceAnchoredFileSystem.checkCancellation()
         let canonicalRootURL = try descriptorURL(descriptor, isDirectory: true)
         hooks.emit(.canonicalPathDerived)
+        try WorkspaceAnchoredFileSystem.checkCancellation()
 
         let verificationDescriptor = try openDirectory(at: canonicalRootURL, noFollow: true)
         defer { Darwin.close(verificationDescriptor) }
@@ -243,6 +305,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
         hooks.emit(.canonicalPathVerified)
+        try WorkspaceAnchoredFileSystem.checkCancellation()
 
         shouldCloseDescriptor = false
         return DescriptorCapture(

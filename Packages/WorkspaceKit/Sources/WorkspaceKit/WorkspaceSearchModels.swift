@@ -53,12 +53,18 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     public let dirtyOverlays: WorkspaceSearchOverlayCollection
     public let limits: WorkspaceSearchLimits
 
-    /// The only root URL exposed by a request is the canonical spelling captured by
-    /// `rootAuthority`; no caller-supplied URL can select a second namespace.
+    /// Derived canonical root spelling from `rootAuthority`. This is not an independent
+    /// namespace selector; filesystem work always uses the retained authority.
     public var rootURL: URL {
         rootAuthority.canonicalRootURL
     }
 
+    /// Creates a request from a pre-captured root authority.
+    ///
+    /// - Important: Phase 3 intentional public API break. The previous nonthrowing
+    ///   `WorkspaceSearchRequest(rootURL:...)` initializer accepted an independent root URL
+    ///   and is removed. Callers must capture `WorkspaceFileSystemRootAuthority` first and
+    ///   pass that value; do not reintroduce an unsafe free-standing request root.
     public init(
         rootAuthority: WorkspaceFileSystemRootAuthority,
         rootIdentity: String? = nil,
@@ -80,9 +86,12 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         self.limits = limits
     }
 
-    /// Compatibility boundary for callers that still carry a selected root URL. The URL
-    /// is accepted only when it is the exact selected or canonical spelling captured by
-    /// `rootAuthority`; mismatch rejection is pure and happens before a request exists.
+    /// Optional pure spelling check against a pre-captured authority.
+    ///
+    /// Accepts `rootURL` only when it equals the authority's original or canonical spelling.
+    /// This is not a source-compatible replacement for the removed independent-root
+    /// initializer: it still requires `rootAuthority` and can throw, and it never opens or
+    /// re-resolves the URL as filesystem authority.
     public init(
         rootURL: URL,
         rootAuthority: WorkspaceFileSystemRootAuthority,

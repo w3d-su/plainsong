@@ -169,10 +169,12 @@ extension WorkspaceAnchoredFileSystem {
         guard displacedEntry.isRegularFile,
               displacedEntry.identity == context.originalMetadata.identity
         else {
-            return rollbackExistingWrite(
+            // The name at the temporary slot is not writer-owned original material. Do not
+            // reverse-swap, unlink, or otherwise mutate through that unrelated entry.
+            return indeterminate(
                 reason: errorForUnexpectedDisplacedEntry(displacedEntry),
-                displacedEntry: displacedEntry,
-                context: context
+                preparedMetadata: commit.prepared.metadata,
+                artifactState: .retained(commit.prepared.location)
             )
         }
 
