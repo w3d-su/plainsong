@@ -41,30 +41,30 @@ extension AppState {
     func scheduleWorkspaceReload(
         root: URL,
         selectFirstIfNeeded: Bool,
-        errorTitle: String,
-        handlesExternalChanges: Bool = false
+        errorTitle: String
     ) {
         let normalizedRoot = root.standardizedFileURL
         let generation = advanceWorkspaceGeneration()
+        let scanner = directoryScanner
         workspaceReloadTask?.cancel()
 
-        workspaceReloadTask = Task { @MainActor [weak self] in
-            guard let self else { return }
+        workspaceReloadTask = Task { @MainActor [weak self, scanner] in
             do {
+                let capture = try await scanner.snapshotCapture(root: normalizedRoot)
+                guard let self else { return }
                 try await applyWorkspaceReload(
                     root: normalizedRoot,
+                    capture: capture,
                     generation: generation,
                     selectFirstIfNeeded: selectFirstIfNeeded
                 )
                 guard isCurrentWorkspaceReload(root: normalizedRoot, generation: generation) else {
                     return
                 }
-                if handlesExternalChanges {
-                    handleCurrentDocumentExternalChange()
-                }
             } catch is CancellationError {
                 // A newer reload, workspace switch, or close invalidated this scan.
             } catch {
+                guard let self else { return }
                 guard isCurrentWorkspaceReload(root: normalizedRoot, generation: generation) else {
                     return
                 }
@@ -77,8 +77,10 @@ extension AppState {
     func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
         let normalizedRoot = root.standardizedFileURL
         let generation = advanceWorkspaceGeneration()
+        let capture = try await directoryScanner.snapshotCapture(root: normalizedRoot)
         try await applyWorkspaceReload(
             root: normalizedRoot,
+            capture: capture,
             generation: generation,
             selectFirstIfNeeded: selectFirstIfNeeded
         )
@@ -93,11 +95,11 @@ extension AppState {
 
     private func applyWorkspaceReload(
         root: URL,
+        capture: WorkspaceDirectorySnapshotCapture,
         generation: UInt64,
         selectFirstIfNeeded: Bool
     ) async throws {
         try Task.checkCancellation()
-        let capture = try await directoryScanner.snapshotCapture(root: root)
         let snapshot = capture.snapshot
         try Task.checkCancellation()
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
@@ -125,40 +127,90 @@ extension AppState {
         // Activation paths use the captured authority's canonical spelling, never a retargeted
         // selected symlink that slipped past a failed proof.
         let activationRoot = capture.rootAuthority.canonicalRootURL
+        let currentDocumentAtPreparation = currentDocument
+        let currentDocumentStateAtPreparation = workspaceReloadCurrentSessionState()
 
         var tree = WorkspaceFileTree.reconcile(
             previous: workspaceTree,
             snapshot: snapshot,
             options: .init(showAllFiles: showAllFiles)
         )
+        let currentDocumentDisposition = try await prepareWorkspaceReloadCurrentDocumentDisposition(
+            tree: tree,
+            rootAuthority: capture.rootAuthority
+        )
 
-        if !selectFirstIfNeeded,
-           let currentDocumentNode = nodeForCurrentDocument(in: tree, root: activationRoot)
-        {
-            tree.selectNode(id: currentDocumentNode.id)
-        } else if tree.selectedNode == nil || selectFirstIfNeeded {
+        if selectFirstIfNeeded {
             tree.selectNode(id: firstEditableNode(in: tree.root)?.id)
+        } else {
+            switch currentDocumentDisposition {
+            case let .present(nodeID):
+                tree.selectNode(id: nodeID)
+            case .missing:
+                tree.selectNode(id: nil)
+            case .unrelated:
+                if tree.selectedNode == nil {
+                    tree.selectNode(id: firstEditableNode(in: tree.root)?.id)
+                }
+            }
         }
 
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
 
-        let preparedActivation = try await prepareWorkspaceReloadActivation(
+        let preparedFile = try await prepareWorkspaceReloadFile(
             selectedNode: tree.selectedNode,
             rootAuthority: capture.rootAuthority,
             activationRoot: activationRoot,
             selectedRoot: root,
             generation: generation
         )
+        try workspaceReloadPostPrepareHook?()
+
+        // The activation load may suspend. Re-prove the selected spelling immediately before
+        // the uninterrupted App-state commit so a root moved/replaced during that load is
+        // rejected instead of publishing capture A under a spelling that now names B.
+        do {
+            try await proveSelectedRootStillNamesCapture(
+                selectedRoot: root,
+                rootAuthority: capture.rootAuthority
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CancellationError()
+        }
 
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
         }
+        guard currentDocument === currentDocumentAtPreparation,
+              workspaceReloadCurrentSessionState() == currentDocumentStateAtPreparation
+        else {
+            // User/session lifecycle work won the suspension. Do not apply a tree selection,
+            // missing-file disposition, or activation prepared for the superseded document.
+            throw CancellationError()
+        }
+
+        // Cache and retirement state can change while the final root proof suspends. Re-derive the
+        // activation source now, then commit it without another suspension so a stale cached or
+        // retired source can neither be resurrected nor trip a commit precondition.
+        let preparedActivation = try preparedFile.map { preparedFile in
+            try prepareAnchoredFileSessionActivation(
+                file: preparedFile.file,
+                at: preparedFile.location,
+                metadata: preparedFile.metadata,
+                sha256Digest: preparedFile.sha256Digest
+            )
+        }
 
         // Every throwing filesystem and cache validation is complete. From here through capture
-        // installation there is no suspension and no throwing operation, so activation and the
+        // installation there is no suspension or throwing operation, so activation and the
         // snapshot/authority/tree become visible as one main-actor transaction.
+        if case let .missing(session, key) = currentDocumentDisposition {
+            markSessionDetachedFromMissingFile(session, url: key)
+        }
         if let preparedActivation {
             commitAnchoredFileSessionActivation(preparedActivation)
         }
@@ -174,13 +226,13 @@ extension AppState {
         scheduleCompletionWorkspaceRefresh(workspaceGeneration: generation)
     }
 
-    private func prepareWorkspaceReloadActivation(
+    private func prepareWorkspaceReloadFile(
         selectedNode: WorkspaceFileNode?,
         rootAuthority: WorkspaceFileSystemRootAuthority,
         activationRoot: URL,
         selectedRoot: URL,
         generation: UInt64
-    ) async throws -> PreparedAnchoredFileSessionActivation? {
+    ) async throws -> PreparedWorkspaceReloadFile? {
         guard let selectedNode, selectedNode.isEditableMarkdown else { return nil }
 
         // This is the exact post-proof/pre-activation boundary. The production hook is nil;
@@ -199,13 +251,137 @@ extension AppState {
                 isDirectory: false
             )
         )
+        try workspaceReloadPostLoadHook?()
         try Task.checkCancellation()
         guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
             throw CancellationError()
         }
-        return try prepareAnchoredFileSessionActivation(
-            file: preparedFile.file,
-            at: preparedFile.location
+        return preparedFile
+    }
+
+    private func prepareWorkspaceReloadCurrentDocumentDisposition(
+        tree: WorkspaceFileTree,
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) async throws -> PreparedWorkspaceReloadCurrentDocumentDisposition {
+        let session = currentDocument
+        guard let fileURL = session.fileURL?.standardizedFileURL else {
+            return .unrelated
+        }
+
+        let retainedLocation = retainedAnchoredSessionLocation(for: session)
+        if let retainedLocation, retainedLocation.rootAuthority != rootAuthority {
+            // A workspace-to-workspace switch deliberately retains the outgoing editor
+            // session until its view is dismantled. If that exact A location is outside B,
+            // it is unrelated to B's first snapshot and must not block selecting B's first
+            // editable file. A lexical collision inside B remains fail-closed: only the
+            // retained A authority may authorize I/O for that session URL.
+            guard (try? rootAuthority.relativePath(
+                forFileURL: retainedLocation.fileURL
+            )) != nil else {
+                return .unrelated
+            }
+            throw AppStateError.invalidSessionIdentity(fileURL)
+        }
+        let lexicalRelativePath: String
+        if let retainedLocation {
+            lexicalRelativePath = retainedLocation.relativePath
+        } else {
+            guard let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL) else {
+                return .unrelated
+            }
+            lexicalRelativePath = relativePath
+        }
+        let key = retainedLocation?.fileURL ?? fileURL
+        let currentLocation = retainedLocation?.rootAuthority == rootAuthority
+            ? retainedLocation
+            : try rootAuthority.location(relativePath: lexicalRelativePath)
+
+        if let exactNode = firstNode(in: tree.root, relativePath: lexicalRelativePath),
+           exactNode.isEditableMarkdown
+        {
+            return .present(nodeID: exactNode.id)
+        }
+
+        let editableNodes = editableWorkspaceNodes(in: tree.root)
+        let canonicalRelativePath = retainedLocation?.rootAuthority == rootAuthority
+            ? retainedLocation?.relativePath
+            : nil
+        let matchingNodeID = await Task.detached(priority: .utility) { () -> WorkspaceFileNode.ID? in
+            let targetRelativePath = canonicalRelativePath
+                ?? (try? rootAuthority.canonicalizedLocation(forFileURL: fileURL).relativePath)
+                ?? lexicalRelativePath
+            for node in editableNodes {
+                let candidateURL = rootAuthority.canonicalRootURL.appendingPathComponent(
+                    node.relativePath,
+                    isDirectory: false
+                )
+                guard let location = try? rootAuthority.canonicalizedLocation(
+                    forFileURL: candidateURL
+                ) else {
+                    continue
+                }
+                if ExactSourceText.matches(location.relativePath, targetRelativePath) {
+                    return node.id
+                }
+            }
+            return nil
+        }.value
+
+        if let matchingNodeID {
+            return .present(nodeID: matchingNodeID)
+        }
+        guard let currentLocation else {
+            return .unrelated
+        }
+        let status = await Task.detached(priority: .utility) {
+            WorkspaceNoFollowFileInspector.status(at: currentLocation)
+        }.value
+        switch status {
+        case .missing:
+            return .missing(session: session, key: key)
+        case .regular:
+            // Enumeration may legitimately skip an unreadable entry. Absence from the
+            // snapshot alone is not proof that the current file disappeared.
+            return .unrelated
+        case .symbolicLink:
+            throw WorkspaceAnchoredFileSystemError.symbolicLink
+        case .notRegularFile:
+            throw WorkspaceAnchoredFileSystemError.notRegularFile
+        case .unreadable:
+            throw WorkspaceAnchoredFileSystemError.unreadable
+        }
+    }
+
+    private func editableWorkspaceNodes(in root: WorkspaceFileNode) -> [WorkspaceFileNode] {
+        var result: [WorkspaceFileNode] = []
+        if root.isEditableMarkdown {
+            result.append(root)
+        }
+        for child in root.children {
+            result.append(contentsOf: editableWorkspaceNodes(in: child))
+        }
+        return result
+    }
+
+    private func workspaceReloadCurrentSessionState() -> WorkspaceReloadCurrentSessionState {
+        let session = currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let stateURL = sessionStateURL(for: session)
+        return WorkspaceReloadCurrentSessionState(
+            version: session.version,
+            fileURL: session.fileURL,
+            fileKind: session.fileKind,
+            isDirty: session.isDirty,
+            stateURL: stateURL,
+            binding: anchoredSessionFileBindings[sessionIdentity],
+            indeterminateWrite: indeterminateSessionWrites[sessionIdentity],
+            indeterminateContext: indeterminateSessionWriteContexts[sessionIdentity],
+            isDetached: stateURL.map(detachedSessionURLs.contains) ?? false,
+            pendingExternalText: stateURL.flatMap { pendingExternalTexts[$0] },
+            lastKnownDiskHash: stateURL.flatMap { lastKnownDiskHashes[$0] },
+            lastKnownDiskModificationDate: stateURL.flatMap { lastKnownDiskModificationDates[$0] },
+            externalChangeURL: externalChangePrompt?.fileURL.standardizedFileURL,
+            missingFileURL: missingFilePrompt?.fileURL.standardizedFileURL
         )
     }
 
@@ -214,6 +390,29 @@ extension AppState {
             && workspaceGeneration == generation
             && workspaceRootURL?.standardizedFileURL == root.standardizedFileURL
     }
+}
+
+private enum PreparedWorkspaceReloadCurrentDocumentDisposition {
+    case present(nodeID: WorkspaceFileNode.ID)
+    case missing(session: DocumentSession, key: URL)
+    case unrelated
+}
+
+private struct WorkspaceReloadCurrentSessionState: Equatable {
+    let version: Int
+    let fileURL: URL?
+    let fileKind: FileKind
+    let isDirty: Bool
+    let stateURL: URL?
+    let binding: AnchoredWorkspaceSessionFileBinding?
+    let indeterminateWrite: WorkspaceIndeterminateFileWrite?
+    let indeterminateContext: IndeterminateSessionWriteContext?
+    let isDetached: Bool
+    let pendingExternalText: String?
+    let lastKnownDiskHash: UInt64?
+    let lastKnownDiskModificationDate: Date?
+    let externalChangeURL: URL?
+    let missingFileURL: URL?
 }
 
 @MainActor

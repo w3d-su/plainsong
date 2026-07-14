@@ -97,17 +97,43 @@ public enum WorkspaceFileWriteArtifactState: Sendable, Equatable {
 public struct WorkspaceNotCommittedFileWrite: Sendable, Equatable {
     public let reason: WorkspaceAnchoredFileSystemError
     public let artifactState: WorkspaceFileWriteArtifactState
+
+    public init(
+        reason: WorkspaceAnchoredFileSystemError,
+        artifactState: WorkspaceFileWriteArtifactState
+    ) {
+        self.reason = reason
+        self.artifactState = artifactState
+    }
 }
 
 public struct WorkspaceDurableFileWrite: Sendable, Equatable {
     public let metadata: WorkspaceCoherentFileMetadata
     public let cleanupState: WorkspaceFileWriteArtifactState
+
+    public init(
+        metadata: WorkspaceCoherentFileMetadata,
+        cleanupState: WorkspaceFileWriteArtifactState
+    ) {
+        self.metadata = metadata
+        self.cleanupState = cleanupState
+    }
 }
 
 public struct WorkspaceIndeterminateFileWrite: Sendable, Equatable {
     public let reason: WorkspaceAnchoredFileSystemError
     public let preparedMetadata: WorkspaceCoherentFileMetadata?
     public let recoveryArtifact: WorkspaceFileWriteArtifactState
+
+    public init(
+        reason: WorkspaceAnchoredFileSystemError,
+        preparedMetadata: WorkspaceCoherentFileMetadata?,
+        recoveryArtifact: WorkspaceFileWriteArtifactState
+    ) {
+        self.reason = reason
+        self.preparedMetadata = preparedMetadata
+        self.recoveryArtifact = recoveryArtifact
+    }
 }
 
 /// The three states callers must arbitrate explicitly after a transactional write.

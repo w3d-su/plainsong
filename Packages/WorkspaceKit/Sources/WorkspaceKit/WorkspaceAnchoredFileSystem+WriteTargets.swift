@@ -37,6 +37,7 @@ extension WorkspaceAnchoredFileSystem {
         let name: String
         let location: WorkspaceFileSystemLocation
         let expectedIdentity: WorkspaceFileSystemIdentity
+        let borrowedDescriptor: Int32?
         let context: ArtifactRemovalContext
         let unlinkCall: InjectedCall
         let syncCall: InjectedCall
@@ -55,6 +56,7 @@ extension WorkspaceAnchoredFileSystem {
 
     struct WriteCommitContext {
         let prepared: PreparedWrite
+        let location: WorkspaceFileSystemLocation
         let chain: DirectoryDescriptorChain
         let parentDescriptor: Int32
         let leaf: String
@@ -218,22 +220,24 @@ extension WorkspaceAnchoredFileSystem {
             if descriptor >= 0 { Darwin.close(descriptor) }
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
+        let expectedByteCount = Int64(data.count)
+        let expectedDigest = sha256Digest(data)
         let createdMetadata: WorkspaceCoherentFileMetadata
         do {
             createdMetadata = try regularFileMetadata(descriptor: descriptor)
         } catch {
-            Darwin.close(descriptor)
             throw TemporaryPreparationError(
                 reason: normalizedError(error),
                 name: name,
                 location: artifactLocation,
-                expectedIdentity: nil
+                descriptor: descriptor,
+                expectedIdentity: nil,
+                expectedByteCount: expectedByteCount,
+                expectedSHA256Digest: expectedDigest
             )
         }
         hooks.emit(.temporaryFileCreated)
 
-        let expectedByteCount = Int64(data.count)
-        let expectedDigest = sha256Digest(data)
         do {
             guard Darwin.ftruncate(descriptor, 0) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.unreadable
@@ -274,21 +278,16 @@ extension WorkspaceAnchoredFileSystem {
                 expectedSHA256Digest: expectedDigest
             )
         } catch {
-            Darwin.close(descriptor)
             throw TemporaryPreparationError(
                 reason: normalizedError(error),
                 name: name,
                 location: artifactLocation,
-                expectedIdentity: createdMetadata.identity
+                descriptor: descriptor,
+                expectedIdentity: createdMetadata.identity,
+                expectedByteCount: expectedByteCount,
+                expectedSHA256Digest: expectedDigest
             )
         }
-    }
-
-    struct TemporaryPreparationError: Error {
-        let reason: WorkspaceAnchoredFileSystemError
-        let name: String
-        let location: WorkspaceFileSystemLocation
-        let expectedIdentity: WorkspaceFileSystemIdentity?
     }
 
     static func validatePreparedContent(_ prepared: PreparedWrite) throws {

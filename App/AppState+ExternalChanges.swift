@@ -5,8 +5,8 @@ import MarkdownCore
 extension AppState {
     func reloadExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL.resolvingSymlinksInPath()
-        guard currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == key else {
+        let key = prompt.fileURL.standardizedFileURL
+        guard sessionStateURL(for: currentDocument) == key else {
             externalChangePrompt = nil
             return
         }
@@ -17,6 +17,8 @@ extension AppState {
             return
         }
 
+        indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
+        indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
         currentDocument.reset(
             text: text,
             url: prompt.fileURL,
@@ -24,7 +26,7 @@ extension AppState {
             isDirty: false
         )
         detachedSessionURLs.remove(key)
-        recordKnownDiskText(text, for: key)
+        recordKnownSessionDiskText(text, for: currentDocument, canonicalURL: key)
         pendingExternalTexts[key] = nil
         externalChangePrompt = nil
         sessionPolicy.updateDirtyState(for: key, isDirty: false)
@@ -34,15 +36,22 @@ extension AppState {
 
     func keepMineForExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL.resolvingSymlinksInPath()
-        guard currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == key else {
+        let key = prompt.fileURL.standardizedFileURL
+        guard sessionStateURL(for: currentDocument) == key else {
             externalChangePrompt = nil
             return
         }
+        let pendingDiskText = pendingExternalTexts[key]
         pendingExternalTexts[key] = nil
-        if let diskText = try? fileStore.load(url: prompt.fileURL).text {
-            recordKnownDiskText(diskText, for: key)
+        if let pendingDiskText {
+            recordKnownSessionDiskText(
+                pendingDiskText,
+                for: currentDocument,
+                canonicalURL: key
+            )
         }
+        indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
+        indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
         externalChangePrompt = nil
         scheduleAutosave(for: currentDocument)
         finishRetiredEditorDocumentBindingsIfPossible(for: currentDocument)
@@ -53,7 +62,11 @@ extension AppState {
     }
 
     func handleExternalChange(for session: DocumentSession) {
-        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
+        if let binding = anchoredSessionFileBinding(for: session) {
+            handleAnchoredExternalChange(for: session, binding: binding)
+            return
+        }
+        guard let url = sessionStateURL(for: session) else { return }
 
         switch diskDocumentState(for: url) {
         case .missing:
@@ -89,30 +102,74 @@ extension AppState {
     }
 
     func recordKnownDiskText(_ text: String, for url: URL, modificationDate: Date? = nil) {
-        let key = url.standardizedFileURL.resolvingSymlinksInPath()
+        let key = url.standardizedFileURL
         lastKnownDiskHashes[key] = Self.contentHash(text)
         recordKnownDiskModificationDate(modificationDate ?? Self.contentModificationDate(for: key), for: key)
     }
 
-    func clearSessionState(for url: URL) {
-        let key = url.standardizedFileURL.resolvingSymlinksInPath()
-        if let session = sessionCache[key] {
-            cancelAutosave(for: session)
-            cancelStatisticsRefresh(for: session)
+    func clearSessionState(
+        for session: DocumentSession,
+        fallbackURL: URL? = nil,
+        removesEditorBindingRegistration: Bool = true
+    ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        var stateKeys = Set(sessionCache.compactMap { key, cachedSession in
+            cachedSession === session ? key : nil
+        })
+        if let stateURL = sessionStateURL(for: session) {
+            stateKeys.insert(stateURL)
+        }
+        if let fallbackURL {
+            stateKeys.insert(fallbackURL.standardizedFileURL)
+        }
+
+        cancelAutosave(for: session)
+        cancelStatisticsRefresh(for: session)
+        if removesEditorBindingRegistration {
             removeEditorDocumentBindingRegistration(for: session)
         }
-        sessionCache[key] = nil
-        sessionPolicy.remove(key)
-        lastKnownDiskHashes[key] = nil
-        lastKnownDiskModificationDates[key] = nil
-        pendingExternalTexts[key] = nil
-        detachedSessionURLs.remove(key)
-        if externalChangePrompt?.fileURL.standardizedFileURL == key {
-            externalChangePrompt = nil
+        anchoredSessionFileBindings[sessionIdentity] = nil
+        indeterminateSessionWrites[sessionIdentity] = nil
+        indeterminateSessionWriteContexts[sessionIdentity] = nil
+
+        for key in stateKeys {
+            if sessionCache[key] === session {
+                sessionCache[key] = nil
+            }
+            sessionPolicy.remove(key)
+            lastKnownDiskHashes[key] = nil
+            lastKnownDiskModificationDates[key] = nil
+            pendingExternalTexts[key] = nil
+            detachedSessionURLs.remove(key)
+            if externalChangePrompt?.fileURL.standardizedFileURL == key {
+                externalChangePrompt = nil
+            }
+            if missingFilePrompt?.fileURL.standardizedFileURL == key {
+                missingFilePrompt = nil
+            }
         }
-        if missingFilePrompt?.fileURL.standardizedFileURL == key {
-            missingFilePrompt = nil
+    }
+
+    func markSessionDetachedFromMissingFile(_ session: DocumentSession, url: URL) {
+        detachedSessionURLs.insert(url)
+        pendingExternalTexts[url] = nil
+        lastKnownDiskHashes[url] = nil
+        lastKnownDiskModificationDates[url] = nil
+        sessionPolicy.updateDirtyState(for: url, isDirty: true)
+        cancelAutosave(for: session)
+
+        if !session.isDirty {
+            session.reset(
+                text: session.text,
+                url: session.fileURL,
+                fileKind: session.fileKind,
+                isDirty: true
+            )
         }
+
+        guard session === currentDocument else { return }
+        externalChangePrompt = nil
+        missingFilePrompt = MissingFilePrompt(fileURL: url)
     }
 
     static func contentHash(_ text: String) -> UInt64 {
@@ -160,28 +217,6 @@ private extension AppState {
         }
 
         return .changed(text: diskText, hash: diskHash, modificationDate: modificationDate)
-    }
-
-    func markSessionDetachedFromMissingFile(_ session: DocumentSession, url: URL) {
-        detachedSessionURLs.insert(url)
-        pendingExternalTexts[url] = nil
-        lastKnownDiskHashes[url] = nil
-        lastKnownDiskModificationDates[url] = nil
-        sessionPolicy.updateDirtyState(for: url, isDirty: true)
-
-        if !session.isDirty {
-            session.reset(
-                text: session.text,
-                url: session.fileURL,
-                fileKind: session.fileKind,
-                isDirty: true
-            )
-        }
-
-        guard session === currentDocument else { return }
-        autosaveTask?.cancel()
-        externalChangePrompt = nil
-        missingFilePrompt = MissingFilePrompt(fileURL: url)
     }
 
     func recordKnownDiskModificationDate(_ modificationDate: Date?, for url: URL) {

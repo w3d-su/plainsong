@@ -19,8 +19,7 @@ extension AppState {
         scheduleWorkspaceReload(
             root: workspaceRootURL,
             selectFirstIfNeeded: false,
-            errorTitle: "Could Not Refresh Workspace",
-            handlesExternalChanges: true
+            errorTitle: "Could Not Refresh Workspace"
         )
     }
 
@@ -114,7 +113,17 @@ extension AppState {
 
     func openWorkspaceFile(_ url: URL) {
         do {
-            try activateFileSession(url: url)
+            if workspaceRootURL != nil {
+                guard let rootAuthority = workspaceSearchRootAuthority,
+                      workspaceInstalledCaptureGeneration == workspaceGeneration
+                else {
+                    throw WorkspaceAnchoredFileSystemError.namespaceChanged
+                }
+                let location = try rootAuthority.canonicalizedLocation(forFileURL: url)
+                try activateAnchoredFileSession(at: location)
+            } else {
+                try activateFileSession(url: url)
+            }
         } catch {
             present(error, title: "Could Not Open File")
         }
@@ -239,7 +248,16 @@ extension AppState {
     }
 
     func save(session: DocumentSession) throws {
-        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
+        guard let sessionURL = session.fileURL?.standardizedFileURL else { return }
+        let sessionIdentity = ObjectIdentifier(session)
+        let anchoredBinding = anchoredSessionFileBinding(for: session)
+        let url = anchoredBinding?.location.fileURL
+            ?? sessionURL.resolvingSymlinksInPath()
+        if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
+            let reconciliationURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
+                ?? url
+            throw MarkdownFileStoreError.writeRequiresReconciliation(reconciliationURL, indeterminate)
+        }
         guard !detachedSessionURLs.contains(url),
               missingFilePrompt?.fileURL.standardizedFileURL != url
         else {
@@ -256,13 +274,146 @@ extension AppState {
         defer { isSaving = false }
 
         let text = session.text
-        try SecurityScopedAccess.withAccess(to: url) {
-            try fileStore.save(text: text, to: url)
+        let savedThroughAnchoredBinding: Bool
+        var cleanupResult: WorkspaceDurableFileWrite?
+        if let anchoredBinding,
+           anchoredBinding.location.fileURL == sessionURL
+        {
+            savedThroughAnchoredBinding = true
+            let outcome = try performAnchoredFileSave(
+                text: text,
+                at: anchoredBinding.location,
+                expecting: .existingContent(
+                    anchoredBinding.identity,
+                    sha256Digest: anchoredBinding.sha256Digest
+                )
+            )
+            switch outcome {
+            case let .committedAndDurable(result):
+                cleanupResult = result.cleanupState == .none ? nil : result
+                indeterminateSessionWrites[sessionIdentity] = nil
+                indeterminateSessionWriteContexts[sessionIdentity] = nil
+                anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
+                    location: anchoredBinding.location,
+                    identity: result.metadata.identity,
+                    sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+                )
+            case let .notCommitted(result):
+                throw notCommittedFileWriteError(result, destinationURL: url)
+            case let .committedButIndeterminate(result):
+                indeterminateSessionWrites[sessionIdentity] = result
+                indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+                    location: anchoredBinding.location,
+                    preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+                )
+                cancelAutosave(for: session)
+                handleAnchoredExternalChange(for: session, binding: anchoredBinding)
+                throw MarkdownFileStoreError.writeRequiresReconciliation(url, result)
+            }
+        } else {
+            savedThroughAnchoredBinding = false
+            anchoredSessionFileBindings[sessionIdentity] = nil
+            cleanupResult = try performLegacyFileSave(text: text, to: url)
         }
         session.markSaved(text: text, url: url)
         sessionPolicy.updateDirtyState(for: url, isDirty: false)
         detachedSessionURLs.remove(url)
-        recordKnownDiskText(text, for: url)
+        if savedThroughAnchoredBinding {
+            lastKnownDiskHashes[url] = Self.contentHash(text)
+            lastKnownDiskModificationDates[url] = nil
+        } else {
+            recordKnownDiskText(text, for: url)
+        }
+        if let cleanupResult {
+            presentCommittedFileWriteCleanup(cleanupResult, destinationURL: url)
+        }
+    }
+
+    func performAnchoredFileSave(
+        text: String,
+        at location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) throws -> WorkspaceFileWriteOutcome {
+        if let anchoredFileSaveOverride {
+            return try anchoredFileSaveOverride(text, location, expectation)
+        }
+        return try fileStore.save(text: text, at: location, expecting: expectation)
+    }
+
+    func performLegacyFileSave(
+        text: String,
+        to destinationURL: URL
+    ) throws -> WorkspaceDurableFileWrite? {
+        do {
+            try SecurityScopedAccess.withAccess(to: destinationURL) {
+                if let legacyFileSaveOverride {
+                    try legacyFileSaveOverride(text, destinationURL)
+                } else {
+                    try fileStore.save(text: text, to: destinationURL)
+                }
+            }
+            return nil
+        } catch let error as MarkdownFileStoreError {
+            switch error {
+            case let .committedWithCleanupRequired(_, result):
+                return result
+            case let .writeNotCommittedWithCleanupRequired(_, result):
+                retainFileWriteArtifactNotice(
+                    destinationURL: destinationURL,
+                    destinationWasCommitted: false,
+                    artifactState: result.artifactState
+                )
+                throw error
+            default:
+                throw error
+            }
+        }
+    }
+
+    func notCommittedFileWriteError(
+        _ result: WorkspaceNotCommittedFileWrite,
+        destinationURL: URL
+    ) -> MarkdownFileStoreError {
+        guard result.artifactState != .none else {
+            return .unwritable(destinationURL)
+        }
+        retainFileWriteArtifactNotice(
+            destinationURL: destinationURL,
+            destinationWasCommitted: false,
+            artifactState: result.artifactState
+        )
+        return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+    }
+
+    func presentCommittedFileWriteCleanup(
+        _ result: WorkspaceDurableFileWrite,
+        destinationURL: URL
+    ) {
+        guard result.cleanupState != .none else { return }
+        retainFileWriteArtifactNotice(
+            destinationURL: destinationURL,
+            destinationWasCommitted: true,
+            artifactState: result.cleanupState
+        )
+        present(
+            MarkdownFileStoreError.committedWithCleanupRequired(destinationURL, result),
+            title: "File Saved; Cleanup Required"
+        )
+    }
+
+    private func retainFileWriteArtifactNotice(
+        destinationURL: URL,
+        destinationWasCommitted: Bool,
+        artifactState: WorkspaceFileWriteArtifactState
+    ) {
+        guard artifactState != .none else { return }
+        let notice = FileWriteArtifactNotice(
+            destinationURL: destinationURL.standardizedFileURL,
+            destinationWasCommitted: destinationWasCommitted,
+            artifactState: artifactState
+        )
+        guard !fileWriteArtifactNotices.contains(notice) else { return }
+        fileWriteArtifactNotices.append(notice)
     }
 
     func cancelForegroundDocumentTasks() {
@@ -299,11 +450,10 @@ extension AppState {
         do {
             let directoryURL = directoryID.flatMap(workspaceURL(for:))
             let resultingURL = try operation(root, directoryURL)
-            refreshWorkspaceAfterFileSystemChange()
-
             if openCreatedFile, FileKind(url: resultingURL) != nil {
                 openWorkspaceFile(resultingURL)
             }
+            refreshWorkspaceAfterFileSystemChange()
         } catch {
             present(error, title: "Workspace Operation Failed")
         }

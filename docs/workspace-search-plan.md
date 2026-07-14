@@ -1,9 +1,10 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. The headless WS3B lifecycle
-> foundation and authority-bound reload auto-open are implemented, but WS3B remains open until
-> workspace-search-result activation consumes retained result authority and PR #82 is restacked;
-> visible WS3 sidebar work and WS4 also remain pending.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. The headless WS3B lifecycle and
+> filesystem-authority hardening are implemented, including authority-bound reload,
+> workspace-search-result and file-tree activation, completion reads, and session writes.
+> The visible Files/Search sidebar workline still needs to be restacked; the remaining visible
+> WS3 sidebar work and WS4 also remain pending.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -215,18 +216,34 @@ App state.
 The reusable WorkspaceKit filesystem foundation is specified in
 `docs/workspace-filesystem-contract.md`. Workspace reload captures one descriptor-backed root
 authority together with its snapshot off the main actor. When reload auto-opens a selected
-document, location construction, anchored loading, and cache/session validation remain rooted
-in `capture.rootAuthority`; all throwing preparation completes before the capture and prepared
-activation are committed without a main-actor suspension and only while the workspace
-generation is current. A post-proof replacement or activation mismatch installs none of the
-stale capture. Main-actor search-request construction remains filesystem-free. Production reads
-walk lexical root-relative paths through a retained no-follow descriptor chain and validate the
-root, every ancestor, the final parent, and the leaf before publishing bytes.
+document, location construction and the exact file byte load remain rooted in
+`capture.rootAuthority`. The loaded descriptor identity and exact-byte digest become the
+session's anchored binding, and a cached current/warm session is reconciled from the loaded
+activation file instead of returning early. Because the load may suspend, the selected root
+spelling is proved a second time after the load and immediately before the prepared activation,
+capture, installed generation, and tree are committed without a main-actor suspension. A failed
+proof or activation installs none of the stale capture. A current-session/state-location change
+during that suspension cancels publication, and cached/retired activation source arbitration is
+repeated after the final proof before the uninterrupted commit. An external namespace mutation can still
+race after that last proof, so this is not claimed to be identity-atomic; retained authority and
+later fail-closed validation keep such a race from redirecting a consumer to root B. Main-actor
+search-request construction remains filesystem-free. Production reads walk lexical
+root-relative paths through a retained no-follow descriptor chain and validate the root, every
+ancestor, the final parent, and the leaf before publishing bytes.
 
 Each production disk result, and each overlay result whose physical destination was validated,
 carries `WorkspaceSearchFileAuthority`: the same retained location plus identity sampled from
-the exact read/validation descriptor. Workspace-search-result activation remains a later
-consumer of that result authority; reload auto-open does not close that gate.
+the exact read/validation descriptor. Workspace-search-result activation consumes that retained
+location and identity; after activation it compares the installed session binding's location
+with the accepted target before fingerprint/range navigation. File-tree/sidebar opening derives
+its location from the installed authority. Completion refresh retains the installed authority
+and current binding location for sibling reads; if the current session binding belongs to a
+previous authority, refresh fails closed to current-document-only completion and reads no
+siblings from the installed replacement root. Reload rejects a previous-authority location that
+lexically collides inside the new root, while treating an outgoing retained location outside the
+new root as unrelated so a normal workspace A-to-unrelated-workspace B switch can install B's
+first editable file. None of these paths decides what to read or save by resolving a mutable
+post-install root or session URL.
 
 Every `WorkspaceSearchFileResult` carries a `WorkspaceSearchContentFingerprint` computed
 from the exact `String` passed to `TextSearchEngine`. Its digest is the 64-character
@@ -243,7 +260,9 @@ empty, absolute, and traversing paths and stores a canonical workspace-relative 
 `WorkspaceSearchOverlayCollection` rejects dictionary key/path mismatches and rejects every
 normalized collision instead of choosing a winner by input or dictionary iteration order;
 for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
-take precedence over disk content.
+take precedence over disk content. An anchored dirty session is eligible only when its retained
+root authority equals the installed authority used for the request; moving root A and placing B
+at the old spelling cannot inject a cached A session's dirty text into B's search.
 
 Workspace document identity keeps one physical-target policy. Initial in-root aliases are
 resolved and containment-checked during candidate planning, then expressed as one canonical
@@ -392,10 +411,13 @@ changes, close/switch, empty-query clear, and teardown explicitly cancel that Ta
 root/workspace/query context checks gate every event, and task-token checks prevent an older
 cleanup from touching newer state. Workspace reload captures the retained snapshot and its
 single descriptor-backed filesystem authority together off the main actor, generation-fences
-installation, prepares optional auto-open through that same authority (including cache/session
-validation), and makes request construction on the main actor filesystem-free. Requests add
+installation, loads optional activation bytes/identity/digest through that same authority, and
+reconciles even a cached current session from that loaded file. A second selected-root proof runs
+after the activation load immediately before the uninterrupted main-actor commit. Cached or
+retired reuse additionally requires any retained binding or exact re-homed quarantine location
+to equal the prepared activation location; URL equality cannot rebind A to replacement B. Requests add
 validated immutable dirty overlays from current and warm Markdown/MDX sessions without
-selecting another root.
+selecting another root, and request construction on the main actor stays filesystem-free.
 
 The App/editor bridge also carries an opaque binding ID distinct from optional navigation
 identity. EditorKit reports installation only from a successful `finishDocumentTransition`
@@ -420,15 +442,43 @@ registration cleanup is exact and idempotent: retired, evicted, and closed sessi
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
-The two activation paths are deliberately distinct. Reload auto-open is implemented here: after
-selected-root proof, selected-node location, anchored loading, and cache/session validation
-consume `capture.rootAuthority` end-to-end, and failed or mismatched auto-open cannot leave the
-new capture installed. Workspace-search-result activation is still deferred: the restacked #82
-App workline must consume the selected result's retained `WorkspaceSearchFileAuthority` instead
-of deriving fresh authority from its URL. Until that search-result activation work is integrated
-and #82 is restacked, headless WS3B is not complete. Its cancellation, fingerprint, exact range,
-command, and binding-lifecycle requirements otherwise remain unchanged. Sidebar UI,
-shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh remain pending.
+Installed workspace sessions retain the exact authority location, descriptor identity, and
+exact-byte digest. Cmd-S/autosave uses the typed anchored `existingContent` write instead of
+resolving a session URL. Save Copy into the installed workspace uses the same authority with a
+typed `existingOrMissing` expectation and first inspects the target through its anchored parent.
+It rejects descriptor-noncanonical spellings, physical-identity collisions, and locations owned by
+current, cached, retired, or editor-bound sessions, including context-only missing quarantines;
+case folding is applied only when that parent reports a case-insensitive filesystem, so distinct
+case spellings remain valid on case-sensitive volumes. It removes only the source session's old
+state after durable success. Any anchored session write
+or Save Copy `committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
+a readable Save Copy destination is re-homed with observed identity/digest for Reload or Keep Mine,
+while a still-missing destination can be retried only with exclusive `missing`. A retry denoting
+that same destination reuses the exact quarantined location even after workspace close or an A/B
+root replacement, and the re-homed context remains the exact session-state key instead of
+following a later replacement symlink. Until reconciliation clears the quarantine, any different
+destination spelling is refused rather than allowed to alias the uncertain entry through case,
+Unicode normalization, or an outside-workspace symlink and fall through to a broad anchored or
+legacy URL write. Cmd-S, autosave, and a second `.existingOrMissing` write cannot retry blindly.
+Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
+App completes the clean/re-home transition, retains the exact authority artifact notice, and
+presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact
+notice. The legacy URL facade emits committed-cleanup and noncommit-cleanup errors rather than
+discarding those typed states, and both App legacy paths consume committed-cleanup as success.
+
+The two activation paths remain deliberately distinct but are both authority-bound. Reload
+activation consumes `capture.rootAuthority`, performs its second selected-root proof after the
+load, and installs nothing on failure. Workspace-search-result activation consumes the accepted
+result's retained `WorkspaceSearchFileAuthority`, activates its exact location/identity, and
+checks the installed binding location rather than resolving the result URL. Existing file-tree
+sidebar opens and completion reads likewise retain the installed authority; a context-only
+quarantined session is treated as authority-bound, so completion cannot derive sibling reads from
+replacement B and reload rejects a cross-authority disposition. The last proof does
+not prevent a later external namespace race; subsequent anchored operations detect disagreement
+and fail closed instead of being described as identity-atomic. Cancellation, fingerprint, exact
+range, command, and binding-lifecycle requirements otherwise remain unchanged. Visible sidebar
+UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent search refresh remain
+pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -482,6 +532,11 @@ shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh 
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.
+- [x] Bind reload, workspace-search-result and file-tree activation, completion reads, and
+  session save to the installed filesystem authority without post-install URL resolution.
+- [x] Preserve typed write outcomes through App save, including exact-digest expectations,
+  descriptor-canonical installed-workspace Save Copy ownership protection, exact cleanup-artifact
+  notices, and per-session indeterminate quarantine.
 - [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
 
 ### WS4 — CI, performance, and acceptance
@@ -501,9 +556,9 @@ shortcuts/focus, rendering/accessibility, and general edit/FSEvent auto-refresh 
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
+| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; session-scoped external conflicts; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens correct node/session; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; post-load root A/B rejection; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts and indeterminate-write quarantine; installed-workspace Save Copy with descriptor-canonical cached/retired/editor ownership checks, write-only/no-access and missing case-alias refusal, distinct-case success on case-sensitive volumes, readable-destination reconciliation, exclusive missing retry, exact-context A/B retry, case-variant/outside-symlink retry refusal, and symlink-safe context cleanup; durable/noncommit cleanup-artifact notices through anchored and legacy ordinary/Save Copy paths; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

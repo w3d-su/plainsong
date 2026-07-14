@@ -2,6 +2,104 @@ import Darwin
 import Foundation
 
 extension WorkspaceAnchoredFileSystem {
+    struct TemporaryPreparationError: Error {
+        let reason: WorkspaceAnchoredFileSystemError
+        let name: String
+        let location: WorkspaceFileSystemLocation
+        let descriptor: Int32
+        let expectedIdentity: WorkspaceFileSystemIdentity?
+        let expectedByteCount: Int64
+        let expectedSHA256Digest: String
+    }
+
+    enum ArtifactIdentityObservation {
+        case matchesExpected
+        case missingOrDifferent
+        case inspectionFailed(WorkspaceAnchoredFileSystemError)
+    }
+
+    struct PreparedRecoveryMaterial {
+        let descriptor: Int32
+        let expectedIdentity: WorkspaceFileSystemIdentity?
+        let expectedByteCount: Int64
+        let expectedSHA256Digest: String
+
+        init(_ prepared: PreparedWrite) {
+            descriptor = prepared.descriptor
+            expectedIdentity = prepared.metadata.identity
+            expectedByteCount = prepared.expectedByteCount
+            expectedSHA256Digest = prepared.expectedSHA256Digest
+        }
+
+        init(_ error: TemporaryPreparationError) {
+            descriptor = error.descriptor
+            expectedIdentity = error.expectedIdentity
+            expectedByteCount = error.expectedByteCount
+            expectedSHA256Digest = error.expectedSHA256Digest
+        }
+    }
+
+    enum PostCleanupDestinationExpectation {
+        case existing(descriptor: Int32, metadata: WorkspaceCoherentFileMetadata)
+        case missing
+    }
+
+    struct PostCleanupDestinationContext {
+        let expectation: PostCleanupDestinationExpectation
+        let location: WorkspaceFileSystemLocation
+        let chain: DirectoryDescriptorChain
+        let parentDescriptor: Int32
+        let leaf: String
+
+        init(
+            target: WriteTarget,
+            location: WorkspaceFileSystemLocation,
+            chain: DirectoryDescriptorChain,
+            parentDescriptor: Int32,
+            leaf: String
+        ) {
+            expectation = switch target {
+            case let .existing(descriptor, metadata, _, _):
+                .existing(descriptor: descriptor, metadata: metadata)
+            case .missing:
+                .missing
+            }
+            self.location = location
+            self.chain = chain
+            self.parentDescriptor = parentDescriptor
+            self.leaf = leaf
+        }
+
+        init(existing context: ExistingWriteContext) {
+            expectation = .existing(
+                descriptor: context.originalDescriptor,
+                metadata: context.originalMetadata
+            )
+            location = context.commit.location
+            chain = context.commit.chain
+            parentDescriptor = context.commit.parentDescriptor
+            leaf = context.commit.leaf
+        }
+
+        init(missing context: WriteCommitContext) {
+            expectation = .missing
+            location = context.location
+            chain = context.chain
+            parentDescriptor = context.parentDescriptor
+            leaf = context.leaf
+        }
+    }
+
+    enum PostCleanupDestinationObservation {
+        case entry(DirectoryEntryIdentity)
+        case missing
+    }
+
+    struct PreparedRecoveryEvidence {
+        let identity: WorkspaceFileSystemIdentity?
+        let metadata: WorkspaceCoherentFileMetadata?
+    }
+
     static func write(
         _ data: Data,
         to location: WorkspaceFileSystemLocation,
@@ -50,6 +148,13 @@ extension WorkspaceAnchoredFileSystem {
             return notCommitted(reason: normalizedError(error), artifactState: .none)
         }
         defer { closeWriteTarget(target) }
+        let postCleanupContext = PostCleanupDestinationContext(
+            target: target,
+            location: location,
+            chain: chain,
+            parentDescriptor: parentDescriptor,
+            leaf: leaf
+        )
 
         let prepared: PreparedWrite
         do {
@@ -61,14 +166,21 @@ extension WorkspaceAnchoredFileSystem {
                 hooks: hooks
             )
         } catch let error as TemporaryPreparationError {
+            defer { Darwin.close(error.descriptor) }
             let artifactState = removeArtifact(
                 named: error.name,
                 location: error.location,
                 expectedIdentity: error.expectedIdentity,
+                borrowedDescriptor: error.descriptor,
                 context: artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
-            return notCommitted(reason: error.reason, artifactState: artifactState)
+            return postCleanupOutcome(
+                reason: error.reason,
+                artifactState: artifactState,
+                prepared: PreparedRecoveryMaterial(error),
+                context: postCleanupContext
+            )
         } catch {
             return notCommitted(reason: normalizedError(error), artifactState: .none)
         }
@@ -90,17 +202,21 @@ extension WorkspaceAnchoredFileSystem {
                 named: prepared.name,
                 location: prepared.location,
                 expectedIdentity: prepared.metadata.identity,
+                borrowedDescriptor: prepared.descriptor,
                 context: artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
-            return notCommitted(
+            return postCleanupOutcome(
                 reason: normalizedError(error),
-                artifactState: artifactState
+                artifactState: artifactState,
+                prepared: PreparedRecoveryMaterial(prepared),
+                context: postCleanupContext
             )
         }
 
         let commit = WriteCommitContext(
             prepared: prepared,
+            location: location,
             chain: chain,
             parentDescriptor: parentDescriptor,
             leaf: leaf,
@@ -130,10 +246,16 @@ extension WorkspaceAnchoredFileSystem {
                 named: commit.prepared.name,
                 location: commit.prepared.location,
                 expectedIdentity: commit.prepared.metadata.identity,
+                borrowedDescriptor: commit.prepared.descriptor,
                 context: commit.artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
-            return notCommitted(reason: normalizedError(error), artifactState: artifactState)
+            return postCleanupOutcome(
+                reason: normalizedError(error),
+                artifactState: artifactState,
+                prepared: PreparedRecoveryMaterial(commit.prepared),
+                context: PostCleanupDestinationContext(existing: context)
+            )
         }
 
         commit.hooks.emit(.didCommit(.swap))
@@ -241,10 +363,16 @@ extension WorkspaceAnchoredFileSystem {
                 named: context.prepared.name,
                 location: context.prepared.location,
                 expectedIdentity: context.prepared.metadata.identity,
+                borrowedDescriptor: context.prepared.descriptor,
                 context: context.artifactRemovalContext,
                 unlinkCall: .cleanupTemporary
             )
-            return notCommitted(reason: normalizedError(error), artifactState: artifactState)
+            return postCleanupOutcome(
+                reason: normalizedError(error),
+                artifactState: artifactState,
+                prepared: PreparedRecoveryMaterial(context.prepared),
+                context: PostCleanupDestinationContext(missing: context)
+            )
         }
 
         context.hooks.emit(.didCommit(.exclusiveCreate))

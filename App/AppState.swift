@@ -26,6 +26,12 @@ protocol WorkspaceDirectoryScanning: Sendable {
 
 extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
 
+struct FileWriteArtifactNotice: Equatable {
+    let destinationURL: URL
+    let destinationWasCommitted: Bool
+    let artifactState: WorkspaceFileWriteArtifactState
+}
+
 /// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
@@ -65,6 +71,7 @@ final class AppState: ObservableObject {
     @Published var presentedError: UserVisibleError?
     @Published var externalChangePrompt: ExternalChangePrompt?
     @Published var missingFilePrompt: MissingFilePrompt?
+    @Published var fileWriteArtifactNotices: [FileWriteArtifactNotice] = []
     @Published private(set) var wysiwygFallbackMessage: String?
     @Published private(set) var editorFocusRequestID = 0
 
@@ -84,6 +91,20 @@ final class AppState: ObservableObject {
     var workspaceReloadTask: Task<Void, Never>?
     /// Deterministic test seam at the final root-proof -> reload-activation boundary.
     var workspaceReloadPostProofHook: (@MainActor () throws -> Void)?
+    /// Deterministic test seam after the authority-bound activation file is loaded.
+    var workspaceReloadPostLoadHook: (@MainActor () throws -> Void)?
+    /// Deterministic test seam after activation-file preparation but before the final root proof.
+    var workspaceReloadPostPrepareHook: (@MainActor () throws -> Void)?
+    /// Deterministic test seam after search activation but before its identity arbitration.
+    var workspaceSearchPostActivationHook: (@MainActor () throws -> Void)?
+    /// Deterministic test seam for typed anchored-save outcomes.
+    var anchoredFileSaveOverride: (@MainActor (
+        String,
+        WorkspaceFileSystemLocation,
+        WorkspaceNoFollowFileWriteExpectation
+    ) throws -> WorkspaceFileWriteOutcome)?
+    /// Deterministic test seam for the synchronous URL facade's mapped outcome.
+    var legacyFileSaveOverride: (@MainActor (String, URL) throws -> Void)?
     var workspaceSearchTask: Task<Void, Never>?
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
@@ -106,6 +127,13 @@ final class AppState: ObservableObject {
     var lastKnownDiskModificationDates: [URL: Date] = [:]
     var pendingExternalTexts: [URL: String] = [:]
     var detachedSessionURLs: Set<URL> = []
+    /// Exact authority, identity, and content installed for each anchored workspace session.
+    /// Saves use this proof instead of recapturing the session's mutable URL.
+    var anchoredSessionFileBindings: [ObjectIdentifier: AnchoredWorkspaceSessionFileBinding] = [:]
+    /// A typed indeterminate commit must be reconciled before this session can write again.
+    var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:]
+    /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
+    var indeterminateSessionWriteContexts: [ObjectIdentifier: IndeterminateSessionWriteContext] = [:]
     let preferences: PlainsongPreferences
     private(set) var isWYSIWYGMechanismHealthy = true
 
@@ -153,6 +181,9 @@ final class AppState: ObservableObject {
     }
 
     deinit {
+        workspaceReloadTask?.cancel()
+        completionWorkspaceTask?.cancel()
+        workspaceWatcher?.stop()
         workspaceSearchTask?.cancel()
         for task in sessionAutosaveTasks.values {
             task.task.cancel()
@@ -218,29 +249,6 @@ final class AppState: ObservableObject {
         isExperimentalWYSIWYGAvailable
             ? "Cycle layout: source + preview, source only, WYSIWYG (Experimental)"
             : "Toggle layout between source + preview and source only"
-    }
-
-    var hasOpenDocument: Bool {
-        currentDocument.fileURL != nil
-    }
-
-    var canSave: Bool {
-        guard let url = currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else {
-            return false
-        }
-        return !isSaving &&
-            !detachedSessionURLs.contains(url) &&
-            pendingExternalTexts[url] == nil &&
-            externalChangePrompt?.fileURL.standardizedFileURL != url &&
-            missingFilePrompt?.fileURL.standardizedFileURL != url
-    }
-
-    var windowTitle: String {
-        workspaceRootURL?.lastPathComponent ?? currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
-    }
-
-    var previewAssetRootURL: URL? {
-        workspaceRootURL
     }
 
     func restoreLastOpenedFileIfNeeded() {
@@ -418,7 +426,8 @@ final class AppState: ObservableObject {
            let persistedMode = EditorLayoutMode(rawValue: rawMode)
         {
             guard persistedMode != .wysiwyg || isExperimentalWYSIWYGEnabled else {
-                let message = "Experimental WYSIWYG is disabled; falling back to source-only layout without changing source text."
+                let message = "Experimental WYSIWYG is disabled; " +
+                    "falling back to source-only layout without changing source text."
                 userDefaults.set(EditorLayoutMode.sourceOnly.rawValue, forKey: layoutModeDefaultsKey)
                 NSLog("[Plainsong] %@", message)
                 return (.sourceOnly, message)
@@ -437,6 +446,32 @@ final class AppState: ObservableObject {
         userDefaults.set(migratedMode.rawValue, forKey: layoutModeDefaultsKey)
         userDefaults.removeObject(forKey: legacyPreviewVisibleDefaultsKey)
         return (migratedMode, nil)
+    }
+}
+
+extension AppState {
+    var hasOpenDocument: Bool {
+        currentDocument.fileURL != nil
+    }
+
+    var canSave: Bool {
+        guard let url = sessionStateURL(for: currentDocument) else {
+            return false
+        }
+        return !isSaving &&
+            indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
+            !detachedSessionURLs.contains(url) &&
+            pendingExternalTexts[url] == nil &&
+            externalChangePrompt?.fileURL.standardizedFileURL != url &&
+            missingFilePrompt?.fileURL.standardizedFileURL != url
+    }
+
+    var windowTitle: String {
+        workspaceRootURL?.lastPathComponent ?? currentDocument.fileURL?.lastPathComponent ?? "Plainsong"
+    }
+
+    var previewAssetRootURL: URL? {
+        workspaceRootURL
     }
 }
 

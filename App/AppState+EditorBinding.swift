@@ -114,7 +114,7 @@ extension AppState {
     }
 
     func isManagedEditorSession(_ session: DocumentSession) -> Bool {
-        guard let fileURL = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else {
+        guard let fileURL = sessionStateURL(for: session) else {
             return session === currentDocument
         }
         guard !detachedSessionURLs.contains(fileURL) else { return false }
@@ -231,7 +231,7 @@ extension AppState {
         }
 
         let session = retirement.session
-        let canonicalURL = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
+        let canonicalURL = sessionStateURL(for: session)
         if let canonicalURL, pendingExternalTexts[canonicalURL] != nil {
             cancelAutosave(for: session)
             return
@@ -275,6 +275,9 @@ extension AppState {
         lastKnownDiskModificationDates[canonicalURL] = nil
         pendingExternalTexts[canonicalURL] = nil
         detachedSessionURLs.remove(canonicalURL)
+        anchoredSessionFileBindings[ObjectIdentifier(session)] = nil
+        indeterminateSessionWrites[ObjectIdentifier(session)] = nil
+        indeterminateSessionWriteContexts[ObjectIdentifier(session)] = nil
     }
 }
 

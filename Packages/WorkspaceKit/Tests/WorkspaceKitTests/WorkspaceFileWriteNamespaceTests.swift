@@ -160,8 +160,9 @@ extension WorkspaceAnchoredFileSystemTests {
         )
 
         try mutation.rethrowIfFailed()
-        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .namespaceChanged))
-        XCTAssertEqual(result.artifactState, .none)
+        let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .changedIdentity))
+        XCTAssertNotNil(result.preparedMetadata)
+        XCTAssertEqual(result.recoveryArtifact, .none)
         try assertReplacementRace(
             fixture: fixture,
             movedDestination: moved,
@@ -236,9 +237,10 @@ extension WorkspaceAnchoredFileSystemTests {
         )
 
         try mutation.rethrowIfFailed()
-        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .namespaceChanged))
-        guard case let .removalIndeterminate(artifact) = result.artifactState else {
-            return XCTFail("Expected indeterminate prepared cleanup, got \(result.artifactState)")
+        let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .namespaceChanged))
+        XCTAssertNotNil(result.preparedMetadata)
+        guard case let .removalIndeterminate(artifact) = result.recoveryArtifact else {
+            return XCTFail("Expected indeterminate prepared cleanup, got \(result.recoveryArtifact)")
         }
         try assertReplacementRace(
             fixture: fixture,

@@ -16,10 +16,16 @@ public struct MarkdownFile: Sendable, Equatable {
 public struct MarkdownFileReadResult: Sendable, Equatable {
     public let file: MarkdownFile
     public let metadata: WorkspaceCoherentFileMetadata
+    public let sha256Digest: String
 
-    public init(file: MarkdownFile, metadata: WorkspaceCoherentFileMetadata) {
+    public init(
+        file: MarkdownFile,
+        metadata: WorkspaceCoherentFileMetadata,
+        sha256Digest: String
+    ) {
         self.file = file
         self.metadata = metadata
+        self.sha256Digest = sha256Digest
     }
 }
 
@@ -28,6 +34,8 @@ public enum MarkdownFileStoreError: LocalizedError, Equatable {
     case unreadable(URL)
     case unwritable(URL)
     case changedIdentity(URL)
+    case writeNotCommittedWithCleanupRequired(URL, WorkspaceNotCommittedFileWrite)
+    case committedWithCleanupRequired(URL, WorkspaceDurableFileWrite)
     case writeRequiresReconciliation(URL, WorkspaceIndeterminateFileWrite)
 
     public var errorDescription: String? {
@@ -40,8 +48,38 @@ public enum MarkdownFileStoreError: LocalizedError, Equatable {
             "Could not save changes to \(url.lastPathComponent)."
         case let .changedIdentity(url):
             "\(url.lastPathComponent) changed before it could be opened."
+        case let .writeNotCommittedWithCleanupRequired(url, result):
+            Self.artifactDescription(
+                destinationURL: url,
+                artifactState: result.artifactState,
+                destinationWasCommitted: false
+            )
+        case let .committedWithCleanupRequired(url, result):
+            Self.artifactDescription(
+                destinationURL: url,
+                artifactState: result.cleanupState,
+                destinationWasCommitted: true
+            )
         case let .writeRequiresReconciliation(url, _):
             "\(url.lastPathComponent) may already contain the new bytes and must be reconciled."
+        }
+    }
+
+    private static func artifactDescription(
+        destinationURL: URL,
+        artifactState: WorkspaceFileWriteArtifactState,
+        destinationWasCommitted: Bool
+    ) -> String {
+        let outcome = destinationWasCommitted
+            ? "\(destinationURL.lastPathComponent) was saved"
+            : "\(destinationURL.lastPathComponent) was not replaced"
+        return switch artifactState {
+        case .none:
+            outcome
+        case let .retained(location):
+            "\(outcome), but a recovery artifact was retained at \(location.fileURL.path)."
+        case let .removalIndeterminate(location):
+            "\(outcome), but removal of the recovery artifact at \(location.fileURL.path) could not be confirmed."
         }
     }
 }
@@ -65,7 +103,12 @@ public struct MarkdownFileStore: Sendable {
     /// Loads through a caller-established root authority, walking every relative path
     /// component with `O_NOFOLLOW` and reading from the same verified descriptor.
     public func load(at location: WorkspaceFileSystemLocation) throws -> MarkdownFile {
-        try loadResult(at: location, expectedIdentity: nil).file
+        try loadResult(at: location).file
+    }
+
+    /// Preserves metadata sampled from the same descriptor that supplied the returned bytes.
+    public func loadResult(at location: WorkspaceFileSystemLocation) throws -> MarkdownFileReadResult {
+        try performLoadResult(at: location, expectedIdentity: nil)
     }
 
     /// Loads and validates `expectedIdentity` against metadata sampled from the same
@@ -74,10 +117,10 @@ public struct MarkdownFileStore: Sendable {
         at location: WorkspaceFileSystemLocation,
         expecting expectedIdentity: WorkspaceFileSystemIdentity
     ) throws -> MarkdownFileReadResult {
-        try loadResult(at: location, expectedIdentity: expectedIdentity)
+        try performLoadResult(at: location, expectedIdentity: expectedIdentity)
     }
 
-    private func loadResult(
+    private func performLoadResult(
         at location: WorkspaceFileSystemLocation,
         expectedIdentity: WorkspaceFileSystemIdentity?
     ) throws -> MarkdownFileReadResult {
@@ -100,7 +143,8 @@ public struct MarkdownFileStore: Sendable {
                 }
                 return MarkdownFileReadResult(
                     file: MarkdownFile(url: url, text: text, fileKind: fileKind),
-                    metadata: result.metadata
+                    metadata: result.metadata,
+                    sha256Digest: WorkspaceAnchoredFileSystem.sha256Digest(result.data)
                 )
             }
         } catch let error as MarkdownFileStoreError {
@@ -127,18 +171,35 @@ public struct MarkdownFileStore: Sendable {
                         expecting: .existingOrMissing
                     )
                 }
-            switch outcome {
-            case .committedAndDurable:
-                return
-            case .notCommitted:
-                throw MarkdownFileStoreError.unwritable(url)
-            case let .committedButIndeterminate(indeterminate):
-                throw MarkdownFileStoreError.writeRequiresReconciliation(url, indeterminate)
-            }
+            try Self.mapLegacySaveOutcome(outcome, destinationURL: url)
         } catch let error as MarkdownFileStoreError {
             throw error
         } catch {
             throw MarkdownFileStoreError.unwritable(url)
+        }
+    }
+
+    static func mapLegacySaveOutcome(
+        _ outcome: WorkspaceFileWriteOutcome,
+        destinationURL: URL
+    ) throws {
+        switch outcome {
+        case let .committedAndDurable(result):
+            guard result.cleanupState != .none else { return }
+            throw MarkdownFileStoreError.committedWithCleanupRequired(destinationURL, result)
+        case let .notCommitted(result):
+            guard result.artifactState != .none else {
+                throw MarkdownFileStoreError.unwritable(destinationURL)
+            }
+            throw MarkdownFileStoreError.writeNotCommittedWithCleanupRequired(
+                destinationURL,
+                result
+            )
+        case let .committedButIndeterminate(indeterminate):
+            throw MarkdownFileStoreError.writeRequiresReconciliation(
+                destinationURL,
+                indeterminate
+            )
         }
     }
 

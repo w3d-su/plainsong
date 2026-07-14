@@ -109,6 +109,63 @@ final class WorkspaceAnchoredFileSystemTests: XCTestCase {
         XCTAssertThrowsError(try MarkdownFileStore().load(at: outsideLocation))
     }
 
+    func testTargetInspectionSupportsWriteOnlyAndNoAccessExistingFile() throws {
+        let root = try makeTemporaryDirectory()
+        let file = root.appendingPathComponent("post.md")
+        let unrelatedHardLink = root.appendingPathComponent("unrelated-hard-link.md")
+        try "original".write(to: unrelatedHardLink, atomically: true, encoding: .utf8)
+        try FileManager.default.linkItem(at: unrelatedHardLink, to: file)
+        defer { try? FileManager.default.removeItem(at: root) }
+        defer { _ = Darwin.chmod(file.path, mode_t(S_IRUSR | S_IWUSR)) }
+
+        let location = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            .location(relativePath: "post.md")
+        let expectedParentIsCaseSensitive = try caseSensitivity(at: root)
+        let fileStatus = try noFollowStatus(at: file)
+        let expectedIdentity = WorkspaceFileSystemIdentity(
+            device: UInt64(fileStatus.st_dev),
+            inode: UInt64(fileStatus.st_ino)
+        )
+
+        for mode in [mode_t(S_IWUSR), mode_t(0)] {
+            XCTAssertEqual(Darwin.chmod(file.path, mode), 0)
+
+            let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
+
+            XCTAssertEqual(inspection.state, .regular(expectedIdentity))
+            XCTAssertEqual(inspection.canonicalLocation, location)
+            XCTAssertEqual(
+                inspection.parentIsCaseSensitive,
+                expectedParentIsCaseSensitive
+            )
+        }
+    }
+
+    func testMissingTargetInspectionReturnsDescriptorCanonicalCaseAliasParent() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let canonicalDirectory = root.appendingPathComponent("Folder", isDirectory: true)
+        let aliasDirectory = root.appendingPathComponent("folder", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: canonicalDirectory,
+            withIntermediateDirectories: true
+        )
+        guard FileManager.default.fileExists(atPath: aliasDirectory.path) else {
+            throw XCTSkip("Case-sensitive volume has no case-alias directory")
+        }
+
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let aliasLocation = try authority.location(relativePath: "folder/recovered.md")
+        let expectedLocation = try authority.location(relativePath: "Folder/recovered.md")
+
+        let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: aliasLocation)
+
+        XCTAssertEqual(inspection.state, .missing)
+        XCTAssertEqual(inspection.canonicalLocation, expectedLocation)
+        XCTAssertNotEqual(inspection.canonicalLocation, aliasLocation)
+        XCTAssertFalse(inspection.parentIsCaseSensitive)
+    }
+
     func testLeafReplacementAfterParentIsAnchoredCannotRedirectRead() async throws {
         let parent = try makeTemporaryDirectory()
         let root = parent.appendingPathComponent("workspace", isDirectory: true)
@@ -223,6 +280,23 @@ extension WorkspaceAnchoredFileSystemTests {
             throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
         }
         return fileStatus
+    }
+
+    func caseSensitivity(at directory: URL) throws -> Bool {
+        let descriptor = Darwin.open(
+            directory.path,
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
+        )
+        guard descriptor >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        defer { Darwin.close(descriptor) }
+        errno = 0
+        let value = Darwin.fpathconf(descriptor, _PC_CASE_SENSITIVE)
+        guard value >= 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        return value != 0
     }
 
     func assertNoWriteTemporaryFiles(

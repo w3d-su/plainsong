@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 @testable import WorkspaceKit
 import XCTest
@@ -63,6 +64,128 @@ extension WorkspaceAnchoredFileSystemTests {
         try assertFixtureSentinel(fixture)
     }
 
+    func testRollbackCleanupSupportsWriteOnlyDestinationMode() throws {
+        let fixture = try makeWriteFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let originalIdentity = try XCTUnwrap(fixture.originalIdentity)
+        XCTAssertEqual(Darwin.chmod(fixture.destination.path, mode_t(S_IWUSR)), 0)
+        defer { _ = Darwin.chmod(fixture.destination.path, mode_t(S_IRUSR | S_IWUSR)) }
+        let modeInspection = temporaryModeInspection(
+            for: fixture,
+            expectedMode: mode_t(S_IWUSR)
+        )
+        let hooks = rollbackFailureHooks(modeInspection: modeInspection)
+
+        let outcome = write(
+            to: fixture,
+            expecting: .existing(originalIdentity),
+            hooks: hooks
+        )
+
+        try modeInspection.rethrowIfFailed()
+        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .unreadable))
+        XCTAssertEqual(result.artifactState, .none)
+        XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
+        try assertNoWriteArtifacts(for: fixture)
+        try assertFixtureSentinel(fixture)
+    }
+
+    func testRollbackCleanupSupportsNoAccessDestinationMode() throws {
+        let fixture = try makeWriteFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let originalIdentity = try XCTUnwrap(fixture.originalIdentity)
+        XCTAssertEqual(Darwin.chmod(fixture.destination.path, mode_t(0)), 0)
+        defer { _ = Darwin.chmod(fixture.destination.path, mode_t(S_IRUSR | S_IWUSR)) }
+        let modeInspection = temporaryModeInspection(for: fixture, expectedMode: mode_t(0))
+        let hooks = rollbackFailureHooks(modeInspection: modeInspection)
+
+        let outcome = write(
+            to: fixture,
+            expecting: .existing(originalIdentity),
+            hooks: hooks
+        )
+
+        try modeInspection.rethrowIfFailed()
+        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .unreadable))
+        XCTAssertEqual(result.artifactState, .none)
+        XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
+        try assertNoWriteArtifacts(for: fixture)
+        try assertFixtureSentinel(fixture)
+    }
+
+    func testCleanupInspectionErrorCannotCollapseToNoArtifact() throws {
+        let fixture = try makeWriteFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.parent) }
+        let originalIdentity = try XCTUnwrap(fixture.originalIdentity)
+        let directory = fixture.destination.deletingLastPathComponent()
+        let originalMode = try mode_t(noFollowStatus(at: directory).st_mode & mode_t(0o7777))
+        defer { _ = Darwin.chmod(directory.path, originalMode) }
+        let permissionMutation = SynchronousMutation {
+            guard Darwin.chmod(directory.path, mode_t(0)) == 0 else {
+                throw WorkspaceWriteModeTestError.permissionChangeFailed
+            }
+        }
+        let hooks = WorkspaceAnchoredFileSystem.Hooks(injectedFailure: { call in
+            switch call {
+            case .renameSwap:
+                return .unreadable
+            case .syncCleanupDirectory:
+                permissionMutation.run()
+                return nil
+            default:
+                return nil
+            }
+        })
+
+        let outcome = write(
+            to: fixture,
+            expecting: .existing(originalIdentity),
+            hooks: hooks
+        )
+
+        XCTAssertEqual(Darwin.chmod(directory.path, originalMode), 0)
+        try permissionMutation.rethrowIfFailed()
+        let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .unreadable))
+        guard case .removalIndeterminate = result.recoveryArtifact else {
+            return XCTFail("Inspection failure must not report no cleanup artifact")
+        }
+        XCTAssertEqual(try writeFileIdentity(at: fixture.destination), originalIdentity)
+        try assertFixtureSentinel(fixture)
+    }
+
+    private func temporaryModeInspection(
+        for fixture: WorkspaceWriteFixture,
+        expectedMode: mode_t
+    ) -> SynchronousMutation {
+        SynchronousMutation {
+            let directory = fixture.destination.deletingLastPathComponent()
+            let temporaryURLs = try self.writeTemporaryURLs(in: directory)
+            guard temporaryURLs.count == 1, let temporary = temporaryURLs.first else {
+                throw WorkspaceWriteModeTestError.unexpectedArtifactCount(temporaryURLs.count)
+            }
+            let status = try self.noFollowStatus(at: temporary)
+            guard mode_t(status.st_mode & mode_t(0o7777)) == expectedMode else {
+                throw WorkspaceWriteModeTestError.unexpectedMode(status.st_mode)
+            }
+        }
+    }
+
+    private func rollbackFailureHooks(
+        modeInspection: SynchronousMutation
+    ) -> WorkspaceAnchoredFileSystem.Hooks {
+        WorkspaceAnchoredFileSystem.Hooks(injectedFailure: { call in
+            switch call {
+            case .afterRenameSwap:
+                return .unreadable
+            case .cleanupTemporary:
+                modeInspection.run()
+                return nil
+            default:
+                return nil
+            }
+        })
+    }
+
     func testFailureAfterExclusiveRenameRemovesCreatedDestinationAndSyncsRollback() throws {
         let fixture = try makeWriteFixture(originalText: nil)
         defer { try? FileManager.default.removeItem(at: fixture.parent) }
@@ -81,7 +204,7 @@ extension WorkspaceAnchoredFileSystemTests {
         try assertFixtureSentinel(fixture)
     }
 
-    func testExclusiveCommitCollisionDoesNotReplaceRacingDestination() throws {
+    func testExclusiveCommitCollisionCannotProveDestinationMissing() throws {
         let fixture = try makeWriteFixture(originalText: nil)
         defer { try? FileManager.default.removeItem(at: fixture.parent) }
         let mutation = SynchronousMutation {
@@ -98,8 +221,9 @@ extension WorkspaceAnchoredFileSystemTests {
         let outcome = write(to: fixture, expecting: .missing, hooks: hooks)
 
         try mutation.rethrowIfFailed()
-        let result = try XCTUnwrap(requireNotCommitted(outcome, reason: .changedIdentity))
-        XCTAssertEqual(result.artifactState, .none)
+        let result = try XCTUnwrap(requireIndeterminate(outcome, reason: .changedIdentity))
+        XCTAssertNotNil(result.preparedMetadata)
+        XCTAssertEqual(result.recoveryArtifact, .none)
         XCTAssertEqual(try writeText(at: fixture.destination), "racing destination")
         try assertNoWriteArtifacts(for: fixture)
         try assertFixtureSentinel(fixture)
@@ -190,4 +314,10 @@ extension WorkspaceAnchoredFileSystemTests {
         try assertNoWriteArtifacts(for: fixture)
         try assertFixtureSentinel(fixture)
     }
+}
+
+private enum WorkspaceWriteModeTestError: Error {
+    case permissionChangeFailed
+    case unexpectedArtifactCount(Int)
+    case unexpectedMode(mode_t)
 }

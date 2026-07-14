@@ -9,23 +9,32 @@ extension AppState {
     /// without resolving either the workspace root or a cached session URL again.
     func prepareAnchoredFileSessionActivation(
         file: MarkdownFile,
-        at location: WorkspaceFileSystemLocation
+        at location: WorkspaceFileSystemLocation,
+        metadata: WorkspaceCoherentFileMetadata,
+        sha256Digest: String
     ) throws -> PreparedAnchoredFileSessionActivation {
         let key = location.fileURL
         guard file.url == key else {
             throw AppStateError.invalidSessionIdentity(key)
         }
+        let binding = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: metadata.identity,
+            sha256Digest: sha256Digest
+        )
 
         if let cachedSession = sessionCache[key] {
             guard cachedSession.fileURL?.standardizedFileURL == key else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
+            try validateReusableAnchoredSession(cachedSession, at: location)
             guard !detachedSessionURLs.contains(key) else {
                 throw AppStateError.missingFile(key)
             }
             return PreparedAnchoredFileSessionActivation(
                 canonicalURL: key,
                 file: file,
+                binding: binding,
                 session: cachedSession,
                 source: .cached
             )
@@ -40,9 +49,11 @@ extension AppState {
             return (bindingID, retirement)
         }
         if retiredMatches.count == 1, let match = retiredMatches.first {
+            try validateReusableAnchoredSession(match.1.session, at: location)
             return PreparedAnchoredFileSessionActivation(
                 canonicalURL: key,
                 file: file,
+                binding: binding,
                 session: match.1.session,
                 source: .retired(bindingID: match.0)
             )
@@ -51,6 +62,7 @@ extension AppState {
         return PreparedAnchoredFileSessionActivation(
             canonicalURL: key,
             file: file,
+            binding: binding,
             session: DocumentSession(
                 text: file.text,
                 url: file.url,
@@ -61,6 +73,23 @@ extension AppState {
         )
     }
 
+    private func validateReusableAnchoredSession(
+        _ session: DocumentSession,
+        at location: WorkspaceFileSystemLocation
+    ) throws {
+        let sessionIdentity = ObjectIdentifier(session)
+        if let retainedBinding = anchoredSessionFileBindings[sessionIdentity],
+           retainedBinding.location != location
+        {
+            throw AppStateError.invalidSessionIdentity(location.fileURL)
+        }
+        if let retainedContext = indeterminateSessionWriteContexts[sessionIdentity],
+           retainedContext.location != location
+        {
+            throw AppStateError.invalidSessionIdentity(location.fileURL)
+        }
+    }
+
     /// Applies a fully validated activation without further throwing filesystem work. Reload
     /// commits this and its snapshot/authority/tree as one uninterrupted main-actor transaction.
     func commitAnchoredFileSessionActivation(
@@ -68,15 +97,14 @@ extension AppState {
     ) {
         let key = activation.canonicalURL
         let session = activation.session
+        anchoredSessionFileBindings[ObjectIdentifier(session)] = activation.binding
 
         switch activation.source {
         case .cached:
-            if session === currentDocument {
-                handleSessionAccess(url: key, isDirty: session.isDirty)
-                return
+            if session !== currentDocument {
+                cancelForegroundDocumentTasks()
+                setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
-            cancelForegroundDocumentTasks()
-            setCurrentDocument(session, synchronizingWorkspaceTree: false)
             reconcileSession(session, withAnchoredFile: activation.file, canonicalURL: key)
             handleSessionAccess(url: key, isDirty: session.isDirty)
 
@@ -106,6 +134,24 @@ extension AppState {
         }
     }
 
+    func activateAnchoredFileSession(
+        at location: WorkspaceFileSystemLocation,
+        expecting expectedIdentity: WorkspaceFileSystemIdentity? = nil
+    ) throws {
+        let result: MarkdownFileReadResult = if let expectedIdentity {
+            try fileStore.load(at: location, expecting: expectedIdentity)
+        } else {
+            try fileStore.loadResult(at: location)
+        }
+        let activation = try prepareAnchoredFileSessionActivation(
+            file: result.file,
+            at: location,
+            metadata: result.metadata,
+            sha256Digest: result.sha256Digest
+        )
+        commitAnchoredFileSessionActivation(activation)
+    }
+
     func proveSelectedRootStillNamesCapture(
         selectedRoot: URL,
         rootAuthority: WorkspaceFileSystemRootAuthority
@@ -131,9 +177,14 @@ extension AppState {
                 let location = try rootAuthority.canonicalizedLocation(
                     forFileURL: candidateURL
                 )
-                let file = try fileStore.load(at: location)
+                let result = try fileStore.loadResult(at: location)
                 try Task.checkCancellation()
-                return PreparedWorkspaceReloadFile(location: location, file: file)
+                return PreparedWorkspaceReloadFile(
+                    location: location,
+                    file: result.file,
+                    metadata: result.metadata,
+                    sha256Digest: result.sha256Digest
+                )
             }
             defer { group.cancelAll() }
             guard let preparedFile = try await group.next() else {
@@ -172,6 +223,17 @@ extension AppState {
         canonicalURL: URL
     ) {
         let diskHash = Self.contentHash(file.text)
+        if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
+            pendingExternalTexts[canonicalURL] = file.text
+            lastKnownDiskHashes[canonicalURL] = diskHash
+            lastKnownDiskModificationDates[canonicalURL] = nil
+            cancelAutosave(for: session)
+            if session === currentDocument {
+                missingFilePrompt = nil
+                externalChangePrompt = ExternalChangePrompt(fileURL: canonicalURL)
+            }
+            return
+        }
         guard lastKnownDiskHashes[canonicalURL] != diskHash else { return }
 
         if session.isDirty {
@@ -203,6 +265,79 @@ extension AppState {
         lastKnownDiskHashes[canonicalURL] = Self.contentHash(text)
         lastKnownDiskModificationDates[canonicalURL] = nil
     }
+
+    func anchoredSessionFileBinding(
+        for session: DocumentSession
+    ) -> AnchoredWorkspaceSessionFileBinding? {
+        guard let fileURL = session.fileURL?.standardizedFileURL,
+              let binding = anchoredSessionFileBindings[ObjectIdentifier(session)],
+              binding.location.fileURL == fileURL
+        else {
+            return nil
+        }
+        return binding
+    }
+
+    /// Authority retained for one session even when an indeterminate missing Save Copy has no
+    /// readable destination from which to install a normal anchored binding. The context only
+    /// identifies the session after it has been rehomed to that exact destination URL.
+    func retainedAnchoredSessionLocation(
+        for session: DocumentSession
+    ) -> WorkspaceFileSystemLocation? {
+        if let binding = anchoredSessionFileBinding(for: session) {
+            return binding.location
+        }
+        guard let fileURL = session.fileURL?.standardizedFileURL,
+              let context = indeterminateSessionWriteContexts[ObjectIdentifier(session)],
+              context.location.fileURL == fileURL
+        else {
+            return nil
+        }
+        return context.location
+    }
+
+    /// Canonical App-state key for one session. Anchored workspace sessions never resolve their
+    /// mutable display URL again; legacy standalone sessions retain the prior URL behavior.
+    func sessionStateURL(for session: DocumentSession) -> URL? {
+        if let location = retainedAnchoredSessionLocation(for: session) {
+            return location.fileURL
+        }
+        return session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
+    }
+
+    func recordKnownSessionDiskText(
+        _ text: String,
+        for session: DocumentSession,
+        canonicalURL: URL
+    ) {
+        if anchoredSessionFileBinding(for: session) != nil {
+            lastKnownDiskHashes[canonicalURL] = Self.contentHash(text)
+            lastKnownDiskModificationDates[canonicalURL] = nil
+        } else {
+            recordKnownDiskText(text, for: canonicalURL)
+        }
+    }
+
+    func handleAnchoredExternalChange(
+        for session: DocumentSession,
+        binding: AnchoredWorkspaceSessionFileBinding
+    ) {
+        let key = binding.location.fileURL
+        switch WorkspaceNoFollowFileInspector.status(at: binding.location) {
+        case .missing:
+            markSessionDetachedFromMissingFile(session, url: key)
+        case .regular:
+            guard let result = try? fileStore.loadResult(at: binding.location) else { return }
+            anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
+                location: binding.location,
+                identity: result.metadata.identity,
+                sha256Digest: result.sha256Digest
+            )
+            reconcileSession(session, withAnchoredFile: result.file, canonicalURL: key)
+        case .symbolicLink, .notRegularFile, .unreadable:
+            return
+        }
+    }
 }
 
 struct PreparedAnchoredFileSessionActivation {
@@ -214,6 +349,7 @@ struct PreparedAnchoredFileSessionActivation {
 
     let canonicalURL: URL
     let file: MarkdownFile
+    let binding: AnchoredWorkspaceSessionFileBinding
     let session: DocumentSession
     let source: Source
 }
@@ -221,4 +357,17 @@ struct PreparedAnchoredFileSessionActivation {
 struct PreparedWorkspaceReloadFile {
     let location: WorkspaceFileSystemLocation
     let file: MarkdownFile
+    let metadata: WorkspaceCoherentFileMetadata
+    let sha256Digest: String
+}
+
+struct AnchoredWorkspaceSessionFileBinding: Equatable {
+    let location: WorkspaceFileSystemLocation
+    let identity: WorkspaceFileSystemIdentity
+    let sha256Digest: String
+}
+
+struct IndeterminateSessionWriteContext: Equatable {
+    let location: WorkspaceFileSystemLocation
+    let preparedSHA256Digest: String
 }

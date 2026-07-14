@@ -19,6 +19,12 @@ extension AppState {
         }
 
         let sessionsToClose = workspaceSessionsForClosure()
+        if let retirementLease,
+           let retirementURL = sessionStateURL(for: retirementLease.session),
+           detachedSessionURLs.contains(retirementURL)
+        {
+            throw AppStateError.missingFile(retirementURL)
+        }
         for session in sessionsToClose where session !== retirementLease?.session && session.isDirty {
             try save(session: session)
         }
@@ -47,7 +53,7 @@ private extension AppState {
     }
 
     func sessionClosureIdentity(_ session: DocumentSession) -> String {
-        session.fileURL?.standardizedFileURL.resolvingSymlinksInPath().absoluteString ?? ""
+        sessionStateURL(for: session)?.absoluteString ?? ""
     }
 
     func commitWorkspaceClosure(

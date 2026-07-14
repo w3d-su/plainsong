@@ -104,6 +104,42 @@ final class CompletionWorkspaceProviderTests: XCTestCase {
         XCTAssertFalse(workspace.frontmatterKeys.contains("key_50"))
     }
 
+    func testAnchoredWorkspaceDoesNotReadReplacementRootSibling() async throws {
+        let parent = try makeTemporaryDirectory()
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        let moved = parent.appendingPathComponent("captured-A", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let currentFile = root.appendingPathComponent("current.md")
+        try "Body A".write(to: currentFile, atomically: true, encoding: .utf8)
+        try "---\na_key: yes\n---\n".write(
+            to: root.appendingPathComponent("sibling.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let capture = try await WorkspaceDirectoryScanner().snapshotCapture(root: root)
+        let currentLocation = try capture.rootAuthority.canonicalizedLocation(
+            forFileURL: currentFile
+        )
+
+        try FileManager.default.moveItem(at: root, to: moved)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "Body B".write(to: root.appendingPathComponent("current.md"), atomically: true, encoding: .utf8)
+        try "---\nb_key: yes\n---\n".write(
+            to: root.appendingPathComponent("sibling.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let workspace = try CompletionWorkspaceProvider().workspace(
+            rootAuthority: capture.rootAuthority,
+            currentFileLocation: currentLocation,
+            currentText: "Body A",
+            snapshot: capture.snapshot
+        )
+
+        XCTAssertFalse(workspace.frontmatterKeys.contains("b_key"))
+    }
+
     private func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("CompletionWorkspaceProviderTests")

@@ -332,7 +332,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         return descriptor
     }
 
-    private static func descriptorURL(_ descriptor: Int32, isDirectory: Bool) throws -> URL {
+    static func descriptorURL(_ descriptor: Int32, isDirectory: Bool) throws -> URL {
         var information = vnode_fdinfowithpath()
         let result = Darwin.proc_pidfdinfo(
             Darwin.getpid(),

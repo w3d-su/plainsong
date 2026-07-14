@@ -75,11 +75,23 @@ extension AppState {
     ) {
         completionWorkspaceTask?.cancel()
 
-        let rootURL = workspaceRootURL
         let snapshot = workspaceSnapshot
+        let rootAuthority = workspaceSearchRootAuthority
         let workspaceGeneration = expectedWorkspaceGeneration ?? workspaceGeneration
         let fileURL = currentDocument.fileURL
         let text = currentDocument.text
+        let currentFileLocation: WorkspaceFileSystemLocation? = {
+            if let retainedLocation = retainedAnchoredSessionLocation(for: currentDocument) {
+                guard retainedLocation.rootAuthority == rootAuthority else { return nil }
+                return retainedLocation
+            }
+            guard let rootAuthority, let fileURL,
+                  let relativePath = try? rootAuthority.relativePath(forFileURL: fileURL)
+            else {
+                return nil
+            }
+            return try? rootAuthority.location(relativePath: relativePath)
+        }()
 
         completionWorkspaceTask = Task { @MainActor [weak self] in
             if debounceNanoseconds > 0 {
@@ -91,17 +103,17 @@ extension AppState {
             }
 
             let workspace = await Task.detached(priority: .utility) {
-                if let rootURL, let fileURL, let snapshot {
+                if let rootAuthority, let currentFileLocation, let snapshot {
                     do {
                         return try CompletionWorkspaceProvider().workspace(
-                            rootURL: rootURL,
-                            currentFileURL: fileURL,
+                            rootAuthority: rootAuthority,
+                            currentFileLocation: currentFileLocation,
                             currentText: text,
                             snapshot: snapshot
                         )
                     } catch {
                         return CompletionWorkspace(
-                            currentFilePath: fileURL.lastPathComponent,
+                            currentFilePath: currentFileLocation.fileURL.lastPathComponent,
                             currentFileHeadingAnchors: []
                         )
                     }
@@ -124,7 +136,11 @@ extension AppState {
 
             guard let self,
                   !Task.isCancelled,
-                  self.workspaceGeneration == workspaceGeneration
+                  self.workspaceGeneration == workspaceGeneration,
+                  rootAuthority == nil || (
+                      workspaceInstalledCaptureGeneration == workspaceGeneration
+                          && workspaceSearchRootAuthority == rootAuthority
+                  )
             else {
                 return
             }
@@ -149,8 +165,11 @@ extension AppState {
 
         for session in candidateSessions where session.isDirty {
             let sessionIdentity = ObjectIdentifier(session)
+            let anchoredBinding = anchoredSessionFileBinding(for: session)
             guard seenSessions.insert(sessionIdentity).inserted,
-                  let fileURL = session.fileURL?.standardizedFileURL,
+                  anchoredBinding == nil || anchoredBinding?.location.rootAuthority == rootAuthority,
+                  let fileURL = anchoredBinding?.location.fileURL
+                  ?? session.fileURL?.standardizedFileURL,
                   !detachedSessionURLs.contains(fileURL),
                   let inferredKind = FileKind(url: fileURL),
                   inferredKind == session.fileKind

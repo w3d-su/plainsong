@@ -6,6 +6,7 @@ extension WorkspaceAnchoredFileSystem {
         named name: String,
         location: WorkspaceFileSystemLocation,
         expectedIdentity: WorkspaceFileSystemIdentity?,
+        borrowedDescriptor: Int32?,
         context: ArtifactRemovalContext,
         unlinkCall: InjectedCall
     ) -> WorkspaceFileWriteArtifactState {
@@ -13,6 +14,7 @@ extension WorkspaceAnchoredFileSystem {
             named: name,
             location: location,
             expectedIdentity: expectedIdentity,
+            borrowedDescriptor: borrowedDescriptor,
             context: context,
             unlinkCall: unlinkCall,
             syncCall: .syncCleanupDirectory
@@ -23,6 +25,7 @@ extension WorkspaceAnchoredFileSystem {
         named name: String,
         location: WorkspaceFileSystemLocation,
         expectedIdentity: WorkspaceFileSystemIdentity?,
+        borrowedDescriptor: Int32?,
         context: ArtifactRemovalContext,
         unlinkCall: InjectedCall,
         syncCall: InjectedCall
@@ -38,6 +41,7 @@ extension WorkspaceAnchoredFileSystem {
             name: name,
             location: location,
             expectedIdentity: expectedIdentity,
+            borrowedDescriptor: borrowedDescriptor,
             context: context,
             unlinkCall: unlinkCall,
             syncCall: syncCall
@@ -86,8 +90,7 @@ extension WorkspaceAnchoredFileSystem {
                 name: request.name,
                 expectedIdentity: request.expectedIdentity
             )
-            // Pre-quarantine boundary for temporary/rollback artifact hooks. Re-validate after
-            // the hook so an unrelated replacement is never moved into quarantine.
+            // Re-validate after the cleanup hook so an unrelated replacement is never moved.
             try request.context.hooks.check(request.unlinkCall)
             try request.context.chain.validateNamespace()
             try validateArtifactIdentity(
@@ -95,10 +98,8 @@ extension WorkspaceAnchoredFileSystem {
                 name: request.name,
                 expectedIdentity: request.expectedIdentity
             )
-            // RENAME_EXCL protects only the random sibling destination. macOS cannot condition
-            // this rename on the validated source inode. This is the final instrumented
-            // boundary; an injected race fails closed before the syscall, while production
-            // retains an honest last-check-to-rename name race.
+            // RENAME_EXCL only protects the random destination; macOS cannot condition this
+            // rename on the validated source inode, leaving a residual production name race.
             try request.context.hooks.check(.renameQuarantinedArtifactAfterValidation)
         } catch {
             return .failed(ArtifactRemovalResult(
@@ -166,6 +167,7 @@ extension WorkspaceAnchoredFileSystem {
 
         // Bind an open descriptor to the writer-owned inode before any destructive name op.
         let openedDescriptor: Int32
+        var ownedDescriptor: Int32?
         do {
             try request.context.chain.validateNamespace()
             try validateArtifactIdentity(
@@ -173,23 +175,31 @@ extension WorkspaceAnchoredFileSystem {
                 name: artifact.name,
                 expectedIdentity: request.expectedIdentity
             )
-            openedDescriptor = try openFile(
-                parentDescriptor: parentDescriptor,
-                leaf: artifact.name,
-                flags: O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
-            )
+            if let borrowedDescriptor = request.borrowedDescriptor {
+                openedDescriptor = borrowedDescriptor
+            } else {
+                openedDescriptor = try openFile(
+                    parentDescriptor: parentDescriptor,
+                    leaf: artifact.name,
+                    flags: O_EVTONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+                )
+                ownedDescriptor = openedDescriptor
+            }
             let openedMetadata = try regularFileMetadata(descriptor: openedDescriptor)
             guard openedMetadata.identity == expectedIdentity else {
-                Darwin.close(openedDescriptor)
                 throw WorkspaceAnchoredFileSystemError.namespaceChanged
             }
         } catch {
+            if let ownedDescriptor { Darwin.close(ownedDescriptor) }
             return quarantineRemovalFailure(
                 artifact: artifact,
                 error: error
             )
         }
-        defer { Darwin.close(openedDescriptor) }
+        // A writer-owned descriptor is borrowed through cleanup and remains owned by its caller.
+        defer {
+            if let ownedDescriptor { Darwin.close(ownedDescriptor) }
+        }
 
         // Post-validation / pre-removal boundary. Tests install racers here.
         do {
@@ -201,9 +211,8 @@ extension WorkspaceAnchoredFileSystem {
             )
         }
 
-        // Rebind the name to the open-fd identity. macOS has no regular-file fd unlink or
-        // identity-conditional unlink. The final hook exposes the last validation-to-unlinkat
-        // boundary; an injected race fails closed. Production retains that residual name race.
+        // Rebind the name to the open-fd identity. macOS lacks identity-conditional unlink;
+        // the final hook exposes that residual validation-to-unlinkat race to tests.
         do {
             try request.context.chain.validateNamespace()
             let entry = try directoryEntryIdentity(
@@ -237,21 +246,40 @@ extension WorkspaceAnchoredFileSystem {
             )
         }
 
+        return finalizeArtifactRemoval(artifact)
+    }
+
+    private static func finalizeArtifactRemoval(
+        _ artifact: QuarantinedArtifact
+    ) -> ArtifactRemovalResult {
+        let request = artifact.request
         do {
             try request.context.chain.validateNamespace()
             try request.context.hooks.check(request.syncCall)
-            try syncDirectory(parentDescriptor)
-            try request.context.chain.validateNamespace()
-            guard !artifactReferencesIdentity(
-                parentDescriptor: parentDescriptor,
-                name: artifact.name,
-                expectedIdentity: expectedIdentity
-            ), !artifactReferencesIdentity(
-                parentDescriptor: parentDescriptor,
-                name: request.name,
-                expectedIdentity: expectedIdentity
-            ) else {
-                throw WorkspaceAnchoredFileSystemError.cleanupFailed
+            try syncDirectory(request.context.parentDescriptor)
+            for candidate in [
+                (name: artifact.name, location: artifact.location),
+                (name: request.name, location: request.location),
+            ] {
+                switch observeArtifactIdentity(
+                    parentDescriptor: request.context.parentDescriptor,
+                    name: candidate.name,
+                    expectedIdentity: request.expectedIdentity,
+                    context: request.context
+                ) {
+                case .matchesExpected:
+                    return ArtifactRemovalResult(
+                        state: .retained(candidate.location),
+                        failureReason: .cleanupFailed
+                    )
+                case .missingOrDifferent:
+                    continue
+                case let .inspectionFailed(error):
+                    return ArtifactRemovalResult(
+                        state: .removalIndeterminate(artifact.location),
+                        failureReason: error
+                    )
+                }
             }
             return ArtifactRemovalResult(state: .none, failureReason: nil)
         } catch {
@@ -298,18 +326,38 @@ extension WorkspaceAnchoredFileSystem {
         }
     }
 
-    static func artifactReferencesIdentity(
+    static func observeArtifactIdentity(
         parentDescriptor: Int32,
         name: String,
-        expectedIdentity: WorkspaceFileSystemIdentity
-    ) -> Bool {
-        guard let entry = try? directoryEntryIdentity(
-            parentDescriptor: parentDescriptor,
-            component: name
-        ) else {
-            return false
+        expectedIdentity: WorkspaceFileSystemIdentity,
+        context: ArtifactRemovalContext
+    ) -> ArtifactIdentityObservation {
+        do {
+            try context.chain.validateNamespace()
+        } catch {
+            return .inspectionFailed(normalizedError(error))
         }
-        return entry.isRegularFile && entry.identity == expectedIdentity
+        let result = Result {
+            try directoryEntryIdentity(
+                parentDescriptor: parentDescriptor,
+                component: name
+            )
+        }
+        do {
+            try context.chain.validateNamespace()
+        } catch {
+            return .inspectionFailed(normalizedError(error))
+        }
+        switch result {
+        case let .success(entry):
+            return entry.isRegularFile && entry.identity == expectedIdentity
+                ? .matchesExpected
+                : .missingOrDifferent
+        case let .failure(error):
+            return normalizedError(error) == .missing
+                ? .missingOrDifferent
+                : .inspectionFailed(normalizedError(error))
+        }
     }
 
     static func artifactState(
@@ -332,17 +380,20 @@ extension WorkspaceAnchoredFileSystem {
         expectedIdentity: WorkspaceFileSystemIdentity,
         context: ArtifactRemovalContext
     ) -> WorkspaceFileWriteArtifactState {
-        do {
-            try context.chain.validateNamespace()
-        } catch {
-            return .removalIndeterminate(fallbackLocation)
-        }
-        for candidate in candidates where artifactReferencesIdentity(
-            parentDescriptor: context.parentDescriptor,
-            name: candidate.name,
-            expectedIdentity: expectedIdentity
-        ) {
-            return .retained(candidate.location)
+        for candidate in candidates {
+            switch observeArtifactIdentity(
+                parentDescriptor: context.parentDescriptor,
+                name: candidate.name,
+                expectedIdentity: expectedIdentity,
+                context: context
+            ) {
+            case .matchesExpected:
+                return .retained(candidate.location)
+            case .missingOrDifferent:
+                continue
+            case .inspectionFailed:
+                return .removalIndeterminate(fallbackLocation)
+            }
         }
         return .removalIndeterminate(fallbackLocation)
     }

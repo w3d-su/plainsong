@@ -305,7 +305,36 @@ public enum WorkspaceNoFollowFileStatus: Sendable, Equatable {
     case unreadable
 }
 
+public enum WorkspaceNoFollowFileTargetState: Sendable, Equatable {
+    case regular(WorkspaceFileSystemIdentity)
+    case missing
+}
+
+public struct WorkspaceNoFollowFileTargetInspection: Sendable, Equatable {
+    public let state: WorkspaceNoFollowFileTargetState
+    public let canonicalLocation: WorkspaceFileSystemLocation
+    public let parentIsCaseSensitive: Bool
+
+    public init(
+        state: WorkspaceNoFollowFileTargetState,
+        canonicalLocation: WorkspaceFileSystemLocation,
+        parentIsCaseSensitive: Bool
+    ) {
+        self.state = state
+        self.canonicalLocation = canonicalLocation
+        self.parentIsCaseSensitive = parentIsCaseSensitive
+    }
+}
+
 public enum WorkspaceNoFollowFileInspector {
+    public static func inspectFileTarget(
+        at location: WorkspaceFileSystemLocation
+    ) throws -> WorkspaceNoFollowFileTargetInspection {
+        try WorkspaceAnchoredFileSystem.withSecurityScopedAccess(to: location) {
+            try WorkspaceAnchoredFileSystem.inspectFileTarget(location)
+        }
+    }
+
     public static func status(at url: URL) -> WorkspaceNoFollowFileStatus {
         guard let location = try? WorkspaceFileSystemLocation(fileURL: url) else {
             return .unreadable
