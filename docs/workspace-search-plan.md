@@ -464,7 +464,9 @@ a readable Save Copy destination is re-homed with observed identity/digest for R
 while a proven-missing destination exposes only exact-location `.missing` recovery. Symlink,
 non-regular, unreadable, and inspection-failure states remain quarantined with an actionable Check
 Again reconciliation that reclassifies only the retained location and authority. The exact
-location, result, and prepared digest remain retained. Cmd-S and autosave stay blocked; every
+location, URL spelling, result, and prepared digest remain retained even when the leaf becomes a
+directory; the location captures its URL once, so a later leaf-kind change cannot append a slash.
+Cmd-S and autosave stay blocked; every
 differently spelled or broad Save Copy retry is refused before writer entry, and no legacy URL
 fallback is allowed.
 Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:

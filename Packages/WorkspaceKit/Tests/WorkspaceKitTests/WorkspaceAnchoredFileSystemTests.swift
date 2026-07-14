@@ -4,6 +4,24 @@ import Foundation
 import XCTest
 
 final class WorkspaceAnchoredFileSystemTests: XCTestCase {
+    func testLocationFileURLSpellingDoesNotChangeWhenLeafBecomesDirectory() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let location = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            .location(relativePath: "recovered.md")
+        let retainedURL = location.fileURL
+        XCTAssertFalse(retainedURL.absoluteString.hasSuffix("/"))
+
+        try FileManager.default.createDirectory(
+            at: retainedURL,
+            withIntermediateDirectories: false
+        )
+
+        XCTAssertEqual(location.fileURL, retainedURL)
+        XCTAssertEqual(location.fileURL.absoluteString, retainedURL.absoluteString)
+        XCTAssertFalse(location.fileURL.absoluteString.hasSuffix("/"))
+    }
+
     func testLocationRejectsEmbeddedNULBeforeCallingPOSIXAPIs() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

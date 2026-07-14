@@ -5,6 +5,7 @@ import Foundation
 public struct WorkspaceFileSystemLocation: Sendable, Hashable {
     public let rootAuthority: WorkspaceFileSystemRootAuthority
     public let relativePath: String
+    public let fileURL: URL
 
     public var rootURL: URL {
         rootAuthority.canonicalRootURL
@@ -12,12 +13,6 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
 
     public var securityScopedURL: URL {
         rootAuthority.securityScopedURL
-    }
-
-    public var fileURL: URL {
-        rootAuthority.canonicalRootURL
-            .appendingPathComponent(relativePath, isDirectory: false)
-            .standardizedFileURL
     }
 
     public init(
@@ -52,8 +47,21 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
         rootAuthority: WorkspaceFileSystemRootAuthority,
         relativePath: String
     ) throws {
+        let relativePath = try WorkspaceRootContainment.normalizedRelativePath(relativePath)
         self.rootAuthority = rootAuthority
-        self.relativePath = try WorkspaceRootContainment.normalizedRelativePath(relativePath)
+        self.relativePath = relativePath
+        fileURL = rootAuthority.canonicalRootURL
+            .appendingPathComponent(relativePath, isDirectory: false)
+            .standardizedFileURL
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.rootAuthority == rhs.rootAuthority && lhs.relativePath == rhs.relativePath
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rootAuthority)
+        hasher.combine(relativePath)
     }
 
     func sibling(named name: String) -> WorkspaceFileSystemLocation? {

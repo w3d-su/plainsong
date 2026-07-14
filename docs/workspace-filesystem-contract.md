@@ -240,7 +240,10 @@ variants collide only when the parent filesystem reports case-insensitive names;
 spellings remain valid on case-sensitive volumes. The sole self-collision exception is the source
 session saving to its byte-for-byte original path spelling after that exact leaf is proven missing.
 Regular aliases and hard links at that path still collide, and every other session remains
-protected. The App clears only the source session's old state after durable success. Any session
+protected. A retained location captures its file URL spelling once at construction; a later leaf
+kind change cannot append a directory slash or otherwise change the spelling used as the
+quarantine/session key. The App clears only the source session's old state after durable success.
+Any session
 `committedButIndeterminate`, including Save Copy, installs a per-session reconciliation quarantine
 that retains the exact destination and prepared-byte digest. A readable Save Copy destination is
 re-homed as the same dirty session with its observed identity/digest and is presented through
@@ -297,8 +300,9 @@ timing sleeps—to cover:
   inspection for `0200`/`000` leaves, cached/retired/editor ownership collision refusal,
   descriptor-retained unanchored ownership after unlink or path replacement, fail-closed missing
   proof, original-path missing recovery without source self-collision, missing case-alias quarantine
-  collision, distinct-case success on case-sensitive volumes, retained save authority after
-  workspace close, and per-session indeterminate-write quarantine;
+  collision, location URL stability when an invalid leaf becomes a directory, distinct-case success
+  on case-sensitive volumes, retained save authority after workspace close, and per-session
+  indeterminate-write quarantine;
 - final-suspension current-session changes and cached-source eviction, proving reload neither
   steals a newer selection nor commits a stale cached/retired activation;
 - Save Copy indeterminate outcomes with readable, still-missing, symlink, non-regular, and
