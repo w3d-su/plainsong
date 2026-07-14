@@ -3731,7 +3731,11 @@ final class AppStateTests: XCTestCase {
         XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL))
 
         XCTAssertEqual(writerEntries, 1)
-        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, destinationURL)
+        XCTAssertEqual(appState.currentDocument.fileURL, destinationURL)
+        XCTAssertEqual(
+            appState.currentDocument.fileURL?.absoluteString,
+            destinationURL.absoluteString
+        )
         XCTAssertEqual(
             appState.indeterminateFileWriteReconciliationPrompt,
             IndeterminateFileWriteReconciliationPrompt(fileURL: destinationURL, state: state)
