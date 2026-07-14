@@ -28,6 +28,7 @@ extension AppState {
                 else {
                     return
                 }
+                autosaveTask = nil
                 autosaveIfNeeded()
             } catch {
                 return

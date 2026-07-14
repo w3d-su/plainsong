@@ -97,9 +97,18 @@ private extension AppState {
         requiredBy retirementLease: InstalledEditorDocumentBindingLease?
     ) -> SecurityScopedResourceAccess? {
         guard let retirementLease,
-              let workspaceRootURL,
-              let fileURL = retirementLease.session.fileURL,
-              WorkspaceRootContainment.isContained(fileURL, in: workspaceRootURL)
+              let installedAuthority = workspaceSearchRootAuthority
+        else {
+            return nil
+        }
+        if let retainedLocation = retainedAnchoredSessionLocation(
+            for: retirementLease.session
+        ) {
+            guard retainedLocation.rootAuthority == installedAuthority else { return nil }
+            return authority
+        }
+        guard let fileURL = retirementLease.session.fileURL,
+              (try? installedAuthority.canonicalizedLocation(forFileURL: fileURL)) != nil
         else {
             return nil
         }

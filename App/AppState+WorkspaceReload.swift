@@ -109,16 +109,10 @@ extension AppState {
         // Off-main proof that the currently selected root spelling still names the captured
         // physical root. Reject stale captures rather than installing authority A while the
         // mutable selected spelling now opens B (and auto-activation would follow B).
-        do {
-            try await proveSelectedRootStillNamesCapture(
-                selectedRoot: root,
-                rootAuthority: capture.rootAuthority
-            )
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw CancellationError()
-        }
+        try await proveSelectedRootStillNamesCapture(
+            selectedRoot: root,
+            rootAuthority: capture.rootAuthority
+        )
         try Task.checkCancellation()
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()
@@ -171,16 +165,10 @@ extension AppState {
         // The activation load may suspend. Re-prove the selected spelling immediately before
         // the uninterrupted App-state commit so a root moved/replaced during that load is
         // rejected instead of publishing capture A under a spelling that now names B.
-        do {
-            try await proveSelectedRootStillNamesCapture(
-                selectedRoot: root,
-                rootAuthority: capture.rootAuthority
-            )
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw CancellationError()
-        }
+        try await proveSelectedRootStillNamesCapture(
+            selectedRoot: root,
+            rootAuthority: capture.rootAuthority
+        )
 
         guard isCurrentWorkspaceReload(root: root, generation: generation) else {
             throw CancellationError()

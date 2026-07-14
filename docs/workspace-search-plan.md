@@ -1,10 +1,10 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. The headless WS3B lifecycle and
-> filesystem-authority hardening are implemented, including authority-bound reload,
-> workspace-search-result and file-tree activation, completion reads, and session writes.
-> The visible Files/Search sidebar workline still needs to be restacked; the remaining visible
-> WS3 sidebar work and WS4 also remain pending.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. Draft PR #85 closes the WS3B
+> filesystem-authority/write sub-gate. Draft PR #82 remains the headless multi-window lifecycle
+> hardening PR and still requires restacking onto that authority baseline; it was not superseded
+> by a visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item,
+> refresh work, WS3C, WS4, and the overall Definition of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -444,27 +444,35 @@ cleanup; unrelated or stale revokes cannot clear a newer lease.
 
 Installed workspace sessions retain the exact authority location, descriptor identity, and
 exact-byte digest. Cmd-S/autosave uses the typed anchored `existingContent` write instead of
-resolving a session URL. Save Copy into the installed workspace uses the same authority with a
-typed `existingOrMissing` expectation and first inspects the target through its anchored parent.
-It rejects descriptor-noncanonical spellings, physical-identity collisions, and locations owned by
-current, cached, retired, or editor-bound sessions, including context-only missing quarantines;
-case folding is applied only when that parent reports a case-insensitive filesystem, so distinct
-case spellings remain valid on case-sensitive volumes. It removes only the source session's old
-state after durable success. Any anchored session write
-or Save Copy `committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
+resolving a session URL. Standalone ordinary save and every Save Copy destination also establish
+one no-follow `WorkspaceFileSystemLocation` before writing and consume the typed outcome directly.
+Save Copy reuses its one target inspection for both ownership arbitration and the first writer
+expectation: a regular file is `.existing(identity)` and an absent leaf is `.missing`; the first
+attempt is never widened to `.existingOrMissing`. Outside-workspace final symlinks are rejected
+instead of being followed by a legacy save. Descriptor-derived physical identity detects
+hard-link ownership across current, cached, retired, editor-bound, and unanchored standalone
+sessions. Case folding is applied only when that parent reports a case-insensitive filesystem, so
+distinct case spellings remain valid on case-sensitive volumes. Only the source session's old
+state is removed after durable success. Any session write or Save Copy
+`committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
 a readable Save Copy destination is re-homed with observed identity/digest for Reload or Keep Mine,
-while a still-missing destination can be retried only with exclusive `missing`. A retry denoting
-that same destination reuses the exact quarantined location even after workspace close or an A/B
-root replacement, and the re-homed context remains the exact session-state key instead of
-following a later replacement symlink. Until reconciliation clears the quarantine, any different
-destination spelling is refused rather than allowed to alias the uncertain entry through case,
-Unicode normalization, or an outside-workspace symlink and fall through to a broad anchored or
-legacy URL write. Cmd-S, autosave, and a second `.existingOrMissing` write cannot retry blindly.
+while a still-missing destination exposes the missing-file reconciliation state. The exact
+location, result, and prepared digest remain retained. Until explicit reconciliation clears the
+quarantine, Cmd-S, autosave, and every Save Copy spelling are refused before writer entry; no
+exclusive retry or legacy URL fallback is allowed.
 Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
 App completes the clean/re-home transition, retains the exact authority artifact notice, and
 presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact
-notice. The legacy URL facade emits committed-cleanup and noncommit-cleanup errors rather than
-discarding those typed states, and both App legacy paths consume committed-cleanup as success.
+notice. An explicit acknowledgement API removes the notice and releases its retained authority
+lifetime without deleting the artifact; workspace close preserves unacknowledged notices. The
+legacy URL facade continues to map typed outcomes for external callers, but App ordinary save and
+Save Copy no longer discard those outcomes through that facade.
+
+Workspace retirement transfers the active security-scoped lease only when the retiring session's
+retained binding or quarantine authority equals the installed workspace authority; mutable selected
+root containment is not consulted. Initial and final selected-root proof failures propagate their
+typed filesystem error to the normal reload error path. Only actual task/generation cancellation is
+silent.
 
 The two activation paths remain deliberately distinct but are both authority-bound. Reload
 activation consumes `capture.rootAuthority`, performs its second selected-root proof after the
@@ -558,7 +566,7 @@ pending.
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
 | WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; post-load root A/B rejection; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts and indeterminate-write quarantine; installed-workspace Save Copy with descriptor-canonical cached/retired/editor ownership checks, write-only/no-access and missing case-alias refusal, distinct-case success on case-sensitive volumes, readable-destination reconciliation, exclusive missing retry, exact-context A/B retry, case-variant/outside-symlink retry refusal, and symlink-safe context cleanup; durable/noncommit cleanup-artifact notices through anchored and legacy ordinary/Save Copy paths; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts and exact-location indeterminate-write quarantine with all second writes blocked; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

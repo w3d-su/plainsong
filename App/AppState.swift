@@ -26,10 +26,29 @@ protocol WorkspaceDirectoryScanning: Sendable {
 
 extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
 
-struct FileWriteArtifactNotice: Equatable {
+struct FileWriteArtifactNotice: Identifiable, Equatable {
+    let id: UUID
     let destinationURL: URL
     let destinationWasCommitted: Bool
     let artifactState: WorkspaceFileWriteArtifactState
+
+    init(
+        id: UUID = UUID(),
+        destinationURL: URL,
+        destinationWasCommitted: Bool,
+        artifactState: WorkspaceFileWriteArtifactState
+    ) {
+        self.id = id
+        self.destinationURL = destinationURL
+        self.destinationWasCommitted = destinationWasCommitted
+        self.artifactState = artifactState
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.destinationURL == rhs.destinationURL
+            && lhs.destinationWasCommitted == rhs.destinationWasCommitted
+            && lhs.artifactState == rhs.artifactState
+    }
 }
 
 /// Top-level app state for the current editor window.
@@ -103,8 +122,6 @@ final class AppState: ObservableObject {
         WorkspaceFileSystemLocation,
         WorkspaceNoFollowFileWriteExpectation
     ) throws -> WorkspaceFileWriteOutcome)?
-    /// Deterministic test seam for the synchronous URL facade's mapped outcome.
-    var legacyFileSaveOverride: (@MainActor (String, URL) throws -> Void)?
     var workspaceSearchTask: Task<Void, Never>?
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0

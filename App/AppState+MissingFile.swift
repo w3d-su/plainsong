@@ -60,59 +60,49 @@ extension AppState {
 
         let session = currentDocument
         let text = session.text
-        let workspaceLocation = try workspaceSaveCopyLocation(
+        let saveCopyLocation = try workspaceSaveCopyLocation(
             for: destinationURL,
             session: session
         )
-        let destination = workspaceLocation?.fileURL
-            ?? destinationURL.standardizedFileURL.resolvingSymlinksInPath()
+        let destination = saveCopyLocation.fileURL
         if let existingSession = sessionCache[destination], existingSession !== session {
             throw AppStateError.invalidSessionIdentity(destination)
         }
-        if let workspaceLocation {
-            try validateWorkspaceSaveCopyDestinationOwnership(
-                for: session,
-                at: workspaceLocation
-            )
-        }
+        let saveCopyInspection = try validateWorkspaceSaveCopyDestinationOwnership(
+            at: saveCopyLocation
+        )
 
-        let anchoredBinding: AnchoredWorkspaceSessionFileBinding?
+        let anchoredBinding: AnchoredWorkspaceSessionFileBinding
         let cleanupResult: WorkspaceDurableFileWrite?
-        if let workspaceLocation {
-            let expectation = try workspaceSaveCopyExpectation(
-                for: session,
+        let expectation = try workspaceSaveCopyExpectation(
+            for: session,
+            at: saveCopyLocation,
+            initialInspection: saveCopyInspection
+        )
+        let outcome = try performAnchoredFileSave(
+            text: text,
+            at: saveCopyLocation,
+            expecting: expectation
+        )
+        switch outcome {
+        case let .committedAndDurable(result):
+            cleanupResult = result.cleanupState == .none ? nil : result
+            anchoredBinding = AnchoredWorkspaceSessionFileBinding(
+                location: saveCopyLocation,
+                identity: result.metadata.identity,
+                sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+            )
+        case let .notCommitted(result):
+            throw notCommittedFileWriteError(result, destinationURL: destination)
+        case let .committedButIndeterminate(result):
+            quarantineIndeterminateSaveCopy(
+                session: session,
                 text: text,
                 oldURL: oldURL,
-                at: workspaceLocation
+                location: saveCopyLocation,
+                result: result
             )
-            let outcome = try performAnchoredFileSave(
-                text: text,
-                at: workspaceLocation,
-                expecting: expectation
-            )
-            switch outcome {
-            case let .committedAndDurable(result):
-                cleanupResult = result.cleanupState == .none ? nil : result
-                anchoredBinding = AnchoredWorkspaceSessionFileBinding(
-                    location: workspaceLocation,
-                    identity: result.metadata.identity,
-                    sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
-                )
-            case let .notCommitted(result):
-                throw notCommittedFileWriteError(result, destinationURL: destination)
-            case let .committedButIndeterminate(result):
-                quarantineIndeterminateSaveCopy(
-                    session: session,
-                    text: text,
-                    oldURL: oldURL,
-                    location: workspaceLocation,
-                    result: result
-                )
-                throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
-            }
-        } else {
-            cleanupResult = try performLegacyFileSave(text: text, to: destination)
-            anchoredBinding = nil
+            throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
         }
 
         clearSessionState(
@@ -122,13 +112,9 @@ extension AppState {
         )
         session.markSaved(text: text, url: destination)
         sessionCache[destination] = session
-        if let anchoredBinding {
-            anchoredSessionFileBindings[ObjectIdentifier(session)] = anchoredBinding
-            lastKnownDiskHashes[destination] = Self.contentHash(text)
-            lastKnownDiskModificationDates[destination] = nil
-        } else {
-            recordKnownDiskText(text, for: destination)
-        }
+        anchoredSessionFileBindings[ObjectIdentifier(session)] = anchoredBinding
+        lastKnownDiskHashes[destination] = Self.contentHash(text)
+        lastKnownDiskModificationDates[destination] = nil
         handleSessionAccess(url: destination, isDirty: false)
         rememberRecentItem(destination)
         if let cleanupResult {
@@ -137,9 +123,8 @@ extension AppState {
     }
 
     private func validateWorkspaceSaveCopyDestinationOwnership(
-        for sourceSession: DocumentSession,
         at location: WorkspaceFileSystemLocation
-    ) throws {
+    ) throws -> WorkspaceNoFollowFileTargetInspection {
         let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
         guard inspection.canonicalLocation == location else {
             // Keeping the request spelling as App state would split this session from the
@@ -152,7 +137,7 @@ extension AppState {
         case .missing: nil
         }
         var inspectedSessions: Set<ObjectIdentifier> = []
-        for candidate in workspaceSaveCopyOwnershipCandidates() where candidate !== sourceSession {
+        for candidate in workspaceSaveCopyOwnershipCandidates() {
             let sessionIdentity = ObjectIdentifier(candidate)
             guard inspectedSessions.insert(sessionIdentity).inserted else { continue }
 
@@ -175,6 +160,7 @@ extension AppState {
                 binding?.identity == destinationIdentity
                     || indeterminateSessionWrites[sessionIdentity]?.preparedMetadata?.identity
                     == destinationIdentity
+                    || workspaceSaveCopyPhysicalIdentity(for: candidate) == destinationIdentity
             } == true
             let unanchoredURLMayAlias = binding == nil && context == nil
                 && workspaceSaveCopySessionURL(
@@ -189,6 +175,22 @@ extension AppState {
                 throw AppStateError.invalidSessionIdentity(location.fileURL)
             }
         }
+        return inspection
+    }
+
+    private func workspaceSaveCopyPhysicalIdentity(
+        for session: DocumentSession
+    ) -> WorkspaceFileSystemIdentity? {
+        guard anchoredSessionFileBinding(for: session) == nil,
+              indeterminateSessionWriteContexts[ObjectIdentifier(session)] == nil,
+              let fileURL = session.fileURL,
+              let location = try? WorkspaceFileSystemLocation(fileURL: fileURL),
+              let inspection = try? WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
+        else {
+            return nil
+        }
+        guard case let .regular(identity) = inspection.state else { return nil }
+        return identity
     }
 
     private func workspaceSaveCopyOwnershipCandidates() -> [DocumentSession] {
@@ -248,69 +250,23 @@ extension AppState {
 
     private func workspaceSaveCopyExpectation(
         for session: DocumentSession,
-        text: String,
-        oldURL: URL,
-        at location: WorkspaceFileSystemLocation
+        at location: WorkspaceFileSystemLocation,
+        initialInspection: WorkspaceNoFollowFileTargetInspection?
     ) throws -> WorkspaceNoFollowFileWriteExpectation {
         let sessionIdentity = ObjectIdentifier(session)
-        guard let indeterminate = indeterminateSessionWrites[sessionIdentity] else {
-            return .existingOrMissing
-        }
-        guard let context = indeterminateSessionWriteContexts[sessionIdentity],
-              context.location == location
-        else {
+        if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
             throw MarkdownFileStoreError.writeRequiresReconciliation(
                 location.fileURL,
                 indeterminate
             )
         }
-
-        switch WorkspaceNoFollowFileInspector.status(at: location) {
-        case .missing:
-            // A deliberate retry remains exclusive. If the uncertain first commit appears before
-            // publish, the writer reports non-commit instead of replacing it.
-            return .missing
-        case .regular:
-            if let observed = try? fileStore.loadResult(at: location) {
-                rehomeIndeterminateSaveCopy(
-                    session: session,
-                    text: text,
-                    oldURL: oldURL,
-                    observed: observed,
-                    context: context,
-                    result: indeterminate
-                )
-                throw MarkdownFileStoreError.writeRequiresReconciliation(
-                    location.fileURL,
-                    indeterminate
-                )
-            }
-            return try exactPreparedSaveCopyExpectation(
-                result: indeterminate,
-                context: context,
-                destination: location.fileURL
-            )
-        case .symbolicLink, .notRegularFile, .unreadable:
-            return try exactPreparedSaveCopyExpectation(
-                result: indeterminate,
-                context: context,
-                destination: location.fileURL
-            )
+        guard let initialInspection else {
+            throw WorkspaceAnchoredFileSystemError.unreadable
         }
-    }
-
-    private func exactPreparedSaveCopyExpectation(
-        result: WorkspaceIndeterminateFileWrite,
-        context: IndeterminateSessionWriteContext,
-        destination: URL
-    ) throws -> WorkspaceNoFollowFileWriteExpectation {
-        guard let preparedMetadata = result.preparedMetadata else {
-            throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
+        return switch initialInspection.state {
+        case let .regular(identity): .existing(identity)
+        case .missing: .missing
         }
-        return .existingContent(
-            preparedMetadata.identity,
-            sha256Digest: context.preparedSHA256Digest
-        )
     }
 
     private func quarantineIndeterminateSaveCopy(
@@ -424,28 +380,13 @@ extension AppState {
     private func workspaceSaveCopyLocation(
         for destinationURL: URL,
         session: DocumentSession
-    ) throws -> WorkspaceFileSystemLocation? {
+    ) throws -> WorkspaceFileSystemLocation {
         let sessionIdentity = ObjectIdentifier(session)
         if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
-            guard let context = indeterminateSessionWriteContexts[sessionIdentity] else {
-                throw MarkdownFileStoreError.writeRequiresReconciliation(
-                    destinationURL.standardizedFileURL,
-                    indeterminate
-                )
-            }
-            let destinationURL = destinationURL.standardizedFileURL
-            let denotesQuarantinedDestination = context.location.fileURL == destinationURL
-                || (try? context.location.rootAuthority.relativePath(
-                    forFileURL: destinationURL
-                )) == context.location.relativePath
-            if denotesQuarantinedDestination {
-                return context.location
-            }
-            // A different spelling can still denote the same directory entry on a
-            // case-insensitive or normalization-insensitive volume. Until reconciliation
-            // clears the exact quarantine, never downgrade a Save Copy to a broad write.
+            let reconciliationURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
+                ?? destinationURL.standardizedFileURL
             throw MarkdownFileStoreError.writeRequiresReconciliation(
-                context.location.fileURL,
+                reconciliationURL,
                 indeterminate
             )
         }
@@ -454,15 +395,17 @@ extension AppState {
 
     private func workspaceSaveCopyLocation(
         for destinationURL: URL
-    ) throws -> WorkspaceFileSystemLocation? {
-        guard workspaceRootURL != nil else { return nil }
+    ) throws -> WorkspaceFileSystemLocation {
+        guard workspaceRootURL != nil else {
+            return try WorkspaceFileSystemLocation(fileURL: destinationURL)
+        }
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration
         else {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
         guard let relativePath = try? rootAuthority.relativePath(forFileURL: destinationURL) else {
-            return nil
+            return try WorkspaceFileSystemLocation(fileURL: destinationURL)
         }
         return try rootAuthority.location(relativePath: relativePath)
     }
