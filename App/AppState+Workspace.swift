@@ -177,6 +177,7 @@ extension AppState {
     func activateFileSession(url: URL) throws {
         let key = try canonicalSessionURL(for: url)
         if let cachedSession = sessionCache[key] {
+            retainUnanchoredManagedSessionOwnership(for: cachedSession)
             if cachedSession === currentDocument {
                 synchronizeWorkspaceTreeSelection(for: cachedSession)
                 handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
@@ -198,7 +199,9 @@ extension AppState {
             return
         }
 
-        let file = try fileStore.load(url: key)
+        let location = try WorkspaceFileSystemLocation(fileURL: key)
+        let loaded = try fileStore.loadResult(at: location)
+        let file = loaded.file
         let recoveredSession = recoverRetiredSession(for: key)
         let session = recoveredSession ?? DocumentSession(
             text: file.text,
@@ -207,6 +210,11 @@ extension AppState {
             isDirty: false
         )
         cancelForegroundDocumentTasks()
+        retainUnanchoredManagedSessionOwnership(
+            for: session,
+            location: location,
+            identity: loaded.metadata.identity
+        )
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
         if missingFilePrompt?.fileURL.standardizedFileURL == key {
@@ -234,6 +242,9 @@ extension AppState {
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
+        if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
+            refreshIndeterminateFileWriteReconciliation(for: session)
+        }
         observeCurrentDocument()
         scheduleCompletionWorkspaceRefresh()
     }
@@ -314,10 +325,11 @@ extension AppState {
                 identity: result.metadata.identity,
                 sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
             )
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
         case let .notCommitted(result):
             throw notCommittedFileWriteError(result, destinationURL: destination)
         case let .committedButIndeterminate(result):
-            if let prewriteBinding {
+            if prewriteBinding != nil {
                 indeterminateSessionWrites[sessionIdentity] = result
                 indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
                     location: location,
@@ -326,7 +338,7 @@ extension AppState {
                     ).sha256Digest
                 )
                 cancelAutosave(for: session)
-                handleAnchoredExternalChange(for: session, binding: prewriteBinding)
+                refreshIndeterminateFileWriteReconciliation(for: session)
             } else {
                 quarantineIndeterminateStandaloneSave(
                     session: session,
@@ -360,24 +372,7 @@ extension AppState {
             preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
         )
         cancelAutosave(for: session)
-
-        if let observed = try? fileStore.loadResult(at: location) {
-            let destination = location.fileURL
-            anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
-                location: location,
-                identity: observed.metadata.identity,
-                sha256Digest: observed.sha256Digest
-            )
-            pendingExternalTexts[destination] = observed.file.text
-            lastKnownDiskHashes[destination] = Self.contentHash(observed.file.text)
-            lastKnownDiskModificationDates[destination] = nil
-            if session === currentDocument {
-                missingFilePrompt = nil
-                externalChangePrompt = ExternalChangePrompt(fileURL: destination)
-            }
-        } else if WorkspaceNoFollowFileInspector.status(at: location) == .missing {
-            markSessionDetachedFromMissingFile(session, url: location.fileURL)
-        }
+        refreshIndeterminateFileWriteReconciliation(for: session)
     }
 
     func performAnchoredFileSave(

@@ -451,15 +451,22 @@ expectation: a regular file is `.existing(identity)` and an absent leaf is `.mis
 attempt is never widened to `.existingOrMissing`. Outside-workspace final symlinks are rejected
 instead of being followed by a legacy save. Descriptor-derived physical identity detects
 hard-link ownership across current, cached, retired, editor-bound, and unanchored standalone
-sessions. Case folding is applied only when that parent reports a case-insensitive filesystem, so
-distinct case spellings remain valid on case-sensitive volumes. Only the source session's old
-state is removed after durable success. Any session write or Save Copy
+sessions. Unanchored sessions retain that descriptor-derived location/identity when they become
+App-managed; arbitration never re-inspects mutable `session.fileURL`, and missing proof, deletion,
+replacement, or inspection failure fails closed. Case folding is applied only when that parent
+reports a case-insensitive filesystem, so distinct case spellings remain valid on case-sensitive
+volumes. A source session may Save Copy to its byte-for-byte original path only when that exact leaf
+is proven missing; this removes only the source self-collision, while existing aliases, hard links,
+and every other session remain protected. Only the source session's old state is removed after
+durable success. Any session write or Save Copy
 `committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
 a readable Save Copy destination is re-homed with observed identity/digest for Reload or Keep Mine,
-while a still-missing destination exposes the missing-file reconciliation state. The exact
-location, result, and prepared digest remain retained. Until explicit reconciliation clears the
-quarantine, Cmd-S, autosave, and every Save Copy spelling are refused before writer entry; no
-exclusive retry or legacy URL fallback is allowed.
+while a proven-missing destination exposes only exact-location `.missing` recovery. Symlink,
+non-regular, unreadable, and inspection-failure states remain quarantined with an actionable Check
+Again reconciliation that reclassifies only the retained location and authority. The exact
+location, result, and prepared digest remain retained. Cmd-S and autosave stay blocked; every
+differently spelled or broad Save Copy retry is refused before writer entry, and no legacy URL
+fallback is allowed.
 Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
 App completes the clean/re-home transition, retains the exact authority artifact notice, and
 presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact
@@ -566,7 +573,7 @@ pending.
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
 | WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts and exact-location indeterminate-write quarantine with all second writes blocked; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing exact retry, actionable invalid-state reconciliation, and differently spelled retry refusal; original-path anchored/unanchored recovery; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions, including unlinked/replaced hard links and fail-closed missing proof; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

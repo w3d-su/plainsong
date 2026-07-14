@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 extension AppState {
     func editorDocumentBinding(for session: DocumentSession) -> AppEditorDocumentBinding {
+        retainUnanchoredManagedSessionOwnership(for: session)
         let sessionIdentity = ObjectIdentifier(session)
         let bindingID: EditorDocumentBindingID
         if let existing = registeredEditorDocumentBindingID(for: session) {
@@ -276,6 +277,7 @@ extension AppState {
         pendingExternalTexts[canonicalURL] = nil
         detachedSessionURLs.remove(canonicalURL)
         anchoredSessionFileBindings[ObjectIdentifier(session)] = nil
+        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
         indeterminateSessionWrites[ObjectIdentifier(session)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(session)] = nil
     }

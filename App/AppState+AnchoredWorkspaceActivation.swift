@@ -98,6 +98,7 @@ extension AppState {
         let key = activation.canonicalURL
         let session = activation.session
         anchoredSessionFileBindings[ObjectIdentifier(session)] = activation.binding
+        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
 
         switch activation.source {
         case .cached:
@@ -333,6 +334,7 @@ extension AppState {
                 identity: result.metadata.identity,
                 sha256Digest: result.sha256Digest
             )
+            unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
             reconcileSession(session, withAnchoredFile: result.file, canonicalURL: key)
         case .symbolicLink, .notRegularFile, .unreadable:
             return

@@ -19,6 +19,7 @@ extension AppState {
 
         indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
+        indeterminateFileWriteReconciliationPrompt = nil
         currentDocument.reset(
             text: text,
             url: prompt.fileURL,
@@ -52,6 +53,7 @@ extension AppState {
         }
         indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
+        indeterminateFileWriteReconciliationPrompt = nil
         externalChangePrompt = nil
         scheduleAutosave(for: currentDocument)
         finishRetiredEditorDocumentBindingsIfPossible(for: currentDocument)
@@ -129,6 +131,7 @@ extension AppState {
             removeEditorDocumentBindingRegistration(for: session)
         }
         anchoredSessionFileBindings[sessionIdentity] = nil
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
 
@@ -146,6 +149,9 @@ extension AppState {
             }
             if missingFilePrompt?.fileURL.standardizedFileURL == key {
                 missingFilePrompt = nil
+            }
+            if indeterminateFileWriteReconciliationPrompt?.fileURL.standardizedFileURL == key {
+                indeterminateFileWriteReconciliationPrompt = nil
             }
         }
     }

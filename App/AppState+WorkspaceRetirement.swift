@@ -107,12 +107,28 @@ private extension AppState {
             guard retainedLocation.rootAuthority == installedAuthority else { return nil }
             return authority
         }
-        guard let fileURL = retirementLease.session.fileURL,
-              (try? installedAuthority.canonicalizedLocation(forFileURL: fileURL)) != nil
+        let sessionIdentity = ObjectIdentifier(retirementLease.session)
+        guard case let .proven(retainedLocation, retainedIdentity) =
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity]
         else {
             return nil
         }
-        return authority
+        do {
+            let installedLocation = try installedAuthority.canonicalizedLocation(
+                forFileURL: retainedLocation.fileURL
+            )
+            let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(
+                at: installedLocation
+            )
+            guard case let .regular(installedIdentity) = inspection.state,
+                  installedIdentity == retainedIdentity
+            else {
+                return nil
+            }
+            return authority
+        } catch {
+            return nil
+        }
     }
 
     func clearClosedWorkspaceState(
@@ -140,5 +156,12 @@ private extension AppState {
         retainMetadataOnlyForRetiredEditorSessions()
         externalChangePrompt = nil
         missingFilePrompt = nil
+        indeterminateFileWriteReconciliationPrompt = nil
+        if let retirementLease,
+           retirementLease.session === currentDocument,
+           indeterminateSessionWrites[ObjectIdentifier(currentDocument)] != nil
+        {
+            refreshIndeterminateFileWriteReconciliation(for: currentDocument)
+        }
     }
 }

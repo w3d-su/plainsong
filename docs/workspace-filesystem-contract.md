@@ -226,15 +226,21 @@ its exact outcome.
 
 App workspace sessions retain the anchored location, exact loaded identity, and exact-byte digest.
 Ordinary save uses the typed `existingContent(identity, sha256Digest:)` expectation. Save Copy for
-a destination inside the installed workspace instead uses the installed authority and typed
-`existingOrMissing` write. Before entering the writer it inspects the target from the anchored
-parent descriptor, derives the actual parent/leaf spelling and physical identity without requiring
-content-read permission, and rejects a noncanonical request spelling so App state cannot split from
-the scanner's key. Ownership arbitration deduplicates current, cached, retired, and editor-bound
+a destination inside or outside the installed workspace establishes one no-follow location. Before
+entering the writer it inspects the target once from the retained parent descriptor, derives the
+actual parent/leaf spelling and physical identity without requiring content-read permission, and
+uses only `.existing(identity)` or `.missing`; it never widens the first attempt to
+`existingOrMissing`. A noncanonical request spelling is rejected so App state cannot split from the
+scanner's key. Ownership arbitration deduplicates current, cached, retired, and editor-bound
 sessions, then protects exact/canonically equivalent locations, indeterminate-write contexts, and
-matching destination identities. Case variants collide only when the parent filesystem reports
-case-insensitive names; distinct case spellings remain valid on case-sensitive volumes. The App
-clears only the source session's old state after durable success. Any anchored-session
+matching destination identities. When an unanchored session first becomes App-managed, App retains
+its descriptor-derived location and identity. Arbitration never re-derives that proof from mutable
+`session.fileURL`; missing proof, deletion, replacement, or inspection failure fails closed. Case
+variants collide only when the parent filesystem reports case-insensitive names; distinct case
+spellings remain valid on case-sensitive volumes. The sole self-collision exception is the source
+session saving to its byte-for-byte original path spelling after that exact leaf is proven missing.
+Regular aliases and hard links at that path still collide, and every other session remains
+protected. The App clears only the source session's old state after durable success. Any session
 `committedButIndeterminate`, including Save Copy, installs a per-session reconciliation quarantine
 that retains the exact destination and prepared-byte digest. A readable Save Copy destination is
 re-homed as the same dirty session with its observed identity/digest and is presented through
@@ -246,10 +252,12 @@ different destination spelling requires reconciliation before another Save Copy:
 variants and an outside-workspace symlink can otherwise alias the uncertain entry on macOS and
 bypass the anchored expectation through the legacy URL writer. Once a missing destination has
 been re-homed, its exact quarantine URL is also the session-state key; cleanup never resolves a
-later symlink at that name and therefore cannot clear another session's state. If the destination cannot be decoded or
-classified safely, a retry is limited to the exact prepared identity/content when that proof
-exists. Blind Cmd-S and autosave remain blocked until explicit reconciliation or a durable
-recovery copy clears the quarantine.
+later symlink at that name and therefore cannot clear another session's state. A symlink,
+non-regular leaf, unreadable file, or inspection failure stays quarantined and exposes Check Again;
+it does not authorize any writer. Check Again reclassifies only the retained location and authority,
+eventually yielding Reload/Keep Mine, the exact missing recovery, or the same actionable blocked
+state. Blind Cmd-S and autosave remain blocked until explicit reconciliation or a durable exact
+missing recovery clears the quarantine.
 
 For ordinary save and Save Copy, App completes a proven durable state transition first—adopting
 metadata, marking clean, or re-homing the session—then retains every non-`none` `cleanupState` as
@@ -286,15 +294,18 @@ timing sleeps—to cover:
 - dirty-overlay collection after root A is moved and replacement B takes its spelling, proving a
   cached session still bound to A cannot inject its dirty text into B's search request;
 - file-tree/sidebar activation, installed-workspace Save Copy, descriptor-canonical target
-  inspection for `0200`/`000` leaves, cached/retired/editor ownership collision refusal, missing
-  case-alias quarantine collision, distinct-case success on case-sensitive volumes, retained save
-  authority after workspace close, and per-session indeterminate-write quarantine;
+  inspection for `0200`/`000` leaves, cached/retired/editor ownership collision refusal,
+  descriptor-retained unanchored ownership after unlink or path replacement, fail-closed missing
+  proof, original-path missing recovery without source self-collision, missing case-alias quarantine
+  collision, distinct-case success on case-sensitive volumes, retained save authority after
+  workspace close, and per-session indeterminate-write quarantine;
 - final-suspension current-session changes and cached-source eviction, proving reload neither
   steals a newer selection nor commits a stale cached/retired activation;
-- Save Copy indeterminate outcomes with a readable destination and with a still-missing
-  destination, proving Reload/Keep Mine quarantine and exclusive retry respectively, plus
-  replacement-root retry, case-variant/outside-symlink retry refusal, and replacement-symlink
-  cleanup cases proving the retained context neither writes B nor clears another session's state;
+- Save Copy indeterminate outcomes with readable, still-missing, symlink, non-regular, and
+  unreadable destinations, proving Reload/Keep Mine, exact `.missing` recovery, and actionable
+  Check Again quarantine respectively, plus differently spelled, replacement-root, case-variant,
+  and outside-symlink retry refusal and replacement-symlink cleanup cases proving the retained
+  context neither writes B nor clears another session's state;
 - a displaced-name racer combined with `.afterRenameSwap` failure, proving no reverse swap and
   a truthful `removalIndeterminate` recovery state;
 - racing replacement names at temporary, rollback-artifact, cleanup-staging rename,

@@ -51,6 +51,17 @@ struct FileWriteArtifactNotice: Identifiable, Equatable {
     }
 }
 
+enum IndeterminateFileWriteReconciliationState: Equatable {
+    case symbolicLink
+    case notRegularFile
+    case unreadable
+}
+
+struct IndeterminateFileWriteReconciliationPrompt: Equatable {
+    let fileURL: URL
+    let state: IndeterminateFileWriteReconciliationState
+}
+
 /// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
@@ -90,6 +101,8 @@ final class AppState: ObservableObject {
     @Published var presentedError: UserVisibleError?
     @Published var externalChangePrompt: ExternalChangePrompt?
     @Published var missingFilePrompt: MissingFilePrompt?
+    @Published var indeterminateFileWriteReconciliationPrompt:
+        IndeterminateFileWriteReconciliationPrompt?
     @Published var fileWriteArtifactNotices: [FileWriteArtifactNotice] = []
     @Published private(set) var wysiwygFallbackMessage: String?
     @Published private(set) var editorFocusRequestID = 0
@@ -147,6 +160,10 @@ final class AppState: ObservableObject {
     /// Exact authority, identity, and content installed for each anchored workspace session.
     /// Saves use this proof instead of recapturing the session's mutable URL.
     var anchoredSessionFileBindings: [ObjectIdentifier: AnchoredWorkspaceSessionFileBinding] = [:]
+    /// Descriptor-derived physical identity retained when an unanchored session becomes managed.
+    /// `.unavailable` is a durable fail-closed proof state, never permission to re-inspect a URL.
+    var unanchoredManagedSessionOwnershipProofs:
+        [ObjectIdentifier: UnanchoredManagedSessionOwnershipProof] = [:]
     /// A typed indeterminate commit must be reconciled before this session can write again.
     var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:]
     /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
@@ -195,6 +212,7 @@ final class AppState: ObservableObject {
             self?.handlePreferencesChanged()
         }
         observeCurrentDocument()
+        retainUnanchoredManagedSessionOwnership(for: currentDocument)
     }
 
     deinit {

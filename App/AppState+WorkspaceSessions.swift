@@ -60,6 +60,7 @@ extension AppState {
         _ lease: InstalledEditorDocumentBindingLease,
         securityScopedAuthority: SecurityScopedResourceAccess?
     ) {
+        retainUnanchoredManagedSessionOwnership(for: lease.session)
         if let existing = retiredEditorDocumentBindings[lease.id],
            existing.session === lease.session
         {
@@ -171,6 +172,9 @@ extension AppState {
         anchoredSessionFileBindings = anchoredSessionFileBindings.filter {
             retainedSessionIdentities.contains($0.key)
         }
+        unanchoredManagedSessionOwnershipProofs = unanchoredManagedSessionOwnershipProofs.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
         indeterminateSessionWrites = indeterminateSessionWrites.filter {
             retainedSessionIdentities.contains($0.key)
         }
@@ -252,6 +256,7 @@ extension AppState {
         }
         cancelAutosave(for: session)
         anchoredSessionFileBindings[ObjectIdentifier(session)] = nil
+        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
         indeterminateSessionWrites[ObjectIdentifier(session)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(session)] = nil
         sessionCache[eviction.url] = nil

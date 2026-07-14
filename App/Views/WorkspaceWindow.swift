@@ -104,7 +104,9 @@ private struct EditorWorkspace: View {
                 isSaving: appState.isSaving
             )
 
-            if appState.missingFilePrompt != nil {
+            if appState.indeterminateFileWriteReconciliationPrompt != nil {
+                FileWriteReconciliationBanner()
+            } else if appState.missingFilePrompt != nil {
                 MissingFileBanner()
             } else if appState.externalChangePrompt != nil {
                 ExternalChangeBanner()
