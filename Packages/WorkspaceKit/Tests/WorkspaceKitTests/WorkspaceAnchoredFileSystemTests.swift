@@ -4,6 +4,50 @@ import Foundation
 import XCTest
 
 final class WorkspaceAnchoredFileSystemTests: XCTestCase {
+    func testLocationFileURLIsSlashFreeWhenLeafIsAlreadyDirectory() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appendingPathComponent("recovered.md", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "recovered.md")
+        let equalLocation = try authority.location(relativePath: "recovered.md")
+        let expectedPath = authority.canonicalRootURL.path(percentEncoded: false)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let expectedAbsolutePath = "/\(expectedPath)/recovered.md"
+
+        XCTAssertFalse(location.fileURL.absoluteString.hasSuffix("/"))
+        XCTAssertEqual(location, equalLocation)
+        XCTAssertEqual(location.fileURL.absoluteString, equalLocation.fileURL.absoluteString)
+        XCTAssertEqual(
+            location.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            expectedAbsolutePath.utf8.map(\.self)
+        )
+    }
+
+    func testLocationEqualityAndURLSpellingPreserveNFCAndNFDBytes() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+
+        let nfc = try authority.location(relativePath: nfcPath)
+        let nfd = try authority.location(relativePath: nfdPath)
+
+        XCTAssertNotEqual(nfc, nfd)
+        XCTAssertEqual(Set([nfc, nfd]).count, 2)
+        XCTAssertEqual(
+            nfc.fileURL.lastPathComponent.utf8.map(\.self),
+            nfcPath.utf8.map(\.self)
+        )
+        XCTAssertEqual(
+            nfd.fileURL.lastPathComponent.utf8.map(\.self),
+            nfdPath.utf8.map(\.self)
+        )
+    }
+
     func testLocationFileURLSpellingDoesNotChangeWhenLeafBecomesDirectory() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

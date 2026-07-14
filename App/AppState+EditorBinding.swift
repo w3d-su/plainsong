@@ -232,7 +232,12 @@ extension AppState {
         }
 
         let session = retirement.session
+        let sessionIdentity = ObjectIdentifier(session)
         let canonicalURL = sessionStateURL(for: session)
+        if indeterminateSessionWrites[sessionIdentity] != nil {
+            cancelAutosave(for: session)
+            return
+        }
         if let canonicalURL, pendingExternalTexts[canonicalURL] != nil {
             cancelAutosave(for: session)
             return
@@ -262,6 +267,8 @@ extension AppState {
         for canonicalURL: URL?,
         session: DocumentSession
     ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard indeterminateSessionWrites[sessionIdentity] == nil else { return }
         guard let canonicalURL,
               currentDocument !== session,
               sessionCache[canonicalURL] !== session,
@@ -276,10 +283,10 @@ extension AppState {
         lastKnownDiskModificationDates[canonicalURL] = nil
         pendingExternalTexts[canonicalURL] = nil
         detachedSessionURLs.remove(canonicalURL)
-        anchoredSessionFileBindings[ObjectIdentifier(session)] = nil
-        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
-        indeterminateSessionWrites[ObjectIdentifier(session)] = nil
-        indeterminateSessionWriteContexts[ObjectIdentifier(session)] = nil
+        anchoredSessionFileBindings[sessionIdentity] = nil
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        indeterminateSessionWrites[sessionIdentity] = nil
+        indeterminateSessionWriteContexts[sessionIdentity] = nil
     }
 }
 

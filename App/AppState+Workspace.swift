@@ -183,8 +183,8 @@ extension AppState {
                 handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
                 return
             }
-            guard let cachedURL = cachedSession.fileURL,
-                  try canonicalSessionURL(for: cachedURL) == key
+            guard let cachedURL = sessionStateURL(for: cachedSession),
+                  exactFileURLSpellingMatches(cachedURL, key)
             else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
@@ -213,11 +213,14 @@ extension AppState {
         retainUnanchoredManagedSessionOwnership(
             for: session,
             location: location,
-            identity: loaded.metadata.identity
+            identity: loaded.metadata.identity,
+            sha256Digest: loaded.sha256Digest
         )
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
-        if missingFilePrompt?.fileURL.standardizedFileURL == key {
+        if let prompt = missingFilePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
             missingFilePrompt = nil
         }
         if recoveredSession == nil {
@@ -259,23 +262,36 @@ extension AppState {
     }
 
     func save(session: DocumentSession) throws {
-        guard let sessionURL = session.fileURL?.standardizedFileURL else { return }
+        guard session.fileURL != nil else { return }
         let sessionIdentity = ObjectIdentifier(session)
         let retainedBinding = anchoredSessionFileBinding(for: session)
-        let url = retainedBinding?.location.fileURL ?? sessionURL
+        let retainedUnanchoredProof: UnanchoredManagedSessionFileProof? =
+            if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
+                proof
+            } else {
+                nil
+            }
+        guard let url = retainedBinding?.location.fileURL
+            ?? retainedUnanchoredProof?.location.fileURL
+            ?? sessionStateURL(for: session)
+        else {
+            return
+        }
         if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
             let reconciliationURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
                 ?? url
             throw MarkdownFileStoreError.writeRequiresReconciliation(reconciliationURL, indeterminate)
         }
-        guard !detachedSessionURLs.contains(url),
-              missingFilePrompt?.fileURL.standardizedFileURL != url
-        else {
+        let hasMatchingMissingPrompt = missingFilePrompt.map {
+            exactFileURLSpellingMatches($0.fileURL, url)
+        } ?? false
+        guard !detachedSessionURLs.contains(url), !hasMatchingMissingPrompt else {
             throw AppStateError.missingFile(url)
         }
-        guard pendingExternalTexts[url] == nil,
-              externalChangePrompt?.fileURL.standardizedFileURL != url
-        else {
+        let hasMatchingExternalChangePrompt = externalChangePrompt.map {
+            exactFileURLSpellingMatches($0.fileURL, url)
+        } ?? false
+        guard pendingExternalTexts[url] == nil, !hasMatchingExternalChangePrompt else {
             throw AppStateError.unresolvedExternalChange(url)
         }
 
@@ -286,27 +302,20 @@ extension AppState {
         let text = session.text
         let location: WorkspaceFileSystemLocation
         let expectation: WorkspaceNoFollowFileWriteExpectation
-        let prewriteBinding: AnchoredWorkspaceSessionFileBinding?
-        if let retainedBinding,
-           retainedBinding.location.fileURL == sessionURL
-        {
+        if let retainedBinding {
             location = retainedBinding.location
             expectation = .existingContent(
                 retainedBinding.identity,
                 sha256Digest: retainedBinding.sha256Digest
             )
-            prewriteBinding = retainedBinding
+        } else if let retainedUnanchoredProof {
+            location = retainedUnanchoredProof.location
+            expectation = .existingContent(
+                retainedUnanchoredProof.identity,
+                sha256Digest: retainedUnanchoredProof.sha256Digest
+            )
         } else {
-            location = try WorkspaceFileSystemLocation(fileURL: sessionURL)
-            let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
-            guard inspection.canonicalLocation == location else {
-                throw AppStateError.invalidSessionIdentity(location.fileURL)
-            }
-            expectation = switch inspection.state {
-            case let .regular(identity): .existing(identity)
-            case .missing: .missing
-            }
-            prewriteBinding = nil
+            throw AppStateError.invalidSessionIdentity(url)
         }
         let destination = location.fileURL
         let outcome = try performAnchoredFileSave(
@@ -329,24 +338,15 @@ extension AppState {
         case let .notCommitted(result):
             throw notCommittedFileWriteError(result, destinationURL: destination)
         case let .committedButIndeterminate(result):
-            if prewriteBinding != nil {
-                indeterminateSessionWrites[sessionIdentity] = result
-                indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
-                    location: location,
-                    preparedSHA256Digest: WorkspaceSearchContentFingerprint(
-                        text: text
-                    ).sha256Digest
-                )
-                cancelAutosave(for: session)
-                refreshIndeterminateFileWriteReconciliation(for: session)
-            } else {
-                quarantineIndeterminateStandaloneSave(
-                    session: session,
-                    text: text,
-                    location: location,
-                    result: result
-                )
-            }
+            indeterminateSessionWrites[sessionIdentity] = result
+            indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+                location: location,
+                preparedSHA256Digest: WorkspaceSearchContentFingerprint(
+                    text: text
+                ).sha256Digest
+            )
+            cancelAutosave(for: session)
+            refreshIndeterminateFileWriteReconciliation(for: session)
             throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
         }
         session.markSaved(text: text, url: destination)
@@ -357,22 +357,6 @@ extension AppState {
         if let cleanupResult {
             presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
         }
-    }
-
-    private func quarantineIndeterminateStandaloneSave(
-        session: DocumentSession,
-        text: String,
-        location: WorkspaceFileSystemLocation,
-        result: WorkspaceIndeterminateFileWrite
-    ) {
-        let sessionIdentity = ObjectIdentifier(session)
-        indeterminateSessionWrites[sessionIdentity] = result
-        indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
-            location: location,
-            preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
-        )
-        cancelAutosave(for: session)
-        refreshIndeterminateFileWriteReconciliation(for: session)
     }
 
     func performAnchoredFileSave(

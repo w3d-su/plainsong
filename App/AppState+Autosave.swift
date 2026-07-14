@@ -118,16 +118,14 @@ extension AppState {
     }
 
     func canAutosave(session: DocumentSession) -> Bool {
-        guard let sessionURL = session.fileURL?.standardizedFileURL else { return false }
+        guard let url = sessionStateURL(for: session) else { return false }
         guard indeterminateSessionWrites[ObjectIdentifier(session)] == nil else { return false }
-        let url = anchoredSessionFileBinding(for: session)?.location.fileURL
-            ?? sessionURL.resolvingSymlinksInPath()
         guard session === currentDocument || sessionCache[url] === session || isRetiredEditorSession(session) else {
             return false
         }
         return !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
-            externalChangePrompt?.fileURL.standardizedFileURL != url &&
-            missingFilePrompt?.fileURL.standardizedFileURL != url
+            externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
+            missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }
 }

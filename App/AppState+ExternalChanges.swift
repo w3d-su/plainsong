@@ -5,8 +5,10 @@ import MarkdownCore
 extension AppState {
     func reloadExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL
-        guard sessionStateURL(for: currentDocument) == key else {
+        let key = prompt.fileURL
+        guard let stateURL = sessionStateURL(for: currentDocument),
+              exactFileURLSpellingMatches(stateURL, key)
+        else {
             externalChangePrompt = nil
             return
         }
@@ -37,8 +39,10 @@ extension AppState {
 
     func keepMineForExternallyChangedFile() {
         guard let prompt = externalChangePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL
-        guard sessionStateURL(for: currentDocument) == key else {
+        let key = prompt.fileURL
+        guard let stateURL = sessionStateURL(for: currentDocument),
+              exactFileURLSpellingMatches(stateURL, key)
+        else {
             externalChangePrompt = nil
             return
         }
@@ -68,6 +72,7 @@ extension AppState {
             handleAnchoredExternalChange(for: session, binding: binding)
             return
         }
+        refreshUnanchoredManagedSessionOwnershipFromDisk(for: session)
         guard let url = sessionStateURL(for: session) else { return }
 
         switch diskDocumentState(for: url) {
@@ -104,7 +109,7 @@ extension AppState {
     }
 
     func recordKnownDiskText(_ text: String, for url: URL, modificationDate: Date? = nil) {
-        let key = url.standardizedFileURL
+        let key = url
         lastKnownDiskHashes[key] = Self.contentHash(text)
         recordKnownDiskModificationDate(modificationDate ?? Self.contentModificationDate(for: key), for: key)
     }
@@ -122,7 +127,7 @@ extension AppState {
             stateKeys.insert(stateURL)
         }
         if let fallbackURL {
-            stateKeys.insert(fallbackURL.standardizedFileURL)
+            stateKeys.insert(fallbackURL)
         }
 
         cancelAutosave(for: session)
@@ -144,13 +149,19 @@ extension AppState {
             lastKnownDiskModificationDates[key] = nil
             pendingExternalTexts[key] = nil
             detachedSessionURLs.remove(key)
-            if externalChangePrompt?.fileURL.standardizedFileURL == key {
+            if let prompt = externalChangePrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, key)
+            {
                 externalChangePrompt = nil
             }
-            if missingFilePrompt?.fileURL.standardizedFileURL == key {
+            if let prompt = missingFilePrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, key)
+            {
                 missingFilePrompt = nil
             }
-            if indeterminateFileWriteReconciliationPrompt?.fileURL.standardizedFileURL == key {
+            if let prompt = indeterminateFileWriteReconciliationPrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, key)
+            {
                 indeterminateFileWriteReconciliationPrompt = nil
             }
         }
@@ -226,11 +237,10 @@ private extension AppState {
     }
 
     func recordKnownDiskModificationDate(_ modificationDate: Date?, for url: URL) {
-        let key = url.standardizedFileURL.resolvingSymlinksInPath()
         if let modificationDate {
-            lastKnownDiskModificationDates[key] = modificationDate
+            lastKnownDiskModificationDates[url] = modificationDate
         } else {
-            lastKnownDiskModificationDates[key] = nil
+            lastKnownDiskModificationDates[url] = nil
         }
     }
 }

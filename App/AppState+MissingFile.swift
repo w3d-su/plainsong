@@ -24,40 +24,62 @@ extension AppState {
 
     func closeMissingFile() {
         guard let prompt = missingFilePrompt else { return }
-        let key = prompt.fileURL.standardizedFileURL
-        guard currentDocument.fileURL?.standardizedFileURL == key else {
+        let key = prompt.fileURL
+        guard let currentStateURL = sessionStateURL(for: currentDocument),
+              exactFileURLSpellingMatches(currentStateURL, key)
+        else {
             missingFilePrompt = nil
             return
         }
 
         let closingSession = currentDocument
+        let sessionIdentity = ObjectIdentifier(closingSession)
+        if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
+            let retainedURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
+                ?? prompt.fileURL
+            present(
+                MarkdownFileStoreError.writeRequiresReconciliation(
+                    retainedURL,
+                    indeterminate
+                ),
+                title: "Could Not Close File"
+            )
+            return
+        }
         clearSessionState(for: closingSession, fallbackURL: key)
         currentDocument = DocumentSession()
         observeCurrentDocument()
     }
 
     func clearPromptsNotMatchingCurrentDocument() {
-        guard let url = currentDocument.fileURL?.standardizedFileURL else {
+        guard let url = sessionStateURL(for: currentDocument) else {
             externalChangePrompt = nil
             missingFilePrompt = nil
             indeterminateFileWriteReconciliationPrompt = nil
             return
         }
 
-        if externalChangePrompt?.fileURL.standardizedFileURL != url {
+        if let prompt = externalChangePrompt,
+           !exactFileURLSpellingMatches(prompt.fileURL, url)
+        {
             externalChangePrompt = nil
         }
-        if missingFilePrompt?.fileURL.standardizedFileURL != url {
+        if let prompt = missingFilePrompt,
+           !exactFileURLSpellingMatches(prompt.fileURL, url)
+        {
             missingFilePrompt = nil
         }
-        if indeterminateFileWriteReconciliationPrompt?.fileURL.standardizedFileURL != url {
+        if let prompt = indeterminateFileWriteReconciliationPrompt,
+           !exactFileURLSpellingMatches(prompt.fileURL, url)
+        {
             indeterminateFileWriteReconciliationPrompt = nil
         }
     }
 
     func saveDetachedCurrentDocument(to destinationURL: URL) throws {
-        guard let oldURL = missingFilePrompt?.fileURL.standardizedFileURL,
-              currentDocument.fileURL?.standardizedFileURL == oldURL
+        guard let oldURL = missingFilePrompt?.fileURL,
+              let currentStateURL = sessionStateURL(for: currentDocument),
+              exactFileURLSpellingMatches(currentStateURL, oldURL)
         else {
             return
         }
@@ -74,8 +96,7 @@ extension AppState {
         }
         let saveCopyInspection = try validateWorkspaceSaveCopyDestinationOwnership(
             at: saveCopyLocation,
-            excluding: session,
-            onlyAtProvenMissingSourceURL: oldURL
+            excluding: session
         )
 
         let anchoredBinding: AnchoredWorkspaceSessionFileBinding
@@ -131,8 +152,7 @@ extension AppState {
 
     private func validateWorkspaceSaveCopyDestinationOwnership(
         at location: WorkspaceFileSystemLocation,
-        excluding sourceSession: DocumentSession,
-        onlyAtProvenMissingSourceURL sourceURL: URL
+        excluding sourceSession: DocumentSession
     ) throws -> WorkspaceNoFollowFileTargetInspection {
         let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
         guard inspection.canonicalLocation == location else {
@@ -147,10 +167,6 @@ extension AppState {
         }
         var inspectedSessions: Set<ObjectIdentifier> = []
         for candidate in workspaceSaveCopyOwnershipCandidates() {
-            let isExactMissingSourceRecovery = candidate === sourceSession
-                && destinationIdentity == nil
-                && sourceURL.path(percentEncoded: false) == location.fileURL.path(percentEncoded: false)
-            guard !isExactMissingSourceRecovery else { continue }
             let sessionIdentity = ObjectIdentifier(candidate)
             guard inspectedSessions.insert(sessionIdentity).inserted else { continue }
 
@@ -163,42 +179,46 @@ extension AppState {
             } else {
                 nil
             }
-            let unanchoredLocation: WorkspaceFileSystemLocation?
-            let unanchoredIdentity: WorkspaceFileSystemIdentity?
+            let unanchoredProofValue: UnanchoredManagedSessionFileProof?
             switch unanchoredProof {
-            case let .proven(location, identity):
-                unanchoredLocation = location
-                unanchoredIdentity = identity
-            case .unavailable, .none where binding == nil && context == nil:
+            case let .proven(proof):
+                unanchoredProofValue = proof
+            case .unavailable:
                 throw AppStateError.invalidSessionIdentity(location.fileURL)
             case .none:
-                unanchoredLocation = nil
-                unanchoredIdentity = nil
+                guard binding != nil || context != nil else {
+                    throw AppStateError.invalidSessionIdentity(location.fileURL)
+                }
+                unanchoredProofValue = nil
             }
-            let ownsDestinationByLocation = binding.map { binding in
+
+            var retainedLocations: [WorkspaceFileSystemLocation] = []
+            if let binding {
+                retainedLocations.append(binding.location)
+            }
+            if let context {
+                retainedLocations.append(context.location)
+            }
+            if let unanchoredProofValue {
+                retainedLocations.append(contentsOf: unanchoredProofValue.retainedLocations)
+            }
+            let isExactMissingSourceRecovery = candidate === sourceSession
+                && destinationIdentity == nil
+                && retainedLocations.contains(location)
+            guard !isExactMissingSourceRecovery else { continue }
+
+            let ownsDestinationByLocation = retainedLocations.contains { retainedLocation in
                 workspaceSaveCopyLocationsMayAlias(
-                    binding.location,
+                    retainedLocation,
                     location,
                     parentIsCaseSensitive: inspection.parentIsCaseSensitive
                 )
-            } == true || context.map { context in
-                workspaceSaveCopyLocationsMayAlias(
-                    context.location,
-                    location,
-                    parentIsCaseSensitive: inspection.parentIsCaseSensitive
-                )
-            } == true || unanchoredLocation.map { retainedLocation in
-                workspaceSaveCopyFileURLsMayAlias(
-                    retainedLocation.fileURL,
-                    location.fileURL,
-                    parentIsCaseSensitive: inspection.parentIsCaseSensitive
-                )
-            } == true
+            }
             let ownsDestinationByIdentity = destinationIdentity.map { destinationIdentity in
                 binding?.identity == destinationIdentity
                     || indeterminateSessionWrites[sessionIdentity]?.preparedMetadata?.identity
                     == destinationIdentity
-                    || unanchoredIdentity == destinationIdentity
+                    || unanchoredProofValue?.identity == destinationIdentity
             } == true
             let ownsDestination = ownsDestinationByLocation
                 || ownsDestinationByIdentity
@@ -225,14 +245,22 @@ extension AppState {
         _ rhs: WorkspaceFileSystemLocation,
         parentIsCaseSensitive: Bool
     ) -> Bool {
-        guard lhs.rootAuthority == rhs.rootAuthority else { return false }
-        return workspaceSaveCopyAliasKey(
+        if lhs.rootAuthority != rhs.rootAuthority {
+            return workspaceSaveCopyFileURLsMayAlias(
+                lhs.fileURL,
+                rhs.fileURL,
+                parentIsCaseSensitive: parentIsCaseSensitive
+            )
+        }
+        let lhsKey = workspaceSaveCopyAliasKey(
             lhs.relativePath,
             parentIsCaseSensitive: parentIsCaseSensitive
-        ) == workspaceSaveCopyAliasKey(
+        )
+        let rhsKey = workspaceSaveCopyAliasKey(
             rhs.relativePath,
             parentIsCaseSensitive: parentIsCaseSensitive
         )
+        return lhsKey.utf8.elementsEqual(rhsKey.utf8)
     }
 
     private func workspaceSaveCopyAliasKey(
@@ -251,13 +279,15 @@ extension AppState {
         _ rhs: URL,
         parentIsCaseSensitive: Bool
     ) -> Bool {
-        workspaceSaveCopyAliasKey(
+        let lhsKey = workspaceSaveCopyAliasKey(
             lhs.path(percentEncoded: false),
             parentIsCaseSensitive: parentIsCaseSensitive
-        ) == workspaceSaveCopyAliasKey(
+        )
+        let rhsKey = workspaceSaveCopyAliasKey(
             rhs.path(percentEncoded: false),
             parentIsCaseSensitive: parentIsCaseSensitive
         )
+        return lhsKey.utf8.elementsEqual(rhsKey.utf8)
     }
 
     private func workspaceSaveCopyExpectation(
@@ -324,13 +354,12 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
             guard let context = indeterminateSessionWriteContexts[sessionIdentity],
-                  destinationURL.path(percentEncoded: false)
-                  == context.location.fileURL.path(percentEncoded: false),
+                  exactFileURLSpellingMatches(destinationURL, context.location.fileURL),
                   WorkspaceNoFollowFileInspector.status(at: context.location) == .missing
             else {
                 refreshIndeterminateFileWriteReconciliation(for: session)
                 let reconciliationURL = indeterminateSessionWriteContexts[sessionIdentity]?
-                    .location.fileURL ?? destinationURL.standardizedFileURL
+                    .location.fileURL ?? destinationURL
                 throw MarkdownFileStoreError.writeRequiresReconciliation(
                     reconciliationURL,
                     indeterminate

@@ -2,6 +2,7 @@
 // existing source without regenerating the out-of-scope project file.
 // swiftlint:disable file_length type_body_length
 import AppKit
+import Darwin
 @testable import EditorKit
 import MarkdownCore
 @testable import Plainsong
@@ -1394,6 +1395,7 @@ final class AppStateTests: XCTestCase {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let originalURL = root.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("disk standalone", to: originalURL)
         let session = DocumentSession(
             text: "unsaved standalone",
             url: originalURL,
@@ -1402,6 +1404,7 @@ final class AppStateTests: XCTestCase {
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         appState.sessionCache[originalURL] = session
+        try FileManager.default.removeItem(at: originalURL)
         appState.markSessionDetachedFromMissingFile(session, url: originalURL)
         var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
         appState.anchoredFileSaveOverride = { text, location, expectation in
@@ -1414,6 +1417,343 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(expectations, [.missing])
         XCTAssertEqual(try String(contentsOf: originalURL, encoding: .utf8), "unsaved standalone")
         XCTAssertFalse(session.isDirty)
+    }
+
+    func testUnanchoredOrdinarySaveRejectsReplacementInodeWithoutTouchingIt() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let documentURL = root.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("loaded A", to: documentURL)
+        let session = DocumentSession(
+            text: "edited A",
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[documentURL] = session
+
+        try FileManager.default.removeItem(at: documentURL)
+        try writeText("replacement B", to: documentURL)
+
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "replacement B")
+        XCTAssertTrue(session.isDirty)
+    }
+
+    func testUnanchoredOrdinarySaveUsesExactLoadedContentDigest() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let documentURL = root.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("loaded A", to: documentURL)
+        let session = DocumentSession(
+            text: "edited A",
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[documentURL] = session
+        let descriptor = Darwin.open(documentURL.path, O_WRONLY | O_TRUNC)
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
+        if descriptor >= 0 {
+            let replacement = Data("same inode replacement".utf8)
+            _ = replacement.withUnsafeBytes { bytes in
+                Darwin.write(descriptor, bytes.baseAddress, bytes.count)
+            }
+            Darwin.close(descriptor)
+        }
+
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(
+            try String(contentsOf: documentURL, encoding: .utf8),
+            "same inode replacement"
+        )
+        XCTAssertTrue(session.isDirty)
+    }
+
+    func testUnanchoredOrdinarySaveFailsClosedForDeletedOrUnavailableProof() throws {
+        for startsExisting in [true, false] {
+            let root = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let documentURL = root.appendingPathComponent("post.md").standardizedFileURL
+            if startsExisting {
+                try writeText("loaded A", to: documentURL)
+            }
+            let session = DocumentSession(
+                text: "edited A",
+                url: documentURL,
+                fileKind: .markdown,
+                isDirty: true
+            )
+            let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+            appState.sessionCache[documentURL] = session
+            if startsExisting {
+                try FileManager.default.removeItem(at: documentURL)
+            }
+
+            XCTAssertThrowsError(
+                try appState.saveCurrentDocument(),
+                "startsExisting: \(startsExisting)"
+            )
+            XCTAssertFalse(FileManager.default.fileExists(atPath: documentURL.path))
+            XCTAssertTrue(session.isDirty)
+        }
+    }
+
+    func testUnanchoredSessionStateURLKeepsRetainedRawSpellingWhenLeafBecomesDirectory() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let documentURL = root.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("loaded", to: documentURL)
+        let session = DocumentSession(
+            text: "loaded",
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let retainedURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+
+        try FileManager.default.removeItem(at: documentURL)
+        try FileManager.default.createDirectory(at: documentURL, withIntermediateDirectories: false)
+
+        XCTAssertEqual(
+            appState.sessionStateURL(for: session)?.absoluteString,
+            retainedURL.absoluteString
+        )
+        XCTAssertFalse(try XCTUnwrap(appState.sessionStateURL(for: session)).absoluteString.hasSuffix("/"))
+    }
+
+    func testAnchoredAndQuarantinedSessionStateURLUsesRetainedSessionIdentity() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let anchoredLocation = try authority.location(relativePath: "anchored.md")
+        let quarantineLocation = try authority.location(relativePath: "quarantined.md")
+        let mutableDisplayURL = root.appendingPathComponent("mutable-display.md")
+        try writeText("anchored", to: anchoredLocation.fileURL)
+        let read = try MarkdownFileStore().loadResult(at: anchoredLocation)
+        let session = DocumentSession(
+            text: read.file.text,
+            url: anchoredLocation.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let sessionIdentity = ObjectIdentifier(session)
+        appState.anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
+            location: anchoredLocation,
+            identity: read.metadata.identity,
+            sha256Digest: read.sha256Digest
+        )
+
+        session.reset(
+            text: session.text,
+            url: mutableDisplayURL,
+            fileKind: session.fileKind,
+            isDirty: false
+        )
+
+        XCTAssertEqual(appState.sessionStateURL(for: session), anchoredLocation.fileURL)
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: session)?.location,
+            anchoredLocation
+        )
+
+        appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
+            reason: .durabilityFailed,
+            preparedMetadata: nil,
+            recoveryArtifact: .none
+        )
+        appState.indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+            location: quarantineLocation,
+            preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: session.text).sha256Digest
+        )
+
+        XCTAssertEqual(appState.sessionStateURL(for: session), quarantineLocation.fileURL)
+    }
+
+    func testSaveCopyDoesNotExemptSourceAcrossAtoBAtSameVisibleSpelling() throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let selectedRoot = parent.appendingPathComponent("workspace", isDirectory: true)
+        let movedA = parent.appendingPathComponent("workspace-a", isDirectory: true)
+        try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+        let originalURL = selectedRoot.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("disk A", to: originalURL)
+        let session = DocumentSession(
+            text: "unsaved A",
+            url: originalURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[originalURL] = session
+
+        try FileManager.default.moveItem(at: selectedRoot, to: movedA)
+        try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+        let authorityB = try WorkspaceFileSystemRootAuthority(rootURL: selectedRoot)
+        appState.workspaceRootURL = selectedRoot
+        appState.workspaceSearchRootAuthority = authorityB
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.markSessionDetachedFromMissingFile(session, url: originalURL)
+
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: originalURL))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertTrue(session.isDirty)
+    }
+
+    func testQuarantinedSaveCopyRetryRequiresLiteralNFCNFDSpellingBytes() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcLocation = try authority.location(relativePath: "caf\u{00E9}.md")
+        let nfdLocation = try authority.location(relativePath: "cafe\u{0301}.md")
+        let session = DocumentSession(
+            text: "unsaved",
+            url: nfdLocation.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let sessionIdentity = ObjectIdentifier(session)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = authority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.sessionCache[nfdLocation.fileURL] = session
+        let result = WorkspaceIndeterminateFileWrite(
+            reason: .durabilityFailed,
+            preparedMetadata: nil,
+            recoveryArtifact: .none
+        )
+        appState.indeterminateSessionWrites[sessionIdentity] = result
+        appState.indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+            location: nfdLocation,
+            preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: session.text).sha256Digest
+        )
+        appState.detachedSessionURLs.insert(nfdLocation.fileURL)
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: nfdLocation.fileURL)
+        var didAttemptWrite = false
+        appState.anchoredFileSaveOverride = { _, _, _ in
+            didAttemptWrite = true
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
+        }
+
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: nfcLocation.fileURL))
+        XCTAssertFalse(didAttemptWrite)
+        XCTAssertEqual(appState.indeterminateSessionWriteContexts[sessionIdentity]?.location, nfdLocation)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSaveCopyRejectsSameVisiblePathAcrossCachedRetiredEditorAndQuarantineAuthorities() throws {
+        enum Placement: CaseIterable {
+            case cached
+            case retired
+            case editorBound
+            case quarantined
+        }
+
+        for placement in Placement.allCases {
+            let parent = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: parent) }
+            let selectedRoot = parent.appendingPathComponent("workspace", isDirectory: true)
+            let movedA = parent.appendingPathComponent("workspace-a", isDirectory: true)
+            try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+            let ownedURL = selectedRoot.appendingPathComponent("owned.md").standardizedFileURL
+            try writeText("owned A", to: ownedURL)
+            let authorityA = try WorkspaceFileSystemRootAuthority(rootURL: selectedRoot)
+            let ownedLocationA = try authorityA.location(relativePath: "owned.md")
+            let ownedReadA = try MarkdownFileStore().loadResult(at: ownedLocationA)
+
+            try FileManager.default.moveItem(at: selectedRoot, to: movedA)
+            try FileManager.default.createDirectory(at: selectedRoot, withIntermediateDirectories: true)
+            let sourceURL = selectedRoot.appendingPathComponent("source.md").standardizedFileURL
+            try writeText("source B", to: sourceURL)
+            let authorityB = try WorkspaceFileSystemRootAuthority(rootURL: selectedRoot)
+            let sourceLocationB = try authorityB.location(relativePath: "source.md")
+            let sourceReadB = try MarkdownFileStore().loadResult(at: sourceLocationB)
+            let sourceSession = DocumentSession(
+                text: "unsaved source",
+                url: sourceURL,
+                fileKind: .markdown,
+                isDirty: true
+            )
+            let ownedSession = DocumentSession(
+                text: "owned A",
+                url: ownedURL,
+                fileKind: .markdown,
+                isDirty: false
+            )
+            let appState = AppState(
+                currentDocument: sourceSession,
+                shouldRestoreLastOpenedFile: false
+            )
+            appState.workspaceRootURL = selectedRoot
+            appState.workspaceSearchRootAuthority = authorityB
+            appState.workspaceGeneration = 1
+            appState.workspaceInstalledCaptureGeneration = 1
+            appState.sessionCache[sourceURL] = sourceSession
+            appState.anchoredSessionFileBindings[ObjectIdentifier(sourceSession)] =
+                AnchoredWorkspaceSessionFileBinding(
+                    location: sourceLocationB,
+                    identity: sourceReadB.metadata.identity,
+                    sha256Digest: sourceReadB.sha256Digest
+                )
+            try FileManager.default.removeItem(at: sourceURL)
+            appState.markSessionDetachedFromMissingFile(sourceSession, url: sourceURL)
+
+            let ownedIdentity = ObjectIdentifier(ownedSession)
+            let ownedBinding = AnchoredWorkspaceSessionFileBinding(
+                location: ownedLocationA,
+                identity: ownedReadA.metadata.identity,
+                sha256Digest: ownedReadA.sha256Digest
+            )
+            switch placement {
+            case .cached:
+                appState.sessionCache[ownedURL] = ownedSession
+                appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
+            case .retired:
+                let bindingID = EditorDocumentBindingID()
+                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+                    id: bindingID,
+                    session: ownedSession,
+                    securityScopedAuthority: nil,
+                    isAwaitingBindingEnd: true
+                )
+                appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
+            case .editorBound:
+                let bindingID = EditorDocumentBindingID()
+                appState.editorDocumentBindingIDs[ownedIdentity] = bindingID
+                appState.editorDocumentBindingSessions[bindingID] = ownedSession
+                appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
+            case .quarantined:
+                appState.sessionCache[ownedURL] = ownedSession
+                appState.indeterminateSessionWrites[ownedIdentity] = WorkspaceIndeterminateFileWrite(
+                    reason: .durabilityFailed,
+                    preparedMetadata: nil,
+                    recoveryArtifact: .none
+                )
+                appState.indeterminateSessionWriteContexts[ownedIdentity] =
+                    IndeterminateSessionWriteContext(
+                        location: ownedLocationA,
+                        preparedSHA256Digest: WorkspaceSearchContentFingerprint(
+                            text: ownedSession.text
+                        ).sha256Digest
+                    )
+            }
+
+            XCTAssertThrowsError(
+                try appState.saveDetachedCurrentDocument(to: ownedURL),
+                "placement: \(placement)"
+            )
+            XCTAssertFalse(
+                FileManager.default.fileExists(atPath: ownedURL.path),
+                "placement: \(placement)"
+            )
+        }
     }
 
     func testAnchoredWorkspaceSaveUsesExactLoadedByteDigestForUTF8BOMFile() async throws {
@@ -1541,7 +1881,7 @@ final class AppStateTests: XCTestCase {
             text: "unsaved A",
             url: missingURL,
             fileKind: .markdown,
-            isDirty: true
+            isDirty: false
         )
         let otherSession = DocumentSession(
             text: "dirty B",
@@ -1577,7 +1917,13 @@ final class AppStateTests: XCTestCase {
 
         appState.closeMissingFile()
 
-        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertTrue(appState.sessionCache[missingURL] === missingSession)
+        XCTAssertTrue(appState.currentDocument === missingSession)
+        XCTAssertNotNil(appState.indeterminateSessionWrites[ObjectIdentifier(missingSession)])
+        XCTAssertEqual(
+            appState.indeterminateSessionWriteContexts[ObjectIdentifier(missingSession)]?.location,
+            missingLocation
+        )
         XCTAssertTrue(appState.sessionCache[otherURL] === otherSession)
         XCTAssertEqual(appState.pendingExternalTexts[otherURL], "pending B")
         XCTAssertEqual(appState.lastKnownDiskHashes[otherURL], 42)
@@ -3138,7 +3484,13 @@ final class AppStateTests: XCTestCase {
         appState.anchoredFileSaveOverride = { _, actualLocation, expectation in
             writerEntries += 1
             XCTAssertEqual(actualLocation, location)
-            XCTAssertEqual(expectation, .existing(loaded.metadata.identity))
+            XCTAssertEqual(
+                expectation,
+                .existingContent(
+                    loaded.metadata.identity,
+                    sha256Digest: loaded.sha256Digest
+                )
+            )
             return .committedButIndeterminate(indeterminate)
         }
 
@@ -4198,6 +4550,172 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
     }
 
+    func testCleanQuarantineIsProtectedFromLRUEviction() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let quarantinedURL = root.appendingPathComponent("quarantined.md").standardizedFileURL
+        let otherURL = root.appendingPathComponent("other.md").standardizedFileURL
+        let location = try WorkspaceFileSystemLocation(fileURL: quarantinedURL)
+        let quarantinedSession = DocumentSession(
+            text: "clean quarantined bytes",
+            url: quarantinedURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let otherSession = DocumentSession(
+            text: "other",
+            url: otherURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        let quarantinedIdentity = ObjectIdentifier(quarantinedSession)
+        appState.sessionCache[quarantinedURL] = quarantinedSession
+        appState.indeterminateSessionWrites[quarantinedIdentity] = WorkspaceIndeterminateFileWrite(
+            reason: .durabilityFailed,
+            preparedMetadata: nil,
+            recoveryArtifact: .none
+        )
+        appState.indeterminateSessionWriteContexts[quarantinedIdentity] =
+            IndeterminateSessionWriteContext(
+                location: location,
+                preparedSHA256Digest: WorkspaceSearchContentFingerprint(
+                    text: quarantinedSession.text
+                ).sha256Digest
+            )
+        appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
+        _ = appState.sessionPolicy.access(quarantinedURL, isDirty: false)
+        appState.sessionCache[otherURL] = otherSession
+
+        appState.handleSessionAccess(url: otherURL, isDirty: false)
+
+        XCTAssertTrue(appState.sessionCache[quarantinedURL] === quarantinedSession)
+        XCTAssertNotNil(appState.indeterminateSessionWrites[quarantinedIdentity])
+        XCTAssertEqual(
+            appState.indeterminateSessionWriteContexts[quarantinedIdentity]?.location,
+            location
+        )
+    }
+
+    func testCleanQuarantineSurvivesEditorRetirementAndMetadataCleanup() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let quarantinedURL = root.appendingPathComponent("quarantined.md").standardizedFileURL
+        let location = try WorkspaceFileSystemLocation(fileURL: quarantinedURL)
+        let session = DocumentSession(
+            text: "clean quarantined bytes",
+            url: quarantinedURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let sessionIdentity = ObjectIdentifier(session)
+        appState.sessionCache[quarantinedURL] = session
+        appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
+            reason: .durabilityFailed,
+            preparedMetadata: nil,
+            recoveryArtifact: .none
+        )
+        appState.indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+            location: location,
+            preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: session.text).sha256Digest
+        )
+        let binding = appState.editorDocumentBinding(for: session)
+        binding.onLifecycle(.installed(binding.id))
+        let lease = try XCTUnwrap(appState.installedEditorDocumentBindingLease)
+        appState.beginEditorDocumentBindingRetirement(lease, securityScopedAuthority: nil)
+        appState.currentDocument = DocumentSession()
+        appState.sessionCache[quarantinedURL] = nil
+
+        binding.onLifecycle(.revoked(binding.id))
+
+        XCTAssertTrue(appState.retiredEditorDocumentBindings[binding.id]?.session === session)
+        XCTAssertNotNil(appState.indeterminateSessionWrites[sessionIdentity])
+        XCTAssertEqual(
+            appState.indeterminateSessionWriteContexts[sessionIdentity]?.location,
+            location
+        )
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testCleanQuarantineBlocksWorkspaceCloseAndSwitchWithoutDiscardingContext() throws {
+        func makeQuarantinedWorkspace() throws -> (
+            appState: AppState,
+            root: URL,
+            session: DocumentSession,
+            location: WorkspaceFileSystemLocation
+        ) {
+            let root = try makeTemporaryDirectory()
+            let quarantinedURL = root.appendingPathComponent("quarantined.md").standardizedFileURL
+            let location = try WorkspaceFileSystemRootAuthority(rootURL: root)
+                .location(relativePath: "quarantined.md")
+            let session = DocumentSession(
+                text: "clean quarantined bytes",
+                url: quarantinedURL,
+                fileKind: .markdown,
+                isDirty: false
+            )
+            let appState = AppState(shouldRestoreLastOpenedFile: false)
+            let sessionIdentity = ObjectIdentifier(session)
+            appState.workspaceRootURL = root
+            appState.workspaceSearchRootAuthority = location.rootAuthority
+            appState.workspaceGeneration = 1
+            appState.workspaceInstalledCaptureGeneration = 1
+            appState.sessionCache[quarantinedURL] = session
+            appState.indeterminateSessionWrites[sessionIdentity] = WorkspaceIndeterminateFileWrite(
+                reason: .durabilityFailed,
+                preparedMetadata: nil,
+                recoveryArtifact: .none
+            )
+            appState.indeterminateSessionWriteContexts[sessionIdentity] =
+                IndeterminateSessionWriteContext(
+                    location: location,
+                    preparedSHA256Digest: WorkspaceSearchContentFingerprint(
+                        text: session.text
+                    ).sha256Digest
+                )
+            return (appState, root, session, location)
+        }
+
+        let closeFixture = try makeQuarantinedWorkspace()
+        defer { try? FileManager.default.removeItem(at: closeFixture.root) }
+        XCTAssertThrowsError(try closeFixture.appState.closeWorkspaceForReplacement())
+        XCTAssertEqual(closeFixture.appState.workspaceRootURL, closeFixture.root)
+        XCTAssertTrue(
+            closeFixture.appState.sessionCache[closeFixture.location.fileURL]
+                === closeFixture.session
+        )
+        XCTAssertEqual(
+            closeFixture.appState.indeterminateSessionWriteContexts[
+                ObjectIdentifier(closeFixture.session)
+            ]?.location,
+            closeFixture.location
+        )
+
+        let switchFixture = try makeQuarantinedWorkspace()
+        defer { try? FileManager.default.removeItem(at: switchFixture.root) }
+        let replacementRoot = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: replacementRoot) }
+        XCTAssertThrowsError(
+            try switchFixture.appState.open(
+                url: replacementRoot,
+                rememberAsLastOpened: false,
+                preserveWorkspace: false
+            )
+        )
+        XCTAssertEqual(switchFixture.appState.workspaceRootURL, switchFixture.root)
+        XCTAssertTrue(
+            switchFixture.appState.sessionCache[switchFixture.location.fileURL]
+                === switchFixture.session
+        )
+        XCTAssertEqual(
+            switchFixture.appState.indeterminateSessionWriteContexts[
+                ObjectIdentifier(switchFixture.session)
+            ]?.location,
+            switchFixture.location
+        )
+    }
+
     func testUnretirableExternalConflictBlocksWorkspaceCloseWithoutDiscardingSession() throws {
         let rootURL = try makeTemporaryDirectory()
         let documentURL = rootURL.appendingPathComponent("post.md")
@@ -4367,6 +4885,63 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: documentA, encoding: .utf8), "late editor commit")
         XCTAssertEqual(try String(contentsOf: documentB, encoding: .utf8), "B sentinel")
         XCTAssertNil(appState.retiredEditorDocumentBindings[editorBinding.id])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testUnanchoredRetirementUsesCapturedWorkspaceMembershipAfterUnlinkAndReplacement() throws {
+        enum Mutation: CaseIterable {
+            case unlink
+            case replacement
+        }
+
+        for mutation in Mutation.allCases {
+            let root = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let documentURL = root.appendingPathComponent("post.md").standardizedFileURL
+            try "captured original".write(
+                to: documentURL,
+                atomically: true,
+                encoding: .utf8
+            )
+            let session = DocumentSession(
+                text: "captured original",
+                url: documentURL,
+                fileKind: .markdown,
+                isDirty: false
+            )
+            let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+            configureWorkspace(
+                appState,
+                rootURL: root,
+                paths: ["post.md"],
+                currentSession: session,
+                retainSecurityScope: true
+            )
+            appState.retainUnanchoredManagedSessionOwnership(for: session)
+            let editorBinding = appState.editorDocumentBinding(for: session)
+            editorBinding.onLifecycle(.installed(editorBinding.id))
+
+            try FileManager.default.removeItem(at: documentURL)
+            if mutation == .replacement {
+                try "replacement B".write(
+                    to: documentURL,
+                    atomically: true,
+                    encoding: .utf8
+                )
+            }
+
+            try appState.closeWorkspaceForReplacement()
+
+            let retirement = try XCTUnwrap(
+                appState.retiredEditorDocumentBindings[editorBinding.id],
+                "mutation: \(mutation)"
+            )
+            XCTAssertEqual(
+                retirement.securityScopedAuthority?.url.standardizedFileURL,
+                root.standardizedFileURL,
+                "mutation: \(mutation)"
+            )
+        }
     }
 
     // swiftlint:disable:next function_body_length
@@ -5039,6 +5614,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.sessionCache[aliasURL] = duplicatePath
         appState.sessionCache[currentURL] = appState.currentDocument
         appState.detachedSessionURLs.insert(detachedURL.standardizedFileURL)
+        appState.retainUnanchoredManagedSessionOwnership(for: warm)
 
         appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "dirty"))
         try await waitUntil("overlay request starts") { provider.requests.count == 1 }

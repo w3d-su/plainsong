@@ -60,7 +60,6 @@ extension AppState {
         _ lease: InstalledEditorDocumentBindingLease,
         securityScopedAuthority: SecurityScopedResourceAccess?
     ) {
-        retainUnanchoredManagedSessionOwnership(for: lease.session)
         if let existing = retiredEditorDocumentBindings[lease.id],
            existing.session === lease.session
         {
@@ -122,7 +121,8 @@ extension AppState {
         var matches: [(EditorDocumentBindingID, RetiredEditorDocumentBinding)] = []
         for (bindingID, retirement) in retiredEditorDocumentBindings {
             if !retirement.isAwaitingBindingEnd,
-               sessionStateURL(for: retirement.session) == canonicalURL
+               let retiredURL = sessionStateURL(for: retirement.session),
+               exactFileURLSpellingMatches(retiredURL, canonicalURL)
             {
                 matches.append((bindingID, retirement))
             }
@@ -204,6 +204,11 @@ extension AppState {
         {
             urls.insert(installedURL)
         }
+        for (sessionIdentity, context) in indeterminateSessionWriteContexts
+            where indeterminateSessionWrites[sessionIdentity] != nil
+        {
+            urls.insert(context.location.fileURL)
+        }
         return urls
     }
 
@@ -239,6 +244,15 @@ extension AppState {
         _ eviction: WorkspaceSessionEviction,
         session: DocumentSession
     ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        if indeterminateSessionWrites[sessionIdentity] != nil {
+            _ = sessionPolicy.access(
+                eviction.url,
+                isDirty: session.isDirty,
+                protectedURLs: protectedSessionURLs().union([eviction.url])
+            )
+            return
+        }
         if eviction.requiresSave {
             do {
                 try save(session: session)
@@ -255,10 +269,10 @@ extension AppState {
             }
         }
         cancelAutosave(for: session)
-        anchoredSessionFileBindings[ObjectIdentifier(session)] = nil
-        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
-        indeterminateSessionWrites[ObjectIdentifier(session)] = nil
-        indeterminateSessionWriteContexts[ObjectIdentifier(session)] = nil
+        anchoredSessionFileBindings[sessionIdentity] = nil
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        indeterminateSessionWrites[sessionIdentity] = nil
+        indeterminateSessionWriteContexts[sessionIdentity] = nil
         sessionCache[eviction.url] = nil
         removeEditorDocumentBindingRegistration(for: session)
     }

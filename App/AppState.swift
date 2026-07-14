@@ -497,8 +497,8 @@ extension AppState {
             indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
-            externalChangePrompt?.fileURL.standardizedFileURL != url &&
-            missingFilePrompt?.fileURL.standardizedFileURL != url
+            externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
+            missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }
 
     var windowTitle: String {

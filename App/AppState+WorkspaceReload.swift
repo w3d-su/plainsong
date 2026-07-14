@@ -252,11 +252,20 @@ extension AppState {
         rootAuthority: WorkspaceFileSystemRootAuthority
     ) async throws -> PreparedWorkspaceReloadCurrentDocumentDisposition {
         let session = currentDocument
-        guard let fileURL = session.fileURL?.standardizedFileURL else {
+        guard let fileURL = sessionStateURL(for: session) else {
             return .unrelated
         }
 
+        let unanchoredWorkspaceLocation: WorkspaceFileSystemLocation? =
+            if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[
+                ObjectIdentifier(session)
+            ] {
+                proof.installedWorkspaceLocation
+            } else {
+                nil
+            }
         let retainedLocation = retainedAnchoredSessionLocation(for: session)
+            ?? unanchoredWorkspaceLocation
         if let retainedLocation, retainedLocation.rootAuthority != rootAuthority {
             // A workspace-to-workspace switch deliberately retains the outgoing editor
             // session until its view is dismantled. If that exact A location is outside B,
@@ -368,8 +377,8 @@ extension AppState {
             pendingExternalText: stateURL.flatMap { pendingExternalTexts[$0] },
             lastKnownDiskHash: stateURL.flatMap { lastKnownDiskHashes[$0] },
             lastKnownDiskModificationDate: stateURL.flatMap { lastKnownDiskModificationDates[$0] },
-            externalChangeURL: externalChangePrompt?.fileURL.standardizedFileURL,
-            missingFileURL: missingFilePrompt?.fileURL.standardizedFileURL
+            externalChangeURL: externalChangePrompt?.fileURL,
+            missingFileURL: missingFilePrompt?.fileURL
         )
     }
 
@@ -401,6 +410,47 @@ private struct WorkspaceReloadCurrentSessionState: Equatable {
     let lastKnownDiskModificationDate: Date?
     let externalChangeURL: URL?
     let missingFileURL: URL?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.version == rhs.version
+            && exactPathMatches(lhs.fileURL, rhs.fileURL)
+            && lhs.fileKind == rhs.fileKind
+            && lhs.isDirty == rhs.isDirty
+            && exactPathMatches(lhs.stateURL, rhs.stateURL)
+            && lhs.binding == rhs.binding
+            && lhs.indeterminateWrite == rhs.indeterminateWrite
+            && lhs.indeterminateContext == rhs.indeterminateContext
+            && lhs.isDetached == rhs.isDetached
+            && exactTextMatches(lhs.pendingExternalText, rhs.pendingExternalText)
+            && lhs.lastKnownDiskHash == rhs.lastKnownDiskHash
+            && lhs.lastKnownDiskModificationDate == rhs.lastKnownDiskModificationDate
+            && exactPathMatches(lhs.externalChangeURL, rhs.externalChangeURL)
+            && exactPathMatches(lhs.missingFileURL, rhs.missingFileURL)
+    }
+
+    private static func exactPathMatches(_ lhs: URL?, _ rhs: URL?) -> Bool {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?):
+            lhs.path(percentEncoded: false).utf8.elementsEqual(
+                rhs.path(percentEncoded: false).utf8
+            )
+        case (nil, nil):
+            true
+        default:
+            false
+        }
+    }
+
+    private static func exactTextMatches(_ lhs: String?, _ rhs: String?) -> Bool {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?):
+            ExactSourceText.matches(lhs, rhs)
+        case (nil, nil):
+            true
+        default:
+            false
+        }
+    }
 }
 
 @MainActor

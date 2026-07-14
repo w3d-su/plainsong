@@ -442,23 +442,30 @@ registration cleanup is exact and idempotent: retired, evicted, and closed sessi
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
-Installed workspace sessions retain the exact authority location, descriptor identity, and
-exact-byte digest. Cmd-S/autosave uses the typed anchored `existingContent` write instead of
-resolving a session URL. Standalone ordinary save and every Save Copy destination also establish
-one no-follow `WorkspaceFileSystemLocation` before writing and consume the typed outcome directly.
+Installed and standalone managed sessions retain the exact authority location, descriptor
+identity, and exact loaded-byte digest. Standalone proof also captures installed-workspace
+membership when present. Cmd-S/autosave uses typed `existingContent(identity, digest)` through
+that retained location instead of resolving or reinspecting a session URL; unavailable, deleted,
+replaced, or changed-content proof fails closed. Every Save Copy destination establishes one
+no-follow `WorkspaceFileSystemLocation` before writing and consumes the typed outcome directly.
 Save Copy reuses its one target inspection for both ownership arbitration and the first writer
 expectation: a regular file is `.existing(identity)` and an absent leaf is `.missing`; the first
 attempt is never widened to `.existingOrMissing`. Outside-workspace final symlinks are rejected
 instead of being followed by a legacy save. Descriptor-derived physical identity detects
 hard-link ownership across current, cached, retired, editor-bound, and unanchored standalone
-sessions. Unanchored sessions retain that descriptor-derived location/identity when they become
-App-managed; arbitration never re-inspects mutable `session.fileURL`, and missing proof, deletion,
-replacement, or inspection failure fails closed. Case folding is applied only when that parent
-reports a case-insensitive filesystem, so distinct case spellings remain valid on case-sensitive
-volumes. A source session may Save Copy to its byte-for-byte original path only when that exact leaf
-is proven missing; this removes only the source self-collision, while existing aliases, hard links,
-and every other session remain protected. Only the source session's old state is removed after
-durable success. Any session write or Save Copy
+sessions. Arbitration never re-inspects mutable `session.fileURL`. A source session may Save Copy
+to a proven-missing destination only when its retained authority/location equals that destination;
+literal path spelling is compared by UTF-8 bytes, so NFC/NFD spellings do not become an accidental
+self-exemption. Canonically equivalent App-visible paths remain protected even when cached,
+retired, editor-bound, or quarantined owners belong to different authorities. Case folding is
+applied only when the destination parent reports a case-insensitive filesystem, so distinct case
+spellings remain valid on case-sensitive volumes. Existing aliases, hard links, and every other
+session remain protected. Only the source session's old state is removed after durable success.
+
+`WorkspaceFileSystemLocation.fileURL` is lexical and leaf-state-independent: construction never
+inspects the leaf, equal locations expose identical slash-free URLs, and literal relative-path
+bytes keep NFC/NFD locations distinct. Session binding/context lookup starts from retained session
+identity and stored spelling without standardizing or resolving mutable URLs. Any session write or Save Copy
 `committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
 a readable Save Copy destination is re-homed with observed identity/digest for Reload or Keep Mine,
 while a proven-missing destination exposes only exact-location `.missing` recovery. Symlink,
@@ -466,7 +473,9 @@ non-regular, unreadable, and inspection-failure states remain quarantined with a
 Again reconciliation that reclassifies only the retained location and authority. The exact
 location, URL spelling, result, and prepared digest remain retained even when the leaf becomes a
 directory; the location captures its URL once, so a later leaf-kind change cannot append a slash.
-Cmd-S and autosave stay blocked; every
+That quarantine is independent of dirty state: LRU eviction, editor retirement and metadata
+cleanup, missing-file close, workspace close, and workspace switch retain or block rather than
+discarding a clean quarantined session. Cmd-S and autosave stay blocked; every
 differently spelled or broad Save Copy retry is refused before writer entry, and no legacy URL
 fallback is allowed.
 Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
@@ -478,8 +487,8 @@ legacy URL facade continues to map typed outcomes for external callers, but App 
 Save Copy no longer discard those outcomes through that facade.
 
 Workspace retirement transfers the active security-scoped lease only when the retiring session's
-retained binding or quarantine authority equals the installed workspace authority; mutable selected
-root containment is not consulted. Initial and final selected-root proof failures propagate their
+retained binding/quarantine authority or captured standalone workspace membership equals the
+installed workspace authority; it never reopens or reinspects the current path. Initial and final selected-root proof failures propagate their
 typed filesystem error to the normal reload error path. Only actual task/generation cancellation is
 silent.
 
@@ -575,7 +584,7 @@ pending.
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
 | WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing exact retry, actionable invalid-state reconciliation, and differently spelled retry refusal; original-path anchored/unanchored recovery; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions, including unlinked/replaced hard links and fail-closed missing proof; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

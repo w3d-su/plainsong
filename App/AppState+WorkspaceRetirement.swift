@@ -14,11 +14,29 @@ extension AppState {
 
     func closeWorkspaceForReplacement() throws {
         let retirementLease = editorDocumentBindingLeaseEligibleForRetirement()
+        let sessionsToClose = workspaceSessionsForClosure()
+        if let quarantinedSession = sessionsToClose.first(where: { session in
+            session !== retirementLease?.session
+                && indeterminateSessionWrites[ObjectIdentifier(session)] != nil
+        }) {
+            let sessionIdentity = ObjectIdentifier(quarantinedSession)
+            let result = indeterminateSessionWrites[sessionIdentity]!
+            guard let context = indeterminateSessionWriteContexts[sessionIdentity] else {
+                throw AppStateError.invalidSessionIdentity(
+                    sessionStateURL(for: quarantinedSession)
+                        ?? quarantinedSession.fileURL
+                        ?? URL(fileURLWithPath: "/")
+                )
+            }
+            throw MarkdownFileStoreError.writeRequiresReconciliation(
+                context.location.fileURL,
+                result
+            )
+        }
         if let conflictURL = firstUnretirableExternalConflict(excluding: retirementLease?.session) {
             throw AppStateError.unresolvedExternalChange(conflictURL)
         }
 
-        let sessionsToClose = workspaceSessionsForClosure()
         if let retirementLease,
            let retirementURL = sessionStateURL(for: retirementLease.session),
            detachedSessionURLs.contains(retirementURL)
@@ -39,6 +57,11 @@ extension AppState {
 private extension AppState {
     func workspaceSessionsForClosure() -> [DocumentSession] {
         var sessions = Array(sessionCache.values)
+        sessions.append(contentsOf: retiredEditorDocumentBindings.values.map(\.session))
+        sessions.append(contentsOf: editorDocumentBindingSessions.values)
+        if let installedSession = installedEditorDocumentBindingLease?.session {
+            sessions.append(installedSession)
+        }
         if currentDocument.fileURL != nil {
             sessions.append(currentDocument)
         }
@@ -108,27 +131,15 @@ private extension AppState {
             return authority
         }
         let sessionIdentity = ObjectIdentifier(retirementLease.session)
-        guard case let .proven(retainedLocation, retainedIdentity) =
+        guard case let .proven(proof) =
             unanchoredManagedSessionOwnershipProofs[sessionIdentity]
         else {
             return nil
         }
-        do {
-            let installedLocation = try installedAuthority.canonicalizedLocation(
-                forFileURL: retainedLocation.fileURL
-            )
-            let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(
-                at: installedLocation
-            )
-            guard case let .regular(installedIdentity) = inspection.state,
-                  installedIdentity == retainedIdentity
-            else {
-                return nil
-            }
-            return authority
-        } catch {
+        guard proof.installedWorkspaceLocation?.rootAuthority == installedAuthority else {
             return nil
         }
+        return authority
     }
 
     func clearClosedWorkspaceState(

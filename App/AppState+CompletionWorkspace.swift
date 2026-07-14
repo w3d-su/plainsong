@@ -166,10 +166,17 @@ extension AppState {
         for session in candidateSessions where session.isDirty {
             let sessionIdentity = ObjectIdentifier(session)
             let anchoredBinding = anchoredSessionFileBinding(for: session)
+            let unanchoredWorkspaceLocation: WorkspaceFileSystemLocation? =
+                if case let .proven(proof)? =
+                unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
+                    proof.installedWorkspaceLocation
+                } else {
+                    nil
+                }
+            let retainedLocation = anchoredBinding?.location ?? unanchoredWorkspaceLocation
             guard seenSessions.insert(sessionIdentity).inserted,
-                  anchoredBinding == nil || anchoredBinding?.location.rootAuthority == rootAuthority,
-                  let fileURL = anchoredBinding?.location.fileURL
-                  ?? session.fileURL?.standardizedFileURL,
+                  retainedLocation?.rootAuthority == rootAuthority,
+                  let fileURL = retainedLocation?.fileURL,
                   !detachedSessionURLs.contains(fileURL),
                   let inferredKind = FileKind(url: fileURL),
                   inferredKind == session.fileKind

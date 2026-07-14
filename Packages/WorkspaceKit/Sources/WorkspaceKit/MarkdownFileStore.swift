@@ -92,9 +92,12 @@ public struct MarkdownFileStore: Sendable {
 
         do {
             let location = try WorkspaceFileSystemLocation(fileURL: url)
-            return try load(at: location)
-        } catch let error as MarkdownFileStoreError {
-            throw error
+            let file = try load(at: location)
+            return MarkdownFile(url: url, text: file.text, fileKind: file.fileKind)
+        } catch is MarkdownFileStoreError {
+            // The URL compatibility facade preserves the caller's display spelling even though
+            // the typed location below exposes its descriptor-canonical lexical spelling.
+            throw MarkdownFileStoreError.unreadable(url)
         } catch {
             throw MarkdownFileStoreError.unreadable(url)
         }

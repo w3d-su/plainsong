@@ -24,7 +24,9 @@ extension AppState {
         )
 
         if let cachedSession = sessionCache[key] {
-            guard cachedSession.fileURL?.standardizedFileURL == key else {
+            guard let cachedStateURL = sessionStateURL(for: cachedSession),
+                  exactFileURLSpellingMatches(cachedStateURL, key)
+            else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
             try validateReusableAnchoredSession(cachedSession, at: location)
@@ -42,7 +44,8 @@ extension AppState {
 
         let retiredMatches = retiredEditorDocumentBindings.compactMap { bindingID, retirement in
             guard !retirement.isAwaitingBindingEnd,
-                  retirement.session.fileURL?.standardizedFileURL == key
+                  let retiredStateURL = sessionStateURL(for: retirement.session),
+                  exactFileURLSpellingMatches(retiredStateURL, key)
             else {
                 return nil as (EditorDocumentBindingID, RetiredEditorDocumentBinding)?
             }
@@ -205,7 +208,9 @@ extension AppState {
         cancelForegroundDocumentTasks()
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
-        if missingFilePrompt?.fileURL.standardizedFileURL == key {
+        if let prompt = missingFilePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
             missingFilePrompt = nil
         }
         if recordsLoadedText {
@@ -270,13 +275,7 @@ extension AppState {
     func anchoredSessionFileBinding(
         for session: DocumentSession
     ) -> AnchoredWorkspaceSessionFileBinding? {
-        guard let fileURL = session.fileURL?.standardizedFileURL,
-              let binding = anchoredSessionFileBindings[ObjectIdentifier(session)],
-              binding.location.fileURL == fileURL
-        else {
-            return nil
-        }
-        return binding
+        anchoredSessionFileBindings[ObjectIdentifier(session)]
     }
 
     /// Authority retained for one session even when an indeterminate missing Save Copy has no
@@ -285,25 +284,29 @@ extension AppState {
     func retainedAnchoredSessionLocation(
         for session: DocumentSession
     ) -> WorkspaceFileSystemLocation? {
-        if let binding = anchoredSessionFileBinding(for: session) {
-            return binding.location
+        let sessionIdentity = ObjectIdentifier(session)
+        if indeterminateSessionWrites[sessionIdentity] != nil,
+           let context = indeterminateSessionWriteContexts[sessionIdentity]
+        {
+            return context.location
         }
-        guard let fileURL = session.fileURL?.standardizedFileURL,
-              let context = indeterminateSessionWriteContexts[ObjectIdentifier(session)],
-              context.location.fileURL == fileURL
-        else {
-            return nil
-        }
-        return context.location
+        return anchoredSessionFileBindings[sessionIdentity]?.location
     }
 
-    /// Canonical App-state key for one session. Anchored workspace sessions never resolve their
-    /// mutable display URL again; legacy standalone sessions retain the prior URL behavior.
+    /// Exact App-state key for one session. Managed sessions use retained authority spelling and
+    /// never resolve or standardize their mutable display URL again.
     func sessionStateURL(for session: DocumentSession) -> URL? {
         if let location = retainedAnchoredSessionLocation(for: session) {
             return location.fileURL
         }
-        return session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
+        switch unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] {
+        case let .proven(proof):
+            return proof.location.fileURL
+        case let .unavailable(fileURL):
+            return fileURL
+        case nil:
+            return session.fileURL
+        }
     }
 
     func recordKnownSessionDiskText(

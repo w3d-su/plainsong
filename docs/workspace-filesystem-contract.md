@@ -224,9 +224,14 @@ That synchronous compatibility facade finishes its transaction even when it inhe
 cancelled scheduling task; the typed location API continues to honor cancellation and expose
 its exact outcome.
 
-App workspace sessions retain the anchored location, exact loaded identity, and exact-byte digest.
-Ordinary save uses the typed `existingContent(identity, sha256Digest:)` expectation. Save Copy for
-a destination inside or outside the installed workspace establishes one no-follow location. Before
+App workspace sessions retain a descriptor-bound location, exact loaded identity, and exact-byte
+digest whether the session was loaded through an installed workspace authority or first became
+managed as a standalone session. The standalone proof also captures its location under the
+then-installed workspace authority when that membership exists. Ordinary Cmd-S/autosave writes
+through that retained location with the typed `existingContent(identity, sha256Digest:)`
+expectation; it never reopens `session.fileURL` to widen or reconstruct proof. Missing, deleted,
+replaced, or unavailable proof fails closed. Save Copy for a destination inside or outside the
+installed workspace establishes one no-follow location. Before
 entering the writer it inspects the target once from the retained parent descriptor, derives the
 actual parent/leaf spelling and physical identity without requiring content-read permission, and
 uses only `.existing(identity)` or `.missing`; it never widens the first attempt to
@@ -235,14 +240,24 @@ scanner's key. Ownership arbitration deduplicates current, cached, retired, and 
 sessions, then protects exact/canonically equivalent locations, indeterminate-write contexts, and
 matching destination identities. When an unanchored session first becomes App-managed, App retains
 its descriptor-derived location and identity. Arbitration never re-derives that proof from mutable
-`session.fileURL`; missing proof, deletion, replacement, or inspection failure fails closed. Case
-variants collide only when the parent filesystem reports case-insensitive names; distinct case
-spellings remain valid on case-sensitive volumes. The sole self-collision exception is the source
-session saving to its byte-for-byte original path spelling after that exact leaf is proven missing.
-Regular aliases and hard links at that path still collide, and every other session remains
-protected. A retained location captures its file URL spelling once at construction; a later leaf
-kind change cannot append a directory slash or otherwise change the spelling used as the
-quarantine/session key. The App clears only the source session's old state after durable success.
+`session.fileURL`; missing proof, deletion, replacement, or inspection failure fails closed. The
+source self-collision exception applies only when the destination is proven missing and the
+source's retained authority/location equals the destination exactly. Exact spelling comparisons
+use literal UTF-8 bytes rather than Swift's canonically equivalent `String ==`. Ownership still
+rejects the same or canonically equivalent App-visible path across different root authorities for
+current, cached, retired, editor-bound, and quarantined sessions. Case variants collide only when
+the destination parent reports case-insensitive names; distinct case spellings remain valid on
+case-sensitive volumes. Existing aliases and hard links always collide.
+
+`WorkspaceFileSystemLocation.fileURL` is derived lexically from the captured canonical root URL
+and stored relative-path bytes. Construction does not inspect the leaf, and the resulting spelling
+never gains a directory slash when that leaf is already or later becomes a directory. Location
+equality/hashing also consumes the literal relative-path bytes, so NFC and NFD spellings remain
+distinct and equal locations always expose identical slash-free URLs. App binding, quarantine,
+autosave, and context lookup begins from retained session identity and uses that stored URL
+spelling without standardizing or resolving the mutable session URL. The App clears only the
+source session's old state after durable Save Copy success.
+
 Any session
 `committedButIndeterminate`, including Save Copy, installs a per-session reconciliation quarantine
 that retains the exact destination and prepared-byte digest. A readable Save Copy destination is
@@ -259,17 +274,20 @@ later symlink at that name and therefore cannot clear another session's state. A
 non-regular leaf, unreadable file, or inspection failure stays quarantined and exposes Check Again;
 it does not authorize any writer. Check Again reclassifies only the retained location and authority,
 eventually yielding Reload/Keep Mine, the exact missing recovery, or the same actionable blocked
-state. Blind Cmd-S and autosave remain blocked until explicit reconciliation or a durable exact
-missing recovery clears the quarantine.
+state. Quarantine is a retention condition independent of `isDirty`: LRU eviction, editor
+retirement and metadata cleanup, missing-file close, workspace close, and workspace switch may not
+discard even a clean quarantined session or its exact context before reconciliation. Blind Cmd-S
+and autosave remain blocked until explicit reconciliation or a durable exact missing recovery
+clears the quarantine. Workspace retirement decides security-scope transfer only from the retained
+anchored authority or the standalone proof's captured installed-workspace membership; it never
+reopens or reinspects the current path.
 
 For ordinary save and Save Copy, App completes a proven durable state transition first—adopting
 metadata, marking clean, or re-homing the session—then retains every non-`none` `cleanupState` as
 an exact authority-backed artifact notice and presents “File Saved; Cleanup Required.” A
 `notCommitted` result keeps the session dirty and likewise retains any non-`none` `artifactState`.
-The two legacy App paths consume `committedWithCleanupRequired` as committed success before
-surfacing the same notice; they never route it through indeterminate quarantine or a generic
-unwritable failure. Artifacts are not auto-deleted because the public artifact state does not carry
-an expected identity for a safe later unlink.
+Artifacts are not auto-deleted because the public artifact state does not carry an expected
+identity for a safe later unlink.
 
 ## Deterministic regression boundary
 
@@ -298,11 +316,12 @@ timing sleeps—to cover:
   cached session still bound to A cannot inject its dirty text into B's search request;
 - file-tree/sidebar activation, installed-workspace Save Copy, descriptor-canonical target
   inspection for `0200`/`000` leaves, cached/retired/editor ownership collision refusal,
-  descriptor-retained unanchored ownership after unlink or path replacement, fail-closed missing
-  proof, original-path missing recovery without source self-collision, missing case-alias quarantine
-  collision, location URL stability when an invalid leaf becomes a directory, distinct-case success
-  on case-sensitive volumes, retained save authority after workspace close, and per-session
-  indeterminate-write quarantine;
+  retained unanchored location/identity/loaded-digest proof after unlink, replacement, or same-inode
+  content change, fail-closed unavailable proof, authority-exact original-path missing recovery,
+  A-to-B same-spelling and cross-authority cached/retired/editor/context ownership refusal, literal
+  NFC/NFD retry spelling, lexical URL stability when the leaf is already or later becomes a
+  directory, stable `sessionStateURL`, distinct-case success on case-sensitive volumes, retained
+  save authority after workspace close, and per-session indeterminate-write quarantine;
 - final-suspension current-session changes and cached-source eviction, proving reload neither
   steals a newer selection nor commits a stale cached/retired activation;
 - Save Copy indeterminate outcomes with readable, still-missing, symlink, non-regular, and
@@ -321,8 +340,11 @@ timing sleeps—to cover:
 - tri-state cleanup inspection failure plus write-only and no-access artifact modes, proving
   uncertainty cannot collapse to `.none` and cleanup does not require read permission;
 - durable retained/removal-indeterminate and proven-noncommit artifact outcomes through typed and
-  legacy App saves, proving successful commits finish clean/re-home while exact cleanup notices
-  remain observable and noncommits remain dirty;
+  App saves, proving successful commits finish clean/re-home while exact cleanup notices remain
+  observable and noncommits remain dirty;
+- clean-session quarantine through LRU eviction, editor retirement/metadata cleanup, missing-file
+  close, workspace close, and workspace switch, plus unlinked/replaced unanchored retirement,
+  proving reconciliation context and captured membership outlive every lifecycle exit;
 - async authority capture cancellation that releases a live descriptor-backed authority;
 - post-capture root moved/symlink-replaced/directory-replaced normalized to `namespaceChanged`;
 - complete returned-metadata equality for existing replacement and missing creation;

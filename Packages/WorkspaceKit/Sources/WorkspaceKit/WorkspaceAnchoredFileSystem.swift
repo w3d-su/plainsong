@@ -50,18 +50,22 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
         let relativePath = try WorkspaceRootContainment.normalizedRelativePath(relativePath)
         self.rootAuthority = rootAuthority
         self.relativePath = relativePath
-        fileURL = rootAuthority.canonicalRootURL
-            .appendingPathComponent(relativePath, isDirectory: false)
-            .standardizedFileURL
+        fileURL = Self.lexicalFileURL(
+            rootURL: rootAuthority.canonicalRootURL,
+            relativePath: relativePath
+        )
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.rootAuthority == rhs.rootAuthority && lhs.relativePath == rhs.relativePath
+        lhs.rootAuthority == rhs.rootAuthority
+            && lhs.relativePath.utf8.elementsEqual(rhs.relativePath.utf8)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(rootAuthority)
-        hasher.combine(relativePath)
+        for byte in relativePath.utf8 {
+            hasher.combine(byte)
+        }
     }
 
     func sibling(named name: String) -> WorkspaceFileSystemLocation? {
@@ -72,6 +76,23 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
             rootAuthority: rootAuthority,
             relativePath: (parent + [name]).joined(separator: "/")
         )
+    }
+
+    private static func lexicalFileURL(rootURL: URL, relativePath: String) -> URL {
+        let encodedRelativePath = relativePath.utf8.map { byte -> String in
+            switch byte {
+            case 0x2D, 0x2E, 0x2F, 0x30 ... 0x39, 0x41 ... 0x5A, 0x5F, 0x61 ... 0x7A, 0x7E:
+                String(UnicodeScalar(byte))
+            default:
+                String(format: "%%%02X", byte)
+            }
+        }.joined()
+        let rootSpelling = rootURL.absoluteString
+        let separator = rootSpelling.hasSuffix("/") ? "" : "/"
+        guard let fileURL = URL(string: rootSpelling + separator + encodedRelativePath) else {
+            preconditionFailure("Validated filesystem path could not form a lexical file URL")
+        }
+        return fileURL
     }
 }
 
