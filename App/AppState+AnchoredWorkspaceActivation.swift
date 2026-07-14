@@ -23,6 +23,16 @@ extension AppState {
             sha256Digest: sha256Digest
         )
 
+        // A URL-keyed conflict/detachment fence remains owned by its retained A authority. A
+        // candidate B that merely reuses A's lexical spelling must fail before it can fall
+        // through to a newly loaded session and erase or inherit that state.
+        guard !hasStatefulRetainedAuthorityCollision(
+            at: key,
+            candidateLocation: location
+        ) else {
+            throw AppStateError.invalidSessionIdentity(key)
+        }
+
         if let cachedSession = sessionCache[key] {
             guard let cachedStateURL = sessionStateURL(for: cachedSession),
                   exactFileURLSpellingMatches(cachedStateURL, key)
@@ -100,8 +110,12 @@ extension AppState {
     ) {
         let key = activation.canonicalURL
         let session = activation.session
-        anchoredSessionFileBindings[ObjectIdentifier(session)] = activation.binding
-        unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
+        let observation = ObservedRetainedFileVersion(
+            location: activation.binding.location,
+            file: activation.file,
+            identity: activation.binding.identity,
+            sha256Digest: activation.binding.sha256Digest
+        )
 
         switch activation.source {
         case .cached:
@@ -109,7 +123,15 @@ extension AppState {
                 cancelForegroundDocumentTasks()
                 setCurrentDocument(session, synchronizingWorkspaceTree: false)
             }
-            reconcileSession(session, withAnchoredFile: activation.file, canonicalURL: key)
+            guard reconcileObservedRetainedFileVersion(
+                observation,
+                for: session,
+                canonicalURL: key
+            ) else {
+                handleSessionAccess(url: key, isDirty: session.isDirty)
+                return
+            }
+            adoptAnchoredFileBinding(activation.binding, for: session)
             handleSessionAccess(url: key, isDirty: session.isDirty)
 
         case let .retired(bindingID):
@@ -119,17 +141,18 @@ extension AppState {
             else {
                 preconditionFailure("Prepared retired reload activation changed before commit")
             }
-            retiredEditorDocumentBindings[bindingID] = nil
-            retirement.securityScopedAuthority?.stop()
-            installAnchoredFileSession(
+            let accepted = installAnchoredFileSession(
                 session,
                 activation: activation,
                 recordsLoadedText: false,
                 reconcilesExternalChange: true
             )
+            guard accepted else { return }
+            retiredEditorDocumentBindings[bindingID] = nil
+            retirement.securityScopedAuthority?.stop()
 
         case .loaded:
-            installAnchoredFileSession(
+            _ = installAnchoredFileSession(
                 session,
                 activation: activation,
                 recordsLoadedText: true,
@@ -198,12 +221,13 @@ extension AppState {
         }
     }
 
+    @discardableResult
     private func installAnchoredFileSession(
         _ session: DocumentSession,
         activation: PreparedAnchoredFileSessionActivation,
         recordsLoadedText: Bool,
         reconcilesExternalChange: Bool
-    ) {
+    ) -> Bool {
         let key = activation.canonicalURL
         cancelForegroundDocumentTasks()
         sessionCache[key] = session
@@ -217,54 +241,25 @@ extension AppState {
             recordKnownAnchoredDiskText(activation.file.text, canonicalURL: key)
         }
         setCurrentDocument(session, synchronizingWorkspaceTree: false)
-        if reconcilesExternalChange {
-            reconcileSession(session, withAnchoredFile: activation.file, canonicalURL: key)
-        }
-        handleSessionAccess(url: key, isDirty: session.isDirty)
-    }
-
-    private func reconcileSession(
-        _ session: DocumentSession,
-        withAnchoredFile file: MarkdownFile,
-        canonicalURL: URL
-    ) {
-        let diskHash = Self.contentHash(file.text)
-        if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
-            pendingExternalTexts[canonicalURL] = file.text
-            lastKnownDiskHashes[canonicalURL] = diskHash
-            lastKnownDiskModificationDates[canonicalURL] = nil
-            cancelAutosave(for: session)
-            if session === currentDocument {
-                missingFilePrompt = nil
-                externalChangePrompt = ExternalChangePrompt(fileURL: canonicalURL)
-            }
-            return
-        }
-        guard lastKnownDiskHashes[canonicalURL] != diskHash else { return }
-
-        if session.isDirty {
-            pendingExternalTexts[canonicalURL] = file.text
-            cancelAutosave(for: session)
-            if session === currentDocument {
-                missingFilePrompt = nil
-                externalChangePrompt = ExternalChangePrompt(fileURL: canonicalURL)
-            }
-            return
-        }
-
-        pendingExternalTexts[canonicalURL] = nil
-        session.reset(
-            text: file.text,
-            url: canonicalURL,
-            fileKind: file.fileKind,
-            isDirty: false
+        let observation = ObservedRetainedFileVersion(
+            location: activation.binding.location,
+            file: activation.file,
+            identity: activation.binding.identity,
+            sha256Digest: activation.binding.sha256Digest
         )
-        detachedSessionURLs.remove(canonicalURL)
-        if session === currentDocument {
-            missingFilePrompt = nil
+        if reconcilesExternalChange {
+            guard reconcileObservedRetainedFileVersion(
+                observation,
+                for: session,
+                canonicalURL: key
+            ) else {
+                handleSessionAccess(url: key, isDirty: session.isDirty)
+                return false
+            }
         }
-        lastKnownDiskHashes[canonicalURL] = diskHash
-        lastKnownDiskModificationDates[canonicalURL] = nil
+        adoptAnchoredFileBinding(activation.binding, for: session)
+        handleSessionAccess(url: key, isDirty: session.isDirty)
+        return true
     }
 
     private func recordKnownAnchoredDiskText(_ text: String, canonicalURL: URL) {
@@ -322,25 +317,43 @@ extension AppState {
         }
     }
 
+    /// Handles a background-observed possible external change to an anchored session.
+    ///
+    /// Performs one coherent authority-bound read and only advances the retained binding once
+    /// identity/SHA-256 arbitration accepts the observed version. A dirty conflict keeps the
+    /// previous proof until Reload or Keep Mine explicitly resolves it.
     func handleAnchoredExternalChange(
         for session: DocumentSession,
         binding: AnchoredWorkspaceSessionFileBinding
     ) {
         let key = binding.location.fileURL
-        switch WorkspaceNoFollowFileInspector.status(at: binding.location) {
-        case .missing:
-            markSessionDetachedFromMissingFile(session, url: key)
-        case .regular:
-            guard let result = try? fileStore.loadResult(at: binding.location) else { return }
-            anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
+        do {
+            let observation = try ObservedRetainedFileVersion(
                 location: binding.location,
-                identity: result.metadata.identity,
-                sha256Digest: result.sha256Digest
+                result: fileStore.loadResult(at: binding.location)
             )
-            unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = nil
-            reconcileSession(session, withAnchoredFile: result.file, canonicalURL: key)
-        case .symbolicLink, .notRegularFile, .unreadable:
-            return
+            let changed = observedRetainedFileVersionDiffers(observation, for: session)
+            guard reconcileObservedRetainedFileVersion(
+                observation,
+                for: session,
+                canonicalURL: key
+            ) else {
+                return
+            }
+            if changed {
+                adoptAnchoredFileBinding(
+                    AnchoredWorkspaceSessionFileBinding(
+                        location: binding.location,
+                        identity: observation.identity,
+                        sha256Digest: observation.sha256Digest
+                    ),
+                    for: session
+                )
+            }
+        } catch WorkspaceAnchoredFileSystemError.missing {
+            markSessionDetachedFromMissingFile(session, url: key)
+        } catch {
+            // An unreadable/symlink/replaced namespace cannot authorize a binding update.
         }
     }
 }

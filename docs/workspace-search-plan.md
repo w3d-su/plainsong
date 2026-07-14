@@ -462,13 +462,25 @@ applied only when the destination parent reports a case-insensitive filesystem, 
 spellings remain valid on case-sensitive volumes. Existing aliases, hard links, and every other
 session remain protected. Only the source session's old state is removed after durable success.
 
+An external notification first performs one coherent authority-bound read through the retained
+anchored binding or standalone proof, then compares its literal location, descriptor identity,
+and SHA-256 digest before adopting anything. mtime, FNV, URL recapture, and a cache/retirement
+hit do not authorize a proof replacement. For a dirty session, any unaccepted identity or byte
+change (including a same-inode rewrite) enters the session conflict, cancels autosave, and keeps
+the prior proof intact; only an explicit Reload or Keep Mine performs a fresh read and adopts the
+accepted observation. The rule is identical for anchored and standalone sessions.
+A stateful retained A session (pending conflict, detachment, or indeterminate context) also blocks
+a replacement-parent B at the same lexical URL until A is resolved; B cannot inherit or clear A's
+URL-keyed fence merely by reusing its spelling.
+
 `WorkspaceFileSystemLocation.fileURL` is lexical and leaf-state-independent: construction never
 inspects the leaf, equal locations expose identical slash-free URLs, and literal relative-path
 bytes keep NFC/NFD locations distinct. Session binding/context lookup starts from retained session
 identity and stored spelling without standardizing or resolving mutable URLs. Any session write or Save Copy
 `committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
-a readable Save Copy destination is re-homed with observed identity/digest for Reload or Keep Mine,
-while a proven-missing destination exposes only exact-location `.missing` recovery. Symlink,
+a readable Save Copy destination records its observed identity/digest as pending for Reload or Keep
+Mine while retaining the prior proof until that explicit resolution; a proven-missing destination
+exposes only exact-location `.missing` recovery. Symlink,
 non-regular, unreadable, and inspection-failure states remain quarantined with an actionable Check
 Again reconciliation that reclassifies only the retained location and authority. The exact
 location, URL spelling, result, and prepared digest remain retained even when the leaf becomes a
@@ -478,6 +490,12 @@ cleanup, missing-file close, workspace close, and workspace switch retain or blo
 discarding a clean quarantined session. Cmd-S and autosave stay blocked; every
 differently spelled or broad Save Copy retry is refused before writer entry, and no legacy URL
 fallback is allowed.
+Root capture, `relativePath(forFileURL:)`, standalone capture, recovery, and LRU keys preserve
+literal UTF-8 path bytes rather than round-tripping through `standardizedFileURL`; only
+separator/dot traversal normalization remains. Non-file URLs and NUL-bearing raw paths are
+rejected before any C-string filesystem call. A descriptor-derived canonical parent may unify an
+alias cache key, but it does not alter an NFC leaf: an exact missing-source Save Copy reuses that
+retained NFC authority/location, while an NFD alternative remains non-exact and is refused.
 Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
 App completes the clean/re-home transition, retains the exact authority artifact notice, and
 presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact

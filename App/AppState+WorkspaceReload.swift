@@ -43,29 +43,29 @@ extension AppState {
         selectFirstIfNeeded: Bool,
         errorTitle: String
     ) {
-        let normalizedRoot = root.standardizedFileURL
+        let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
         let scanner = directoryScanner
         workspaceReloadTask?.cancel()
 
         workspaceReloadTask = Task { @MainActor [weak self, scanner] in
             do {
-                let capture = try await scanner.snapshotCapture(root: normalizedRoot)
+                let capture = try await scanner.snapshotCapture(root: selectedRoot)
                 guard let self else { return }
                 try await applyWorkspaceReload(
-                    root: normalizedRoot,
+                    root: selectedRoot,
                     capture: capture,
                     generation: generation,
                     selectFirstIfNeeded: selectFirstIfNeeded
                 )
-                guard isCurrentWorkspaceReload(root: normalizedRoot, generation: generation) else {
+                guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
                     return
                 }
             } catch is CancellationError {
                 // A newer reload, workspace switch, or close invalidated this scan.
             } catch {
                 guard let self else { return }
-                guard isCurrentWorkspaceReload(root: normalizedRoot, generation: generation) else {
+                guard isCurrentWorkspaceReload(root: selectedRoot, generation: generation) else {
                     return
                 }
                 present(error, title: errorTitle)
@@ -75,11 +75,11 @@ extension AppState {
 
     /// Direct callers receive their own generation so a slower scan cannot apply stale state.
     func reloadWorkspaceTree(root: URL, selectFirstIfNeeded: Bool) async throws {
-        let normalizedRoot = root.standardizedFileURL
+        let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
-        let capture = try await directoryScanner.snapshotCapture(root: normalizedRoot)
+        let capture = try await directoryScanner.snapshotCapture(root: selectedRoot)
         try await applyWorkspaceReload(
-            root: normalizedRoot,
+            root: selectedRoot,
             capture: capture,
             generation: generation,
             selectFirstIfNeeded: selectFirstIfNeeded
@@ -118,9 +118,6 @@ extension AppState {
             throw CancellationError()
         }
 
-        // Activation paths use the captured authority's canonical spelling, never a retargeted
-        // selected symlink that slipped past a failed proof.
-        let activationRoot = capture.rootAuthority.canonicalRootURL
         let currentDocumentAtPreparation = currentDocument
         let currentDocumentStateAtPreparation = workspaceReloadCurrentSessionState()
 
@@ -156,7 +153,6 @@ extension AppState {
         let preparedFile = try await prepareWorkspaceReloadFile(
             selectedNode: tree.selectedNode,
             rootAuthority: capture.rootAuthority,
-            activationRoot: activationRoot,
             selectedRoot: root,
             generation: generation
         )
@@ -217,7 +213,6 @@ extension AppState {
     private func prepareWorkspaceReloadFile(
         selectedNode: WorkspaceFileNode?,
         rootAuthority: WorkspaceFileSystemRootAuthority,
-        activationRoot: URL,
         selectedRoot: URL,
         generation: UInt64
     ) async throws -> PreparedWorkspaceReloadFile? {
@@ -232,12 +227,16 @@ extension AppState {
             throw CancellationError()
         }
 
+        // Activation paths use the captured authority's canonical spelling, never a retargeted
+        // selected symlink that slipped past a failed proof. The candidate URL is built through
+        // `location(relativePath:)`, never `appendingPathComponent`, which silently decomposes
+        // precomposed Unicode (NFC) in the leaf into decomposed form (NFD) via CoreFoundation's
+        // file-system-representation bridging before `canonicalizedLocation` ever sees it.
         let preparedFile = try await prepareAnchoredWorkspaceReloadFile(
             rootAuthority: rootAuthority,
-            candidateURL: activationRoot.appendingPathComponent(
-                selectedNode.relativePath,
-                isDirectory: false
-            )
+            candidateURL: rootAuthority.location(
+                relativePath: selectedNode.relativePath
+            ).fileURL
         )
         try workspaceReloadPostLoadHook?()
         try Task.checkCancellation()
@@ -308,13 +307,17 @@ extension AppState {
                 ?? (try? rootAuthority.canonicalizedLocation(forFileURL: fileURL).relativePath)
                 ?? lexicalRelativePath
             for node in editableNodes {
-                let candidateURL = rootAuthority.canonicalRootURL.appendingPathComponent(
-                    node.relativePath,
-                    isDirectory: false
-                )
-                guard let location = try? rootAuthority.canonicalizedLocation(
-                    forFileURL: candidateURL
-                ) else {
+                // Built through `location(relativePath:)`, never `appendingPathComponent`,
+                // which silently decomposes precomposed Unicode (NFC) in `node.relativePath`
+                // into decomposed form (NFD) before `canonicalizedLocation` ever sees it.
+                guard
+                    let candidateURL = try? rootAuthority.location(
+                        relativePath: node.relativePath
+                    ).fileURL,
+                    let location = try? rootAuthority.canonicalizedLocation(
+                        forFileURL: candidateURL
+                    )
+                else {
                     continue
                 }
                 if ExactSourceText.matches(location.relativePath, targetRelativePath) {
@@ -375,6 +378,7 @@ extension AppState {
             indeterminateContext: indeterminateSessionWriteContexts[sessionIdentity],
             isDetached: stateURL.map(detachedSessionURLs.contains) ?? false,
             pendingExternalText: stateURL.flatMap { pendingExternalTexts[$0] },
+            pendingExternalVersion: stateURL.flatMap { pendingExternalFileVersions[$0] },
             lastKnownDiskHash: stateURL.flatMap { lastKnownDiskHashes[$0] },
             lastKnownDiskModificationDate: stateURL.flatMap { lastKnownDiskModificationDates[$0] },
             externalChangeURL: externalChangePrompt?.fileURL,
@@ -385,7 +389,7 @@ extension AppState {
     private func isCurrentWorkspaceReload(root: URL, generation: UInt64) -> Bool {
         !Task.isCancelled
             && workspaceGeneration == generation
-            && workspaceRootURL?.standardizedFileURL == root.standardizedFileURL
+            && workspaceRootURL.map { exactFileURLSpellingMatches($0, root) } == true
     }
 }
 
@@ -406,6 +410,7 @@ private struct WorkspaceReloadCurrentSessionState: Equatable {
     let indeterminateContext: IndeterminateSessionWriteContext?
     let isDetached: Bool
     let pendingExternalText: String?
+    let pendingExternalVersion: ObservedRetainedFileVersion?
     let lastKnownDiskHash: UInt64?
     let lastKnownDiskModificationDate: Date?
     let externalChangeURL: URL?
@@ -422,6 +427,7 @@ private struct WorkspaceReloadCurrentSessionState: Equatable {
             && lhs.indeterminateContext == rhs.indeterminateContext
             && lhs.isDetached == rhs.isDetached
             && exactTextMatches(lhs.pendingExternalText, rhs.pendingExternalText)
+            && lhs.pendingExternalVersion == rhs.pendingExternalVersion
             && lhs.lastKnownDiskHash == rhs.lastKnownDiskHash
             && lhs.lastKnownDiskModificationDate == rhs.lastKnownDiskModificationDate
             && exactPathMatches(lhs.externalChangeURL, rhs.externalChangeURL)
@@ -429,16 +435,11 @@ private struct WorkspaceReloadCurrentSessionState: Equatable {
     }
 
     private static func exactPathMatches(_ lhs: URL?, _ rhs: URL?) -> Bool {
-        switch (lhs, rhs) {
-        case let (lhs?, rhs?):
-            lhs.path(percentEncoded: false).utf8.elementsEqual(
-                rhs.path(percentEncoded: false).utf8
-            )
-        case (nil, nil):
-            true
-        default:
-            false
-        }
+        guard let lhs, let rhs else { return lhs == nil && rhs == nil }
+        guard lhs.isFileURL, rhs.isFileURL else { return false }
+        return lhs.path(percentEncoded: false).utf8.elementsEqual(
+            rhs.path(percentEncoded: false).utf8
+        )
     }
 
     private static func exactTextMatches(_ lhs: String?, _ rhs: String?) -> Bool {
@@ -719,7 +720,9 @@ extension AppState {
     func workspaceSearchAuthorityMatchesCurrentRoot(
         _ rootAuthority: WorkspaceFileSystemRootAuthority
     ) -> Bool {
-        workspaceRootURL?.standardizedFileURL == rootAuthority.originalRootURL
+        workspaceRootURL.map {
+            exactFileURLSpellingMatches($0, rootAuthority.originalRootURL)
+        } == true
             && workspaceInstalledCaptureGeneration == workspaceGeneration
             && workspaceSearchRootAuthority == rootAuthority
     }

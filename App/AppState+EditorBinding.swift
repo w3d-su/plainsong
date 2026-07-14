@@ -238,7 +238,9 @@ extension AppState {
             cancelAutosave(for: session)
             return
         }
-        if let canonicalURL, pendingExternalTexts[canonicalURL] != nil {
+        if let canonicalURL,
+           pendingExternalTexts[canonicalURL] != nil || pendingExternalFileVersions[canonicalURL] != nil
+        {
             cancelAutosave(for: session)
             return
         }
@@ -281,7 +283,7 @@ extension AppState {
 
         lastKnownDiskHashes[canonicalURL] = nil
         lastKnownDiskModificationDates[canonicalURL] = nil
-        pendingExternalTexts[canonicalURL] = nil
+        clearExternalChangeConflict(at: canonicalURL)
         detachedSessionURLs.remove(canonicalURL)
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil

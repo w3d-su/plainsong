@@ -31,15 +31,27 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
 
     /// Establishes standalone authority before the operation by anchoring the canonical
     /// parent and retaining the final filename as a no-follow lexical component.
+    ///
+    /// Deliberately does not route `fileURL` through `standardizedFileURL`: that call
+    /// silently decomposes precomposed Unicode (NFC) into decomposed form (NFD) via
+    /// CoreFoundation's file-system-representation bridging, which would corrupt an
+    /// already-exact retained spelling on the round trip through this initializer.
+    /// `lastPathComponent`/`deletingLastPathComponent()` read the URL's existing path
+    /// bytes without that normalization. The parent is opened by root-authority capture,
+    /// so descriptor-derived canonicalization follows aliases without first round-tripping
+    /// its literal spelling through Foundation.
     public init(fileURL: URL) throws {
-        let fileURL = fileURL.standardizedFileURL
-        let parentURL = fileURL.deletingLastPathComponent().resolvingSymlinksInPath()
+        let path = try WorkspaceLiteralFileURL.absolutePath(of: fileURL)
+        let parentURL = try WorkspaceLiteralFileURL.fileURL(
+            path: WorkspaceLiteralFileURL.parentPath(of: path),
+            isDirectory: true
+        )
         try self.init(
             rootAuthority: WorkspaceFileSystemRootAuthority(
                 rootURL: parentURL,
                 securityScopedURL: fileURL
             ),
-            relativePath: fileURL.lastPathComponent
+            relativePath: WorkspaceLiteralFileURL.leafName(of: path)
         )
     }
 
@@ -79,7 +91,40 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
     }
 
     private static func lexicalFileURL(rootURL: URL, relativePath: String) -> URL {
-        let encodedRelativePath = relativePath.utf8.map { byte -> String in
+        let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(
+            rootURL.path(percentEncoded: false)
+        )
+        let path = rootPath == "/" ? "/\(relativePath)" : "\(rootPath)/\(relativePath)"
+        return WorkspaceLiteralFileURL.fileURL(path: path, isDirectory: false)
+    }
+}
+
+/// Builds and decomposes file URLs without asking Foundation to convert the path through a
+/// filesystem representation. That conversion can normalize NFC to NFD, while descriptor-backed
+/// authority must preserve the literal UTF-8 spelling that it captured or the caller supplied.
+enum WorkspaceLiteralFileURL {
+    /// Validates a user-visible URL before it crosses into a raw C-string path API. URL path
+    /// access alone does not prove a file scheme, and an embedded NUL would truncate the path
+    /// when passed to `open(2)`/`openat(2)`.
+    static func absolutePath(of fileURL: URL) throws -> String {
+        guard fileURL.isFileURL else {
+            throw WorkspaceRootContainmentError.absolutePath(fileURL.absoluteString)
+        }
+        let path = fileURL.path(percentEncoded: false)
+        guard path.hasPrefix("/") else {
+            throw WorkspaceRootContainmentError.absolutePath(path)
+        }
+        guard !path.utf8.contains(0) else {
+            throw WorkspaceRootContainmentError.traversal(path)
+        }
+        return path
+    }
+
+    static func fileURL(path: String, isDirectory: Bool) -> URL {
+        precondition(path.hasPrefix("/"), "Filesystem URL paths must be absolute")
+        precondition(!path.utf8.contains(0), "Filesystem URL paths may not contain NUL")
+
+        let encodedPath = path.utf8.map { byte -> String in
             switch byte {
             case 0x2D, 0x2E, 0x2F, 0x30 ... 0x39, 0x41 ... 0x5A, 0x5F, 0x61 ... 0x7A, 0x7E:
                 String(UnicodeScalar(byte))
@@ -87,12 +132,67 @@ public struct WorkspaceFileSystemLocation: Sendable, Hashable {
                 String(format: "%%%02X", byte)
             }
         }.joined()
-        let rootSpelling = rootURL.absoluteString
-        let separator = rootSpelling.hasSuffix("/") ? "" : "/"
-        guard let fileURL = URL(string: rootSpelling + separator + encodedRelativePath) else {
+        let directorySuffix = isDirectory && path != "/" && !path.hasSuffix("/") ? "/" : ""
+        guard let url = URL(string: "file://\(encodedPath)\(directorySuffix)") else {
             preconditionFailure("Validated filesystem path could not form a lexical file URL")
         }
-        return fileURL
+        return url
+    }
+
+    static func parentPath(of path: String) throws -> String {
+        guard path.hasPrefix("/") else {
+            throw WorkspaceRootContainmentError.absolutePath(path)
+        }
+        let trimmedPath = WorkspaceRootContainment.normalizedDirectoryPath(path)
+        guard let separator = trimmedPath.lastIndex(of: "/") else {
+            throw WorkspaceRootContainmentError.absolutePath(path)
+        }
+        return separator == trimmedPath.startIndex ? "/" : String(trimmedPath[..<separator])
+    }
+
+    static func leafName(of path: String) throws -> String {
+        guard path.hasPrefix("/") else {
+            throw WorkspaceRootContainmentError.absolutePath(path)
+        }
+        let trimmedPath = WorkspaceRootContainment.normalizedDirectoryPath(path)
+        guard let separator = trimmedPath.lastIndex(of: "/"), separator != trimmedPath.endIndex else {
+            throw WorkspaceRootContainmentError.emptyRelativePath
+        }
+        let leaf = String(trimmedPath[trimmedPath.index(after: separator)...])
+        guard !leaf.isEmpty else {
+            throw WorkspaceRootContainmentError.emptyRelativePath
+        }
+        return leaf
+    }
+
+    static func pathBytesMatch(_ lhs: URL, _ rhs: URL) -> Bool {
+        guard lhs.isFileURL, rhs.isFileURL else { return false }
+        return lhs.path(percentEncoded: false).utf8.elementsEqual(rhs.path(percentEncoded: false).utf8)
+    }
+
+    /// Returns the literal root-relative spelling for an absolute child path, or `nil` when the
+    /// child is not under the literal root. This deliberately compares each path component as
+    /// UTF-8 bytes: Swift `String` equality and prefix APIs canonical-equate NFC and NFD, which
+    /// would let a visually equivalent sibling cross a descriptor-authority containment check.
+    /// An equal child and root is represented as the empty relative path.
+    static func relativePath(of childPath: String, containedIn rootPath: String) -> String? {
+        guard childPath.utf8.first == 0x2F, rootPath.utf8.first == 0x2F else {
+            return nil
+        }
+        let childComponents = literalPathComponents(childPath)
+        let rootComponents = literalPathComponents(rootPath)
+        guard childComponents.count >= rootComponents.count,
+              zip(childComponents, rootComponents).allSatisfy({
+                  $0.utf8.elementsEqual($1.utf8)
+              })
+        else {
+            return nil
+        }
+        return childComponents.dropFirst(rootComponents.count).joined(separator: "/")
+    }
+
+    private static func literalPathComponents(_ path: String) -> [Substring] {
+        path.split(separator: "/", omittingEmptySubsequences: true)
     }
 }
 

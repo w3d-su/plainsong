@@ -23,17 +23,22 @@ extension AppState {
         case .regular:
             do {
                 let observed = try fileStore.loadResult(at: context.location)
-                anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
-                    location: context.location,
-                    identity: observed.metadata.identity,
-                    sha256Digest: observed.sha256Digest
-                )
-                unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
                 let destination = context.location.fileURL
+                // A readable destination is still unaccepted until the user chooses Reload or
+                // Keep Mine. Stop any queued write before publishing its pending version.
+                cancelAutosave(for: session)
                 detachedSessionURLs.remove(destination)
                 pendingExternalTexts[destination] = observed.file.text
+                pendingExternalFileVersions[destination] = ObservedRetainedFileVersion(
+                    location: context.location,
+                    result: observed
+                )
                 lastKnownDiskHashes[destination] = Self.contentHash(observed.file.text)
                 lastKnownDiskModificationDates[destination] = nil
+                // The indeterminate destination is observable, but it is not accepted yet.
+                // Retain the session's old binding/proof until Reload or Keep Mine adopts this
+                // exact observation; `observeRetainedFileVersion` prioritizes the context
+                // while the indeterminate fence remains active.
                 if session === currentDocument {
                     indeterminateFileWriteReconciliationPrompt = nil
                     missingFilePrompt = nil
@@ -49,7 +54,7 @@ extension AppState {
         case .missing:
             let destination = context.location.fileURL
             detachedSessionURLs.insert(destination)
-            pendingExternalTexts[destination] = nil
+            clearExternalChangeConflict(at: destination)
             lastKnownDiskHashes[destination] = nil
             lastKnownDiskModificationDates[destination] = nil
             sessionPolicy.updateDirtyState(for: destination, isDirty: true)

@@ -27,16 +27,16 @@ extension AppState {
         guard var tree = workspaceTree,
               let node = tree.node(id: nodeID),
               node.isEditableMarkdown,
-              let workspaceRootURL
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
+              let fileURL = try? rootAuthority.location(relativePath: node.relativePath).fileURL
         else {
             return
         }
 
         tree.selectNode(id: nodeID)
         workspaceTree = tree
-        openWorkspaceFile(
-            workspaceRootURL.appendingPathComponent(node.relativePath, isDirectory: false)
-        )
+        openWorkspaceFile(fileURL)
     }
 
     func setWorkspaceNodeExpanded(_ isExpanded: Bool, id nodeID: WorkspaceFileNode.ID) {
@@ -136,7 +136,10 @@ extension AppState {
 
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
-        let root = url.standardizedFileURL
+        // Keep the chosen root's literal spelling until descriptor capture proves its canonical
+        // physical location. Standardizing here loses precomposed Unicode before WS3B's
+        // authority layer can retain it.
+        let root = url
         try closeWorkspaceForReplacement()
         workspaceAccess = SecurityScopedAccess.startAccessing(root)
         workspaceRootURL = root
@@ -158,7 +161,8 @@ extension AppState {
         workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
             Task { @MainActor [weak self] in
                 guard let self,
-                      workspaceRootURL?.standardizedFileURL == root
+                      let currentRoot = workspaceRootURL,
+                      exactFileURLSpellingMatches(currentRoot, root)
                 else {
                     return
                 }
@@ -175,9 +179,25 @@ extension AppState {
     }
 
     func activateFileSession(url: URL) throws {
-        let key = try canonicalSessionURL(for: url)
+        let requestedURL = try canonicalSessionURL(for: url)
+        // The candidate location is only a cache discriminator. A cached or retired session
+        // must match it through its existing retained authority; its new authority/metadata is
+        // never adopted from this capture before external-change arbitration.
+        let location = try WorkspaceFileSystemLocation(fileURL: requestedURL)
+        let key = location.fileURL
+        // URL-keyed prompt/detachment state is only safe while it belongs to the same retained
+        // authority. Do not let a replacement parent B install at A's lexical spelling and
+        // inherit, clear, or overwrite a still-stateful retired/current A session.
+        guard !hasStatefulRetainedAuthorityCollision(
+            at: key,
+            candidateLocation: location
+        ) else {
+            throw AppStateError.invalidSessionIdentity(key)
+        }
         if let cachedSession = sessionCache[key] {
-            retainUnanchoredManagedSessionOwnership(for: cachedSession)
+            guard retainedManagedSessionLocation(for: cachedSession) == location else {
+                throw AppStateError.invalidSessionIdentity(key)
+            }
             if cachedSession === currentDocument {
                 synchronizeWorkspaceTreeSelection(for: cachedSession)
                 handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
@@ -191,7 +211,6 @@ extension AppState {
             guard !detachedSessionURLs.contains(key) else {
                 throw AppStateError.missingFile(key)
             }
-            _ = try fileStore.load(url: key)
             cancelForegroundDocumentTasks()
             setCurrentDocument(cachedSession)
             handleExternalChange(for: cachedSession)
@@ -199,10 +218,12 @@ extension AppState {
             return
         }
 
-        let location = try WorkspaceFileSystemLocation(fileURL: key)
         let loaded = try fileStore.loadResult(at: location)
         let file = loaded.file
-        let recoveredSession = recoverRetiredSession(for: key)
+        let recoveredSession = recoverRetiredSession(
+            for: key,
+            matching: location
+        )
         let session = recoveredSession ?? DocumentSession(
             text: file.text,
             url: file.url,
@@ -291,7 +312,10 @@ extension AppState {
         let hasMatchingExternalChangePrompt = externalChangePrompt.map {
             exactFileURLSpellingMatches($0.fileURL, url)
         } ?? false
-        guard pendingExternalTexts[url] == nil, !hasMatchingExternalChangePrompt else {
+        guard pendingExternalTexts[url] == nil,
+              pendingExternalFileVersions[url] == nil,
+              !hasMatchingExternalChangePrompt
+        else {
             throw AppStateError.unresolvedExternalChange(url)
         }
 
@@ -336,6 +360,7 @@ extension AppState {
             )
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
         case let .notCommitted(result):
+            handleExternalWritePreconditionFailure(result, for: session)
             throw notCommittedFileWriteError(result, destinationURL: destination)
         case let .committedButIndeterminate(result):
             indeterminateSessionWrites[sessionIdentity] = result
@@ -383,6 +408,22 @@ extension AppState {
             artifactState: result.artifactState
         )
         return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+    }
+
+    /// A typed writer precondition can discover the same external B version before an FSEvent
+    /// reaches `handleExternalChange`. Treat identity/content disagreement as the session-scoped
+    /// arbitration event, not merely an unwritable save: one fresh retained-authority
+    /// observation records the conflict and preserves A's proof.
+    private func handleExternalWritePreconditionFailure(
+        _ result: WorkspaceNotCommittedFileWrite,
+        for session: DocumentSession
+    ) {
+        switch result.reason {
+        case .changedIdentity, .changedContent:
+            handleExternalChange(for: session)
+        default:
+            break
+        }
     }
 
     func presentCommittedFileWriteCleanup(
@@ -467,6 +508,8 @@ extension AppState {
 
     func workspaceURL(for nodeID: WorkspaceFileNode.ID) -> URL? {
         guard let workspaceRootURL,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
               let node = workspaceTree?.node(id: nodeID)
         else {
             return nil
@@ -475,7 +518,7 @@ extension AppState {
         if node.relativePath.isEmpty {
             return workspaceRootURL
         }
-        return workspaceRootURL.appendingPathComponent(node.relativePath, isDirectory: node.isDirectory)
+        return try? rootAuthority.location(relativePath: node.relativePath).fileURL
     }
 
     func firstEditableNode(in node: WorkspaceFileNode) -> WorkspaceFileNode? {

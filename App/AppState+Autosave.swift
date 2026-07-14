@@ -125,6 +125,7 @@ extension AppState {
         }
         return !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
+            pendingExternalFileVersions[url] == nil &&
             externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
             missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }

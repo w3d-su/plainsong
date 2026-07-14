@@ -103,9 +103,8 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
     ) throws {
-        let standardizedRoot = rootURL.standardizedFileURL
-        guard standardizedRoot == rootAuthority.originalRootURL
-            || standardizedRoot == rootAuthority.canonicalRootURL
+        guard WorkspaceLiteralFileURL.pathBytesMatch(rootURL, rootAuthority.originalRootURL)
+            || WorkspaceLiteralFileURL.pathBytesMatch(rootURL, rootAuthority.canonicalRootURL)
         else {
             throw WorkspaceSearchRequestError.rootAuthorityMismatch
         }

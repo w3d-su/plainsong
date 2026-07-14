@@ -48,8 +48,12 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         securityScopedURL: URL? = nil,
         hooks: CaptureHooks
     ) throws {
-        let originalRootURL = rootURL.standardizedFileURL
-        let scopedURL = (securityScopedURL ?? rootURL).standardizedFileURL
+        // Keep the caller's literal URL spelling intact through the capture. The descriptor
+        // establishes the canonical physical root below; `standardizedFileURL` would instead
+        // normalize an NFC component to NFD before that authority proof even starts.
+        _ = try WorkspaceLiteralFileURL.absolutePath(of: rootURL)
+        let originalRootURL = rootURL
+        let scopedURL = securityScopedURL ?? rootURL
         let capture = try SecurityScopedAccess.withAccess(to: scopedURL) {
             try Self.captureDescriptor(rootURL: originalRootURL, hooks: hooks)
         }
@@ -119,7 +123,6 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         selectedRootURL: URL
     ) throws {
         try WorkspaceAnchoredFileSystem.checkCancellation()
-        let selectedRootURL = selectedRootURL.standardizedFileURL
         try validateCanonicalBinding()
         try WorkspaceAnchoredFileSystem.checkCancellation()
 
@@ -142,34 +145,48 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         lhs: WorkspaceFileSystemRootAuthority,
         rhs: WorkspaceFileSystemRootAuthority
     ) -> Bool {
-        lhs.canonicalRootURL == rhs.canonicalRootURL
+        WorkspaceLiteralFileURL.pathBytesMatch(lhs.canonicalRootURL, rhs.canonicalRootURL)
             && lhs.physicalIdentity == rhs.physicalIdentity
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(canonicalRootURL)
+        for byte in canonicalRootURL.path(percentEncoded: false).utf8 {
+            hasher.combine(byte)
+        }
         hasher.combine(physicalIdentity)
     }
 
     /// Converts a file URL expressed under either spelling captured for this authority
     /// into its canonical root-relative path without performing filesystem work.
+    ///
+    /// Reads `fileURL.path(percentEncoded: false)` directly rather than routing through
+    /// `standardizedFileURL`, which silently decomposes precomposed Unicode (NFC) into
+    /// decomposed form (NFD) via CoreFoundation's file-system-representation bridging. A
+    /// retained lexical URL fed back through this function must reproduce its exact bytes;
+    /// component-wise splitting on `/` still rejects `..`/collapses `.` via
+    /// `normalizedRelativePath` and tolerates redundant slashes without touching Unicode.
     public func relativePath(forFileURL fileURL: URL) throws -> String {
-        let filePath = WorkspaceRootContainment.normalizedDirectoryPath(
-            fileURL.standardizedFileURL.path(percentEncoded: false)
+        let fileComponents = try Self.literalPathComponents(
+            WorkspaceLiteralFileURL.absolutePath(of: fileURL)
         )
         for rootURL in [canonicalRootURL, originalRootURL] {
-            let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(
-                rootURL.standardizedFileURL.path(percentEncoded: false)
-            )
-            guard rootPath == "/" || filePath.hasPrefix("\(rootPath)/") else {
+            let rootComponents = Self.literalPathComponents(rootURL.path(percentEncoded: false))
+            guard fileComponents.count > rootComponents.count,
+                  zip(fileComponents, rootComponents).allSatisfy({
+                      $0.utf8.elementsEqual($1.utf8)
+                  })
+            else {
                 continue
             }
-            let relativePath = rootPath == "/"
-                ? String(filePath.dropFirst())
-                : String(filePath.dropFirst(rootPath.count + 1))
+            let relativePath = fileComponents.dropFirst(rootComponents.count)
+                .joined(separator: "/")
             return try WorkspaceRootContainment.normalizedRelativePath(relativePath)
         }
         throw WorkspaceRootContainmentError.fileOutsideRoot
+    }
+
+    private static func literalPathComponents(_ path: String) -> [Substring] {
+        path.split(separator: "/", omittingEmptySubsequences: true)
     }
 
     /// Resolves one file URL through this retained authority and returns the exact canonical,
@@ -247,8 +264,10 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
                 verificationDescriptor
             )
             guard verificationIdentity == physicalIdentity,
-                  try Self.descriptorURL(verificationDescriptor, isDirectory: true)
-                  == canonicalRootURL
+                  try WorkspaceLiteralFileURL.pathBytesMatch(
+                      Self.descriptorURL(verificationDescriptor, isDirectory: true),
+                      canonicalRootURL
+                  )
             else {
                 throw WorkspaceAnchoredFileSystemError.namespaceChanged
             }
@@ -300,7 +319,10 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
             verificationDescriptor
         )
         guard verificationIdentity == identity,
-              try descriptorURL(verificationDescriptor, isDirectory: true) == canonicalRootURL
+              try WorkspaceLiteralFileURL.pathBytesMatch(
+                  descriptorURL(verificationDescriptor, isDirectory: true),
+                  canonicalRootURL
+              )
         else {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
@@ -317,9 +339,9 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
 
     private static func openDirectory(at url: URL, noFollow: Bool) throws -> Int32 {
         let flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC | (noFollow ? O_NOFOLLOW : 0)
-        let descriptor = url.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path else { return -1 }
-            return Darwin.open(path, flags)
+        let path = try WorkspaceLiteralFileURL.absolutePath(of: url)
+        let descriptor = path.withCString { path -> Int32 in
+            Darwin.open(path, flags)
         }
         guard descriptor >= 0 else {
             throw switch errno {
@@ -352,7 +374,7 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         guard path.hasPrefix("/") else {
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
-        return URL(fileURLWithPath: path, isDirectory: isDirectory)
+        return WorkspaceLiteralFileURL.fileURL(path: path, isDirectory: isDirectory)
     }
 
     private static func errorForFailedAliasOpen(

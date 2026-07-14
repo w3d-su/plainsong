@@ -2,6 +2,20 @@
 import XCTest
 
 final class WorkspaceSessionLRUPolicyTests: XCTestCase {
+    func testEvictionRetainsDistinctNFCAndNFDURLSpellings() throws {
+        var policy = WorkspaceSessionLRUPolicy(limit: 1)
+        let nfc = try XCTUnwrap(URL(string: "file:///tmp/caf%C3%A9.md"))
+        let nfd = try XCTUnwrap(URL(string: "file:///tmp/cafe%CC%81.md"))
+
+        XCTAssertTrue(policy.access(nfc, isDirty: false).isEmpty)
+        let evictions = policy.access(nfd, isDirty: false)
+
+        XCTAssertEqual(evictions, [WorkspaceSessionEviction(url: nfc, requiresSave: false)])
+        XCTAssertEqual(policy.warmURLsInLeastRecentOrder, [nfd])
+        XCTAssertNil(policy.dirtyState(for: nfc))
+        XCTAssertEqual(policy.dirtyState(for: nfd), false)
+    }
+
     func testEvictsLeastRecentlyUsedCleanSessionOverLimit() {
         var policy = WorkspaceSessionLRUPolicy(limit: 2)
         let firstURL = URL(fileURLWithPath: "/tmp/a.md")

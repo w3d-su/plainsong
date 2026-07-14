@@ -153,8 +153,7 @@ extension WorkspaceAnchoredFileSystem {
             context.parentDescriptor,
             isDirectory: true
         )
-        guard finalURL.path(percentEncoded: false)
-            == context.canonicalParentURL.path(percentEncoded: false)
+        guard WorkspaceLiteralFileURL.pathBytesMatch(finalURL, context.canonicalParentURL)
         else {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
@@ -167,12 +166,13 @@ extension WorkspaceAnchoredFileSystem {
         canonicalParentURL: URL,
         canonicalLeaf: String
     ) throws -> WorkspaceNoFollowFileTargetInspection {
-        let canonicalFileURL = canonicalParentURL.appendingPathComponent(
-            canonicalLeaf,
-            isDirectory: false
-        )
+        // Deliberately does not combine `canonicalParentURL` and `canonicalLeaf` via
+        // `appendingPathComponent`: that call decomposes precomposed Unicode (NFC) in the leaf
+        // into decomposed form (NFD) via CoreFoundation's file-system-representation bridging,
+        // independent of and in addition to the `standardizedFileURL` corruption this same
+        // family of functions must avoid. The leaf is joined at the string level instead.
         let canonicalRelativePath = try context.location.rootAuthority
-            .relativePath(forCanonicalDescriptorFileURL: canonicalFileURL)
+            .relativePath(forCanonicalDescriptorParentURL: canonicalParentURL, leaf: canonicalLeaf)
         return try WorkspaceNoFollowFileTargetInspection(
             state: state,
             canonicalLocation: context.location.rootAuthority.location(
@@ -294,23 +294,31 @@ extension WorkspaceAnchoredFileSystem {
 }
 
 extension WorkspaceFileSystemRootAuthority {
-    /// Converts a path derived from this authority's live descriptors without asking
-    /// Foundation to standardize a possibly missing final component. Standardization can
-    /// rewrite an existing `/private/var` root to `/var` while retaining `/private/var` for
-    /// a missing child, which would make one descriptor-bound path appear outside its root.
-    func relativePath(forCanonicalDescriptorFileURL fileURL: URL) throws -> String {
+    /// Converts a descriptor-derived parent directory plus a literal leaf name into a
+    /// root-relative path without asking Foundation to standardize a possibly missing final
+    /// component or to combine the two path segments. Standardization can rewrite an existing
+    /// `/private/var` root to `/var` while retaining `/private/var` for a missing child, which
+    /// would make one descriptor-bound path appear outside its root; combining via
+    /// `appendingPathComponent` separately decomposes precomposed Unicode (NFC) in `leaf` into
+    /// decomposed form (NFD). The leaf is therefore joined at the string level instead.
+    func relativePath(
+        forCanonicalDescriptorParentURL parentURL: URL,
+        leaf: String
+    ) throws -> String {
         let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(
             canonicalRootURL.path(percentEncoded: false)
         )
-        let filePath = WorkspaceRootContainment.normalizedDirectoryPath(
-            fileURL.path(percentEncoded: false)
+        let parentPath = WorkspaceRootContainment.normalizedDirectoryPath(
+            parentURL.path(percentEncoded: false)
         )
-        guard rootPath == "/" || filePath.hasPrefix("\(rootPath)/") else {
+        guard let parentRelativePath = WorkspaceLiteralFileURL.relativePath(
+            of: parentPath,
+            containedIn: rootPath
+        )
+        else {
             throw WorkspaceRootContainmentError.fileOutsideRoot
         }
-        let relativePath = rootPath == "/"
-            ? String(filePath.dropFirst())
-            : String(filePath.dropFirst(rootPath.count + 1))
+        let relativePath = parentRelativePath.isEmpty ? leaf : "\(parentRelativePath)/\(leaf)"
         return try WorkspaceRootContainment.normalizedRelativePath(relativePath)
     }
 }

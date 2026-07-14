@@ -62,14 +62,16 @@ struct IndeterminateFileWriteReconciliationPrompt: Equatable {
     let state: IndeterminateFileWriteReconciliationState
 }
 
+struct AppStateUserVisibleError: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
 /// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
-    struct UserVisibleError: Identifiable {
-        let id = UUID()
-        let title: String
-        let message: String
-    }
+    typealias UserVisibleError = AppStateUserVisibleError
 
     struct ExternalChangePrompt: Identifiable, Equatable {
         let id = UUID()
@@ -156,6 +158,11 @@ final class AppState: ObservableObject {
     var lastKnownDiskHashes: [URL: UInt64] = [:]
     var lastKnownDiskModificationDates: [URL: Date] = [:]
     var pendingExternalTexts: [URL: String] = [:]
+    /// Coherent descriptor-bound observations that back pending external-change text. The
+    /// legacy text map remains the session-scoped save/autosave fence, while this companion
+    /// prevents Reload or Keep Mine from pairing one observed text version with a later,
+    /// unrelated identity/SHA proof.
+    var pendingExternalFileVersions: [URL: ObservedRetainedFileVersion] = [:]
     var detachedSessionURLs: Set<URL> = []
     /// Exact authority, identity, and content installed for each anchored workspace session.
     /// Saves use this proof instead of recapturing the session's mutable URL.
@@ -497,6 +504,7 @@ extension AppState {
             indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
+            pendingExternalFileVersions[url] == nil &&
             externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
             missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }

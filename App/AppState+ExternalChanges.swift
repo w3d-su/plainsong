@@ -12,10 +12,20 @@ extension AppState {
             externalChangePrompt = nil
             return
         }
-        guard let text = pendingExternalTexts[key],
-              let fileKind = FileKind(url: prompt.fileURL)
-        else {
+        guard pendingExternalTexts[key] != nil || pendingExternalFileVersions[key] != nil else {
             externalChangePrompt = nil
+            return
+        }
+
+        // Do not restore the earlier pending text and then refresh a proof in a second read.
+        // The file can change from B to C while the prompt is visible; both the restored text
+        // and adopted proof must come from this one, fresh descriptor-bound observation.
+        guard let observation = try? observeRetainedFileVersion(for: currentDocument),
+              exactFileURLSpellingMatches(observation.location.fileURL, key),
+              adoptObservedRetainedFileVersion(observation, for: currentDocument)
+        else {
+            // Fail closed. The prior proof and conflict fence remain in force until a later
+            // explicit Reload or Keep Mine can read and verify the retained authority.
             return
         }
 
@@ -23,14 +33,18 @@ extension AppState {
         indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
         indeterminateFileWriteReconciliationPrompt = nil
         currentDocument.reset(
-            text: text,
-            url: prompt.fileURL,
-            fileKind: fileKind,
+            text: observation.file.text,
+            url: key,
+            fileKind: observation.file.fileKind,
             isDirty: false
         )
         detachedSessionURLs.remove(key)
-        recordKnownSessionDiskText(text, for: currentDocument, canonicalURL: key)
-        pendingExternalTexts[key] = nil
+        recordKnownSessionDiskText(
+            observation.file.text,
+            for: currentDocument,
+            canonicalURL: key
+        )
+        clearExternalChangeConflict(at: key)
         externalChangePrompt = nil
         sessionPolicy.updateDirtyState(for: key, isDirty: false)
         cancelAutosave(for: currentDocument)
@@ -46,15 +60,27 @@ extension AppState {
             externalChangePrompt = nil
             return
         }
-        let pendingDiskText = pendingExternalTexts[key]
-        pendingExternalTexts[key] = nil
-        if let pendingDiskText {
-            recordKnownSessionDiskText(
-                pendingDiskText,
-                for: currentDocument,
-                canonicalURL: key
-            )
+        guard pendingExternalTexts[key] != nil || pendingExternalFileVersions[key] != nil else {
+            externalChangePrompt = nil
+            return
         }
+
+        // Keeping local edits is still an explicit resolution, but it may only authorize the
+        // next write after a fresh observation of the retained location has supplied its exact
+        // identity and SHA-256. If the file changed again while the prompt was open, retain the
+        // conflict instead of allowing stale local content to overwrite it.
+        guard let observation = try? observeRetainedFileVersion(for: currentDocument),
+              exactFileURLSpellingMatches(observation.location.fileURL, key),
+              adoptObservedRetainedFileVersion(observation, for: currentDocument)
+        else {
+            return
+        }
+        recordKnownSessionDiskText(
+            observation.file.text,
+            for: currentDocument,
+            canonicalURL: key
+        )
+        clearExternalChangeConflict(at: key)
         indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
         indeterminateFileWriteReconciliationPrompt = nil
@@ -68,44 +94,17 @@ extension AppState {
     }
 
     func handleExternalChange(for session: DocumentSession) {
+        // An indeterminate write owns a distinct retained destination. Do not let the old
+        // anchored proof (if any) redirect this arbitration back to its pre-write source.
+        if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
+            refreshIndeterminateFileWriteReconciliation(for: session)
+            return
+        }
         if let binding = anchoredSessionFileBinding(for: session) {
             handleAnchoredExternalChange(for: session, binding: binding)
             return
         }
-        refreshUnanchoredManagedSessionOwnershipFromDisk(for: session)
-        guard let url = sessionStateURL(for: session) else { return }
-
-        switch diskDocumentState(for: url) {
-        case .missing:
-            markSessionDetachedFromMissingFile(session, url: url)
-        case .unchanged:
-            return
-        case let .changed(diskText, diskHash, modificationDate):
-            if session.isDirty {
-                pendingExternalTexts[url] = diskText
-                cancelAutosave(for: session)
-                if session === currentDocument {
-                    missingFilePrompt = nil
-                    externalChangePrompt = ExternalChangePrompt(fileURL: url)
-                }
-                return
-            }
-
-            guard let fileKind = FileKind(url: url) else { return }
-            pendingExternalTexts[url] = nil
-            session.reset(
-                text: diskText,
-                url: url,
-                fileKind: fileKind,
-                isDirty: false
-            )
-            detachedSessionURLs.remove(url)
-            if session === currentDocument {
-                missingFilePrompt = nil
-            }
-            lastKnownDiskHashes[url] = diskHash
-            recordKnownDiskModificationDate(modificationDate, for: url)
-        }
+        handleUnanchoredExternalChange(for: session)
     }
 
     func recordKnownDiskText(_ text: String, for url: URL, modificationDate: Date? = nil) {
@@ -147,7 +146,7 @@ extension AppState {
             sessionPolicy.remove(key)
             lastKnownDiskHashes[key] = nil
             lastKnownDiskModificationDates[key] = nil
-            pendingExternalTexts[key] = nil
+            clearExternalChangeConflict(at: key)
             detachedSessionURLs.remove(key)
             if let prompt = externalChangePrompt,
                exactFileURLSpellingMatches(prompt.fileURL, key)
@@ -169,7 +168,7 @@ extension AppState {
 
     func markSessionDetachedFromMissingFile(_ session: DocumentSession, url: URL) {
         detachedSessionURLs.insert(url)
-        pendingExternalTexts[url] = nil
+        clearExternalChangeConflict(at: url)
         lastKnownDiskHashes[url] = nil
         lastKnownDiskModificationDates[url] = nil
         sessionPolicy.updateDirtyState(for: url, isDirty: true)
@@ -204,38 +203,6 @@ extension AppState {
 }
 
 private extension AppState {
-    enum DiskDocumentState {
-        case missing
-        case unchanged
-        case changed(text: String, hash: UInt64, modificationDate: Date?)
-    }
-
-    func diskDocumentState(for url: URL) -> DiskDocumentState {
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return .missing
-        }
-
-        let modificationDate = Self.contentModificationDate(for: url)
-        let modificationDateUnchanged = modificationDate.map {
-            lastKnownDiskModificationDates[url] == $0
-        } ?? false
-        if modificationDateUnchanged, lastKnownDiskHashes[url] != nil {
-            return .unchanged
-        }
-
-        guard let diskText = try? fileStore.load(url: url).text else {
-            return .unchanged
-        }
-
-        let diskHash = Self.contentHash(diskText)
-        if lastKnownDiskHashes[url] == diskHash {
-            recordKnownDiskModificationDate(modificationDate, for: url)
-            return .unchanged
-        }
-
-        return .changed(text: diskText, hash: diskHash, modificationDate: modificationDate)
-    }
-
     func recordKnownDiskModificationDate(_ modificationDate: Date?, for url: URL) {
         if let modificationDate {
             lastKnownDiskModificationDates[url] = modificationDate

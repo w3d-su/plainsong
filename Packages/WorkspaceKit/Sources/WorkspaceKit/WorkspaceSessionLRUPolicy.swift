@@ -31,24 +31,27 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         isDirty: Bool,
         protectedURLs: Set<URL> = []
     ) -> [WorkspaceSessionEviction] {
-        let key = url.standardizedFileURL
+        // Session maps use the retained lexical URL spelling. `standardizedFileURL` silently
+        // rewrites NFC to NFD on macOS, collapsing distinct exact locations and returning an
+        // eviction key that cannot address the App's retained-session cache.
+        let key = url
         entries[key] = Entry(isDirty: isDirty)
         refreshRecency(for: key)
         return enforceLimit(protectedURLs: protectedURLs)
     }
 
     public mutating func updateDirtyState(for url: URL, isDirty: Bool) {
-        let key = url.standardizedFileURL
+        let key = url
         guard entries[key] != nil else { return }
         entries[key] = Entry(isDirty: isDirty)
     }
 
     public func dirtyState(for url: URL) -> Bool? {
-        entries[url.standardizedFileURL]?.isDirty
+        entries[url]?.isDirty
     }
 
     public mutating func remove(_ url: URL) {
-        let key = url.standardizedFileURL
+        let key = url
         entries[key] = nil
         leastRecentURLs.removeAll { $0 == key }
     }
@@ -64,7 +67,6 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
 
     private mutating func enforceLimit(protectedURLs: Set<URL>) -> [WorkspaceSessionEviction] {
         var evictions: [WorkspaceSessionEviction] = []
-        let protectedURLs = Set(protectedURLs.map(\.standardizedFileURL))
 
         while leastRecentURLs.count > limit {
             guard let evictionIndex = leastRecentURLs.firstIndex(where: {

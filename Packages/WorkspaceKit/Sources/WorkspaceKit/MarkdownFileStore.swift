@@ -150,6 +150,10 @@ public struct MarkdownFileStore: Sendable {
                     sha256Digest: WorkspaceAnchoredFileSystem.sha256Digest(result.data)
                 )
             }
+        } catch WorkspaceAnchoredFileSystemError.missing {
+            // App-owned external-change arbitration needs to distinguish deletion from an
+            // unreadable replacement without reopening the retained path for a second probe.
+            throw WorkspaceAnchoredFileSystemError.missing
         } catch let error as MarkdownFileStoreError {
             throw error
         } catch {

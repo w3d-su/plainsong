@@ -1419,6 +1419,290 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(session.isDirty)
     }
 
+    func testAnchoredMissingDocumentWithNFCSpellingRecoversToExactNFCSpelling() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let nfcName = "caf\u{00E9}.md"
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let originalLocation = try authority.location(relativePath: nfcName)
+        // Use the retained, lexically constructed URL rather than `.appendingPathComponent`:
+        // the latter decomposes NFC to NFD immediately at construction via CoreFoundation's
+        // file-system-representation bridging, before any Plainsong code runs, which would
+        // not exercise the round trip through `relativePath(forFileURL:)` this test targets.
+        let originalURL = originalLocation.fileURL
+        try writeText("disk A", to: originalURL)
+        let originalRead = try MarkdownFileStore().loadResult(at: originalLocation)
+        let session = DocumentSession(
+            text: "unsaved A",
+            url: originalURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = authority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.sessionCache[originalURL] = session
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
+            AnchoredWorkspaceSessionFileBinding(
+                location: originalLocation,
+                identity: originalRead.metadata.identity,
+                sha256Digest: originalRead.sha256Digest
+            )
+        try FileManager.default.removeItem(at: originalURL)
+        appState.markSessionDetachedFromMissingFile(session, url: originalURL)
+        var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            expectations.append(expectation)
+            return try MarkdownFileStore().save(text: text, at: location, expecting: expectation)
+        }
+
+        let nfdAlternativeURL = try authority.location(
+            relativePath: "cafe\u{0301}.md"
+        ).fileURL
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: nfdAlternativeURL))
+        XCTAssertTrue(expectations.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: nfdAlternativeURL.path))
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL, originalURL)
+
+        // The panel-returned URL carries the exact NFC bytes the user typed/selected, matching
+        // the retained NFC-spelled location. Recognizing this as the exact missing source
+        // (rather than corrupting it to NFD via `relativePath(forFileURL:)` and spuriously
+        // failing the retained-location match) is what lets `.missing` be used instead of a
+        // rejected `invalidSessionIdentity`.
+        try appState.saveDetachedCurrentDocument(to: originalURL)
+
+        XCTAssertEqual(expectations, [.missing])
+        XCTAssertEqual(try String(contentsOf: originalURL, encoding: .utf8), "unsaved A")
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.missingFilePrompt)
+    }
+
+    func testUnanchoredMissingDocumentWithNFCSpellingRecoversToExactNFCSpelling() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let nfcName = "caf\u{00E9}.md"
+        // Use a retained, lexically constructed URL rather than `.appendingPathComponent`: the
+        // latter decomposes NFC to NFD immediately at construction, before any Plainsong code
+        // runs, which would not exercise the round trip through
+        // `WorkspaceFileSystemLocation(fileURL:)` this test targets.
+        let originalURL = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            .location(relativePath: nfcName)
+            .fileURL
+        try writeText("disk standalone", to: originalURL)
+        let session = DocumentSession(
+            text: "unsaved standalone",
+            url: originalURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[originalURL] = session
+        try FileManager.default.removeItem(at: originalURL)
+        appState.markSessionDetachedFromMissingFile(session, url: originalURL)
+        var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            expectations.append(expectation)
+            return try MarkdownFileStore().save(text: text, at: location, expecting: expectation)
+        }
+
+        let nfdAlternativeURL = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            .location(relativePath: "cafe\u{0301}.md")
+            .fileURL
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: nfdAlternativeURL))
+        XCTAssertTrue(expectations.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: nfdAlternativeURL.path))
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL, originalURL)
+
+        // Standalone (non-workspace) recovery goes through `WorkspaceFileSystemLocation(fileURL:)`
+        // rather than `relativePath(forFileURL:)`; the exact NFC round trip must hold there too.
+        try appState.saveDetachedCurrentDocument(to: originalURL)
+
+        XCTAssertEqual(expectations, [.missing])
+        XCTAssertEqual(try String(contentsOf: originalURL, encoding: .utf8), "unsaved standalone")
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testOrdinaryStandaloneNFCSaveCopyRetainsExactLocationAndRejectsNFDAlternative() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcLocation = try authority.location(relativePath: "caf\u{00E9}.md")
+        guard case .committedAndDurable = WorkspaceNoFollowFileWriter.write(
+            text: "disk NFC",
+            to: nfcLocation,
+            expecting: .missing
+        ) else {
+            return XCTFail("test setup must create the NFC source through literal UTF-8 bytes")
+        }
+
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        appState.openExternalFile(nfcLocation.fileURL)
+        let session = appState.currentDocument
+        XCTAssertEqual(
+            appState.sessionStateURL(for: session)?.path(percentEncoded: false).utf8.map(\.self),
+            nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+        guard case let .proven(retainedProof)? =
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
+        else {
+            return XCTFail("ordinary standalone opening must retain a descriptor-bound proof")
+        }
+        XCTAssertEqual(retainedProof.location, nfcLocation)
+
+        appState.replaceDocumentText("local NFC edits")
+        try FileManager.default.removeItem(at: nfcLocation.fileURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+
+        let nfdAlternative = try authority.location(relativePath: "cafe\u{0301}.md")
+        var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            expectations.append(expectation)
+            return try MarkdownFileStore().save(text: text, at: location, expecting: expectation)
+        }
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: nfdAlternative.fileURL))
+        XCTAssertTrue(expectations.isEmpty)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+
+        try appState.saveDetachedCurrentDocument(to: nfcLocation.fileURL)
+        XCTAssertEqual(expectations, [.missing])
+        XCTAssertEqual(try MarkdownFileStore().loadResult(at: nfcLocation).file.text, "local NFC edits")
+    }
+
+    func testStandaloneAliasUsesCanonicalCacheKeyWithoutChangingNFCLeafBytes() throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("source-root", isDirectory: true)
+        let alias = parent.appendingPathComponent("source-alias", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcLocation = try authority.location(relativePath: "caf\u{00E9}.md")
+        guard case .committedAndDurable = WorkspaceNoFollowFileWriter.write(
+            text: "disk NFC",
+            to: nfcLocation,
+            expecting: .missing
+        ) else {
+            return XCTFail("test setup must create the NFC source through literal UTF-8 bytes")
+        }
+
+        let aliasBaseURL = alias.absoluteString.hasSuffix("/")
+            ? alias.absoluteString
+            : "\(alias.absoluteString)/"
+        let aliasURL = try XCTUnwrap(URL(string: "\(aliasBaseURL)caf%C3%A9.md"))
+        let aliasPath = alias.path(percentEncoded: false)
+        let literalAliasPath = aliasPath.hasSuffix("/") ? String(aliasPath.dropLast()) : aliasPath
+        XCTAssertEqual(
+            aliasURL.path(percentEncoded: false).utf8.map(\.self),
+            "\(literalAliasPath)/caf\u{00E9}.md".utf8.map(\.self)
+        )
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+        }
+
+        try appState.activateFileSession(url: aliasURL)
+        let firstSession = appState.currentDocument
+        let firstProof = try XCTUnwrap(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(firstSession)]
+        )
+        XCTAssertTrue(appState.sessionCache[nfcLocation.fileURL] === firstSession)
+        XCTAssertNil(appState.sessionCache[aliasURL])
+        XCTAssertEqual(
+            appState.sessionStateURL(for: firstSession)?.path(percentEncoded: false).utf8.map(\.self),
+            nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+
+        try appState.activateFileSession(url: aliasURL)
+
+        XCTAssertTrue(appState.currentDocument === firstSession)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(firstSession)],
+            firstProof
+        )
+    }
+
+    func testOrdinaryAnchoredNFCSaveCopyRetainsExactLocationAndRejectsNFDAlternative() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let setupAuthority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcLocation = try setupAuthority.location(relativePath: "caf\u{00E9}.md")
+        guard case .committedAndDurable = WorkspaceNoFollowFileWriter.write(
+            text: "disk NFC",
+            to: nfcLocation,
+            expecting: .missing
+        ) else {
+            return XCTFail("test setup must create the NFC source through literal UTF-8 bytes")
+        }
+
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        defer {
+            appState.workspaceReloadTask?.cancel()
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+        }
+        appState.openExternalFile(root)
+        try await waitUntil("ordinary NFC workspace activation") {
+            guard let binding = appState.anchoredSessionFileBinding(for: appState.currentDocument)
+            else {
+                return false
+            }
+            return binding.location.relativePath.utf8.elementsEqual("caf\u{00E9}.md".utf8)
+                && appState.currentDocument.text == "disk NFC"
+        }
+
+        let session = appState.currentDocument
+        let retainedLocation = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session)?.location)
+        XCTAssertEqual(
+            retainedLocation.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+        appState.replaceDocumentText("local anchored NFC edits", in: session)
+        try FileManager.default.removeItem(at: retainedLocation.fileURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            retainedLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+
+        let nfdAlternative = try retainedLocation.rootAuthority.location(
+            relativePath: "cafe\u{0301}.md"
+        )
+        var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            expectations.append(expectation)
+            return try MarkdownFileStore().save(text: text, at: location, expecting: expectation)
+        }
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: nfdAlternative.fileURL))
+        XCTAssertTrue(expectations.isEmpty)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
+            retainedLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
+        )
+
+        try appState.saveDetachedCurrentDocument(to: retainedLocation.fileURL)
+        XCTAssertEqual(expectations, [.missing])
+        XCTAssertEqual(
+            try MarkdownFileStore().loadResult(at: retainedLocation).file.text,
+            "local anchored NFC edits"
+        )
+    }
+
     func testUnanchoredOrdinarySaveRejectsReplacementInodeWithoutTouchingIt() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -2741,11 +3025,14 @@ final class AppStateTests: XCTestCase {
     func testIndeterminateSaveCopyRehomesReadableDestinationAndBlocksBlindRetry() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let missingURL = root.appendingPathComponent("missing.md").standardizedFileURL
-        let destinationURL = root.appendingPathComponent("recovered.md").standardizedFileURL
-        try writeText("missing A", to: missingURL)
+        let sourceURL = root.appendingPathComponent("missing.md").standardizedFileURL
+        try writeText("missing A", to: sourceURL)
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let missingLocation = try authority.location(relativePath: "missing.md")
+        // App session maps retain the descriptor-canonical location spelling, not the
+        // caller's `/var` alias for the selected root.
+        let missingURL = missingLocation.fileURL
+        let destinationURL = try authority.location(relativePath: "recovered.md").fileURL
         let missingRead = try MarkdownFileStore().loadResult(at: missingLocation)
         let session = DocumentSession(
             text: "unsaved A",
@@ -3567,10 +3854,11 @@ final class AppStateTests: XCTestCase {
     func testIndeterminateAnchoredSaveBlocksBlindRetryUntilExplicitReconciliation() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let post = root.appendingPathComponent("post.md").standardizedFileURL
-        try writeText("disk A", to: post)
+        let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
+        try writeText("disk A", to: initialPostURL)
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let location = try authority.location(relativePath: "post.md")
+        let post = location.fileURL
         let loaded = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(
             text: "edited A",
@@ -3694,6 +3982,753 @@ final class AppStateTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 1_250_000_000)
         XCTAssertFalse(FileManager.default.fileExists(atPath: post.path))
+    }
+
+    func testUnanchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let post = directory.appendingPathComponent("post.md")
+        try writeText("Original", to: post)
+        let originalStatus = try fileStatus(at: post)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(post)
+        let session = appState.currentDocument
+        guard case let .proven(originalProof)? =
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
+        else {
+            return XCTFail("opening a standalone file must retain its original proof")
+        }
+        appState.replaceDocumentText("Local unsaved edits", in: session)
+
+        // Rewrite B through the same inode, then restore the exact kernel mtime captured for A.
+        // The direct handler below must still compare the retained SHA-256, not mtime/FNV.
+        let handle = try FileHandle(forWritingTo: post)
+        try handle.truncate(atOffset: 0)
+        handle.write(Data("Changed on disk, same inode".utf8))
+        try handle.close()
+        try restoreAccessAndModificationTimes(of: post, from: originalStatus)
+        let rewrittenStatus = try fileStatus(at: post)
+        XCTAssertEqual(rewrittenStatus.st_ino, originalStatus.st_ino, "test setup must rewrite the same inode")
+        assertModificationTime(rewrittenStatus, matches: originalStatus)
+
+        appState.handleExternalChange(for: session)
+
+        let promptURL = try XCTUnwrap(appState.externalChangePrompt?.fileURL)
+        XCTAssertEqual(promptURL.standardizedFileURL, post.standardizedFileURL)
+        XCTAssertEqual(appState.pendingExternalTexts[promptURL], "Changed on disk, same inode")
+        XCTAssertEqual(appState.currentDocument.text, "Local unsaved edits")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
+            .proven(originalProof)
+        )
+        XCTAssertFalse(appState.canAutosave(session: session))
+
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+
+        XCTAssertEqual(
+            try String(contentsOf: post, encoding: .utf8),
+            "Changed on disk, same inode",
+            "autosave/Cmd-S must not overwrite external bytes before Reload or Keep Mine resolves"
+        )
+    }
+
+    func testUnanchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let post = directory.appendingPathComponent("post.md")
+        try writeText("Original", to: post)
+        let originalStatus = try fileStatus(at: post)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+
+        appState.openExternalFile(post)
+        let session = appState.currentDocument
+        guard case let .proven(originalProof)? =
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
+        else {
+            return XCTFail("opening a standalone file must retain its original proof")
+        }
+        appState.replaceDocumentText("Local unsaved edits", in: session)
+
+        // Atomic replacement B receives A's original mtime after the rename. The changed
+        // inode alone must be enough to enter conflict handling before any proof is adopted.
+        try "Changed on disk, replaced inode".write(to: post, atomically: true, encoding: .utf8)
+        try restoreAccessAndModificationTimes(of: post, from: originalStatus)
+        let replacementStatus = try fileStatus(at: post)
+        XCTAssertNotEqual(replacementStatus.st_ino, originalStatus.st_ino, "test setup must replace the inode")
+        assertModificationTime(replacementStatus, matches: originalStatus)
+
+        appState.handleExternalChange(for: session)
+
+        let promptURL = try XCTUnwrap(appState.externalChangePrompt?.fileURL)
+        XCTAssertEqual(promptURL.standardizedFileURL, post.standardizedFileURL)
+        XCTAssertEqual(appState.pendingExternalTexts[promptURL], "Changed on disk, replaced inode")
+        XCTAssertEqual(appState.currentDocument.text, "Local unsaved edits")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
+            .proven(originalProof)
+        )
+        XCTAssertFalse(appState.canAutosave(session: session))
+
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+
+        XCTAssertEqual(
+            try String(contentsOf: post, encoding: .utf8),
+            "Changed on disk, replaced inode",
+            "autosave/Cmd-S must not overwrite external bytes before Reload or Keep Mine resolves"
+        )
+    }
+
+    func testCachedStandaloneActivationArbitratesThroughItsRetainedProof() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sourceURL = root.appendingPathComponent("post.md")
+        try writeText("disk A", to: sourceURL)
+        let location = try WorkspaceFileSystemLocation(fileURL: sourceURL)
+        let loaded = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: "local edits",
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: DocumentSession(),
+            shouldRestoreLastOpenedFile: false
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+        }
+        let sessionIdentity = ObjectIdentifier(session)
+        let originalProof = UnanchoredManagedSessionFileProof(
+            location: location,
+            identity: loaded.metadata.identity,
+            sha256Digest: loaded.sha256Digest,
+            installedWorkspaceLocation: nil
+        )
+        appState.sessionCache[location.fileURL] = session
+        appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(originalProof)
+        appState.scheduleAutosave(for: session)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[sessionIdentity])
+
+        try writeText("disk B", to: location.fileURL)
+        try appState.activateFileSession(url: location.fileURL)
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+            .proven(originalProof)
+        )
+        XCTAssertNil(appState.sessionAutosaveTasks[sessionIdentity])
+        XCTAssertThrowsError(try appState.save(session: session))
+        XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "disk B")
+    }
+
+    func testAnchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("Original", to: location.fileURL)
+        let loaded = try MarkdownFileStore().loadResult(at: location)
+        let originalStatus = try fileStatus(at: location.fileURL)
+        let session = DocumentSession(
+            text: loaded.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = authority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.sessionCache[location.fileURL] = session
+        let originalBinding = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: loaded.metadata.identity,
+            sha256Digest: loaded.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = originalBinding
+        appState.replaceDocumentText("Local anchored edits", in: session)
+
+        let handle = try FileHandle(forWritingTo: location.fileURL)
+        try handle.truncate(atOffset: 0)
+        handle.write(Data("Changed anchored, same inode".utf8))
+        try handle.close()
+        try restoreAccessAndModificationTimes(of: location.fileURL, from: originalStatus)
+        let rewrittenStatus = try fileStatus(at: location.fileURL)
+        XCTAssertEqual(rewrittenStatus.st_ino, originalStatus.st_ino)
+        assertModificationTime(rewrittenStatus, matches: originalStatus)
+
+        appState.handleExternalChange(for: session)
+
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "Changed anchored, same inode")
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertEqual(session.text, "Local anchored edits")
+        XCTAssertFalse(appState.canAutosave(session: session))
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "Changed anchored, same inode")
+    }
+
+    func testAnchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("Original", to: location.fileURL)
+        let loaded = try MarkdownFileStore().loadResult(at: location)
+        let originalStatus = try fileStatus(at: location.fileURL)
+        let session = DocumentSession(
+            text: loaded.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = authority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.sessionCache[location.fileURL] = session
+        let originalBinding = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: loaded.metadata.identity,
+            sha256Digest: loaded.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = originalBinding
+        appState.replaceDocumentText("Local anchored edits", in: session)
+
+        try "Changed anchored, replaced inode".write(
+            to: location.fileURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try restoreAccessAndModificationTimes(of: location.fileURL, from: originalStatus)
+        let replacementStatus = try fileStatus(at: location.fileURL)
+        XCTAssertNotEqual(replacementStatus.st_ino, originalStatus.st_ino)
+        assertModificationTime(replacementStatus, matches: originalStatus)
+
+        appState.handleExternalChange(for: session)
+
+        XCTAssertEqual(
+            appState.pendingExternalTexts[location.fileURL],
+            "Changed anchored, replaced inode"
+        )
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertEqual(session.text, "Local anchored edits")
+        XCTAssertFalse(appState.canAutosave(session: session))
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(
+            try String(contentsOf: location.fileURL, encoding: .utf8),
+            "Changed anchored, replaced inode"
+        )
+    }
+
+    func testStandaloneSaveDetectedExternalVersionEntersConflictBeforeOverwrite() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let post = directory.appendingPathComponent("post.md")
+        try writeText("disk A", to: post)
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        appState.openExternalFile(post)
+        let session = appState.currentDocument
+        guard case let .proven(proofA)? =
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
+        else {
+            return XCTFail("standalone source must retain a proof before the save race")
+        }
+        appState.replaceDocumentText("local edits", in: session)
+        XCTAssertNotNil(appState.autosaveTask)
+
+        try writeText("disk B", to: post)
+
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(appState.pendingExternalTexts[proofA.location.fileURL], "disk B")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
+            .proven(proofA)
+        )
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, proofA.location.fileURL)
+        XCTAssertNil(appState.autosaveTask)
+        XCTAssertFalse(appState.canAutosave(session: session))
+
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(try String(contentsOf: post, encoding: .utf8), "disk B")
+    }
+
+    func testAnchoredSaveDetectedExternalVersionEntersConflictBeforeOverwrite() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("disk A", to: location.fileURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: loadedA.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[location.fileURL] = session
+        let bindingA = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: loadedA.metadata.identity,
+            sha256Digest: loadedA.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = bindingA
+        appState.replaceDocumentText("local edits", in: session)
+        XCTAssertNotNil(appState.autosaveTask)
+
+        try writeText("disk B", to: location.fileURL)
+
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
+        XCTAssertNil(appState.autosaveTask)
+        XCTAssertFalse(appState.canAutosave(session: session))
+
+        appState.flushAutosaveIfNeeded()
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "disk B")
+    }
+
+    func testCachedAndRetiredAnchoredActivationDoNotAdoptExternalProofBeforeArbitration() throws {
+        for source in ["cached", "retired"] {
+            let root = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+            let location = try authority.location(relativePath: "post.md")
+            try writeText("disk A", to: location.fileURL)
+            let original = try MarkdownFileStore().loadResult(at: location)
+            let session = DocumentSession(
+                text: original.file.text,
+                url: location.fileURL,
+                fileKind: .markdown,
+                isDirty: false
+            )
+            let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+            appState.workspaceRootURL = root
+            appState.workspaceSearchRootAuthority = authority
+            appState.workspaceGeneration = 1
+            appState.workspaceInstalledCaptureGeneration = 1
+            let originalBinding = AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: original.metadata.identity,
+                sha256Digest: original.sha256Digest
+            )
+            appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = originalBinding
+            appState.replaceDocumentText("local (source) edits", in: session)
+
+            let retiredBindingID: EditorDocumentBindingID?
+            switch source {
+            case "cached":
+                appState.sessionCache[location.fileURL] = session
+                retiredBindingID = nil
+            case "retired":
+                let bindingID = EditorDocumentBindingID()
+                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+                    id: bindingID,
+                    session: session,
+                    securityScopedAuthority: nil,
+                    isAwaitingBindingEnd: false
+                )
+                retiredBindingID = bindingID
+                appState.setCurrentDocument(
+                    DocumentSession(text: "other", fileKind: .markdown),
+                    synchronizingWorkspaceTree: false
+                )
+            default:
+                XCTFail("unexpected activation source")
+                continue
+            }
+
+            try writeText("disk B (source)", to: location.fileURL)
+            let observed = try MarkdownFileStore().loadResult(at: location)
+            let activation = try appState.prepareAnchoredFileSessionActivation(
+                file: observed.file,
+                at: location,
+                metadata: observed.metadata,
+                sha256Digest: observed.sha256Digest
+            )
+            switch (source, activation.source) {
+            case ("cached", .cached), ("retired", .retired(_)):
+                break
+            default:
+                XCTFail("activation must retain its expected reusable-session source")
+            }
+
+            appState.commitAnchoredFileSessionActivation(activation)
+
+            XCTAssertEqual(
+                appState.anchoredSessionFileBinding(for: session),
+                originalBinding,
+                "\(source) activation must keep A's identity/SHA until explicit resolution"
+            )
+            XCTAssertEqual(session.text, "local (source) edits")
+            XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B (source)")
+            XCTAssertFalse(appState.canAutosave(session: session))
+            if let retiredBindingID {
+                XCTAssertNotNil(
+                    appState.retiredEditorDocumentBindings[retiredBindingID],
+                    "a rejected retired activation must not drop its retained authority"
+                )
+            }
+            appState.flushAutosaveIfNeeded()
+            XCTAssertThrowsError(try appState.save(session: session))
+            XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "disk B (source)")
+        }
+    }
+
+    func testStandaloneCachedAndRetiredSessionsDoNotCrossReplacementParentAuthority() throws {
+        for source in ["cached", "retired"] {
+            let parent = try makeTemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: parent) }
+            let root = parent.appendingPathComponent("workspace", isDirectory: true)
+            let movedRoot = parent.appendingPathComponent("captured-A", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let sourceURL = root.appendingPathComponent("post.md")
+            try writeText("disk A", to: sourceURL)
+            let locationA = try WorkspaceFileSystemLocation(fileURL: sourceURL)
+            let loadedA = try MarkdownFileStore().loadResult(at: locationA)
+            let session = DocumentSession(
+                text: "local A edits",
+                url: locationA.fileURL,
+                fileKind: .markdown,
+                isDirty: true
+            )
+            let appState = AppState(
+                currentDocument: DocumentSession(),
+                shouldRestoreLastOpenedFile: false
+            )
+            let sessionIdentity = ObjectIdentifier(session)
+            let proofA = UnanchoredManagedSessionFileProof(
+                location: locationA,
+                identity: loadedA.metadata.identity,
+                sha256Digest: loadedA.sha256Digest,
+                installedWorkspaceLocation: nil
+            )
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(proofA)
+
+            let retiredBindingID: EditorDocumentBindingID?
+            switch source {
+            case "cached":
+                appState.sessionCache[locationA.fileURL] = session
+                retiredBindingID = nil
+            case "retired":
+                let bindingID = EditorDocumentBindingID()
+                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+                    id: bindingID,
+                    session: session,
+                    securityScopedAuthority: nil,
+                    isAwaitingBindingEnd: false
+                )
+                retiredBindingID = bindingID
+            default:
+                XCTFail("unexpected source")
+                continue
+            }
+
+            try FileManager.default.moveItem(at: root, to: movedRoot)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try writeText("disk B", to: sourceURL)
+            let locationB = try WorkspaceFileSystemLocation(fileURL: sourceURL)
+            XCTAssertEqual(locationB.fileURL, locationA.fileURL)
+            XCTAssertNotEqual(locationB, locationA)
+
+            switch source {
+            case "cached":
+                XCTAssertThrowsError(try appState.activateFileSession(url: sourceURL))
+                XCTAssertTrue(appState.currentDocument !== session)
+                XCTAssertTrue(appState.sessionCache[locationA.fileURL] === session)
+            case "retired":
+                try appState.activateFileSession(url: sourceURL)
+                XCTAssertTrue(appState.currentDocument !== session)
+                XCTAssertEqual(appState.currentDocument.text, "disk B")
+                let bindingID = try XCTUnwrap(retiredBindingID)
+                XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+            default:
+                XCTFail("unexpected source")
+            }
+
+            XCTAssertEqual(
+                appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+                .proven(proofA)
+            )
+            XCTAssertThrowsError(try appState.save(session: session))
+            XCTAssertEqual(try String(contentsOf: sourceURL, encoding: .utf8), "disk B")
+        }
+    }
+
+    func testStatefulRetiredStandaloneSessionRejectsReplacementParentAuthority() throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        let movedRoot = parent.appendingPathComponent("captured-A", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let sourceURL = root.appendingPathComponent("post.md")
+        try writeText("disk A", to: sourceURL)
+        let locationA = try WorkspaceFileSystemLocation(fileURL: sourceURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: locationA)
+        let session = DocumentSession(
+            text: "local A edits",
+            url: locationA.fileURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: DocumentSession(),
+            shouldRestoreLastOpenedFile: false
+        )
+        let sessionIdentity = ObjectIdentifier(session)
+        let proofA = UnanchoredManagedSessionFileProof(
+            location: locationA,
+            identity: loadedA.metadata.identity,
+            sha256Digest: loadedA.sha256Digest,
+            installedWorkspaceLocation: nil
+        )
+        appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(proofA)
+        let bindingID = EditorDocumentBindingID()
+        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+            id: bindingID,
+            session: session,
+            securityScopedAuthority: nil,
+            isAwaitingBindingEnd: false
+        )
+
+        try writeText("disk B1", to: sourceURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+            .proven(proofA)
+        )
+
+        try FileManager.default.moveItem(at: root, to: movedRoot)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try writeText("disk B2", to: sourceURL)
+        let locationB = try WorkspaceFileSystemLocation(fileURL: sourceURL)
+        let loadedB = try MarkdownFileStore().loadResult(at: locationB)
+        XCTAssertEqual(locationB.fileURL, locationA.fileURL)
+        XCTAssertNotEqual(locationB, locationA)
+
+        XCTAssertThrowsError(try appState.activateFileSession(url: sourceURL)) { error in
+            guard case let .invalidSessionIdentity(url) = error as? AppStateError else {
+                return XCTFail("replacement B must fail through the authority identity guard: \(error)")
+            }
+            XCTAssertEqual(url, locationB.fileURL)
+        }
+        XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+        XCTAssertNil(appState.sessionCache[locationB.fileURL])
+        XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+            .proven(proofA)
+        )
+
+        // Even if a fresh B session was already cached at the lexical key, it must not consume
+        // A's pending fence through the cache-hit fast path.
+        let cachedB = DocumentSession(
+            text: loadedB.file.text,
+            url: locationB.fileURL,
+            fileKind: loadedB.file.fileKind,
+            isDirty: false
+        )
+        appState.sessionCache[locationB.fileURL] = cachedB
+        appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(cachedB)] = .proven(
+            UnanchoredManagedSessionFileProof(
+                location: locationB,
+                identity: loadedB.metadata.identity,
+                sha256Digest: loadedB.sha256Digest,
+                installedWorkspaceLocation: nil
+            )
+        )
+        XCTAssertThrowsError(try appState.activateFileSession(url: sourceURL))
+        XCTAssertTrue(appState.sessionCache[locationB.fileURL] === cachedB)
+        XCTAssertTrue(appState.currentDocument !== cachedB)
+        XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
+        XCTAssertEqual(try String(contentsOf: sourceURL, encoding: .utf8), "disk B2")
+    }
+
+    func testStatefulAwaitingRetiredAnchoredSessionRejectsReplacementParentAuthority() throws {
+        let parent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("workspace", isDirectory: true)
+        let movedRoot = parent.appendingPathComponent("captured-A", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let authorityA = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let locationA = try authorityA.location(relativePath: "post.md")
+        try writeText("disk A", to: locationA.fileURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: locationA)
+        let session = DocumentSession(
+            text: "local A edits",
+            url: locationA.fileURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: DocumentSession(),
+            shouldRestoreLastOpenedFile: false
+        )
+        let bindingA = AnchoredWorkspaceSessionFileBinding(
+            location: locationA,
+            identity: loadedA.metadata.identity,
+            sha256Digest: loadedA.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = bindingA
+        let bindingID = EditorDocumentBindingID()
+        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+            id: bindingID,
+            session: session,
+            securityScopedAuthority: nil,
+            isAwaitingBindingEnd: true
+        )
+
+        try writeText("disk B1", to: locationA.fileURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
+
+        try FileManager.default.moveItem(at: root, to: movedRoot)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try writeText("disk B2", to: root.appendingPathComponent("post.md"))
+        let authorityB = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let locationB = try authorityB.location(relativePath: "post.md")
+        XCTAssertEqual(locationB.fileURL, locationA.fileURL)
+        XCTAssertNotEqual(locationB, locationA)
+        let loadedB = try MarkdownFileStore().loadResult(at: locationB)
+
+        XCTAssertThrowsError(try appState.prepareAnchoredFileSessionActivation(
+            file: loadedB.file,
+            at: locationB,
+            metadata: loadedB.metadata,
+            sha256Digest: loadedB.sha256Digest
+        )) { error in
+            guard case let .invalidSessionIdentity(url) = error as? AppStateError else {
+                return XCTFail("replacement B must fail through the authority identity guard: \(error)")
+            }
+            XCTAssertEqual(url, locationB.fileURL)
+        }
+        XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+        XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
+        XCTAssertEqual(try String(contentsOf: locationB.fileURL, encoding: .utf8), "disk B2")
+    }
+
+    func testReloadExternalConflictUsesFreshCTextAndProofAfterPendingB() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("disk A", to: location.fileURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: loadedA.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[location.fileURL] = session
+        let bindingA = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: loadedA.metadata.identity,
+            sha256Digest: loadedA.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = bindingA
+        appState.replaceDocumentText("local edits")
+
+        try writeText("disk B", to: location.fileURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
+
+        try writeText("disk C", to: location.fileURL)
+        let loadedC = try MarkdownFileStore().loadResult(at: location)
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertEqual(session.text, "disk C")
+        XCTAssertFalse(session.isDirty)
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: session),
+            AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: loadedC.metadata.identity,
+                sha256Digest: loadedC.sha256Digest
+            )
+        )
+        XCTAssertNil(appState.pendingExternalTexts[location.fileURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[location.fileURL])
+        XCTAssertNil(appState.externalChangePrompt)
+    }
+
+    func testKeepMineExternalConflictUsesFreshCProofBeforeWritingLocalEdits() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("disk A", to: location.fileURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: loadedA.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[location.fileURL] = session
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
+            AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: loadedA.metadata.identity,
+                sha256Digest: loadedA.sha256Digest
+            )
+        appState.replaceDocumentText("local edits")
+
+        try writeText("disk B", to: location.fileURL)
+        appState.handleExternalChange(for: session)
+        try writeText("disk C", to: location.fileURL)
+        let loadedC = try MarkdownFileStore().loadResult(at: location)
+
+        var expectations: [WorkspaceNoFollowFileWriteExpectation] = []
+        appState.anchoredFileSaveOverride = { text, fileLocation, expectation in
+            expectations.append(expectation)
+            return try MarkdownFileStore().save(text: text, at: fileLocation, expecting: expectation)
+        }
+        appState.keepMineForExternallyChangedFile()
+
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: session),
+            AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: loadedC.metadata.identity,
+                sha256Digest: loadedC.sha256Digest
+            )
+        )
+        XCTAssertNil(appState.pendingExternalTexts[location.fileURL])
+        XCTAssertTrue(session.isDirty)
+        try appState.saveCurrentDocument()
+        XCTAssertEqual(
+            expectations,
+            [
+                .existingContent(
+                    loadedC.metadata.identity,
+                    sha256Digest: loadedC.sha256Digest
+                ),
+            ]
+        )
+        XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "local edits")
     }
 
     func testWorkspaceReloadKeepsLatestSnapshotWhenOlderScanFinishesLast() async throws {
@@ -4137,6 +5172,34 @@ final class AppStateTests: XCTestCase {
                 ofItemAtPath: url.path
             )
         }
+    }
+
+    private func fileStatus(at url: URL) throws -> stat {
+        var status = stat()
+        let result = url.path(percentEncoded: false).withCString {
+            Darwin.lstat($0, &status)
+        }
+        guard result == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        return status
+    }
+
+    private func restoreAccessAndModificationTimes(of url: URL, from status: stat) throws {
+        var timestamps = [status.st_atimespec, status.st_mtimespec]
+        let result = url.path(percentEncoded: false).withCString { path in
+            timestamps.withUnsafeMutableBufferPointer { values in
+                Darwin.utimensat(AT_FDCWD, path, values.baseAddress, 0)
+            }
+        }
+        guard result == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
+    private func assertModificationTime(_ actual: stat, matches expected: stat) {
+        XCTAssertEqual(actual.st_mtimespec.tv_sec, expected.st_mtimespec.tv_sec)
+        XCTAssertEqual(actual.st_mtimespec.tv_nsec, expected.st_mtimespec.tv_nsec)
     }
 
     func testUntitledFileNameDeduplicatesAgainstExistingFiles() throws {

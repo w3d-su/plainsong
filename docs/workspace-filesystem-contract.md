@@ -258,12 +258,29 @@ autosave, and context lookup begins from retained session identity and uses that
 spelling without standardizing or resolving the mutable session URL. The App clears only the
 source session's old state after durable Save Copy success.
 
+Root capture, `relativePath(forFileURL:)`, standalone capture/recovery, and LRU keys preserve
+literal UTF-8 bytes rather than making an NFC-to-NFD `standardizedFileURL` round trip. Raw
+non-file URLs and NUL-bearing paths are rejected before C-string descriptor calls; traversal and
+containment checks remain descriptor-bound. A descriptor-derived canonical parent may give aliases
+one cache key without changing the literal leaf bytes, so an NFC missing source can reuse its exact
+retained authority/location while an NFD alternative is not an exact recovery target.
+
+On an external notification, App takes one coherent read through the retained anchored binding or
+standalone proof and compares literal location, descriptor identity, and SHA-256 before adopting
+the observation. mtime/FNV, a mutable session URL, or cached/retired reuse never authorizes proof
+replacement. A dirty session with any unaccepted identity or content change, including a same-inode
+rewrite, enters conflict handling, cancels autosave, and retains the old proof until explicit
+Reload or Keep Mine obtains and adopts a fresh observation. Cmd-S/autosave therefore cannot
+overwrite those external bytes before resolution. A stateful retained A session (pending conflict,
+detachment, or indeterminate context) blocks a replacement-parent B at the same lexical URL, so B
+cannot inherit or clear A's URL-keyed fence merely by reusing the spelling.
+
 Any session
 `committedButIndeterminate`, including Save Copy, installs a per-session reconciliation quarantine
-that retains the exact destination and prepared-byte digest. A readable Save Copy destination is
-re-homed as the same dirty session with its observed identity/digest and is presented through
-Reload or Keep Mine; an observed-missing destination may be retried only with exclusive `missing`,
-never `existingOrMissing`. A retry denoting that same quarantined destination always reuses the
+that retains the exact destination and prepared-byte digest. A readable Save Copy destination
+records its observed identity/digest as pending and is presented through Reload or Keep Mine while
+the prior proof remains intact; an observed-missing destination may be retried only with exclusive
+`missing`, never `existingOrMissing`. A retry denoting that same quarantined destination always reuses the
 retained location, even if the workspace is closed or replacement root B is now installed at the
 same spelling, so namespace validation remains bound to A. While that quarantine exists, any
 different destination spelling requires reconciliation before another Save Copy: case or Unicode
