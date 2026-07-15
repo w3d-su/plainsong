@@ -422,6 +422,24 @@ extension WorkspaceSearchContractTests {
         XCTAssertTrue(policy.isIgnored(relativePath: doubleStarPath))
     }
 
+    func testIgnoreGlobStarBacktracksWhenFilenameStartsWithLiteralStar() async throws {
+        let root = try makeTemporaryDirectory()
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let candidatePath = "*draft.md"
+        let reader = ByteExactIgnoreReader(contents: [
+            WorkspacePathByteKey(".gitignore"): Data("*.md\n".utf8),
+        ])
+
+        let policy = try await WorkspaceSearchIgnorePolicy.load(
+            rootAuthority: authority,
+            candidatePaths: [candidatePath],
+            limits: WorkspaceSearchLimits(),
+            reader: reader
+        )
+
+        XCTAssertTrue(policy.isIgnored(relativePath: candidatePath))
+    }
+
     private func makeRequest(
         root: URL,
         entries: [WorkspaceFileSnapshot.Entry],

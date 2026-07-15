@@ -202,16 +202,16 @@ private enum WorkspaceSearchGlob {
         var retryValueIndex = 0
 
         while valueIndex < valueCharacters.count {
-            if patternIndex < patternCharacters.count,
-               patternCharacters[patternIndex] == "?"
-               || utf8BytesMatch(patternCharacters[patternIndex], valueCharacters[valueIndex])
-            {
-                patternIndex += 1
-                valueIndex += 1
-            } else if patternIndex < patternCharacters.count, patternCharacters[patternIndex] == "*" {
+            if patternIndex < patternCharacters.count, patternCharacters[patternIndex] == "*" {
                 starIndex = patternIndex
                 patternIndex += 1
                 retryValueIndex = valueIndex
+            } else if patternIndex < patternCharacters.count,
+                      patternCharacters[patternIndex] == "?"
+                      || utf8BytesMatch(patternCharacters[patternIndex], valueCharacters[valueIndex])
+            {
+                patternIndex += 1
+                valueIndex += 1
             } else if let starIndex {
                 patternIndex = starIndex + 1
                 retryValueIndex += 1
