@@ -283,7 +283,11 @@ final class AppStateTests: XCTestCase {
         let firstSession = DocumentSession(text: "First", url: firstURL, fileKind: .markdown)
         let secondSession = DocumentSession(text: "Second", url: secondURL, fileKind: .markdown)
         let appState = AppState(currentDocument: firstSession)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: firstSession
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         appState.setCurrentDocument(secondSession)
@@ -295,6 +299,62 @@ final class AppStateTests: XCTestCase {
             .fileExists(atPath: firstDirectory.appendingPathComponent("assets/image.png").path))
         XCTAssertFalse(FileManager.default
             .fileExists(atPath: secondDirectory.appendingPathComponent("assets/image.png").path))
+    }
+
+    func testCapturedImageAssetInserterRejectsReplacedDocumentParentWithOriginalHardLink() async throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(
+            text: "Body",
+            url: documentURL,
+            fileKind: .markdown
+        )
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: false
+        )
+        let replacementDocumentURL = documentDirectory.appendingPathComponent("post.md")
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: replacementDocumentURL
+        )
+        let replacementStatus = try fileStatus(at: replacementDocumentURL)
+        let retainedStatus = try fileStatus(
+            at: retainedDirectory.appendingPathComponent("post.md")
+        )
+        XCTAssertEqual(
+            replacementStatus.st_ino,
+            retainedStatus.st_ino,
+            "test setup must put the original document inode under a replacement parent"
+        )
+
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+
+        XCTAssertTrue(insertion.relativePaths.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: documentDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: retainedDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
     }
 
     func testSavingOpenDocumentDoesNotRewriteLastOpenedBookmark() throws {
@@ -642,7 +702,11 @@ final class AppStateTests: XCTestCase {
             defaults.removePersistentDomain(forName: suiteName)
         }
         let appState = AppState(currentDocument: session, userDefaults: defaults)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
         appState.preferences.setAssetFolderRelativePath("media/images")
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
@@ -663,7 +727,11 @@ final class AppStateTests: XCTestCase {
         try Data([4, 5, 6]).write(to: externalImage)
         let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
         let appState = AppState(currentDocument: session)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([
@@ -673,7 +741,11 @@ final class AppStateTests: XCTestCase {
         let placedURLs = insertion.relativePaths.map {
             root.appendingPathComponent($0).standardizedFileURL
         }
-        XCTAssertEqual(insertion.relativePaths, ["assets/image.png", "assets/external.png"])
+        XCTAssertEqual(
+            insertion.relativePaths,
+            ["assets/image.png", "assets/external.png"],
+            appState.presentedError?.message ?? ""
+        )
         XCTAssertTrue(placedURLs.allSatisfy {
             FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
         })
@@ -699,11 +771,19 @@ final class AppStateTests: XCTestCase {
         try existingData.write(to: existingImage)
         let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
         let appState = AppState(currentDocument: session)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([.file(existingImage)])
-        XCTAssertEqual(insertion.relativePaths, ["assets/existing.png"])
+        XCTAssertEqual(
+            insertion.relativePaths,
+            ["assets/existing.png"],
+            appState.presentedError?.message ?? ""
+        )
 
         await insertion.discard()
 
@@ -716,7 +796,11 @@ final class AppStateTests: XCTestCase {
         try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
         let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
         let appState = AppState(currentDocument: session)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([
@@ -742,7 +826,11 @@ final class AppStateTests: XCTestCase {
         try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
         let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
         let appState = AppState(currentDocument: session)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([
@@ -808,6 +896,90 @@ final class AppStateTests: XCTestCase {
             try imageAssetDirectoryEntries(in: root),
             ["image-1.png", "image.png"]
         )
+    }
+
+    func testEditorImageAssetPlacementRejectsAssetDirectoryReplacementBeforePublish() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let relocatedDirectory = root.appendingPathComponent(
+            "assets-before-publish",
+            isDirectory: true
+        )
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case .willPublish = event else { return }
+            try FileManager.default.moveItem(at: assetsDirectory, to: relocatedDirectory)
+            try FileManager.default.createDirectory(
+                at: assetsDirectory,
+                withIntermediateDirectories: false
+            )
+        })
+
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
+        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
+    }
+
+    func testEditorImageAssetPlacementRollsBackAssetDirectoryMovedImmediatelyAfterRename() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let relocatedDirectory = root.appendingPathComponent(
+            "assets-after-rename",
+            isDirectory: true
+        )
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case .didRenameBeforeValidation = event else { return }
+            try FileManager.default.moveItem(at: assetsDirectory, to: relocatedDirectory)
+            try FileManager.default.createDirectory(
+                at: assetsDirectory,
+                withIntermediateDirectories: false
+            )
+        })
+
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
+        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
+    }
+
+    func testDidPublishAssetDirectoryMoveCannotReturnStaleEditorImageReference() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let relocatedDirectory = root.appendingPathComponent(
+            "assets-after-publish-callback",
+            isDirectory: true
+        )
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case .didPublish = event else { return }
+            try FileManager.default.moveItem(at: assetsDirectory, to: relocatedDirectory)
+            try FileManager.default.createDirectory(
+                at: assetsDirectory,
+                withIntermediateDirectories: false
+            )
+        })
+
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
+        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
     }
 
     func testEditorImageAssetPlacementRejectsReplacedStagingName() throws {
@@ -893,7 +1065,11 @@ final class AppStateTests: XCTestCase {
         try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
         let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
         let appState = AppState(currentDocument: session)
-        appState.workspaceRootURL = root
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([
@@ -6017,8 +6193,37 @@ final class AppStateTests: XCTestCase {
         guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else {
             return []
         }
-        return try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
-            .sorted()
+        return try directoryEntries(at: directory)
+    }
+
+    private func directoryEntries(at directory: URL) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(
+            atPath: directory.path(percentEncoded: false)
+        ).sorted()
+    }
+
+    private func configureImageAssetWorkspace(
+        _ appState: AppState,
+        rootURL: URL,
+        currentSession: DocumentSession
+    ) throws {
+        let rootAuthority = try WorkspaceFileSystemRootAuthority(rootURL: rootURL)
+        let fileURL = try XCTUnwrap(currentSession.fileURL)
+        let location = try rootAuthority.canonicalizedLocation(forFileURL: fileURL)
+        let loaded = try MarkdownFileStore().loadResult(at: location)
+        appState.workspaceRootURL = rootURL
+        appState.workspaceSearchRootAuthority = rootAuthority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.adoptAnchoredFileBinding(
+            AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: loaded.metadata.identity,
+                sha256Digest: loaded.sha256Digest
+            ),
+            for: currentSession
+        )
+        appState.sessionCache[location.fileURL] = currentSession
     }
 
     private func writeText(_ text: String, to url: URL, touchOffset: TimeInterval = 0) throws {
@@ -10538,7 +10743,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testFingerprintMismatchSearchObservationEvictsOlderDiskInspection() async throws {
+    func testFingerprintMismatchSearchObservationAdoptsNewestCleanVersionAndEvictsOlderInspection() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let reader = ControlledCoherentFileReader()
         let resultSource = "source B needle"
@@ -10594,9 +10799,15 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             match: match
         )
 
-        XCTAssertEqual(session.text, resultSource)
+        XCTAssertEqual(session.text, observedSource)
         XCTAssertFalse(session.isDirty)
-        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        let observedBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+        XCTAssertEqual(observedBinding.location, originalBinding.location)
+        XCTAssertEqual(observedBinding.identity, originalBinding.identity)
+        XCTAssertEqual(
+            observedBinding.sha256Digest,
+            WorkspaceSearchContentFingerprint(text: observedSource).sha256Digest
+        )
         XCTAssertNil(appState.externalDiskInspectionTasks[sessionIdentity])
         XCTAssertEqual(
             appState.currentExternalDiskEventGeneration(for: session),
@@ -10605,6 +10816,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertNil(appState.pendingExternalTexts[documentURL])
         XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
         XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertEqual(
+            appState.lastKnownDiskHashes[documentURL],
+            AppState.contentHash(observedSource)
+        )
 
         reader.resolve(
             request: 0,
@@ -10615,12 +10830,217 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         await olderInspection.task.value
 
-        XCTAssertEqual(session.text, resultSource)
-        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertEqual(session.text, observedSource)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), observedBinding)
         XCTAssertNil(appState.pendingExternalTexts[documentURL])
         XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
         XCTAssertNil(appState.externalChangePrompt)
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), observedSource)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testInvalidRangeSearchObservationAdoptsNewestCleanVersionBeforeRejectingNavigation() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let sourceA = "source A"
+        let observedSource = "source C needle"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA],
+            currentPath: "a.md",
+            coherentFileReader: reader
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let originalBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("invalid-range search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let validResult = result(
+            path: "a.md",
+            text: observedSource,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let previewRange = (observedSource as NSString).range(of: "needle")
+        let invalidMatch = TextSearchMatch(
+            range: NSRange(location: 999, length: 1),
+            line: 1,
+            preview: observedSource,
+            previewMatchRange: previewRange
+        )
+        let fileResult = WorkspaceSearchFileResult(
+            relativePath: validResult.relativePath,
+            contentFingerprint: validResult.contentFingerprint,
+            matches: [invalidMatch],
+            isTruncated: validResult.isTruncated,
+            fileAuthority: validResult.fileAuthority
+        )
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("invalid-range result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("older invalid-range inspection starts") {
+            reader.requestCount == 1
+        }
+        let olderInspection = try XCTUnwrap(
+            appState.externalDiskInspectionTasks[sessionIdentity]
+        )
+        let olderGeneration = olderInspection.diskEventGeneration
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(observedSource.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalBinding.identity)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: invalidMatch
+        )
+
+        XCTAssertEqual(session.text, observedSource)
+        XCTAssertFalse(session.isDirty)
+        let observedBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+        XCTAssertEqual(observedBinding.location, originalBinding.location)
+        XCTAssertEqual(observedBinding.identity, originalBinding.identity)
+        XCTAssertEqual(
+            observedBinding.sha256Digest,
+            WorkspaceSearchContentFingerprint(text: observedSource).sha256Digest
+        )
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: session),
+            olderGeneration + 1
+        )
+        XCTAssertNil(appState.externalDiskInspectionTasks[sessionIdentity])
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: sourceA, identity: originalBinding.identity))
+        )
+        await olderInspection.task.value
+
+        XCTAssertEqual(session.text, observedSource)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), observedBinding)
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertNil(appState.externalChangePrompt)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testRejectedSearchObservationLetsCleanReusableRetirementFinishAfterSupersession() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let sourceA = "current source"
+        let resultSource = "retired B needle"
+        let observedSource = "retired C"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA, "b.md": resultSource],
+            currentPath: "a.md",
+            coherentFileReader: reader
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let currentSession = appState.currentDocument
+        let retiredURL = fixture.rootURL.appendingPathComponent("b.md")
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
+        let retiredLocation = try rootAuthority.canonicalizedLocation(forFileURL: retiredURL)
+        let retiredRead = try MarkdownFileStore().loadResult(at: retiredLocation)
+        let retiredSession = DocumentSession(
+            text: resultSource,
+            url: retiredLocation.fileURL,
+            fileKind: .markdown
+        )
+        let retiredIdentity = ObjectIdentifier(retiredSession)
+        let originalBinding = AnchoredWorkspaceSessionFileBinding(
+            location: retiredLocation,
+            identity: retiredRead.metadata.identity,
+            sha256Digest: retiredRead.sha256Digest
+        )
+        appState.adoptAnchoredFileBinding(originalBinding, for: retiredSession)
+        appState.retiredEditorDocumentSessions[retiredLocation.fileURL] =
+            RetiredEditorDocumentSession(
+                canonicalURL: retiredLocation.fileURL,
+                session: retiredSession,
+                bindingIDs: [],
+                awaitingInstallations: [],
+                securityScopedAuthorityOwners: []
+            )
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("retired search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "b.md",
+            text: resultSource,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("retired search result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.handleExternalChange(for: retiredSession)
+        try await waitUntil("older retired inspection starts") { reader.requestCount == 1 }
+        let olderInspection = try XCTUnwrap(
+            appState.externalDiskInspectionTasks[retiredIdentity]
+        )
+        let olderGeneration = olderInspection.diskEventGeneration
+
+        let handle = try FileHandle(forWritingTo: retiredURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(observedSource.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: retiredURL), originalBinding.identity)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === currentSession)
+        XCTAssertEqual(retiredSession.text, observedSource)
+        XCTAssertFalse(retiredSession.isDirty)
+        XCTAssertNil(appState.externalDiskInspectionTasks[retiredIdentity])
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: retiredSession),
+            olderGeneration + 1
+        )
+        XCTAssertNil(appState.retiredEditorDocumentSessions[retiredLocation.fileURL])
+        XCTAssertNil(appState.anchoredSessionFileBinding(for: retiredSession))
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(
+                text: resultSource,
+                identity: originalBinding.identity
+            ))
+        )
+        await olderInspection.task.value
+
+        XCTAssertTrue(appState.currentDocument === currentSession)
+        XCTAssertEqual(retiredSession.text, observedSource)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[retiredLocation.fileURL])
+        XCTAssertNil(appState.anchoredSessionFileBinding(for: retiredSession))
+        XCTAssertNil(appState.pendingExternalTexts[retiredLocation.fileURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[retiredLocation.fileURL])
     }
 
     func testSearchObservationRestartsReloadAndKeepMineAgainstNewerConflictVersion() async throws {

@@ -92,6 +92,49 @@ final class EditorProgrammaticWriterActivationTests: XCTestCase {
         XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
     }
 
+    func testDelayedImageInsertionRejectsCanonicalEquivalentContextChange() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        let gate = ImageInsertionGate()
+        let nfcContext = "/tmp/caf\u{00E9}.md"
+        let nfdContext = "/tmp/cafe\u{0301}.md"
+        XCTAssertEqual(nfcContext, nfdContext)
+        XCTAssertFalse(ExactSourceText.matches(nfcContext, nfdContext))
+        scenario.first.coordinator.updateImageAssetContextID(nfcContext)
+        scenario.first.coordinator.updateImageAssetInserter { assets in
+            await gate.insert(assets)
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/canonical-context.png")]
+        ), true)
+        try await waitForImageInsertionInvocation(gate)
+        let capturedGeneration = scenario.first.coordinator.imageAssetInsertionGeneration
+
+        scenario.first.coordinator.updateImageAssetContextID(nfdContext)
+
+        XCTAssertEqual(
+            scenario.first.coordinator.imageAssetInsertionGeneration,
+            capturedGeneration + 1,
+            "raw-different context must supersede the delayed insertion"
+        )
+        // Exercise the independent commit-time context fence even if generation equality
+        // were accidentally restored by a future lifecycle change.
+        scenario.first.coordinator.imageAssetInsertionGeneration = capturedGeneration
+        gate.resume(relativePaths: ["assets/canonical-context.png"])
+        try await waitForDiscardCount(1, in: gate)
+
+        XCTAssertEqual(scenario.model.source, "Stale source")
+        XCTAssertEqual(Self.text(in: scenario.first.textView), "Stale source")
+        XCTAssertTrue(scenario.model.publications.isEmpty)
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+    }
+
     func testRejectedImagePublicationDiscardsPlacedAsset() async throws {
         let scenario = try makeScenario(firstWriterIsPending: false)
         defer {

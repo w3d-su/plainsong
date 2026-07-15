@@ -392,15 +392,21 @@ Opening a result is a two-stage action:
    older or repeated navigation and cancellation commands are ignored.
 
 Acceptance and execution are separate. A stale root/workspace/query context or an event that
-is not the retained result/match is ignored without disturbing unrelated navigation. App first
-prepares the destination session and validates its retained filesystem location, physical identity,
-exact content fingerprint, and half-open UTF-16 range without changing the current document, tree selection,
-navigation command, search task, autosave, statistics, completion work, or prompts. Missing
-nodes, open/detach/identity failures, fingerprint mismatch, and invalid ranges discard that
-prepared attempt with all of those prior states unchanged. Only a fully validated attempt emits
-a newer cancellation, commits the session/tree switch and task transfer, then emits an even
-newer exact-range navigation. Reactivating the already-current session remains a
-document-transition no-op before that successful navigation.
+is not the retained result/match is ignored without disturbing unrelated navigation. Structural
+target checks and failures before a retained-file read remain side-effect free. Once App has made
+one coherent retained-authority read for a reusable cached or retired session, however, that read
+is also an external disk observation: before fingerprint or range validation can reject navigation,
+App advances the session's disk-event generation and either adopts the accepted observation and
+its proof or records a conflict while retaining the prior proof. That observation may therefore
+update the destination session's external-change state and cancel that session's autosave under
+the normal conflict rule; it still cannot change the current document, tree selection, navigation
+command, search task, or unrelated session work/prompts. Missing nodes and pre-read
+open/detach/identity failures leave all prior state unchanged. Fingerprint mismatch and invalid
+ranges preserve the navigation/UI transaction,
+but cannot erase an observation already read from disk. Only a fully validated attempt emits a
+newer cancellation, commits the session/tree switch and task transfer, then emits an even newer
+exact-range navigation. Reactivating the already-current session remains a document-transition
+no-op before that successful navigation.
 
 The result carries the exact searched-content fingerprint. App fingerprints the prepared
 destination source before activation; a digest or UTF-8 byte-count mismatch rejects that attempt
@@ -485,6 +491,16 @@ App placement is transactional: it stages with exclusive creation, publishes wit
 existing name, and retains descriptor-bound identity, byte-count, and SHA-256 receipts. A failed
 publication or rejected Markdown mutation quarantines each created leaf before exact validation;
 changed or indeterminate bytes are preserved and surfaced instead of being unlinked.
+The App-provided inserter also captures the session's retained document location and file identity
+plus the descriptor identities of the workspace-root-to-document-parent chain before suspension;
+it never re-derives placement authority from a later occupant of mutable `currentFileURL`. The
+asset-directory lease similarly retains every root-to-assets component identity and proves that
+the live namespace still names its terminal descriptor immediately before and after publication.
+Moving or replacing the document parent or asset directory therefore fails closed; a post-publish
+failure rolls back through the leased descriptor and returns no Markdown path for bytes that landed
+under a displaced directory. File-based insertion also keeps the supplied literal URL through
+containment and no-follow validation, avoiding a Foundation `/private/var` to `/var` rewrite that
+would turn a valid descriptor-canonical spelling into an `O_NOFOLLOW_ANY` failure.
 Marked-text commit provenance retains the initial selected replacement span for AppKit's
 `.notFound` path, but uses the exact delegate-confirmed replacement location when AppKit performs
 an explicit replacement before commit. Selection-only or rejected mutations discard an
@@ -587,7 +603,11 @@ URL-keyed fence merely by reusing its spelling.
 Every coherent retained-file observation made for search-result activation advances that
 session's external disk-event generation, even when the observed identity and digest still match.
 It therefore supersedes older initial-inspection, Reload, and Keep Mine work before any proof can
-be adopted. An explicit resolution intent survives or restarts only against a fresh coherent read
+be adopted. The same observation is then reconciled before fingerprint/range navigation checks:
+an accepted clean version updates the retained proof even if a stale search result is rejected,
+while dirty or pending local source records a conflict and keeps its previous proof. A reusable
+retired session follows the same rule so rejection cannot strand cleanup behind an unrecorded disk
+version. An explicit resolution intent survives or restarts only against a fresh coherent read
 under the newer generation; an older asynchronous result cannot finalize the observation or
 silently consume the user's choice.
 
@@ -736,8 +756,8 @@ pending.
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
-| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across suspension with no rejected-window orphan; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty-overlay and clean pending-native activation arbitration before proof adoption; coherent search-observation generation supersession with explicit intent restarting only from a fresh read; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across suspension with no rejected-window orphan; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
+| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; retained document-parent and asset-directory component-chain validation across move/replacement races; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 

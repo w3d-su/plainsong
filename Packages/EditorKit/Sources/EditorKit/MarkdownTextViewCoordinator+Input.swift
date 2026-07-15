@@ -228,7 +228,7 @@ extension MarkdownTextViewCoordinator {
         let relativePaths = transaction.relativePaths
         guard !relativePaths.isEmpty,
               imageAssetInsertionGeneration == context.generation,
-              imageAssetContextID == context.imageAssetContextID,
+              imageAssetContextIDMatches(context.imageAssetContextID),
               !context.requiresPublicationProof || installedDocument.hasSourceContract,
               MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
         else {

@@ -131,9 +131,6 @@ extension AppState {
                 return
             }
             try workspaceSearchPostActivationHook?()
-            guard reconcileWorkspaceSearchActivation(activation) else {
-                return
-            }
             cancelPendingEditorNavigationIfNeeded(force: true)
             commitWorkspaceSearchActivation(activation)
             issueEditorNavigation(
@@ -175,6 +172,17 @@ extension AppState {
             metadata: readResult.metadata,
             sha256Digest: readResult.sha256Digest
         )
+        var shouldFinishRejectedRetiredSession = switch anchoredActivation.source {
+        case .retired:
+            true
+        case .cached, .loaded:
+            false
+        }
+        defer {
+            if shouldFinishRejectedRetiredSession {
+                finishRetiredEditorDocumentSessionIfPossible(for: anchoredActivation.session)
+            }
+        }
         supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
             anchoredActivation
         )
@@ -182,7 +190,8 @@ extension AppState {
               !hasConflictingPhysicalSessionOwnership(
                   target.expectedIdentity,
                   excluding: anchoredActivation.session
-              )
+              ),
+              reconcileReusableWorkspaceSearchObservation(anchoredActivation)
         else {
             return nil
         }
@@ -205,38 +214,42 @@ extension AppState {
             return nil
         }
 
-        return PreparedWorkspaceSearchActivation(
+        let activation = PreparedWorkspaceSearchActivation(
             nodeID: target.nodeID,
             anchoredActivation: anchoredActivation,
-            usesLoadedSource: usesLoadedSource,
             documentIdentity: EditorDocumentIdentity(
                 rawValue: target.location.fileURL.absoluteString
             )
         )
+        shouldFinishRejectedRetiredSession = false
+        return activation
     }
 
-    /// A reusable session can still carry the disk proof from A while the activation load
-    /// observes B. Arbitrate that coherent observation before adopting its binding or changing
-    /// navigation/tree/task ownership, so a dirty overlay cannot make B writable by association.
-    private func reconcileWorkspaceSearchActivation(
-        _ activation: PreparedWorkspaceSearchActivation
+    /// A reusable session can still carry the disk proof from A while the coherent activation
+    /// load observes C. Account for C before fingerprint/range validation can reject navigation:
+    /// a clean session adopts C, while dirty or pending source retains A and records a conflict.
+    private func reconcileReusableWorkspaceSearchObservation(
+        _ activation: PreparedAnchoredFileSessionActivation
     ) -> Bool {
-        let prepared = activation.anchoredActivation
-        switch prepared.source {
+        switch activation.source {
         case .loaded:
             return true
         case .cached, .retired:
             let observation = ObservedRetainedFileVersion(
-                location: prepared.binding.location,
-                file: prepared.file,
-                identity: prepared.binding.identity,
-                sha256Digest: prepared.binding.sha256Digest
+                location: activation.binding.location,
+                file: activation.file,
+                identity: activation.binding.identity,
+                sha256Digest: activation.binding.sha256Digest
             )
-            return reconcileObservedRetainedFileVersion(
+            guard reconcileObservedRetainedFileVersion(
                 observation,
-                for: prepared.session,
-                canonicalURL: prepared.canonicalURL
-            )
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            ) else {
+                return false
+            }
+            adoptAnchoredFileBinding(activation.binding, for: activation.session)
+            return true
         }
     }
 
@@ -281,7 +294,8 @@ extension AppState {
         }
         sessionCache[canonicalURL] = session
 
-        if activation.usesLoadedSource {
+        switch prepared.source {
+        case .loaded:
             session.reset(
                 text: prepared.file.text,
                 url: canonicalURL,
@@ -296,16 +310,10 @@ extension AppState {
                 for: session,
                 canonicalURL: canonicalURL
             )
-        } else if indeterminateSessionWrites[sessionIdentity] == nil {
-            // Dirty overlays keep their App source, but the production search read has already
-            // revalidated this exact retained identity. Updating the disk proof does not clear
-            // dirty/pending/conflict state or grant a different path authority.
-            adoptAnchoredFileBinding(prepared.binding, for: session)
-            recordKnownSessionDiskText(
-                prepared.file.text,
-                for: session,
-                canonicalURL: canonicalURL
-            )
+        case .cached, .retired:
+            // Reusable observations were reconciled and, when accepted, adopted before
+            // fingerprint/range validation. Commit only changes activation ownership here.
+            break
         }
 
         if session !== currentDocument {
@@ -561,7 +569,6 @@ private struct WorkspaceSearchActivationTarget {
 private struct PreparedWorkspaceSearchActivation {
     let nodeID: WorkspaceFileNode.ID
     let anchoredActivation: PreparedAnchoredFileSessionActivation
-    let usesLoadedSource: Bool
     let documentIdentity: EditorDocumentIdentity
 }
 

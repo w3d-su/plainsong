@@ -104,28 +104,58 @@ extension AppState {
     }
 
     var editorImageAssetInserter: EditorImageAssetInserter? {
-        guard let rootURL = workspaceRootURL,
-              let currentFileURL = currentDocument.fileURL
+        let sessionIdentity = ObjectIdentifier(currentDocument)
+        guard workspaceRootURL != nil,
+              indeterminateSessionWrites[sessionIdentity] == nil,
+              indeterminateSessionWriteContexts[sessionIdentity] == nil,
+              let installedRootAuthority = workspaceSearchRootAuthority,
+              let retainedProof = retainedEditorImageAssetDocumentProof(
+                  for: currentDocument
+              ),
+              retainedProof.location.rootAuthority == installedRootAuthority
         else {
             return nil
         }
-        let rootAuthority = workspaceSearchRootAuthority
+        let documentAuthority: EditorImageAssetDocumentAuthority
+        do {
+            documentAuthority = try SecurityScopedAccess.withAccess(
+                to: retainedProof.location.securityScopedURL
+            ) {
+                try EditorImageAssetDocumentAuthority(
+                    location: retainedProof.location,
+                    expectedIdentity: retainedProof.identity
+                )
+            }
+        } catch {
+            return nil
+        }
 
-        return { [weak self, rootURL, currentFileURL, rootAuthority] assets in
+        return { [weak self, documentAuthority] assets in
             await self?.insertEditorImageAssets(
                 assets,
-                rootURL: rootURL,
-                currentFileURL: currentFileURL,
-                rootAuthority: rootAuthority
+                documentAuthority: documentAuthority
             ) ?? EditorImageAssetInsertion(relativePaths: [])
         }
     }
 
+    private func retainedEditorImageAssetDocumentProof(
+        for session: DocumentSession
+    ) -> (location: WorkspaceFileSystemLocation, identity: WorkspaceFileSystemIdentity)? {
+        let sessionIdentity = ObjectIdentifier(session)
+        if let binding = anchoredSessionFileBindings[sessionIdentity] {
+            return (binding.location, binding.identity)
+        }
+        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+           let installedLocation = proof.installedWorkspaceLocation
+        {
+            return (installedLocation, proof.identity)
+        }
+        return nil
+    }
+
     private func insertEditorImageAssets(
         _ assets: [EditorImageAsset],
-        rootURL: URL,
-        currentFileURL: URL,
-        rootAuthority: WorkspaceFileSystemRootAuthority?
+        documentAuthority: EditorImageAssetDocumentAuthority
     ) async -> EditorImageAssetInsertion {
         let assetFolderRelativePath = preferences.assetFolderRelativePath
 
@@ -134,15 +164,14 @@ extension AppState {
                 try placeEditorImageAssets(
                     assets: assets,
                     assetFolderRelativePath: assetFolderRelativePath,
-                    rootURL: rootURL,
-                    currentFileURL: currentFileURL,
-                    rootAuthority: rootAuthority
+                    documentAuthority: documentAuthority
                 )
             }.value
 
             refreshWorkspaceAfterFileSystemChange()
             let cleanupSecurityScopedURL = placement.createdAssets.first?
-                .directory.rootAuthority.securityScopedURL ?? rootURL
+                .directory.rootAuthority.securityScopedURL
+                ?? documentAuthority.location.securityScopedURL
             return EditorImageAssetInsertion(
                 relativePaths: placement.relativePaths
             ) { [weak self] in
@@ -173,6 +202,7 @@ struct EditorImageAssetPlacement {
 
 enum EditorImageAssetPlacementEvent: Equatable {
     case willPublish(URL)
+    case didRenameBeforeValidation(URL)
     case didPublish(URL)
 }
 
@@ -193,26 +223,6 @@ private struct EditorImageAssetStableMetadata: Equatable {
     let modificationNanoseconds: Int64
     let changeSeconds: Int64
     let changeNanoseconds: Int64
-}
-
-final class EditorImageAssetDirectoryLease: @unchecked Sendable {
-    let descriptor: Int32
-    let directoryURL: URL
-    let rootAuthority: WorkspaceFileSystemRootAuthority
-
-    init(
-        descriptor: Int32,
-        directoryURL: URL,
-        rootAuthority: WorkspaceFileSystemRootAuthority
-    ) {
-        self.descriptor = descriptor
-        self.directoryURL = directoryURL
-        self.rootAuthority = rootAuthority
-    }
-
-    deinit {
-        Darwin.close(descriptor)
-    }
 }
 
 final class CreatedEditorImageAsset: @unchecked Sendable {
@@ -300,30 +310,60 @@ func placeEditorImageAssets(
         let currentLocation = try rootAuthority.canonicalizedLocation(
             forFileURL: currentFileURL
         )
+        let documentAuthority = try EditorImageAssetDocumentAuthority(
+            location: currentLocation
+        )
+        return try placeEditorImageAssets(
+            assets: assets,
+            assetFolderRelativePath: assetFolderRelativePath,
+            documentAuthority: documentAuthority,
+            eventHandler: eventHandler,
+            managesSecurityScope: false
+        )
+    }
+}
+
+func placeEditorImageAssets(
+    assets: [EditorImageAsset],
+    assetFolderRelativePath: String,
+    documentAuthority: EditorImageAssetDocumentAuthority,
+    eventHandler: EditorImageAssetPlacementEventHandler? = nil
+) throws -> EditorImageAssetPlacement {
+    try placeEditorImageAssets(
+        assets: assets,
+        assetFolderRelativePath: assetFolderRelativePath,
+        documentAuthority: documentAuthority,
+        eventHandler: eventHandler,
+        managesSecurityScope: true
+    )
+}
+
+private func placeEditorImageAssets(
+    assets: [EditorImageAsset],
+    assetFolderRelativePath: String,
+    documentAuthority: EditorImageAssetDocumentAuthority,
+    eventHandler: EditorImageAssetPlacementEventHandler?,
+    managesSecurityScope: Bool
+) throws -> EditorImageAssetPlacement {
+    let operation = {
+        try documentAuthority.validateNamespaceBinding()
         let context = try EditorImageAssetPlacementContext(
-            rootAuthority: rootAuthority,
-            currentDirectoryComponents: currentLocation.relativePath
-                .split(separator: "/", omittingEmptySubsequences: true)
-                .dropLast()
-                .map(String.init),
-            assetFolderComponents: editorImageAssetFolderComponents(
-                assetFolderRelativePath
-            ),
+            documentAuthority: documentAuthority,
+            assetFolderComponents: editorImageAssetFolderComponents(assetFolderRelativePath),
             eventHandler: eventHandler
         )
         var state = EditorImageAssetPlacementState()
 
         do {
             for asset in assets {
-                try rootAuthority.proveSelectedSpellingNamesCapturedIdentity(
-                    selectedRootURL: rootURL
-                )
+                try documentAuthority.validateNamespaceBinding()
                 try appendEditorImageAsset(asset, context: context, state: &state)
+                try documentAuthority.validateNamespaceBinding()
             }
         } catch {
             let outcome = discardEditorImageAssets(
                 state.createdAssets,
-                rootURL: securityScopedURL
+                rootURL: documentAuthority.location.securityScopedURL
             )
             if let issue = outcome.userFacingIssue {
                 throw EditorImageAssetPlacementRollbackError(
@@ -339,13 +379,28 @@ func placeEditorImageAssets(
             createdAssets: state.createdAssets
         )
     }
+
+    if managesSecurityScope {
+        return try SecurityScopedAccess.withAccess(
+            to: documentAuthority.location.securityScopedURL,
+            operation
+        )
+    }
+    return try operation()
 }
 
 private struct EditorImageAssetPlacementContext {
-    let rootAuthority: WorkspaceFileSystemRootAuthority
-    let currentDirectoryComponents: [String]
+    let documentAuthority: EditorImageAssetDocumentAuthority
     let assetFolderComponents: [String]
     let eventHandler: EditorImageAssetPlacementEventHandler?
+
+    var rootAuthority: WorkspaceFileSystemRootAuthority {
+        documentAuthority.rootAuthority
+    }
+
+    var currentDirectoryComponents: [String] {
+        documentAuthority.currentDirectoryComponents
+    }
 }
 
 private struct EditorImageAssetPlacementState {
@@ -379,11 +434,14 @@ private func appendEditorImageFile(
     state: inout EditorImageAssetPlacementState
 ) throws {
     try SecurityScopedAccess.withAccess(to: sourceURL) {
-        let resolvedSourceURL = sourceURL.resolvingSymlinksInPath()
+        // Keep the supplied literal spelling. `resolvingSymlinksInPath()` can rewrite the
+        // descriptor-canonical `/private/var/...` spelling back through the `/var` symlink;
+        // that both loses workspace containment and makes the no-follow import open fail.
         if let sourceLocation = try? context.rootAuthority.canonicalizedLocation(
-            forFileURL: resolvedSourceURL
+            forFileURL: sourceURL
         ) {
             try withValidatedEditorImageFile(at: sourceLocation.fileURL) { _ in }
+            try context.documentAuthority.validateNamespaceBinding()
             state.relativePaths.append(editorImageRelativePath(
                 from: context.currentDirectoryComponents,
                 to: sourceLocation.relativePath
@@ -393,12 +451,12 @@ private func appendEditorImageFile(
             return
         }
 
-        let importedData = try withValidatedEditorImageFile(at: resolvedSourceURL) {
+        let importedData = try withValidatedEditorImageFile(at: sourceURL) {
             try readEditorImageFile(from: $0)
         }
         try appendCreatedEditorImageAsset(
             importedData,
-            filename: sanitizedEditorImageFilename(resolvedSourceURL.lastPathComponent),
+            filename: sanitizedEditorImageFilename(sourceURL.lastPathComponent),
             context: context,
             state: &state
         )
@@ -412,20 +470,22 @@ private func appendCreatedEditorImageAsset(
     state: inout EditorImageAssetPlacementState
 ) throws {
     let directory = try state.assetDirectory ?? makeEditorImageAssetDirectory(
-        rootAuthority: context.rootAuthority,
-        currentDirectoryComponents: context.currentDirectoryComponents,
+        documentAuthority: context.documentAuthority,
         assetFolderComponents: context.assetFolderComponents
     )
     state.assetDirectory = directory
     let created = try placeCreatedEditorImageAsset(
         filename: filename,
         directory: directory,
+        documentAuthority: context.documentAuthority,
         eventHandler: context.eventHandler
     ) {
         try writeEditorImageData(data, to: $0)
     }
     state.createdAssets.append(created)
     try context.eventHandler?(.didPublish(created.fileURL))
+    try context.documentAuthority.validateNamespaceBinding()
+    try directory.validateNamespaceBinding()
     state.relativePaths.append(editorImageAssetRelativePath(
         folderComponents: context.assetFolderComponents,
         leafName: created.leafName
@@ -433,96 +493,27 @@ private func appendCreatedEditorImageAsset(
 }
 
 private func makeEditorImageAssetDirectory(
-    rootAuthority: WorkspaceFileSystemRootAuthority,
-    currentDirectoryComponents: [String],
+    documentAuthority: EditorImageAssetDocumentAuthority,
     assetFolderComponents: [String]
 ) throws -> EditorImageAssetDirectoryLease {
-    let rootURL = rootAuthority.canonicalRootURL
-    var descriptor = Darwin.open(
-        rootURL.path(percentEncoded: false),
-        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY
+    try documentAuthority.validateNamespaceBinding()
+    let currentDirectoryComponents = documentAuthority.currentDirectoryComponents
+    return try makeEditorImageDirectoryLease(
+        rootAuthority: documentAuthority.rootAuthority,
+        directoryComponents: currentDirectoryComponents + assetFolderComponents,
+        createMissingFromIndex: currentDirectoryComponents.count
     )
-    guard descriptor >= 0 else { throw editorImagePOSIXError() }
-    var directoryURL = rootURL
-
-    do {
-        let verification = try WorkspaceFileSystemRootAuthority(
-            rootURL: rootURL,
-            securityScopedURL: rootAuthority.securityScopedURL
-        )
-        guard verification == rootAuthority else {
-            throw WorkspaceAnchoredFileSystemError.namespaceChanged
-        }
-        for component in currentDirectoryComponents {
-            let nextDescriptor = try openEditorImageDirectory(
-                parentDescriptor: descriptor,
-                component: component,
-                createIfMissing: false
-            )
-            Darwin.close(descriptor)
-            descriptor = nextDescriptor
-            directoryURL.appendPathComponent(component, isDirectory: true)
-        }
-        for component in assetFolderComponents {
-            let nextDescriptor = try openEditorImageDirectory(
-                parentDescriptor: descriptor,
-                component: component,
-                createIfMissing: true
-            )
-            Darwin.close(descriptor)
-            descriptor = nextDescriptor
-            directoryURL.appendPathComponent(component, isDirectory: true)
-        }
-        return EditorImageAssetDirectoryLease(
-            descriptor: descriptor,
-            directoryURL: directoryURL,
-            rootAuthority: rootAuthority
-        )
-    } catch {
-        Darwin.close(descriptor)
-        throw error
-    }
-}
-
-private func openEditorImageDirectory(
-    parentDescriptor: Int32,
-    component: String,
-    createIfMissing: Bool
-) throws -> Int32 {
-    func open() -> Int32 {
-        component.withCString {
-            Darwin.openat(
-                parentDescriptor,
-                $0,
-                O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
-            )
-        }
-    }
-
-    var descriptor = open()
-    if descriptor < 0, errno == ENOENT, createIfMissing {
-        let createResult = component.withCString {
-            Darwin.mkdirat(
-                parentDescriptor,
-                $0,
-                mode_t(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
-            )
-        }
-        guard createResult == 0 || errno == EEXIST else {
-            throw editorImagePOSIXError()
-        }
-        descriptor = open()
-    }
-    guard descriptor >= 0 else { throw editorImagePOSIXError() }
-    return descriptor
 }
 
 private func placeCreatedEditorImageAsset(
     filename: String,
     directory: EditorImageAssetDirectoryLease,
+    documentAuthority: EditorImageAssetDocumentAuthority,
     eventHandler: EditorImageAssetPlacementEventHandler?,
     writeContents: (Int32) throws -> Void
 ) throws -> CreatedEditorImageAsset {
+    try documentAuthority.validateNamespaceBinding()
+    try directory.validateNamespaceBinding()
     let stagingName = ".plainsong-image-stage-\(UUID().uuidString)"
     let stagingDescriptor = stagingName.withCString {
         Darwin.openat(
@@ -558,6 +549,7 @@ private func placeCreatedEditorImageAsset(
             stagingDescriptor: stagingDescriptor,
             proof: proof,
             directory: directory,
+            documentAuthority: documentAuthority,
             eventHandler: eventHandler,
             publishedAsset: &publishedAsset
         )
@@ -597,6 +589,7 @@ private func publishStagedEditorImageAsset(
     stagingDescriptor: Int32,
     proof: EditorImageAssetContentProof,
     directory: EditorImageAssetDirectoryLease,
+    documentAuthority: EditorImageAssetDocumentAuthority,
     eventHandler: EditorImageAssetPlacementEventHandler?,
     publishedAsset: inout CreatedEditorImageAsset?
 ) throws -> CreatedEditorImageAsset {
@@ -615,6 +608,8 @@ private func publishStagedEditorImageAsset(
         guard try editorImageAssetContentProof(descriptor: stagingDescriptor) == proof else {
             throw CocoaError(.fileReadUnknown)
         }
+        try documentAuthority.validateNamespaceBinding()
+        try directory.validateNamespaceBinding()
         let renameResult = secureEditorImageRename(
             parentDescriptor: directory.descriptor,
             from: stagingName,
@@ -629,6 +624,9 @@ private func publishStagedEditorImageAsset(
                 proof: proof
             )
             publishedAsset = created
+            try eventHandler?(.didRenameBeforeValidation(candidateURL))
+            try documentAuthority.validateNamespaceBinding()
+            try directory.validateNamespaceBinding()
             try validateEditorImageNamespaceEntry(
                 directoryDescriptor: directory.descriptor,
                 leafName: candidate,

@@ -80,10 +80,21 @@ extension MarkdownTextViewCoordinator {
     }
 
     func updateImageAssetContextID(_ contextID: String?) {
-        if imageAssetContextID != contextID {
+        if !imageAssetContextIDMatches(contextID) {
             imageAssetInsertionGeneration &+= 1
         }
         imageAssetContextID = contextID
+    }
+
+    func imageAssetContextIDMatches(_ contextID: String?) -> Bool {
+        switch (imageAssetContextID, contextID) {
+        case (nil, nil):
+            true
+        case let (current?, candidate?):
+            ExactSourceText.matches(current, candidate)
+        default:
+            false
+        }
     }
 
     func reportVisibleRangeIfNeeded(in textView: STTextView) {
