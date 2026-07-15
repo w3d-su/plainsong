@@ -391,6 +391,37 @@ extension WorkspaceSearchContractTests {
         XCTAssertFalse(policy.isIgnored(relativePath: nfdCandidate))
     }
 
+    func testIgnoreGlobLiteralsUseExactUTF8BytesWithoutChangingWildcardSemantics() async throws {
+        let root = try makeTemporaryDirectory()
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+        let questionPath = "question-\u{732B}.md"
+        let starPath = "star-cafe\u{0301}.md"
+        let doubleStarPath = "deep/one/two/post\u{732B}.md"
+        let reader = ByteExactIgnoreReader(contents: [
+            WorkspacePathByteKey(".gitignore"): Data("""
+            \(nfcPath)
+            question-?.md
+            star-*.md
+            deep/**/post?.md
+            """.utf8),
+        ])
+
+        let policy = try await WorkspaceSearchIgnorePolicy.load(
+            rootAuthority: authority,
+            candidatePaths: [nfcPath, nfdPath, questionPath, starPath, doubleStarPath],
+            limits: WorkspaceSearchLimits(),
+            reader: reader
+        )
+
+        XCTAssertTrue(policy.isIgnored(relativePath: nfcPath))
+        XCTAssertFalse(policy.isIgnored(relativePath: nfdPath))
+        XCTAssertTrue(policy.isIgnored(relativePath: questionPath))
+        XCTAssertTrue(policy.isIgnored(relativePath: starPath))
+        XCTAssertTrue(policy.isIgnored(relativePath: doubleStarPath))
+    }
+
     private func makeRequest(
         root: URL,
         entries: [WorkspaceFileSnapshot.Entry],

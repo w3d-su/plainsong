@@ -47,11 +47,11 @@ public struct CompletionWorkspaceProvider: Sendable {
         let markdownPaths = snapshot.entries
             .filter { $0.kind == .markdown || $0.kind == .mdx }
             .map(\.relativePath)
-            .sorted()
+            .sorted(by: byteOrderedPath)
         let imagePaths = snapshot.entries
             .filter { $0.kind == .image }
             .map(\.relativePath)
-            .sorted()
+            .sorted(by: byteOrderedPath)
         for relativePath in markdownPaths + imagePaths {
             guard (try? rootAuthority.location(relativePath: relativePath)) != nil else {
                 throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
@@ -124,9 +124,10 @@ private extension CompletionWorkspaceProvider {
         var keys: [String] = []
         var seen: Set<String> = []
         let fileStore = MarkdownFileStore()
+        let currentPathKey = WorkspacePathByteKey(currentRelativePath)
 
         let siblingPaths = markdownPaths.lazy
-            .filter { $0 != currentRelativePath }
+            .filter { WorkspacePathByteKey($0) != currentPathKey }
             // Keep completion metadata refresh bounded in large content workspaces.
             .prefix(Self.siblingFrontmatterReadLimit)
 
@@ -144,6 +145,10 @@ private extension CompletionWorkspaceProvider {
         }
 
         return keys
+    }
+
+    func byteOrderedPath(_ first: String, _ second: String) -> Bool {
+        WorkspacePathByteKey(first) < WorkspacePathByteKey(second)
     }
 
     func headingAnchors(in text: String) -> [String] {

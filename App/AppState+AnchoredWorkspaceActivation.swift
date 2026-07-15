@@ -40,9 +40,6 @@ extension AppState {
                 throw AppStateError.invalidSessionIdentity(key)
             }
             try validateReusableAnchoredSession(cachedSession, at: location)
-            guard !detachedSessionURLs.contains(key) else {
-                throw AppStateError.missingFile(key)
-            }
             return PreparedAnchoredFileSessionActivation(
                 canonicalURL: key,
                 file: file,
@@ -231,11 +228,8 @@ extension AppState {
         let key = activation.canonicalURL
         cancelForegroundDocumentTasks()
         sessionCache[key] = session
-        detachedSessionURLs.remove(key)
-        if let prompt = missingFilePrompt,
-           exactFileURLSpellingMatches(prompt.fileURL, key)
-        {
-            missingFilePrompt = nil
+        if !reconcilesExternalChange {
+            clearMissingFileActivationFence(at: key)
         }
         if recordsLoadedText {
             recordKnownAnchoredDiskText(activation.file.text, canonicalURL: key)
@@ -256,10 +250,20 @@ extension AppState {
                 handleSessionAccess(url: key, isDirty: session.isDirty)
                 return false
             }
+            clearMissingFileActivationFence(at: key)
         }
         adoptAnchoredFileBinding(activation.binding, for: session)
         handleSessionAccess(url: key, isDirty: session.isDirty)
         return true
+    }
+
+    private func clearMissingFileActivationFence(at key: URL) {
+        detachedSessionURLs.remove(key)
+        if let prompt = missingFilePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
+            missingFilePrompt = nil
+        }
     }
 
     private func recordKnownAnchoredDiskText(_ text: String, canonicalURL: URL) {

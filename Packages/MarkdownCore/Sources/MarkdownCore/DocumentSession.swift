@@ -121,6 +121,19 @@ public final class DocumentSession: ObservableObject {
         self.savedText = savedText
     }
 
+    /// Replaces the persisted-text baseline without changing the editor's current text.
+    ///
+    /// External-change arbitration uses this after proving a newer disk version: the editor
+    /// keeps the user's local bytes, while subsequent edits become clean only when they exactly
+    /// match the newly observed disk bytes.
+    public func rebaseSavedText(to newSavedText: String) {
+        savedText = newSavedText
+        let newIsDirty = !ExactSourceText.matches(newSavedText, text)
+        if isDirty != newIsDirty {
+            isDirty = newIsDirty
+        }
+    }
+
     /// Replaces the full session state when opening or restoring a document.
     public func reset(
         text newText: String,

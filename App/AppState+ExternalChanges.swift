@@ -75,10 +75,6 @@ extension AppState {
         else {
             return
         }
-        let localTextDiffersFromObservedDisk = !ExactSourceText.matches(
-            currentDocument.text,
-            observation.file.text
-        )
         recordKnownSessionDiskText(
             observation.file.text,
             for: currentDocument,
@@ -94,14 +90,7 @@ extension AppState {
         {
             missingFilePrompt = nil
         }
-        if localTextDiffersFromObservedDisk, !currentDocument.isDirty {
-            currentDocument.reset(
-                text: currentDocument.text,
-                url: currentDocument.fileURL,
-                fileKind: currentDocument.fileKind,
-                isDirty: true
-            )
-        }
+        currentDocument.rebaseSavedText(to: observation.file.text)
         sessionPolicy.updateDirtyState(for: key, isDirty: currentDocument.isDirty)
         externalChangePrompt = nil
         scheduleAutosave(for: currentDocument)

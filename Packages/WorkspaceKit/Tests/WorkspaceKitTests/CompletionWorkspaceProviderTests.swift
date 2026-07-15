@@ -104,6 +104,57 @@ final class CompletionWorkspaceProviderTests: XCTestCase {
         XCTAssertFalse(workspace.frontmatterKeys.contains("key_50"))
     }
 
+    func testCanonicalEquivalentSiblingUsesByteExactExclusionAndOrderingBeforeReadCap() throws {
+        let root = try makeTemporaryDirectory()
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcCurrentPath = "caf\u{00E9}.md"
+        let nfdSiblingPath = "cafe\u{0301}.md"
+        var entries = [entry(nfcCurrentPath)]
+
+        for index in 0 ..< 49 {
+            let relativePath = String(format: "a-%03d.md", index)
+            try """
+            ---
+            key_\(index): value
+            ---
+            Body
+            """.write(to: root.appendingPathComponent(relativePath), atomically: true, encoding: .utf8)
+            entries.append(entry(relativePath))
+        }
+        try """
+        ---
+        nfd_sibling: value
+        ---
+        Body
+        """.write(to: root.appendingPathComponent(nfdSiblingPath), atomically: true, encoding: .utf8)
+        entries.append(entry(nfdSiblingPath))
+
+        let afterCapPath = "z-after-cap.md"
+        try """
+        ---
+        after_cap: value
+        ---
+        Body
+        """.write(to: root.appendingPathComponent(afterCapPath), atomically: true, encoding: .utf8)
+        entries.append(entry(afterCapPath))
+
+        let workspace = try CompletionWorkspaceProvider().workspace(
+            rootAuthority: authority,
+            currentFileLocation: authority.location(relativePath: nfcCurrentPath),
+            currentText: "Local current text",
+            snapshot: WorkspaceFileSnapshot(entries: entries)
+        )
+
+        XCTAssertEqual(
+            workspace.markdownFilePaths.map { Array($0.utf8) },
+            entries.map(\.relativePath).sorted {
+                WorkspacePathByteKey($0) < WorkspacePathByteKey($1)
+            }.map { Array($0.utf8) }
+        )
+        XCTAssertTrue(workspace.frontmatterKeys.contains("nfd_sibling"))
+        XCTAssertFalse(workspace.frontmatterKeys.contains("after_cap"))
+    }
+
     func testAnchoredWorkspaceDoesNotReadReplacementRootSibling() async throws {
         let parent = try makeTemporaryDirectory()
         let root = parent.appendingPathComponent("workspace", isDirectory: true)
@@ -146,5 +197,14 @@ final class CompletionWorkspaceProviderTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func entry(_ relativePath: String) -> WorkspaceFileSnapshot.Entry {
+        WorkspaceFileSnapshot.Entry(
+            relativePath: relativePath,
+            kind: .markdown,
+            identity: relativePath,
+            contentModificationDate: nil
+        )
     }
 }

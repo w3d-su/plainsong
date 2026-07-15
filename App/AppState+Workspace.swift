@@ -208,9 +208,6 @@ extension AppState {
             else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
-            guard !detachedSessionURLs.contains(key) else {
-                throw AppStateError.missingFile(key)
-            }
             cancelForegroundDocumentTasks()
             setCurrentDocument(cachedSession)
             handleExternalChange(for: cachedSession)
@@ -238,13 +235,13 @@ extension AppState {
             sha256Digest: loaded.sha256Digest
         )
         sessionCache[key] = session
-        detachedSessionURLs.remove(key)
-        if let prompt = missingFilePrompt,
-           exactFileURLSpellingMatches(prompt.fileURL, key)
-        {
-            missingFilePrompt = nil
-        }
         if recoveredSession == nil {
+            detachedSessionURLs.remove(key)
+            if let prompt = missingFilePrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, key)
+            {
+                missingFilePrompt = nil
+            }
             recordKnownDiskText(file.text, for: key)
         }
         setCurrentDocument(session)

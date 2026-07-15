@@ -203,7 +203,8 @@ private enum WorkspaceSearchGlob {
 
         while valueIndex < valueCharacters.count {
             if patternIndex < patternCharacters.count,
-               patternCharacters[patternIndex] == "?" || patternCharacters[patternIndex] == valueCharacters[valueIndex]
+               patternCharacters[patternIndex] == "?"
+               || utf8BytesMatch(patternCharacters[patternIndex], valueCharacters[valueIndex])
             {
                 patternIndex += 1
                 valueIndex += 1
@@ -224,6 +225,12 @@ private enum WorkspaceSearchGlob {
             patternIndex += 1
         }
         return patternIndex == patternCharacters.count
+    }
+
+    private static func utf8BytesMatch(_ first: Character, _ second: Character) -> Bool {
+        // Keep wildcard consumption grapheme-based without inheriting Character's
+        // canonical-equivalent equality for literal path bytes.
+        String(first).utf8.elementsEqual(String(second).utf8)
     }
 }
 

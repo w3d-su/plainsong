@@ -4049,20 +4049,24 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: post.path))
     }
 
-    func testAnchoredDeleteRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
+    // swiftlint:disable:next function_body_length
+    func testAnchoredDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
         try writeText("disk A", to: initialPostURL)
+        let parkedPostURL = root.appendingPathComponent("post-parked.md").standardizedFileURL
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let location = try authority.location(relativePath: "post.md")
+        let otherLocation = try authority.location(relativePath: "other.md")
+        try writeText("other B", to: otherLocation.fileURL)
         let post = location.fileURL
         let loadedA = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(
-            text: "local edits",
+            text: loadedA.file.text,
             url: post,
             fileKind: .markdown,
-            isDirty: true
+            isDirty: false
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         defer { appState.autosaveTask?.cancel() }
@@ -4071,25 +4075,44 @@ final class AppStateTests: XCTestCase {
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
         appState.sessionCache[post] = session
-        _ = appState.sessionPolicy.access(post, isDirty: true)
+        _ = appState.sessionPolicy.access(post, isDirty: false)
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
             AnchoredWorkspaceSessionFileBinding(
                 location: location,
                 identity: loadedA.metadata.identity,
                 sha256Digest: loadedA.sha256Digest
             )
+        appState.replaceDocumentText("local edits")
+        XCTAssertTrue(session.isDirty)
 
-        try FileManager.default.removeItem(at: post)
+        try FileManager.default.moveItem(at: post, to: parkedPostURL)
         appState.handleExternalChange(for: session)
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, post)
 
-        try writeText("disk B", to: post)
-        appState.handleExternalChange(for: session)
-        XCTAssertEqual(appState.pendingExternalTexts[post], "disk B")
+        try appState.activateAnchoredFileSession(at: otherLocation)
+        XCTAssertFalse(appState.currentDocument === session)
+        XCTAssertEqual(appState.currentDocument.fileURL, otherLocation.fileURL)
+        XCTAssertNil(appState.missingFilePrompt)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(post))
+
+        try FileManager.default.moveItem(at: parkedPostURL, to: post)
+        try appState.activateAnchoredFileSession(at: location)
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[post] === session)
+        XCTAssertEqual(session.text, "local edits")
+        XCTAssertEqual(appState.pendingExternalTexts[post], "disk A")
+        XCTAssertEqual(
+            appState.pendingExternalFileVersions[post]?.identity,
+            loadedA.metadata.identity
+        )
+        XCTAssertEqual(
+            appState.pendingExternalFileVersions[post]?.sha256Digest,
+            loadedA.sha256Digest
+        )
         XCTAssertEqual(appState.externalChangePrompt?.fileURL, post)
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
-        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: post)
 
         appState.keepMineForExternallyChangedFile()
 
@@ -4105,25 +4128,29 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: post, encoding: .utf8), "local edits")
     }
 
-    func testStandaloneDeleteRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
+    // swiftlint:disable:next function_body_length
+    func testStandaloneDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
         try writeText("disk A", to: initialPostURL)
+        let parkedPostURL = root.appendingPathComponent("post-parked.md").standardizedFileURL
         let location = try WorkspaceFileSystemLocation(fileURL: initialPostURL)
+        let otherURL = root.appendingPathComponent("other.md").standardizedFileURL
+        try writeText("other B", to: otherURL)
         let post = location.fileURL
         let loadedA = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(
-            text: "standalone local edits",
+            text: loadedA.file.text,
             url: post,
             fileKind: .markdown,
-            isDirty: true
+            isDirty: false
         )
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
         defer { appState.autosaveTask?.cancel() }
         let sessionIdentity = ObjectIdentifier(session)
         appState.sessionCache[post] = session
-        _ = appState.sessionPolicy.access(post, isDirty: true)
+        _ = appState.sessionPolicy.access(post, isDirty: false)
         appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(
             UnanchoredManagedSessionFileProof(
                 location: location,
@@ -4132,15 +4159,35 @@ final class AppStateTests: XCTestCase {
                 installedWorkspaceLocation: nil
             )
         )
+        appState.replaceDocumentText("standalone local edits")
+        XCTAssertTrue(session.isDirty)
 
-        try FileManager.default.removeItem(at: post)
+        try FileManager.default.moveItem(at: post, to: parkedPostURL)
         appState.handleExternalChange(for: session)
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, post)
 
-        try writeText("standalone disk B", to: post)
-        appState.handleExternalChange(for: session)
-        XCTAssertEqual(appState.pendingExternalTexts[post], "standalone disk B")
+        try appState.activateFileSession(url: otherURL)
+        XCTAssertFalse(appState.currentDocument === session)
+        XCTAssertEqual(appState.currentDocument.fileURL, otherURL)
+        XCTAssertNil(appState.missingFilePrompt)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(post))
+
+        try FileManager.default.moveItem(at: parkedPostURL, to: post)
+        try appState.activateFileSession(url: post)
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[post] === session)
+        XCTAssertEqual(session.text, "standalone local edits")
+        XCTAssertEqual(appState.pendingExternalTexts[post], "disk A")
+        XCTAssertEqual(
+            appState.pendingExternalFileVersions[post]?.identity,
+            loadedA.metadata.identity
+        )
+        XCTAssertEqual(
+            appState.pendingExternalFileVersions[post]?.sha256Digest,
+            loadedA.sha256Digest
+        )
         XCTAssertEqual(appState.externalChangePrompt?.fileURL, post)
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
 
@@ -4568,6 +4615,151 @@ final class AppStateTests: XCTestCase {
         }
     }
 
+    // swiftlint:disable:next function_body_length
+    func testRetiredAnchoredDetachedActivationRequiresResolutionForSameObservedVersion() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let parkedURL = root.appendingPathComponent("post-parked.md").standardizedFileURL
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        try writeText("disk A", to: location.fileURL)
+        let original = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: original.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        session.replaceText("local edits")
+        let appState = AppState(
+            currentDocument: DocumentSession(text: "other", fileKind: .markdown),
+            shouldRestoreLastOpenedFile: false
+        )
+        defer { appState.autosaveTask?.cancel() }
+        let originalBinding = AnchoredWorkspaceSessionFileBinding(
+            location: location,
+            identity: original.metadata.identity,
+            sha256Digest: original.sha256Digest
+        )
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = originalBinding
+        let bindingID = EditorDocumentBindingID()
+        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+            id: bindingID,
+            session: session,
+            securityScopedAuthority: nil,
+            isAwaitingBindingEnd: false
+        )
+
+        try FileManager.default.moveItem(at: location.fileURL, to: parkedURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
+
+        try FileManager.default.moveItem(at: parkedURL, to: location.fileURL)
+        let restored = try MarkdownFileStore().loadResult(at: location)
+        XCTAssertEqual(restored.metadata.identity, original.metadata.identity)
+        XCTAssertEqual(restored.sha256Digest, original.sha256Digest)
+        let activation = try appState.prepareAnchoredFileSessionActivation(
+            file: restored.file,
+            at: location,
+            metadata: restored.metadata,
+            sha256Digest: restored.sha256Digest
+        )
+        guard case .retired = activation.source else {
+            return XCTFail("detached retained session must use retired activation")
+        }
+
+        appState.commitAnchoredFileSessionActivation(activation)
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk A")
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertNotNil(appState.retiredEditorDocumentBindings[bindingID])
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertThrowsError(try appState.save(session: session))
+
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertEqual(session.text, "disk A")
+        XCTAssertFalse(session.isDirty)
+        XCTAssertFalse(appState.detachedSessionURLs.contains(location.fileURL))
+        XCTAssertNil(appState.pendingExternalTexts[location.fileURL])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingID])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testRetiredStandaloneDetachedActivationRequiresResolutionForSameObservedVersion() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let postURL = root.appendingPathComponent("post.md").standardizedFileURL
+        let parkedURL = root.appendingPathComponent("post-parked.md").standardizedFileURL
+        try writeText("disk A", to: postURL)
+        let location = try WorkspaceFileSystemLocation(fileURL: postURL)
+        let original = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: original.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        session.replaceText("local edits")
+        let appState = AppState(
+            currentDocument: DocumentSession(text: "other", fileKind: .markdown),
+            shouldRestoreLastOpenedFile: false
+        )
+        defer { appState.autosaveTask?.cancel() }
+        let originalProof = UnanchoredManagedSessionFileProof(
+            location: location,
+            identity: original.metadata.identity,
+            sha256Digest: original.sha256Digest,
+            installedWorkspaceLocation: nil
+        )
+        appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)] = .proven(
+            originalProof
+        )
+        let bindingID = EditorDocumentBindingID()
+        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
+            id: bindingID,
+            session: session,
+            securityScopedAuthority: nil,
+            isAwaitingBindingEnd: false
+        )
+
+        try FileManager.default.moveItem(at: location.fileURL, to: parkedURL)
+        appState.handleExternalChange(for: session)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
+
+        try FileManager.default.moveItem(at: parkedURL, to: location.fileURL)
+        let restored = try MarkdownFileStore().loadResult(at: location)
+        XCTAssertEqual(restored.metadata.identity, original.metadata.identity)
+        XCTAssertEqual(restored.sha256Digest, original.sha256Digest)
+
+        try appState.activateFileSession(url: location.fileURL)
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[location.fileURL] === session)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
+        XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk A")
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
+            .proven(originalProof)
+        )
+        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingID])
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertThrowsError(try appState.save(session: session))
+
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertEqual(session.text, "disk A")
+        XCTAssertFalse(session.isDirty)
+        XCTAssertFalse(appState.detachedSessionURLs.contains(location.fileURL))
+        XCTAssertNil(appState.pendingExternalTexts[location.fileURL])
+        XCTAssertNil(appState.externalChangePrompt)
+    }
+
     func testStandaloneCachedAndRetiredSessionsDoNotCrossReplacementParentAuthority() throws {
         for source in ["cached", "retired"] {
             let parent = try makeTemporaryDirectory()
@@ -4906,6 +5098,62 @@ final class AppStateTests: XCTestCase {
             ]
         )
         XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "local edits")
+    }
+
+    func testKeepMineRebasesSavedTextToFreshCanonicalEquivalentC() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: "post.md")
+        let diskA = "cafe\u{0301}"
+        let diskC = "caf\u{00E9}"
+        XCTAssertTrue(diskA == diskC)
+        XCTAssertFalse(ExactSourceText.matches(diskA, diskC))
+        try writeText(diskA, to: location.fileURL)
+        let loadedA = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(
+            text: loadedA.file.text,
+            url: location.fileURL,
+            fileKind: .markdown,
+            isDirty: false
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        defer { appState.autosaveTask?.cancel() }
+        appState.sessionCache[location.fileURL] = session
+        _ = appState.sessionPolicy.access(location.fileURL, isDirty: false)
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
+            AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: loadedA.metadata.identity,
+                sha256Digest: loadedA.sha256Digest
+            )
+        let localText = "local edits"
+        appState.replaceDocumentText(localText)
+
+        try writeText("disk B", to: location.fileURL)
+        appState.handleExternalChange(for: session)
+        try writeText(diskC, to: location.fileURL)
+
+        appState.keepMineForExternallyChangedFile()
+        appState.autosaveTask?.cancel()
+
+        XCTAssertTrue(ExactSourceText.matches(session.text, localText))
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: location.fileURL), true)
+        XCTAssertEqual(try Data(contentsOf: location.fileURL), Data(diskC.utf8))
+
+        appState.replaceDocumentText(diskC)
+
+        XCTAssertTrue(ExactSourceText.matches(session.text, diskC))
+        XCTAssertFalse(session.isDirty)
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: location.fileURL), false)
+
+        appState.replaceDocumentText(diskA)
+
+        XCTAssertTrue(ExactSourceText.matches(session.text, diskA))
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.sessionPolicy.dirtyState(for: location.fileURL), true)
+        XCTAssertEqual(try Data(contentsOf: location.fileURL), Data(diskC.utf8))
     }
 
     func testWorkspaceReloadKeepsLatestSnapshotWhenOlderScanFinishesLast() async throws {

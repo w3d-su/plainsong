@@ -285,8 +285,16 @@ rewrite, enters conflict handling, cancels autosave, and retains the old proof u
 Reload or Keep Mine obtains and adopts a fresh observation. Cmd-S/autosave therefore cannot
 overwrite those external bytes before resolution. Keep Mine accepts the newest fresh observation
 (C even if the original prompt described B), clears matching detached and missing-file fences, and
-restores save eligibility for both anchored and standalone delete/recreate sessions. If a clean
-quarantined session's local source differs byte-for-byte from the observation, Keep Mine marks the
+atomically establishes C as the saved-text baseline without replacing or publishing the current
+editor source. Returning the editor to exact C is therefore clean, while returning it to old A
+remains dirty. A detached cached or reusable retired session reopened after switching to another
+file is admitted through its retained authority checks and into this arbitration, so a recreated
+leaf can present Reload/Keep Mine; activation itself neither clears the detached fence nor adopts C. Explicit
+resolution is required even if the leaf was restored with A's exact identity, digest, and bytes,
+because the missing-file transition invalidated the session's saved baseline and save fence. A
+successful resolution restores save eligibility for both anchored and standalone delete/recreate
+sessions. If a clean quarantined session's local source differs byte-for-byte from the observation,
+Keep Mine marks the
 session and its LRU record dirty before autosave scheduling rather than exposing a false clean
 state. A stateful retained A session (pending conflict,
 detachment, or indeterminate context) blocks a replacement-parent B at the same lexical URL, so B
@@ -349,7 +357,10 @@ timing sleeps—to cover:
 - dirty-overlay collection after root A is moved and replacement B takes its spelling, proving a
   cached session still bound to A cannot inject its dirty text into B's search request;
 - synthetic NFC/NFD snapshot candidates, overlays, and nested ignore files, proving normalized
-  paths remain distinct UTF-8 keys and no spelling suppresses or supplies another's overlay;
+  paths remain distinct UTF-8 keys, literal ignore rules do not canonical-equate spellings, and no
+  spelling suppresses or supplies another's overlay;
+- completion current-file exclusion and ordering at the bounded sibling-read limit, proving a
+  byte-distinct NFC/NFD sibling remains eligible and the first 50 reads are byte-deterministic;
 - NFC/NFD directory pairs in the file tree, proving grouping, default-filter ancestors, fallback
   IDs, and expansion state remain distinct even without resource identities;
 - a nested original-root symlink that also lies below the canonical root, proving relative-path
@@ -385,9 +396,14 @@ timing sleeps—to cover:
 - clean-session quarantine through LRU eviction, editor retirement/metadata cleanup, missing-file
   close, workspace close, and workspace switch, plus unlinked/replaced unanchored retirement,
   proving reconciliation context and captured membership outlive every lifecycle exit;
-- anchored and standalone delete/recreate Keep Mine resolution, proving detached/missing fences
-  clear and Cmd-S/autosave resume, plus a clean quarantine whose local and observed Unicode
-  spellings are canonically equivalent but byte-distinct, proving the session/LRU becomes dirty;
+- anchored and standalone delete/recreate recovery after switching to another file, proving the
+  original cached session reaches arbitration with its detached fence intact even when A's exact
+  identity/digest is restored, then Keep Mine clears matching fences and resumes Cmd-S/autosave;
+- reusable retired anchored and standalone same-proof restoration, proving activation cannot clear
+  detachment before arbitration and Reload remains required before save/autosave resumes;
+- Keep Mine rebaselining from A to fresh C without changing local editor text, proving exact C
+  becomes clean while byte-distinct, canonically equivalent A remains dirty, plus a clean
+  quarantine whose local/observed Unicode spellings make the session/LRU dirty;
 - async authority capture cancellation that releases a live descriptor-backed authority;
 - post-capture root moved/symlink-replaced/directory-replaced normalized to `namespaceChanged`;
 - complete returned-metadata equality for existing replacement and missing creation;

@@ -266,6 +266,9 @@ deduplication, ignore-file ancestor enumeration, and deterministic path ordering
 byte-exact key. An anchored dirty session is eligible only when its retained
 root authority equals the installed authority used for the request; moving root A and placing B
 at the old spelling cannot inject a cached A session's dirty text into B's search.
+Completion metadata uses that byte key for current-file exclusion and ordering before the bounded
+50-sibling frontmatter read. A canonically equivalent but byte-distinct sibling therefore remains
+eligible, and snapshot insertion order cannot choose which siblings fall inside the read cap.
 
 Workspace document identity keeps one physical-target policy. Initial in-root aliases are
 resolved and containment-checked during candidate planning, then expressed as one canonical
@@ -343,7 +346,9 @@ rather than being read.
 Rules support blank lines, `#` comments, leading `/` rooted patterns, trailing `/`
 directory-only patterns, `*`, `?`, `**`, `!` negation, nested base directories, and
 last-matching-rule-wins behavior. `*` and `?` never span `/`; `**` spans zero or more path
-components. This is deliberately not complete Git ignore compatibility: bracket classes,
+components. Literal pattern characters match only identical UTF-8 bytes; Swift's canonical
+equivalence therefore cannot make an NFC ignore rule suppress an NFD candidate (or vice versa).
+This is deliberately not complete Git ignore compatibility: bracket classes,
 backslash escaping, global/exclude files, and Git's traversal rule that prevents a child from
 being re-included beneath an ignored parent are unsupported. Because WS2 filters an immutable
 snapshot rather than pruning a filesystem walk, a later negation may re-include a child.
@@ -448,8 +453,17 @@ clean; Keep Mine performs and adopts a fresh observation, accepts the latest obs
 (for example C after an earlier B prompt), clears matching conflict, detached, and missing-file
 fences, and restores save/autosave eligibility. If a clean quarantined session's local source
 differs byte-for-byte from that observation, Keep Mine marks both the session and its LRU record
-dirty before scheduling autosave, so the UI cannot claim a false clean state. Binding
-registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
+dirty before scheduling autosave, so the UI cannot claim a false clean state. The accepted
+observation also becomes the session's saved-text baseline without replacing or publishing the
+current editor text: editing back to C becomes clean, while editing back to pre-conflict A remains
+dirty. If a detached cached or reusable retired session is reopened after the user switched to
+another file, activation retains its old authority/proof and routes the recreated leaf through
+this same arbitration; it does not reject the session before Reload/Keep Mine can be offered, and
+the detached fence remains until one of those explicit resolutions succeeds. This arbitration is
+required even when the restored leaf has the same descriptor identity, digest, and bytes as A,
+because detachment invalidated the session's saved baseline.
+
+Binding registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
@@ -617,10 +631,10 @@ pending.
 
 | Target | Hard CI coverage |
 |---|---|
-| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; byte-distinct NFC/NFD synthetic candidates, overlays, ignore ancestors, file-tree grouping/filtering/fallback IDs, and longest matching root spelling; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
+| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; saved-baseline rebasing with exact-byte dirty state |
+| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; byte-distinct NFC/NFD synthetic candidates, overlays, ignore ancestors/literals, file-tree grouping/filtering/fallback IDs, completion current-file exclusion/50-read ordering, and longest matching root spelling; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; anchored and standalone delete/recreate Keep Mine detached-fence recovery; clean-quarantine Keep Mine exact-byte dirty/LRU restoration; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; anchored and standalone cached delete/switch/same-proof restore activation plus Keep Mine detached-fence recovery; reusable retired anchored/standalone same-proof restore arbitration; fresh-C saved-baseline byte-exact dirty transitions; clean-quarantine Keep Mine exact-byte dirty/LRU restoration; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

@@ -191,7 +191,9 @@ extension AppState {
 
     /// Decides whether a coherent observation is acceptable before any caller adopts a new
     /// anchored binding or unanchored identity/SHA proof. FNV and mtime remain bookkeeping only;
-    /// they cannot make a changed disk version writable.
+    /// they cannot make a changed disk version writable. A detached session still requires an
+    /// explicit Reload/Keep Mine even when a restored leaf has the same identity and bytes: the
+    /// missing-file transition intentionally invalidated its saved-text baseline and save fence.
     @discardableResult
     func reconcileObservedRetainedFileVersion(
         _ observation: ObservedRetainedFileVersion,
@@ -201,8 +203,10 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         let hasPendingConflict = pendingExternalTexts[canonicalURL] != nil
             || pendingExternalFileVersions[canonicalURL] != nil
+        let isDetached = detachedSessionURLs.contains(canonicalURL)
         let changed = observedRetainedFileVersionDiffers(observation, for: session)
         guard !hasPendingConflict,
+              !isDetached,
               indeterminateSessionWrites[sessionIdentity] == nil,
               !changed || !session.isDirty
         else {
