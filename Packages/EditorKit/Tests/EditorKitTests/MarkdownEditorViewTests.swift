@@ -82,7 +82,6 @@ final class MarkdownEditorViewTests: XCTestCase {
 
     func testHighlightRequestFallsBackToSelectionWindowWhenViewportIsEmpty() {
         let range = MarkdownEditorView.highlightRequestRange(
-            textLength: 50000,
             visibleRange: NSRange(location: 0, length: 0),
             selection: NSRange(location: 20000, length: 0)
         )

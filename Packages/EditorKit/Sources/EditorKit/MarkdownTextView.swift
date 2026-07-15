@@ -22,6 +22,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
     private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
+    private let documentSourceContract: EditorDocumentSourceContract?
     private let navigationCommand: EditorNavigationCommand?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
@@ -44,6 +45,7 @@ struct MarkdownTextView: NSViewRepresentable {
         documentIdentity: EditorDocumentIdentity? = nil,
         documentBindingID: EditorDocumentBindingID? = nil,
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
+        documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
@@ -65,6 +67,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.documentIdentity = documentIdentity
         self.documentBindingID = documentBindingID
         self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
+        self.documentSourceContract = documentSourceContract
         self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
@@ -114,6 +117,9 @@ struct MarkdownTextView: NSViewRepresentable {
         let installation = context.coordinator.finishDocumentTransition(candidate, in: textView)
         context.coordinator.attachFocusHandler(to: textView)
         if installation != nil {
+            // Keep initial construction behavior distinct from representable updates:
+            // deferred retries use the update completion path below, while first render
+            // must not introduce a new styling or selection pass.
             updateNonDocumentCoordinatorInputs(context.coordinator, for: textView)
             applyWYSIWYGMechanismState(to: textView)
             updateImageThumbnailConfiguration(context.coordinator, for: textView)
@@ -144,52 +150,16 @@ struct MarkdownTextView: NSViewRepresentable {
         let candidate = prepareCoordinatorInputs(coordinator, for: textView)
         coordinator.attachFocusHandler(to: textView)
 
-        applyIncomingTextIfNeeded(candidate.sourceText, to: textView, coordinator: coordinator)
+        applyIncomingTextIfNeeded(candidate, to: textView, coordinator: coordinator)
 
         let installation = coordinator.finishDocumentTransition(candidate, in: textView)
 
         if installation != nil {
-            updateNonDocumentCoordinatorInputs(coordinator, for: textView)
-            coordinator.attachPasteAndDragHandlers(to: textView)
-            coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
-            applyWYSIWYGMechanismState(to: textView)
-            updateImageThumbnailConfiguration(coordinator, for: textView)
-            coordinator.focusIfNeeded(focusRequestID, textView: textView)
-            let didApplyStyledText = applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
-            if didApplyStyledText, let styledText {
-                // Markers are preserved across highlight setAttributes; only force a rewrite
-                // when the plan/outcomes change (handled inside the presentation controller).
-                coordinator.applyImageThumbnailPresentation(
-                    foldPlan: styledText.foldPlan,
-                    in: textView,
-                    forceReapply: false
-                )
-            }
-
-            let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
-                !textView.hasMarkedText()
-                    && textView.textSelection != proposedSelection
-            } ?? false
-
-            if shouldApplySelection, let selection = candidate.requestedSelection {
-                let textLength = Self.textStorage(of: textView)?.length ?? 0
-                textView.textSelection = selection.clamped(toLength: textLength)
-            }
-
-            if textView.isEditable != isEnabled {
-                textView.isEditable = isEnabled
-            }
-            if textView.isSelectable != isEnabled {
-                textView.isSelectable = isEnabled
-            }
-            if textView.showsLineNumbers != showsLineNumbers {
-                textView.showsLineNumbers = showsLineNumbers
-            }
-            if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
-                textView.font = font
-                textView.gutterView?.font = font
-            }
-            coordinator.applyPendingNavigationIfPossible(in: textView)
+            completeDocumentInstallation(
+                candidate,
+                in: textView,
+                coordinator: coordinator
+            )
         }
         coordinator.isUserEditing = false
         // No unconditional needsLayout/needsDisplay here: forcing a relayout pass on
@@ -198,39 +168,105 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     private func applyIncomingTextIfNeeded(
-        _ incomingText: String,
+        _ candidate: EditorDocumentTransitionCandidate,
         to textView: MarkdownSTTextView,
         coordinator: Coordinator
     ) {
-        let policy = MarkdownTextViewUpdatePolicy(
-            isUserEditing: coordinator.isUserEditing,
-            hasMarkedText: textView.hasMarkedText(),
-            incomingTextEqualsCurrentText: Self.plainTextMatches(textView, incomingText)
-        )
-        guard policy.shouldApplyIncomingText else {
+        guard !coordinator.canProveCurrentInstalledSource(for: candidate),
+              !coordinator.isUserEditing,
+              !textView.hasMarkedText()
+        else {
+            return
+        }
+
+        guard !coordinator.nativeTextMatches(
+            textView,
+            candidate.sourceText,
+            recordingFor: candidate
+        ) else {
             return
         }
 
         coordinator.isUpdating = true
         let currentSelection = textView.selectedRange()
-        textView.text = incomingText
-        textView.textSelection = currentSelection.clamped(toLength: (incomingText as NSString).length)
+        textView.text = candidate.sourceText
+        textView.textSelection = currentSelection.clamped(
+            toLength: (candidate.sourceText as NSString).length
+        )
         coordinator.isUpdating = false
+        coordinator.notePreparedNativeSource(candidate)
     }
 
     private func prepareCoordinatorInputs(
         _ coordinator: Coordinator,
         for textView: MarkdownSTTextView
     ) -> EditorDocumentTransitionCandidate {
-        coordinator.prepareDocumentTransition(
+        coordinator.setDeferredDocumentTransitionInstallationHandler { [self] coordinator, candidate, textView in
+            completeDocumentInstallation(
+                candidate,
+                in: textView,
+                coordinator: coordinator
+            )
+        }
+        return coordinator.prepareDocumentTransition(
             text: $text,
             selection: $selection,
             documentIdentity: documentIdentity,
             documentBindingID: documentBindingID,
             onDocumentBindingLifecycle: onDocumentBindingLifecycle,
+            documentSourceContract: documentSourceContract,
             navigationCommand: navigationCommand,
             in: textView
         )
+    }
+
+    private func completeDocumentInstallation(
+        _ candidate: EditorDocumentTransitionCandidate,
+        in textView: MarkdownSTTextView,
+        coordinator: Coordinator
+    ) {
+        updateNonDocumentCoordinatorInputs(coordinator, for: textView)
+        coordinator.attachPasteAndDragHandlers(to: textView)
+        coordinator.attachVisibleRangeReporter(onVisibleRangeChange, to: textView)
+        applyWYSIWYGMechanismState(to: textView)
+        updateImageThumbnailConfiguration(coordinator, for: textView)
+        coordinator.focusIfNeeded(focusRequestID, textView: textView)
+        let didApplyStyledText = applyStyledTextIfNeeded(to: textView, coordinator: coordinator)
+        if didApplyStyledText, let styledText {
+            // Markers are preserved across highlight setAttributes; only force a rewrite
+            // when the plan/outcomes change (handled inside the presentation controller).
+            coordinator.applyImageThumbnailPresentation(
+                foldPlan: styledText.foldPlan,
+                in: textView,
+                forceReapply: false
+            )
+        }
+
+        let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
+            !textView.hasMarkedText()
+                && textView.textSelection != proposedSelection
+        } ?? false
+
+        if shouldApplySelection, let selection = candidate.requestedSelection {
+            let textLength = Self.textStorage(of: textView)?.length ?? 0
+            textView.textSelection = selection.clamped(toLength: textLength)
+        }
+
+        if textView.isEditable != isEnabled {
+            textView.isEditable = isEnabled
+        }
+        if textView.isSelectable != isEnabled {
+            textView.isSelectable = isEnabled
+        }
+        if textView.showsLineNumbers != showsLineNumbers {
+            textView.showsLineNumbers = showsLineNumbers
+        }
+        if textView.font.fontName != font.fontName || textView.font.pointSize != font.pointSize {
+            textView.font = font
+            textView.gutterView?.font = font
+        }
+        coordinator.applyPendingNavigationIfPossible(in: textView)
+        coordinator.isUserEditing = false
     }
 
     private func updateNonDocumentCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
@@ -259,6 +295,7 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()
         coordinator.cancelPendingNavigationTasks()
+        coordinator.detachDeferredDocumentTransitionInstallationHandler()
         coordinator.revokeInstalledDocumentBinding()
         coordinator.detachImageThumbnailPresentation(from: textView)
         textView.textDelegate = nil

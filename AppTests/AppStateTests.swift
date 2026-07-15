@@ -1142,11 +1142,12 @@ final class AppStateTests: XCTestCase {
         let bindingA = try XCTUnwrap(appState.anchoredSessionFileBinding(for: sessionA))
         let retiredBindingID = EditorDocumentBindingID()
         appState.sessionCache[post] = nil
-        appState.retiredEditorDocumentBindings[retiredBindingID] = RetiredEditorDocumentBinding(
-            id: retiredBindingID,
+        appState.retiredEditorDocumentSessions[post] = RetiredEditorDocumentSession(
+            canonicalURL: post,
             session: sessionA,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: false
+            bindingIDs: [retiredBindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
         let unrelatedSession = DocumentSession(
             text: "unrelated",
@@ -1175,7 +1176,7 @@ final class AppStateTests: XCTestCase {
         }
 
         XCTAssertTrue(appState.currentDocument === unrelatedSession)
-        XCTAssertTrue(appState.retiredEditorDocumentBindings[retiredBindingID]?.session === sessionA)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[post]?.session === sessionA)
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: sessionA), bindingA)
         XCTAssertEqual(try String(contentsOf: post, encoding: .utf8), "disk B")
     }
@@ -1526,7 +1527,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(session.isDirty)
     }
 
-    func testOrdinaryStandaloneNFCSaveCopyRetainsExactLocationAndRejectsNFDAlternative() throws {
+    func testOrdinaryStandaloneNFCSaveCopyRetainsExactLocationAndRejectsNFDAlternative() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -1541,6 +1542,11 @@ final class AppStateTests: XCTestCase {
 
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.openExternalFile(nfcLocation.fileURL)
+        try await waitUntil("ordinary standalone NFC file opens") {
+            appState.currentDocument.fileURL?.path(percentEncoded: false).utf8.elementsEqual(
+                nfcLocation.fileURL.path(percentEncoded: false).utf8
+            ) == true
+        }
         let session = appState.currentDocument
         XCTAssertEqual(
             appState.sessionStateURL(for: session)?.path(percentEncoded: false).utf8.map(\.self),
@@ -1556,6 +1562,11 @@ final class AppStateTests: XCTestCase {
         appState.replaceDocumentText("local NFC edits")
         try FileManager.default.removeItem(at: nfcLocation.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("ordinary standalone NFC file detaches at the exact spelling") {
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.elementsEqual(
+                nfcLocation.fileURL.path(percentEncoded: false).utf8
+            ) == true
+        }
         XCTAssertEqual(
             appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
             nfcLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
@@ -1674,6 +1685,11 @@ final class AppStateTests: XCTestCase {
         appState.replaceDocumentText("local anchored NFC edits", in: session)
         try FileManager.default.removeItem(at: retainedLocation.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("ordinary anchored NFC file detaches at the exact spelling") {
+            appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.elementsEqual(
+                retainedLocation.fileURL.path(percentEncoded: false).utf8
+            ) == true
+        }
         XCTAssertEqual(
             appState.missingFilePrompt?.fileURL.path(percentEncoded: false).utf8.map(\.self),
             retainedLocation.fileURL.path(percentEncoded: false).utf8.map(\.self)
@@ -2000,12 +2016,12 @@ final class AppStateTests: XCTestCase {
                 appState.sessionCache[ownedURL] = ownedSession
                 appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
             case .retired:
-                let bindingID = EditorDocumentBindingID()
-                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-                    id: bindingID,
+                appState.retiredEditorDocumentSessions[ownedURL] = RetiredEditorDocumentSession(
+                    canonicalURL: ownedURL,
                     session: ownedSession,
-                    securityScopedAuthority: nil,
-                    isAwaitingBindingEnd: true
+                    bindingIDs: [],
+                    awaitingInstallations: [],
+                    securityScopedAuthorityOwners: []
                 )
                 appState.anchoredSessionFileBindings[ownedIdentity] = ownedBinding
             case .editorBound:
@@ -2195,7 +2211,7 @@ final class AppStateTests: XCTestCase {
         appState.detachedSessionURLs.insert(missingURL)
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: missingURL)
         appState.pendingExternalTexts[otherURL] = "pending B"
-        appState.lastKnownDiskHashes[otherURL] = 42
+        appState.lastKnownDiskHashes[otherURL] = "known B"
         appState.detachedSessionURLs.insert(otherURL)
         try FileManager.default.createSymbolicLink(at: missingURL, withDestinationURL: otherURL)
 
@@ -2210,7 +2226,7 @@ final class AppStateTests: XCTestCase {
         )
         XCTAssertTrue(appState.sessionCache[otherURL] === otherSession)
         XCTAssertEqual(appState.pendingExternalTexts[otherURL], "pending B")
-        XCTAssertEqual(appState.lastKnownDiskHashes[otherURL], 42)
+        XCTAssertEqual(appState.lastKnownDiskHashes[otherURL], "known B")
         XCTAssertTrue(appState.detachedSessionURLs.contains(otherURL))
     }
 
@@ -2360,12 +2376,13 @@ final class AppStateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         fixture.appState.sessionCache[fixture.ownedURL] = nil
         let retiredBindingID = EditorDocumentBindingID()
-        fixture.appState.retiredEditorDocumentBindings[retiredBindingID] =
-            RetiredEditorDocumentBinding(
-                id: retiredBindingID,
+        fixture.appState.retiredEditorDocumentSessions[fixture.ownedURL] =
+            RetiredEditorDocumentSession(
+                canonicalURL: fixture.ownedURL,
                 session: fixture.ownedSession,
-                securityScopedAuthority: nil,
-                isAwaitingBindingEnd: true
+                bindingIDs: [retiredBindingID],
+                awaitingInstallations: [],
+                securityScopedAuthorityOwners: []
             )
 
         XCTAssertThrowsError(
@@ -2374,7 +2391,7 @@ final class AppStateTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: fixture.ownedURL, encoding: .utf8), "owned disk")
         XCTAssertTrue(
-            fixture.appState.retiredEditorDocumentBindings[retiredBindingID]?.session
+            fixture.appState.retiredEditorDocumentSessions[fixture.ownedURL]?.session
                 === fixture.ownedSession
         )
         XCTAssertTrue(fixture.appState.currentDocument === fixture.missingSession)
@@ -2434,18 +2451,19 @@ final class AppStateTests: XCTestCase {
             isDirty: true
         )
         let bindingID = EditorDocumentBindingID()
-        fixture.appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-            id: bindingID,
+        fixture.appState.retiredEditorDocumentSessions[ownedURL] = RetiredEditorDocumentSession(
+            canonicalURL: ownedURL,
             session: ownedSession,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: true
+            bindingIDs: [bindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
 
         XCTAssertThrowsError(try fixture.appState.saveDetachedCurrentDocument(to: outsideAlias))
 
         XCTAssertEqual(try String(contentsOf: ownedURL, encoding: .utf8), "retired sentinel")
         XCTAssertTrue(
-            fixture.appState.retiredEditorDocumentBindings[bindingID]?.session === ownedSession
+            fixture.appState.retiredEditorDocumentSessions[ownedURL]?.session === ownedSession
         )
     }
 
@@ -2542,12 +2560,13 @@ final class AppStateTests: XCTestCase {
                 fixture.appState.sessionCache[standaloneURL] = ownedSession
             case "retired":
                 let bindingID = EditorDocumentBindingID()
-                fixture.appState.retiredEditorDocumentBindings[bindingID] =
-                    RetiredEditorDocumentBinding(
-                        id: bindingID,
+                fixture.appState.retiredEditorDocumentSessions[standaloneURL] =
+                    RetiredEditorDocumentSession(
+                        canonicalURL: standaloneURL,
                         session: ownedSession,
-                        securityScopedAuthority: nil,
-                        isAwaitingBindingEnd: true
+                        bindingIDs: [bindingID],
+                        awaitingInstallations: [],
+                        securityScopedAuthorityOwners: []
                     )
             default:
                 let bindingID = EditorDocumentBindingID()
@@ -3022,7 +3041,7 @@ final class AppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testIndeterminateSaveCopyRehomesReadableDestinationAndBlocksBlindRetry() throws {
+    func testIndeterminateSaveCopyRehomesReadableDestinationAndBlocksBlindRetry() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let sourceURL = root.appendingPathComponent("missing.md").standardizedFileURL
@@ -3095,6 +3114,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(saveAttempts, 1, "a readable indeterminate destination must not be overwritten")
 
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine clears the readable Save Copy quarantine") {
+            appState.indeterminateSessionWrites[ObjectIdentifier(session)] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
         appState.autosaveTask?.cancel()
         XCTAssertNil(appState.indeterminateSessionWrites[ObjectIdentifier(session)])
         XCTAssertTrue(appState.canSave)
@@ -3168,8 +3191,8 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(appState.currentDocument.isDirty)
     }
 
-    func testIndeterminateSaveCopyExposesSymlinkReconciliationUntilExactLocationIsReadable() throws {
-        try assertUnavailableIndeterminateSaveCopyReconciliation(state: .symbolicLink) { destination in
+    func testIndeterminateSaveCopyExposesSymlinkReconciliationUntilExactLocationIsReadable() async throws {
+        try await assertUnavailableIndeterminateSaveCopyReconciliation(state: .symbolicLink) { destination in
             let target = destination.deletingLastPathComponent().appendingPathComponent("target.md")
             try self.writeText("symlink target", to: target)
             try FileManager.default.createSymbolicLink(at: destination, withDestinationURL: target)
@@ -3179,8 +3202,8 @@ final class AppStateTests: XCTestCase {
         }
     }
 
-    func testIndeterminateSaveCopyExposesNonRegularReconciliationUntilExactLocationIsReadable() throws {
-        try assertUnavailableIndeterminateSaveCopyReconciliation(state: .notRegularFile) { destination in
+    func testIndeterminateSaveCopyExposesNonRegularReconciliationUntilExactLocationIsReadable() async throws {
+        try await assertUnavailableIndeterminateSaveCopyReconciliation(state: .notRegularFile) { destination in
             try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
         } repair: { destination in
             try FileManager.default.removeItem(at: destination)
@@ -3188,8 +3211,8 @@ final class AppStateTests: XCTestCase {
         }
     }
 
-    func testIndeterminateSaveCopyExposesUnreadableReconciliationUntilExactLocationIsReadable() throws {
-        try assertUnavailableIndeterminateSaveCopyReconciliation(state: .unreadable) { destination in
+    func testIndeterminateSaveCopyExposesUnreadableReconciliationUntilExactLocationIsReadable() async throws {
+        try await assertUnavailableIndeterminateSaveCopyReconciliation(state: .unreadable) { destination in
             try self.writeText("unreadable disk", to: destination)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0],
@@ -3851,7 +3874,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: destinationURL.path))
     }
 
-    func testIndeterminateAnchoredSaveBlocksBlindRetryUntilExplicitReconciliation() throws {
+    func testIndeterminateAnchoredSaveBlocksBlindRetryUntilExplicitReconciliation() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
@@ -3900,6 +3923,10 @@ final class AppStateTests: XCTestCase {
         appState.handleExternalChange(for: session)
         XCTAssertEqual(appState.pendingExternalTexts[post], "disk A")
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine clears the indeterminate anchored write") {
+            appState.indeterminateSessionWrites[ObjectIdentifier(session)] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
         appState.autosaveTask?.cancel()
         appState.anchoredFileSaveOverride = nil
         XCTAssertNil(appState.indeterminateSessionWrites[ObjectIdentifier(session)])
@@ -3907,7 +3934,7 @@ final class AppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testKeepMineMarksCleanQuarantineDirtyWhenCanonicalEquivalentDiskBytesDiffer() throws {
+    func testKeepMineMarksCleanQuarantineDirtyWhenCanonicalEquivalentDiskBytesDiffer() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let localText = "caf\u{00E9}"
@@ -3955,6 +3982,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(ExactSourceText.matches(pendingText, diskText))
 
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine resolves the clean quarantine") {
+            appState.indeterminateSessionWrites[sessionIdentity] == nil &&
+                appState.externalReloadTasks[sessionIdentity] == nil
+        }
 
         XCTAssertTrue(session.isDirty)
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: post), true)
@@ -4042,6 +4073,10 @@ final class AppStateTests: XCTestCase {
         try FileManager.default.removeItem(at: post)
         appState.refreshWorkspaceAfterFileSystemChange()
 
+        try await waitUntil("deleted file detaches") {
+            appState.missingFilePrompt?.fileURL.standardizedFileURL == post.standardizedFileURL &&
+                !appState.canSave
+        }
         XCTAssertEqual(appState.missingFilePrompt?.fileURL.standardizedFileURL, post.standardizedFileURL)
         XCTAssertFalse(appState.canSave)
 
@@ -4050,7 +4085,7 @@ final class AppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testAnchoredDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
+    func testAnchoredDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
@@ -4087,6 +4122,9 @@ final class AppStateTests: XCTestCase {
 
         try FileManager.default.moveItem(at: post, to: parkedPostURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("anchored missing file detaches") {
+            appState.detachedSessionURLs.contains(post)
+        }
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, post)
 
@@ -4098,6 +4136,9 @@ final class AppStateTests: XCTestCase {
 
         try FileManager.default.moveItem(at: parkedPostURL, to: post)
         try appState.activateAnchoredFileSession(at: location)
+        try await waitUntil("anchored reactivation publishes the restored disk conflict") {
+            appState.pendingExternalTexts[post] == "disk A"
+        }
 
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertTrue(appState.sessionCache[post] === session)
@@ -4115,6 +4156,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
 
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("anchored Keep Mine clears the detached fence") {
+            !appState.detachedSessionURLs.contains(post) &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertFalse(appState.detachedSessionURLs.contains(post))
         XCTAssertNil(appState.pendingExternalTexts[post])
@@ -4129,7 +4174,7 @@ final class AppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testStandaloneDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() throws {
+    func testStandaloneDeleteSwitchRecreateKeepMineClearsDetachedFenceAndRestoresSaving() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let initialPostURL = root.appendingPathComponent("post.md").standardizedFileURL
@@ -4164,6 +4209,9 @@ final class AppStateTests: XCTestCase {
 
         try FileManager.default.moveItem(at: post, to: parkedPostURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("standalone missing file detaches") {
+            appState.detachedSessionURLs.contains(post)
+        }
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
         XCTAssertEqual(appState.missingFilePrompt?.fileURL, post)
 
@@ -4175,6 +4223,9 @@ final class AppStateTests: XCTestCase {
 
         try FileManager.default.moveItem(at: parkedPostURL, to: post)
         try appState.activateFileSession(url: post)
+        try await waitUntil("standalone reactivation publishes the restored disk conflict") {
+            appState.pendingExternalTexts[post] == "disk A"
+        }
 
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertTrue(appState.sessionCache[post] === session)
@@ -4192,6 +4243,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(appState.detachedSessionURLs.contains(post))
 
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("standalone Keep Mine clears the detached fence") {
+            !appState.detachedSessionURLs.contains(post) &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertFalse(appState.detachedSessionURLs.contains(post))
         XCTAssertNil(appState.pendingExternalTexts[post])
@@ -4208,7 +4263,7 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testUnanchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+    func testUnanchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() async throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let post = directory.appendingPathComponent("post.md")
@@ -4217,6 +4272,9 @@ final class AppStateTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
 
         appState.openExternalFile(post)
+        try await waitUntil("standalone same-inode source opens") {
+            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
         let session = appState.currentDocument
         guard case let .proven(originalProof)? =
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
@@ -4237,6 +4295,9 @@ final class AppStateTests: XCTestCase {
         assertModificationTime(rewrittenStatus, matches: originalStatus)
 
         appState.handleExternalChange(for: session)
+        try await waitUntil("same-inode rewrite publishes a conflict") {
+            appState.externalChangePrompt?.fileURL.standardizedFileURL == post.standardizedFileURL
+        }
 
         let promptURL = try XCTUnwrap(appState.externalChangePrompt?.fileURL)
         XCTAssertEqual(promptURL.standardizedFileURL, post.standardizedFileURL)
@@ -4258,7 +4319,7 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testUnanchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+    func testUnanchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() async throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let post = directory.appendingPathComponent("post.md")
@@ -4267,6 +4328,9 @@ final class AppStateTests: XCTestCase {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
 
         appState.openExternalFile(post)
+        try await waitUntil("standalone replacement source opens") {
+            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
         let session = appState.currentDocument
         guard case let .proven(originalProof)? =
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
@@ -4284,6 +4348,9 @@ final class AppStateTests: XCTestCase {
         assertModificationTime(replacementStatus, matches: originalStatus)
 
         appState.handleExternalChange(for: session)
+        try await waitUntil("replacement inode publishes a conflict") {
+            appState.externalChangePrompt?.fileURL.standardizedFileURL == post.standardizedFileURL
+        }
 
         let promptURL = try XCTUnwrap(appState.externalChangePrompt?.fileURL)
         XCTAssertEqual(promptURL.standardizedFileURL, post.standardizedFileURL)
@@ -4305,7 +4372,7 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testCachedStandaloneActivationArbitratesThroughItsRetainedProof() throws {
+    func testCachedStandaloneActivationArbitratesThroughItsRetainedProof() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let sourceURL = root.appendingPathComponent("post.md")
@@ -4342,6 +4409,9 @@ final class AppStateTests: XCTestCase {
 
         try writeText("disk B", to: location.fileURL)
         try appState.activateFileSession(url: location.fileURL)
+        try await waitUntil("cached standalone activation publishes its conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "disk B"
+        }
 
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
@@ -4354,7 +4424,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "disk B")
     }
 
-    func testAnchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+    func testAnchoredSameInodeRewriteWithPreservedMtimeEntersConflictAndBlocksOverwrite() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -4392,6 +4462,9 @@ final class AppStateTests: XCTestCase {
         assertModificationTime(rewrittenStatus, matches: originalStatus)
 
         appState.handleExternalChange(for: session)
+        try await waitUntil("anchored same-inode rewrite publishes a conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "Changed anchored, same inode"
+        }
 
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "Changed anchored, same inode")
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
@@ -4402,7 +4475,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "Changed anchored, same inode")
     }
 
-    func testAnchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() throws {
+    func testAnchoredReplacementInodeWithPreservedMtimeEntersConflictAndBlocksOverwrite() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -4441,6 +4514,9 @@ final class AppStateTests: XCTestCase {
         assertModificationTime(replacementStatus, matches: originalStatus)
 
         appState.handleExternalChange(for: session)
+        try await waitUntil("anchored replacement inode publishes a conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "Changed anchored, replaced inode"
+        }
 
         XCTAssertEqual(
             appState.pendingExternalTexts[location.fileURL],
@@ -4457,13 +4533,16 @@ final class AppStateTests: XCTestCase {
         )
     }
 
-    func testStandaloneSaveDetectedExternalVersionEntersConflictBeforeOverwrite() throws {
+    func testStandaloneSaveDetectedExternalVersionEntersConflictBeforeOverwrite() async throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let post = directory.appendingPathComponent("post.md")
         try writeText("disk A", to: post)
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.openExternalFile(post)
+        try await waitUntil("standalone save-race source opens") {
+            appState.currentDocument.fileURL?.standardizedFileURL == post.standardizedFileURL
+        }
         let session = appState.currentDocument
         guard case let .proven(proofA)? =
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)]
@@ -4476,6 +4555,9 @@ final class AppStateTests: XCTestCase {
         try writeText("disk B", to: post)
 
         XCTAssertThrowsError(try appState.saveCurrentDocument())
+        try await waitUntil("standalone save race publishes a conflict") {
+            appState.pendingExternalTexts[proofA.location.fileURL] == "disk B"
+        }
         XCTAssertEqual(appState.pendingExternalTexts[proofA.location.fileURL], "disk B")
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
@@ -4490,7 +4572,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: post, encoding: .utf8), "disk B")
     }
 
-    func testAnchoredSaveDetectedExternalVersionEntersConflictBeforeOverwrite() throws {
+    func testAnchoredSaveDetectedExternalVersionEntersConflictBeforeOverwrite() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -4517,6 +4599,9 @@ final class AppStateTests: XCTestCase {
         try writeText("disk B", to: location.fileURL)
 
         XCTAssertThrowsError(try appState.saveCurrentDocument())
+        try await waitUntil("anchored save race publishes a conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "disk B"
+        }
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
         XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
@@ -4556,27 +4641,52 @@ final class AppStateTests: XCTestCase {
             appState.replaceDocumentText("local (source) edits", in: session)
 
             let retiredBindingID: EditorDocumentBindingID?
+            var staleInspectionTask: Task<Void, Never>?
             switch source {
             case "cached":
                 appState.sessionCache[location.fileURL] = session
                 retiredBindingID = nil
             case "retired":
                 let bindingID = EditorDocumentBindingID()
-                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-                    id: bindingID,
+                appState.retiredEditorDocumentSessions[location.fileURL] = RetiredEditorDocumentSession(
+                    canonicalURL: location.fileURL,
                     session: session,
-                    securityScopedAuthority: nil,
-                    isAwaitingBindingEnd: false
+                    bindingIDs: [bindingID],
+                    awaitingInstallations: [],
+                    securityScopedAuthorityOwners: []
                 )
                 retiredBindingID = bindingID
                 appState.setCurrentDocument(
                     DocumentSession(text: "other", fileKind: .markdown),
                     synchronizingWorkspaceTree: false
                 )
+                let task = Task {
+                    _ = try? await Task.sleep(nanoseconds: 60_000_000_000)
+                }
+                staleInspectionTask = task
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] =
+                    ExternalDiskInspectionTask(
+                        token: UUID(),
+                        session: session,
+                        canonicalURL: location.fileURL,
+                        location: location,
+                        lifecycleGeneration: appState.currentSessionLifecycleGeneration(
+                            for: session
+                        ),
+                        diskEventGeneration: appState.currentExternalDiskEventGeneration(
+                            for: session
+                        ),
+                        sourceSnapshot: EditorDocumentSourceSnapshot(
+                            source: session.text,
+                            revision: session.version
+                        ),
+                        task: task
+                    )
             default:
                 XCTFail("unexpected activation source")
                 continue
             }
+            defer { staleInspectionTask?.cancel() }
 
             try writeText("disk B (source)", to: location.fileURL)
             let observed = try MarkdownFileStore().loadResult(at: location)
@@ -4605,9 +4715,11 @@ final class AppStateTests: XCTestCase {
             XCTAssertFalse(appState.canAutosave(session: session))
             if let retiredBindingID {
                 XCTAssertNotNil(
-                    appState.retiredEditorDocumentBindings[retiredBindingID],
+                    appState.retiredEditorDocumentSessions[location.fileURL],
                     "a rejected retired activation must not drop its retained authority"
                 )
+                XCTAssertNil(appState.externalDiskInspectionTasks[ObjectIdentifier(session)])
+                XCTAssertEqual(staleInspectionTask?.isCancelled, true)
             }
             appState.flushAutosaveIfNeeded()
             XCTAssertThrowsError(try appState.save(session: session))
@@ -4616,7 +4728,7 @@ final class AppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testRetiredAnchoredDetachedActivationRequiresResolutionForSameObservedVersion() throws {
+    func testRetiredAnchoredDetachedActivationRequiresResolutionForSameObservedVersion() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let parkedURL = root.appendingPathComponent("post-parked.md").standardizedFileURL
@@ -4643,15 +4755,19 @@ final class AppStateTests: XCTestCase {
         )
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = originalBinding
         let bindingID = EditorDocumentBindingID()
-        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-            id: bindingID,
+        appState.retiredEditorDocumentSessions[location.fileURL] = RetiredEditorDocumentSession(
+            canonicalURL: location.fileURL,
             session: session,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: false
+            bindingIDs: [bindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
 
         try FileManager.default.moveItem(at: location.fileURL, to: parkedURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("retired anchored session detaches") {
+            appState.detachedSessionURLs.contains(location.fileURL)
+        }
         XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
 
         try FileManager.default.moveItem(at: parkedURL, to: location.fileURL)
@@ -4669,28 +4785,35 @@ final class AppStateTests: XCTestCase {
         }
 
         appState.commitAnchoredFileSessionActivation(activation)
+        try await waitUntil("retired anchored activation publishes a conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "disk A"
+        }
 
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk A")
         XCTAssertEqual(appState.externalChangePrompt?.fileURL, location.fileURL)
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
-        XCTAssertNotNil(appState.retiredEditorDocumentBindings[bindingID])
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[location.fileURL])
         XCTAssertFalse(appState.canAutosave(session: session))
         XCTAssertThrowsError(try appState.save(session: session))
 
         appState.reloadExternallyChangedFile()
+        try await waitUntil("retired anchored Reload converges") {
+            session.text == "disk A" &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertEqual(session.text, "disk A")
         XCTAssertFalse(session.isDirty)
         XCTAssertFalse(appState.detachedSessionURLs.contains(location.fileURL))
         XCTAssertNil(appState.pendingExternalTexts[location.fileURL])
         XCTAssertNil(appState.externalChangePrompt)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingID])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[location.fileURL])
     }
 
     // swiftlint:disable:next function_body_length
-    func testRetiredStandaloneDetachedActivationRequiresResolutionForSameObservedVersion() throws {
+    func testRetiredStandaloneDetachedActivationRequiresResolutionForSameObservedVersion() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let postURL = root.appendingPathComponent("post.md").standardizedFileURL
@@ -4720,15 +4843,19 @@ final class AppStateTests: XCTestCase {
             originalProof
         )
         let bindingID = EditorDocumentBindingID()
-        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-            id: bindingID,
+        appState.retiredEditorDocumentSessions[location.fileURL] = RetiredEditorDocumentSession(
+            canonicalURL: location.fileURL,
             session: session,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: false
+            bindingIDs: [bindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
 
         try FileManager.default.moveItem(at: location.fileURL, to: parkedURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("retired standalone session detaches") {
+            appState.detachedSessionURLs.contains(location.fileURL)
+        }
         XCTAssertTrue(appState.detachedSessionURLs.contains(location.fileURL))
 
         try FileManager.default.moveItem(at: parkedURL, to: location.fileURL)
@@ -4737,6 +4864,9 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(restored.sha256Digest, original.sha256Digest)
 
         try appState.activateFileSession(url: location.fileURL)
+        try await waitUntil("retired standalone activation publishes a conflict") {
+            appState.pendingExternalTexts[location.fileURL] == "disk A"
+        }
 
         XCTAssertTrue(appState.currentDocument === session)
         XCTAssertTrue(appState.sessionCache[location.fileURL] === session)
@@ -4747,11 +4877,15 @@ final class AppStateTests: XCTestCase {
             appState.unanchoredManagedSessionOwnershipProofs[ObjectIdentifier(session)],
             .proven(originalProof)
         )
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingID])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[location.fileURL])
         XCTAssertFalse(appState.canAutosave(session: session))
         XCTAssertThrowsError(try appState.save(session: session))
 
         appState.reloadExternallyChangedFile()
+        try await waitUntil("retired standalone Reload converges") {
+            session.text == "disk A" &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertEqual(session.text, "disk A")
         XCTAssertFalse(session.isDirty)
@@ -4797,11 +4931,12 @@ final class AppStateTests: XCTestCase {
                 retiredBindingID = nil
             case "retired":
                 let bindingID = EditorDocumentBindingID()
-                appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-                    id: bindingID,
+                appState.retiredEditorDocumentSessions[locationA.fileURL] = RetiredEditorDocumentSession(
+                    canonicalURL: locationA.fileURL,
                     session: session,
-                    securityScopedAuthority: nil,
-                    isAwaitingBindingEnd: false
+                    bindingIDs: [bindingID],
+                    awaitingInstallations: [],
+                    securityScopedAuthorityOwners: []
                 )
                 retiredBindingID = bindingID
             default:
@@ -4826,7 +4961,9 @@ final class AppStateTests: XCTestCase {
                 XCTAssertTrue(appState.currentDocument !== session)
                 XCTAssertEqual(appState.currentDocument.text, "disk B")
                 let bindingID = try XCTUnwrap(retiredBindingID)
-                XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+                let retirement = appState.retiredEditorDocumentSessions[locationA.fileURL]
+                XCTAssertTrue(retirement?.session === session)
+                XCTAssertTrue(retirement?.bindingIDs.contains(bindingID) == true)
             default:
                 XCTFail("unexpected source")
             }
@@ -4840,7 +4977,7 @@ final class AppStateTests: XCTestCase {
         }
     }
 
-    func testStatefulRetiredStandaloneSessionRejectsReplacementParentAuthority() throws {
+    func testStatefulRetiredStandaloneSessionRejectsReplacementParentAuthority() async throws {
         let parent = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parent) }
         let root = parent.appendingPathComponent("workspace", isDirectory: true)
@@ -4869,15 +5006,19 @@ final class AppStateTests: XCTestCase {
         )
         appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(proofA)
         let bindingID = EditorDocumentBindingID()
-        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-            id: bindingID,
+        appState.retiredEditorDocumentSessions[locationA.fileURL] = RetiredEditorDocumentSession(
+            canonicalURL: locationA.fileURL,
             session: session,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: false
+            bindingIDs: [bindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
 
         try writeText("disk B1", to: sourceURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("retired standalone session records B1") {
+            appState.pendingExternalTexts[locationA.fileURL] == "disk B1"
+        }
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(
             appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
@@ -4898,7 +5039,7 @@ final class AppStateTests: XCTestCase {
             }
             XCTAssertEqual(url, locationB.fileURL)
         }
-        XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[locationA.fileURL]?.session === session)
         XCTAssertNil(appState.sessionCache[locationB.fileURL])
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(
@@ -4930,7 +5071,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: sourceURL, encoding: .utf8), "disk B2")
     }
 
-    func testStatefulAwaitingRetiredAnchoredSessionRejectsReplacementParentAuthority() throws {
+    func testStatefulAwaitingRetiredAnchoredSessionRejectsReplacementParentAuthority() async throws {
         let parent = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parent) }
         let root = parent.appendingPathComponent("workspace", isDirectory: true)
@@ -4957,15 +5098,19 @@ final class AppStateTests: XCTestCase {
         )
         appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = bindingA
         let bindingID = EditorDocumentBindingID()
-        appState.retiredEditorDocumentBindings[bindingID] = RetiredEditorDocumentBinding(
-            id: bindingID,
+        appState.retiredEditorDocumentSessions[locationA.fileURL] = RetiredEditorDocumentSession(
+            canonicalURL: locationA.fileURL,
             session: session,
-            securityScopedAuthority: nil,
-            isAwaitingBindingEnd: true
+            bindingIDs: [bindingID],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
         )
 
         try writeText("disk B1", to: locationA.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("retired anchored session records B1") {
+            appState.pendingExternalTexts[locationA.fileURL] == "disk B1"
+        }
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
 
@@ -4989,13 +5134,13 @@ final class AppStateTests: XCTestCase {
             }
             XCTAssertEqual(url, locationB.fileURL)
         }
-        XCTAssertTrue(appState.retiredEditorDocumentBindings[bindingID]?.session === session)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[locationA.fileURL]?.session === session)
         XCTAssertEqual(appState.pendingExternalTexts[locationA.fileURL], "disk B1")
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
         XCTAssertEqual(try String(contentsOf: locationB.fileURL, encoding: .utf8), "disk B2")
     }
 
-    func testReloadExternalConflictUsesFreshCTextAndProofAfterPendingB() throws {
+    func testReloadExternalConflictUsesFreshCTextAndProofAfterPendingB() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -5020,12 +5165,19 @@ final class AppStateTests: XCTestCase {
 
         try writeText("disk B", to: location.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("Reload scenario records disk B") {
+            appState.pendingExternalTexts[location.fileURL] == "disk B"
+        }
         XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B")
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), bindingA)
 
         try writeText("disk C", to: location.fileURL)
         let loadedC = try MarkdownFileStore().loadResult(at: location)
         appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload applies fresh disk C") {
+            session.text == "disk C" &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertEqual(session.text, "disk C")
         XCTAssertFalse(session.isDirty)
@@ -5042,7 +5194,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(appState.externalChangePrompt)
     }
 
-    func testKeepMineExternalConflictUsesFreshCProofBeforeWritingLocalEdits() throws {
+    func testKeepMineExternalConflictUsesFreshCProofBeforeWritingLocalEdits() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -5067,6 +5219,9 @@ final class AppStateTests: XCTestCase {
 
         try writeText("disk B", to: location.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("Keep Mine scenario records disk B") {
+            appState.pendingExternalTexts[location.fileURL] == "disk B"
+        }
         try writeText("disk C", to: location.fileURL)
         let loadedC = try MarkdownFileStore().loadResult(at: location)
 
@@ -5076,6 +5231,10 @@ final class AppStateTests: XCTestCase {
             return try MarkdownFileStore().save(text: text, at: fileLocation, expecting: expectation)
         }
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine adopts fresh disk C proof") {
+            appState.pendingExternalTexts[location.fileURL] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertEqual(
             appState.anchoredSessionFileBinding(for: session),
@@ -5100,7 +5259,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: location.fileURL, encoding: .utf8), "local edits")
     }
 
-    func testKeepMineRebasesSavedTextToFreshCanonicalEquivalentC() throws {
+    func testKeepMineRebasesSavedTextToFreshCanonicalEquivalentC() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
@@ -5132,9 +5291,16 @@ final class AppStateTests: XCTestCase {
 
         try writeText("disk B", to: location.fileURL)
         appState.handleExternalChange(for: session)
+        try await waitUntil("canonical-equivalent scenario records disk B") {
+            appState.pendingExternalTexts[location.fileURL] == "disk B"
+        }
         try writeText(diskC, to: location.fileURL)
 
         appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine rebases the exact disk C bytes") {
+            appState.pendingExternalTexts[location.fileURL] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
         appState.autosaveTask?.cancel()
 
         XCTAssertTrue(ExactSourceText.matches(session.text, localText))
@@ -5511,7 +5677,7 @@ final class AppStateTests: XCTestCase {
         state: IndeterminateFileWriteReconciliationState,
         makeUnavailable: @escaping (URL) throws -> Void,
         repair: (URL) throws -> Void
-    ) throws {
+    ) async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let originalURL = root.appendingPathComponent("missing.md").standardizedFileURL
@@ -5565,6 +5731,10 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(writerEntries, 1)
 
         appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload accepts the repaired Save Copy destination") {
+            appState.indeterminateSessionWrites[ObjectIdentifier(session)] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
         XCTAssertNil(appState.indeterminateSessionWrites[ObjectIdentifier(session)])
         XCTAssertEqual(session.text, "disk after repair")
         XCTAssertFalse(session.isDirty)
@@ -5586,7 +5756,7 @@ final class AppStateTests: XCTestCase {
             .appendingPathComponent("PlainsongAppStateTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 
     private func writeText(_ text: String, to url: URL, touchOffset: TimeInterval = 0) throws {
@@ -5682,7 +5852,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     }
 
     // swiftlint:disable:next function_body_length
-    func testInstalledEditorLeaseRetainsExactCrossDocumentIMECommitUntilHandoffAndTeardown() async throws {
+    func testSearchNavigationCancellationStillAutomaticallyInstallsSingleDestinationUpdate() async throws {
         let rootURL = try makeTemporaryDirectory()
         let documentAURL = rootURL.appendingPathComponent("a.md")
         let documentBURL = rootURL.appendingPathComponent("b.md")
@@ -5703,22 +5873,14 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             shouldRestoreLastOpenedFile: false,
             userDefaults: defaults
         )
-        let workspaceSnapshot = snapshot(paths: ["a.md", "b.md"], rootURL: rootURL)
-        appState.workspaceRootURL = rootURL
-        appState.workspaceSnapshot = workspaceSnapshot
-        appState.workspaceSearchRootAuthority = try WorkspaceFileSystemRootAuthority(
-            rootURL: rootURL
-        )
-        appState.workspaceGeneration = 1
-        appState.workspaceInstalledCaptureGeneration = 1
-        appState.workspaceTree = WorkspaceFileTree.reconcile(
-            previous: nil,
-            snapshot: workspaceSnapshot,
-            options: .init(showAllFiles: false)
-        )
         appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
-        appState.sessionCache[documentAURL.standardizedFileURL] = sessionA
-        _ = appState.sessionPolicy.access(documentAURL, isDirty: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA
+        )
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
 
         var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
         var selectionB: NSRange? = NSRange(location: 2, length: 0)
@@ -5730,7 +5892,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
             documentBindingID: bindingA.id,
-            onDocumentBindingLifecycle: bindingA.onLifecycle
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
         )
         let fixture = try makeEditorBridgeFixture(
             representable: documentAView,
@@ -5751,7 +5914,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             defaults.removePersistentDomain(forName: defaultsSuiteName)
         }
 
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
+        let installationA = try XCTUnwrap(
+            appState.editorBindingInstallations.first(where: { $0.value === sessionA })?.key
+        )
         XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
         fixture.textView.textSelection = selectionA ?? .notFound
         fixture.textView.setMarkedText(
@@ -5761,7 +5927,53 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         XCTAssertTrue(fixture.textView.hasMarkedText())
 
+        let searchResult = result(
+            path: "a.md",
+            text: sourceA,
+            needle: "composition",
+            rootURL: rootURL
+        )
+        let searchMatch = try XCTUnwrap(searchResult.matches.first)
+        let searchContext = WorkspaceSearchContext(
+            rootIdentity: rootAuthority.canonicalRootURL.path(percentEncoded: false),
+            workspaceGeneration: appState.workspaceGeneration,
+            queryGeneration: 1
+        )
+        appState.workspaceSearchState = WorkspaceSearchState(
+            activeQuery: TextSearchQuery(pattern: "composition"),
+            queryGeneration: 1,
+            activeContext: searchContext,
+            phase: .completed,
+            fileResults: [searchResult]
+        )
+        appState.activateWorkspaceSearchResult(
+            context: searchContext,
+            fileResult: searchResult,
+            match: searchMatch
+        )
+        guard case .navigate? = appState.editorNavigationCommand else {
+            return XCTFail("Expected a real App search-navigation request for A")
+        }
+        let pendingNavigationAView = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract,
+            navigationCommand: appState.editorNavigationCommand
+        )
+        pendingNavigationAView.updateRepresentedTextView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+
         try appState.activateFileSession(url: documentBURL)
+        guard case .cancel? = appState.editorNavigationCommand else {
+            return XCTFail("Ordinary App document switch must emit navigation cancellation")
+        }
         let sessionB = appState.currentDocument
         let dirtySourceB = "# B Unique\nB dirty body"
         appState.replaceDocumentText(dirtySourceB, in: sessionB)
@@ -5776,7 +5988,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
             documentBindingID: bindingB.id,
-            onDocumentBindingLifecycle: bindingB.onLifecycle
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract,
+            navigationCommand: appState.editorNavigationCommand
         )
         documentBView.updateRepresentedTextView(
             fixture.scrollView,
@@ -5784,7 +5998,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
 
         XCTAssertTrue(fixture.textView.hasMarkedText())
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
         XCTAssertTrue(appState.sessionCache[documentAURL.standardizedFileURL] === sessionA)
         XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentAURL))
         XCTAssertEqual(Data(sessionB.text.utf8), Data(dirtySourceB.utf8))
@@ -5810,28 +6024,47 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(selectionB, NSRange(location: 2, length: 0))
         XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), sourceB)
 
-        documentBView.updateRepresentedTextView(
-            fixture.scrollView,
-            coordinator: fixture.coordinator
-        )
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        try await waitUntil("single destination update retries after IME commit") {
+            appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB) &&
+                fixture.coordinator.currentDocumentIdentity == AppState.editorDocumentIdentity(
+                    for: documentBURL
+                )
+        }
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
         XCTAssertNil(appState.sessionCache[documentAURL.standardizedFileURL])
         XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
 
-        bindingA.text.wrappedValue = committedSourceA + " rejected"
+        _ = bindingA.sourceContract.publish(EditorDocumentSourcePublication(
+            installation: installationA,
+            base: EditorDocumentSourceSnapshot(source: committedSourceA, revision: sessionA.version),
+            source: committedSourceA + " rejected"
+        ))
         XCTAssertEqual(Data(sessionA.text.utf8), Data(committedSourceA.utf8))
         let finalSourceB = "# B Unique\nB editor write succeeds"
-        bindingB.text.wrappedValue = finalSourceB
+        fixture.textView.textSelection = NSRange(
+            location: 0,
+            length: (dirtySourceB as NSString).length
+        )
+        fixture.textView.insertText(finalSourceB, replacementRange: .notFound)
+        let installationB = try XCTUnwrap(
+            appState.editorBindingInstallations.first(where: { $0.value === sessionB })?.key
+        )
         XCTAssertEqual(Data(sessionB.text.utf8), Data(finalSourceB.utf8))
+        XCTAssertEqual(Data(sessionA.text.utf8), Data(committedSourceA.utf8))
 
         MarkdownTextView.dismantleNSView(
             fixture.scrollView,
             coordinator: fixture.coordinator
         )
-        XCTAssertNil(appState.installedEditorDocumentBindingLease)
-        bindingB.text.wrappedValue = finalSourceB + " rejected after teardown"
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
+        _ = bindingB.sourceContract.publish(EditorDocumentSourcePublication(
+            installation: installationB,
+            base: EditorDocumentSourceSnapshot(source: finalSourceB, revision: sessionB.version),
+            source: finalSourceB + " rejected after teardown"
+        ))
         XCTAssertEqual(Data(sessionB.text.utf8), Data(finalSourceB.utf8))
 
+        appState.flushAutosaveIfNeeded()
         try await Task.sleep(nanoseconds: 750_000_000)
         XCTAssertEqual(sessionA.statistics, TextStatistics(text: committedSourceA))
         XCTAssertEqual(sessionB.statistics, TextStatistics(text: finalSourceB))
@@ -5870,6 +6103,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             paths: ["a.md", "b.md"],
             currentSession: sessionA
         )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
         appState.sessionPolicy = WorkspaceSessionLRUPolicy(limit: 1)
         appState.replaceDocumentText(dirtySourceA, in: sessionA)
 
@@ -5883,7 +6117,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
             documentBindingID: bindingA.id,
-            onDocumentBindingLifecycle: bindingA.onLifecycle
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
         )
         let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: dirtySourceA)
         defer {
@@ -5928,27 +6163,31 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
             documentBindingID: bindingB.id,
-            onDocumentBindingLifecycle: bindingB.onLifecycle
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract
         )
         documentBView.updateRepresentedTextView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
 
         try externalSourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
-        appState.lastKnownDiskModificationDates[documentAURL.standardizedFileURL] = .distantPast
+        appState.lastKnownDiskModificationDates[canonicalA] = .distantPast
         appState.handleExternalChange(for: sessionA)
 
-        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
+        try await waitUntil("non-current A records its external conflict") {
+            appState.pendingExternalTexts[canonicalA] == externalSourceA
+        }
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalSourceA)
         XCTAssertNil(appState.externalChangePrompt)
         XCTAssertTrue(appState.currentDocument === sessionB)
-        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentAURL)
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: canonicalA)
         appState.reloadExternallyChangedFile()
-        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
-        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentAURL)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalSourceA)
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: canonicalA)
         appState.keepMineForExternallyChangedFile()
-        XCTAssertEqual(appState.pendingExternalTexts[documentAURL.standardizedFileURL], externalSourceA)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalSourceA)
         XCTAssertNil(appState.externalChangePrompt)
 
         let committedText = "臺e\u{0301}🧪"
@@ -5957,6 +6196,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertFalse(documentBAutosave.isCancelled)
         XCTAssertFalse(documentBStatistics.isCancelled)
         XCTAssertFalse(documentBCompletion.isCancelled)
+        XCTAssertTrue(appState.canAutosave(session: sessionB))
+        XCTAssertFalse(appState.hasPendingEditorSource(for: sessionB))
+        XCTAssertNil(appState.externalDiskInspectionTasks[ObjectIdentifier(sessionB)])
         try await Task.sleep(nanoseconds: 750_000_000)
 
         XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
@@ -5971,6 +6213,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         }
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalSourceA)
         XCTAssertEqual(sessionB.text, dirtySourceB)
+        XCTAssertNil(appState.presentedError, appState.presentedError?.message ?? "")
         XCTAssertFalse(sessionB.isDirty)
         XCTAssertEqual(sessionB.statistics, TextStatistics(text: dirtySourceB))
         XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b-unique"])
@@ -5982,22 +6225,167 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
-        XCTAssertTrue(appState.sessionCache[documentAURL.standardizedFileURL] === sessionA)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
+        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
         XCTAssertTrue(sessionA.isDirty)
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalSourceA)
 
         try appState.activateFileSession(url: documentAURL)
         XCTAssertEqual(appState.externalChangePrompt?.fileURL.standardizedFileURL, documentAURL.standardizedFileURL)
         appState.keepMineForExternallyChangedFile()
-        XCTAssertNil(appState.pendingExternalTexts[documentAURL.standardizedFileURL])
+        try await waitUntil("non-current Keep Mine completes after reactivation") {
+            appState.externalReloadTasks[ObjectIdentifier(sessionA)] == nil &&
+                appState.externalChangePrompt == nil
+        }
+        XCTAssertNil(appState.pendingExternalTexts[canonicalA])
         XCTAssertTrue(appState.canAutosave(session: sessionA))
         try appState.save(session: sessionA)
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
         XCTAssertFalse(sessionA.isDirty)
     }
 
-    func testReloadClearsSessionConflictAndRestoresSaveEligibility() throws {
+    func testContentFencedBackgroundAutosaveDetectsInPlaceRewriteBeforeWatcher() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let originalA = "AAAA"
+        let localA = "A local dirty source"
+        let externalA = "BBBB"
+        try originalA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try "B source".write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.5, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(
+            text: originalA,
+            url: documentAURL,
+            fileKind: .markdown
+        )
+        let appState = AppState(
+            currentDocument: sessionA,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA
+        )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.recordKnownDiskText(originalA, for: canonicalA)
+        let originalIdentity = try regularIdentity(at: documentAURL)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            appState.workspaceReloadTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        appState.replaceDocumentText(localA, in: sessionA)
+        try appState.activateFileSession(url: documentBURL)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        let handle = try FileHandle(forWritingTo: documentAURL)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data(externalA.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentAURL), originalIdentity)
+
+        try await waitUntil("content-fenced autosave starts coherent inspection") {
+            appState.pendingExternalTexts[canonicalA] == externalA &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
+        }
+
+        XCTAssertTrue(appState.currentDocument.fileURL == documentBURL)
+        XCTAssertEqual(sessionA.text, localA)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(appState.presentedError?.title, "Autosave Failed")
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalA)
+    }
+
+    func testRealWatcherImmediatelyInspectsNonCurrentWarmSession() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let originalA = "AAAA"
+        let externalA = "BBBB"
+        try originalA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try "B source".write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(30.0, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(
+            text: originalA,
+            url: documentAURL,
+            fileKind: .markdown
+        )
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(
+            currentDocument: sessionA,
+            directoryScanner: scanner,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA
+        )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.recordKnownDiskText(originalA, for: canonicalA)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            appState.workspaceReloadTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        appState.replaceDocumentText("A local dirty source", in: sessionA)
+        try appState.activateFileSession(url: documentBURL)
+        let originalIdentity = try regularIdentity(at: documentAURL)
+        let handle = try FileHandle(forWritingTo: documentAURL)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data(externalA.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentAURL), originalIdentity)
+
+        appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(1)
+        let reloadTask = appState.workspaceReloadTask
+
+        try await waitUntil("real watcher fans out to non-current A before tree scan completes") {
+            appState.pendingExternalTexts[canonicalA] == externalA &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
+        }
+        XCTAssertNotNil(reloadTask)
+        await scanner.completeRequest(
+            at: 0,
+            with: snapshot(paths: ["a.md", "b.md"], rootURL: rootURL)
+        )
+        await reloadTask?.value
+        XCTAssertTrue(appState.currentDocument.fileURL == documentBURL)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalA)
+    }
+
+    func testReloadClearsSessionConflictAndRestoresSaveEligibility() async throws {
         let rootURL = try makeTemporaryDirectory()
         let documentURL = rootURL.appendingPathComponent("post.md")
         let original = "Original"
@@ -6012,6 +6400,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             paths: ["post.md"],
             currentSession: session
         )
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
         defer {
             appState.autosaveTask?.cancel()
             appState.statisticsTask?.cancel()
@@ -6021,21 +6410,1177 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         appState.replaceDocumentText(local, in: session)
         try external.write(to: documentURL, atomically: true, encoding: .utf8)
-        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
         appState.handleExternalChange(for: session)
+        try await waitUntil("external conflict is ready for Reload") {
+            appState.pendingExternalTexts[canonicalURL] == external &&
+                appState.externalChangePrompt?.fileURL == canonicalURL
+        }
         XCTAssertFalse(appState.canAutosave(session: session))
         XCTAssertThrowsError(try appState.save(session: session))
 
         appState.reloadExternallyChangedFile()
 
+        try await waitUntil("Reload synchronizes the session and clears its conflict") {
+            session.text == external &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+
         XCTAssertEqual(session.text, external)
         XCTAssertFalse(session.isDirty)
-        XCTAssertNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
         XCTAssertNil(appState.externalChangePrompt)
         XCTAssertTrue(appState.canAutosave(session: session))
         XCTAssertEqual(appState.sessionPolicy.dirtyState(for: documentURL), false)
         XCTAssertNoThrow(try appState.save(session: session))
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+    }
+
+    func testWatcherEventYSupersedesSuspendedReloadXAndStaleDropsOlderResult() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "Original"
+        let local = "Local dirty text"
+        let olderDisk = "Older delayed disk text"
+        let newerDisk = "Newer delayed disk text"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[key] = session
+        appState.replaceDocumentText(local, in: session)
+        appState.pendingExternalTexts[key] = "detected disk conflict"
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("first delayed Reload starts") { reader.requestCount == 1 }
+        var mainActorAdvanced = false
+        Task { @MainActor in mainActorAdvanced = true }
+        await Task.yield()
+        XCTAssertTrue(mainActorAdvanced)
+        XCTAssertEqual(session.text, local)
+        XCTAssertFalse(appState.canSave)
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("watcher event Y starts a newer physical read") { reader.requestCount == 2 }
+        let identity = try regularIdentity(at: documentURL)
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: olderDisk, identity: identity))
+        )
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(session.text, local)
+        XCTAssertEqual(appState.pendingExternalTexts[key], "detected disk conflict")
+
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: newerDisk, identity: identity))
+        )
+        try await waitUntil("newer delayed Reload wins") {
+            session.text == newerDisk &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertNil(appState.pendingExternalTexts[key])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertTrue(appState.canSave)
+    }
+
+    func testReloadSelectionSupersedesOlderInFlightDiskInspection() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "Original"
+        let local = "Local dirty text"
+        let olderDisk = "Older inspection X"
+        let newerDisk = "Resolution Y"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[key] = session
+        appState.replaceDocumentText(local, in: session)
+        appState.pendingExternalTexts[key] = olderDisk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("older disk inspection suspends") { reader.requestCount == 1 }
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload starts a superseding read") { reader.requestCount == 2 }
+        guard reader.requestCount == 2 else { return }
+        XCTAssertNil(appState.externalDiskInspectionTasks[ObjectIdentifier(session)])
+
+        let identity = try regularIdentity(at: documentURL)
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: newerDisk, identity: identity))
+        )
+        try await waitUntil("Reload Y completes") {
+            session.text == newerDisk &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertEqual(appState.lastKnownDiskHashes[key], AppState.contentHash(newerDisk))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: olderDisk, identity: identity))
+        )
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(session.text, newerDisk)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.pendingExternalTexts[key])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(appState.lastKnownDiskHashes[key], AppState.contentHash(newerDisk))
+        XCTAssertTrue(appState.canAutosave(session: session))
+    }
+
+    func testKeepMineSelectionSupersedesOlderInFlightDiskInspection() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "Original"
+        let local = "Local dirty text"
+        let olderDisk = "Older inspection X"
+        let newerDisk = "Resolution Y"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[key] = session
+        appState.replaceDocumentText(local, in: session)
+        appState.pendingExternalTexts[key] = olderDisk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("older Keep Mine inspection suspends") { reader.requestCount == 1 }
+        appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine starts a superseding read") { reader.requestCount == 2 }
+        guard reader.requestCount == 2 else { return }
+        XCTAssertNil(appState.externalDiskInspectionTasks[ObjectIdentifier(session)])
+
+        let identity = try regularIdentity(at: documentURL)
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: newerDisk, identity: identity))
+        )
+        try await waitUntil("Keep Mine Y completes") {
+            appState.externalReloadTasks[ObjectIdentifier(session)] == nil &&
+                appState.autosaveTask != nil
+        }
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        XCTAssertEqual(appState.lastKnownDiskHashes[key], AppState.contentHash(newerDisk))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: olderDisk, identity: identity))
+        )
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(session.text, local)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertNil(appState.pendingExternalTexts[key])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(appState.lastKnownDiskHashes[key], AppState.contentHash(newerDisk))
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertTrue(appState.canAutosave(session: session))
+    }
+
+    func testOneMiBReloadPreparationStaysOffMainAndMainActorApplyIsBounded() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Local source"
+        let oneMiBSource = String(repeating: "a", count: 1_048_576)
+        XCTAssertEqual(oneMiBSource.utf8.count, 1_048_576)
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let preparationGate = ExternalReloadPreparationGate()
+        let preparer = ProductionExternalReloadApplicationPreparer(
+            willPrepare: { preparationGate.beginAndWait() },
+            didPrepare: { preparationGate.finish() }
+        )
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            externalReloadApplicationPreparer: preparer,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        appState.pendingExternalTexts[key] = oneMiBSource
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("1 MiB physical Reload read starts") { reader.requestCount == 1 }
+
+        try reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(
+                text: oneMiBSource,
+                identity: regularIdentity(at: documentURL)
+            ))
+        )
+        try await waitUntil("off-main payload preparation reaches its gate") {
+            preparationGate.hasBegun
+        }
+        var mainActorSentinelAdvanced = false
+        Task { @MainActor in mainActorSentinelAdvanced = true }
+        await Task.yield()
+        XCTAssertTrue(mainActorSentinelAdvanced)
+        XCTAssertEqual(session.text, local)
+        XCTAssertNotNil(appState.externalReloadTasks[ObjectIdentifier(session)])
+
+        preparationGate.release()
+        try await waitUntil(
+            "1 MiB Reload applies",
+            timeoutNanoseconds: 5_000_000_000
+        ) {
+            session.text.utf8.count == 1_048_576 &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+        let preparationFinishedAt = try XCTUnwrap(preparationGate.finishedUptimeNanoseconds)
+        let observedApplyLatency = DispatchTime.now().uptimeNanoseconds - preparationFinishedAt
+        XCTAssertLessThan(
+            observedApplyLatency,
+            50_000_000,
+            "The bounded MainActor application stage should remain below 50 ms"
+        )
+        XCTAssertEqual(session.statistics, TextStatistics(text: oneMiBSource))
+    }
+
+    func testWatcherSupersessionCancelsSuspendedReloadPreparationBeforeStaleApply() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Local source"
+        let staleDisk = String(repeating: "x", count: 1_048_576)
+        let newerDisk = "Disk source Y"
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let preparationGate = ExternalReloadPreparationGate()
+        let preparer = ProductionExternalReloadApplicationPreparer(
+            willPrepare: { preparationGate.beginAndWait() },
+            didPrepare: { preparationGate.finish() }
+        )
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            externalReloadApplicationPreparer: preparer,
+            directoryScanner: scanner,
+            shouldRestoreLastOpenedFile: false
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.pendingExternalTexts[key] = staleDisk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("stale Reload read starts") { reader.requestCount == 1 }
+        let staleIdentity = try regularIdentity(at: documentURL)
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: staleDisk, identity: staleIdentity))
+        )
+        try await waitUntil("stale payload preparation suspends") {
+            preparationGate.hasBegun
+        }
+
+        try newerDisk.write(to: documentURL, atomically: true, encoding: .utf8)
+        let newerIdentity = try regularIdentity(at: documentURL)
+        appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(1)
+        try await waitUntil("real watcher Y supersedes before its tree scan resumes") {
+            reader.requestCount == 2
+        }
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: newerDisk, identity: newerIdentity))
+        )
+        try await waitUntil("newer payload applies while stale work remains suspended") {
+            session.text == newerDisk &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+
+        preparationGate.release()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await scanner.completeRequest(
+            at: 0,
+            with: snapshot(paths: ["post.md"], rootURL: rootURL)
+        )
+        await appState.workspaceReloadTask?.value
+        XCTAssertEqual(session.text, newerDisk)
+        XCTAssertEqual(preparationGate.successfulPreparationCount, 1)
+        XCTAssertNil(appState.pendingExternalReloadApplications[ObjectIdentifier(session)])
+    }
+
+    func testNativeTypingIsRejectedBeforeMutationWhilePhysicalReloadReadIsSuspended() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Local source"
+        let disk = "Coherent disk source"
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection: NSRange? = NSRange(location: (local as NSString).length, length: 0)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: local)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+
+        appState.pendingExternalTexts[key] = disk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        let previousVersion = session.version
+        let previousDirtyState = session.isDirty
+        let previousDiskSource = try String(contentsOf: documentURL, encoding: .utf8)
+        let previousWriter = appState.editorWriterInstallations[ObjectIdentifier(session)]
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("physical Reload read suspends") { reader.requestCount == 1 }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.insertText("!", replacementRange: .notFound)
+
+        XCTAssertEqual(fixture.textView.text, local)
+        XCTAssertEqual(session.text, local)
+        XCTAssertEqual(session.version, previousVersion)
+        XCTAssertEqual(session.isDirty, previousDirtyState)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), previousDiskSource)
+        XCTAssertNotNil(appState.externalReloadTasks[ObjectIdentifier(session)])
+        XCTAssertEqual(appState.editorWriterInstallations[ObjectIdentifier(session)], previousWriter)
+
+        try reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: disk, identity: regularIdentity(at: documentURL)))
+        )
+        try await waitUntil("Reload applies after the read resumes") {
+            session.text == disk && fixture.textView.text == disk &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testWatcherYSupersedesReloadXDuringPartialCoordinatorConvergence() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Local source"
+        let disk = "Disk source X"
+        let newerDisk = "Disk source Y"
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
+        var selection2 = selection1
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let installationsBeforeFixture1 = Set(appState.editorBindingInstallations.keys)
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: local)
+        let installation1 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys)
+                .subtracting(installationsBeforeFixture1)
+                .first
+        )
+        let fixture2 = try makeEditorBridgeFixture(representable: view2, source: local, makeKey: false)
+        let installation2 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys).subtracting([installation1]).first
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+            MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+        }
+        let secondSynchronizer = try XCTUnwrap(
+            appState.editorDocumentSourceSynchronizers[installation2]
+        )
+        appState.editorDocumentSourceSynchronizers[installation2] = { _ in false }
+
+        appState.pendingExternalTexts[key] = disk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("two-coordinator Reload read suspends") { reader.requestCount == 1 }
+        try reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: disk, identity: regularIdentity(at: documentURL)))
+        )
+        try await waitUntil("only the first coordinator converges") {
+            session.text == disk && fixture1.textView.text == disk && fixture2.textView.text == local &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(session)] != nil
+        }
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(session)])
+        XCTAssertThrowsError(try appState.save(session: session)) { error in
+            guard case let AppStateError.unresolvedExternalChange(url) = error else {
+                return XCTFail("Expected unresolved external change")
+            }
+            XCTAssertEqual(url, documentURL.standardizedFileURL)
+        }
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), local)
+
+        XCTAssertTrue(fixture1.window.makeFirstResponder(fixture1.textView))
+        fixture1.textView.textSelection = NSRange(location: (disk as NSString).length, length: 0)
+        fixture1.textView.insertText("!", replacementRange: .notFound)
+        XCTAssertEqual(fixture1.textView.text, disk)
+        XCTAssertEqual(session.text, disk)
+        XCTAssertNotNil(appState.externalReloadTasks[ObjectIdentifier(session)])
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("watcher Y starts a new read during partial X convergence") {
+            reader.requestCount == 2
+        }
+        XCTAssertEqual(session.text, disk)
+        XCTAssertEqual(fixture1.textView.text, disk)
+        XCTAssertEqual(fixture2.textView.text, local)
+        XCTAssertNotNil(appState.externalReloadTasks[ObjectIdentifier(session)])
+
+        try reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(
+                text: newerDisk,
+                identity: regularIdentity(at: documentURL)
+            ))
+        )
+        try await waitUntil("Y replaces X but remains fenced on the second coordinator") {
+            session.text == newerDisk &&
+                fixture1.textView.text == newerDisk &&
+                fixture2.textView.text == local &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(session)] != nil
+        }
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(session)])
+        XCTAssertThrowsError(try appState.save(session: session))
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), local)
+
+        appState.editorDocumentSourceSynchronizers[installation2] = secondSynchronizer
+        appState.synchronizePendingExternalReloadIfPossible(for: session)
+        try await waitUntil("second coordinator converges to Y and releases the fence") {
+            fixture2.textView.text == newerDisk &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+        fixture1.textView.textSelection = NSRange(
+            location: (newerDisk as NSString).length,
+            length: 0
+        )
+        fixture1.textView.insertText("!", replacementRange: .notFound)
+        XCTAssertEqual(session.text, newerDisk + "!")
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testKeepMineKeepsSaveAndAutosaveFencedUntilEveryCoordinatorConverges() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Local source"
+        let external = "External source"
+        try external.write(to: documentURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(30.0, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[key] = session
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
+        var selection2 = selection1
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let installationsBeforeFixture1 = Set(appState.editorBindingInstallations.keys)
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: local)
+        let installation1 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys)
+                .subtracting(installationsBeforeFixture1)
+                .first
+        )
+        let fixture2 = try makeEditorBridgeFixture(representable: view2, source: local, makeKey: false)
+        let installation2 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys).subtracting([installation1]).first
+        )
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+            MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        let secondSynchronizer = try XCTUnwrap(
+            appState.editorDocumentSourceSynchronizers[installation2]
+        )
+        appState.editorDocumentSourceSynchronizers[installation2] = { _ in false }
+
+        appState.pendingExternalTexts[key] = external
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine read starts") { reader.requestCount == 1 }
+        try reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(
+                text: external,
+                identity: regularIdentity(at: documentURL)
+            ))
+        )
+        try await waitUntil("Keep Mine remains partially converged") {
+            appState.pendingExternalReloadApplications[ObjectIdentifier(session)]?
+                .synchronizedInstallations == Set([installation1])
+        }
+
+        XCTAssertEqual(session.text, local)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(session)])
+        XCTAssertThrowsError(try appState.save(session: session)) { error in
+            guard case AppStateError.unresolvedExternalChange = error else {
+                return XCTFail("Expected unresolved external change")
+            }
+        }
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+
+        appState.editorDocumentSourceSynchronizers[installation2] = secondSynchronizer
+        appState.synchronizePendingExternalReloadIfPossible(for: session)
+        try await waitUntil("Keep Mine releases the fence after every coordinator converges") {
+            appState.pendingExternalReloadApplications[ObjectIdentifier(session)] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertTrue(appState.canAutosave(session: session))
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+    }
+
+    func testWatcherDetectsSameInodeSameSizeContentWithRestoredModificationTime() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let original = "AAAA"
+        let replacement = "BBBB"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let originalIdentity = try regularIdentity(at: documentURL)
+        let originalAttributes = try FileManager.default.attributesOfItem(atPath: documentURL.path)
+        let originalModificationDate = try XCTUnwrap(originalAttributes[.modificationDate] as? Date)
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        appState.recordKnownDiskText(original, for: key, modificationDate: originalModificationDate)
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data(replacement.utf8))
+        try handle.synchronize()
+        try handle.close()
+        try FileManager.default.setAttributes(
+            [.modificationDate: originalModificationDate],
+            ofItemAtPath: documentURL.path
+        )
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalIdentity)
+        XCTAssertEqual(
+            try FileManager.default.attributesOfItem(atPath: documentURL.path)[.size] as? Int,
+            original.utf8.count
+        )
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("coherent watcher read detects restored-mtime content") {
+            session.text == replacement &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertEqual(session.text, replacement)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testOwnedTreeAndEditorIdentityStayStableAfterPathComponentBecomesSymlink() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let directoryURL = rootURL.appendingPathComponent("notes", isDirectory: true)
+        let movedDirectoryURL = rootURL.appendingPathComponent("notes-moved", isDirectory: true)
+        let outsideURL = try makeTemporaryDirectory()
+        let documentURL = directoryURL.appendingPathComponent("post.md")
+        let outsideDocumentURL = outsideURL.appendingPathComponent("post.md")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try "Owned source".write(to: documentURL, atomically: true, encoding: .utf8)
+        try "Untrusted source".write(to: outsideDocumentURL, atomically: true, encoding: .utf8)
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+            try? FileManager.default.removeItem(at: outsideURL)
+        }
+
+        let session = DocumentSession(
+            text: "Owned source",
+            url: documentURL,
+            fileKind: .markdown
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["notes/post.md"],
+            currentSession: session
+        )
+        appState.recordKnownDiskText("Owned source", for: documentURL)
+        let ownership = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+        let editorIdentity = appState.activeEditorDocumentIdentity
+        let selectedNodeID = appState.workspaceTree?.selectedNodeID
+
+        try FileManager.default.moveItem(at: directoryURL, to: movedDirectoryURL)
+        try FileManager.default.createSymbolicLink(at: directoryURL, withDestinationURL: outsideURL)
+        appState.synchronizeWorkspaceTreeSelection(for: session)
+
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), ownership)
+        XCTAssertEqual(appState.activeEditorDocumentIdentity, editorIdentity)
+        XCTAssertEqual(appState.workspaceTree?.selectedNodeID, selectedNodeID)
+        XCTAssertEqual(ownership.location.relativePath, "notes/post.md")
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("anchored watcher refuses replaced path component") {
+            appState.missingFilePrompt?.fileURL == ownership.location.fileURL
+        }
+        XCTAssertEqual(session.text, "Owned source")
+        XCTAssertNotEqual(session.text, "Untrusted source")
+    }
+
+    func testSelectionOnlyClosingDelimiterKeepsAppSourceVersionDirtyDiskAndAutosaveUnchanged() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let source = "()"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        appState.recordKnownDiskText(source, for: key)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection: NSRange? = NSRange(location: 1, length: 0)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: source)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        let version = session.version
+        let isDirty = session.isDirty
+        let diskHash = appState.lastKnownDiskHashes[key]
+        let autosaveWasScheduled = appState.autosaveTask != nil
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.insertText(")", replacementRange: .notFound)
+
+        XCTAssertEqual(fixture.textView.text, source)
+        XCTAssertEqual(fixture.textView.textSelection, NSRange(location: 2, length: 0))
+        XCTAssertEqual(session.text, source)
+        XCTAssertEqual(session.version, version)
+        XCTAssertEqual(session.isDirty, isDirty)
+        XCTAssertEqual(appState.lastKnownDiskHashes[key], diskHash)
+        XCTAssertEqual(appState.autosaveTask != nil, autosaveWasScheduled)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), source)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testDelayedReloadSurvivesRetirementAndReactivationButOnlyLatestLifecycleMayApply() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A local source"
+        let sourceB = "B source"
+        let diskA = "A coherent disk source"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let sessionA = DocumentSession(
+            text: sourceA,
+            url: documentAURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: sessionA,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let installationA = EditorDocumentBindingInstallation(
+            bindingID: bindingA.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        bindingA.onLifecycle(.installed(installationA))
+        let canonicalA = documentAURL.standardizedFileURL
+        appState.pendingExternalTexts[canonicalA] = "detected A conflict"
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: canonicalA)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("active lifecycle Reload starts") { reader.requestCount == 1 }
+        let saveCopyURL = rootURL.appendingPathComponent("save-copy-during-reload.md")
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: canonicalA)
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: saveCopyURL)) { error in
+            guard case AppStateError.unresolvedExternalChange = error else {
+                return XCTFail("Expected the suspended Reload to fence Save Copy")
+            }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: saveCopyURL.path))
+        XCTAssertNotNil(appState.externalReloadTasks[ObjectIdentifier(sessionA)])
+        appState.missingFilePrompt = nil
+        try appState.open(url: documentBURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        try await waitUntil("retired lifecycle restarts Reload") { reader.requestCount == 2 }
+        try appState.open(url: documentAURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        try await waitUntil("reactivated lifecycle restarts Reload") { reader.requestCount == 3 }
+
+        let identity = try regularIdentity(at: documentAURL)
+        let snapshot = coherentSnapshot(text: diskA, identity: identity)
+        reader.resolve(request: 0, with: .loaded(snapshot))
+        reader.resolve(request: 1, with: .loaded(snapshot))
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(sessionA.text, sourceA)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], "detected A conflict")
+
+        reader.resolve(request: 2, with: .loaded(snapshot))
+        try await waitUntil("latest lifecycle applies but waits for exact installation") {
+            sessionA.text == diskA &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(sessionA)] != nil
+        }
+        XCTAssertFalse(appState.canSave)
+        bindingA.onLifecycle(.revoked(installationA))
+        try await waitUntil("revocation completes lifecycle-fenced Reload") {
+            appState.externalReloadTasks[ObjectIdentifier(sessionA)] == nil
+        }
+        XCTAssertNil(appState.pendingExternalTexts[canonicalA])
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalA])
+    }
+
+    func testPartiallyConvergedReloadRestartsAcrossRetirementAndReactivation() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let local = "A local source"
+        let disk = "A accepted disk source"
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation1 = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        let installation2 = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation1))
+        binding.onLifecycle(.installed(installation2))
+        let sourceContract = try XCTUnwrap(binding.sourceContract)
+        sourceContract.registerSourceSynchronizer(installation1) { _ in true }
+        sourceContract.registerSourceSynchronizer(installation2) { _ in false }
+        appState.pendingExternalTexts[key] = disk
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("initial partial-convergence Reload starts") {
+            reader.requestCount == 1
+        }
+        let snapshot = try coherentSnapshot(
+            text: disk,
+            identity: regularIdentity(at: documentURL)
+        )
+        reader.resolve(request: 0, with: .loaded(snapshot))
+        try await waitUntil("only one exact installation accepts X") {
+            session.text == disk &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(session)]?
+                .synchronizedInstallations == Set([installation1])
+        }
+
+        try appState.closeWorkspaceForReplacement()
+        try await waitUntil("retirement recaptures accepted X in a new lifecycle") {
+            reader.requestCount == 2
+        }
+        try appState.activateFileSession(url: documentURL)
+        try await waitUntil("reactivation supersedes the retired lifecycle read") {
+            reader.requestCount == 3
+        }
+        reader.resolve(request: 1, with: .loaded(snapshot))
+        reader.resolve(request: 2, with: .loaded(snapshot))
+        try await waitUntil("latest lifecycle remains fenced on installation two") {
+            session.text == disk &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(session)] != nil &&
+                appState.deferredExternalChangeResolutions[key] == .reload
+        }
+
+        sourceContract.registerSourceSynchronizer(installation2) { _ in true }
+        appState.synchronizePendingExternalReloadIfPossible(for: session)
+        try await waitUntil("both exact installations converge in the latest lifecycle") {
+            appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+
+        XCTAssertEqual(session.text, disk)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.pendingExternalReloadApplications[ObjectIdentifier(session)])
+        XCTAssertNil(appState.pendingExternalTexts[key])
+        XCTAssertNil(appState.deferredExternalChangeResolutions[key])
+        XCTAssertNil(appState.externalChangePrompt)
+        binding.onLifecycle(.revoked(installation1))
+        binding.onLifecycle(.revoked(installation2))
+    }
+
+    func testInvalidUTF8ReloadResultPreservesLocalSourceInDetachedRecovery() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let local = "Recoverable local source"
+        try local.write(to: documentURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let reader = ControlledCoherentFileReader()
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: session,
+            coherentFileReader: reader,
+            shouldRestoreLastOpenedFile: false
+        )
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        appState.pendingExternalTexts[key] = "unreadable replacement"
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("invalid UTF-8 Reload starts") { reader.requestCount == 1 }
+        reader.resolve(request: 0, with: .invalidUTF8)
+        try await waitUntil("invalid UTF-8 enters recovery") {
+            appState.detachedSessionURLs.contains(key)
+        }
+
+        XCTAssertEqual(session.text, local)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL, key)
+        XCTAssertFalse(appState.canSave)
+    }
+
+    func testDeferredReloadNeverFollowsInWorkspaceOrEscapingSymlinkSubstitution() async throws {
+        for race in [SaveCopySymlinkRace.leaf, .intermediate] {
+            try await assertDeferredSymlinkSubstitutionDoesNotFollow(
+                intent: .reload,
+                race: race,
+                targetOutsideWorkspace: false
+            )
+            try await assertDeferredSymlinkSubstitutionDoesNotFollow(
+                intent: .reload,
+                race: race,
+                targetOutsideWorkspace: true
+            )
+        }
+    }
+
+    func testDeferredKeepMineNeverFollowsInWorkspaceOrEscapingSymlinkSubstitution() async throws {
+        for race in [SaveCopySymlinkRace.leaf, .intermediate] {
+            try await assertDeferredSymlinkSubstitutionDoesNotFollow(
+                intent: .keepMine,
+                race: race,
+                targetOutsideWorkspace: false
+            )
+            try await assertDeferredSymlinkSubstitutionDoesNotFollow(
+                intent: .keepMine,
+                race: race,
+                targetOutsideWorkspace: true
+            )
+        }
+    }
+
+    func testReloadSynchronizesEveryLiveMirrorBeforeOneWriterAcceptsImmediateInput() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        let diskX = "Disk X"
+        let local = "Local discarded source"
+        let diskY = "Disk Y"
+        try diskX.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(
+            text: local,
+            url: documentURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let key = documentURL.standardizedFileURL
+        appState.sessionCache[key] = session
+        appState.recordKnownDiskText(diskX, for: key)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = NSRange(location: (local as NSString).length, length: 0)
+        var selection2 = selection1
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: key),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: local)
+        let fixture2 = try makeEditorBridgeFixture(
+            representable: view2,
+            source: local,
+            makeKey: false
+        )
+        defer {
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+            MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try diskY.write(to: key, atomically: true, encoding: .utf8)
+        appState.pendingExternalTexts[key] = diskY
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: key)
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload synchronizes every live mirror") {
+            session.text == diskY &&
+                fixture1.textView.text == diskY &&
+                fixture2.textView.text == diskY &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+
+        let installedSnapshot = EditorDocumentSourceSnapshot(
+            source: diskY,
+            revision: session.version
+        )
+        XCTAssertEqual(fixture1.coordinator.currentInstalledSourceSnapshot, installedSnapshot)
+        XCTAssertEqual(fixture2.coordinator.currentInstalledSourceSnapshot, installedSnapshot)
+        XCTAssertNil(appState.editorWriterInstallations[ObjectIdentifier(session)])
+
+        XCTAssertTrue(fixture1.window.makeFirstResponder(fixture1.textView))
+        fixture1.textView.textSelection = NSRange(location: (diskY as NSString).length, length: 0)
+        fixture1.textView.insertText("!", replacementRange: .notFound)
+        XCTAssertEqual(session.text, diskY + "!")
+        XCTAssertEqual(fixture1.textView.text, diskY + "!")
+
+        fixture2.textView.textSelection = NSRange(location: (diskY as NSString).length, length: 0)
+        fixture2.textView.insertText("?", replacementRange: .notFound)
+        XCTAssertEqual(session.text, diskY + "!")
+        XCTAssertEqual(fixture2.textView.text, diskY + "!")
+    }
+
+    func testAsyncUnretirableExternalConflictBlocksWorkspaceCloseWithoutDiscardingSession() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("post.md")
+        try "Original".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Original", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["post.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        defer {
+            appState.clearExternalChangeConflict(at: stateURL)
+            appState.externalChangePrompt = nil
+            appState.closeWorkspace()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        appState.replaceDocumentText("Local dirty text", in: session)
+        try "External disk text".write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[stateURL] = .distantPast
+        appState.handleExternalChange(for: session)
+
+        appState.removeEditorDocumentBindingRegistration(for: session)
+        appState.editorBindingInstallations.removeAll()
+        appState.closeWorkspace()
+
+        XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootURL.standardizedFileURL)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[stateURL] === session)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(session.text, "Local dirty text")
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "External disk text")
+        XCTAssertNotNil(appState.presentedError)
+        try await waitUntil("blocked close retains the detected external source") {
+            appState.pendingExternalTexts[stateURL] != nil
+        }
     }
 
     func testCleanQuarantineIsProtectedFromLRUEviction() throws {
@@ -6109,15 +7654,23 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             preparedSHA256Digest: WorkspaceSearchContentFingerprint(text: session.text).sha256Digest
         )
         let binding = appState.editorDocumentBinding(for: session)
-        binding.onLifecycle(.installed(binding.id))
-        let lease = try XCTUnwrap(appState.installedEditorDocumentBindingLease)
-        appState.beginEditorDocumentBindingRetirement(lease, securityScopedAuthority: nil)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        appState.beginEditorDocumentSessionRetirement(
+            canonicalURL: quarantinedURL,
+            session: session,
+            installations: [installation],
+            securityScopedAuthorityOwner: nil
+        )
         appState.currentDocument = DocumentSession()
         appState.sessionCache[quarantinedURL] = nil
 
-        binding.onLifecycle(.revoked(binding.id))
+        binding.onLifecycle(.revoked(installation))
 
-        XCTAssertTrue(appState.retiredEditorDocumentBindings[binding.id]?.session === session)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[quarantinedURL]?.session === session)
         XCTAssertNotNil(appState.indeterminateSessionWrites[sessionIdentity])
         XCTAssertEqual(
             appState.indeterminateSessionWriteContexts[sessionIdentity]?.location,
@@ -6204,7 +7757,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
     }
 
-    func testUnretirableExternalConflictBlocksWorkspaceCloseWithoutDiscardingSession() throws {
+    func testUnretirableExternalConflictBlocksWorkspaceCloseWithoutDiscardingSession() async throws {
         let rootURL = try makeTemporaryDirectory()
         let documentURL = rootURL.appendingPathComponent("post.md")
         try "Original".write(to: documentURL, atomically: true, encoding: .utf8)
@@ -6217,29 +7770,32 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             currentSession: session,
             retainSecurityScope: true
         )
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
         defer {
-            appState.pendingExternalTexts[documentURL.standardizedFileURL] = nil
+            appState.pendingExternalTexts[canonicalURL] = nil
             appState.externalChangePrompt = nil
             appState.closeWorkspace()
             try? FileManager.default.removeItem(at: rootURL)
         }
         appState.replaceDocumentText("Local dirty text", in: session)
         try "External disk text".write(to: documentURL, atomically: true, encoding: .utf8)
-        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
         appState.handleExternalChange(for: session)
 
         appState.removeEditorDocumentBindingRegistration(for: session)
-        appState.installedEditorDocumentBindingLease = nil
+        appState.editorBindingInstallations.removeAll()
         appState.closeWorkspace()
 
         XCTAssertEqual(appState.workspaceRootURL?.standardizedFileURL, rootURL.standardizedFileURL)
         XCTAssertTrue(appState.currentDocument === session)
-        XCTAssertTrue(appState.sessionCache[documentURL.standardizedFileURL] === session)
+        XCTAssertTrue(appState.sessionCache[canonicalURL] === session)
         XCTAssertTrue(session.isDirty)
         XCTAssertEqual(session.text, "Local dirty text")
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), "External disk text")
-        XCTAssertNotNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
         XCTAssertNotNil(appState.presentedError)
+        try await waitUntil("blocked close retains the detected external source") {
+            appState.pendingExternalTexts[canonicalURL] != nil
+        }
     }
 
     func testWorkspaceCloseRemovesUninstalledSessionBindingRegistration() throws {
@@ -6264,10 +7820,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertTrue(appState.sessionCache.isEmpty)
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
         XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
-        XCTAssertTrue(appState.retiredEditorDocumentBindings.isEmpty)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions.isEmpty)
     }
 
-    func testRetiredInstalledConflictStaysRecoverableAfterRevocationUntilReload() throws {
+    func testRetiredInstalledConflictStaysRecoverableAfterRevocationUntilReload() async throws {
         let rootURL = try makeTemporaryDirectory()
         let documentURL = rootURL.appendingPathComponent("post.md")
         let original = "Original"
@@ -6299,32 +7855,53 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             try? FileManager.default.removeItem(at: rootURL)
         }
         let binding = appState.editorDocumentBinding(for: session)
-        binding.onLifecycle(.installed(binding.id))
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
         appState.replaceDocumentText(local, in: session)
         try external.write(to: documentURL, atomically: true, encoding: .utf8)
-        appState.lastKnownDiskModificationDates[documentURL.standardizedFileURL] = .distantPast
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
         appState.handleExternalChange(for: session)
 
         try appState.closeWorkspaceForReplacement()
-        binding.onLifecycle(.revoked(binding.id))
+        binding.onLifecycle(.revoked(installation))
 
-        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[binding.id])
-        XCTAssertFalse(retirement.isAwaitingBindingEnd)
+        try await waitUntil("retired session records its external conflict") {
+            appState.pendingExternalTexts[canonicalURL] == external &&
+                appState.externalChangePrompt?.fileURL == canonicalURL &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertTrue(retirement.awaitingInstallations.isEmpty)
         XCTAssertTrue(retirement.session === session)
-        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, rootURL.standardizedFileURL)
+        XCTAssertEqual(
+            retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
+            rootURL.standardizedFileURL
+        )
         XCTAssertTrue(session.isDirty)
         XCTAssertEqual(session.text, local)
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
         XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
 
-        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentURL)
+        XCTAssertEqual(
+            appState.externalChangePrompt?.fileURL.standardizedFileURL,
+            documentURL.standardizedFileURL
+        )
         appState.reloadExternallyChangedFile()
+
+        try await waitUntil("retired Reload completes before authority release") {
+            session.text == external &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
 
         XCTAssertEqual(session.text, external)
         XCTAssertFalse(session.isDirty)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[binding.id])
-        XCTAssertNil(appState.pendingExternalTexts[documentURL.standardizedFileURL])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
     }
 
@@ -6359,20 +7936,46 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let locationA = try authorityA.canonicalizedLocation(forFileURL: documentA)
         try appState.activateAnchoredFileSession(at: locationA)
         let editorBinding = appState.editorDocumentBinding(for: session)
-        editorBinding.onLifecycle(.installed(editorBinding.id))
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: editorBinding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        editorBinding.onLifecycle(.installed(installation))
 
         try FileManager.default.removeItem(at: selectedRoot)
         try FileManager.default.createSymbolicLink(at: selectedRoot, withDestinationURL: rootB)
         try appState.closeWorkspaceForReplacement()
 
-        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[editorBinding.id])
-        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, selectedRoot)
-        editorBinding.text.wrappedValue = "late editor commit"
-        editorBinding.onLifecycle(.revoked(editorBinding.id))
+        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentSessions[stateURL])
+        XCTAssertEqual(
+            retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
+            selectedRoot
+        )
+        let baseSnapshot = editorBinding.sourceContract.snapshot()
+        XCTAssertEqual(
+            editorBinding.sourceContract.writer(.activate(
+                installation,
+                from: baseSnapshot
+            )),
+            .activated(baseSnapshot)
+        )
+        XCTAssertEqual(
+            editorBinding.sourceContract.publish(EditorDocumentSourcePublication(
+                installation: installation,
+                base: baseSnapshot,
+                source: "late editor commit"
+            )),
+            .accepted(
+                EditorDocumentSourceSnapshot(source: "late editor commit", revision: 1),
+                sourceWasReconciled: false
+            )
+        )
+        editorBinding.onLifecycle(.revoked(installation))
 
         XCTAssertEqual(try String(contentsOf: documentA, encoding: .utf8), "late editor commit")
         XCTAssertEqual(try String(contentsOf: documentB, encoding: .utf8), "B sentinel")
-        XCTAssertNil(appState.retiredEditorDocumentBindings[editorBinding.id])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[stateURL])
     }
 
     // swiftlint:disable:next function_body_length
@@ -6407,7 +8010,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             )
             appState.retainUnanchoredManagedSessionOwnership(for: session)
             let editorBinding = appState.editorDocumentBinding(for: session)
-            editorBinding.onLifecycle(.installed(editorBinding.id))
+            let installation = EditorDocumentBindingInstallation(
+                bindingID: editorBinding.id,
+                installationID: EditorDocumentBindingInstallationID()
+            )
+            editorBinding.onLifecycle(.installed(installation))
+            let stateURL = try XCTUnwrap(appState.sessionStateURL(for: session))
 
             try FileManager.default.removeItem(at: documentURL)
             if mutation == .replacement {
@@ -6421,14 +8029,15 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             try appState.closeWorkspaceForReplacement()
 
             let retirement = try XCTUnwrap(
-                appState.retiredEditorDocumentBindings[editorBinding.id],
+                appState.retiredEditorDocumentSessions[stateURL],
                 "mutation: \(mutation)"
             )
             XCTAssertEqual(
-                retirement.securityScopedAuthority?.url.standardizedFileURL,
+                retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
                 root.standardizedFileURL,
                 "mutation: \(mutation)"
             )
+            editorBinding.onLifecycle(.revoked(installation))
         }
     }
 
@@ -6462,7 +8071,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
             documentBindingID: bindingA.id,
-            onDocumentBindingLifecycle: bindingA.onLifecycle
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
         )
         let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
         defer {
@@ -6496,18 +8106,25 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
             documentBindingID: bindingB.id,
-            onDocumentBindingLifecycle: bindingB.onLifecycle
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract
         )
         documentBView.updateRepresentedTextView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
 
-        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
+        let canonicalDocumentAURL = documentAURL.standardizedFileURL.resolvingSymlinksInPath()
+        let retirement = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalDocumentAURL]
+        )
         XCTAssertTrue(retirement.session === sessionA)
-        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceRoot.standardizedFileURL)
-        XCTAssertTrue(retirement.isAwaitingBindingEnd)
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertEqual(
+            retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
+            workspaceRoot.standardizedFileURL
+        )
+        XCTAssertFalse(retirement.awaitingInstallations.isEmpty)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
         XCTAssertNil(appState.workspaceRootURL)
 
         editorFixture.textView.insertText("臺", replacementRange: .notFound)
@@ -6522,13 +8139,16 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
         XCTAssertEqual(sessionB.text, sourceB)
         XCTAssertEqual(sessionB.version, 0)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalDocumentAURL])
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)])
         XCTAssertNil(appState.editorDocumentBindingSessions[bindingA.id])
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
-        bindingA.onLifecycle(.revoked(bindingA.id))
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
+        bindingA.onLifecycle(.revoked(EditorDocumentBindingInstallation(
+            bindingID: bindingA.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )))
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalDocumentAURL])
     }
 
     // swiftlint:disable:next function_body_length
@@ -6574,7 +8194,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
             documentBindingID: bindingA.id,
-            onDocumentBindingLifecycle: bindingA.onLifecycle
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
         )
         let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
         defer {
@@ -6600,13 +8221,19 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         await appState.workspaceReloadTask?.value
         let sessionB = appState.currentDocument
         XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
+        let canonicalDocumentAURL = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        let retirement = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalDocumentAURL]
+        )
+        XCTAssertEqual(
+            retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
+            workspaceA.standardizedFileURL
+        )
         XCTAssertEqual(appState.anchoredSessionFileBinding(for: sessionA), anchoredBindingA)
         XCTAssertEqual(
             appState.anchoredSessionFileBinding(for: sessionB)?.location.rootAuthority.canonicalRootURL,
             workspaceB.standardizedFileURL
         )
-        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
-        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceA.standardizedFileURL)
         XCTAssertEqual(appState.workspaceAccess?.url.standardizedFileURL, workspaceB.standardizedFileURL)
 
         let bindingB = appState.editorDocumentBinding(for: sessionB)
@@ -6617,13 +8244,14 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
             documentBindingID: bindingB.id,
-            onDocumentBindingLifecycle: bindingB.onLifecycle
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract
         )
         documentBView.updateRepresentedTextView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
 
         editorFixture.textView.insertText("臺", replacementRange: .notFound)
         documentBView.updateRepresentedTextView(
@@ -6635,8 +8263,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(sessionA.version, 1)
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
         XCTAssertEqual(sessionB.text, sourceB)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionB)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalDocumentAURL])
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingB.id, session: sessionB))
     }
 
     // swiftlint:disable:next function_body_length
@@ -6673,7 +8301,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
             documentBindingID: bindingA.id,
-            onDocumentBindingLifecycle: bindingA.onLifecycle
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
         )
         let editorFixture = try makeEditorBridgeFixture(representable: documentAView, source: sourceA)
         defer {
@@ -6696,10 +8325,16 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: missingDestinationURL.path))
         XCTAssertTrue(appState.currentDocument === sessionA)
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === sessionA)
-        let retirement = try XCTUnwrap(appState.retiredEditorDocumentBindings[bindingA.id])
-        XCTAssertEqual(retirement.securityScopedAuthority?.url.standardizedFileURL, workspaceA.standardizedFileURL)
-        XCTAssertTrue(retirement.isAwaitingBindingEnd)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
+        let canonicalDocumentAURL = documentAURL.standardizedFileURL.resolvingSymlinksInPath()
+        let retirement = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalDocumentAURL]
+        )
+        XCTAssertEqual(
+            retirement.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
+            workspaceA.standardizedFileURL
+        )
+        XCTAssertFalse(retirement.awaitingInstallations.isEmpty)
 
         try Data([0xFF]).write(to: missingDestinationURL)
         XCTAssertThrowsError(
@@ -6710,32 +8345,1095 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             )
         )
         let retirementAfterRepeatedFailure = try XCTUnwrap(
-            appState.retiredEditorDocumentBindings[bindingA.id]
+            appState.retiredEditorDocumentSessions[canonicalDocumentAURL]
         )
         XCTAssertTrue(retirementAfterRepeatedFailure.session === sessionA)
         XCTAssertEqual(
-            retirementAfterRepeatedFailure.securityScopedAuthority?.url.standardizedFileURL,
+            retirementAfterRepeatedFailure.securityScopedAuthorityOwners.first?.authority.url.standardizedFileURL,
             workspaceA.standardizedFileURL
         )
-        XCTAssertTrue(retirementAfterRepeatedFailure.isAwaitingBindingEnd)
+        XCTAssertFalse(retirementAfterRepeatedFailure.awaitingInstallations.isEmpty)
         XCTAssertNil(appState.workspaceRootURL)
 
         editorFixture.textView.insertText("臺", replacementRange: .notFound)
         XCTAssertEqual(sessionA.text, sourceA + "臺")
         XCTAssertEqual(sessionA.version, 1)
         XCTAssertTrue(sessionA.isDirty)
-        XCTAssertNotNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[canonicalDocumentAURL])
 
         MarkdownTextView.dismantleNSView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertNil(appState.installedEditorDocumentBindingLease)
-        XCTAssertNil(appState.retiredEditorDocumentBindings[bindingA.id])
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalDocumentAURL])
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)])
         XCTAssertNil(appState.editorDocumentBindingSessions[bindingA.id])
         XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA + "臺")
         XCTAssertFalse(sessionA.isDirty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testTwoCoordinatorsShareOneBindingWithoutConsumingEachOthersInstallation() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "A composition: "
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        appState.recordKnownDiskText(source, for: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        var selection2: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: source)
+        let firstInstallation = try XCTUnwrap(
+            appState.editorBindingInstallations.keys.first
+        )
+        binding.onLifecycle(.installed(firstInstallation))
+        XCTAssertEqual(appState.editorBindingInstallations.count, 1)
+
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture2 = try makeEditorBridgeFixture(
+            representable: view2,
+            source: source,
+            makeKey: false
+        )
+        defer {
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                fixture1.scrollView,
+                coordinator: fixture1.coordinator
+            )
+            MarkdownTextView.dismantleNSView(
+                fixture2.scrollView,
+                coordinator: fixture2.coordinator
+            )
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertEqual(appState.editorBindingInstallations.count, 2)
+        XCTAssertEqual(
+            Set(appState.editorBindingInstallations.keys.map(\.bindingID)),
+            [binding.id]
+        )
+
+        try appState.closeWorkspaceForReplacement()
+        let canonicalURL = documentURL.standardizedFileURL.resolvingSymlinksInPath()
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentSessions[canonicalURL])
+        let authorityOwner = try XCTUnwrap(retirement.securityScopedAuthorityOwners.first)
+        XCTAssertEqual(retirement.awaitingInstallations.count, 2)
+        XCTAssertFalse(authorityOwner.hasStopped)
+
+        MarkdownTextView.dismantleNSView(
+            fixture1.scrollView,
+            coordinator: fixture1.coordinator
+        )
+        XCTAssertEqual(appState.editorBindingInstallations.count, 1)
+        XCTAssertEqual(
+            appState.retiredEditorDocumentSessions[canonicalURL]?.awaitingInstallations.count,
+            1
+        )
+        XCTAssertFalse(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), source)
+        binding.onLifecycle(.revoked(firstInstallation))
+        binding.onLifecycle(.revoked(EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )))
+        XCTAssertEqual(appState.editorBindingInstallations.count, 1)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: session))
+
+        fixture2.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(fixture2.window.makeFirstResponder(fixture2.textView))
+        fixture2.textView.textSelection = selection2 ?? .notFound
+        let committedText = "臺e\u{0301}🧪"
+        fixture2.textView.insertText(committedText, replacementRange: .notFound)
+        let committedSource = source + committedText
+
+        XCTAssertEqual(Array(session.text.utf16), Array(committedSource.utf16))
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: session))
+
+        MarkdownTextView.dismantleNSView(
+            fixture2.scrollView,
+            coordinator: fixture2.coordinator
+        )
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), committedSource)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSeparateCoordinatorsRetireAAndBWithOneSharedAuthorityUntilFinalRevoke() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "B remains unchanged"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+        appState.recordKnownDiskText(sourceA, for: documentAURL)
+
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let viewA = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
+        )
+        let fixtureA = try makeEditorBridgeFixture(representable: viewA, source: sourceA)
+        XCTAssertTrue(fixtureA.window.makeFirstResponder(fixtureA.textView))
+        fixtureA.textView.textSelection = selectionA ?? .notFound
+        fixtureA.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.activateFileSession(url: documentBURL)
+        let sessionB = appState.currentDocument
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let viewB = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract
+        )
+        let fixtureB = try makeEditorBridgeFixture(
+            representable: viewB,
+            source: sourceB,
+            makeKey: false
+        )
+        defer {
+            fixtureA.window.orderOut(nil)
+            fixtureB.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                fixtureA.scrollView,
+                coordinator: fixtureA.coordinator
+            )
+            MarkdownTextView.dismantleNSView(
+                fixtureB.scrollView,
+                coordinator: fixtureB.coordinator
+            )
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixtureA.textView.hasMarkedText())
+        XCTAssertEqual(appState.editorBindingInstallations.count, 2)
+        fixtureA.textView.insertText("臺e\u{0301}🧪", replacementRange: .notFound)
+        let committedSourceA = sourceA + "臺e\u{0301}🧪"
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
+        XCTAssertEqual(sessionB.text, sourceB)
+
+        try appState.closeWorkspaceForReplacement()
+        let canonicalA = documentAURL.standardizedFileURL.resolvingSymlinksInPath()
+        let canonicalB = documentBURL.standardizedFileURL.resolvingSymlinksInPath()
+        let retirementA = try XCTUnwrap(appState.retiredEditorDocumentSessions[canonicalA])
+        let retirementB = try XCTUnwrap(appState.retiredEditorDocumentSessions[canonicalB])
+        let authorityOwner = try XCTUnwrap(retirementA.securityScopedAuthorityOwners.first)
+        XCTAssertTrue(retirementB.securityScopedAuthorityOwners.first === authorityOwner)
+        XCTAssertEqual(authorityOwner.dependentSessionCount, 2)
+        XCTAssertFalse(authorityOwner.hasStopped)
+
+        MarkdownTextView.dismantleNSView(
+            fixtureA.scrollView,
+            coordinator: fixtureA.coordinator
+        )
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[canonicalB])
+        XCTAssertEqual(authorityOwner.dependentSessionCount, 1)
+        XCTAssertFalse(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
+        XCTAssertEqual(sessionB.text, sourceB)
+
+        MarkdownTextView.dismantleNSView(
+            fixtureB.scrollView,
+            coordinator: fixtureB.coordinator
+        )
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalB])
+        XCTAssertEqual(authorityOwner.dependentSessionCount, 0)
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
+        XCTAssertEqual(try String(contentsOf: documentBURL, encoding: .utf8), sourceB)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testRetiredSessionReactivationBeforeIMECommitKeepsOneCanonicalSessionAndTasks() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A source: "
+        let dirtySourceA = "A dirty source: "
+        let sourceB = "B source"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(10, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: sessionA,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.recordKnownDiskText(sourceA, for: canonicalA)
+        appState.replaceDocumentText(dirtySourceA)
+
+        var selectionA: NSRange? = NSRange(location: (dirtySourceA as NSString).length, length: 0)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let viewA = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
+        )
+        let fixtureA = try makeEditorBridgeFixture(representable: viewA, source: dirtySourceA)
+        defer {
+            fixtureA.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                fixtureA.scrollView,
+                coordinator: fixtureA.coordinator
+            )
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        XCTAssertTrue(fixtureA.window.makeFirstResponder(fixtureA.textView))
+        fixtureA.textView.textSelection = selectionA ?? .notFound
+        fixtureA.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        try appState.open(
+            url: documentBURL,
+            rememberAsLastOpened: false,
+            preserveWorkspace: false
+        )
+        let sessionB = appState.currentDocument
+        let retirement = try XCTUnwrap(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertTrue(retirement.session === sessionA)
+        XCTAssertTrue(appState.currentDocument === sessionB)
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertTrue(fixtureA.textView.hasMarkedText())
+
+        try appState.open(
+            url: documentAURL,
+            rememberAsLastOpened: false,
+            preserveWorkspace: false
+        )
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(bindingA.id, session: sessionA))
+        XCTAssertEqual(
+            appState.editorDocumentBindingIDs[ObjectIdentifier(sessionA)],
+            bindingA.id
+        )
+        XCTAssertEqual(sessionB.text, sourceB)
+
+        let committedText = "臺e\u{0301}🧪"
+        fixtureA.textView.insertText(committedText, replacementRange: .notFound)
+        let committedSourceA = dirtySourceA + committedText
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedSourceA.utf16))
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertTrue(appState.editorDocumentBindingSessions[bindingA.id] === sessionA)
+        XCTAssertEqual(
+            Set(appState.editorBindingInstallations.values.map(ObjectIdentifier.init)),
+            [ObjectIdentifier(sessionA)]
+        )
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), sourceA)
+
+        MarkdownTextView.dismantleNSView(
+            fixtureA.scrollView,
+            coordinator: fixtureA.coordinator
+        )
+        try await waitUntil("reactivated retirement finishes after inspection and revoke") {
+            appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil &&
+                appState.retiredEditorDocumentSessions[canonicalA] == nil
+        }
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedSourceA)
+        XCTAssertFalse(sessionA.isDirty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSaveCopyRekeysRetiredMarkedTextSessionWithoutRevokingLiveInstallation() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let sourceURL = rootURL.appendingPathComponent("missing.md")
+        let destinationURL = rootURL.appendingPathComponent("recovered.md")
+        let source = "Local composition: "
+        try source.write(to: sourceURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: sourceURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["missing.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let oldCanonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.recordKnownDiskText(source, for: oldCanonicalURL)
+        var selection: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        let binding = appState.editorDocumentBinding(for: session)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: sourceURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: source)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(
+                fixture.scrollView,
+                coordinator: fixture.coordinator
+            )
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        let installationsBeforeSaveCopy = Set(
+            appState.editorBindingInstallations.keys
+        )
+
+        fixture.textView.insertText(" ordinary", replacementRange: .notFound)
+        let ordinarySource = source + " ordinary"
+        XCTAssertEqual(session.text, ordinarySource)
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        try appState.closeWorkspaceForReplacement()
+        XCTAssertEqual(appState.sessionStateURL(for: session), oldCanonicalURL)
+        let oldRetirement = try XCTUnwrap(appState.retiredEditorDocumentSessions[oldCanonicalURL])
+        let authorityOwner = try XCTUnwrap(oldRetirement.securityScopedAuthorityOwners.first)
+
+        try FileManager.default.removeItem(at: sourceURL)
+        appState.handleExternalChange(for: session)
+        try await waitUntil("retired missing source inspection completes before Save Copy") {
+            appState.missingFilePrompt?.fileURL == oldCanonicalURL &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.standardizedFileURL,
+            sourceURL.standardizedFileURL
+        )
+
+        let committedText = "臺e\u{0301}🧪"
+        fixture.textView.insertText(committedText, replacementRange: .notFound)
+        let committedSource = ordinarySource + committedText
+        XCTAssertEqual(Array(session.text.utf16), Array(committedSource.utf16))
+        XCTAssertFalse(fixture.textView.hasMarkedText())
+
+        try appState.saveDetachedCurrentDocument(to: destinationURL)
+        let newCanonicalURL = destinationURL.standardizedFileURL.resolvingSymlinksInPath()
+        XCTAssertNil(appState.retiredEditorDocumentSessions[oldCanonicalURL])
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[newCanonicalURL]?.session === session)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[newCanonicalURL] === session)
+        XCTAssertEqual(session.fileURL?.standardizedFileURL, newCanonicalURL)
+        XCTAssertEqual(appState.sessionStateURL(for: session), newCanonicalURL)
+        XCTAssertEqual(appState.activeEditorDocumentIdentity, AppState.editorDocumentIdentity(for: newCanonicalURL))
+        XCTAssertEqual(
+            Set(appState.editorBindingInstallations.keys),
+            installationsBeforeSaveCopy
+        )
+        XCTAssertTrue(appState.editorDocumentBindingSessions[binding.id] === session)
+        XCTAssertNil(appState.missingFilePrompt)
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), committedSource)
+        XCTAssertFalse(authorityOwner.hasStopped)
+
+        fixture.textView.insertText(" post-copy", replacementRange: .notFound)
+        let finalSource = committedSource + " post-copy"
+        XCTAssertEqual(Array(session.text.utf16), Array(finalSource.utf16))
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertTrue(appState.sessionCache[newCanonicalURL] === session)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: session))
+
+        MarkdownTextView.dismantleNSView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+        XCTAssertNil(appState.retiredEditorDocumentSessions[newCanonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), finalSource)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testSaveCopyRejectsRetiredDestinationBeforeWritingOrRekeying() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let sourceURL = rootURL.appendingPathComponent("missing.md")
+        let destinationURL = rootURL.appendingPathComponent("owned.md")
+        let source = "local recovery source"
+        let destinationSource = "existing retired destination"
+        try source.write(to: sourceURL, atomically: true, encoding: .utf8)
+        try destinationSource.write(to: destinationURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let sourceSession = DocumentSession(
+            text: source,
+            url: sourceURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let destinationSession = DocumentSession(
+            text: destinationSource,
+            url: destinationURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(
+            currentDocument: sourceSession,
+            shouldRestoreLastOpenedFile: false
+        )
+        let sourceKey = try XCTUnwrap(appState.sessionStateURL(for: sourceSession))
+        let destinationKey = destinationURL.standardizedFileURL.resolvingSymlinksInPath()
+        appState.retainUnanchoredManagedSessionOwnership(for: destinationSession)
+        try FileManager.default.removeItem(at: sourceURL)
+        appState.sessionCache[sourceKey] = sourceSession
+        appState.detachedSessionURLs.insert(sourceKey)
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: sourceKey)
+        appState.retiredEditorDocumentSessions[sourceKey] = RetiredEditorDocumentSession(
+            canonicalURL: sourceKey,
+            session: sourceSession,
+            bindingIDs: [],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
+        )
+        appState.retiredEditorDocumentSessions[destinationKey] = RetiredEditorDocumentSession(
+            canonicalURL: destinationKey,
+            session: destinationSession,
+            bindingIDs: [],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
+        )
+
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL)) { error in
+            guard case let AppStateError.invalidSessionIdentity(url) = error else {
+                return XCTFail("Expected retained destination ownership rejection, got \(error)")
+            }
+            XCTAssertEqual(url, destinationKey)
+        }
+        XCTAssertEqual(
+            try String(contentsOf: destinationURL, encoding: .utf8),
+            destinationSource
+        )
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[sourceKey]?.session === sourceSession)
+        XCTAssertTrue(
+            appState.retiredEditorDocumentSessions[destinationKey]?.session === destinationSession
+        )
+        XCTAssertTrue(appState.sessionCache[sourceKey] === sourceSession)
+        XCTAssertEqual(sourceSession.fileURL?.standardizedFileURL, sourceKey)
+        XCTAssertTrue(sourceSession.isDirty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testRetiredSaveFailureKeepsSourceReachableAndRetryReleasesAuthority() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "A source"
+        let localSource = "A local recovery source"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let fileWriter = FailingOnceWorkspaceAnchoredFileWriter()
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            shouldRestoreLastOpenedFile: false
+        )
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            try fileWriter.save(text: text, to: location, expecting: expectation)
+        }
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        appState.recordKnownDiskText(source, for: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        appState.replaceDocumentText(localSource)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try appState.closeWorkspaceForReplacement()
+        let canonicalURL = documentURL.standardizedFileURL.resolvingSymlinksInPath()
+        let authorityOwner = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalURL]?
+                .securityScopedAuthorityOwners.first
+        )
+        binding.onLifecycle(.revoked(installation))
+
+        XCTAssertEqual(fileWriter.writeAttemptCount, 1)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(session.text, localSource)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalURL]?.session === session)
+        XCTAssertTrue(
+            appState.retiredEditorDocumentSessions[canonicalURL]?.awaitingInstallations.isEmpty == true
+        )
+        XCTAssertEqual(appState.presentedError?.title, "Could Not Save Retired File")
+        XCTAssertFalse(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), source)
+
+        appState.presentedError = nil
+        appState.finishRetiredEditorDocumentSessionIfPossible(for: session)
+
+        XCTAssertEqual(fileWriter.writeAttemptCount, 2)
+        XCTAssertNil(appState.presentedError)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), localSource)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testEndedMissingRetirementReopensExactSessionBeforeDiskAndSaveCopyRecoversIt() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let recoveredURL = rootURL.appendingPathComponent("recovered.md")
+        let sourceA = "A source"
+        let localSourceA = "A unsaved local source"
+        let sourceB = "B source"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.recordKnownDiskText(sourceA, for: canonicalA)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let installationA = EditorDocumentBindingInstallation(
+            bindingID: bindingA.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        bindingA.onLifecycle(.installed(installationA))
+        appState.replaceDocumentText(localSourceA)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try appState.closeWorkspaceForReplacement()
+        let authorityOwner = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalA]?
+                .securityScopedAuthorityOwners.first
+        )
+        try FileManager.default.removeItem(at: documentAURL)
+        appState.handleExternalChange(for: sessionA)
+        bindingA.onLifecycle(.revoked(installationA))
+        try await waitUntil("ended retirement records the missing source") {
+            appState.missingFilePrompt?.fileURL == canonicalA &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
+        }
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
+        XCTAssertTrue(
+            appState.retiredEditorDocumentSessions[canonicalA]?.awaitingInstallations.isEmpty == true
+        )
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.standardizedFileURL,
+            documentAURL.standardizedFileURL
+        )
+        XCTAssertEqual(sessionA.text, localSourceA)
+        XCTAssertFalse(authorityOwner.hasStopped)
+
+        try appState.open(
+            url: documentBURL,
+            rememberAsLastOpened: false,
+            preserveWorkspace: false
+        )
+        let sessionB = appState.currentDocument
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNil(appState.missingFilePrompt)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
+
+        try appState.activateFileSession(url: documentAURL)
+        try await waitUntil("reactivated missing inspection completes before Save Copy") {
+            appState.missingFilePrompt?.fileURL == canonicalA &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
+        }
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertTrue(appState.sessionCache[canonicalA] === sessionA)
+        XCTAssertEqual(sessionA.text, localSourceA)
+        XCTAssertEqual(
+            appState.missingFilePrompt?.fileURL.standardizedFileURL,
+            documentAURL.standardizedFileURL
+        )
+
+        try appState.saveDetachedCurrentDocument(to: recoveredURL)
+        let recoveredCanonicalURL = recoveredURL.standardizedFileURL.resolvingSymlinksInPath()
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertTrue(appState.sessionCache[recoveredCanonicalURL] === sessionA)
+        XCTAssertEqual(sessionA.fileURL?.standardizedFileURL, recoveredCanonicalURL)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[recoveredCanonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: recoveredURL, encoding: .utf8), localSourceA)
+        XCTAssertFalse(sessionA.isDirty)
+    }
+
+    func testRetiredConflictKeepMineUsesRealPromptSavesLocalSourceAndReleasesAuthority() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "A source"
+        let localSource = "A local source"
+        let externalSource = "A external source"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        appState.replaceDocumentText(localSource)
+        try externalSource.write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
+        appState.handleExternalChange(for: session)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try appState.closeWorkspaceForReplacement()
+        let authorityOwner = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalURL]?
+                .securityScopedAuthorityOwners.first
+        )
+        binding.onLifecycle(.revoked(installation))
+        try await waitUntil("retired external source is ready for Keep Mine") {
+            appState.externalChangePrompt?.fileURL == canonicalURL &&
+                appState.pendingExternalTexts[canonicalURL] == externalSource &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertEqual(
+            appState.externalChangePrompt?.fileURL.standardizedFileURL,
+            documentURL.standardizedFileURL
+        )
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalURL], externalSource)
+
+        appState.keepMineForExternallyChangedFile()
+
+        try await waitUntil("retired Keep Mine saves and releases authority") {
+            appState.retiredEditorDocumentSessions[canonicalURL] == nil
+        }
+
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), localSource)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    func testMissingRetirementExplicitCloseDiscardsSourceAndReleasesAuthority() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "A unsaved source"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        try FileManager.default.removeItem(at: documentURL)
+        appState.handleExternalChange(for: session)
+        try appState.closeWorkspaceForReplacement()
+        let authorityOwner = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalURL]?
+                .securityScopedAuthorityOwners.first
+        )
+        binding.onLifecycle(.revoked(installation))
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        try await waitUntil("retired missing inspection completes before explicit close") {
+            appState.missingFilePrompt?.fileURL == canonicalURL &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+        XCTAssertNotNil(appState.missingFilePrompt)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(session.text, source)
+        XCTAssertFalse(authorityOwner.hasStopped)
+
+        appState.closeMissingFile()
+
+        XCTAssertNil(appState.currentDocument.fileURL)
+        XCTAssertNil(appState.missingFilePrompt)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalURL])
+        XCTAssertTrue(authorityOwner.hasStopped)
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
+        XCTAssertTrue(appState.editorDocumentBindingIDs.isEmpty)
+        XCTAssertTrue(appState.editorDocumentBindingSessions.isEmpty)
+    }
+
+    func testRetiredAutosaveContentFencePreservesInPlaceRewriteWithoutWatcher() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let original = "AAAA"
+        let local = "A retired local source"
+        let external = "BBBB"
+        try original.write(to: documentURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.5, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let session = DocumentSession(text: original, url: documentURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session,
+            retainSecurityScope: true
+        )
+        let key = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.recordKnownDiskText(original, for: key)
+        let originalIdentity = try regularIdentity(at: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        appState.replaceDocumentText(local, in: session)
+        try appState.closeWorkspaceForReplacement()
+        let authorityOwner = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[key]?
+                .securityScopedAuthorityOwners.first
+        )
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(session)])
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: Data(external.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalIdentity)
+
+        try await waitUntil("retired autosave detects exact disk content mismatch") {
+            appState.pendingExternalTexts[key] == external &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(session)] == nil
+        }
+
+        XCTAssertEqual(session.text, local)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[key]?.session === session)
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(session)])
+        XCTAssertEqual(appState.presentedError?.title, "Autosave Failed")
+        XCTAssertFalse(authorityOwner.hasStopped)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), external)
+        binding.onLifecycle(.revoked(installation))
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[key])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSuccessfulTreeSelectionTransfersPendingAutosaveStatisticsAndTerminationFlush() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A source"
+        let dirtySourceA = "A exact dirty source e\u{0301}🧪"
+        let sourceB = "B independent source"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.15, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: sessionA,
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: defaults
+        )
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md", "b.md"],
+            currentSession: sessionA
+        )
+        appState.recordKnownDiskText(sourceA, for: documentAURL)
+        defer {
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        appState.replaceDocumentText(dirtySourceA)
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertNotNil(appState.statisticsTask)
+        let tree = try XCTUnwrap(appState.workspaceTree)
+        let nodeB = try XCTUnwrap(
+            appState.firstNode(in: tree.root, relativePath: "b.md")
+        )
+
+        appState.selectWorkspaceNode(id: nodeB.id)
+
+        let sessionB = appState.currentDocument
+        XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.autosaveTask)
+        XCTAssertNil(appState.statisticsTask)
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionB)])
+        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionB)])
+
+        try await waitUntil("tree-switch A autosave and statistics finish") {
+            !sessionA.isDirty &&
+                sessionA.statistics == TextStatistics(text: dirtySourceA) &&
+                (try? String(contentsOf: documentAURL, encoding: .utf8)) == dirtySourceA
+        }
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+
+        let terminationSourceA = dirtySourceA + "\ntermination flush"
+        appState.applyDocumentText(terminationSourceA, to: sessionA)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        appState.cancelBackgroundAutosave(for: sessionA)
+        appState.flushAutosaveIfNeeded()
+
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), terminationSourceA)
+        XCTAssertFalse(sessionA.isDirty)
+        XCTAssertTrue(appState.currentDocument === sessionB)
+        XCTAssertEqual(sessionB.text, sourceB)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSuccessfulSearchActivationTransfersPendingAWorkAndNavigatesBExactly() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(0.15, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sourceA = "alpha source"
+        let dirtySourceA = "alpha exact dirty e\u{0301}🧪"
+        let sourceB = "# B\nbeta source"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA, "b.md": sourceB],
+            currentPath: "a.md",
+            userDefaults: defaults
+        )
+        defer {
+            cleanUp(fixture)
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+        let appState = fixture.appState
+        let sessionA = appState.currentDocument
+        let documentAURL = fixture.rootURL.appendingPathComponent("a.md")
+        let documentBURL = fixture.rootURL.appendingPathComponent("b.md")
+        appState.recordKnownDiskText(sourceA, for: documentAURL)
+        appState.replaceDocumentText(dirtySourceA)
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
+        try await waitUntil("search-switch request starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let activeContext = context(for: request)
+        let fileResult = result(
+            path: "b.md",
+            text: sourceB,
+            needle: "beta",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(activeContext, fileResult), to: 0)
+        try await waitUntil("search-switch result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.activateWorkspaceSearchResult(
+            context: activeContext,
+            fileResult: fileResult,
+            match: match
+        )
+
+        let sessionB = appState.currentDocument
+        XCTAssertEqual(sessionB.fileURL?.standardizedFileURL, documentBURL.standardizedFileURL)
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNotNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNotNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.autosaveTask)
+        XCTAssertNil(appState.statisticsTask)
+        let navigation = try navigationRequest(from: appState.editorNavigationCommand)
+        XCTAssertEqual(navigation.documentIdentity, AppState.editorDocumentIdentity(for: documentBURL))
+        XCTAssertEqual(navigation.selection, match.range)
+
+        try await waitUntil("search-switch A work and B completion finish") {
+            !sessionA.isDirty &&
+                sessionA.statistics == TextStatistics(text: dirtySourceA) &&
+                appState.completionWorkspace.currentFilePath == "b.md" &&
+                (try? String(contentsOf: documentAURL, encoding: .utf8)) == dirtySourceA
+        }
+        XCTAssertEqual(appState.completionWorkspace.currentFileHeadingAnchors, ["#b"])
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionB)])
+        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionB)])
+        XCTAssertNil(appState.sessionAutosaveTasks[ObjectIdentifier(sessionA)])
+        XCTAssertNil(appState.sessionStatisticsTasks[ObjectIdentifier(sessionA)])
     }
 
     func testDebounceStartsOnlyLatestQueryWithIncreasingGeneration() async throws {
@@ -7276,7 +9974,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
         try await waitUntil("search starts") { provider.requests.count == 1 }
         let request = provider.requests[0]
-        let fileResult = result(path: "b.md", text: "before needle after", needle: "needle")
+        let fileResult = result(
+            path: "b.md",
+            text: "before needle after",
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
         let match = try XCTUnwrap(fileResult.matches.first)
         provider.yield(.fileResult(context(for: request), fileResult), to: 0)
         try await waitUntil("result applies") {
@@ -7361,27 +10064,32 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
         try await waitUntil("stale-result search starts") { provider.requests.count == 1 }
         let firstRequest = provider.requests[0]
-        let staleResult = result(path: "post.md", text: diskText, needle: "needle")
+        let staleResult = result(
+            path: "post.md",
+            text: diskText,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
         let staleMatch = try XCTUnwrap(staleResult.matches.first)
         provider.yield(.fileResult(context(for: firstRequest), staleResult), to: 0)
         try await waitUntil("stale result applies") {
             fixture.appState.workspaceSearchState.fileResults == [staleResult]
         }
 
+        let olderNavigation = seedOlderPendingNavigation(in: fixture.appState)
+        let searchTask = try XCTUnwrap(fixture.appState.workspaceSearchTask)
+        let searchToken = fixture.appState.workspaceSearchTaskToken
         fixture.appState.activateWorkspaceSearchResult(
             context: context(for: firstRequest),
             fileResult: staleResult,
             match: staleMatch
         )
 
-        guard case .cancel? = fixture.appState.editorNavigationCommand else {
-            return XCTFail("Expected stale fingerprint to emit editor cancellation")
-        }
-        try await waitUntil("fresh-overlay search restarts") { provider.requests.count == 2 }
-        let refreshedRequest = provider.requests[1]
-        XCTAssertGreaterThan(refreshedRequest.queryGeneration, firstRequest.queryGeneration)
-        let refreshedOverlay = try XCTUnwrap(refreshedRequest.dirtyOverlays.overlays.first)
-        XCTAssertEqual(Array(refreshedOverlay.text.utf8), Array(liveText.utf8))
+        XCTAssertEqual(fixture.appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertEqual(fixture.appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertNotNil(fixture.appState.workspaceSearchTask)
+        XCTAssertFalse(searchTask.isCancelled)
+        XCTAssertEqual(provider.requests.count, 1)
         XCTAssertNotEqual(
             WorkspaceSearchContentFingerprint(text: diskText).utf8ByteCount,
             WorkspaceSearchContentFingerprint(text: liveText).utf8ByteCount
@@ -7411,7 +10119,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(scenario.fixture.appState.currentDocument.fileURL?.lastPathComponent, "a.md")
     }
 
-    func testAcceptedActivationMissingNodeSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationMissingNodePreservesOlderNavigation() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
@@ -7422,10 +10130,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             options: .init(showAllFiles: false)
         )
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
     }
 
-    func testAcceptedActivationOpenFailureSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationOpenFailurePreservesOlderNavigation() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
@@ -7433,10 +10141,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             at: scenario.fixture.rootURL.appendingPathComponent("b.md")
         )
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
     }
 
-    func testAcceptedActivationDetachedTargetSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationDetachedTargetPreservesOlderNavigation() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
@@ -7452,10 +10160,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         scenario.fixture.appState.recordKnownDiskText("beta", for: targetURL)
         scenario.fixture.appState.detachedSessionURLs.insert(targetURL)
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
     }
 
-    func testAcceptedActivationIdentityMismatchSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationIdentityMismatchPreservesOlderNavigation() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
@@ -7473,26 +10181,264 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         scenario.fixture.appState.sessionCache[targetURL] = mismatchedSession
         scenario.fixture.appState.recordKnownDiskText("alpha", for: mismatchedURL)
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
     }
 
-    func testAcceptedActivationFingerprintMismatchSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationFingerprintMismatchPreservesEntirePreviousTransaction() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let appState = scenario.fixture.appState
+        let previousSession = appState.currentDocument
+        appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let search = try XCTUnwrap(appState.workspaceSearchTask)
+        let searchToken = appState.workspaceSearchTaskToken
+        let previousTree = appState.workspaceTree
         try "changed beta".write(
             to: scenario.fixture.rootURL.appendingPathComponent("b.md"),
             atomically: true,
             encoding: .utf8
         )
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
+        XCTAssertTrue(appState.currentDocument === previousSession)
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.completionWorkspaceTask)
+        XCTAssertNotNil(appState.workspaceSearchTask)
+        XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertFalse(search.isCancelled)
     }
 
-    func testAcceptedActivationInvalidRangeSupersedesOlderNavigation() async throws {
+    func testAcceptedActivationIntermediateSymlinkSwapPreservesEntirePreviousTransaction() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "safe/b.md": "beta"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
+        try await waitUntil("nested activation search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "safe/b.md",
+            text: "beta",
+            needle: "beta",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("nested activation result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        let previousSession = appState.currentDocument
+        appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let search = try XCTUnwrap(appState.workspaceSearchTask)
+        let searchToken = appState.workspaceSearchTaskToken
+        let previousTree = appState.workspaceTree
+
+        let originalParent = fixture.rootURL.appendingPathComponent("safe", isDirectory: true)
+        let retainedParent = fixture.rootURL.appendingPathComponent(
+            "safe-original",
+            isDirectory: true
+        )
+        let replacementParent = fixture.rootURL.appendingPathComponent(
+            "replacement",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: replacementParent,
+            withIntermediateDirectories: true
+        )
+        try "beta".write(
+            to: replacementParent.appendingPathComponent("b.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.moveItem(at: originalParent, to: retainedParent)
+        try FileManager.default.createSymbolicLink(
+            at: originalParent,
+            withDestinationURL: replacementParent
+        )
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === previousSession)
+        XCTAssertEqual(appState.currentDocument.text, "alpha dirty")
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertNotNil(appState.workspaceSearchTask)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertFalse(search.isCancelled)
+        XCTAssertNil(appState.sessionCache[originalParent.appendingPathComponent("b.md")])
+    }
+
+    func testAcceptedActivationHardLinkCollisionPreservesEntirePreviousTransaction() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "temporary"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let documentAURL = fixture.rootURL.appendingPathComponent("a.md")
+        let documentBURL = fixture.rootURL.appendingPathComponent("b.md")
+        try FileManager.default.removeItem(at: documentBURL)
+        try FileManager.default.linkItem(at: documentAURL, to: documentBURL)
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("hard-link activation search starts") {
+            provider.requests.count == 1
+        }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "b.md",
+            text: "alpha",
+            needle: "alpha",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("hard-link search result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        let previousSession = appState.currentDocument
+        appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let search = try XCTUnwrap(appState.workspaceSearchTask)
+        let searchToken = appState.workspaceSearchTaskToken
+        let previousTree = appState.workspaceTree
+        let previousBindings = appState.anchoredSessionFileBindings
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === previousSession)
+        XCTAssertEqual(appState.currentDocument.text, "alpha dirty")
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertNotNil(appState.workspaceSearchTask)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertFalse(search.isCancelled)
+        XCTAssertEqual(appState.anchoredSessionFileBindings, previousBindings)
+        XCTAssertNil(appState.sessionCache[documentBURL.standardizedFileURL])
+    }
+
+    func testAcceptedActivationUnownedHardLinkTreeCollisionPreservesEntirePreviousTransaction() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "b.md": "temporary", "c.md": "charlie"],
+            currentPath: "c.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let documentAURL = fixture.rootURL.appendingPathComponent("a.md")
+        let documentBURL = fixture.rootURL.appendingPathComponent("b.md")
+        try FileManager.default.removeItem(at: documentBURL)
+        try FileManager.default.linkItem(at: documentAURL, to: documentBURL)
+
+        let hardLinkSnapshot = try await WorkspaceDirectoryScanner().snapshot(root: fixture.rootURL)
+        appState.workspaceSnapshot = hardLinkSnapshot
+        appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: hardLinkSnapshot,
+            options: .init(showAllFiles: false)
+        )
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
+        try await waitUntil("unowned hard-link activation search starts") {
+            provider.requests.count == 1
+        }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "b.md",
+            text: "alpha",
+            needle: "alpha",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("unowned hard-link search result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        let previousSession = appState.currentDocument
+        appState.replaceDocumentText("charlie dirty", in: previousSession)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let search = try XCTUnwrap(appState.workspaceSearchTask)
+        let searchToken = appState.workspaceSearchTaskToken
+        let previousTree = appState.workspaceTree
+        let previousBindings = appState.anchoredSessionFileBindings
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === previousSession)
+        XCTAssertEqual(appState.currentDocument.text, "charlie dirty")
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertNotNil(appState.workspaceSearchTask)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertFalse(search.isCancelled)
+        XCTAssertEqual(appState.anchoredSessionFileBindings, previousBindings)
+        XCTAssertNil(appState.sessionCache[documentBURL.standardizedFileURL])
+    }
+
+    func testAcceptedActivationInvalidRangePreservesEntirePreviousTransaction() async throws {
         var scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
+        let appState = scenario.fixture.appState
+        let previousSession = appState.currentDocument
+        appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let autosave = try XCTUnwrap(appState.autosaveTask)
+        let statistics = try XCTUnwrap(appState.statisticsTask)
+        let completion = try XCTUnwrap(appState.completionWorkspaceTask)
+        let search = try XCTUnwrap(appState.workspaceSearchTask)
+        let searchToken = appState.workspaceSearchTaskToken
+        let previousTree = appState.workspaceTree
         let invalidMatch = TextSearchMatch(
             range: NSRange(location: 999, length: 1),
             line: 1,
@@ -7503,15 +10449,27 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             relativePath: "b.md",
             contentFingerprint: WorkspaceSearchContentFingerprint(text: "beta"),
             matches: [invalidMatch],
-            isTruncated: false
+            isTruncated: false,
+            fileAuthority: scenario.fileResult.fileAuthority
         )
         scenario.match = invalidMatch
         scenario.fixture.appState.workspaceSearchState.fileResults = [scenario.fileResult]
 
-        activateAndAssertNewerCancellation(scenario, olderThan: olderNavigation.id)
+        activateAndAssertNavigationUnchanged(scenario, olderNavigation: olderNavigation)
+        XCTAssertTrue(appState.currentDocument === previousSession)
+        XCTAssertEqual(appState.workspaceTree, previousTree)
+        XCTAssertNotNil(appState.autosaveTask)
+        XCTAssertNotNil(appState.statisticsTask)
+        XCTAssertNotNil(appState.completionWorkspaceTask)
+        XCTAssertNotNil(appState.workspaceSearchTask)
+        XCTAssertEqual(appState.workspaceSearchTaskToken, searchToken)
+        XCTAssertFalse(autosave.isCancelled)
+        XCTAssertFalse(statistics.isCancelled)
+        XCTAssertFalse(completion.isCancelled)
+        XCTAssertFalse(search.isCancelled)
     }
 
-    func testUnreadableAcceptedActivationPreservesCurrentWorkAndLeavesCancellationLatest() async throws {
+    func testUnreadableAcceptedActivationPreservesCurrentWorkAndNavigation() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
         let appState = scenario.fixture.appState
@@ -7545,10 +10503,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertNotNil(appState.completionWorkspaceTask)
         XCTAssertEqual(appState.externalChangePrompt, currentPrompt)
         XCTAssertNil(appState.missingFilePrompt)
-        guard case let .cancel(cancellationID)? = appState.editorNavigationCommand else {
-            return XCTFail("Unreadable activation must leave cancellation latest")
-        }
-        XCTAssertGreaterThan(cancellationID, olderNavigation.id)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
     }
 
     func testAlreadyCurrentActivationPreservesWorkAndPromptsBeforeExactNavigation() async throws {
@@ -7572,7 +10527,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "alpha"))
         try await waitUntil("current-session search starts") { provider.requests.count == 1 }
         let request = provider.requests[0]
-        let fileResult = result(path: "a.md", text: dirtyText, needle: "alpha")
+        let fileResult = result(
+            path: "a.md",
+            text: dirtyText,
+            needle: "alpha",
+            rootURL: fixture.rootURL
+        )
         let match = try XCTUnwrap(fileResult.matches.first)
         provider.yield(.fileResult(context(for: request), fileResult), to: 0)
         try await waitUntil("current-session result applies") {
@@ -7613,36 +10573,966 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             showsLineNumbers: false,
             documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
             documentBindingID: binding.id,
-            onDocumentBindingLifecycle: binding.onLifecycle
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
         )
         let editorFixture = try makeEditorBridgeFixture(representable: representable, source: source)
         defer {
             editorFixture.window.orderOut(nil)
             try? FileManager.default.removeItem(at: rootURL)
         }
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
+        XCTAssertTrue(appState.isEditorDocumentBindingInstalled(binding.id, session: session))
+        let installation = try XCTUnwrap(appState.editorBindingInstallations.keys.first)
 
         appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: documentURL)
         appState.closeMissingFile()
 
         XCTAssertNil(appState.editorDocumentBindingIDs[ObjectIdentifier(session)])
         XCTAssertNil(appState.editorDocumentBindingSessions[binding.id])
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
-        binding.onLifecycle(.revoked(EditorDocumentBindingID()))
-        XCTAssertTrue(appState.installedEditorDocumentBindingLease?.session === session)
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
+        let rejected = binding.sourceContract.publish(EditorDocumentSourcePublication(
+            installation: installation,
+            base: EditorDocumentSourceSnapshot(source: source, revision: session.version),
+            source: source + " rejected"
+        ))
+        XCTAssertEqual(
+            rejected,
+            .rejected(EditorDocumentSourceSnapshot(source: source, revision: session.version))
+        )
+        XCTAssertEqual(session.text, source)
+        binding.onLifecycle(.revoked(EditorDocumentBindingInstallation(
+            bindingID: EditorDocumentBindingID(),
+            installationID: EditorDocumentBindingInstallationID()
+        )))
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
 
         MarkdownTextView.dismantleNSView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
         MarkdownTextView.dismantleNSView(
             editorFixture.scrollView,
             coordinator: editorFixture.coordinator
         )
-        XCTAssertNil(appState.installedEditorDocumentBindingLease)
+        XCTAssertTrue(appState.editorBindingInstallations.isEmpty)
         XCTAssertTrue(appState.editorDocumentBindingIDs.isEmpty)
         XCTAssertTrue(appState.editorDocumentBindingSessions.isEmpty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testStaleSecondCoordinatorIsSnapshotFencedBeforeOverlappingNativeEditAndCanRetry() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "prefix target suffix"
+        let targetRange = (source as NSString).range(of: "target")
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session
+        )
+        appState.recordKnownDiskText(source, for: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = targetRange
+        var selection2: NSRange? = targetRange
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: source)
+        let installation1 = try XCTUnwrap(appState.editorBindingInstallations.keys.first)
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture2 = try makeEditorBridgeFixture(
+            representable: view2,
+            source: source,
+            makeKey: false
+        )
+        let installation2 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys).subtracting([installation1]).first
+        )
+        defer {
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+            MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        fixture1.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(fixture1.window.makeFirstResponder(fixture1.textView))
+        fixture1.textView.textSelection = targetRange
+        fixture1.textView.insertText("first1", replacementRange: .notFound)
+        let firstSource = "prefix first1 suffix"
+        XCTAssertEqual(session.text, firstSource)
+        XCTAssertEqual(session.version, 1)
+        XCTAssertEqual(fixture1.textView.text, firstSource)
+        XCTAssertEqual(fixture2.textView.text, source, "second coordinator must still be stale")
+
+        fixture2.textView.insertText("second", replacementRange: .notFound)
+
+        XCTAssertEqual(session.text, firstSource)
+        XCTAssertEqual(session.version, 1)
+        XCTAssertEqual(fixture1.textView.text, firstSource)
+        XCTAssertEqual(fixture2.textView.text, firstSource)
+        XCTAssertEqual(
+            appState.editorWriterInstallations[ObjectIdentifier(session)],
+            installation1,
+            "a fenced stale attempt must not steal writer ownership"
+        )
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.canAutosave(session: session))
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.missingFilePrompt)
+        let firstOverlayTexts = try await appState.workspaceSearchDirtyOverlays(
+            rootAuthority: XCTUnwrap(appState.workspaceSearchRootAuthority)
+        ).overlays.map(\.text)
+        XCTAssertEqual(firstOverlayTexts, [firstSource])
+
+        let retryRange = (firstSource as NSString).range(of: "first1")
+        fixture2.textView.textSelection = retryRange
+        fixture2.textView.insertText("second", replacementRange: .notFound)
+        let retriedSource = "prefix second suffix"
+        XCTAssertEqual(session.text, retriedSource)
+        XCTAssertEqual(session.version, 2)
+        XCTAssertEqual(
+            appState.editorWriterInstallations[ObjectIdentifier(session)],
+            installation2
+        )
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        XCTAssertTrue(appState.canAutosave(session: session))
+
+        view1.updateRepresentedTextView(fixture1.scrollView, coordinator: fixture1.coordinator)
+        XCTAssertEqual(fixture1.textView.text, retriedSource)
+        XCTAssertEqual(fixture2.textView.text, retriedSource)
+        let retriedOverlayTexts = try await appState.workspaceSearchDirtyOverlays(
+            rootAuthority: XCTUnwrap(appState.workspaceSearchRootAuthority)
+        ).overlays.map(\.text)
+        XCTAssertEqual(retriedOverlayTexts, [retriedSource])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testOverlappingPendingPublicationRestoresCurrentSnapshotAndReleasesWriterForRetry() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "prefix target suffix"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: ["a.md"],
+            currentSession: session
+        )
+        appState.recordKnownDiskText(source, for: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection: NSRange? = (source as NSString).range(of: "target")
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: source)
+        let installation = try XCTUnwrap(appState.editorBindingInstallations.keys.first)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            appState.completionWorkspaceTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(appState.pendingEditorSourceInstallations[installation] === session)
+
+        let currentSource = "prefix current suffix"
+        appState.replaceDocumentText(currentSource, in: session)
+        XCTAssertEqual(session.version, 1)
+        fixture.textView.insertText("proposed", replacementRange: .notFound)
+
+        XCTAssertEqual(session.text, currentSource)
+        XCTAssertEqual(session.version, 1)
+        XCTAssertEqual(fixture.textView.text, currentSource)
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        XCTAssertNil(appState.editorWriterInstallations[ObjectIdentifier(session)])
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.canAutosave(session: session))
+        let currentOverlayTexts = try await appState.workspaceSearchDirtyOverlays(
+            rootAuthority: XCTUnwrap(appState.workspaceSearchRootAuthority)
+        ).overlays.map(\.text)
+        XCTAssertEqual(currentOverlayTexts, [currentSource])
+
+        let retryRange = (currentSource as NSString).range(of: "current")
+        fixture.textView.textSelection = retryRange
+        fixture.textView.insertText("retry", replacementRange: .notFound)
+        let retriedSource = "prefix retry suffix"
+        XCTAssertEqual(session.text, retriedSource)
+        XCTAssertEqual(session.version, 2)
+        XCTAssertEqual(
+            appState.editorWriterInstallations[ObjectIdentifier(session)],
+            installation
+        )
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testTwoCoordinatorPendingCommitReconcilesMirroredAdvanceAndRevokedWritersStayRejected() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "A composition: "
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[canonicalURL] = session
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection1: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        var selection2: NSRange? = selection1
+        let view1 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection1 }, set: { selection1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture1 = try makeEditorBridgeFixture(representable: view1, source: source)
+        let installation1 = try XCTUnwrap(appState.editorBindingInstallations.keys.first)
+        let view2 = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection2 }, set: { selection2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture2 = try makeEditorBridgeFixture(representable: view2, source: source, makeKey: false)
+        let installation2 = try XCTUnwrap(
+            Set(appState.editorBindingInstallations.keys).subtracting([installation1]).first
+        )
+        defer {
+            fixture1.window.orderOut(nil)
+            fixture2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+            MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertEqual(appState.editorWriterInstallations[ObjectIdentifier(session)], installation1)
+        XCTAssertTrue(fixture1.window.makeFirstResponder(fixture1.textView))
+        fixture1.textView.textSelection = selection1 ?? .notFound
+        fixture1.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(appState.pendingEditorSourceInstallations[installation1] === session)
+        XCTAssertEqual(
+            binding.sourceContract.writer(.activate(
+                installation2,
+                from: binding.sourceContract.snapshot()
+            )),
+            .rejected(binding.sourceContract.snapshot())
+        )
+        fixture2.textView.textSelection = selection2 ?? .notFound
+        fixture2.textView.insertText(" blocked", replacementRange: .notFound)
+        XCTAssertEqual(fixture2.textView.text, source)
+        XCTAssertEqual(session.text, source)
+
+        let mirroredAdvance = "remote " + source
+        appState.replaceDocumentText(mirroredAdvance, in: session)
+        view2.updateRepresentedTextView(fixture2.scrollView, coordinator: fixture2.coordinator)
+        XCTAssertEqual(fixture2.textView.text, mirroredAdvance)
+        XCTAssertEqual(session.version, 1)
+
+        let committedText = "臺e\u{0301}🧪"
+        fixture1.textView.insertText(committedText, replacementRange: .notFound)
+        let reconciledSource = mirroredAdvance + committedText
+        XCTAssertEqual(Array(session.text.utf16), Array(reconciledSource.utf16))
+        XCTAssertEqual(session.version, 2)
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        try appState.save(session: session)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), reconciledSource)
+
+        MarkdownTextView.dismantleNSView(fixture1.scrollView, coordinator: fixture1.coordinator)
+        let staleWhileMirrorLives = binding.sourceContract.publish(EditorDocumentSourcePublication(
+            installation: installation1,
+            base: EditorDocumentSourceSnapshot(source: reconciledSource, revision: session.version),
+            source: reconciledSource + " stale"
+        ))
+        XCTAssertEqual(
+            staleWhileMirrorLives,
+            .rejected(EditorDocumentSourceSnapshot(source: reconciledSource, revision: session.version))
+        )
+        XCTAssertTrue(appState.editorBindingInstallations[installation2] === session)
+
+        MarkdownTextView.dismantleNSView(fixture2.scrollView, coordinator: fixture2.coordinator)
+        XCTAssertEqual(
+            binding.sourceContract.writer(.activate(
+                installation1,
+                from: binding.sourceContract.snapshot()
+            )),
+            .rejected(binding.sourceContract.snapshot())
+        )
+        XCTAssertEqual(
+            binding.sourceContract.writer(.release(installation2)),
+            .releaseRejected
+        )
+        let staleAfterBothRevoke = binding.sourceContract.publish(EditorDocumentSourcePublication(
+            installation: installation2,
+            base: EditorDocumentSourceSnapshot(source: reconciledSource, revision: session.version),
+            source: reconciledSource + " rejected"
+        ))
+        XCTAssertEqual(
+            staleAfterBothRevoke,
+            .rejected(EditorDocumentSourceSnapshot(source: reconciledSource, revision: session.version))
+        )
+        XCTAssertEqual(session.text, reconciledSource)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testDeferredReloadRereadsXToYCoherentlyAndLaterWatcherDetectsZ() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "Local: "
+        let externalX = "External version X"
+        let externalY = "External version Y"
+        let externalZ = "External version Z"
+        let modificationDateX = Date(timeIntervalSince1970: 1_700_000_100)
+        let modificationDateY = Date(timeIntervalSince1970: 1_700_000_200)
+        let modificationDateZ = Date(timeIntervalSince1970: 1_700_000_300)
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[canonicalURL] = session
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: source)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        let installation = try XCTUnwrap(appState.pendingEditorSourceInstallations.keys.first)
+        try externalX.write(to: documentURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modificationDateX],
+            ofItemAtPath: documentURL.path
+        )
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
+        appState.handleExternalChange(for: session)
+
+        try await waitUntil("external X conflict is detected while composition is pending") {
+            appState.pendingExternalTexts[canonicalURL] == externalX &&
+                appState.externalChangePrompt != nil
+        }
+        XCTAssertTrue(appState.pendingEditorSourceInstallations[installation] === session)
+        XCTAssertEqual(session.text, source)
+        XCTAssertEqual(session.version, 0)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalURL], externalX)
+        XCTAssertNotNil(appState.externalChangePrompt)
+        XCTAssertFalse(appState.canAutosave(session: session))
+
+        appState.reloadExternallyChangedFile()
+        XCTAssertNotNil(appState.deferredExternalChangeResolutions[canonicalURL])
+        XCTAssertEqual(session.text, source)
+        try externalY.write(to: documentURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modificationDateY],
+            ofItemAtPath: documentURL.path
+        )
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+
+        let committedLocal = source + "臺"
+        try await waitUntil("selection-time Reload stale-drops after the accepted IME commit") {
+            session.text == committedLocal &&
+                appState.deferredExternalChangeResolutions[canonicalURL] == nil &&
+                appState.externalChangePrompt != nil
+        }
+        XCTAssertEqual(session.text, committedLocal)
+        XCTAssertEqual(fixture.textView.text, committedLocal)
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalURL], externalX)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("fresh Reload selection rereads Y and synchronizes the live editor") {
+            session.text == externalY &&
+                fixture.textView.text == externalY &&
+                appState.externalReloadTasks[ObjectIdentifier(session)] == nil
+        }
+
+        XCTAssertEqual(session.text, externalY)
+        XCTAssertEqual(fixture.textView.text, externalY)
+        XCTAssertEqual(
+            fixture.coordinator.currentInstalledSourceSnapshot,
+            EditorDocumentSourceSnapshot(source: externalY, revision: session.version)
+        )
+        XCTAssertEqual(session.version, 2)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), externalY)
+        XCTAssertEqual(
+            appState.lastKnownDiskHashes[canonicalURL],
+            AppState.contentHash(externalY)
+        )
+        XCTAssertEqual(
+            appState.lastKnownDiskModificationDates[canonicalURL],
+            modificationDateY
+        )
+
+        fixture.textView.textSelection = NSRange(
+            location: (externalY as NSString).length,
+            length: 0
+        )
+        fixture.textView.insertText("!", replacementRange: .notFound)
+        let editedY = externalY + "!"
+        XCTAssertEqual(session.text, editedY)
+        XCTAssertEqual(fixture.textView.text, editedY)
+        XCTAssertEqual(session.version, 3)
+        XCTAssertTrue(session.isDirty)
+
+        try externalZ.write(to: documentURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modificationDateZ],
+            ofItemAtPath: documentURL.path
+        )
+        appState.handleExternalChange(for: session)
+
+        try await waitUntil("later watcher detects Z") {
+            appState.pendingExternalTexts[canonicalURL] == externalZ &&
+                appState.externalChangePrompt?.fileURL == canonicalURL
+        }
+        XCTAssertEqual(session.text, editedY)
+        XCTAssertEqual(session.version, 3)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalURL], externalZ)
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, canonicalURL)
+    }
+
+    func testDeferredReloadMissingAtExecutionPreservesEditorSourceInRecoveryFlow() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "Retained editor source"
+        let externalX = "External version X"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[canonicalURL] = session
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        binding.sourceContract.pendingSource(.began(installation))
+        defer {
+            binding.onLifecycle(.revoked(installation))
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try externalX.write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
+        appState.handleExternalChange(for: session)
+        try await waitUntil("external X is ready for deferred Reload") {
+            appState.pendingExternalTexts[canonicalURL] == externalX &&
+                appState.externalChangePrompt?.fileURL == canonicalURL
+        }
+        appState.reloadExternallyChangedFile()
+        XCTAssertNotNil(appState.deferredExternalChangeResolutions[canonicalURL])
+
+        try FileManager.default.removeItem(at: documentURL)
+        binding.sourceContract.pendingSource(.synchronized(installation))
+
+        try await waitUntil("missing deferred Reload enters recovery") {
+            appState.detachedSessionURLs.contains(canonicalURL)
+        }
+
+        XCTAssertEqual(session.text, source)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(canonicalURL))
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL, canonicalURL)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalURL])
+        XCTAssertFalse(appState.canAutosave(session: session))
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testPendingCompositionExternalChangeKeepMineSavesNewestCommittedSource() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentURL = rootURL.appendingPathComponent("a.md")
+        let source = "Local: "
+        let diskSource = "External disk source"
+        try source.write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let canonicalURL = try XCTUnwrap(appState.sessionStateURL(for: session))
+        appState.sessionCache[canonicalURL] = session
+        appState.recordKnownDiskText(source, for: canonicalURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        var selection: NSRange? = NSRange(location: (source as NSString).length, length: 0)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: source)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        try diskSource.write(to: documentURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalURL] = .distantPast
+        appState.handleExternalChange(for: session)
+        fixture.textView.insertText("臺e\u{0301}🧪", replacementRange: .notFound)
+        let localSource = source + "臺e\u{0301}🧪"
+
+        XCTAssertEqual(Array(session.text.utf16), Array(localSource.utf16))
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(session.version, 1)
+        try await waitUntil("external disk source is ready for Keep Mine") {
+            appState.pendingExternalTexts[canonicalURL] == diskSource &&
+                appState.externalChangePrompt?.fileURL == canonicalURL
+        }
+        appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine records the disk baseline") {
+            appState.externalReloadTasks[ObjectIdentifier(session)] == nil &&
+                appState.externalChangePrompt == nil
+        }
+        XCTAssertNil(appState.externalChangePrompt)
+        try appState.save(session: session)
+
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), localSource)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.pendingExternalTexts[canonicalURL])
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testRetiredPendingReloadStaleDropsAfterLateCommitAndPreservesItOnReactivation() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "B remains unchanged"
+        let externalA = "A external source"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.sessionCache[canonicalA] = sessionA
+        appState.recordKnownDiskText(sourceA, for: canonicalA)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        let installationA = EditorDocumentBindingInstallation(
+            bindingID: bindingA.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        bindingA.onLifecycle(.installed(installationA))
+        let selectedSourceSnapshot = bindingA.sourceContract.snapshot()
+        XCTAssertEqual(
+            bindingA.sourceContract.writer(.activate(
+                installationA,
+                from: selectedSourceSnapshot
+            )),
+            .activated(selectedSourceSnapshot)
+        )
+        bindingA.sourceContract.pendingSource(.began(installationA))
+        defer {
+            bindingA.onLifecycle(.revoked(installationA))
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            for task in appState.sessionAutosaveTasks.values {
+                task.task.cancel()
+            }
+            for task in appState.sessionStatisticsTasks.values {
+                task.task.cancel()
+            }
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try externalA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalA] = .distantPast
+        appState.handleExternalChange(for: sessionA)
+        try await waitUntil("external conflict is detected before selecting Reload") {
+            appState.externalChangePrompt?.fileURL.standardizedFileURL ==
+                documentAURL.standardizedFileURL
+        }
+        appState.reloadExternallyChangedFile()
+
+        XCTAssertNotNil(appState.deferredExternalChangeResolutions[canonicalA])
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+
+        let committedA = sourceA + "臺e\u{0301}🧪"
+        XCTAssertEqual(
+            bindingA.sourceContract.publish(EditorDocumentSourcePublication(
+                installation: installationA,
+                base: selectedSourceSnapshot,
+                source: committedA
+            )),
+            .accepted(
+                EditorDocumentSourceSnapshot(source: committedA, revision: 1),
+                sourceWasReconciled: false
+            )
+        )
+        bindingA.sourceContract.pendingSource(.synchronized(installationA))
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedA.utf16))
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertTrue(appState.pendingEditorSourceInstallations.isEmpty)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalA)
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalA])
+        XCTAssertNil(appState.externalResolutionIntentCaptures[canonicalA])
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalA)
+
+        try appState.open(url: documentBURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        let sessionB = appState.currentDocument
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[canonicalA])
+
+        try appState.open(url: documentAURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        try await waitUntil("reactivated stale Reload restores the conflict prompt") {
+            appState.externalChangePrompt?.fileURL == canonicalA
+        }
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertEqual(Array(sessionA.text.utf16), Array(committedA.utf16))
+        XCTAssertEqual(sessionA.version, 1)
+        XCTAssertTrue(sessionA.isDirty)
+        XCTAssertEqual(sessionB.text, sourceB)
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalA)
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalA])
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, canonicalA)
+        XCTAssertNil(appState.missingFilePrompt)
+
+        let reactivatedRetirement = try XCTUnwrap(
+            appState.retiredEditorDocumentSessions[canonicalA]
+        )
+        XCTAssertTrue(reactivatedRetirement.session === sessionA)
+        XCTAssertTrue(reactivatedRetirement.awaitingInstallations.contains(installationA))
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), externalA)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testStandaloneReplacementRetiresTwoCoordinatorsReactivatesConflictAndKeepsBIsolated() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let documentBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        let sourceB = "B remains unchanged"
+        let externalA = "A changed on disk"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sourceB.write(to: documentBURL, atomically: true, encoding: .utf8)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        appState.sessionCache[canonicalA] = sessionA
+        appState.recordKnownDiskText(sourceA, for: canonicalA)
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        var selectionA1: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        var selectionA2: NSRange? = selectionA1
+        let viewA1 = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA1 }, set: { selectionA1 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
+        )
+        let fixtureA1 = try makeEditorBridgeFixture(representable: viewA1, source: sourceA)
+        let installationA1 = try XCTUnwrap(appState.editorBindingInstallations.keys.first)
+        let viewA2 = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA2 }, set: { selectionA2 = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
+        )
+        let fixtureA2 = try makeEditorBridgeFixture(representable: viewA2, source: sourceA, makeKey: false)
+        defer {
+            fixtureA1.window.orderOut(nil)
+            fixtureA2.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixtureA1.scrollView, coordinator: fixtureA1.coordinator)
+            MarkdownTextView.dismantleNSView(fixtureA2.scrollView, coordinator: fixtureA2.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixtureA1.window.makeFirstResponder(fixtureA1.textView))
+        fixtureA1.textView.textSelection = selectionA1 ?? .notFound
+        fixtureA1.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        try externalA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalA] = .distantPast
+        appState.handleExternalChange(for: sessionA)
+
+        try appState.open(url: documentBURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        let sessionB = appState.currentDocument
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertEqual(appState.retiredEditorDocumentSessions[canonicalA]?.awaitingInstallations.count, 2)
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        let bindingB = appState.editorDocumentBinding(for: sessionB)
+        let viewB = MarkdownTextView(
+            text: bindingB.text,
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentBURL),
+            documentBindingID: bindingB.id,
+            onDocumentBindingLifecycle: bindingB.onLifecycle,
+            documentSourceContract: bindingB.sourceContract
+        )
+        let fixtureB = try makeEditorBridgeFixture(representable: viewB, source: sourceB, makeKey: false)
+        defer {
+            fixtureB.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixtureB.scrollView, coordinator: fixtureB.coordinator)
+        }
+        let installationB = try XCTUnwrap(
+            appState.editorBindingInstallations.first(where: { $0.value === sessionB })?.key
+        )
+        bindingA.onLifecycle(.revoked(EditorDocumentBindingInstallation(
+            bindingID: bindingA.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )))
+        XCTAssertTrue(appState.editorBindingInstallations[installationB] === sessionB)
+
+        try appState.open(url: documentAURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        try await waitUntil("reactivated A conflict is ready for Keep Mine") {
+            appState.pendingExternalTexts[canonicalA] == externalA &&
+                appState.externalChangePrompt?.fileURL == canonicalA &&
+                appState.externalDiskInspectionTasks[ObjectIdentifier(sessionA)] == nil
+        }
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertNotNil(appState.externalChangePrompt)
+        fixtureA1.textView.insertText("臺", replacementRange: .notFound)
+        let localA = sourceA + "臺"
+        XCTAssertEqual(sessionA.text, localA)
+        XCTAssertEqual(sessionB.text, sourceB)
+        appState.keepMineForExternallyChangedFile()
+        try await waitUntil("reactivated Keep Mine clears A conflict") {
+            appState.externalReloadTasks[ObjectIdentifier(sessionA)] == nil &&
+                appState.pendingExternalReloadApplications[ObjectIdentifier(sessionA)] == nil &&
+                appState.deferredExternalChangeResolutions[canonicalA] == nil &&
+                appState.pendingExternalTexts[canonicalA] == nil &&
+                appState.externalChangePrompt == nil
+        }
+        try appState.save(session: sessionA)
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), localA)
+
+        MarkdownTextView.dismantleNSView(fixtureA1.scrollView, coordinator: fixtureA1.coordinator)
+        bindingA.onLifecycle(.revoked(installationA1))
+        MarkdownTextView.dismantleNSView(fixtureA2.scrollView, coordinator: fixtureA2.coordinator)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertTrue(appState.editorBindingInstallations[installationB] === sessionB)
+        XCTAssertEqual(sessionB.text, sourceB)
+    }
+
+    func testFailedStandaloneDestinationOpenKeepsMarkedSourceWritableUntilFinalRevoke() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let documentAURL = rootURL.appendingPathComponent("a.md")
+        let invalidBURL = rootURL.appendingPathComponent("b.md")
+        let sourceA = "A composition: "
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try Data([0xFF]).write(to: invalidBURL)
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        appState.sessionCache[documentAURL.standardizedFileURL] = sessionA
+        let binding = appState.editorDocumentBinding(for: sessionA)
+        var selection: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        let view = MarkdownTextView(
+            text: binding.text,
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: documentAURL),
+            documentBindingID: binding.id,
+            onDocumentBindingLifecycle: binding.onLifecycle,
+            documentSourceContract: binding.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: view, source: sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+            appState.autosaveTask?.cancel()
+            appState.statisticsTask?.cancel()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selection ?? .notFound
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertThrowsError(
+            try appState.open(url: invalidBURL, rememberAsLastOpened: false, preserveWorkspace: false)
+        )
+        let canonicalA = documentAURL.standardizedFileURL.resolvingSymlinksInPath()
+        XCTAssertTrue(appState.currentDocument === sessionA)
+        XCTAssertNotNil(appState.retiredEditorDocumentSessions[canonicalA])
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+        let committedA = sourceA + "臺"
+        XCTAssertEqual(sessionA.text, committedA)
+
+        MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalA])
+        XCTAssertEqual(try String(contentsOf: documentAURL, encoding: .utf8), committedA)
+    }
+
+    func testSaveCopySourceRetirementMismatchIsSideEffectFreeBeforeDestinationWrite() throws {
+        let rootURL = try makeTemporaryDirectory()
+        let sourceURL = rootURL.appendingPathComponent("missing.md")
+        let destinationURL = rootURL.appendingPathComponent("sentinel.md")
+        let source = "new local source"
+        let sentinel = "destination sentinel"
+        try sentinel.write(to: destinationURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        let session = DocumentSession(text: source, url: sourceURL, fileKind: .markdown, isDirty: true)
+        let wrongOwner = DocumentSession(text: "wrong", url: sourceURL, fileKind: .markdown, isDirty: true)
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let sourceKey = sourceURL.standardizedFileURL.resolvingSymlinksInPath()
+        let destinationKey = destinationURL.standardizedFileURL.resolvingSymlinksInPath()
+        appState.sessionCache[sourceKey] = session
+        appState.detachedSessionURLs.insert(sourceKey)
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: sourceKey)
+        appState.lastKnownDiskHashes[sourceKey] = "retained-hash"
+        appState.pendingExternalTexts[destinationKey] = "retained metadata"
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        appState.retiredEditorDocumentSessions[sourceKey] = RetiredEditorDocumentSession(
+            canonicalURL: sourceKey,
+            session: wrongOwner,
+            bindingIDs: [],
+            awaitingInstallations: [],
+            securityScopedAuthorityOwners: []
+        )
+        let prompt = appState.missingFilePrompt
+        let installations = appState.editorBindingInstallations
+        let bindingIDs = appState.editorDocumentBindingIDs
+        let bindingSessions = appState.editorDocumentBindingSessions
+
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL)) { error in
+            guard case let AppStateError.duplicateSessionOwnership(url) = error else {
+                return XCTFail("Expected conflicting source retirement ownership")
+            }
+            XCTAssertEqual(url, sourceKey)
+        }
+
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), sentinel)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(session.fileURL?.standardizedFileURL, sourceKey)
+        XCTAssertTrue(appState.sessionCache[sourceKey] === session)
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[sourceKey]?.session === wrongOwner)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[destinationKey])
+        XCTAssertEqual(Set(appState.editorBindingInstallations.keys), Set(installations.keys))
+        XCTAssertEqual(appState.editorDocumentBindingIDs, bindingIDs)
+        XCTAssertEqual(Set(appState.editorDocumentBindingSessions.keys), Set(bindingSessions.keys))
+        XCTAssertEqual(appState.missingFilePrompt, prompt)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(sourceKey))
+        XCTAssertEqual(appState.lastKnownDiskHashes[sourceKey], "retained-hash")
+        XCTAssertEqual(appState.pendingExternalTexts[destinationKey], "retained metadata")
     }
 
     private struct AcceptedActivationScenario {
@@ -7663,7 +11553,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         try await waitUntil("accepted activation search starts") { provider.requests.count == 1 }
         let request = provider.requests[0]
         let activeContext = context(for: request)
-        let fileResult = result(path: "b.md", text: "beta", needle: "beta")
+        let fileResult = result(
+            path: "b.md",
+            text: "beta",
+            needle: "beta",
+            rootURL: fixture.rootURL
+        )
         let match = try XCTUnwrap(fileResult.matches.first)
         provider.yield(.fileResult(activeContext, fileResult), to: 0)
         try await waitUntil("accepted activation result applies") {
@@ -7690,19 +11585,19 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         return request
     }
 
-    private func activateAndAssertNewerCancellation(
+    private func activateAndAssertNavigationUnchanged(
         _ scenario: AcceptedActivationScenario,
-        olderThan requestID: UInt64
+        olderNavigation: EditorNavigationRequest
     ) {
         scenario.fixture.appState.activateWorkspaceSearchResult(
             context: scenario.context,
             fileResult: scenario.fileResult,
             match: scenario.match
         )
-        guard case let .cancel(cancellationID)? = scenario.fixture.appState.editorNavigationCommand else {
-            return XCTFail("Accepted activation failure must leave a cancellation command latest")
-        }
-        XCTAssertGreaterThan(cancellationID, requestID)
+        XCTAssertEqual(
+            scenario.fixture.appState.editorNavigationCommand,
+            .navigate(olderNavigation)
+        )
     }
 
     private struct EditorBridgeFixture {
@@ -7714,7 +11609,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
     private func makeEditorBridgeFixture(
         representable: MarkdownTextView,
-        source: String
+        source: String,
+        makeKey: Bool = true
     ) throws -> EditorBridgeFixture {
         let frame = NSRect(x: 0, y: 0, width: 560, height: 120)
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
@@ -7733,7 +11629,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             defer: false
         )
         window.contentView = scrollView
-        window.makeKeyAndOrderFront(nil)
+        if makeKey {
+            window.makeKeyAndOrderFront(nil)
+        }
         representable.updateRepresentedTextView(scrollView, coordinator: coordinator)
         return EditorBridgeFixture(
             window: window,
@@ -7751,6 +11649,170 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
     private enum TestError: Error {
         case expectedEditorNavigation
+        case expectedRegularFile
+    }
+
+    // swiftlint:disable:next function_body_length
+    private func assertDeferredSymlinkSubstitutionDoesNotFollow(
+        intent: DeferredExternalChangeResolution,
+        race: SaveCopySymlinkRace,
+        targetOutsideWorkspace: Bool
+    ) async throws {
+        let outerURL = try makeTemporaryDirectory()
+        let rootURL = outerURL.appendingPathComponent("workspace", isDirectory: true)
+        let ownedParentURL = rootURL.appendingPathComponent("owned", isDirectory: true)
+        let movedParentURL = rootURL.appendingPathComponent(
+            "owned-original",
+            isDirectory: true
+        )
+        let targetParentURL = targetOutsideWorkspace
+            ? outerURL.appendingPathComponent("outside-target", isDirectory: true)
+            : rootURL.appendingPathComponent("target", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: ownedParentURL,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: targetParentURL,
+            withIntermediateDirectories: true
+        )
+        let documentAURL = ownedParentURL.appendingPathComponent("a.md")
+        let documentBURL = targetParentURL.appendingPathComponent("a.md")
+        let sourceA = "A local source: "
+        let externalA = "A changed on disk"
+        let sentinelB = targetOutsideWorkspace
+            ? "outside B sentinel"
+            : "workspace B sentinel"
+        try sourceA.write(to: documentAURL, atomically: true, encoding: .utf8)
+        try sentinelB.write(to: documentBURL, atomically: true, encoding: .utf8)
+
+        let sessionA = DocumentSession(text: sourceA, url: documentAURL, fileKind: .markdown)
+        let sessionB = DocumentSession(text: sentinelB, url: documentBURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: sessionA, shouldRestoreLastOpenedFile: false)
+        configureWorkspace(
+            appState,
+            rootURL: rootURL,
+            paths: targetOutsideWorkspace
+                ? ["owned/a.md"]
+                : ["owned/a.md", "target/a.md"],
+            currentSession: sessionA,
+            retainSecurityScope: true
+        )
+        let canonicalA = try XCTUnwrap(appState.sessionStateURL(for: sessionA))
+        let locationB = try WorkspaceFileSystemLocation(fileURL: documentBURL)
+        let loadedB = try MarkdownFileStore().loadResult(at: locationB)
+        appState.retainUnanchoredManagedSessionOwnership(
+            for: sessionB,
+            location: locationB,
+            identity: loadedB.metadata.identity,
+            sha256Digest: loadedB.sha256Digest
+        )
+        let canonicalB = locationB.fileURL
+        appState.sessionCache[canonicalB] = sessionB
+        appState.recordKnownDiskText(sourceA, for: canonicalA)
+        appState.recordKnownDiskText(sentinelB, for: canonicalB)
+
+        let bindingA = appState.editorDocumentBinding(for: sessionA)
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        let viewA = MarkdownTextView(
+            text: bindingA.text,
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: AppState.editorDocumentIdentity(for: canonicalA),
+            documentBindingID: bindingA.id,
+            onDocumentBindingLifecycle: bindingA.onLifecycle,
+            documentSourceContract: bindingA.sourceContract
+        )
+        let fixture = try makeEditorBridgeFixture(representable: viewA, source: sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+            if appState.missingFilePrompt != nil {
+                appState.closeMissingFile()
+            }
+            try? FileManager.default.removeItem(at: outerURL)
+        }
+
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.textSelection = selectionA ?? .notFound
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        try externalA.write(to: canonicalA, atomically: true, encoding: .utf8)
+        appState.lastKnownDiskModificationDates[canonicalA] = .distantPast
+        appState.handleExternalChange(for: sessionA)
+        try await waitUntil("anchored detection records the external conflict") {
+            appState.pendingExternalTexts[canonicalA] == externalA
+        }
+        XCTAssertEqual(appState.pendingExternalTexts[canonicalA], externalA)
+
+        switch intent {
+        case .reload:
+            appState.reloadExternallyChangedFile()
+        case .keepMine:
+            appState.keepMineForExternallyChangedFile()
+        }
+        XCTAssertEqual(appState.deferredExternalChangeResolutions[canonicalA], intent)
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalB])
+
+        switch race {
+        case .leaf:
+            try FileManager.default.removeItem(at: documentAURL)
+            try FileManager.default.createSymbolicLink(
+                at: documentAURL,
+                withDestinationURL: documentBURL
+            )
+            XCTAssertEqual(
+                WorkspaceNoFollowFileInspector.status(at: canonicalA),
+                .symbolicLink
+            )
+        case .intermediate:
+            try FileManager.default.moveItem(at: ownedParentURL, to: movedParentURL)
+            try FileManager.default.createSymbolicLink(
+                at: ownedParentURL,
+                withDestinationURL: targetParentURL
+            )
+        }
+        try appState.closeWorkspaceForReplacement()
+        XCTAssertTrue(appState.retiredEditorDocumentSessions[canonicalA]?.session === sessionA)
+        XCTAssertNil(appState.retiredEditorDocumentSessions[canonicalB])
+
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+        let committedA = sourceA + "臺"
+        try await waitUntil("accepted input stale-drops the selection-time resolution") {
+            sessionA.text == committedA &&
+                appState.deferredExternalChangeResolutions[canonicalA] == nil &&
+                appState.externalReloadTasks[ObjectIdentifier(sessionA)] == nil &&
+                appState.externalChangePrompt?.fileURL == canonicalA
+        }
+        XCTAssertFalse(appState.detachedSessionURLs.contains(canonicalA))
+
+        switch intent {
+        case .reload:
+            appState.reloadExternallyChangedFile()
+        case .keepMine:
+            appState.keepMineForExternallyChangedFile()
+        }
+        try await waitUntil("symlink substitution enters A recovery") {
+            appState.detachedSessionURLs.contains(canonicalA) &&
+                appState.externalReloadTasks[ObjectIdentifier(sessionA)] == nil
+        }
+
+        XCTAssertEqual(sessionA.text, committedA)
+        XCTAssertEqual(try String(contentsOf: canonicalB, encoding: .utf8), sentinelB)
+        XCTAssertEqual(appState.sessionStateURL(for: sessionA), canonicalA)
+        XCTAssertEqual(appState.missingFilePrompt?.fileURL, canonicalA)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertNil(appState.pendingExternalTexts[canonicalB])
+        XCTAssertNil(appState.deferredExternalChangeResolutions[canonicalB])
+        XCTAssertTrue(appState.editorBindingInstallations.values.contains { $0 === sessionA })
+        XCTAssertFalse(appState.canAutosave(session: sessionA))
+        XCTAssertThrowsError(try appState.save(session: sessionA))
+        appState.flushAutosaveIfNeeded()
+        XCTAssertEqual(try String(contentsOf: canonicalB, encoding: .utf8), sentinelB)
     }
 
     private func configureWorkspace(
@@ -7763,9 +11825,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let workspaceSnapshot = snapshot(paths: paths, rootURL: rootURL)
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
-        appState.workspaceSearchRootAuthority = try? WorkspaceFileSystemRootAuthority(
+        let rootAuthority = try? WorkspaceFileSystemRootAuthority(
             rootURL: rootURL
         )
+        appState.workspaceSearchRootAuthority = rootAuthority
         appState.workspaceGeneration = 1
         appState.workspaceInstalledCaptureGeneration = 1
         appState.workspaceTree = WorkspaceFileTree.reconcile(
@@ -7776,9 +11839,21 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         if retainSecurityScope {
             appState.workspaceAccess = SecurityScopedAccess.startAccessing(rootURL)
         }
-        if let fileURL = currentSession.fileURL?.standardizedFileURL.resolvingSymlinksInPath() {
-            appState.sessionCache[fileURL] = currentSession
-            _ = appState.sessionPolicy.access(fileURL, isDirty: currentSession.isDirty)
+        if let fileURL = currentSession.fileURL,
+           let rootAuthority,
+           let location = try? rootAuthority.canonicalizedLocation(forFileURL: fileURL),
+           let loaded = try? MarkdownFileStore().loadResult(at: location)
+        {
+            appState.adoptAnchoredFileBinding(
+                AnchoredWorkspaceSessionFileBinding(
+                    location: location,
+                    identity: loaded.metadata.identity,
+                    sha256Digest: loaded.sha256Digest
+                ),
+                for: currentSession
+            )
+            appState.sessionCache[location.fileURL] = currentSession
+            _ = appState.sessionPolicy.access(location.fileURL, isDirty: currentSession.isDirty)
         }
     }
 
@@ -7787,6 +11862,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         files: [String: String],
         currentPath: String? = nil,
         debounceNanoseconds: UInt64 = 0,
+        userDefaults: UserDefaults = .standard,
         directoryScanner: any WorkspaceDirectoryScanning = ImmediateWorkspaceDirectoryScanner(
             snapshot: WorkspaceFileSnapshot(entries: [])
         )
@@ -7817,7 +11893,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             directoryScanner: directoryScanner,
             workspaceSearchStreamProvider: provider,
             workspaceSearchDebounceNanoseconds: debounceNanoseconds,
-            shouldRestoreLastOpenedFile: false
+            shouldRestoreLastOpenedFile: false,
+            userDefaults: userDefaults
         )
         appState.workspaceRootURL = rootURL
         appState.workspaceSnapshot = workspaceSnapshot
@@ -7842,6 +11919,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         fixture.appState.autosaveTask?.cancel()
         fixture.appState.statisticsTask?.cancel()
         fixture.appState.completionWorkspaceTask?.cancel()
+        for task in fixture.appState.sessionAutosaveTasks.values {
+            task.task.cancel()
+        }
+        for task in fixture.appState.sessionStatisticsTasks.values {
+            task.task.cancel()
+        }
         fixture.appState.teardownWorkspaceSearch()
         fixture.appState.workspaceWatcher?.stop()
         try? FileManager.default.removeItem(at: fixture.rootURL)
@@ -7871,9 +11954,15 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         path: String,
         text: String,
         needle: String,
-        truncated: Bool = false
+        truncated: Bool = false,
+        rootURL: URL? = nil
     ) -> WorkspaceSearchFileResult {
         let range = (text as NSString).range(of: needle)
+        let fileAuthority: WorkspaceSearchFileAuthority? = if let rootURL {
+            makeSearchFileAuthority(rootURL: rootURL, relativePath: path)
+        } else {
+            nil
+        }
         return WorkspaceSearchFileResult(
             relativePath: path,
             contentFingerprint: WorkspaceSearchContentFingerprint(text: text),
@@ -7883,8 +11972,25 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 preview: text,
                 previewMatchRange: range
             )],
-            isTruncated: truncated
+            isTruncated: truncated,
+            fileAuthority: fileAuthority
         )
+    }
+
+    private func makeSearchFileAuthority(
+        rootURL: URL,
+        relativePath: String
+    ) -> WorkspaceSearchFileAuthority? {
+        guard let authority = try? WorkspaceFileSystemRootAuthority(
+            rootURL: rootURL,
+            securityScopedURL: rootURL
+        ),
+            let location = try? authority.location(relativePath: relativePath),
+            case let .regular(identity) = WorkspaceNoFollowFileInspector.status(at: location)
+        else {
+            return nil
+        }
+        return WorkspaceSearchFileAuthority(location: location, identity: identity)
     }
 
     private func summary(
@@ -7930,7 +12036,34 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             .appendingPathComponent("WorkspaceSearchAppStateTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
+    }
+
+    private func regularIdentity(at url: URL) throws -> WorkspaceFileSystemIdentity {
+        guard case let .regular(identity) = WorkspaceNoFollowFileInspector.status(at: url) else {
+            throw TestError.expectedRegularFile
+        }
+        return identity
+    }
+
+    private func coherentSnapshot(
+        text: String,
+        identity: WorkspaceFileSystemIdentity
+    ) -> WorkspaceCoherentFileSnapshot {
+        let bytes = Data(text.utf8)
+        return WorkspaceCoherentFileSnapshot(
+            text: text,
+            exactBytes: bytes,
+            sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest,
+            metadata: WorkspaceCoherentFileMetadata(
+                identity: identity,
+                byteCount: Int64(bytes.count),
+                modificationSeconds: 1_700_000_000,
+                modificationNanoseconds: 123,
+                changeSeconds: 1_700_000_000,
+                changeNanoseconds: 456
+            )
+        )
     }
 
     private func waitUntil(
@@ -7948,6 +12081,76 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 }
 
 // swiftlint:enable type_body_length
+
+private final class ControlledCoherentFileReader: WorkspaceCoherentFileReading, @unchecked Sendable {
+    private struct Request {
+        let url: URL
+        let continuation: CheckedContinuation<WorkspaceCoherentFileReadOutcome, Never>
+    }
+
+    private let lock = NSLock()
+    private var requests: [Request] = []
+
+    var requestCount: Int {
+        lock.withLock { requests.count }
+    }
+
+    func readCoherentFile(at url: URL) async -> WorkspaceCoherentFileReadOutcome {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                requests.append(Request(url: url, continuation: continuation))
+            }
+        }
+    }
+
+    func resolve(request index: Int, with outcome: WorkspaceCoherentFileReadOutcome) {
+        let continuation = lock.withLock { requests[index].continuation }
+        continuation.resume(returning: outcome)
+    }
+}
+
+private final class ExternalReloadPreparationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let gate = DispatchSemaphore(value: 0)
+    private var began = false
+    private var finishedAt: UInt64?
+    private var invocationCount = 0
+    private var finishedCount = 0
+
+    var hasBegun: Bool {
+        lock.withLock { began }
+    }
+
+    var finishedUptimeNanoseconds: UInt64? {
+        lock.withLock { finishedAt }
+    }
+
+    var successfulPreparationCount: Int {
+        lock.withLock { finishedCount }
+    }
+
+    func beginAndWait() {
+        let shouldWait = lock.withLock {
+            began = true
+            invocationCount += 1
+            return invocationCount == 1
+        }
+        if shouldWait {
+            gate.wait()
+        }
+    }
+
+    func release() {
+        gate.signal()
+    }
+
+    func finish() {
+        lock.withLock {
+            finishedCount += 1
+            finishedAt = DispatchTime.now().uptimeNanoseconds
+        }
+    }
+}
 
 private actor StubWorkspaceImageThumbnailProvider: WorkspaceImageThumbnailLoading {
     struct Request: Equatable {
@@ -8034,6 +12237,109 @@ private struct ImmediateWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
             snapshot: snapshot,
             rootAuthority: rootAuthority
         )
+    }
+}
+
+private enum SaveCopySymlinkRace {
+    case intermediate
+    case leaf
+}
+
+private final class SymlinkSubstitutingWorkspaceAnchoredFileWriter: @unchecked Sendable {
+    private let backingStore = MarkdownFileStore()
+    private let race: SaveCopySymlinkRace
+    private let destinationURL: URL
+    private let destinationParentURL: URL
+    private let movedParentURL: URL
+    private let symlinkTargetURL: URL
+    private let lock = NSLock()
+    private var hasSubstituted = false
+
+    init(
+        race: SaveCopySymlinkRace,
+        destinationURL: URL,
+        destinationParentURL: URL,
+        movedParentURL: URL,
+        symlinkTargetURL: URL
+    ) {
+        self.race = race
+        self.destinationURL = destinationURL
+        self.destinationParentURL = destinationParentURL
+        self.movedParentURL = movedParentURL
+        self.symlinkTargetURL = symlinkTargetURL
+    }
+
+    func save(
+        text: String,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) throws -> WorkspaceFileWriteOutcome {
+        let shouldSubstitute = lock.withLock {
+            guard !hasSubstituted else { return false }
+            hasSubstituted = true
+            return true
+        }
+        if shouldSubstitute {
+            switch race {
+            case .intermediate:
+                try FileManager.default.moveItem(
+                    at: destinationParentURL,
+                    to: movedParentURL
+                )
+                try FileManager.default.createSymbolicLink(
+                    at: destinationParentURL,
+                    withDestinationURL: symlinkTargetURL
+                )
+            case .leaf:
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.createSymbolicLink(
+                    at: destinationURL,
+                    withDestinationURL: symlinkTargetURL
+                )
+            }
+        }
+        return try backingStore.save(text: text, at: location, expecting: expectation)
+    }
+}
+
+private final class FailingOnceWorkspaceAnchoredFileWriter: @unchecked Sendable {
+    private enum SaveFailure: LocalizedError {
+        case injected
+
+        var errorDescription: String? {
+            "Injected first-save failure"
+        }
+    }
+
+    private let backingStore = MarkdownFileStore()
+    private let lock = NSLock()
+    private var shouldFailNextSave = true
+    private var saveAttempts = 0
+
+    var writeAttemptCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return saveAttempts
+    }
+
+    func save(
+        text: String,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) throws -> WorkspaceFileWriteOutcome {
+        let shouldFail: Bool
+        lock.lock()
+        saveAttempts += 1
+        shouldFail = shouldFailNextSave
+        shouldFailNextSave = false
+        lock.unlock()
+
+        if shouldFail {
+            throw SaveFailure.injected
+        }
+        return try backingStore.save(text: text, at: location, expecting: expectation)
     }
 }
 

@@ -411,7 +411,7 @@ private struct WorkspaceReloadCurrentSessionState: Equatable {
     let isDetached: Bool
     let pendingExternalText: String?
     let pendingExternalVersion: ObservedRetainedFileVersion?
-    let lastKnownDiskHash: UInt64?
+    let lastKnownDiskHash: String?
     let lastKnownDiskModificationDate: Date?
     let externalChangeURL: URL?
     let missingFileURL: URL?

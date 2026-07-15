@@ -29,6 +29,7 @@ public struct MarkdownEditorView: View {
     private let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
     private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
+    private let documentSourceContract: EditorDocumentSourceContract?
     private let navigationCommand: EditorNavigationCommand?
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
@@ -51,6 +52,7 @@ public struct MarkdownEditorView: View {
         documentIdentity: EditorDocumentIdentity? = nil,
         documentBindingID: EditorDocumentBindingID? = nil,
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
+        documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
@@ -72,6 +74,7 @@ public struct MarkdownEditorView: View {
         self.documentIdentity = documentIdentity
         self.documentBindingID = documentBindingID
         self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
+        self.documentSourceContract = documentSourceContract
         self.navigationCommand = navigationCommand
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
@@ -107,6 +110,7 @@ public struct MarkdownEditorView: View {
             documentIdentity: documentIdentity,
             documentBindingID: documentBindingID,
             onDocumentBindingLifecycle: onDocumentBindingLifecycle,
+            documentSourceContract: documentSourceContract,
             navigationCommand: navigationCommand,
             scrollProxy: scrollProxy,
             commandProxy: activeCommandProxy,
@@ -194,7 +198,6 @@ public struct MarkdownEditorView: View {
         let source = text
         let kind = fileKind
         let requestedRange = Self.highlightRequestRange(
-            textLength: source.utf16.count,
             visibleRange: visibleTextRange,
             selection: selection
         )
@@ -234,18 +237,24 @@ public struct MarkdownEditorView: View {
     }
 
     nonisolated static func highlightRequestRange(
-        textLength: Int,
         visibleRange: NSRange?,
         selection: NSRange?
     ) -> NSRange {
-        if let visibleRange, visibleRange.length > 0 {
-            return visibleRange.clamped(toLength: textLength)
+        // Keep the debounced task's MainActor preparation independent of document
+        // size. The background highlighter clamps this native viewport/selection
+        // request after it has materialized the source as NSString off-main.
+        if let visibleRange,
+           visibleRange.location != NSNotFound,
+           visibleRange.length > 0
+        {
+            return visibleRange
         }
 
-        let anchor = selection?.location ?? 0
-        let location = min(max(anchor, 0), textLength)
-        let fallbackLength = min(MarkdownSyntaxParser.visibleHighlightMinimumLength, textLength - location)
-        return NSRange(location: location, length: fallbackLength).clamped(toLength: textLength)
+        let fallbackLength = MarkdownSyntaxParser.visibleHighlightMinimumLength
+        let selectionLocation = selection?.location ?? 0
+        let anchor = selectionLocation == NSNotFound ? 0 : selectionLocation
+        let safeAnchor = min(max(anchor, 0), Int.max - fallbackLength)
+        return NSRange(location: safeAnchor, length: fallbackLength)
     }
 }
 

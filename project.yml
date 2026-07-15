@@ -131,10 +131,7 @@ targets:
         type: folder
         buildPhase: resources
     dependencies:
-      - package: MarkdownCore
-      - package: EditorKit
-      - package: PreviewKit
-      - package: WorkspaceKit
+      - target: Plainsong
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.performance-tests

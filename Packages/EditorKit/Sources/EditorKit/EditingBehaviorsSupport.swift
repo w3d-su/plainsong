@@ -6,6 +6,12 @@ final class EditingBehaviorGuard {
     var isApplying = false
 }
 
+enum EditingBehaviorProposal {
+    case allowNativeInput
+    case selectionOnly(MarkdownEditResult)
+    case textMutation(MarkdownEditResult)
+}
+
 @MainActor
 public final class EditorCommandProxy: ObservableObject {
     private weak var textView: STTextView?
@@ -205,22 +211,60 @@ enum EditingBehaviorsSupport {
         fileKind: FileKind,
         editingGuard: EditingBehaviorGuard
     ) -> Bool {
-        guard !editingGuard.isApplying else { return true }
-        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return true }
+        let proposal = proposedChange(
+            in: textView,
+            affectedRange: affectedRange,
+            replacementString: replacementString,
+            fileKind: fileKind,
+            editingGuard: editingGuard
+        )
+        return apply(proposal, to: textView, editingGuard: editingGuard)
+    }
+
+    static func proposedChange(
+        in textView: STTextView,
+        affectedRange: NSTextRange,
+        replacementString: String?,
+        fileKind: FileKind,
+        editingGuard: EditingBehaviorGuard
+    ) -> EditingBehaviorProposal {
+        guard !editingGuard.isApplying else { return .allowNativeInput }
+        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else {
+            return .allowNativeInput
+        }
         guard let replacementString,
               needsMarkdownEvaluation(for: replacementString, fileKind: fileKind),
               let command = command(for: replacementString, fileKind: fileKind),
               let selection = nsRange(for: affectedRange, in: textView)
         else {
-            return true
+            return .allowNativeInput
         }
 
         guard let edit = edit(for: command, textView: textView, selection: selection) else {
-            return true
+            return .allowNativeInput
         }
 
-        apply(edit, to: textView, editingGuard: editingGuard)
-        return false
+        if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
+            return .selectionOnly(edit)
+        }
+        return .textMutation(edit)
+    }
+
+    static func apply(
+        _ proposal: EditingBehaviorProposal,
+        to textView: STTextView,
+        editingGuard: EditingBehaviorGuard
+    ) -> Bool {
+        switch proposal {
+        case .allowNativeInput:
+            return true
+        case let .selectionOnly(edit):
+            textView.textSelection = edit.newSelection
+            return false
+        case let .textMutation(edit):
+            apply(edit, to: textView, editingGuard: editingGuard)
+            return false
+        }
     }
 
     static func applyCommand(
@@ -301,8 +345,8 @@ enum EditingBehaviorsSupport {
         // Keep this as direct reference-state mutation. STTextView synchronously
         // re-enters shouldChangeText during insertText, so an inout guard here traps.
         editingGuard.isApplying = true
+        defer { editingGuard.isApplying = false }
         textView.insertText(edit.replacementString, replacementRange: edit.replacementRange)
-        editingGuard.isApplying = false
         textView.textSelection = edit.newSelection
     }
 

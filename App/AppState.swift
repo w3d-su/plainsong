@@ -26,6 +26,53 @@ protocol WorkspaceDirectoryScanning: Sendable {
 
 extension WorkspaceDirectoryScanner: WorkspaceDirectoryScanning {}
 
+protocol ExternalReloadApplicationPreparing: Sendable {
+    func prepare(
+        snapshot: WorkspaceCoherentFileSnapshot,
+        sourceSnapshot: EditorDocumentSourceSnapshot
+    ) async -> ExternalReloadApplicationPayload?
+}
+
+struct ProductionExternalReloadApplicationPreparer: ExternalReloadApplicationPreparing {
+    private let willPrepare: (@Sendable () -> Void)?
+    private let didPrepare: (@Sendable () -> Void)?
+
+    init(
+        willPrepare: (@Sendable () -> Void)? = nil,
+        didPrepare: (@Sendable () -> Void)? = nil
+    ) {
+        self.willPrepare = willPrepare
+        self.didPrepare = didPrepare
+    }
+
+    func prepare(
+        snapshot: WorkspaceCoherentFileSnapshot,
+        sourceSnapshot: EditorDocumentSourceSnapshot
+    ) async -> ExternalReloadApplicationPayload? {
+        let preparationTask = Task<ExternalReloadApplicationPayload?, Never>.detached(
+            priority: .utility
+        ) {
+            guard !Task.isCancelled else { return nil }
+            willPrepare?()
+            guard !Task.isCancelled else { return nil }
+            guard let payload = ExternalReloadApplicationPayload.preparingIfNotCancelled(
+                snapshot: snapshot,
+                sourceSnapshot: sourceSnapshot
+            ) else {
+                return nil
+            }
+            guard !Task.isCancelled else { return nil }
+            didPrepare?()
+            return payload
+        }
+        return await withTaskCancellationHandler {
+            await preparationTask.value
+        } onCancel: {
+            preparationTask.cancel()
+        }
+    }
+}
+
 struct FileWriteArtifactNotice: Identifiable, Equatable {
     let id: UUID
     let destinationURL: URL
@@ -110,6 +157,8 @@ final class AppState: ObservableObject {
     @Published private(set) var editorFocusRequestID = 0
 
     let fileStore: MarkdownFileStore
+    let coherentFileReader: any WorkspaceCoherentFileReading
+    let externalReloadApplicationPreparer: any ExternalReloadApplicationPreparing
     let lastOpenedFileStore: any LastOpenedFilePersisting
     let recentItemStore: any RecentItemPersisting
     let directoryScanner: any WorkspaceDirectoryScanning
@@ -143,8 +192,29 @@ final class AppState: ObservableObject {
     var editorNavigationGeneration: UInt64 = 0
     var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
     var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]
-    var installedEditorDocumentBindingLease: InstalledEditorDocumentBindingLease?
-    var retiredEditorDocumentBindings: [EditorDocumentBindingID: RetiredEditorDocumentBinding] = [:]
+    var editorBindingInstallations: [
+        EditorDocumentBindingInstallation: DocumentSession
+    ] = [:]
+    var editorWriterInstallations: [ObjectIdentifier: EditorDocumentBindingInstallation] = [:]
+    var pendingEditorSourceInstallations: [
+        EditorDocumentBindingInstallation: DocumentSession
+    ] = [:]
+    var deferredExternalChangeResolutions: [URL: DeferredExternalChangeResolution] = [:]
+    var externalResolutionIntentCaptures: [URL: ExternalResolutionIntentCapture] = [:]
+    var externalReloadTasks: [ObjectIdentifier: ExternalReloadTask] = [:]
+    var externalDiskInspectionTasks: [ObjectIdentifier: ExternalDiskInspectionTask] = [:]
+    var pendingExternalReloadApplications: [
+        ObjectIdentifier: PendingExternalReloadApplication
+    ] = [:]
+    var nextExternalReloadGeneration: UInt64 = 0
+    var externalDiskEventGenerations: [ObjectIdentifier: UInt64] = [:]
+    var retiredEditorDocumentSessions: [URL: RetiredEditorDocumentSession] = [:]
+    var editorDocumentSourceFullComparisonCounts: [
+        EditorDocumentSourceFullComparisonKind: Int
+    ] = [:]
+    var editorDocumentSourceSynchronizers: [
+        EditorDocumentBindingInstallation: EditorDocumentSourceSynchronizer
+    ] = [:]
     var completionWorkspaceTask: Task<Void, Never>?
     var sessionAutosaveTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
     var sessionStatisticsTasks: [ObjectIdentifier: SessionBackgroundTask] = [:]
@@ -154,8 +224,9 @@ final class AppState: ObservableObject {
     var workspaceAccess: SecurityScopedResourceAccess?
     var workspaceWatcher: WorkspaceEventWatcher?
     var sessionCache: [URL: DocumentSession] = [:]
+    var sessionLifecycleGenerations: [ObjectIdentifier: UInt64] = [:]
     var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
-    var lastKnownDiskHashes: [URL: UInt64] = [:]
+    var lastKnownDiskHashes: [URL: String] = [:]
     var lastKnownDiskModificationDates: [URL: Date] = [:]
     var pendingExternalTexts: [URL: String] = [:]
     /// Coherent descriptor-bound observations that back pending external-change text. The
@@ -181,6 +252,9 @@ final class AppState: ObservableObject {
     init(
         currentDocument: DocumentSession = DocumentSession(),
         fileStore: MarkdownFileStore = MarkdownFileStore(),
+        coherentFileReader: any WorkspaceCoherentFileReading = WorkspaceCoherentFileReader(),
+        externalReloadApplicationPreparer: any ExternalReloadApplicationPreparing =
+            ProductionExternalReloadApplicationPreparer(),
         lastOpenedFileStore: any LastOpenedFilePersisting = LastOpenedFileStore(),
         recentItemStore: any RecentItemPersisting = RecentItemStore(),
         directoryScanner: any WorkspaceDirectoryScanning = WorkspaceDirectoryScanner(),
@@ -194,6 +268,8 @@ final class AppState: ObservableObject {
     ) {
         self.currentDocument = currentDocument
         self.fileStore = fileStore
+        self.coherentFileReader = coherentFileReader
+        self.externalReloadApplicationPreparer = externalReloadApplicationPreparer
         self.lastOpenedFileStore = lastOpenedFileStore
         self.recentItemStore = recentItemStore
         self.directoryScanner = directoryScanner
@@ -227,17 +303,30 @@ final class AppState: ObservableObject {
         completionWorkspaceTask?.cancel()
         workspaceWatcher?.stop()
         workspaceSearchTask?.cancel()
+        for reload in externalReloadTasks.values {
+            reload.task.cancel()
+        }
+        for inspection in externalDiskInspectionTasks.values {
+            inspection.task.cancel()
+        }
         for task in sessionAutosaveTasks.values {
             task.task.cancel()
         }
         for task in sessionStatisticsTasks.values {
             task.task.cancel()
         }
-        for retirement in retiredEditorDocumentBindings.values {
-            retirement.securityScopedAuthority?.stop()
+        var stoppedOwners: Set<ObjectIdentifier> = []
+        for retirement in retiredEditorDocumentSessions.values {
+            for owner in retirement.securityScopedAuthorityOwners
+                where stoppedOwners.insert(ObjectIdentifier(owner)).inserted
+            {
+                owner.stop()
+            }
         }
     }
+}
 
+extension AppState {
     var isPreviewVisible: Bool {
         layoutMode.showsPreview
     }
@@ -324,10 +413,6 @@ final class AppState: ObservableObject {
 
     func openExternalFile(_ url: URL) {
         do {
-            if currentDocument.isDirty {
-                try saveCurrentDocument()
-            }
-
             try open(url: url, rememberAsLastOpened: true, preserveWorkspace: false)
         } catch {
             present(error, title: "Could Not Open File")
@@ -444,7 +529,9 @@ final class AppState: ObservableObject {
     private func persistLayoutMode(_ mode: EditorLayoutMode) {
         userDefaults.set(mode.rawValue, forKey: Self.layoutModeDefaultsKey)
     }
+}
 
+extension AppState {
     static var supportedContentTypes: [UTType] {
         [
             UTType(filenameExtension: "md"),
@@ -501,6 +588,8 @@ extension AppState {
             return false
         }
         return !isSaving &&
+            !hasPendingEditorSource(for: currentDocument) &&
+            externalReloadTasks[ObjectIdentifier(currentDocument)] == nil &&
             indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
@@ -518,16 +607,100 @@ extension AppState {
     }
 }
 
-struct InstalledEditorDocumentBindingLease {
-    let id: EditorDocumentBindingID
+struct RetiredEditorDocumentSession {
+    let canonicalURL: URL
     let session: DocumentSession
+    var bindingIDs: Set<EditorDocumentBindingID>
+    var awaitingInstallations: Set<EditorDocumentBindingInstallation>
+    var securityScopedAuthorityOwners: [RetiredWorkspaceAuthorityOwner]
 }
 
-struct RetiredEditorDocumentBinding {
-    let id: EditorDocumentBindingID
-    let session: DocumentSession
-    let securityScopedAuthority: SecurityScopedResourceAccess?
-    var isAwaitingBindingEnd: Bool
+enum DeferredExternalChangeResolution: Equatable {
+    case reload
+    case keepMine
+}
+
+struct ExternalResolutionIntentCapture: Equatable {
+    let intent: DeferredExternalChangeResolution
+    let sourceSnapshot: EditorDocumentSourceSnapshot
+    var diskEventGeneration: UInt64
+}
+
+final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
+    let authority: SecurityScopedResourceAccess
+
+    private let lock = NSLock()
+    private var dependentSessions: Set<ObjectIdentifier> = []
+    private var isStopped = false
+
+    init(authority: SecurityScopedResourceAccess) {
+        self.authority = authority
+    }
+
+    var hasStopped: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isStopped
+    }
+
+    var dependentSessionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return dependentSessions.count
+    }
+
+    deinit {
+        stop()
+    }
+
+    func retain(_ session: DocumentSession) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !isStopped else { return }
+        dependentSessions.insert(ObjectIdentifier(session))
+    }
+
+    func release(_ session: DocumentSession) {
+        let shouldStop: Bool
+        lock.lock()
+        dependentSessions.remove(ObjectIdentifier(session))
+        shouldStop = dependentSessions.isEmpty && !isStopped
+        if shouldStop {
+            isStopped = true
+        }
+        lock.unlock()
+
+        if shouldStop {
+            authority.stop()
+        }
+    }
+
+    func stopIfUnused() {
+        let shouldStop: Bool
+        lock.lock()
+        shouldStop = dependentSessions.isEmpty && !isStopped
+        if shouldStop {
+            isStopped = true
+        }
+        lock.unlock()
+
+        if shouldStop {
+            authority.stop()
+        }
+    }
+
+    func stop() {
+        let shouldStop: Bool
+        lock.lock()
+        shouldStop = !isStopped
+        isStopped = true
+        dependentSessions.removeAll()
+        lock.unlock()
+
+        if shouldStop {
+            authority.stop()
+        }
+    }
 }
 
 struct SessionBackgroundTask {
@@ -535,11 +708,83 @@ struct SessionBackgroundTask {
     let task: Task<Void, Never>
 }
 
+struct ExternalReloadTask {
+    let token: UUID
+    let generation: UInt64
+    let session: DocumentSession
+    let canonicalURL: URL
+    let location: WorkspaceFileSystemLocation
+    let lifecycleGeneration: UInt64
+    let sourceSnapshot: EditorDocumentSourceSnapshot
+    let diskEventGeneration: UInt64
+    let intent: DeferredExternalChangeResolution
+    let task: Task<Void, Never>
+}
+
+struct ExternalDiskInspectionTask {
+    let token: UUID
+    let session: DocumentSession
+    let canonicalURL: URL
+    let location: WorkspaceFileSystemLocation
+    let lifecycleGeneration: UInt64
+    let diskEventGeneration: UInt64
+    let sourceSnapshot: EditorDocumentSourceSnapshot
+    let task: Task<Void, Never>
+}
+
+struct PendingExternalReloadApplication {
+    let token: UUID
+    let generation: UInt64
+    let session: DocumentSession
+    let canonicalURL: URL
+    let payload: ExternalReloadApplicationPayload
+    let acceptedSourceSnapshot: EditorDocumentSourceSnapshot
+    let intent: DeferredExternalChangeResolution
+    var synchronizedInstallations: Set<EditorDocumentBindingInstallation>
+}
+
+struct ExternalReloadApplicationPayload {
+    let snapshot: WorkspaceCoherentFileSnapshot
+    let contentHash: String
+    let textTransition: DocumentSessionTextTransition
+
+    private nonisolated init(
+        snapshot: WorkspaceCoherentFileSnapshot,
+        contentHash: String,
+        textTransition: DocumentSessionTextTransition
+    ) {
+        self.snapshot = snapshot
+        self.contentHash = contentHash
+        self.textTransition = textTransition
+    }
+
+    nonisolated static func preparingIfNotCancelled(
+        snapshot: WorkspaceCoherentFileSnapshot,
+        sourceSnapshot: EditorDocumentSourceSnapshot
+    ) -> Self? {
+        guard !Task.isCancelled else { return nil }
+        let textTransition = DocumentSessionTextTransition(
+            sourceText: sourceSnapshot.source,
+            sourceRevision: sourceSnapshot.revision,
+            destinationText: snapshot.text
+        )
+        guard !Task.isCancelled else { return nil }
+        return Self(
+            snapshot: snapshot,
+            contentHash: snapshot.sha256Digest,
+            textTransition: textTransition
+        )
+    }
+}
+
 enum AppStateError: LocalizedError {
     case unsupportedFile(URL)
     case missingFile(URL)
     case unresolvedExternalChange(URL)
     case invalidSessionIdentity(URL)
+    case duplicateSessionOwnership(URL)
+    case pendingEditorSource(URL)
+    case unsafeWriteTarget(URL)
 
     var errorDescription: String? {
         switch self {
@@ -551,6 +796,12 @@ enum AppStateError: LocalizedError {
             "\(url.lastPathComponent) changed on disk. Choose Reload or Keep mine before saving."
         case let .invalidSessionIdentity(url):
             "The cached editor session for \(url.lastPathComponent) no longer matches that file."
+        case let .duplicateSessionOwnership(url):
+            "More than one editor session owns \(url.lastPathComponent)."
+        case let .pendingEditorSource(url):
+            "\(url.lastPathComponent) still has editor input waiting to synchronize."
+        case let .unsafeWriteTarget(url):
+            "\(url.lastPathComponent) no longer refers to the file owned by this editor session."
         }
     }
 }

@@ -49,14 +49,13 @@ extension AppState {
             )
         }
 
-        let retiredMatches = retiredEditorDocumentBindings.compactMap { bindingID, retirement in
-            guard !retirement.isAwaitingBindingEnd,
-                  let retiredStateURL = sessionStateURL(for: retirement.session),
+        let retiredMatches = retiredEditorDocumentSessions.compactMap { canonicalURL, retirement in
+            guard let retiredStateURL = sessionStateURL(for: retirement.session),
                   exactFileURLSpellingMatches(retiredStateURL, key)
             else {
-                return nil as (EditorDocumentBindingID, RetiredEditorDocumentBinding)?
+                return nil as (URL, RetiredEditorDocumentSession)?
             }
-            return (bindingID, retirement)
+            return (canonicalURL, retirement)
         }
         if retiredMatches.count == 1, let match = retiredMatches.first {
             try validateReusableAnchoredSession(match.1.session, at: location)
@@ -65,7 +64,7 @@ extension AppState {
                 file: file,
                 binding: binding,
                 session: match.1.session,
-                source: .retired(bindingID: match.0)
+                source: .retired(canonicalURL: match.0)
             )
         }
 
@@ -131,22 +130,35 @@ extension AppState {
             adoptAnchoredFileBinding(activation.binding, for: session)
             handleSessionAccess(url: key, isDirty: session.isDirty)
 
-        case let .retired(bindingID):
-            guard let retirement = retiredEditorDocumentBindings[bindingID],
-                  retirement.session === session,
-                  !retirement.isAwaitingBindingEnd
+        case let .retired(canonicalURL):
+            guard let retirement = retiredEditorDocumentSessions[canonicalURL],
+                  retirement.session === session
             else {
                 preconditionFailure("Prepared retired reload activation changed before commit")
             }
+            let sessionIdentity = ObjectIdentifier(session)
+            let shouldRestartInspection = externalDiskInspectionTasks[sessionIdentity] != nil
+            _ = advanceSessionLifecycle(for: session)
             let accepted = installAnchoredFileSession(
                 session,
                 activation: activation,
                 recordsLoadedText: false,
                 reconcilesExternalChange: true
             )
-            guard accepted else { return }
-            retiredEditorDocumentBindings[bindingID] = nil
-            retirement.securityScopedAuthority?.stop()
+            guard accepted else {
+                if shouldRestartInspection {
+                    externalDiskInspectionTasks.removeValue(
+                        forKey: sessionIdentity
+                    )?.task.cancel()
+                }
+                return
+            }
+            if shouldRestartInspection ||
+                deferredExternalChangeResolutions[key] != nil
+            {
+                handleExternalChange(for: session, advancingDiskEvent: false)
+            }
+            finishRetiredEditorDocumentSessionIfPossible(for: session)
 
         case .loaded:
             _ = installAnchoredFileSession(
@@ -226,7 +238,7 @@ extension AppState {
         reconcilesExternalChange: Bool
     ) -> Bool {
         let key = activation.canonicalURL
-        cancelForegroundDocumentTasks()
+        moveCurrentDocumentWorkToBackgroundForAnchoredActivation(session)
         sessionCache[key] = session
         if !reconcilesExternalChange {
             clearMissingFileActivationFence(at: key)
@@ -255,6 +267,15 @@ extension AppState {
         adoptAnchoredFileBinding(activation.binding, for: session)
         handleSessionAccess(url: key, isDirty: session.isDirty)
         return true
+    }
+
+    private func moveCurrentDocumentWorkToBackgroundForAnchoredActivation(
+        _ destinationSession: DocumentSession
+    ) {
+        guard currentDocument !== destinationSession else { return }
+        let previousSession = currentDocument
+        moveCurrentAutosaveToBackground(for: previousSession)
+        moveCurrentStatisticsToBackground(for: previousSession)
     }
 
     private func clearMissingFileActivationFence(at key: URL) {
@@ -365,7 +386,7 @@ extension AppState {
 struct PreparedAnchoredFileSessionActivation {
     enum Source {
         case cached
-        case retired(bindingID: EditorDocumentBindingID)
+        case retired(canonicalURL: URL)
         case loaded
     }
 

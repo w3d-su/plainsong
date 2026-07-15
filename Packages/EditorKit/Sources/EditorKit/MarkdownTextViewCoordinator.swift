@@ -4,46 +4,11 @@ import STTextView
 import SwiftUI
 
 @MainActor
-struct EditorDocumentTransitionCandidate {
-    let generation: UInt64
-    let sourceText: String
-    let requestedSelection: NSRange?
-    fileprivate let text: Binding<String>
-    fileprivate let selection: Binding<NSRange?>
-    fileprivate let documentIdentity: EditorDocumentIdentity?
-    fileprivate let documentBinding: EditorDocumentBindingRegistration?
-}
-
-struct EditorDocumentInstallation: Equatable {
-    let generation: UInt64
-}
-
-@MainActor
-private struct EditorDocumentBindingRegistration {
-    let id: EditorDocumentBindingID
-    let lifecycle: (EditorDocumentBindingLifecycleEvent) -> Void
-}
-
-@MainActor
-private struct EditorDocumentBindingTransition {
-    let revoked: EditorDocumentBindingRegistration?
-    let installed: EditorDocumentBindingRegistration?
-
-    func notify() {
-        if let installed {
-            installed.lifecycle(.installed(installed.id))
-        }
-        if let revoked {
-            revoked.lifecycle(.revoked(revoked.id))
-        }
-    }
-}
-
-@MainActor
 private struct EditorInstalledDocumentState {
     private var textBinding: Binding<String>
     private var selectionBinding: Binding<NSRange?>
     private var documentBinding: EditorDocumentBindingRegistration?
+    private var sourceSnapshot: EditorDocumentSourceSnapshot?
     private(set) var identity: EditorDocumentIdentity?
     private(set) var isInstalled = false
     private var nextCandidateGeneration: UInt64 = 0
@@ -69,12 +34,22 @@ private struct EditorInstalledDocumentState {
         isInstalled && preparedCandidateGeneration == installedCandidateGeneration
     }
 
+    var installedSourceSnapshot: EditorDocumentSourceSnapshot? {
+        sourceSnapshot
+    }
+
+    var hasSourceContract: Bool {
+        documentBinding?.sourceContract != nil
+    }
+
     mutating func prepare(
         text: Binding<String>,
         selection: Binding<NSRange?>,
         documentIdentity: EditorDocumentIdentity?,
         documentBindingID: EditorDocumentBindingID?,
-        onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
+        onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?,
+        documentSourceContract: EditorDocumentSourceContract?,
+        navigationCommand: EditorNavigationCommand?
     ) -> EditorDocumentTransitionCandidate {
         nextCandidateGeneration += 1
         preparedCandidateGeneration = nextCandidateGeneration
@@ -86,21 +61,30 @@ private struct EditorInstalledDocumentState {
             selectionBinding = selection
         }
 
-        let documentBinding: EditorDocumentBindingRegistration? = if let documentBindingID,
-                                                                     let onDocumentBindingLifecycle
-        {
+        let documentBinding: EditorDocumentBindingRegistration? = if let documentSourceContract {
+            EditorDocumentBindingRegistration(
+                id: documentSourceContract.bindingID,
+                lifecycle: documentSourceContract.lifecycle,
+                sourceContract: documentSourceContract
+            )
+        } else if let documentBindingID, let onDocumentBindingLifecycle {
             EditorDocumentBindingRegistration(
                 id: documentBindingID,
-                lifecycle: onDocumentBindingLifecycle
+                lifecycle: onDocumentBindingLifecycle,
+                sourceContract: nil
             )
         } else {
             nil
         }
+        let preparedSourceSnapshot = documentSourceContract?.snapshot()
+        let preparedSource = preparedSourceSnapshot?.source ?? text.wrappedValue
 
         return EditorDocumentTransitionCandidate(
             generation: nextCandidateGeneration,
-            sourceText: text.wrappedValue,
+            sourceText: preparedSource,
+            sourceSnapshot: preparedSourceSnapshot,
             requestedSelection: selection.wrappedValue,
+            navigationCommand: navigationCommand,
             text: text,
             selection: selection,
             documentIdentity: documentIdentity,
@@ -116,6 +100,7 @@ private struct EditorInstalledDocumentState {
         selectionBinding = candidate.selection
         identity = candidate.documentIdentity
         documentBinding = candidate.documentBinding
+        sourceSnapshot = candidate.sourceSnapshot
         isInstalled = true
         installedCandidateGeneration = candidate.generation
         let bindingChanged = previousBinding?.id != candidate.documentBinding?.id
@@ -129,13 +114,128 @@ private struct EditorInstalledDocumentState {
     }
 
     mutating func revokeDocumentBinding() -> EditorDocumentBindingRegistration? {
-        defer { documentBinding = nil }
+        defer {
+            documentBinding = nil
+            sourceSnapshot = nil
+        }
         return documentBinding
+    }
+
+    func requestWriterActivation(
+        installationID: EditorDocumentBindingInstallationID
+    ) -> EditorDocumentWriterEventResult? {
+        guard let documentBinding,
+              let sourceContract = documentBinding.sourceContract,
+              let sourceSnapshot
+        else {
+            return nil
+        }
+        return sourceContract.writer(.activate(
+            EditorDocumentBindingInstallation(
+                bindingID: documentBinding.id,
+                installationID: installationID
+            ),
+            from: sourceSnapshot
+        ))
+    }
+
+    func publishSource(
+        _ source: String,
+        installationID: EditorDocumentBindingInstallationID
+    ) -> EditorDocumentSourcePublicationResult? {
+        guard let documentBinding,
+              let sourceContract = documentBinding.sourceContract,
+              let sourceSnapshot
+        else {
+            return nil
+        }
+        return sourceContract.publish(EditorDocumentSourcePublication(
+            installation: EditorDocumentBindingInstallation(
+                bindingID: documentBinding.id,
+                installationID: installationID
+            ),
+            base: sourceSnapshot,
+            source: source
+        ))
+    }
+
+    mutating func acceptSourceSnapshot(_ snapshot: EditorDocumentSourceSnapshot) {
+        sourceSnapshot = snapshot
+        textBinding.wrappedValue = snapshot.source
+    }
+
+    mutating func synchronizeSourceSnapshot(_ snapshot: EditorDocumentSourceSnapshot) {
+        sourceSnapshot = snapshot
+    }
+
+    mutating func refreshSourceSnapshot() {
+        guard let snapshot = documentBinding?.sourceContract?.snapshot() else { return }
+        sourceSnapshot = snapshot
+    }
+
+    func isSourceRevisionCurrent() -> Bool {
+        guard let sourceSnapshot,
+              let currentSnapshot = documentBinding?.sourceContract?.snapshot()
+        else {
+            return true
+        }
+        return sourceSnapshot.revision == currentSnapshot.revision
+    }
+
+    func canProveCurrentSource(
+        for candidate: EditorDocumentTransitionCandidate
+    ) -> Bool {
+        guard isInstalled,
+              documentBinding?.id == candidate.documentBinding?.id,
+              let sourceSnapshot,
+              let candidateSnapshot = candidate.sourceSnapshot
+        else {
+            return false
+        }
+        return sourceSnapshot.revision == candidateSnapshot.revision
+    }
+
+    func reportPendingSource(
+        _ event: (EditorDocumentBindingInstallation) -> EditorDocumentPendingSourceEvent,
+        installationID: EditorDocumentBindingInstallationID
+    ) {
+        guard let documentBinding,
+              let sourceContract = documentBinding.sourceContract
+        else {
+            return
+        }
+        sourceContract.pendingSource(event(EditorDocumentBindingInstallation(
+            bindingID: documentBinding.id,
+            installationID: installationID
+        )))
+    }
+
+    func releaseWriter(installationID: EditorDocumentBindingInstallationID) {
+        guard let documentBinding,
+              let sourceContract = documentBinding.sourceContract
+        else {
+            return
+        }
+        _ = sourceContract.writer(.release(EditorDocumentBindingInstallation(
+            bindingID: documentBinding.id,
+            installationID: installationID
+        )))
+    }
+
+    func recordFullSourceComparison(_ kind: EditorDocumentSourceFullComparisonKind) {
+        documentBinding?.sourceContract?.recordFullSourceComparison(kind)
     }
 }
 
 @MainActor
 final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
+    typealias DeferredDocumentTransitionInstallationHandler = (
+        MarkdownTextViewCoordinator,
+        EditorDocumentTransitionCandidate,
+        MarkdownSTTextView
+    ) -> Void
+
+    private let documentBindingInstallationID = EditorDocumentBindingInstallationID()
     private var installedDocument: EditorInstalledDocumentState
     var text: String {
         get { installedDocument.text }
@@ -154,6 +254,14 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         installedDocument.identity
     }
 
+    var currentInstalledSourceSnapshot: EditorDocumentSourceSnapshot? {
+        installedDocument.installedSourceSnapshot
+    }
+
+    var preparedDocumentTransitionGeneration: UInt64? {
+        installedDocument.preparedCandidateGeneration
+    }
+
     var navigationState = EditorNavigationStateMachine()
     var navigationRetryTask: Task<Void, Never>?
     var navigationInputDeferralTask: Task<Void, Never>?
@@ -162,23 +270,68 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private(set) var pendingFocusRequestID: Int?
     private weak var pendingFocusTextView: STTextView?
     private var focusRetryTask: Task<Void, Never>?
-    private var scrollProxy: EditorScrollProxy?
-    private var commandProxy: EditorCommandProxy?
-    private let editingBehaviorGuard = EditingBehaviorGuard()
-    private var completionWorkspace: CompletionWorkspace = .empty
-    private var imageAssetInserter: EditorImageAssetInserter?
-    private var imageAssetContextID: String?
+    var scrollProxy: EditorScrollProxy?
+    var commandProxy: EditorCommandProxy?
+    let editingBehaviorGuard = EditingBehaviorGuard()
+    var completionWorkspace: CompletionWorkspace = .empty
+    var imageAssetInserter: EditorImageAssetInserter?
+    var imageAssetContextID: String?
     let imageThumbnailPresentationController = WYSIWYGImagePresentationController()
-    private var recentCompletionIDs: [String] = []
-    private var completionRequestID = 0
-    private var completionTask: Task<[Completion], Never>?
-    private weak var visibleRangeTextView: STTextView?
-    private var visibleRangeObserver: CoordinatorNotificationObserver?
-    private var visibleRangeChangeHandler: ((NSRange) -> Void)?
-    private var lastVisibleTextRange: NSRange?
+    var recentCompletionIDs: [String] = []
+    var completionRequestID = 0
+    var completionTask: Task<[Completion], Never>?
+    weak var visibleRangeTextView: STTextView?
+    var visibleRangeObserver: CoordinatorNotificationObserver?
+    var visibleRangeChangeHandler: ((NSRange) -> Void)?
+    var lastVisibleTextRange: NSRange?
+    private var isSourceSynchronizationPending = false
+    private var isNativeSourceSynchronized = true
+    private var preparedNativeSourceCandidateGeneration: UInt64?
+    private var deferredDocumentTransitionCandidate: EditorDocumentTransitionCandidate?
+    private weak var deferredDocumentTransitionTextView: MarkdownSTTextView?
+    private var deferredDocumentTransitionRetryTask: Task<Void, Never>?
+    private var deferredDocumentTransitionInstallationHandler:
+        DeferredDocumentTransitionInstallationHandler?
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
         installedDocument = EditorInstalledDocumentState(text: text, selection: selection)
+    }
+
+    func canProveCurrentInstalledSource(
+        for candidate: EditorDocumentTransitionCandidate
+    ) -> Bool {
+        isNativeSourceSynchronized &&
+            !isSourceSynchronizationPending &&
+            installedDocument.canProveCurrentSource(for: candidate)
+    }
+
+    func canProveCurrentInstalledSource() -> Bool {
+        installedDocument.hasSourceContract &&
+            isNativeSourceSynchronized &&
+            !isSourceSynchronizationPending &&
+            installedDocument.isSourceRevisionCurrent()
+    }
+
+    func nativeTextMatches(
+        _ textView: STTextView,
+        _ source: String,
+        recordingFor candidate: EditorDocumentTransitionCandidate? = nil
+    ) -> Bool {
+        if let candidate {
+            candidate.recordFullSourceComparison(.nativeView)
+        } else {
+            installedDocument.recordFullSourceComparison(.nativeView)
+        }
+        return MarkdownTextView.plainTextMatches(textView, source)
+    }
+
+    func nativeSourceStringMatches(_ nativeSource: String, _ appSource: String) -> Bool {
+        installedDocument.recordFullSourceComparison(.nativeView)
+        return ExactUTF16Text.matches(nativeSource, appSource)
+    }
+
+    func notePreparedNativeSource(_ candidate: EditorDocumentTransitionCandidate) {
+        preparedNativeSourceCandidateGeneration = candidate.generation
     }
 
     func prepareDocumentTransition(
@@ -187,29 +340,37 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         documentIdentity: EditorDocumentIdentity?,
         documentBindingID: EditorDocumentBindingID? = nil,
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
+        documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand?,
         in textView: STTextView
     ) -> EditorDocumentTransitionCandidate {
         observeNavigationCommand(navigationCommand)
+        supersedeDeferredDocumentTransition()
 
         let candidate = installedDocument.prepare(
             text: text,
             selection: selection,
             documentIdentity: documentIdentity,
             documentBindingID: documentBindingID,
-            onDocumentBindingLifecycle: onDocumentBindingLifecycle
+            onDocumentBindingLifecycle: onDocumentBindingLifecycle,
+            documentSourceContract: documentSourceContract,
+            navigationCommand: navigationCommand
         )
 
         guard installedDocument.isInstalled,
-              !textView.hasMarkedText(),
-              !MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
+              !isSourceSynchronizationPending,
+              !textView.hasMarkedText()
         else {
             return candidate
         }
 
-        // A mismatching candidate cannot be the live installed document. Allow the
-        // normal external-text update even when both optional identities are nil.
-        isUserEditing = false
+        // Equal App-owned binding/revision plus a synchronized native buffer is the
+        // constant-time proof for an ordinary same-document SwiftUI update. A
+        // different candidate must take the stale/recovery path below, where the
+        // literal native comparison is instrumented before installation.
+        if !canProveCurrentInstalledSource(for: candidate) {
+            isUserEditing = false
+        }
         return candidate
     }
 
@@ -218,105 +379,171 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         _ candidate: EditorDocumentTransitionCandidate,
         in textView: STTextView
     ) -> EditorDocumentInstallation? {
-        guard candidate.generation == installedDocument.preparedCandidateGeneration,
-              !textView.hasMarkedText(),
-              MarkdownTextView.plainTextMatches(textView, candidate.sourceText)
-        else {
+        guard candidate.generation == installedDocument.preparedCandidateGeneration else {
             return nil
         }
 
+        let isDeferredByInput = isSourceSynchronizationPending || textView.hasMarkedText()
+        let isExactCandidateInstalled = canProveCurrentInstalledSource(for: candidate) ||
+            preparedNativeSourceCandidateGeneration == candidate.generation
+        guard !isDeferredByInput else {
+            if isDeferredByInput,
+               let textView = textView as? MarkdownSTTextView
+            {
+                deferredDocumentTransitionCandidate = candidate
+                deferredDocumentTransitionTextView = textView
+            }
+            return nil
+        }
+        guard isExactCandidateInstalled || nativeTextMatches(
+            textView,
+            candidate.sourceText,
+            recordingFor: candidate
+        ) else {
+            return nil
+        }
+
+        clearDeferredDocumentTransition()
+        preparedNativeSourceCandidateGeneration = nil
         let (installation, bindingTransition) = installedDocument.install(candidate)
-        bindingTransition.notify()
+        isNativeSourceSynchronized = true
+        bindingTransition.notify(installationID: documentBindingInstallationID)
+        bindingTransition.updateSourceSynchronizers(
+            installationID: documentBindingInstallationID
+        ) { [weak self, weak textView] snapshot in
+            guard let self, let textView else { return false }
+            return synchronizeInstalledSource(snapshot, in: textView)
+        }
         cancelPendingNavigationTasks()
         return installation
     }
 
     func revokeInstalledDocumentBinding() {
+        cancelDeferredDocumentTransition()
+        if isSourceSynchronizationPending {
+            installedDocument.reportPendingSource(
+                EditorDocumentPendingSourceEvent.abandoned,
+                installationID: documentBindingInstallationID
+            )
+            isSourceSynchronizationPending = false
+        }
+        installedDocument.releaseWriter(installationID: documentBindingInstallationID)
         guard let registration = installedDocument.revokeDocumentBinding() else { return }
-        registration.lifecycle(.revoked(registration.id))
+        registration.sourceContract?.unregisterSourceSynchronizer(
+            EditorDocumentBindingInstallation(
+                bindingID: registration.id,
+                installationID: documentBindingInstallationID
+            )
+        )
+        registration.lifecycle(.revoked(EditorDocumentBindingInstallation(
+            bindingID: registration.id,
+            installationID: documentBindingInstallationID
+        )))
     }
 
     var isPreparedDocumentInstalled: Bool {
         installedDocument.isPreparedCandidateInstalled
     }
 
-    func attachScrollProxy(_ proxy: EditorScrollProxy?, to textView: STTextView) {
-        if scrollProxy !== proxy {
-            scrollProxy?.detach()
-            scrollProxy = proxy
+    func setDeferredDocumentTransitionInstallationHandler(
+        _ handler: @escaping DeferredDocumentTransitionInstallationHandler
+    ) {
+        deferredDocumentTransitionInstallationHandler = handler
+    }
+
+    func cancelDeferredDocumentTransition() {
+        clearDeferredDocumentTransition()
+    }
+
+    func detachDeferredDocumentTransitionInstallationHandler() {
+        clearDeferredDocumentTransition()
+        deferredDocumentTransitionInstallationHandler = nil
+    }
+
+    private func supersedeDeferredDocumentTransition() {
+        clearDeferredDocumentTransition()
+    }
+
+    private func clearDeferredDocumentTransition() {
+        deferredDocumentTransitionRetryTask?.cancel()
+        deferredDocumentTransitionRetryTask = nil
+        deferredDocumentTransitionCandidate = nil
+        deferredDocumentTransitionTextView = nil
+    }
+
+    private func scheduleDeferredDocumentTransitionRetry() {
+        guard deferredDocumentTransitionCandidate != nil,
+              let textView = deferredDocumentTransitionTextView
+        else {
+            return
         }
 
-        proxy?.attach(to: textView)
-    }
-
-    func detachScrollProxy() {
-        scrollProxy?.detach()
-        scrollProxy = nil
-    }
-
-    func attachVisibleRangeReporter(_ handler: @escaping (NSRange) -> Void, to textView: STTextView) {
-        visibleRangeChangeHandler = handler
-
-        if visibleRangeTextView !== textView {
-            visibleRangeObserver = nil
-            visibleRangeTextView = textView
-            lastVisibleTextRange = nil
-
-            if let clipView = textView.enclosingScrollView?.contentView {
-                clipView.postsBoundsChangedNotifications = true
-                visibleRangeObserver = CoordinatorNotificationObserver(NotificationCenter.default.addObserver(
-                    forName: NSView.boundsDidChangeNotification,
-                    object: clipView,
-                    queue: .main
-                ) { [weak self, weak textView] _ in
-                    Task { @MainActor [weak self, weak textView] in
-                        guard let textView else { return }
-                        self?.reportVisibleRangeIfNeeded(in: textView)
-                    }
-                })
+        deferredDocumentTransitionRetryTask?.cancel()
+        deferredDocumentTransitionRetryTask = Task { @MainActor [weak self, weak textView] in
+            await Task.yield()
+            guard !Task.isCancelled,
+                  let self,
+                  let textView
+            else {
+                return
             }
-        }
-
-        reportVisibleRangeIfNeeded(in: textView)
-    }
-
-    func detachVisibleRangeReporter() {
-        visibleRangeObserver = nil
-        visibleRangeTextView = nil
-        visibleRangeChangeHandler = nil
-        lastVisibleTextRange = nil
-    }
-
-    func attachCommandProxy(_ proxy: EditorCommandProxy?, to textView: STTextView) {
-        if commandProxy !== proxy {
-            commandProxy?.detach(from: textView)
-            commandProxy = proxy
-        }
-
-        proxy?.attach(
-            to: textView,
-            fileKind: proxy?.currentFileKind() ?? .markdown
-        ) { [weak self, weak textView] command in
-            guard let self, let textView else { return }
-            performCommand(command, in: textView)
+            deferredDocumentTransitionRetryTask = nil
+            retryDeferredDocumentTransitionIfPossible(in: textView)
         }
     }
 
-    func detachCommandProxy(from textView: STTextView) {
-        commandProxy?.detach(from: textView)
-        commandProxy = nil
-    }
+    private func retryDeferredDocumentTransitionIfPossible(
+        in textView: MarkdownSTTextView
+    ) {
+        guard let retainedCandidate = deferredDocumentTransitionCandidate,
+              deferredDocumentTransitionTextView === textView,
+              retainedCandidate.generation == installedDocument.preparedCandidateGeneration,
+              !isSourceSynchronizationPending,
+              !textView.hasMarkedText()
+        else {
+            return
+        }
+        let candidate = retainedCandidate.refreshingSourceSnapshotForRetry()
 
-    func updateCompletionWorkspace(_ workspace: CompletionWorkspace) {
-        completionWorkspace = workspace
-    }
+        // The old document must be fully published to its still-installed binding before
+        // replacing any view state with the destination candidate.
+        _ = syncTextFromTextViewIfNeeded(textView)
+        guard !isSourceSynchronizationPending,
+              !textView.hasMarkedText()
+        else {
+            return
+        }
+        guard canProveCurrentInstalledSource() || nativeTextMatches(textView, text) else {
+            assertionFailure("Old document source did not settle before deferred transition retry")
+            cancelDeferredDocumentTransition()
+            return
+        }
 
-    func updateImageAssetInserter(_ inserter: EditorImageAssetInserter?) {
-        imageAssetInserter = inserter
-    }
+        let previousSelection = textView.selectedRange()
+        isUpdating = true
+        textView.text = candidate.sourceText
+        textView.textSelection = previousSelection.clamped(
+            toLength: (candidate.sourceText as NSString).length
+        )
+        isUpdating = false
+        notePreparedNativeSource(candidate)
 
-    func updateImageAssetContextID(_ contextID: String?) {
-        imageAssetContextID = contextID
+        guard finishDocumentTransition(candidate, in: textView) != nil else {
+            return
+        }
+
+        if let deferredDocumentTransitionInstallationHandler {
+            deferredDocumentTransitionInstallationHandler(self, candidate, textView)
+        } else {
+            if let requestedSelection = candidate.requestedSelection {
+                textView.textSelection = requestedSelection.clamped(
+                    toLength: (candidate.sourceText as NSString).length
+                )
+                selection = textView.selectedRange()
+            }
+            applyPendingNavigationIfPossible(in: textView)
+        }
+        isUserEditing = false
     }
 }
 
@@ -431,46 +658,15 @@ extension MarkdownTextViewCoordinator {
         textView.textSelection = NSRange(location: 0, length: 0)
     }
 
-    func attachPasteAndDragHandlers(to textView: MarkdownSTTextView) {
-        textView.pasteHandler = { [weak self, weak textView] _, pasteboard in
-            guard let self, let textView else { return false }
-            return handlePaste(in: textView, pasteboard: pasteboard)
-        }
-
-        if imageAssetInserter == nil {
-            textView.imageFileDropHandler = nil
-        } else {
-            textView.imageFileDropHandler = { [weak self, weak textView] _, urls in
-                guard let self, let textView else { return false }
-                return handleImageFileDrop(in: textView, urls: urls)
-            }
-        }
-    }
-
-    func detachPasteAndDragHandlers(from textView: MarkdownSTTextView) {
-        textView.pasteHandler = nil
-        textView.imageFileDropHandler = nil
-    }
-
-    func cancelCompletionRequest() {
-        completionRequestID += 1
-        completionTask?.cancel()
-        completionTask = nil
-    }
-
-    private func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {
-        EditingBehaviorsSupport.applyCommand(
-            command,
-            to: textView,
-            editingGuard: editingBehaviorGuard
-        )
-    }
-
-    func textViewWillChangeText(_: Notification) {
+    func textViewWillChangeText(_ notification: Notification) {
         guard !isUpdating else {
             return
         }
 
+        if let textView = notification.object as? MarkdownSTTextView {
+            textView.capturePotentialMarkedTextReplacementRange(textView.selectedRange())
+        }
+        isNativeSourceSynchronized = false
         isUserEditing = true
     }
 
@@ -483,6 +679,8 @@ extension MarkdownTextViewCoordinator {
         syncTextFromTextViewIfNeeded(textView)
         if let textView = textView as? MarkdownSTTextView {
             imageThumbnailPresentationController.documentTextDidChange(in: textView)
+            textView.clearPotentialMarkedTextReplacementRangeIfUnmarked()
+            scheduleMarkedTextReplacementRangeCleanup(for: textView)
         }
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)
@@ -490,15 +688,37 @@ extension MarkdownTextViewCoordinator {
 
     func textView(
         _ textView: STTextView,
+        willChangeTextIn affectedCharRange: NSTextRange,
+        replacementString _: String
+    ) {
+        guard !isUpdating,
+              let textView = textView as? MarkdownSTTextView
+        else {
+            return
+        }
+        textView.confirmPotentialMarkedTextReplacementRange(NSRange(
+            affectedCharRange,
+            in: textView.textContentManager
+        ))
+    }
+
+    func textView(
+        _ textView: STTextView,
         shouldChangeTextIn affectedCharRange: NSTextRange,
         replacementString: String?
     ) -> Bool {
-        if !isUpdating {
+        if !isUpdating, editingBehaviorGuard.isApplying {
+            // The outer behavior already acquired writer authority before applying
+            // this re-entrant native replacement.
             isUserEditing = true
+            return true
         }
 
         let fileKind = commandProxy?.currentFileKind() ?? .markdown
         let selection = NSRange(affectedCharRange, in: textView.textContentManager)
+        if let textView = textView as? MarkdownSTTextView {
+            textView.capturePotentialMarkedTextReplacementRange(selection)
+        }
         let shouldTriggerCompletion = replacementString.map {
             EditorCompletionSupport.shouldTriggerCompletion(
                 replacementString: $0,
@@ -509,8 +729,7 @@ extension MarkdownTextViewCoordinator {
                 fileKind: fileKind
             )
         } ?? false
-
-        let shouldAllowNativeInput = EditingBehaviorsSupport.handleProposedChange(
+        let proposedBehavior = EditingBehaviorsSupport.proposedChange(
             in: textView,
             affectedRange: affectedCharRange,
             replacementString: replacementString,
@@ -518,8 +737,45 @@ extension MarkdownTextViewCoordinator {
             editingGuard: editingBehaviorGuard
         )
 
+        if case .selectionOnly = proposedBehavior {
+            // Skip-over is selection-only. It must not enter the native-source
+            // publication state machine or acquire source mutation authority.
+            (textView as? MarkdownSTTextView)?
+                .discardUnconfirmedMarkedTextReplacementRange()
+            return EditingBehaviorsSupport.apply(
+                proposedBehavior,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        }
+
+        if !isUpdating {
+            // A marked source already passed the activation fence when composition
+            // began. Its commit must publish from that retained base so App can perform
+            // the existing non-overlapping three-way reconciliation.
+            let continuesLegitimateStalePublication = isSourceSynchronizationPending &&
+                !installedDocument.isSourceRevisionCurrent()
+            guard continuesLegitimateStalePublication || requestWriterActivation(in: textView) else {
+                (textView as? MarkdownSTTextView)?
+                    .discardUnconfirmedMarkedTextReplacementRange()
+                return false
+            }
+            isUserEditing = true
+        }
+
+        let shouldAllowNativeInput = EditingBehaviorsSupport.apply(
+            proposedBehavior,
+            to: textView,
+            editingGuard: editingBehaviorGuard
+        )
+
         if shouldTriggerCompletion {
             requestCompletion(afterApplyingChangeIn: textView)
+        }
+
+        if !shouldAllowNativeInput {
+            (textView as? MarkdownSTTextView)?
+                .discardUnconfirmedMarkedTextReplacementRange()
         }
 
         return shouldAllowNativeInput
@@ -538,49 +794,10 @@ extension MarkdownTextViewCoordinator {
         syncTextFromTextViewIfNeeded(textView)
         if let textView = textView as? MarkdownSTTextView {
             imageThumbnailPresentationController.documentTextDidChange(in: textView)
+            textView.clearPotentialMarkedTextReplacementRangeIfUnmarked()
+            scheduleMarkedTextReplacementRangeCleanup(for: textView)
         }
         schedulePendingNavigationAfterInput(in: textView)
-    }
-
-    func textView(
-        _ textView: STTextView,
-        completionItemsAtLocation _: any NSTextLocation
-    ) async -> [any STCompletionItem]? {
-        guard !textView.hasMarkedText() else { return nil }
-        let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        let cursor = textView.selectedRange().location
-        var workspace = completionWorkspace
-        workspace.recentlyUsedCompletionIDs = recentCompletionIDs
-        completionRequestID += 1
-        let requestID = completionRequestID
-        completionTask?.cancel()
-
-        let task = Task.detached(priority: .userInitiated) {
-            CompletionEngine().complete(text: text, cursor: cursor, workspace: workspace)
-        }
-        completionTask = task
-        let completions = await task.value
-
-        if completionRequestID == requestID {
-            completionTask = nil
-        }
-
-        guard !task.isCancelled,
-              completionRequestID == requestID,
-              !completions.isEmpty
-        else {
-            return nil
-        }
-        return completions.map { MarkdownCompletionItem(completion: $0) }
-    }
-
-    func textView(_ textView: STTextView, insertCompletionItem item: any STCompletionItem) {
-        guard let item = item as? MarkdownCompletionItem else { return }
-        recentCompletionIDs = EditorCompletionSupport.recentCompletionIDs(
-            selecting: item.id,
-            existing: recentCompletionIDs
-        )
-        EditorCompletionSupport.insert(item.completion, into: textView, editingGuard: editingBehaviorGuard)
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
@@ -594,6 +811,11 @@ extension MarkdownTextViewCoordinator {
                 imageThumbnailPresentationController.documentTextDidChange(in: textView)
             }
         }
+        (textView as? MarkdownSTTextView)?
+            .clearPotentialMarkedTextReplacementRangeIfUnmarked()
+        if let textView = textView as? MarkdownSTTextView {
+            scheduleMarkedTextReplacementRangeCleanup(for: textView)
+        }
         selection = textView.selectedRange()
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
@@ -602,18 +824,165 @@ extension MarkdownTextViewCoordinator {
 
     @discardableResult
     private func syncTextFromTextViewIfNeeded(_ textView: STTextView) -> Bool {
-        guard !shouldDeferTextSync(from: textView) else {
+        if shouldDeferTextSync(from: textView) {
+            isNativeSourceSynchronized = false
+            beginSourceSynchronizationPending()
+            return false
+        }
+        if installedDocument.hasSourceContract,
+           isNativeSourceSynchronized,
+           !isSourceSynchronizationPending
+        {
             return false
         }
 
-        // `textStorage.string` is a lazily bridged ("foreign") String backed by
-        // CFStorage. One eager transcode here makes later operations native-fast.
-        var newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        guard !ExactUTF16Text.matches(newText, text) else {
+        // Keep the lazily bridged CFStorage string here. Eagerly transcoding a 1 MiB
+        // buffer on every keystroke costs more than one frame; consumers that need a
+        // contiguous UTF-8 view already run outside this synchronous native-input path.
+        let newText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        if !installedDocument.hasSourceContract,
+           nativeSourceStringMatches(newText, text)
+        {
+            installedDocument.refreshSourceSnapshot()
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
             return false
         }
-        newText.makeContiguousUTF8()
-        text = newText
+        guard let publicationResult = installedDocument.publishSource(
+            newText,
+            installationID: documentBindingInstallationID
+        ) else {
+            text = newText
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
+            return true
+        }
+
+        switch publicationResult {
+        case let .accepted(snapshot, sourceWasReconciled):
+            if sourceWasReconciled,
+               !nativeSourceStringMatches(newText, snapshot.source)
+            {
+                applyReconciledSource(snapshot.source, replacing: newText, in: textView)
+            }
+            installedDocument.acceptSourceSnapshot(snapshot)
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
+            return true
+        case let .rejected(snapshot):
+            let didRestoreSource = !nativeTextMatches(
+                textView,
+                snapshot.source
+            )
+            if didRestoreSource {
+                applyReconciledSource(snapshot.source, replacing: newText, in: textView)
+            }
+            installedDocument.synchronizeSourceSnapshot(snapshot)
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
+            installedDocument.releaseWriter(
+                installationID: documentBindingInstallationID
+            )
+            scheduleDeferredDocumentTransitionRetry()
+            return didRestoreSource
+        }
+    }
+
+    private func requestWriterActivation(
+        in textView: STTextView,
+        retryingAfterSynchronization: Bool = false
+    ) -> Bool {
+        guard let result = installedDocument.requestWriterActivation(
+            installationID: documentBindingInstallationID
+        ) else {
+            return true
+        }
+
+        switch result {
+        case let .activated(snapshot):
+            // Matching App-owned revisions plus exact installation authorization are
+            // the constant-time proof for the ordinary native mutation path. The
+            // coordinator's buffer was installed from that retained revision, so do
+            // not scan the native storage again here.
+            installedDocument.synchronizeSourceSnapshot(snapshot)
+            isNativeSourceSynchronized = true
+            return true
+        case let .synchronize(snapshot):
+            let isExactViewBase = nativeTextMatches(
+                textView,
+                snapshot.source
+            )
+            if !isExactViewBase {
+                applyReconciledSource(snapshot.source, replacing: "", in: textView)
+            }
+            installedDocument.synchronizeSourceSnapshot(snapshot)
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
+            scheduleDeferredDocumentTransitionRetry()
+            // A URL or file-kind rekey can advance the session revision without
+            // changing its exact source. Reacquire from that synchronized snapshot
+            // before the native mutation; content-stale views still reject this event.
+            guard isExactViewBase, !retryingAfterSynchronization else {
+                return false
+            }
+            return requestWriterActivation(
+                in: textView,
+                retryingAfterSynchronization: true
+            )
+        case let .rejected(snapshot):
+            if !nativeTextMatches(textView, snapshot.source) {
+                applyReconciledSource(snapshot.source, replacing: "", in: textView)
+            }
+            installedDocument.synchronizeSourceSnapshot(snapshot)
+            isNativeSourceSynchronized = true
+            settleSourceSynchronizationPending()
+            scheduleDeferredDocumentTransitionRetry()
+            return false
+        case .released, .releaseRejected:
+            assertionFailure("Writer activation returned a release result")
+            return false
+        }
+    }
+
+    private func beginSourceSynchronizationPending() {
+        guard !isSourceSynchronizationPending else { return }
+        isSourceSynchronizationPending = true
+        installedDocument.reportPendingSource(
+            EditorDocumentPendingSourceEvent.began,
+            installationID: documentBindingInstallationID
+        )
+    }
+
+    private func settleSourceSynchronizationPending() {
+        guard isSourceSynchronizationPending else { return }
+        installedDocument.reportPendingSource(
+            EditorDocumentPendingSourceEvent.synchronized,
+            installationID: documentBindingInstallationID
+        )
+        isSourceSynchronizationPending = false
+        scheduleDeferredDocumentTransitionRetry()
+    }
+
+    private func synchronizeInstalledSource(
+        _ snapshot: EditorDocumentSourceSnapshot,
+        in textView: STTextView
+    ) -> Bool {
+        guard !isSourceSynchronizationPending,
+              !textView.hasMarkedText()
+        else {
+            return false
+        }
+
+        let selectedRange = textView.selectedRange()
+        isUpdating = true
+        textView.text = snapshot.source
+        textView.textSelection = selectedRange.clamped(
+            toLength: (snapshot.source as NSString).length
+        )
+        isUpdating = false
+        installedDocument.acceptSourceSnapshot(snapshot)
+        isNativeSourceSynchronized = true
+        isUserEditing = false
         return true
     }
 
@@ -625,139 +994,5 @@ extension MarkdownTextViewCoordinator {
         }
 
         return textView.hasMarkedText()
-    }
-
-    private func requestCompletion(afterApplyingChangeIn textView: STTextView) {
-        Task { @MainActor [weak textView] in
-            await Task.yield()
-            guard let textView, !textView.hasMarkedText() else { return }
-            textView.complete(nil)
-        }
-    }
-
-    private func reportVisibleRangeIfNeeded(in textView: STTextView) {
-        guard let visibleRange = MarkdownTextView.visibleTextRange(of: textView),
-              visibleRange != lastVisibleTextRange
-        else {
-            return
-        }
-
-        lastVisibleTextRange = visibleRange
-        scrollProxy?.emitVisibleLine(containingUTF16Offset: visibleRange.location, in: textView)
-        visibleRangeChangeHandler?(visibleRange)
-    }
-
-    private func handlePaste(in textView: MarkdownSTTextView, pasteboard: NSPasteboard) -> Bool {
-        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else {
-            return false
-        }
-
-        if applyURLSmartPaste(in: textView, pasteboard: pasteboard) {
-            return true
-        }
-
-        guard imageAssetInserter != nil else { return false }
-        let assets = MarkdownSTTextView.imageAssets(from: pasteboard)
-        guard !assets.isEmpty else { return false }
-
-        insertImageAssets(assets, into: textView, replacementRange: textView.selectedRange())
-        return true
-    }
-
-    private func applyURLSmartPaste(in textView: MarkdownSTTextView, pasteboard: NSPasteboard) -> Bool {
-        guard let url = pasteboard.string(forType: .string),
-              SmartPaste.isSingleURL(url)
-        else {
-            return false
-        }
-
-        let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        let textLength = (text as NSString).length
-        let selectionRange = textView.selectedRange().clamped(toLength: textLength)
-        guard selectionRange.length > 0 else { return false }
-
-        let selectedText = (text as NSString).substring(with: selectionRange)
-        guard let replacement = SmartPaste.linkReplacement(selection: selectedText, url: url) else {
-            return false
-        }
-
-        let newSelection = NSRange(
-            location: selectionRange.location + (replacement as NSString).length,
-            length: 0
-        )
-        EditingBehaviorsSupport.applyReplacement(
-            replacement,
-            replacementRange: selectionRange,
-            newSelection: newSelection,
-            to: textView,
-            editingGuard: editingBehaviorGuard
-        )
-        return true
-    }
-
-    private func handleImageFileDrop(in textView: MarkdownSTTextView, urls: [URL]) -> Bool {
-        guard imageAssetInserter != nil,
-              MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()),
-              !urls.isEmpty
-        else {
-            return false
-        }
-
-        insertImageAssets(urls.map(EditorImageAsset.file), into: textView, replacementRange: textView.selectedRange())
-        return true
-    }
-
-    private func insertImageAssets(
-        _ assets: [EditorImageAsset],
-        into textView: MarkdownSTTextView,
-        replacementRange: NSRange
-    ) {
-        guard let imageAssetInserter else { return }
-        let capturedText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        let capturedRange = replacementRange.clamped(toLength: (capturedText as NSString).length)
-        let capturedContextID = imageAssetContextID
-
-        Task { @MainActor [weak self, weak textView] in
-            guard let self, let textView else { return }
-            let relativePaths = await imageAssetInserter(assets)
-            guard !relativePaths.isEmpty,
-                  imageAssetContextID == capturedContextID,
-                  MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
-            else {
-                return
-            }
-
-            let insertion = relativePaths
-                .map { SmartPaste.imageInsertion(relativePath: $0) }
-                .joined(separator: "\n")
-            let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-            guard currentText == capturedText else {
-                return
-            }
-            let replacementRange = capturedRange.clamped(toLength: (currentText as NSString).length)
-            let newSelection = NSRange(
-                location: replacementRange.location + (insertion as NSString).length,
-                length: 0
-            )
-            EditingBehaviorsSupport.applyReplacement(
-                insertion,
-                replacementRange: replacementRange,
-                newSelection: newSelection,
-                to: textView,
-                editingGuard: editingBehaviorGuard
-            )
-        }
-    }
-}
-
-private final class CoordinatorNotificationObserver {
-    private let token: NSObjectProtocol
-
-    init(_ token: NSObjectProtocol) {
-        self.token = token
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(token)
     }
 }

@@ -9,7 +9,7 @@ final class EditorInstalledDocumentTransitionTests: XCTestCase {
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
     private let documentB = EditorDocumentIdentity(rawValue: "document-b")
 
-    func testCrossDocumentIMECommitKeepsInstalledBindingUntilDestinationTextIsInstalled() throws {
+    func testCrossDocumentIMECommitAutomaticallyInstallsTheSinglePreparedDestinationUpdate() async throws {
         let scenario = try makeTransitionScenario()
         assertInitialDocumentA(in: scenario)
         beginMarkedTextComposition(in: scenario)
@@ -20,20 +20,24 @@ final class EditorInstalledDocumentTransitionTests: XCTestCase {
         )
         assertDocumentBRemainsPending(in: scenario)
 
+        let originalOrigin = scenario.fixture.scrollView.contentView.bounds.origin
         scenario.fixture.textView.insertText("台", replacementRange: .notFound)
         assertDocumentACommitIsIsolated(in: scenario)
 
-        scenario.fixture.window.makeFirstResponder(nil)
-        let originalOrigin = scenario.fixture.scrollView.contentView.bounds.origin
-        scenario.documentBView.updateRepresentedTextView(
-            scenario.fixture.scrollView,
-            coordinator: scenario.fixture.coordinator
-        )
-        RunLoop.current.run(until: Date().addingTimeInterval(0.03))
+        await yieldForAutomaticTransition()
         assertDocumentBIsInstalledAndNavigated(in: scenario, originalOrigin: originalOrigin)
+
+        let destinationSource = String(decoding: scenario.sourceBUTF16, as: UTF16.self)
+        scenario.fixture.textView.textSelection = NSRange(
+            location: scenario.sourceBUTF16.count,
+            length: 0
+        )
+        scenario.fixture.textView.insertText("!", replacementRange: .notFound)
+        XCTAssertEqual(scenario.model.sourceB, destinationSource + "!")
+        XCTAssertEqual(scenario.model.sourceA, scenario.sourceA + "台")
     }
 
-    func testNilDocumentIdentitiesKeepBindingsPinnedUntilExactCandidateInstallation() throws {
+    func testNilDocumentIdentitiesKeepBindingsPinnedUntilAutomaticExactCandidateInstallation() async throws {
         let sourceA = "Nil identity A composition: "
         let sourceB = "Nil identity B a\u{301}\u{327} 中文 🧪 destination"
         let sourceBBytes = Data(sourceB.utf8)
@@ -73,7 +77,7 @@ final class EditorInstalledDocumentTransitionTests: XCTestCase {
         XCTAssertTrue(model.documentBTextWrites.isEmpty)
         XCTAssertTrue(model.documentBSelectionWrites.isEmpty)
 
-        documentBView.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+        await yieldForAutomaticTransition()
 
         XCTAssertEqual(Data(Self.text(in: fixture.textView).utf8), sourceBBytes)
         XCTAssertEqual(Array(Self.text(in: fixture.textView).utf16), sourceBUTF16)
@@ -89,6 +93,246 @@ final class EditorInstalledDocumentTransitionTests: XCTestCase {
         XCTAssertEqual(Data(model.sourceB.utf8), Data(editedSourceB.utf8))
         XCTAssertEqual(Array(model.sourceB.utf16), Array(editedSourceB.utf16))
         XCTAssertEqual(model.documentBTextWrites, [Data(editedSourceB.utf8)])
+    }
+
+    func testNewestDeferredCandidateSupersedesOlderCandidateAndInstallsOnce() async throws {
+        var sourceA = "A composition: "
+        var sourceB = "B obsolete"
+        var sourceC = "C newest"
+        var selectionA: NSRange? = NSRange(location: (sourceA as NSString).length, length: 0)
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        var selectionC: NSRange? = NSRange(location: 2, length: 0)
+        var lifecycleB: [EditorDocumentBindingLifecycleEvent] = []
+        var lifecycleC: [EditorDocumentBindingLifecycleEvent] = []
+        let bindingA = EditorDocumentBindingID()
+        let bindingB = EditorDocumentBindingID()
+        let bindingC = EditorDocumentBindingID()
+        let viewA = MarkdownTextView(
+            text: Binding(get: { sourceA }, set: { sourceA = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentA,
+            documentBindingID: bindingA,
+            onDocumentBindingLifecycle: { _ in }
+        )
+        let fixture = try makeWindowedFixture(representable: viewA, source: sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        fixture.textView.textSelection = selectionA ?? .notFound
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        let viewB = MarkdownTextView(
+            text: Binding(get: { sourceB }, set: { sourceB = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentB,
+            documentBindingID: bindingB,
+            onDocumentBindingLifecycle: { lifecycleB.append($0) }
+        )
+        viewB.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        let documentC = EditorDocumentIdentity(rawValue: "document-c")
+        let viewC = MarkdownTextView(
+            text: Binding(get: { sourceC }, set: { sourceC = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionC }, set: { selectionC = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentC,
+            documentBindingID: bindingC,
+            onDocumentBindingLifecycle: { lifecycleC.append($0) }
+        )
+        viewC.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+
+        await yieldForAutomaticTransition()
+
+        XCTAssertEqual(sourceA, "A composition: 臺")
+        XCTAssertEqual(sourceB, "B obsolete")
+        XCTAssertEqual(sourceC, "C newest")
+        XCTAssertEqual(Self.text(in: fixture.textView), sourceC)
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, documentC)
+        XCTAssertTrue(lifecycleB.isEmpty)
+        XCTAssertEqual(lifecycleC.count, 1)
+        guard case let .installed(installation) = lifecycleC[0] else {
+            return XCTFail("Newest candidate must install exactly once")
+        }
+        XCTAssertEqual(installation.bindingID, bindingC)
+    }
+
+    func testDismantleBeforeDeferredRetryDiscardsDestinationCandidate() async throws {
+        var sourceA = "A composition: "
+        var sourceB = "B must not install"
+        var lifecycleB: [EditorDocumentBindingLifecycleEvent] = []
+        let viewA = MarkdownTextView(
+            text: Binding(get: { sourceA }, set: { sourceA = $0 }),
+            styledText: nil,
+            selection: .constant(nil),
+            showsLineNumbers: false,
+            documentIdentity: documentA
+        )
+        let fixture = try makeWindowedFixture(representable: viewA, source: sourceA)
+        fixture.textView.textSelection = NSRange(location: (sourceA as NSString).length, length: 0)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        let viewB = MarkdownTextView(
+            text: Binding(get: { sourceB }, set: { sourceB = $0 }),
+            styledText: nil,
+            selection: .constant(nil),
+            showsLineNumbers: false,
+            documentIdentity: documentB,
+            documentBindingID: EditorDocumentBindingID(),
+            onDocumentBindingLifecycle: { lifecycleB.append($0) }
+        )
+        viewB.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+        MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        await yieldForAutomaticTransition()
+
+        XCTAssertEqual(sourceA, "A composition: 臺")
+        XCTAssertEqual(sourceB, "B must not install")
+        XCTAssertEqual(Self.text(in: fixture.textView), sourceA)
+        XCTAssertTrue(lifecycleB.isEmpty)
+        fixture.window.orderOut(nil)
+    }
+
+    func testNavigationCancellationClearsSelectionWorkButStillInstallsDeferredDestination() async throws {
+        var sourceA = "A composition: "
+        var sourceB = "B destination"
+        var selectionB: NSRange? = NSRange(location: 2, length: 0)
+        let viewA = MarkdownTextView(
+            text: Binding(get: { sourceA }, set: { sourceA = $0 }),
+            styledText: nil,
+            selection: .constant(nil),
+            showsLineNumbers: false,
+            documentIdentity: documentA
+        )
+        let fixture = try makeWindowedFixture(representable: viewA, source: sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        fixture.textView.textSelection = NSRange(location: (sourceA as NSString).length, length: 0)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        let cancelledView = MarkdownTextView(
+            text: Binding(get: { sourceB }, set: { sourceB = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentB,
+            navigationCommand: .cancel(id: 1)
+        )
+        cancelledView.updateRepresentedTextView(
+            fixture.scrollView,
+            coordinator: fixture.coordinator
+        )
+        fixture.textView.insertText("臺", replacementRange: .notFound)
+
+        await yieldForAutomaticTransition()
+
+        XCTAssertEqual(sourceA, "A composition: 臺")
+        XCTAssertEqual(sourceB, "B destination")
+        XCTAssertEqual(Self.text(in: fixture.textView), sourceB)
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, documentB)
+        XCTAssertEqual(fixture.textView.selectedRange(), selectionB)
+    }
+
+    func testBindingOnlySameDocumentRetryRefreshesCommittedIMETextBeforeNextEdit() async throws {
+        var source = "A"
+        var selection: NSRange? = NSRange(location: 1, length: 0)
+        let view = MarkdownTextView(
+            text: Binding(get: { source }, set: { source = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selection }, set: { selection = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentA
+        )
+        let fixture = try makeWindowedFixture(representable: view, source: source)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        fixture.textView.textSelection = NSRange(location: 1, length: 0)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+
+        view.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+        fixture.textView.insertText("台", replacementRange: .notFound)
+        XCTAssertEqual(source, "A台")
+
+        await yieldForAutomaticTransition()
+        XCTAssertEqual(Self.text(in: fixture.textView), "A台")
+        XCTAssertEqual(source, "A台")
+
+        fixture.textView.insertText("!", replacementRange: .notFound)
+        XCTAssertEqual(source, "A台!")
+        XCTAssertEqual(Self.text(in: fixture.textView), "A台!")
+    }
+
+    func testBindingOnlyCrossDocumentRetryRefreshesDestinationTextAndSelection() async throws {
+        var sourceA = "A"
+        var sourceB = "B"
+        var selectionA: NSRange? = NSRange(location: 1, length: 0)
+        var selectionB: NSRange? = NSRange(location: 0, length: 0)
+        let viewA = MarkdownTextView(
+            text: Binding(get: { sourceA }, set: { sourceA = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionA }, set: { selectionA = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentA
+        )
+        let fixture = try makeWindowedFixture(representable: viewA, source: sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        fixture.textView.textSelection = NSRange(location: 1, length: 0)
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        fixture.textView.setMarkedText(
+            "ㄊ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        let viewB = MarkdownTextView(
+            text: Binding(get: { sourceB }, set: { sourceB = $0 }),
+            styledText: nil,
+            selection: Binding(get: { selectionB }, set: { selectionB = $0 }),
+            showsLineNumbers: false,
+            documentIdentity: documentB
+        )
+        viewB.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        sourceB = "B changed while deferred"
+        selectionB = NSRange(location: 9, length: 0)
+        fixture.textView.insertText("台", replacementRange: .notFound)
+        await yieldForAutomaticTransition()
+
+        XCTAssertEqual(sourceA, "A台")
+        XCTAssertEqual(Self.text(in: fixture.textView), sourceB)
+        XCTAssertEqual(fixture.textView.selectedRange(), selectionB)
+        XCTAssertEqual(fixture.coordinator.currentDocumentIdentity, documentB)
     }
 
     func testDismantleCancelsNavigationTasksAndDetachesTheInstalledBinding() throws {
@@ -379,6 +623,12 @@ private extension EditorInstalledDocumentTransitionTests {
             do {
                 try await Task.sleep(nanoseconds: 5_000_000_000)
             } catch {}
+        }
+    }
+
+    func yieldForAutomaticTransition() async {
+        for _ in 0 ..< 16 {
+            await Task.yield()
         }
     }
 

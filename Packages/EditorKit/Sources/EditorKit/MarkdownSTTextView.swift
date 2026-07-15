@@ -8,6 +8,8 @@ final class MarkdownSTTextView: STTextView {
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
     var windowAttachmentHandler: ((MarkdownSTTextView) -> Void)?
     private(set) var isSuppressingIntermediateMarkedTextRemoval = false
+    private var markedTextReplacementRange: NSRange?
+    private var isMarkedTextReplacementRangeConfirmed = false
     var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
@@ -94,13 +96,21 @@ final class MarkdownSTTextView: STTextView {
         if replacementRange == .notFound, hasMarkedText() {
             let markedRange = markedRange()
             if markedRange.location != NSNotFound {
-                let insertionLocation = markedRange.location
+                let effectiveReplacementRange = markedTextReplacementRange ?? NSRange(
+                    location: markedRange.location,
+                    length: 0
+                )
                 isSuppressingIntermediateMarkedTextRemoval = true
                 unmarkText()
+                textSelection = effectiveReplacementRange
                 isSuppressingIntermediateMarkedTextRemoval = false
-                textSelection = NSRange(location: insertionLocation, length: 0)
-                super.insertText(string, replacementRange: NSRange(location: insertionLocation, length: 0))
-                ensureInsertionPointAfterInsertedText(string, at: insertionLocation)
+                markedTextReplacementRange = nil
+                isMarkedTextReplacementRangeConfirmed = false
+                super.insertText(string, replacementRange: effectiveReplacementRange)
+                ensureInsertionPointAfterInsertedText(
+                    string,
+                    at: effectiveReplacementRange.location
+                )
                 return
             }
         }
@@ -422,6 +432,51 @@ private struct MarkedTextSnapshot {
 }
 
 extension MarkdownSTTextView {
+    func capturePotentialMarkedTextReplacementRange(_ range: NSRange) {
+        guard markedTextReplacementRange == nil,
+              range.location != NSNotFound
+        else {
+            return
+        }
+        markedTextReplacementRange = range
+        isMarkedTextReplacementRangeConfirmed = false
+    }
+
+    func confirmPotentialMarkedTextReplacementRange(_ range: NSRange) {
+        guard let candidate = markedTextReplacementRange,
+              !isMarkedTextReplacementRangeConfirmed,
+              range.location != NSNotFound
+        else {
+            return
+        }
+
+        // STTextView reports a zero-length native insertion when an initial
+        // `.notFound` marked-text request begins over a selection. Preserve that
+        // selected replacement span because it still exists after `unmarkText()`.
+        // An explicit range is already removed while installing marked text, so its
+        // final commit inserts at that range's lower boundary after the mark is
+        // removed. An explicit zero-length range at another location does likewise.
+        if range.length > 0 || range.location != candidate.location {
+            markedTextReplacementRange = NSRange(location: range.location, length: 0)
+        }
+        isMarkedTextReplacementRangeConfirmed = true
+    }
+
+    func discardUnconfirmedMarkedTextReplacementRange() {
+        guard !isMarkedTextReplacementRangeConfirmed else { return }
+        markedTextReplacementRange = nil
+    }
+
+    func clearPotentialMarkedTextReplacementRangeIfUnmarked() {
+        guard !hasMarkedText(),
+              !isSuppressingIntermediateMarkedTextRemoval
+        else {
+            return
+        }
+        markedTextReplacementRange = nil
+        isMarkedTextReplacementRangeConfirmed = false
+    }
+
     static func shouldReserveMarkedTextKeyForInputContext(_ event: NSEvent, hasMarkedText: Bool) -> Bool {
         guard event.type == .keyDown,
               hasMarkedText,

@@ -4,12 +4,23 @@ import MarkdownCore
 @MainActor
 extension AppState {
     func flushAutosaveIfNeeded() {
-        guard currentDocument.isDirty, canAutosaveCurrentDocument else { return }
+        var sessions = [currentDocument]
+        sessions.append(contentsOf: sessionCache.values)
+        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
+        var seen: Set<ObjectIdentifier> = []
+        sessions = sessions.filter { seen.insert(ObjectIdentifier($0)).inserted }
+        sessions.sort { first, second in
+            let firstURL = first.fileURL?.absoluteString ?? ""
+            let secondURL = second.fileURL?.absoluteString ?? ""
+            return firstURL.utf8.lexicographicallyPrecedes(secondURL.utf8)
+        }
 
-        do {
-            try saveCurrentDocument()
-        } catch {
-            present(error, title: "Could Not Save Changes")
+        for session in sessions where session.isDirty && canAutosave(session: session) {
+            do {
+                try save(session: session)
+            } catch {
+                present(error, title: "Could Not Save Changes")
+            }
         }
     }
 
@@ -104,6 +115,10 @@ extension AppState {
     /// idle, so it is off the typing hot path; a proper serialized background writer
     /// can come with M3's file coordination if profiling ever shows this hitch.
     private func autosaveIfNeeded() {
+        // The anchored writer now checks cooperative cancellation throughout the
+        // operation. Remove the handle before `save` cancels any pending autosave so
+        // the currently firing task does not cancel itself and abort its own write.
+        autosaveTask = nil
         guard currentDocument.isDirty, canAutosaveCurrentDocument else { return }
 
         do {
@@ -124,6 +139,9 @@ extension AppState {
             return false
         }
         return !detachedSessionURLs.contains(url) &&
+            !hasPendingEditorSource(for: session) &&
+            externalReloadTasks[ObjectIdentifier(session)] == nil &&
+            externalDiskInspectionTasks[ObjectIdentifier(session)] == nil &&
             pendingExternalTexts[url] == nil &&
             pendingExternalFileVersions[url] == nil &&
             externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&

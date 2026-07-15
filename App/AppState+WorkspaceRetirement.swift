@@ -1,3 +1,4 @@
+import EditorKit
 import Foundation
 import MarkdownCore
 import WorkspaceKit
@@ -13,10 +14,23 @@ extension AppState {
     }
 
     func closeWorkspaceForReplacement() throws {
-        let retirementLease = editorDocumentBindingLeaseEligibleForRetirement()
         let sessionsToClose = workspaceSessionsForClosure()
+        let retirementPlans = workspaceRetirementPlans(for: sessionsToClose)
+        var retiringSessionIdentities = Set(retirementPlans.map {
+            ObjectIdentifier($0.session)
+        })
+        retiringSessionIdentities.formUnion(retiredEditorDocumentSessions.values.map {
+            ObjectIdentifier($0.session)
+        })
+
+        if let conflictURL = firstUnretirableExternalConflict(
+            excluding: retiringSessionIdentities
+        ) {
+            throw AppStateError.unresolvedExternalChange(conflictURL)
+        }
+
         if let quarantinedSession = sessionsToClose.first(where: { session in
-            session !== retirementLease?.session
+            !retiringSessionIdentities.contains(ObjectIdentifier(session))
                 && indeterminateSessionWrites[ObjectIdentifier(session)] != nil
         }) {
             let sessionIdentity = ObjectIdentifier(quarantinedSession)
@@ -33,22 +47,20 @@ extension AppState {
                 result
             )
         }
-        if let conflictURL = firstUnretirableExternalConflict(excluding: retirementLease?.session) {
-            throw AppStateError.unresolvedExternalChange(conflictURL)
+        if let detachedPlan = retirementPlans.first(where: { plan in
+            detachedSessionURLs.contains(plan.canonicalURL)
+        }) {
+            throw AppStateError.missingFile(detachedPlan.canonicalURL)
         }
 
-        if let retirementLease,
-           let retirementURL = sessionStateURL(for: retirementLease.session),
-           detachedSessionURLs.contains(retirementURL)
+        for session in sessionsToClose
+            where !retiringSessionIdentities.contains(ObjectIdentifier(session)) && session.isDirty
         {
-            throw AppStateError.missingFile(retirementURL)
-        }
-        for session in sessionsToClose where session !== retirementLease?.session && session.isDirty {
             try save(session: session)
         }
         commitWorkspaceClosure(
             sessions: sessionsToClose,
-            retirementLease: retirementLease
+            retirementPlans: retirementPlans
         )
     }
 }
@@ -57,11 +69,9 @@ extension AppState {
 private extension AppState {
     func workspaceSessionsForClosure() -> [DocumentSession] {
         var sessions = Array(sessionCache.values)
-        sessions.append(contentsOf: retiredEditorDocumentBindings.values.map(\.session))
+        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
         sessions.append(contentsOf: editorDocumentBindingSessions.values)
-        if let installedSession = installedEditorDocumentBindingLease?.session {
-            sessions.append(installedSession)
-        }
+        sessions.append(contentsOf: editorBindingInstallations.values)
         if currentDocument.fileURL != nil {
             sessions.append(currentDocument)
         }
@@ -69,9 +79,9 @@ private extension AppState {
         return sessions.filter { session in
             seenSessions.insert(ObjectIdentifier(session)).inserted
         }.sorted { first, second in
-            let firstIdentity = sessionClosureIdentity(first)
-            let secondIdentity = sessionClosureIdentity(second)
-            return firstIdentity.utf8.lexicographicallyPrecedes(secondIdentity.utf8)
+            sessionClosureIdentity(first).utf8.lexicographicallyPrecedes(
+                sessionClosureIdentity(second).utf8
+            )
         }
     }
 
@@ -79,9 +89,64 @@ private extension AppState {
         sessionStateURL(for: session)?.absoluteString ?? ""
     }
 
+    func workspaceRetirementPlans(
+        for sessions: [DocumentSession]
+    ) -> [EditorDocumentRetirementPlan] {
+        let workspaceAuthority = workspaceSearchRootAuthority
+        return sessions.compactMap { session in
+            let sessionIdentity = ObjectIdentifier(session)
+            guard let canonicalURL = sessionStateURL(for: session),
+                  let retainedLocation = retainedManagedSessionLocation(for: session)
+            else {
+                return nil
+            }
+
+            let installations = editorBindingInstallations.reduce(
+                into: Set<EditorDocumentBindingInstallation>()
+            ) { result, entry in
+                let (installation, owner) = entry
+                guard owner === session,
+                      editorDocumentBindingIDs[sessionIdentity] == installation.bindingID,
+                      editorDocumentBindingSessions[installation.bindingID] === session
+                else {
+                    return
+                }
+                result.insert(installation)
+            }
+            guard !installations.isEmpty else { return nil }
+            let requiresWorkspaceAuthority: Bool = if retainedLocation.rootAuthority == workspaceAuthority {
+                true
+            } else if case let .proven(proof)? =
+                unanchoredManagedSessionOwnershipProofs[sessionIdentity]
+            {
+                proof.installedWorkspaceLocation?.rootAuthority ==
+                    workspaceAuthority
+            } else {
+                false
+            }
+            if let existingRetirement = retiredEditorDocumentSessions[canonicalURL],
+               existingRetirement.session === session,
+               installations.isSubset(of: existingRetirement.awaitingInstallations),
+               !requiresWorkspaceAuthority
+            {
+                // A later standalone replacement can enumerate an already-retired
+                // session through its still-live editor registrations. With no new
+                // installation or workspace authority to transfer, this is not a new
+                // lifecycle boundary and must not supersede the reactivation read.
+                return nil
+            }
+            return EditorDocumentRetirementPlan(
+                canonicalURL: canonicalURL,
+                session: session,
+                installations: installations,
+                requiresWorkspaceAuthority: requiresWorkspaceAuthority
+            )
+        }
+    }
+
     func commitWorkspaceClosure(
         sessions: [DocumentSession],
-        retirementLease: InstalledEditorDocumentBindingLease?
+        retirementPlans: [EditorDocumentRetirementPlan]
     ) {
         _ = advanceWorkspaceGeneration()
         workspaceReloadTask?.cancel()
@@ -90,61 +155,37 @@ private extension AppState {
         completionWorkspaceTask = nil
         workspaceWatcher?.stop()
         workspaceWatcher = nil
-        transferWorkspaceAuthority(to: retirementLease)
-        clearClosedWorkspaceState(sessions: sessions, retirementLease: retirementLease)
-    }
-
-    func transferWorkspaceAuthority(to retirementLease: InstalledEditorDocumentBindingLease?) {
-        let activeAuthority = workspaceAccess
-        let retiringAuthority = securityScopedAuthority(
-            activeAuthority,
-            requiredBy: retirementLease
+        transferWorkspaceAuthority(to: retirementPlans)
+        clearClosedWorkspaceState(
+            sessions: sessions,
+            retirementPlans: retirementPlans
         )
-        workspaceAccess = nil
-
-        if let retirementLease {
-            beginEditorDocumentBindingRetirement(
-                retirementLease,
-                securityScopedAuthority: retiringAuthority
-            )
-            if retiringAuthority == nil {
-                activeAuthority?.stop()
-            }
-        } else {
-            activeAuthority?.stop()
-        }
     }
 
-    func securityScopedAuthority(
-        _ authority: SecurityScopedResourceAccess?,
-        requiredBy retirementLease: InstalledEditorDocumentBindingLease?
-    ) -> SecurityScopedResourceAccess? {
-        guard let retirementLease,
-              let installedAuthority = workspaceSearchRootAuthority
-        else {
-            return nil
+    func transferWorkspaceAuthority(
+        to retirementPlans: [EditorDocumentRetirementPlan]
+    ) {
+        let activeAuthority = workspaceAccess
+        workspaceAccess = nil
+        let authorityOwner = activeAuthority.map(RetiredWorkspaceAuthorityOwner.init(authority:))
+
+        for plan in retirementPlans {
+            beginEditorDocumentSessionRetirement(
+                canonicalURL: plan.canonicalURL,
+                session: plan.session,
+                installations: plan.installations,
+                securityScopedAuthorityOwner: plan.requiresWorkspaceAuthority ? authorityOwner : nil
+            )
         }
-        if let retainedLocation = retainedAnchoredSessionLocation(
-            for: retirementLease.session
-        ) {
-            guard retainedLocation.rootAuthority == installedAuthority else { return nil }
-            return authority
+
+        if !retirementPlans.contains(where: \.requiresWorkspaceAuthority) {
+            authorityOwner?.stopIfUnused()
         }
-        let sessionIdentity = ObjectIdentifier(retirementLease.session)
-        guard case let .proven(proof) =
-            unanchoredManagedSessionOwnershipProofs[sessionIdentity]
-        else {
-            return nil
-        }
-        guard proof.installedWorkspaceLocation?.rootAuthority == installedAuthority else {
-            return nil
-        }
-        return authority
     }
 
     func clearClosedWorkspaceState(
         sessions: [DocumentSession],
-        retirementLease: InstalledEditorDocumentBindingLease?
+        retirementPlans: [EditorDocumentRetirementPlan]
     ) {
         workspaceRootURL = nil
         workspaceTree = nil
@@ -152,27 +193,55 @@ private extension AppState {
         workspaceSearchRootAuthority = nil
         workspaceInstalledCaptureGeneration = nil
         completionWorkspace = .empty
-        if retirementLease?.session !== currentDocument {
+
+        let retainedSessionIdentities = Set(retiredEditorDocumentSessions.values.map {
+            ObjectIdentifier($0.session)
+        })
+        var proofRetainedSessionIdentities = retainedSessionIdentities
+        if currentDocument.fileURL != nil {
+            proofRetainedSessionIdentities.insert(ObjectIdentifier(currentDocument))
+        }
+        if !retainedSessionIdentities.contains(ObjectIdentifier(currentDocument)) {
             autosaveTask?.cancel()
             autosaveTask = nil
             statisticsTask?.cancel()
             statisticsTask = nil
         }
-        cancelWorkspaceSessionTasks(except: retirementLease?.session)
-        for session in sessions where session !== retirementLease?.session {
+        cancelWorkspaceSessionTasks(excluding: retainedSessionIdentities)
+        for session in sessions
+            where !retainedSessionIdentities.contains(ObjectIdentifier(session))
+        {
             removeEditorDocumentBindingRegistration(for: session)
         }
         sessionCache.removeAll()
+        for session in sessions
+            where !proofRetainedSessionIdentities.contains(ObjectIdentifier(session))
+        {
+            let sessionIdentity = ObjectIdentifier(session)
+            anchoredSessionFileBindings[sessionIdentity] = nil
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+            indeterminateSessionWrites[sessionIdentity] = nil
+            indeterminateSessionWriteContexts[sessionIdentity] = nil
+        }
         sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
         retainMetadataOnlyForRetiredEditorSessions()
         externalChangePrompt = nil
         missingFilePrompt = nil
         indeterminateFileWriteReconciliationPrompt = nil
-        if let retirementLease,
-           retirementLease.session === currentDocument,
-           indeterminateSessionWrites[ObjectIdentifier(currentDocument)] != nil
-        {
+        restoreRecoveryPrompt(for: currentDocument)
+        if indeterminateSessionWrites[ObjectIdentifier(currentDocument)] != nil {
             refreshIndeterminateFileWriteReconciliation(for: currentDocument)
         }
+
+        for plan in retirementPlans {
+            finishRetiredEditorDocumentSessionIfPossible(for: plan.session)
+        }
     }
+}
+
+private struct EditorDocumentRetirementPlan {
+    let canonicalURL: URL
+    let session: DocumentSession
+    let installations: Set<EditorDocumentBindingInstallation>
+    let requiresWorkspaceAuthority: Bool
 }

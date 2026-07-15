@@ -138,6 +138,146 @@ final class MarkdownEditorInputTests: XCTestCase {
     }
 
     @MainActor
+    func testMarkedTextCommitReplacesTheSelectionThatBeganComposition() {
+        let source = "prefix target suffix"
+        let expected = "prefix proposed suffix"
+        var modelText = source
+        var writes: [String] = []
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: {
+                    modelText = $0
+                    writes.append($0)
+                }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.textDelegate = coordinator
+        textView.text = source
+        textView.textSelection = (source as NSString).range(of: "target")
+
+        textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(textView.hasMarkedText())
+        XCTAssertEqual(modelText, source)
+
+        textView.insertText("proposed", replacementRange: .notFound)
+
+        XCTAssertFalse(textView.hasMarkedText())
+        XCTAssertEqual(Self.text(in: textView), expected)
+        XCTAssertEqual(modelText, expected)
+        XCTAssertEqual(writes, [expected])
+    }
+
+    @MainActor
+    func testMarkedTextCommitUsesExplicitReplacementInsteadOfUnrelatedSelection() {
+        let source = "prefix target suffix"
+        let target = (source as NSString).range(of: "target")
+        let expected = "prefix proposed suffix"
+        var modelText = source
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: { modelText = $0 }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.textDelegate = coordinator
+        textView.text = source
+        textView.textSelection = NSRange(location: 0, length: 0)
+
+        textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: target
+        )
+        textView.insertText("proposed", replacementRange: .notFound)
+
+        XCTAssertEqual(Self.text(in: textView), expected)
+        XCTAssertEqual(modelText, expected)
+    }
+
+    @MainActor
+    func testSelectionOnlyRejectionDoesNotPoisonTheNextMarkedReplacement() {
+        let source = "() target"
+        let target = (source as NSString).range(of: "target")
+        let expected = "() proposed"
+        var modelText = source
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: { modelText = $0 }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.textDelegate = coordinator
+        textView.text = source
+        textView.textSelection = NSRange(location: 1, length: 0)
+
+        textView.insertText(")", replacementRange: .notFound)
+        XCTAssertEqual(Self.text(in: textView), source)
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 2, length: 0))
+
+        textView.textSelection = target
+        textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: .notFound
+        )
+        textView.insertText("proposed", replacementRange: .notFound)
+
+        XCTAssertEqual(Self.text(in: textView), expected)
+        XCTAssertEqual(modelText, expected)
+    }
+
+    @MainActor
+    func testDirectUnmarkClearsReplacementBeforeTheNextComposition() async {
+        let source = "first second"
+        let first = (source as NSString).range(of: "first")
+        let second = (source as NSString).range(of: "second")
+        let expected = "first proposed"
+        var modelText = source
+        let coordinator = MarkdownTextViewCoordinator(
+            text: Binding(
+                get: { modelText },
+                set: { modelText = $0 }
+            ),
+            selection: .constant(nil)
+        )
+        let textView = MarkdownSTTextView(frame: .zero)
+        textView.textDelegate = coordinator
+        textView.text = source
+        textView.textSelection = first
+
+        textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: .notFound
+        )
+        textView.unmarkText()
+        await Task.yield()
+        XCTAssertEqual(Self.text(in: textView), source)
+
+        textView.textSelection = second
+        textView.setMarkedText(
+            "draft",
+            selectedRange: NSRange(location: 5, length: 0),
+            replacementRange: .notFound
+        )
+        textView.insertText("proposed", replacementRange: .notFound)
+
+        XCTAssertEqual(Self.text(in: textView), expected)
+        XCTAssertEqual(modelText, expected)
+    }
+
+    @MainActor
     func testNativeEditPublishesCanonicalEquivalentRawUTF16Sequence() {
         let boundSource = "a\u{301}\u{327}"
         let liveSource = "a\u{327}\u{301}"

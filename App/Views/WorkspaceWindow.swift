@@ -296,6 +296,7 @@ private struct DocumentEditor: View {
             documentIdentity: appState.activeEditorDocumentIdentity,
             documentBindingID: editorBinding.id,
             onDocumentBindingLifecycle: editorBinding.onLifecycle,
+            documentSourceContract: editorBinding.sourceContract,
             navigationCommand: appState.editorNavigationCommand,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
