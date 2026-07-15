@@ -22,7 +22,11 @@ extension AppState {
         switch WorkspaceNoFollowFileInspector.status(at: context.location) {
         case .regular:
             do {
-                let observed = try fileStore.loadResult(at: context.location)
+                let preparedRead = try prepareEditorImageAssetDocumentRead(
+                    fileStore: fileStore,
+                    at: context.location
+                )
+                let observed = preparedRead.result
                 let destination = context.location.fileURL
                 // A readable destination is still unaccepted until the user chooses Reload or
                 // Keep Mine. Stop any queued write before publishing its pending version.
@@ -31,7 +35,8 @@ extension AppState {
                 pendingExternalTexts[destination] = observed.file.text
                 pendingExternalFileVersions[destination] = ObservedRetainedFileVersion(
                     location: context.location,
-                    result: observed
+                    result: observed,
+                    preparedImageAssetAuthority: preparedRead.preparedAuthority
                 )
                 lastKnownDiskHashes[destination] = Self.contentHash(observed.file.text)
                 lastKnownDiskModificationDates[destination] = nil

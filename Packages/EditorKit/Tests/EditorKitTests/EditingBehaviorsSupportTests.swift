@@ -223,9 +223,12 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         var discardCount = 0
         let inserter: EditorImageAssetInserter = { _ in
             try? await Task.sleep(nanoseconds: 50_000_000)
-            return EditorImageAssetInsertion(relativePaths: ["assets/image.png"]) {
-                discardCount += 1
-            }
+            return EditorImageAssetInsertion(
+                relativePaths: ["assets/image.png"],
+                discard: {
+                    discardCount += 1
+                }
+            )
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",
@@ -251,9 +254,12 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         var discardCount = 0
         let inserter: EditorImageAssetInserter = { _ in
             try? await Task.sleep(nanoseconds: 50_000_000)
-            return EditorImageAssetInsertion(relativePaths: ["assets/hero.png"]) {
-                discardCount += 1
-            }
+            return EditorImageAssetInsertion(
+                relativePaths: ["assets/hero.png"],
+                discard: {
+                    discardCount += 1
+                }
+            )
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",

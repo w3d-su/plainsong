@@ -222,29 +222,28 @@ extension AppState {
         )
         let reader = coherentFileReader
         let applicationPreparer = externalReloadApplicationPreparer
+        let completionContext = ExternalDiskInspectionReadContext(
+            canonicalURL: stateURL,
+            location: location,
+            token: token,
+            lifecycleGeneration: lifecycleGeneration,
+            diskEventGeneration: diskEventGeneration
+        )
         let task = Task { @MainActor [weak self, weak session] in
-            let outcome = await reader.readCoherentFile(at: location)
+            let prepared = await prepareExternalFileRead(
+                at: location,
+                reader: reader,
+                applicationPreparer: applicationPreparer,
+                sourceSnapshot: sourceSnapshot
+            )
             guard !Task.isCancelled else { return }
-            let payload: ExternalReloadApplicationPayload? = switch outcome {
-            case let .loaded(snapshot):
-                await applicationPreparer.prepare(
-                    snapshot: snapshot,
-                    sourceSnapshot: sourceSnapshot
-                )
-            case .missing, .symbolicLink, .notRegularFile, .unreadable, .invalidUTF8,
-                 .namespaceChanged, .unstable, .cancelled:
-                nil
-            }
-            guard !Task.isCancelled, let self, let session else { return }
+            guard let self, let session else { return }
             handleExternalDiskInspection(
-                outcome,
-                payload: payload,
+                prepared.outcome,
+                payload: prepared.payload,
+                preparedImageAssetAuthority: prepared.imageAssetAuthority,
                 session: session,
-                canonicalURL: stateURL,
-                location: location,
-                token: token,
-                lifecycleGeneration: lifecycleGeneration,
-                diskEventGeneration: diskEventGeneration
+                context: completionContext
             )
         }
         externalDiskInspectionTasks[sessionIdentity] = ExternalDiskInspectionTask(
@@ -293,6 +292,7 @@ extension AppState {
         }
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
         externalDiskEventGenerations[sessionIdentity] = nil
@@ -439,22 +439,18 @@ private extension AppState {
             intent: intent
         )
         let task = Task { @MainActor [weak self, weak session] in
-            let outcome = await reader.readCoherentFile(at: location)
+            let prepared = await prepareExternalFileRead(
+                at: location,
+                reader: reader,
+                applicationPreparer: applicationPreparer,
+                sourceSnapshot: sourceSnapshot
+            )
             guard !Task.isCancelled else { return }
-            let payload: ExternalReloadApplicationPayload? = switch outcome {
-            case let .loaded(snapshot):
-                await applicationPreparer.prepare(
-                    snapshot: snapshot,
-                    sourceSnapshot: sourceSnapshot
-                )
-            case .missing, .symbolicLink, .notRegularFile, .unreadable, .invalidUTF8,
-                 .namespaceChanged, .unstable, .cancelled:
-                nil
-            }
-            guard !Task.isCancelled, let self, let session else { return }
+            guard let self, let session else { return }
             handleExternalResolutionRead(
-                outcome,
-                payload: payload,
+                prepared.outcome,
+                payload: prepared.payload,
+                preparedImageAssetAuthority: prepared.imageAssetAuthority,
                 session: session,
                 context: completionContext
             )
@@ -476,6 +472,7 @@ private extension AppState {
     func handleExternalResolutionRead(
         _ outcome: WorkspaceCoherentFileReadOutcome,
         payload: ExternalReloadApplicationPayload?,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?,
         session: DocumentSession,
         context: ExternalResolutionReadContext
     ) {
@@ -530,6 +527,7 @@ private extension AppState {
             case .reload:
                 applyExternalReloadSnapshot(
                     payload,
+                    preparedImageAssetAuthority: preparedImageAssetAuthority,
                     session: session,
                     canonicalURL: context.canonicalURL,
                     token: context.token,
@@ -538,6 +536,7 @@ private extension AppState {
             case .keepMine:
                 prepareKeepMineResolution(
                     payload,
+                    preparedImageAssetAuthority: preparedImageAssetAuthority,
                     session: session,
                     canonicalURL: context.canonicalURL,
                     token: context.token,
@@ -556,6 +555,7 @@ private extension AppState {
 
     func applyExternalReloadSnapshot(
         _ payload: ExternalReloadApplicationPayload,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?,
         session: DocumentSession,
         canonicalURL: URL,
         token: UUID,
@@ -587,6 +587,7 @@ private extension AppState {
             session: session,
             canonicalURL: canonicalURL,
             payload: payload,
+            preparedImageAssetAuthority: preparedImageAssetAuthority,
             acceptedSourceSnapshot: acceptedSourceSnapshot,
             intent: .reload,
             synchronizedInstallations: []
@@ -604,7 +605,8 @@ private extension AppState {
               let observation = externalObservation(
                   from: application.payload,
                   location: operation.location,
-                  canonicalURL: application.canonicalURL
+                  canonicalURL: application.canonicalURL,
+                  preparedImageAssetAuthority: application.preparedImageAssetAuthority
               ),
               adoptObservedRetainedFileVersion(observation, for: session)
         else {
@@ -628,6 +630,7 @@ private extension AppState {
 
     func prepareKeepMineResolution(
         _ payload: ExternalReloadApplicationPayload,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?,
         session: DocumentSession,
         canonicalURL: URL,
         token: UUID,
@@ -649,6 +652,7 @@ private extension AppState {
             session: session,
             canonicalURL: canonicalURL,
             payload: payload,
+            preparedImageAssetAuthority: preparedImageAssetAuthority,
             acceptedSourceSnapshot: operation.sourceSnapshot,
             intent: .keepMine,
             synchronizedInstallations: []
@@ -667,7 +671,8 @@ private extension AppState {
               let observation = externalObservation(
                   from: application.payload,
                   location: operation.location,
-                  canonicalURL: application.canonicalURL
+                  canonicalURL: application.canonicalURL,
+                  preparedImageAssetAuthority: application.preparedImageAssetAuthority
               ),
               adoptObservedRetainedFileVersion(observation, for: session)
         else {
@@ -756,30 +761,30 @@ private extension AppState {
     func handleExternalDiskInspection(
         _ outcome: WorkspaceCoherentFileReadOutcome,
         payload: ExternalReloadApplicationPayload?,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?,
         session: DocumentSession,
-        canonicalURL: URL,
-        location: WorkspaceFileSystemLocation,
-        token: UUID,
-        lifecycleGeneration: UInt64,
-        diskEventGeneration: UInt64
+        context: ExternalDiskInspectionReadContext
     ) {
         let sessionIdentity = ObjectIdentifier(session)
         guard let inspection = externalDiskInspectionTasks[sessionIdentity],
-              inspection.token == token,
+              inspection.token == context.token,
               inspection.session === session,
-              exactFileURLSpellingMatches(inspection.canonicalURL, canonicalURL),
-              inspection.location == location,
-              inspection.lifecycleGeneration == lifecycleGeneration,
-              inspection.diskEventGeneration == diskEventGeneration
+              exactFileURLSpellingMatches(inspection.canonicalURL, context.canonicalURL),
+              inspection.location == context.location,
+              inspection.lifecycleGeneration == context.lifecycleGeneration,
+              inspection.diskEventGeneration == context.diskEventGeneration
         else {
             return
         }
         guard let stateURL = sessionStateURL(for: session),
-              exactFileURLSpellingMatches(stateURL, canonicalURL),
-              retainedManagedSessionLocation(for: session) == location,
-              currentSessionLifecycleGeneration(for: session) == lifecycleGeneration,
-              currentExternalDiskEventGeneration(for: session) == diskEventGeneration,
-              isAddressableExternalResolutionSession(session, canonicalURL: canonicalURL)
+              exactFileURLSpellingMatches(stateURL, context.canonicalURL),
+              retainedManagedSessionLocation(for: session) == context.location,
+              currentSessionLifecycleGeneration(for: session) == context.lifecycleGeneration,
+              currentExternalDiskEventGeneration(for: session) == context.diskEventGeneration,
+              isAddressableExternalResolutionSession(
+                  session,
+                  canonicalURL: context.canonicalURL
+              )
         else {
             externalDiskInspectionTasks[sessionIdentity] = nil
             finishRetiredEditorDocumentSessionIfPossible(for: session)
@@ -805,14 +810,15 @@ private extension AppState {
             }
             applyExternalDiskInspection(
                 payload,
+                preparedImageAssetAuthority: preparedImageAssetAuthority,
                 sourceSnapshot: inspection.sourceSnapshot,
                 session: session,
-                canonicalURL: canonicalURL,
-                location: location
+                canonicalURL: context.canonicalURL,
+                location: context.location
             )
         case .missing, .symbolicLink, .notRegularFile, .unreadable, .invalidUTF8,
              .namespaceChanged, .unstable:
-            markSessionDetachedFromMissingFile(session, url: canonicalURL)
+            markSessionDetachedFromMissingFile(session, url: context.canonicalURL)
         case .cancelled:
             break
         }
@@ -820,6 +826,7 @@ private extension AppState {
 
     func applyExternalDiskInspection(
         _ payload: ExternalReloadApplicationPayload,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?,
         sourceSnapshot: EditorDocumentSourceSnapshot,
         session: DocumentSession,
         canonicalURL: URL,
@@ -828,7 +835,8 @@ private extension AppState {
         guard let observation = externalObservation(
             from: payload,
             location: location,
-            canonicalURL: canonicalURL
+            canonicalURL: canonicalURL,
+            preparedImageAssetAuthority: preparedImageAssetAuthority
         ) else {
             markSessionDetachedFromMissingFile(session, url: canonicalURL)
             return
@@ -901,7 +909,8 @@ private extension AppState {
     func externalObservation(
         from payload: ExternalReloadApplicationPayload,
         location: WorkspaceFileSystemLocation,
-        canonicalURL: URL
+        canonicalURL: URL,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
     ) -> ObservedRetainedFileVersion? {
         guard let fileKind = FileKind(url: canonicalURL) else { return nil }
         return ObservedRetainedFileVersion(
@@ -912,7 +921,8 @@ private extension AppState {
                 fileKind: fileKind
             ),
             identity: payload.snapshot.metadata.identity,
-            sha256Digest: payload.snapshot.sha256Digest
+            sha256Digest: payload.snapshot.sha256Digest,
+            preparedImageAssetAuthority: preparedImageAssetAuthority
         )
     }
 

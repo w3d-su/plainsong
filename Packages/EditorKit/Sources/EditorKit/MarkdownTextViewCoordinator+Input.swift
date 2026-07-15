@@ -207,6 +207,32 @@ extension MarkdownTextViewCoordinator {
             }
             guard let textView else { return }
             let transaction = await imageAssetInserter(assets)
+            guard canCommitImageAssetInsertion(
+                transaction,
+                in: textView,
+                context: context
+            ) else {
+                endAsynchronousTextMutationLease()
+                isLeaseActive = false
+                await transaction.discard()
+                return
+            }
+            let isPlacementAuthorityValid = await transaction.validateBeforeCommit()
+            guard isPlacementAuthorityValid,
+                  canCommitImageAssetInsertion(
+                      transaction,
+                      in: textView,
+                      context: context
+                  )
+            else {
+                endAsynchronousTextMutationLease()
+                isLeaseActive = false
+                await transaction.discard()
+                return
+            }
+            // Validation and the final context/source fence completed while the persistent
+            // writer lease was held. Release its pending-source marker and commit in this same
+            // MainActor turn so publication rejection can release the active writer normally.
             endAsynchronousTextMutationLease()
             isLeaseActive = false
             guard commitImageAssetInsertion(
@@ -220,13 +246,12 @@ extension MarkdownTextViewCoordinator {
         }
     }
 
-    private func commitImageAssetInsertion(
+    private func canCommitImageAssetInsertion(
         _ transaction: EditorImageAssetInsertion,
         in textView: MarkdownSTTextView,
         context: EditorImageAssetInsertionContext
     ) -> Bool {
-        let relativePaths = transaction.relativePaths
-        guard !relativePaths.isEmpty,
+        guard !transaction.relativePaths.isEmpty,
               imageAssetInsertionGeneration == context.generation,
               imageAssetContextIDMatches(context.imageAssetContextID),
               !context.requiresPublicationProof || installedDocument.hasSourceContract,
@@ -234,14 +259,26 @@ extension MarkdownTextViewCoordinator {
         else {
             return false
         }
+        let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        return ExactSourceText.matches(currentText, context.text)
+    }
+
+    private func commitImageAssetInsertion(
+        _ transaction: EditorImageAssetInsertion,
+        in textView: MarkdownSTTextView,
+        context: EditorImageAssetInsertionContext
+    ) -> Bool {
+        let relativePaths = transaction.relativePaths
+        guard canCommitImageAssetInsertion(
+            transaction,
+            in: textView,
+            context: context
+        ) else { return false }
 
         let insertion = relativePaths
             .map { SmartPaste.imageInsertion(relativePath: $0) }
             .joined(separator: "\n")
         let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        guard ExactSourceText.matches(currentText, context.text) else {
-            return false
-        }
         let replacementRange = context.replacementRange.clamped(toLength: (currentText as NSString).length)
         let newSelection = NSRange(
             location: replacementRange.location + (insertion as NSString).length,

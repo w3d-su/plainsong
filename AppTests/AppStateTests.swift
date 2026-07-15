@@ -357,6 +357,284 @@ final class AppStateTests: XCTestCase {
         ))
     }
 
+    func testImageAssetInserterGetterDoesNotReopenReplacedDocumentParent() async throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(appState, rootURL: root, currentSession: session)
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: false)
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: documentDirectory.appendingPathComponent("post.md")
+        )
+
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
+        let replacementLocation = try rootAuthority.location(relativePath: "posts/post.md")
+        let replacementRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: MarkdownFileStore(),
+            at: replacementLocation
+        )
+        appState.adoptAnchoredFileBinding(
+            AnchoredWorkspaceSessionFileBinding(
+                location: replacementLocation,
+                identity: replacementRead.result.metadata.identity,
+                sha256Digest: replacementRead.result.sha256Digest
+            ),
+            for: session,
+            preparedImageAssetAuthority: replacementRead.preparedAuthority
+        )
+
+        _ = appState.editorDocumentBinding(for: session)
+        _ = appState.editorDocumentBinding(for: session)
+        let inserter = try XCTUnwrap(
+            appState.editorImageAssetInserter,
+            "body/getter reads must preserve the already-captured exact authority"
+        )
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+
+        XCTAssertTrue(insertion.relativePaths.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: documentDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: retainedDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
+    }
+
+    func testImageAssetAuthorityCacheMissDoesNotRetryFromSwiftUIBody() throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(appState, rootURL: root, currentSession: session)
+        let sessionIdentity = ObjectIdentifier(session)
+        appState.anchoredSessionFileBindings[sessionIdentity] = nil
+        appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        appState.editorImageAssetDocumentAuthorities[sessionIdentity] = nil
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: false)
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: documentDirectory.appendingPathComponent("post.md")
+        )
+
+        _ = appState.editorDocumentBinding(for: session)
+        _ = appState.editorDocumentBinding(for: session)
+
+        XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity])
+        XCTAssertNil(appState.editorImageAssetDocumentAuthorities[sessionIdentity])
+        XCTAssertNil(
+            appState.editorImageAssetInserter,
+            "body evaluation must not inspect the replacement namespace to refill proof/cache"
+        )
+    }
+
+    func testImageAssetAuthorityCacheMissCannotBootstrapReplacementParent() throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(appState, rootURL: root, currentSession: session)
+        let sessionIdentity = ObjectIdentifier(session)
+        appState.editorImageAssetDocumentAuthorities[sessionIdentity] = nil
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: false)
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: documentDirectory.appendingPathComponent("post.md")
+        )
+
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
+        let replacementLocation = try rootAuthority.location(relativePath: "posts/post.md")
+        let replacementRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: MarkdownFileStore(),
+            at: replacementLocation
+        )
+        appState.adoptAnchoredFileBinding(
+            AnchoredWorkspaceSessionFileBinding(
+                location: replacementLocation,
+                identity: replacementRead.result.metadata.identity,
+                sha256Digest: replacementRead.result.sha256Digest
+            ),
+            for: session,
+            preparedImageAssetAuthority: replacementRead.preparedAuthority
+        )
+
+        XCTAssertNil(appState.editorImageAssetDocumentAuthorities[sessionIdentity])
+        XCTAssertNil(appState.editorImageAssetInserter)
+    }
+
+    func testImageAssetAuthorityRejectsReplacementParentAfterLeafIdentityChanges() throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(appState, rootURL: root, currentSession: session)
+        let sessionIdentity = ObjectIdentifier(session)
+        let originalAuthority = try XCTUnwrap(
+            appState.editorImageAssetDocumentAuthorities[sessionIdentity]
+        )
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: documentDirectory, withIntermediateDirectories: false)
+        let replacementDocumentURL = documentDirectory.appendingPathComponent("post.md")
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: replacementDocumentURL
+        )
+        try "Replacement".write(
+            to: replacementDocumentURL,
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
+        let replacementLocation = try rootAuthority.location(relativePath: "posts/post.md")
+        let replacementRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: MarkdownFileStore(),
+            at: replacementLocation
+        )
+        XCTAssertNotEqual(replacementRead.result.metadata.identity, originalAuthority.identity)
+        appState.adoptAnchoredFileBinding(
+            AnchoredWorkspaceSessionFileBinding(
+                location: replacementLocation,
+                identity: replacementRead.result.metadata.identity,
+                sha256Digest: replacementRead.result.sha256Digest
+            ),
+            for: session,
+            preparedImageAssetAuthority: replacementRead.preparedAuthority
+        )
+
+        XCTAssertEqual(
+            appState.editorImageAssetDocumentAuthorities[sessionIdentity]?.identity,
+            originalAuthority.identity
+        )
+        XCTAssertNil(appState.editorImageAssetInserter)
+    }
+
+    func testAnchoredActivationCarriesPreloadedImageAuthorityAcrossParentReplacement() async throws {
+        let root = try makeTemporaryDirectory()
+        let documentDirectory = root.appendingPathComponent("posts", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: true
+        )
+        let documentURL = documentDirectory.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let rootAuthority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try rootAuthority.location(relativePath: "posts/post.md")
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: MarkdownFileStore(),
+            at: location
+        )
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = rootAuthority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        let activation = try appState.prepareAnchoredFileSessionActivation(
+            file: preparedRead.result.file,
+            at: location,
+            metadata: preparedRead.result.metadata,
+            sha256Digest: preparedRead.result.sha256Digest,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
+        )
+
+        let retainedDirectory = root.appendingPathComponent("retained-posts", isDirectory: true)
+        try FileManager.default.moveItem(at: documentDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(
+            at: documentDirectory,
+            withIntermediateDirectories: false
+        )
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("post.md"),
+            to: documentDirectory.appendingPathComponent("post.md")
+        )
+
+        appState.commitAnchoredFileSessionActivation(activation)
+
+        XCTAssertEqual(appState.currentDocument.text, "Body")
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+        XCTAssertTrue(insertion.relativePaths.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: documentDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: retainedDirectory.appendingPathComponent("assets").path(percentEncoded: false)
+        ))
+    }
+
+    func testDurableSaveRebindsImageAuthorityThroughRetainedParent() async throws {
+        let root = try makeTemporaryDirectory()
+        let documentURL = root.appendingPathComponent("post.md")
+        try "Body".write(to: documentURL, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: documentURL, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(appState, rootURL: root, currentSession: session)
+        let originalAuthority = try XCTUnwrap(
+            appState.editorImageAssetDocumentAuthorities[ObjectIdentifier(session)]
+        )
+
+        appState.replaceDocumentText("Changed", in: session)
+        try appState.save(session: session)
+
+        let savedBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+        let savedAuthority = try XCTUnwrap(
+            appState.editorImageAssetDocumentAuthorities[ObjectIdentifier(session)]
+        )
+        XCTAssertNotEqual(savedBinding.identity, originalAuthority.identity)
+        XCTAssertTrue(savedAuthority.matches(
+            location: savedBinding.location,
+            identity: savedBinding.identity
+        ))
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+        XCTAssertEqual(insertion.relativePaths, ["assets/image.png"])
+        let isValid = await insertion.validateBeforeCommit()
+        XCTAssertTrue(isValid)
+        await insertion.discard()
+    }
+
     func testSavingOpenDocumentDoesNotRewriteLastOpenedBookmark() throws {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("post.md")
@@ -718,7 +996,7 @@ final class AppStateTests: XCTestCase {
         ))
     }
 
-    func testDiscardedEditorImageInsertionRemovesOnlyNewlyCreatedAssets() async throws {
+    func testDiscardedEditorImageInsertionMovesCreatedAssetsToVisibleRecovery() async throws {
         let root = try makeTemporaryDirectory()
         let externalDirectory = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -755,9 +1033,17 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(placedURLs.allSatisfy {
             !FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
         })
+        let recoveryNames = try imageAssetDirectoryEntries(in: root)
+        XCTAssertEqual(recoveryNames.count, 2)
+        XCTAssertTrue(recoveryNames.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
+        let recoveryData = try recoveryNames.map {
+            try Data(contentsOf: root.appendingPathComponent("assets/\($0)"))
+        }
+        XCTAssertEqual(Set(recoveryData), Set([Data([1, 2, 3]), Data([4, 5, 6])]))
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: externalImage.path(percentEncoded: false)
         ))
+        XCTAssertEqual(appState.presentedError?.title, "Image Cleanup Needs Attention")
     }
 
     func testDiscardedEditorImageInsertionPreservesExistingWorkspaceReference() async throws {
@@ -790,6 +1076,93 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: existingImage), existingData)
     }
 
+    func testImagePlacementCommitValidationRejectsMovedAssetDirectory() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+        XCTAssertEqual(insertion.relativePaths, ["assets/image.png"])
+        let assetDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let retainedDirectory = root.appendingPathComponent("assets-old", isDirectory: true)
+        try FileManager.default.moveItem(at: assetDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: assetDirectory, withIntermediateDirectories: false)
+        let replacementData = Data([9, 8, 7])
+        let replacementImage = assetDirectory.appendingPathComponent("image.png")
+        try replacementData.write(to: replacementImage)
+
+        let isValid = await insertion.validateBeforeCommit()
+        XCTAssertFalse(isValid)
+        await insertion.discard()
+
+        XCTAssertEqual(try Data(contentsOf: replacementImage), replacementData)
+        let retainedEntries = try directoryEntries(at: retainedDirectory)
+        let recoveryName = try XCTUnwrap(retainedEntries.first)
+        XCTAssertEqual(retainedEntries, [recoveryName])
+        XCTAssertTrue(recoveryName.hasPrefix("Plainsong-preserved-"))
+        XCTAssertEqual(
+            try Data(contentsOf: retainedDirectory.appendingPathComponent(recoveryName)),
+            Data([1, 2, 3])
+        )
+        XCTAssertTrue(appState.presentedError?.message.contains(
+            retainedDirectory.appendingPathComponent(recoveryName).path(percentEncoded: false)
+        ) == true)
+        XCTAssertFalse(appState.presentedError?.message.contains(
+            assetDirectory.appendingPathComponent(recoveryName).path(percentEncoded: false)
+        ) == true)
+    }
+
+    func testImagePlacementCommitValidationRejectsMovedWorkspaceReferenceParent() async throws {
+        let root = try makeTemporaryDirectory()
+        let mediaDirectory = root.appendingPathComponent("media", isDirectory: true)
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+        let currentFile = root.appendingPathComponent("post.md")
+        let existingImage = mediaDirectory.appendingPathComponent("existing.png")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        try Data([1, 2, 3]).write(to: existingImage)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([.file(existingImage)])
+        XCTAssertEqual(insertion.relativePaths, ["media/existing.png"])
+        let retainedDirectory = root.appendingPathComponent("media-old", isDirectory: true)
+        try FileManager.default.moveItem(at: mediaDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: false)
+        try FileManager.default.linkItem(
+            at: retainedDirectory.appendingPathComponent("existing.png"),
+            to: mediaDirectory.appendingPathComponent("existing.png")
+        )
+
+        let isValid = await insertion.validateBeforeCommit()
+        XCTAssertFalse(isValid)
+        await insertion.discard()
+
+        XCTAssertEqual(
+            try Data(contentsOf: mediaDirectory.appendingPathComponent("existing.png")),
+            Data([1, 2, 3])
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: retainedDirectory.appendingPathComponent("existing.png")),
+            Data([1, 2, 3])
+        )
+    }
+
     func testDiscardedEditorImageInsertionPreservesIdentityReplacement() async throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -820,7 +1193,7 @@ final class AppStateTests: XCTestCase {
         ))
     }
 
-    func testDiscardedEditorImageInsertionPreservesSameInodeRewrite() async throws {
+    func testDiscardedEditorImageInsertionMovesSameInodeRewriteToVisibleRecovery() async throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
         try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
@@ -853,8 +1226,771 @@ final class AppStateTests: XCTestCase {
 
         await insertion.discard()
 
-        XCTAssertEqual(try Data(contentsOf: placedImage), rewrittenData)
-        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), ["image.png"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: placedImage.path(percentEncoded: false)))
+        let entries = try imageAssetDirectoryEntries(in: root)
+        let recoveryName = try XCTUnwrap(entries.first)
+        XCTAssertEqual(entries, [recoveryName])
+        XCTAssertTrue(recoveryName.hasPrefix("Plainsong-preserved-"))
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("assets/\(recoveryName)")),
+            rewrittenData
+        )
+        XCTAssertEqual(appState.presentedError?.title, "Image Cleanup Needs Attention")
+    }
+
+    func testDiscardRacePreservesReplacementAtVisibleRecoveryPathWhenRestoreIsBlocked() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let replacementData = Data([9, 8, 7])
+        let blockerData = Data([4, 5, 6])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            switch event {
+            case .willRename:
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try replacementData.write(to: originalURL)
+            case .didRename:
+                try blockerData.write(to: originalURL)
+            case .didValidateRecovery:
+                break
+            }
+        }
+
+        let entries = try imageAssetDirectoryEntries(in: root)
+        let recoveryName = try XCTUnwrap(entries.first {
+            $0.hasPrefix("Plainsong-preserved-")
+        })
+        let recoveryURL = root
+            .appendingPathComponent("assets", isDirectory: true)
+            .appendingPathComponent(recoveryName)
+        XCTAssertFalse(recoveryName.hasPrefix("."))
+        XCTAssertEqual(try Data(contentsOf: originalURL), blockerData)
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), replacementData)
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(
+            outcome.issues.contains { $0.contains(recoveryURL.path(percentEncoded: false)) }
+        )
+    }
+
+    func testDiscardReportsCreatedAssetMovedAwayFromMissingPublishedLeaf() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+        try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+
+        let outcome = discardEditorImageAssets(placement.createdAssets, rootURL: root)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertFalse(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardFsyncFailureReportsRecoveryRacerAndMovedCreatedAsset() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let racerData = Data([9, 8, 7])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in throw CocoaError(.fileWriteUnknown) },
+            eventHandler: { event in
+                guard case .willRename = event else { return }
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try racerData.write(to: originalURL)
+            }
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        let recoveryName = try XCTUnwrap(try imageAssetDirectoryEntries(in: root).first)
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), racerData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardFsyncFailureDoesNotAttributeLaterOccupantToAcquiredRacer() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let racerData = Data([9, 8, 7])
+        let laterOccupantData = Data([4, 5, 6])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let retainedRacerURL = root.appendingPathComponent("racer-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in
+                let recoveryName = try XCTUnwrap(
+                    try imageAssetDirectoryEntries(in: root).first {
+                        $0.hasPrefix("Plainsong-preserved-")
+                    }
+                )
+                let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+                try FileManager.default.moveItem(at: recoveryURL, to: retainedRacerURL)
+                try laterOccupantData.write(to: recoveryURL)
+                throw CocoaError(.fileWriteUnknown)
+            },
+            eventHandler: { event in
+                guard case .willRename = event else { return }
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try racerData.write(to: originalURL)
+            }
+        )
+
+        let recoveryName = try XCTUnwrap(
+            try imageAssetDirectoryEntries(in: root).first {
+                $0.hasPrefix("Plainsong-preserved-")
+            }
+        )
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try Data(contentsOf: retainedRacerURL), racerData)
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), laterOccupantData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("an unavailable visible path")
+                && $0.contains("entry acquired by the recovery rename could not be rebound")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+                && $0.contains("is not proof of the entry acquired by rename")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertFalse(outcome.issues.contains {
+            $0.contains(retainedRacerURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardSuccessfulFsyncDoesNotAttributeLaterOccupantToAcquiredRacer() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let racerData = Data([9, 8, 7])
+        let laterOccupantData = Data([4, 5, 6])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let retainedRacerURL = root.appendingPathComponent("racer-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in
+                let recoveryName = try XCTUnwrap(
+                    try imageAssetDirectoryEntries(in: root).first {
+                        $0.hasPrefix("Plainsong-preserved-")
+                    }
+                )
+                let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+                try FileManager.default.moveItem(at: recoveryURL, to: retainedRacerURL)
+                try laterOccupantData.write(to: recoveryURL)
+            },
+            eventHandler: { event in
+                guard case .willRename = event else { return }
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try racerData.write(to: originalURL)
+            }
+        )
+
+        let recoveryName = try XCTUnwrap(
+            try imageAssetDirectoryEntries(in: root).first {
+                $0.hasPrefix("Plainsong-preserved-")
+            }
+        )
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try Data(contentsOf: retainedRacerURL), racerData)
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), laterOccupantData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("an unavailable visible path")
+                && $0.contains("has no atomic provenance proof")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+                && $0.contains("is not proof of the entry acquired by rename")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertFalse(outcome.issues.contains {
+            $0.contains(retainedRacerURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardSuccessfulFsyncDoesNotTreatLaterCreatedHardLinkAsAcquired() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let racerData = Data([9, 8, 7])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let retainedRacerURL = root.appendingPathComponent("racer-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in
+                let recoveryName = try XCTUnwrap(
+                    try imageAssetDirectoryEntries(in: root).first {
+                        $0.hasPrefix("Plainsong-preserved-")
+                    }
+                )
+                let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+                try FileManager.default.moveItem(at: recoveryURL, to: retainedRacerURL)
+                try FileManager.default.linkItem(at: retainedCreatedURL, to: recoveryURL)
+            },
+            eventHandler: { event in
+                guard case .willRename = event else { return }
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try racerData.write(to: originalURL)
+            }
+        )
+
+        let recoveryName = try XCTUnwrap(
+            try imageAssetDirectoryEntries(in: root).first {
+                $0.hasPrefix("Plainsong-preserved-")
+            }
+        )
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try Data(contentsOf: retainedRacerURL), racerData)
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), createdData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("an unavailable visible path")
+                && $0.contains("cannot atomically prove which entry it acquired")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+                || $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertFalse(outcome.issues.contains {
+            $0.contains(retainedRacerURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardPostRenameMissingStillRefreshesWithoutArtifact() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in },
+            namespaceInspector: { _, _ in .missing },
+            descriptorLinkInspector: { _ in .unlinked }
+        )
+
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("an unavailable visible path")
+                && $0.contains("cannot atomically prove which entry it acquired")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertNotNil(outcome.userFacingIssue)
+    }
+
+    func testDiscardPostRenameInspectionFailureReportsIndeterminateArtifacts() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in },
+            namespaceInspector: { _, _ in
+                .indeterminate("injected namespace inspection failure")
+            },
+            descriptorLinkInspector: { _ in
+                .indeterminate("injected descriptor inspection failure")
+            }
+        )
+
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("injected namespace inspection failure") &&
+                $0.contains("unavailable visible path")
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("injected descriptor inspection failure") &&
+                $0.contains("unavailable visible path")
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardMissingLeafDoesNotTreatDescriptorInspectionFailureAsMissing() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+        try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root,
+            directorySynchronizer: { _ in },
+            descriptorLinkInspector: { _ in
+                .indeterminate("injected descriptor inspection failure")
+            }
+        )
+
+        XCTAssertFalse(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("injected descriptor inspection failure") &&
+                $0.contains("unavailable visible path")
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardRacePreservesReplacementWhenOriginalNameRemainsFree() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let replacementData = Data([9, 8, 7])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            guard case .willRename = event else { return }
+            try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+            try replacementData.write(to: originalURL)
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        let recoveryName = try XCTUnwrap(try imageAssetDirectoryEntries(in: root).first)
+        XCTAssertTrue(recoveryName.hasPrefix("Plainsong-preserved-"))
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), replacementData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardRaceNeverRenamesReplacementOfAcquiredRecoverySource() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let racerData = Data([9, 8, 7])
+        let laterReplacementData = Data([4, 5, 6])
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let retainedRacerURL = root.appendingPathComponent("racer-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            switch event {
+            case .willRename:
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try racerData.write(to: originalURL)
+            case let .didRename(_, recoveryLeafName):
+                let acquiredURL = root.appendingPathComponent("assets/\(recoveryLeafName)")
+                try FileManager.default.moveItem(at: acquiredURL, to: retainedRacerURL)
+                try laterReplacementData.write(to: acquiredURL)
+            case .didValidateRecovery:
+                break
+            }
+        }
+
+        let recoveryName = try XCTUnwrap(try imageAssetDirectoryEntries(in: root).first)
+        let installedRecoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try Data(contentsOf: retainedRacerURL), racerData)
+        XCTAssertEqual(try Data(contentsOf: installedRecoveryURL), laterReplacementData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedRacerURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardRaceReportsSymlinkRecoveryPathWhenRestoreIsBlocked() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        let targetURL = root.appendingPathComponent("target.png")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        try Data([7, 7, 7]).write(to: targetURL)
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            switch event {
+            case .willRename:
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try FileManager.default.createSymbolicLink(at: originalURL, withDestinationURL: targetURL)
+            case .didRename:
+                try Data([4, 5, 6]).write(to: originalURL)
+            case .didValidateRecovery:
+                break
+            }
+        }
+
+        let recoveryName = try XCTUnwrap(try imageAssetDirectoryEntries(in: root).first {
+            $0.hasPrefix("Plainsong-preserved-")
+        })
+        let recoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: recoveryURL.path),
+            targetURL.path
+        )
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(recoveryURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardRaceDoesNotAttributeReplacementPathToMovedSymlink() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        let firstTargetURL = root.appendingPathComponent("target-a.png")
+        let secondTargetURL = root.appendingPathComponent("target-b.png")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        try Data([7, 7, 7]).write(to: firstTargetURL)
+        try Data([8, 8, 8]).write(to: secondTargetURL)
+        let originalURL = root.appendingPathComponent("assets/image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let movedSymlinkURL = root.appendingPathComponent("racer-link")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            switch event {
+            case .willRename:
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try FileManager.default.createSymbolicLink(
+                    at: originalURL,
+                    withDestinationURL: firstTargetURL
+                )
+            case let .didRename(_, recoveryLeafName):
+                let acquiredURL = root.appendingPathComponent("assets/\(recoveryLeafName)")
+                try FileManager.default.moveItem(at: acquiredURL, to: movedSymlinkURL)
+                try FileManager.default.createSymbolicLink(
+                    at: acquiredURL,
+                    withDestinationURL: secondTargetURL
+                )
+            case .didValidateRecovery:
+                break
+            }
+        }
+
+        let recoveryName = try XCTUnwrap(try imageAssetDirectoryEntries(in: root).first)
+        let installedRecoveryURL = root.appendingPathComponent("assets/\(recoveryName)")
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: movedSymlinkURL.path),
+            firstTargetURL.path
+        )
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(
+                atPath: installedRecoveryURL.path
+            ),
+            secondTargetURL.path
+        )
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("unavailable visible path") && !$0.contains(installedRecoveryURL.path)
+        }, outcome.issues.joined(separator: "\n"))
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains(retainedCreatedURL.path(percentEncoded: false))
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testPreservedNamespaceLocationDoesNotAdoptLaterRegularOccupant() throws {
+        let root = try makeTemporaryDirectory()
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: assetsDirectory,
+            withIntermediateDirectories: false
+        )
+        let leafURL = assetsDirectory.appendingPathComponent("image.png")
+        let retainedURL = root.appendingPathComponent("retained-image.png")
+        try Data([1, 2, 3]).write(to: leafURL)
+        let capturedStatus = try fileStatus(at: leafURL)
+        let capturedIdentity = WorkspaceFileSystemIdentity(
+            device: UInt64(capturedStatus.st_dev),
+            inode: UInt64(capturedStatus.st_ino)
+        )
+        let directoryDescriptor = Darwin.open(
+            assetsDirectory.path,
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC
+        )
+        XCTAssertGreaterThanOrEqual(directoryDescriptor, 0)
+        defer { Darwin.close(directoryDescriptor) }
+        try FileManager.default.moveItem(at: leafURL, to: retainedURL)
+        try Data([9, 8, 7]).write(to: leafURL)
+
+        let location = editorImageAssetPreservedLocationForNamespaceEntry(
+            directoryDescriptor: directoryDescriptor,
+            leafName: "image.png",
+            fallbackIdentity: capturedIdentity
+        )
+
+        XCTAssertNil(location.currentPath)
+        XCTAssertEqual(location.identity, capturedIdentity)
+        XCTAssertNotEqual(location.currentPath, leafURL.path(percentEncoded: false))
+    }
+
+    func testDiscardRaceReportsDirectoryRecoveryPathWhenRestoreIsBlocked() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let retainedDirectory = root.appendingPathComponent("assets-old", isDirectory: true)
+        let originalURL = assetsDirectory.appendingPathComponent("image.png")
+        let retainedCreatedURL = root.appendingPathComponent("created-original.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            switch event {
+            case .willRename:
+                try FileManager.default.moveItem(at: originalURL, to: retainedCreatedURL)
+                try FileManager.default.createDirectory(
+                    at: originalURL,
+                    withIntermediateDirectories: false
+                )
+            case .didRename:
+                try FileManager.default.moveItem(at: assetsDirectory, to: retainedDirectory)
+                try FileManager.default.createDirectory(
+                    at: assetsDirectory,
+                    withIntermediateDirectories: false
+                )
+                try Data([4, 5, 6]).write(
+                    to: retainedDirectory.appendingPathComponent("image.png")
+                )
+            case .didValidateRecovery:
+                break
+            }
+        }
+
+        let recoveryName = try XCTUnwrap(try directoryEntries(at: retainedDirectory).first {
+            $0.hasPrefix("Plainsong-preserved-")
+        })
+        let recoveryURL = retainedDirectory.appendingPathComponent(recoveryName)
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: recoveryURL.path,
+            isDirectory: &isDirectory
+        ))
+        XCTAssertTrue(isDirectory.boolValue)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(outcome.issues.contains {
+            $0.contains("/assets-old/\(recoveryName)") &&
+                !$0.contains("unavailable visible path")
+        }, outcome.issues.joined(separator: "\n"))
+    }
+
+    func testDiscardNeverUnlinksReplacementInstalledAfterExactRecoveryValidation() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let createdData = Data([1, 2, 3])
+        let replacementData = Data([9, 8, 7])
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let retainedCreatedURL = assetsDirectory.appendingPathComponent("retained-created.png")
+        let placement = try placeEditorImageAssets(
+            assets: [.data(createdData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+
+        let outcome = discardEditorImageAssets(
+            placement.createdAssets,
+            rootURL: root
+        ) { event in
+            guard case let .didValidateRecovery(recoveryLeafName) = event else { return }
+            let recoveryURL = assetsDirectory.appendingPathComponent(recoveryLeafName)
+            try FileManager.default.moveItem(at: recoveryURL, to: retainedCreatedURL)
+            try replacementData.write(to: recoveryURL)
+        }
+
+        let recoveryName = try XCTUnwrap(
+            directoryEntries(at: assetsDirectory).first {
+                $0.hasPrefix("Plainsong-preserved-")
+            }
+        )
+        let installedReplacementURL = assetsDirectory.appendingPathComponent(recoveryName)
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try Data(contentsOf: installedReplacementURL), replacementData)
+        XCTAssertTrue(outcome.didChangeWorkspace)
+        XCTAssertTrue(
+            outcome.issues.contains {
+                $0.contains(retainedCreatedURL.path(percentEncoded: false)) &&
+                    $0.contains("no file was removed")
+            }
+        )
+    }
+
+    func testDiscardReportsMovedDirectoryPathForSameInodeRewrite() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let placement = try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        )
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let retainedDirectory = root.appendingPathComponent("assets-old", isDirectory: true)
+        try FileManager.default.moveItem(at: assetsDirectory, to: retainedDirectory)
+        try FileManager.default.createDirectory(at: assetsDirectory, withIntermediateDirectories: false)
+        let retainedImage = retainedDirectory.appendingPathComponent("image.png")
+        let rewrittenData = Data([7, 8, 9])
+        let handle = try FileHandle(forWritingTo: retainedImage)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: rewrittenData)
+        try handle.synchronize()
+        try handle.close()
+
+        let outcome = discardEditorImageAssets(placement.createdAssets, rootURL: root)
+
+        let entries = try directoryEntries(at: retainedDirectory)
+        let recoveryName = try XCTUnwrap(entries.first)
+        let recoveryURL = retainedDirectory.appendingPathComponent(recoveryName)
+        XCTAssertEqual(entries, [recoveryName])
+        XCTAssertTrue(recoveryName.hasPrefix("Plainsong-preserved-"))
+        XCTAssertEqual(try Data(contentsOf: recoveryURL), rewrittenData)
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
+        XCTAssertTrue(outcome.issues.contains { $0.contains(recoveryURL.path(percentEncoded: false)) })
+        XCTAssertFalse(outcome.issues.contains {
+            $0.contains(assetsDirectory.appendingPathComponent(recoveryName).path(percentEncoded: false))
+        })
     }
 
     func testEditorImageAssetPlacementDoesNotOverwriteExclusiveCreateRaceWinner() throws {
@@ -898,6 +2034,48 @@ final class AppStateTests: XCTestCase {
         )
     }
 
+    func testWorkspaceImageReferenceRejectsParentReplacementAfterAuthorityCapture() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let mediaDirectory = root.appendingPathComponent("media", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: mediaDirectory,
+            withIntermediateDirectories: false
+        )
+        let sourceURL = mediaDirectory.appendingPathComponent("image.png")
+        let sourceData = Data([1, 2, 3])
+        try sourceData.write(to: sourceURL)
+        let retainedDirectory = root.appendingPathComponent("media-original", isDirectory: true)
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.file(sourceURL)],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case .didCaptureWorkspaceReference = event else { return }
+            try FileManager.default.moveItem(at: mediaDirectory, to: retainedDirectory)
+            try FileManager.default.createDirectory(
+                at: mediaDirectory,
+                withIntermediateDirectories: false
+            )
+            try FileManager.default.linkItem(
+                at: retainedDirectory.appendingPathComponent("image.png"),
+                to: mediaDirectory.appendingPathComponent("image.png")
+            )
+        })
+
+        let replacementURL = mediaDirectory.appendingPathComponent("image.png")
+        XCTAssertEqual(try Data(contentsOf: replacementURL), sourceData)
+        let replacementStatus = try fileStatus(at: replacementURL)
+        let retainedStatus = try fileStatus(
+            at: retainedDirectory.appendingPathComponent("image.png")
+        )
+        XCTAssertEqual(replacementStatus.st_dev, retainedStatus.st_dev)
+        XCTAssertEqual(replacementStatus.st_ino, retainedStatus.st_ino)
+    }
+
     func testEditorImageAssetPlacementRejectsAssetDirectoryReplacementBeforePublish() throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -923,7 +2101,9 @@ final class AppStateTests: XCTestCase {
         })
 
         XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
-        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
+        let entries = try directoryEntries(at: relocatedDirectory)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
     }
 
     func testEditorImageAssetPlacementRollsBackAssetDirectoryMovedImmediatelyAfterRename() throws {
@@ -951,7 +2131,9 @@ final class AppStateTests: XCTestCase {
         })
 
         XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
-        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
+        let entries = try directoryEntries(at: relocatedDirectory)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
     }
 
     func testDidPublishAssetDirectoryMoveCannotReturnStaleEditorImageReference() throws {
@@ -979,7 +2161,9 @@ final class AppStateTests: XCTestCase {
         })
 
         XCTAssertEqual(try directoryEntries(at: assetsDirectory), [])
-        XCTAssertEqual(try directoryEntries(at: relocatedDirectory), [])
+        let entries = try directoryEntries(at: relocatedDirectory)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
     }
 
     func testEditorImageAssetPlacementRejectsReplacedStagingName() throws {
@@ -1016,6 +2200,93 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(entries, [preservedURL.lastPathComponent])
     }
 
+    func testPlacementRollbackMarksPreservedOriginalAsWorkspaceChange() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let createdData = Data([1, 2, 3])
+        defer {
+            _ = assetsDirectory.path(percentEncoded: false).withCString {
+                Darwin.chmod($0, mode_t(0o755))
+            }
+        }
+
+        do {
+            _ = try placeEditorImageAssets(
+                assets: [.data(createdData, suggestedFilename: "image.png")],
+                assetFolderRelativePath: "assets",
+                rootURL: root,
+                currentFileURL: currentFile
+            ) { event in
+                guard case let .didRenameBeforeValidation(candidateURL) = event else {
+                    return
+                }
+                let result = candidateURL.deletingLastPathComponent()
+                    .path(percentEncoded: false)
+                    .withCString { Darwin.chmod($0, mode_t(0o555)) }
+                guard result == 0 else { throw CocoaError(.fileWriteNoPermission) }
+                throw CocoaError(.fileWriteUnknown)
+            }
+            XCTFail("Expected placement rollback")
+        } catch {
+            let rollbackError = try XCTUnwrap(
+                error as? EditorImageAssetPlacementRollbackError
+            )
+            XCTAssertTrue(rollbackError.didChangeWorkspace)
+            XCTAssertTrue(rollbackError.cleanupDescriptions.contains {
+                $0.contains("staging file preserved") && $0.contains("image.png")
+            })
+        }
+
+        let publishedURL = assetsDirectory.appendingPathComponent("image.png")
+        XCTAssertEqual(try Data(contentsOf: publishedURL), createdData)
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), ["image.png"])
+    }
+
+    func testPlacementRollbackMarksPreflightArtifactsAsWorkspaceChange() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        let retainedCreatedURL = root.appendingPathComponent("retained-created.png")
+        let createdData = Data([1, 2, 3])
+        let replacementData = Data([9, 8, 7])
+
+        do {
+            _ = try placeEditorImageAssets(
+                assets: [.data(createdData, suggestedFilename: "image.png")],
+                assetFolderRelativePath: "assets",
+                rootURL: root,
+                currentFileURL: currentFile
+            ) { event in
+                guard case let .didRenameBeforeValidation(candidateURL) = event else {
+                    return
+                }
+                try FileManager.default.moveItem(at: candidateURL, to: retainedCreatedURL)
+                try replacementData.write(to: candidateURL)
+                throw CocoaError(.fileWriteUnknown)
+            }
+            XCTFail("Expected placement rollback")
+        } catch {
+            let rollbackError = try XCTUnwrap(
+                error as? EditorImageAssetPlacementRollbackError
+            )
+            XCTAssertTrue(rollbackError.didChangeWorkspace)
+            XCTAssertTrue(rollbackError.cleanupDescriptions.contains {
+                $0.contains(
+                    assetsDirectory.appendingPathComponent("image.png")
+                        .path(percentEncoded: false)
+                ) && $0.contains(retainedCreatedURL.path(percentEncoded: false))
+            })
+        }
+
+        let replacementURL = assetsDirectory.appendingPathComponent("image.png")
+        XCTAssertEqual(try Data(contentsOf: replacementURL), replacementData)
+        XCTAssertEqual(try Data(contentsOf: retainedCreatedURL), createdData)
+        XCTAssertEqual(try directoryEntries(at: assetsDirectory), ["image.png"])
+    }
+
     func testDidPublishFailureRollsBackCurrentEditorImageAssetAndArtifacts() throws {
         let root = try makeTemporaryDirectory()
         let currentFile = root.appendingPathComponent("post.md")
@@ -1031,7 +2302,9 @@ final class AppStateTests: XCTestCase {
             throw CocoaError(.fileWriteUnknown)
         })
 
-        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), [])
+        let entries = try imageAssetDirectoryEntries(in: root)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
     }
 
     func testSecondDidPublishFailureRollsBackAllEditorImageAssetsAndArtifacts() throws {
@@ -1056,7 +2329,9 @@ final class AppStateTests: XCTestCase {
             throw CocoaError(.fileWriteUnknown)
         })
 
-        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), [])
+        let entries = try imageAssetDirectoryEntries(in: root)
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
     }
 
     func testFailedMultiAssetInsertionRollsBackEarlierCreatedAsset() async throws {
@@ -1070,6 +2345,7 @@ final class AppStateTests: XCTestCase {
             rootURL: root,
             currentSession: session
         )
+        let initialWorkspaceGeneration = appState.workspaceGeneration
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         let insertion = await inserter([
@@ -1081,6 +2357,11 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: root.appendingPathComponent("assets/image.png").path(percentEncoded: false)
         ))
+        let entries = try imageAssetDirectoryEntries(in: root)
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries.allSatisfy { $0.hasPrefix("Plainsong-preserved-") })
+        XCTAssertEqual(appState.presentedError?.title, "Could Not Insert Image")
+        XCTAssertGreaterThan(appState.workspaceGeneration, initialWorkspaceGeneration)
     }
 
     func testOpeningFolderBuildsWorkspaceTreeAndSelectsFirstMarkdownFile() async throws {
@@ -1779,7 +3060,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: post.path))
     }
 
-    func testAnchoredMissingDocumentCanSaveCopyBackToItsOriginalProvenMissingPath() throws {
+    func testAnchoredMissingDocumentCanSaveCopyBackToItsOriginalProvenMissingPath() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let originalURL = root.appendingPathComponent("post.md").standardizedFileURL
@@ -1819,6 +3100,14 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: originalURL, encoding: .utf8), "unsaved A")
         XCTAssertFalse(session.isDirty)
         XCTAssertNil(appState.missingFilePrompt)
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "recovered.png"),
+        ])
+        XCTAssertEqual(insertion.relativePaths, ["assets/recovered.png"])
+        let remainsAuthorized = await insertion.validateBeforeCommit()
+        XCTAssertTrue(remainsAuthorized)
+        await insertion.discard()
     }
 
     func testUnanchoredMissingDocumentCanSaveCopyBackToItsOriginalProvenMissingPath() throws {
@@ -3978,6 +5267,38 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: recovery, encoding: .utf8), "retained artifact")
     }
 
+    func testPresentedReconciliationErrorIncludesEveryRecoveryArtifactPath() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let retained = try authority.location(relativePath: ".retained-recovery")
+        let indeterminate = try authority.location(relativePath: ".indeterminate-recovery")
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        let destination = root.appendingPathComponent("post.md")
+
+        let expectations: [(WorkspaceFileWriteArtifactState, WorkspaceFileSystemLocation, String)] = [
+            (.retained(retained), retained, "was retained at"),
+            (.removalIndeterminate(indeterminate), indeterminate, "could not be confirmed"),
+        ]
+        for (artifact, location, wording) in expectations {
+            appState.present(
+                MarkdownFileStoreError.writeRequiresReconciliation(
+                    destination,
+                    WorkspaceIndeterminateFileWrite(
+                        reason: .namespaceChanged,
+                        preparedMetadata: nil,
+                        recoveryArtifact: artifact
+                    )
+                ),
+                title: "Could Not Save Copy"
+            )
+
+            XCTAssertEqual(appState.presentedError?.title, "Could Not Save Copy")
+            XCTAssertTrue(appState.presentedError?.message.contains(wording) == true)
+            XCTAssertTrue(appState.presentedError?.message.contains(location.fileURL.path) == true)
+        }
+    }
+
     // swiftlint:disable:next function_body_length
     func testAnchoredSaveCopyRetainsRemovalIndeterminateNoticeAfterRehome() throws {
         let root = try makeTemporaryDirectory()
@@ -4050,6 +5371,112 @@ final class AppStateTests: XCTestCase {
             ]
         )
         XCTAssertEqual(appState.presentedError?.title, "File Saved; Cleanup Required")
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testDurableSaveCopyBindFailureQuarantinesAndRetainsCleanupNotice() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let missingURL = root.appendingPathComponent("missing.md").standardizedFileURL
+        let destinationURL = root.appendingPathComponent("recovered.md").standardizedFileURL
+        let committedURL = root.appendingPathComponent("committed-recovered.md").standardizedFileURL
+        let cleanupURL = root.appendingPathComponent(".recovered.cleanup").standardizedFileURL
+        try writeText("disk A", to: missingURL)
+        try writeText("retained cleanup", to: cleanupURL)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let missingLocation = try authority.location(relativePath: "missing.md")
+        let cleanupLocation = try authority.location(relativePath: ".recovered.cleanup")
+        let loaded = try MarkdownFileStore().loadResult(at: missingLocation)
+        let session = DocumentSession(
+            text: "unsaved A",
+            url: missingURL,
+            fileKind: .markdown,
+            isDirty: true
+        )
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        appState.workspaceSearchRootAuthority = authority
+        appState.workspaceGeneration = 1
+        appState.workspaceInstalledCaptureGeneration = 1
+        appState.sessionCache[missingURL] = session
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] =
+            AnchoredWorkspaceSessionFileBinding(
+                location: missingLocation,
+                identity: loaded.metadata.identity,
+                sha256Digest: loaded.sha256Digest
+            )
+        appState.detachedSessionURLs.insert(missingURL)
+        appState.missingFilePrompt = AppState.MissingFilePrompt(fileURL: missingURL)
+        var writerEntries = 0
+        var durableResult: WorkspaceDurableFileWrite?
+        appState.anchoredFileSaveOverride = { text, location, expectation in
+            writerEntries += 1
+            let outcome = try MarkdownFileStore().save(
+                text: text,
+                at: location,
+                expecting: expectation
+            )
+            guard case let .committedAndDurable(actual) = outcome else {
+                XCTFail("Expected a durable Save Copy")
+                return outcome
+            }
+            try FileManager.default.moveItem(at: destinationURL, to: committedURL)
+            try self.writeText("replacement B", to: destinationURL)
+            let exposed = WorkspaceDurableFileWrite(
+                metadata: actual.metadata,
+                cleanupState: .retained(cleanupLocation)
+            )
+            durableResult = exposed
+            return .committedAndDurable(exposed)
+        }
+
+        XCTAssertThrowsError(try appState.saveDetachedCurrentDocument(to: destinationURL)) { error in
+            guard case let MarkdownFileStoreError.writeRequiresReconciliation(url, result) = error
+            else {
+                return XCTFail("Expected postcommit reconciliation, got \(error)")
+            }
+            XCTAssertEqual(url.standardizedFileURL, destinationURL)
+            XCTAssertEqual(result.reason, .namespaceChanged)
+            XCTAssertEqual(result.preparedMetadata, durableResult?.metadata)
+            XCTAssertEqual(result.recoveryArtifact, .retained(cleanupLocation))
+        }
+
+        let sessionIdentity = ObjectIdentifier(session)
+        XCTAssertEqual(writerEntries, 1)
+        XCTAssertEqual(try String(contentsOf: committedURL, encoding: .utf8), "unsaved A")
+        XCTAssertEqual(try String(contentsOf: destinationURL, encoding: .utf8), "replacement B")
+        XCTAssertEqual(session.fileURL?.standardizedFileURL, destinationURL)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertTrue(appState.sessionCache[destinationURL] === session)
+        XCTAssertNil(appState.sessionCache[missingURL])
+        XCTAssertEqual(
+            appState.indeterminateSessionWrites[sessionIdentity]?.recoveryArtifact,
+            .retained(cleanupLocation)
+        )
+        XCTAssertEqual(appState.pendingExternalTexts[destinationURL], "replacement B")
+        XCTAssertFalse(appState.canSave)
+        XCTAssertEqual(
+            appState.fileWriteArtifactNotices,
+            [
+                FileWriteArtifactNotice(
+                    destinationURL: destinationURL,
+                    destinationWasCommitted: true,
+                    artifactState: .retained(cleanupLocation)
+                ),
+            ]
+        )
+
+        XCTAssertThrowsError(try appState.saveCurrentDocument())
+        XCTAssertEqual(writerEntries, 1)
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload clears postcommit Save Copy quarantine") {
+            appState.indeterminateSessionWrites[sessionIdentity] == nil &&
+                appState.externalReloadTasks[sessionIdentity] == nil
+        }
+        XCTAssertEqual(
+            appState.fileWriteArtifactNotices.first?.artifactState,
+            .retained(cleanupLocation)
+        )
     }
 
     func testAnchoredNotCommittedSaveRetainsPreparedArtifactAndLeavesSessionDirty() throws {
@@ -5142,7 +6569,7 @@ final class AppStateTests: XCTestCase {
             XCTAssertEqual(session.text, "local (source) edits")
             XCTAssertEqual(appState.pendingExternalTexts[location.fileURL], "disk B (source)")
             XCTAssertFalse(appState.canAutosave(session: session))
-            if let retiredBindingID {
+            if retiredBindingID != nil {
                 XCTAssertNotNil(
                     appState.retiredEditorDocumentSessions[location.fileURL],
                     "a rejected retired activation must not drop its retained authority"
@@ -6210,7 +7637,11 @@ final class AppStateTests: XCTestCase {
         let rootAuthority = try WorkspaceFileSystemRootAuthority(rootURL: rootURL)
         let fileURL = try XCTUnwrap(currentSession.fileURL)
         let location = try rootAuthority.canonicalizedLocation(forFileURL: fileURL)
-        let loaded = try MarkdownFileStore().loadResult(at: location)
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: MarkdownFileStore(),
+            at: location
+        )
+        let loaded = preparedRead.result
         appState.workspaceRootURL = rootURL
         appState.workspaceSearchRootAuthority = rootAuthority
         appState.workspaceGeneration = 1
@@ -6221,7 +7652,9 @@ final class AppStateTests: XCTestCase {
                 identity: loaded.metadata.identity,
                 sha256Digest: loaded.sha256Digest
             ),
-            for: currentSession
+            for: currentSession,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority,
+            allowsImageAssetAuthorityBootstrap: true
         )
         appState.sessionCache[location.fileURL] = currentSession
     }
@@ -11043,6 +12476,14 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertNil(appState.pendingExternalFileVersions[retiredLocation.fileURL])
     }
 
+    func testCachedSearchHardLinkCollisionDetachesBeforeEvictingOlderInspection() async throws {
+        try await assertReusableSearchHardLinkCollisionIsAccountedFor(.cached)
+    }
+
+    func testRetiredSearchHardLinkCollisionDetachesBeforeEvictingOlderInspection() async throws {
+        try await assertReusableSearchHardLinkCollisionIsAccountedFor(.retired)
+    }
+
     func testSearchObservationRestartsReloadAndKeepMineAgainstNewerConflictVersion() async throws {
         for intent in [DeferredExternalChangeResolution.reload, .keepMine] {
             try await assertSearchObservationSupersedesOlderExternalResolution(intent: intent)
@@ -12926,9 +14367,150 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         let snapshot: WorkspaceFileSnapshot
     }
 
+    private enum ReusableSearchSessionStorage {
+        case cached
+        case retired
+    }
+
     private enum TestError: Error {
         case expectedEditorNavigation
         case expectedRegularFile
+    }
+
+    // swiftlint:disable:next function_body_length
+    private func assertReusableSearchHardLinkCollisionIsAccountedFor(
+        _ storage: ReusableSearchSessionStorage
+    ) async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let ownerText = "owner A needle"
+        let retainedText = "retained B"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": ownerText, "b.md": retainedText],
+            currentPath: "a.md",
+            coherentFileReader: reader
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let ownerSession = appState.currentDocument
+        let ownerURL = fixture.rootURL.appendingPathComponent("a.md")
+        let retainedURL = fixture.rootURL.appendingPathComponent("b.md")
+        let rootAuthority = try XCTUnwrap(appState.workspaceSearchRootAuthority)
+        let retainedLocation = try rootAuthority.canonicalizedLocation(forFileURL: retainedURL)
+        let retainedRead = try MarkdownFileStore().loadResult(at: retainedLocation)
+        let retainedSession = DocumentSession(
+            text: retainedText,
+            url: retainedLocation.fileURL,
+            fileKind: .markdown
+        )
+        let retainedSessionIdentity = ObjectIdentifier(retainedSession)
+        let retainedBinding = AnchoredWorkspaceSessionFileBinding(
+            location: retainedLocation,
+            identity: retainedRead.metadata.identity,
+            sha256Digest: retainedRead.sha256Digest
+        )
+        appState.adoptAnchoredFileBinding(retainedBinding, for: retainedSession)
+        switch storage {
+        case .cached:
+            appState.sessionCache[retainedLocation.fileURL] = retainedSession
+        case .retired:
+            appState.retiredEditorDocumentSessions[retainedLocation.fileURL] =
+                RetiredEditorDocumentSession(
+                    canonicalURL: retainedLocation.fileURL,
+                    session: retainedSession,
+                    bindingIDs: [],
+                    awaitingInstallations: [],
+                    securityScopedAuthorityOwners: []
+                )
+        }
+
+        appState.handleExternalChange(for: retainedSession)
+        try await waitUntil("older retained B inspection starts") { reader.requestCount == 1 }
+        let olderInspection = try XCTUnwrap(
+            appState.externalDiskInspectionTasks[retainedSessionIdentity]
+        )
+        let olderGeneration = olderInspection.diskEventGeneration
+
+        try FileManager.default.removeItem(at: retainedURL)
+        try FileManager.default.linkItem(at: ownerURL, to: retainedURL)
+        let ownerIdentity = try regularIdentity(at: ownerURL)
+        XCTAssertEqual(try regularIdentity(at: retainedURL), ownerIdentity)
+        XCTAssertNotEqual(ownerIdentity, retainedBinding.identity)
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("hard-link replacement search starts") {
+            provider.requests.count == 1
+        }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "b.md",
+            text: ownerText,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("hard-link replacement result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === ownerSession)
+        XCTAssertEqual(retainedSession.text, retainedText)
+        XCTAssertTrue(retainedSession.isDirty)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(retainedLocation.fileURL))
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: retainedSession),
+            retainedBinding
+        )
+        XCTAssertNil(appState.externalDiskInspectionTasks[retainedSessionIdentity])
+        XCTAssertTrue(olderInspection.task.isCancelled)
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: retainedSession),
+            olderGeneration + 1
+        )
+        XCTAssertNil(appState.pendingExternalTexts[retainedLocation.fileURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[retainedLocation.fileURL])
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertFalse(appState.canAutosave(session: retainedSession))
+        XCTAssertThrowsError(try appState.save(session: retainedSession))
+        switch storage {
+        case .cached:
+            XCTAssertTrue(appState.sessionCache[retainedLocation.fileURL] === retainedSession)
+        case .retired:
+            XCTAssertTrue(
+                appState.retiredEditorDocumentSessions[retainedLocation.fileURL]?.session ===
+                    retainedSession
+            )
+        }
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(
+                text: retainedText,
+                identity: retainedBinding.identity
+            ))
+        )
+        await olderInspection.task.value
+
+        XCTAssertEqual(retainedSession.text, retainedText)
+        XCTAssertTrue(retainedSession.isDirty)
+        XCTAssertTrue(appState.detachedSessionURLs.contains(retainedLocation.fileURL))
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: retainedSession),
+            retainedBinding
+        )
+        XCTAssertNil(appState.externalDiskInspectionTasks[retainedSessionIdentity])
+        XCTAssertNil(appState.pendingExternalTexts[retainedLocation.fileURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[retainedLocation.fileURL])
+        XCTAssertEqual(try String(contentsOf: retainedURL, encoding: .utf8), ownerText)
     }
 
     // swiftlint:disable:next function_body_length

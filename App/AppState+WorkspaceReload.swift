@@ -185,7 +185,8 @@ extension AppState {
                 file: preparedFile.file,
                 at: preparedFile.location,
                 metadata: preparedFile.metadata,
-                sha256Digest: preparedFile.sha256Digest
+                sha256Digest: preparedFile.sha256Digest,
+                preparedImageAssetAuthority: preparedFile.preparedImageAssetAuthority
             )
         }
 

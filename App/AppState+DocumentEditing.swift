@@ -162,15 +162,18 @@ extension AppState {
             return nil
         }
 
-        let readResult = try fileStore.load(
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: fileStore,
             at: target.location,
             expecting: target.expectedIdentity
         )
+        let readResult = preparedRead.result
         let anchoredActivation = try prepareAnchoredFileSessionActivation(
             file: readResult.file,
             at: target.location,
             metadata: readResult.metadata,
-            sha256Digest: readResult.sha256Digest
+            sha256Digest: readResult.sha256Digest,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
         )
         var shouldFinishRejectedRetiredSession = switch anchoredActivation.source {
         case .retired:
@@ -183,16 +186,22 @@ extension AppState {
                 finishRetiredEditorDocumentSessionIfPossible(for: anchoredActivation.session)
             }
         }
+        guard anchoredActivation.binding.identity == target.expectedIdentity else {
+            return nil
+        }
+        if hasConflictingPhysicalSessionOwnership(
+            target.expectedIdentity,
+            excluding: anchoredActivation.session
+        ) {
+            accountForReusableWorkspaceSearchPhysicalOwnershipCollision(
+                anchoredActivation
+            )
+            return nil
+        }
         supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
             anchoredActivation
         )
-        guard anchoredActivation.binding.identity == target.expectedIdentity,
-              !hasConflictingPhysicalSessionOwnership(
-                  target.expectedIdentity,
-                  excluding: anchoredActivation.session
-              ),
-              reconcileReusableWorkspaceSearchObservation(anchoredActivation)
-        else {
+        guard reconcileReusableWorkspaceSearchObservation(anchoredActivation) else {
             return nil
         }
 
@@ -248,7 +257,11 @@ extension AppState {
             ) else {
                 return false
             }
-            adoptAnchoredFileBinding(activation.binding, for: activation.session)
+            adoptAnchoredFileBinding(
+                activation.binding,
+                for: activation.session,
+                preparedImageAssetAuthority: activation.preparedImageAssetAuthority
+            )
             return true
         }
     }
@@ -261,6 +274,28 @@ extension AppState {
     ) {
         switch activation.source {
         case .cached, .retired:
+            supersedeExternalWorkAfterWorkspaceSearchObservation(
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            )
+        case .loaded:
+            break
+        }
+    }
+
+    /// A cached or retired B whose path now names an inode already owned by A cannot adopt
+    /// that observation. Treat the replacement as B losing its retained namespace, then
+    /// advance the disk-event fence so an older inspection cannot later restore stale state.
+    /// A newly loaded candidate owns no reusable state and remains transactionally invisible.
+    private func accountForReusableWorkspaceSearchPhysicalOwnershipCollision(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) {
+        switch activation.source {
+        case .cached, .retired:
+            markSessionDetachedFromMissingFile(
+                activation.session,
+                url: activation.canonicalURL
+            )
             supersedeExternalWorkAfterWorkspaceSearchObservation(
                 for: activation.session,
                 canonicalURL: activation.canonicalURL
@@ -304,7 +339,11 @@ extension AppState {
             )
             clearExternalChangeConflict(at: canonicalURL)
             detachedSessionURLs.remove(canonicalURL)
-            adoptAnchoredFileBinding(prepared.binding, for: session)
+            adoptAnchoredFileBinding(
+                prepared.binding,
+                for: session,
+                preparedImageAssetAuthority: prepared.preparedImageAssetAuthority
+            )
             recordKnownSessionDiskText(
                 prepared.file.text,
                 for: session,

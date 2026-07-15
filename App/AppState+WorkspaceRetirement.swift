@@ -220,6 +220,7 @@ private extension AppState {
             let sessionIdentity = ObjectIdentifier(session)
             anchoredSessionFileBindings[sessionIdentity] = nil
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+            discardEditorImageAssetDocumentAuthority(for: session)
             indeterminateSessionWrites[sessionIdentity] = nil
             indeterminateSessionWriteContexts[sessionIdentity] = nil
         }

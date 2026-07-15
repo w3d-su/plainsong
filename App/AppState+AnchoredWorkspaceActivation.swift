@@ -11,7 +11,8 @@ extension AppState {
         file: MarkdownFile,
         at location: WorkspaceFileSystemLocation,
         metadata: WorkspaceCoherentFileMetadata,
-        sha256Digest: String
+        sha256Digest: String,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
     ) throws -> PreparedAnchoredFileSessionActivation {
         let key = location.fileURL
         guard file.url == key else {
@@ -45,7 +46,8 @@ extension AppState {
                 file: file,
                 binding: binding,
                 session: cachedSession,
-                source: .cached
+                source: .cached,
+                preparedImageAssetAuthority: preparedImageAssetAuthority
             )
         }
 
@@ -64,7 +66,8 @@ extension AppState {
                 file: file,
                 binding: binding,
                 session: match.1.session,
-                source: .retired(canonicalURL: match.0)
+                source: .retired(canonicalURL: match.0),
+                preparedImageAssetAuthority: preparedImageAssetAuthority
             )
         }
 
@@ -78,7 +81,8 @@ extension AppState {
                 fileKind: file.fileKind,
                 isDirty: false
             ),
-            source: .loaded
+            source: .loaded,
+            preparedImageAssetAuthority: preparedImageAssetAuthority
         )
     }
 
@@ -110,7 +114,8 @@ extension AppState {
             location: activation.binding.location,
             file: activation.file,
             identity: activation.binding.identity,
-            sha256Digest: activation.binding.sha256Digest
+            sha256Digest: activation.binding.sha256Digest,
+            preparedImageAssetAuthority: activation.preparedImageAssetAuthority
         )
 
         switch activation.source {
@@ -127,7 +132,11 @@ extension AppState {
                 handleSessionAccess(url: key, isDirty: session.isDirty)
                 return
             }
-            adoptAnchoredFileBinding(activation.binding, for: session)
+            adoptAnchoredFileBinding(
+                activation.binding,
+                for: session,
+                preparedImageAssetAuthority: activation.preparedImageAssetAuthority
+            )
             handleSessionAccess(url: key, isDirty: session.isDirty)
 
         case let .retired(canonicalURL):
@@ -174,16 +183,18 @@ extension AppState {
         at location: WorkspaceFileSystemLocation,
         expecting expectedIdentity: WorkspaceFileSystemIdentity? = nil
     ) throws {
-        let result: MarkdownFileReadResult = if let expectedIdentity {
-            try fileStore.load(at: location, expecting: expectedIdentity)
-        } else {
-            try fileStore.loadResult(at: location)
-        }
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: fileStore,
+            at: location,
+            expecting: expectedIdentity
+        )
+        let result = preparedRead.result
         let activation = try prepareAnchoredFileSessionActivation(
             file: result.file,
             at: location,
             metadata: result.metadata,
-            sha256Digest: result.sha256Digest
+            sha256Digest: result.sha256Digest,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
         )
         commitAnchoredFileSessionActivation(activation)
     }
@@ -213,13 +224,18 @@ extension AppState {
                 let location = try rootAuthority.canonicalizedLocation(
                     forFileURL: candidateURL
                 )
-                let result = try fileStore.loadResult(at: location)
+                let preparedRead = try prepareEditorImageAssetDocumentRead(
+                    fileStore: fileStore,
+                    at: location
+                )
+                let result = preparedRead.result
                 try Task.checkCancellation()
                 return PreparedWorkspaceReloadFile(
                     location: location,
                     file: result.file,
                     metadata: result.metadata,
-                    sha256Digest: result.sha256Digest
+                    sha256Digest: result.sha256Digest,
+                    preparedImageAssetAuthority: preparedRead.preparedAuthority
                 )
             }
             defer { group.cancelAll() }
@@ -251,7 +267,8 @@ extension AppState {
             location: activation.binding.location,
             file: activation.file,
             identity: activation.binding.identity,
-            sha256Digest: activation.binding.sha256Digest
+            sha256Digest: activation.binding.sha256Digest,
+            preparedImageAssetAuthority: activation.preparedImageAssetAuthority
         )
         if reconcilesExternalChange {
             guard reconcileObservedRetainedFileVersion(
@@ -264,7 +281,11 @@ extension AppState {
             }
             clearMissingFileActivationFence(at: key)
         }
-        adoptAnchoredFileBinding(activation.binding, for: session)
+        adoptAnchoredFileBinding(
+            activation.binding,
+            for: session,
+            preparedImageAssetAuthority: activation.preparedImageAssetAuthority
+        )
         handleSessionAccess(url: key, isDirty: session.isDirty)
         return true
     }
@@ -353,9 +374,14 @@ extension AppState {
     ) {
         let key = binding.location.fileURL
         do {
-            let observation = try ObservedRetainedFileVersion(
+            let preparedRead = try prepareEditorImageAssetDocumentRead(
+                fileStore: fileStore,
+                at: binding.location
+            )
+            let observation = ObservedRetainedFileVersion(
                 location: binding.location,
-                result: fileStore.loadResult(at: binding.location)
+                result: preparedRead.result,
+                preparedImageAssetAuthority: preparedRead.preparedAuthority
             )
             let changed = observedRetainedFileVersionDiffers(observation, for: session)
             guard reconcileObservedRetainedFileVersion(
@@ -372,7 +398,8 @@ extension AppState {
                         identity: observation.identity,
                         sha256Digest: observation.sha256Digest
                     ),
-                    for: session
+                    for: session,
+                    preparedImageAssetAuthority: observation.preparedImageAssetAuthority
                 )
             }
         } catch WorkspaceAnchoredFileSystemError.missing {
@@ -395,6 +422,7 @@ struct PreparedAnchoredFileSessionActivation {
     let binding: AnchoredWorkspaceSessionFileBinding
     let session: DocumentSession
     let source: Source
+    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
 }
 
 struct PreparedWorkspaceReloadFile {
@@ -402,6 +430,7 @@ struct PreparedWorkspaceReloadFile {
     let file: MarkdownFile
     let metadata: WorkspaceCoherentFileMetadata
     let sha256Digest: String
+    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
 }
 
 struct AnchoredWorkspaceSessionFileBinding: Equatable {

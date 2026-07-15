@@ -271,7 +271,21 @@ extension AppState {
             return
         }
 
-        let loaded = try fileStore.loadResult(at: location)
+        let loadLocation = if let installedAuthority = workspaceSearchRootAuthority,
+                              workspaceInstalledCaptureGeneration == workspaceGeneration,
+                              let installedLocation = try? installedAuthority.canonicalizedLocation(
+                                  forFileURL: requestedURL
+                              )
+        {
+            installedLocation
+        } else {
+            location
+        }
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: fileStore,
+            at: loadLocation
+        )
+        let loaded = preparedRead.result
         let file = loaded.file
         let session = DocumentSession(
             text: file.text,
@@ -282,9 +296,10 @@ extension AppState {
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
         retainUnanchoredManagedSessionOwnership(
             for: session,
-            location: location,
+            location: loadLocation,
             identity: loaded.metadata.identity,
-            sha256Digest: loaded.sha256Digest
+            sha256Digest: loaded.sha256Digest,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
         )
         sessionCache[key] = session
         detachedSessionURLs.remove(key)
@@ -382,12 +397,22 @@ extension AppState {
             cleanupResult = result.cleanupState == .none ? nil : result
             indeterminateSessionWrites[sessionIdentity] = nil
             indeterminateSessionWriteContexts[sessionIdentity] = nil
-            anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
-                location: writeContext.location,
-                identity: result.metadata.identity,
-                sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+            let preparedImageAssetAuthority =
+                rebindEditorImageAssetDocumentAuthorityAfterSave(
+                    for: session,
+                    location: writeContext.location,
+                    replacing: writeContext.expectedIdentity,
+                    with: result.metadata.identity
+                )
+            adoptAnchoredFileBinding(
+                AnchoredWorkspaceSessionFileBinding(
+                    location: writeContext.location,
+                    identity: result.metadata.identity,
+                    sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+                ),
+                for: session,
+                preparedImageAssetAuthority: preparedImageAssetAuthority
             )
-            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
         case let .notCommitted(result):
             handleExternalWritePreconditionFailure(result, for: session)
             throw notCommittedFileWriteError(result, destinationURL: destination)
@@ -495,14 +520,25 @@ extension AppState {
         destinationURL: URL
     ) {
         guard result.cleanupState != .none else { return }
-        retainFileWriteArtifactNotice(
-            destinationURL: destinationURL,
-            destinationWasCommitted: true,
-            artifactState: result.cleanupState
+        retainCommittedFileWriteCleanupNotice(
+            result,
+            destinationURL: destinationURL
         )
         present(
             MarkdownFileStoreError.committedWithCleanupRequired(destinationURL, result),
             title: "File Saved; Cleanup Required"
+        )
+    }
+
+    func retainCommittedFileWriteCleanupNotice(
+        _ result: WorkspaceDurableFileWrite,
+        destinationURL: URL
+    ) {
+        guard result.cleanupState != .none else { return }
+        retainFileWriteArtifactNotice(
+            destinationURL: destinationURL,
+            destinationWasCommitted: true,
+            artifactState: result.cleanupState
         )
     }
 

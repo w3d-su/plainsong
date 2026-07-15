@@ -242,6 +242,11 @@ final class AppState: ObservableObject {
     /// `.unavailable` is a durable fail-closed proof state, never permission to re-inspect a URL.
     var unanchoredManagedSessionOwnershipProofs:
         [ObjectIdentifier: UnanchoredManagedSessionOwnershipProof] = [:]
+    /// Descriptor-bound image placement authority cached for the exact retained document
+    /// binding. SwiftUI reads only this cache; opening and validating the namespace never
+    /// happens while evaluating `DocumentEditor.body`.
+    var editorImageAssetDocumentAuthorities:
+        [ObjectIdentifier: RetainedEditorImageAssetDocumentAuthority] = [:]
     /// A typed indeterminate commit must be reconciled before this session can write again.
     var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:]
     /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
@@ -472,7 +477,28 @@ extension AppState {
     }
 
     func present(_ error: Error, title: String) {
-        presentedError = UserVisibleError(title: title, message: error.localizedDescription)
+        presentedError = UserVisibleError(
+            title: title,
+            message: userVisibleDescription(for: error)
+        )
+    }
+
+    private func userVisibleDescription(for error: Error) -> String {
+        guard case let MarkdownFileStoreError.writeRequiresReconciliation(url, result) = error
+        else {
+            return error.localizedDescription
+        }
+
+        let reconciliation =
+            "\(url.lastPathComponent) may already contain the new bytes and must be reconciled."
+        return switch result.recoveryArtifact {
+        case .none:
+            reconciliation
+        case let .retained(location):
+            "\(reconciliation) A recovery artifact was retained at \(location.fileURL.path)."
+        case let .removalIndeterminate(location):
+            "\(reconciliation) Removal of the recovery artifact at \(location.fileURL.path) could not be confirmed."
+        }
     }
 
     func observeCurrentDocument() {
@@ -738,6 +764,7 @@ struct PendingExternalReloadApplication {
     let session: DocumentSession
     let canonicalURL: URL
     let payload: ExternalReloadApplicationPayload
+    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
     let acceptedSourceSnapshot: EditorDocumentSourceSnapshot
     let intent: DeferredExternalChangeResolution
     var synchronizedInstallations: Set<EditorDocumentBindingInstallation>

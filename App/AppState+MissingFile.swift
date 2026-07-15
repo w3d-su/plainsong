@@ -141,14 +141,20 @@ extension AppState {
             at: saveCopyLocation,
             excluding: session
         )
+        let destinationImageAssetAuthority =
+            try prepareEditorImageAssetDocumentDestinationAuthority(
+                at: saveCopyLocation
+            )
 
         let anchoredBinding: AnchoredWorkspaceSessionFileBinding
+        let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority
         let cleanupResult: WorkspaceDurableFileWrite?
         let expectation = try workspaceSaveCopyExpectation(
             for: session,
             at: saveCopyLocation,
             initialInspection: saveCopyInspection
         )
+        try destinationImageAssetAuthority.validateParentNamespaceBinding()
         let outcome = try performAnchoredFileSave(
             text: text,
             at: saveCopyLocation,
@@ -157,6 +163,15 @@ extension AppState {
         switch outcome {
         case let .committedAndDurable(result):
             cleanupResult = result.cleanupState == .none ? nil : result
+            preparedImageAssetAuthority = try bindCommittedSaveCopyAuthorityOrQuarantine(
+                destinationAuthority: destinationImageAssetAuthority,
+                durableResult: result,
+                session: session,
+                text: text,
+                oldURL: oldURL,
+                location: saveCopyLocation,
+                retirement: retirement
+            )
             anchoredBinding = AnchoredWorkspaceSessionFileBinding(
                 location: saveCopyLocation,
                 identity: result.metadata.identity,
@@ -176,36 +191,98 @@ extension AppState {
             throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
         }
 
-        clearSessionState(
-            for: session,
-            fallbackURL: oldURL,
-            removesEditorBindingRegistration: false
-        )
-        rehomeRetirement(
-            retirement,
+        completeDetachedSaveCopy(CompletedDetachedSaveCopy(
             session: session,
-            from: oldURL,
-            to: destination
-        )
-        _ = advanceSessionLifecycle(for: session)
-        session.markSaved(text: text, url: destination)
-        sessionCache[destination] = session
-        anchoredSessionFileBindings[sessionIdentity] = anchoredBinding
-        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
-        lastKnownDiskHashes[destination] = Self.contentHash(text)
-        lastKnownDiskModificationDates[destination] = nil
-        handleSessionAccess(url: destination, isDirty: false)
-        rememberRecentItem(destination)
-        restoreRecoveryPrompt(for: session)
-        finishRetiredEditorDocumentSessionIfPossible(for: session)
-        if let cleanupResult {
-            presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
-        }
+            text: text,
+            oldURL: oldURL,
+            retirement: retirement,
+            binding: anchoredBinding,
+            preparedImageAssetAuthority: preparedImageAssetAuthority,
+            cleanupResult: cleanupResult
+        ))
     }
+}
+
+private struct CompletedDetachedSaveCopy {
+    let session: DocumentSession
+    let text: String
+    let oldURL: URL
+    let retirement: RetiredEditorDocumentSession?
+    let binding: AnchoredWorkspaceSessionFileBinding
+    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority
+    let cleanupResult: WorkspaceDurableFileWrite?
 }
 
 @MainActor
 private extension AppState {
+    func bindCommittedSaveCopyAuthorityOrQuarantine(
+        destinationAuthority: PreparedImageAssetDestinationAuthority,
+        durableResult: WorkspaceDurableFileWrite,
+        session: DocumentSession,
+        text: String,
+        oldURL: URL,
+        location: WorkspaceFileSystemLocation,
+        retirement: RetiredEditorDocumentSession?
+    ) throws -> PreparedEditorImageAssetDocumentAuthority {
+        do {
+            return try destinationAuthority.bindWrittenDocument(
+                expectedIdentity: durableResult.metadata.identity
+            )
+        } catch {
+            let result = WorkspaceIndeterminateFileWrite(
+                reason: (error as? WorkspaceAnchoredFileSystemError) ?? .namespaceChanged,
+                preparedMetadata: durableResult.metadata,
+                recoveryArtifact: durableResult.cleanupState
+            )
+            retainCommittedFileWriteCleanupNotice(
+                durableResult,
+                destinationURL: location.fileURL
+            )
+            quarantineIndeterminateSaveCopy(
+                session: session,
+                text: text,
+                oldURL: oldURL,
+                location: location,
+                result: result,
+                retirement: retirement
+            )
+            throw MarkdownFileStoreError.writeRequiresReconciliation(location.fileURL, result)
+        }
+    }
+
+    func completeDetachedSaveCopy(_ completed: CompletedDetachedSaveCopy) {
+        let destination = completed.binding.location.fileURL
+        clearSessionState(
+            for: completed.session,
+            fallbackURL: completed.oldURL,
+            removesEditorBindingRegistration: false
+        )
+        rehomeRetirement(
+            completed.retirement,
+            session: completed.session,
+            from: completed.oldURL,
+            to: destination
+        )
+        _ = advanceSessionLifecycle(for: completed.session)
+        completed.session.markSaved(text: completed.text, url: destination)
+        sessionCache[destination] = completed.session
+        adoptAnchoredFileBinding(
+            completed.binding,
+            for: completed.session,
+            preparedImageAssetAuthority: completed.preparedImageAssetAuthority,
+            allowsImageAssetAuthorityBootstrap: true
+        )
+        lastKnownDiskHashes[destination] = Self.contentHash(completed.text)
+        lastKnownDiskModificationDates[destination] = nil
+        handleSessionAccess(url: destination, isDirty: false)
+        rememberRecentItem(destination)
+        restoreRecoveryPrompt(for: completed.session)
+        finishRetiredEditorDocumentSessionIfPossible(for: completed.session)
+        if let cleanupResult = completed.cleanupResult {
+            presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
+        }
+    }
+
     func validatedRetirementForSaveCopy(
         session: DocumentSession,
         oldURL: URL

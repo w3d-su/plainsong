@@ -142,6 +142,7 @@ extension AppState {
         let sessionIdentity = ObjectIdentifier(session)
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
         removeEditorDocumentBindingRegistration(for: session)
@@ -344,6 +345,9 @@ extension AppState {
         unanchoredManagedSessionOwnershipProofs = unanchoredManagedSessionOwnershipProofs.filter {
             retainedSessionIdentities.contains($0.key)
         }
+        editorImageAssetDocumentAuthorities = editorImageAssetDocumentAuthorities.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
         indeterminateSessionWrites = indeterminateSessionWrites.filter {
             retainedSessionIdentities.contains($0.key)
         }
@@ -458,6 +462,7 @@ private extension AppState {
         cancelAutosave(for: session)
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
         sessionCache[eviction.url] = nil

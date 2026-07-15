@@ -61,6 +61,85 @@ final class EditorProgrammaticWriterActivationTests: XCTestCase {
         XCTAssertEqual(gate.discardCount, 0)
     }
 
+    func testImageInsertionHoldsWriterLeaseThroughPlacementCommitValidation() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        let gate = ImagePlacementValidationGate()
+        scenario.first.coordinator.updateImageAssetInserter { _ in
+            EditorImageAssetInsertion(
+                relativePaths: ["assets/first.png"],
+                validateBeforeCommit: {
+                    await gate.validate()
+                },
+                discard: {
+                    gate.discardCount += 1
+                }
+            )
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/first.png")]
+        ), true)
+        try await waitForPlacementValidationInvocation(gate)
+        XCTAssertEqual(scenario.model.pendingWriterInstallations, [scenario.firstInstallation])
+
+        requestRejectedImageInsertion(in: scenario)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(scenario.model.imageInserterInvocationCount, 0)
+        XCTAssertEqual(scenario.model.activeWriterInstallation, scenario.firstInstallation)
+
+        gate.resume(isValid: false)
+        try await waitForPlacementValidationDiscard(gate)
+
+        XCTAssertEqual(scenario.model.source, "Stale source")
+        XCTAssertEqual(Self.text(in: scenario.first.textView), "Stale source")
+        XCTAssertTrue(scenario.model.publications.isEmpty)
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+        XCTAssertEqual(scenario.model.activeWriterInstallation, scenario.firstInstallation)
+    }
+
+    func testImageInsertionRechecksContextAfterPlacementCommitValidation() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        let gate = ImagePlacementValidationGate()
+        scenario.first.coordinator.updateImageAssetContextID("file-a")
+        scenario.first.coordinator.updateImageAssetInserter { _ in
+            EditorImageAssetInsertion(
+                relativePaths: ["assets/first.png"],
+                validateBeforeCommit: {
+                    await gate.validate()
+                },
+                discard: {
+                    gate.discardCount += 1
+                }
+            )
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/first.png")]
+        ), true)
+        try await waitForPlacementValidationInvocation(gate)
+        scenario.first.coordinator.updateImageAssetContextID("file-b")
+
+        gate.resume(isValid: true)
+        try await waitForPlacementValidationDiscard(gate)
+
+        XCTAssertEqual(scenario.model.source, "Stale source")
+        XCTAssertEqual(Self.text(in: scenario.first.textView), "Stale source")
+        XCTAssertTrue(scenario.model.publications.isEmpty)
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+    }
+
     func testDismantledImageInsertionDiscardsPlacedAsset() async throws {
         let scenario = try makeScenario(firstWriterIsPending: false)
         var didDismantleFirst = false
@@ -143,9 +222,12 @@ final class EditorProgrammaticWriterActivationTests: XCTestCase {
         }
         scenario.model.rejectNextPublication = true
         scenario.first.coordinator.updateImageAssetInserter { _ in
-            EditorImageAssetInsertion(relativePaths: ["assets/rejected.png"]) {
-                scenario.model.imageDiscardCount += 1
-            }
+            EditorImageAssetInsertion(
+                relativePaths: ["assets/rejected.png"],
+                discard: {
+                    scenario.model.imageDiscardCount += 1
+                }
+            )
         }
         scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
 
@@ -451,6 +533,26 @@ private extension EditorProgrammaticWriterActivationTests {
         XCTAssertEqual(model.imageDiscardCount, expected)
     }
 
+    func waitForPlacementValidationInvocation(
+        _ gate: ImagePlacementValidationGate
+    ) async throws {
+        for _ in 0 ..< 20 {
+            if gate.invocationCount == 1 { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(gate.invocationCount, 1)
+    }
+
+    func waitForPlacementValidationDiscard(
+        _ gate: ImagePlacementValidationGate
+    ) async throws {
+        for _ in 0 ..< 20 {
+            if gate.discardCount == 1 { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(gate.discardCount, 1)
+    }
+
     static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
@@ -479,10 +581,30 @@ private final class ImageInsertionGate {
 
     func resume(relativePaths: [String]) {
         continuation?.resume(returning: EditorImageAssetInsertion(
-            relativePaths: relativePaths
-        ) { [weak self] in
-            self?.discardCount += 1
-        })
+            relativePaths: relativePaths,
+            discard: { [weak self] in
+                self?.discardCount += 1
+            }
+        ))
+        continuation = nil
+    }
+}
+
+@MainActor
+private final class ImagePlacementValidationGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private(set) var invocationCount = 0
+    var discardCount = 0
+
+    func validate() async -> Bool {
+        invocationCount += 1
+        return await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func resume(isValid: Bool) {
+        continuation?.resume(returning: isValid)
         continuation = nil
     }
 }
