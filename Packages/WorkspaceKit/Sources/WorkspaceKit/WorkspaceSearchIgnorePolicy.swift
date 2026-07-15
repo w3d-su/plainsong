@@ -63,7 +63,7 @@ struct WorkspaceSearchIgnorePolicy {
     }
 
     private static func ancestorDirectories(for paths: [String]) -> [String] {
-        var directories: Set = [""]
+        var directories = [WorkspacePathByteKey(""): ""]
         for path in paths {
             let components = path.split(separator: "/", omittingEmptySubsequences: true)
             guard components.count > 1 else { continue }
@@ -71,14 +71,16 @@ struct WorkspaceSearchIgnorePolicy {
             var directory = ""
             for component in components.dropLast() {
                 directory = directory.isEmpty ? String(component) : "\(directory)/\(component)"
-                directories.insert(directory)
+                directories[WorkspacePathByteKey(directory)] = directory
             }
         }
 
-        return directories.sorted { first, second in
+        return directories.values.sorted { first, second in
             let firstDepth = first.split(separator: "/", omittingEmptySubsequences: true).count
             let secondDepth = second.split(separator: "/", omittingEmptySubsequences: true).count
-            return firstDepth == secondDepth ? first < second : firstDepth < secondDepth
+            return firstDepth == secondDepth
+                ? WorkspacePathByteKey(first) < WorkspacePathByteKey(second)
+                : firstDepth < secondDepth
         }
     }
 
@@ -128,8 +130,9 @@ private struct WorkspaceSearchIgnoreRule {
 
     private func pathRelativeToBase(_ relativePath: String) -> String? {
         guard !baseDirectory.isEmpty else { return relativePath }
-        guard relativePath.hasPrefix("\(baseDirectory)/") else { return nil }
-        return String(relativePath.dropFirst(baseDirectory.count + 1))
+        let prefix = "\(baseDirectory)/"
+        guard relativePath.utf8.starts(with: prefix.utf8) else { return nil }
+        return String(relativePath.dropFirst(prefix.count))
     }
 
     private func directoryPrefixes(of path: String) -> [String] {

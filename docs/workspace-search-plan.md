@@ -206,8 +206,8 @@ A request should contain only immutable, Sendable data:
 - a root identity string plus workspace/query generations used only as App lifecycle tokens,
   never as filesystem authority;
 - query and configurable limits;
-- a validated `WorkspaceSearchOverlayCollection` containing canonical relative paths and
-  immutable unsaved text.
+- a validated `WorkspaceSearchOverlayCollection` containing normalized relative paths,
+  indexed by their exact UTF-8 bytes, and immutable unsaved text.
 
 The service emits partial per-file results and a final summary. Result application is valid
 only when root identity, workspace generation, and query generation still match the active
@@ -256,11 +256,14 @@ version is retained by the WS2 result model. If a disk file changes after the sn
 before its read, its result fingerprints the newly read and searched content.
 
 Dirty overlays are validated before a request is built. `WorkspaceSearchOverlay` rejects
-empty, absolute, and traversing paths and stores a canonical workspace-relative path.
+empty, absolute, and traversing paths and stores a normalized workspace-relative path.
 `WorkspaceSearchOverlayCollection` rejects dictionary key/path mismatches and rejects every
-normalized collision instead of choosing a winner by input or dictionary iteration order;
-for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
-take precedence over disk content. An anchored dirty session is eligible only when its retained
+exact-byte normalized collision instead of choosing a winner by input or dictionary iteration
+order; for example, `post.md` and `./post.md` cannot coexist. Canonically equivalent NFC and
+NFD spellings remain separate UTF-8 path keys, so an overlay can neither replace nor be applied
+to the other spelling. Valid overlays continue to take precedence over disk content. Candidate
+deduplication, ignore-file ancestor enumeration, and deterministic path ordering use the same
+byte-exact key. An anchored dirty session is eligible only when its retained
 root authority equals the installed authority used for the request; moving root A and placing B
 at the old spelling cannot inject a cached A session's dirty text into B's search.
 
@@ -271,7 +274,7 @@ outside-root target remains a typed `symlinkEscape`. Once the canonical path is 
 request's captured root authority, production reads never resolve the alias or another mutable
 URL again. Every component is opened no-follow through retained descriptors, so a symlink,
 rename, or replacement introduced after planning fails closed. Dirty overlays use the same
-canonical candidate key and are accepted only after the exact physical leaf is validated.
+byte-exact normalized candidate key and are accepted only after the exact physical leaf is validated.
 Candidate, skipped, progress, and terminal counts remain internally consistent.
 
 Search reads must:
@@ -352,6 +355,10 @@ The sidebar gains two modes inside the existing stable shell:
 - **Files** preserves the current tree, file information, and frontmatter panel.
 - **Search** presents the field, case/word controls, progress, grouped results, and
   summary/error states.
+
+Files-tree parent grouping and default-filter ancestor visibility use UTF-8 byte keys. If a
+snapshot entry has no resource identity, its fallback node ID is a namespaced ASCII hex encoding
+of the exact relative-path bytes, so NFC/NFD directories neither share children nor expansion IDs.
 
 `Command-Shift-F` selects Search mode and increments a search-focus request token.
 `Command-F` remains the focused editor's single-file find action. Keyboard selection and
@@ -437,7 +444,11 @@ External-change conflicts are session-scoped by the canonical URL entry in
 `save(session:)` reject that exact session even while another document is current. LRU
 eviction, workspace retirement, and close paths retain or block on the dirty conflict rather
 than overwriting disk or silently dropping the session. Reload restores the external text as
-clean; Keep Mine clears the conflict and restores save/autosave eligibility. Binding
+clean; Keep Mine performs and adopts a fresh observation, accepts the latest observed version
+(for example C after an earlier B prompt), clears matching conflict, detached, and missing-file
+fences, and restores save/autosave eligibility. If a clean quarantined session's local source
+differs byte-for-byte from that observation, Keep Mine marks both the session and its LRU record
+dirty before scheduling autosave, so the UI cannot claim a false clean state. Binding
 registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
@@ -468,7 +479,9 @@ and SHA-256 digest before adopting anything. mtime, FNV, URL recapture, and a ca
 hit do not authorize a proof replacement. For a dirty session, any unaccepted identity or byte
 change (including a same-inode rewrite) enters the session conflict, cancels autosave, and keeps
 the prior proof intact; only an explicit Reload or Keep Mine performs a fresh read and adopts the
-accepted observation. The rule is identical for anchored and standalone sessions.
+accepted observation. Keep Mine resolves against that newest observation rather than retaining a
+stale B proof when the file has advanced to C. The rule is identical for anchored and standalone
+sessions, including delete/recreate recovery.
 A stateful retained A session (pending conflict, detachment, or indeterminate context) also blocks
 a replacement-parent B at the same lexical URL until A is resolved; B cannot inherit or clear A's
 URL-keyed fence merely by reusing its spelling.
@@ -492,7 +505,10 @@ differently spelled or broad Save Copy retry is refused before writer entry, and
 fallback is allowed.
 Root capture, `relativePath(forFileURL:)`, standalone capture, recovery, and LRU keys preserve
 literal UTF-8 path bytes rather than round-tripping through `standardizedFileURL`; only
-separator/dot traversal normalization remains. Non-file URLs and NUL-bearing raw paths are
+separator/dot traversal normalization remains. When both canonical and original root spellings
+are exact-byte prefixes, relative-path extraction chooses the longest component prefix, so an
+original symlink nested under the canonical root is not retained as a false path component.
+Non-file URLs and NUL-bearing raw paths are
 rejected before any C-string filesystem call. A descriptor-derived canonical parent may unify an
 alias cache key, but it does not alter an NFC leaf: an exact missing-source Save Copy reuses that
 retained NFC authority/location, while an NFD alternative remains non-exact and is refused.
@@ -562,6 +578,8 @@ pending.
   file results, final progress, and terminal state.
 - [x] Validate dirty overlays deterministically, rejecting invalid paths, key/path
   mismatches, and normalized collisions before search.
+- [x] Keep candidate, overlay, and ignore-ancestor path identity byte-exact so NFC/NFD
+  spellings remain independently searchable.
 
 ### WS3 — Sidebar and exact navigation
 
@@ -600,9 +618,9 @@ pending.
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
+| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; byte-distinct NFC/NFD synthetic candidates, overlays, ignore ancestors, file-tree grouping/filtering/fallback IDs, and longest matching root spelling; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; anchored and standalone delete/recreate Keep Mine detached-fence recovery; clean-quarantine Keep Mine exact-byte dirty/LRU restoration; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

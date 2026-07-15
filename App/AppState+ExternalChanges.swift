@@ -67,14 +67,18 @@ extension AppState {
 
         // Keeping local edits is still an explicit resolution, but it may only authorize the
         // next write after a fresh observation of the retained location has supplied its exact
-        // identity and SHA-256. If the file changed again while the prompt was open, retain the
-        // conflict instead of allowing stale local content to overwrite it.
+        // identity and SHA-256. If the file changed from B to C while the prompt was open, resolve
+        // against C rather than authorizing local content with B's stale proof.
         guard let observation = try? observeRetainedFileVersion(for: currentDocument),
               exactFileURLSpellingMatches(observation.location.fileURL, key),
               adoptObservedRetainedFileVersion(observation, for: currentDocument)
         else {
             return
         }
+        let localTextDiffersFromObservedDisk = !ExactSourceText.matches(
+            currentDocument.text,
+            observation.file.text
+        )
         recordKnownSessionDiskText(
             observation.file.text,
             for: currentDocument,
@@ -84,6 +88,21 @@ extension AppState {
         indeterminateSessionWrites[ObjectIdentifier(currentDocument)] = nil
         indeterminateSessionWriteContexts[ObjectIdentifier(currentDocument)] = nil
         indeterminateFileWriteReconciliationPrompt = nil
+        detachedSessionURLs.remove(key)
+        if let prompt = missingFilePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
+            missingFilePrompt = nil
+        }
+        if localTextDiffersFromObservedDisk, !currentDocument.isDirty {
+            currentDocument.reset(
+                text: currentDocument.text,
+                url: currentDocument.fileURL,
+                fileKind: currentDocument.fileKind,
+                isDirty: true
+            )
+        }
+        sessionPolicy.updateDirtyState(for: key, isDirty: currentDocument.isDirty)
         externalChangePrompt = nil
         scheduleAutosave(for: currentDocument)
         finishRetiredEditorDocumentBindingsIfPossible(for: currentDocument)

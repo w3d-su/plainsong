@@ -88,6 +88,41 @@ final class WorkspaceLiteralSpellingTests: XCTestCase {
         )
     }
 
+    func testRelativePathPrefersLongestMatchingOriginalRootSpelling() throws {
+        let temporaryParent = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: temporaryParent) }
+        let parentAuthority = try WorkspaceFileSystemRootAuthority(rootURL: temporaryParent)
+        let canonicalRoot = parentAuthority.canonicalRootURL
+            .appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: canonicalRoot,
+            withIntermediateDirectories: false
+        )
+        let originalRoot = canonicalRoot.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(
+            at: originalRoot,
+            withDestinationURL: canonicalRoot
+        )
+        try "content".write(
+            to: canonicalRoot.appendingPathComponent("post.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: originalRoot)
+        let originalFileURL = WorkspaceLiteralFileURL.fileURL(
+            path: originalRoot.path(percentEncoded: false) + "/post.md",
+            isDirectory: false
+        )
+
+        XCTAssertTrue(
+            WorkspaceLiteralFileURL.pathBytesMatch(authority.canonicalRootURL, canonicalRoot)
+        )
+        let relativePath = try authority.relativePath(forFileURL: originalFileURL)
+        XCTAssertEqual(relativePath, "post.md")
+        let location = try authority.location(relativePath: relativePath)
+        _ = try WorkspaceAnchoredFileSystem.validate(location)
+    }
+
     func testLocationFileURLInitRoundTripsRetainedNFCSpellingExactly() throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

@@ -3,6 +3,8 @@ import MarkdownCore
 @testable import WorkspaceKit
 import XCTest
 
+// swiftlint:disable file_length
+
 private struct WorkspaceSearchFingerprintVector {
     let text: String
     let digest: String
@@ -269,10 +271,131 @@ extension WorkspaceSearchContractTests {
         XCTAssertEqual(diskReadCount, 0)
     }
 
+    func testSyntheticCanonicalEquivalentSnapshotPathsRemainDistinctCandidates() async throws {
+        let root = try makeTemporaryDirectory()
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+        let request = try makeRequest(
+            root: root,
+            entries: [entry(nfcPath), entry(nfdPath)],
+            limits: WorkspaceSearchLimits(maximumIgnoreFiles: 0)
+        )
+
+        let plan = try await WorkspaceSearchCandidatePlanner.makePlan(
+            request: request,
+            reader: MissingContractReader()
+        )
+        let candidatePaths = plan.items.compactMap { item -> String? in
+            guard case let .candidate(_, candidate) = item else { return nil }
+            return candidate.relativePath
+        }
+        let expectedPaths = [nfcPath, nfdPath].sorted {
+            WorkspacePathByteKey($0) < WorkspacePathByteKey($1)
+        }
+
+        XCTAssertEqual(plan.candidateFileCount, 2)
+        XCTAssertEqual(
+            candidatePaths.map { WorkspacePathByteKey($0).bytes },
+            expectedPaths.map { WorkspacePathByteKey($0).bytes }
+        )
+    }
+
+    func testCanonicalEquivalentOverlayPathsUseDistinctByteKeys() throws {
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+        let overlays = try WorkspaceSearchOverlayCollection([
+            WorkspaceSearchOverlay(relativePath: nfcPath, text: "NFC overlay"),
+            WorkspaceSearchOverlay(relativePath: nfdPath, text: "NFD overlay"),
+        ])
+        let expectedPaths = [nfcPath, nfdPath].sorted {
+            WorkspacePathByteKey($0) < WorkspacePathByteKey($1)
+        }
+
+        XCTAssertEqual(
+            overlays.overlays.map { WorkspacePathByteKey($0.relativePath).bytes },
+            expectedPaths.map { WorkspacePathByteKey($0).bytes }
+        )
+        XCTAssertEqual(overlays[nfcPath]?.text, "NFC overlay")
+        XCTAssertEqual(overlays[nfdPath]?.text, "NFD overlay")
+    }
+
+    func testLegacyOverlayKeyRequiresByteExactValuePath() throws {
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+        let overlay = try WorkspaceSearchOverlay(relativePath: nfcPath, text: "needle")
+
+        XCTAssertThrowsError(
+            try WorkspaceSearchOverlayCollection(validating: [nfdPath: overlay])
+        ) { error in
+            guard case let .keyPathMismatch(key, overlayRelativePath) =
+                error as? WorkspaceSearchOverlayValidationError
+            else {
+                return XCTFail("expected a byte-exact key/path mismatch, got \(error)")
+            }
+            XCTAssertEqual(WorkspacePathByteKey(key).bytes, WorkspacePathByteKey(nfdPath).bytes)
+            XCTAssertEqual(
+                WorkspacePathByteKey(overlayRelativePath).bytes,
+                WorkspacePathByteKey(nfcPath).bytes
+            )
+        }
+    }
+
+    func testSyntheticCandidateDoesNotBorrowCanonicalEquivalentOverlay() async throws {
+        let root = try makeTemporaryDirectory()
+        let nfcPath = "caf\u{00E9}.md"
+        let nfdPath = "cafe\u{0301}.md"
+
+        for (candidatePath, overlayPath) in [(nfcPath, nfdPath), (nfdPath, nfcPath)] {
+            let overlays = try WorkspaceSearchOverlayCollection([
+                WorkspaceSearchOverlay(relativePath: overlayPath, text: "wrong overlay"),
+            ])
+            let request = try makeRequest(
+                root: root,
+                entries: [entry(candidatePath)],
+                overlays: overlays,
+                limits: WorkspaceSearchLimits(maximumIgnoreFiles: 0)
+            )
+            let plan = try await WorkspaceSearchCandidatePlanner.makePlan(
+                request: request,
+                reader: MissingContractReader()
+            )
+            let candidates = plan.items.compactMap { item -> WorkspaceSearchCandidate? in
+                guard case let .candidate(_, candidate) = item else { return nil }
+                return candidate
+            }
+
+            XCTAssertEqual(candidates.count, 1)
+            XCTAssertNil(candidates.first?.overlay)
+        }
+    }
+
+    func testNestedIgnoreRuleDoesNotCrossCanonicalEquivalentDirectoryBytes() async throws {
+        let root = try makeTemporaryDirectory()
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let nfcDirectory = "caf\u{00E9}"
+        let nfdDirectory = "cafe\u{0301}"
+        let nfcCandidate = "\(nfcDirectory)/post.md"
+        let nfdCandidate = "\(nfdDirectory)/post.md"
+        let reader = ByteExactIgnoreReader(contents: [
+            WorkspacePathByteKey("\(nfcDirectory)/.gitignore"): Data("post.md\n".utf8),
+        ])
+
+        let policy = try await WorkspaceSearchIgnorePolicy.load(
+            rootAuthority: authority,
+            candidatePaths: [nfcCandidate, nfdCandidate],
+            limits: WorkspaceSearchLimits(),
+            reader: reader
+        )
+
+        XCTAssertTrue(policy.isIgnored(relativePath: nfcCandidate))
+        XCTAssertFalse(policy.isIgnored(relativePath: nfdCandidate))
+    }
+
     private func makeRequest(
         root: URL,
         entries: [WorkspaceFileSnapshot.Entry],
-        overlays: WorkspaceSearchOverlayCollection = .empty
+        overlays: WorkspaceSearchOverlayCollection = .empty,
+        limits: WorkspaceSearchLimits = .init()
     ) throws -> WorkspaceSearchRequest {
         try WorkspaceSearchRequest(
             rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
@@ -281,7 +404,8 @@ extension WorkspaceSearchContractTests {
             workspaceGeneration: 3,
             queryGeneration: 5,
             query: TextSearchQuery(pattern: "needle"),
-            dirtyOverlays: overlays
+            dirtyOverlays: overlays,
+            limits: limits
         )
     }
 
@@ -355,6 +479,24 @@ private actor FingerprintReader: SyntheticWorkspaceSearchFileReading {
 
     func readCount(for path: String) -> Int {
         readCounts[path, default: 0]
+    }
+}
+
+private struct ByteExactIgnoreReader: SyntheticWorkspaceSearchFileReading {
+    let contents: [WorkspacePathByteKey: Data]
+
+    func readFile(at _: URL, maximumByteCount _: Int) async throws -> Data {
+        throw WorkspaceSearchFileReadError.disappeared
+    }
+
+    func readFile(
+        at location: WorkspaceFileSystemLocation,
+        maximumByteCount: Int
+    ) async throws -> Data {
+        guard let data = contents[WorkspacePathByteKey(location.relativePath)] else {
+            throw WorkspaceSearchFileReadError.disappeared
+        }
+        return Data(data.prefix(maximumByteCount))
     }
 }
 

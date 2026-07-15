@@ -36,7 +36,7 @@ enum WorkspaceSearchCandidatePlanner {
         var invalidItems: [WorkspaceSearchCandidatePlanItem] = []
         var validEntries: [WorkspaceSearchCandidate] = []
         var hardIgnoredItems: [WorkspaceSearchCandidatePlanItem] = []
-        var seenCanonicalCandidatePaths: Set<String> = []
+        var seenCandidatePathKeys: Set<WorkspacePathByteKey> = []
 
         for entry in entries {
             switch try classify(entry, request: request) {
@@ -45,7 +45,7 @@ enum WorkspaceSearchCandidatePlanner {
             case let .hardIgnored(item):
                 hardIgnoredItems.append(item)
             case let .candidate(candidate):
-                if seenCanonicalCandidatePaths.insert(candidate.relativePath).inserted {
+                if seenCandidatePathKeys.insert(WorkspacePathByteKey(candidate.relativePath)).inserted {
                     validEntries.append(candidate)
                 }
             }
@@ -68,10 +68,7 @@ enum WorkspaceSearchCandidatePlanner {
                 items.append(.candidate(sortKey: candidate.relativePath, candidate: candidate))
             }
         }
-        items.sort { first, second in
-            first.sortKey == second.sortKey ? planItemRank(first) < planItemRank(second) : first.sortKey < second
-                .sortKey
-        }
+        items.sort(by: comparePlanItems)
 
         return WorkspaceSearchCandidatePlan(
             items: items,
@@ -147,8 +144,10 @@ enum WorkspaceSearchCandidatePlanner {
         _ first: WorkspaceFileSnapshot.Entry,
         _ second: WorkspaceFileSnapshot.Entry
     ) -> Bool {
-        if first.relativePath != second.relativePath {
-            return first.relativePath < second.relativePath
+        let firstPathKey = WorkspacePathByteKey(first.relativePath)
+        let secondPathKey = WorkspacePathByteKey(second.relativePath)
+        if firstPathKey != secondPathKey {
+            return firstPathKey < secondPathKey
         }
         return (first.identity ?? "") < (second.identity ?? "")
     }
@@ -162,6 +161,17 @@ enum WorkspaceSearchCandidatePlanner {
         case .ignored:
             2
         }
+    }
+
+    private static func comparePlanItems(
+        _ first: WorkspaceSearchCandidatePlanItem,
+        _ second: WorkspaceSearchCandidatePlanItem
+    ) -> Bool {
+        let firstPathKey = WorkspacePathByteKey(first.sortKey)
+        let secondPathKey = WorkspacePathByteKey(second.sortKey)
+        return firstPathKey == secondPathKey
+            ? planItemRank(first) < planItemRank(second)
+            : firstPathKey < secondPathKey
     }
 
     private static func skipReason(for error: Error) -> WorkspaceSearchSkipReason {

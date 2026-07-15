@@ -10,11 +10,15 @@
 `WorkspaceFileSystemRootAuthority` is established before an operation begins. It captures:
 
 - one canonical root spelling and its physical `(device, inode)` identity;
-- the original URL only for display/security-scope access; and
+- the original root spelling for display/security-scope access and exact URL-to-relative-path
+  mapping; and
 - a `WorkspaceFileSystemLocation` containing a normalized lexical root-relative path.
 
 The relative path rejects empty, absolute, parent-traversing, and embedded-NUL input. A URL
-computed from the original spelling is never filesystem authority.
+computed from the original spelling is never filesystem authority. If a file URL has exact-byte
+prefix matches against both canonical and original root spellings, `relativePath(forFileURL:)`
+chooses the longest component prefix. Thus an original symlink nested beneath the canonical root
+does not survive as a false leading relative component and fail the later no-follow traversal.
 
 Capture starts under the selected root's security-scoped lease, opens that directory exactly
 once, samples `(device, inode)` from the opened descriptor, and derives its canonical spelling
@@ -64,7 +68,13 @@ Production workspace search first canonicalizes an initially present, in-root al
 existing physical-target policy through the request's one captured authority, then builds the
 canonical location from that same request-owned root. Candidate planning, ignore files,
 overlays, reads, security-scoped access, and result authority cannot supply an independent root
-URL. App workspace reload captures the snapshot and root authority together off the main actor
+URL. Normalized candidate deduplication, dirty-overlay storage/lookup, ignore-file ancestor
+enumeration, and deterministic path ordering use UTF-8 byte keys; canonically equivalent NFC/NFD
+spellings remain independent paths and can neither suppress nor borrow one another's overlay.
+The file tree uses the same byte identity for parent grouping and default-filter ancestors. When
+the scanner cannot supply a resource identity, a namespaced ASCII hex encoding of the relative
+path bytes supplies the fallback node ID rather than a canonically equivalent Swift `String` key.
+App workspace reload captures the snapshot and root authority together off the main actor
 and proves that the selected root spelling still names the captured physical identity. When
 reload activation is requested, selected-node location and the exact file bytes, descriptor
 metadata, identity, and SHA-256 digest are loaded through `capture.rootAuthority`; no activation
@@ -263,7 +273,9 @@ literal UTF-8 bytes rather than making an NFC-to-NFD `standardizedFileURL` round
 non-file URLs and NUL-bearing paths are rejected before C-string descriptor calls; traversal and
 containment checks remain descriptor-bound. A descriptor-derived canonical parent may give aliases
 one cache key without changing the literal leaf bytes, so an NFC missing source can reuse its exact
-retained authority/location while an NFD alternative is not an exact recovery target.
+retained authority/location while an NFD alternative is not an exact recovery target. If the
+canonical and original root spellings both exactly prefix a supplied file URL, the longest
+component prefix wins so nested original symlinks round-trip to the intended relative spelling.
 
 On an external notification, App takes one coherent read through the retained anchored binding or
 standalone proof and compares literal location, descriptor identity, and SHA-256 before adopting
@@ -271,7 +283,12 @@ the observation. mtime/FNV, a mutable session URL, or cached/retired reuse never
 replacement. A dirty session with any unaccepted identity or content change, including a same-inode
 rewrite, enters conflict handling, cancels autosave, and retains the old proof until explicit
 Reload or Keep Mine obtains and adopts a fresh observation. Cmd-S/autosave therefore cannot
-overwrite those external bytes before resolution. A stateful retained A session (pending conflict,
+overwrite those external bytes before resolution. Keep Mine accepts the newest fresh observation
+(C even if the original prompt described B), clears matching detached and missing-file fences, and
+restores save eligibility for both anchored and standalone delete/recreate sessions. If a clean
+quarantined session's local source differs byte-for-byte from the observation, Keep Mine marks the
+session and its LRU record dirty before autosave scheduling rather than exposing a false clean
+state. A stateful retained A session (pending conflict,
 detachment, or indeterminate context) blocks a replacement-parent B at the same lexical URL, so B
 cannot inherit or clear A's URL-keyed fence merely by reusing the spelling.
 
@@ -331,6 +348,12 @@ timing sleeps—to cover:
   sibling reads from B;
 - dirty-overlay collection after root A is moved and replacement B takes its spelling, proving a
   cached session still bound to A cannot inject its dirty text into B's search request;
+- synthetic NFC/NFD snapshot candidates, overlays, and nested ignore files, proving normalized
+  paths remain distinct UTF-8 keys and no spelling suppresses or supplies another's overlay;
+- NFC/NFD directory pairs in the file tree, proving grouping, default-filter ancestors, fallback
+  IDs, and expansion state remain distinct even without resource identities;
+- a nested original-root symlink that also lies below the canonical root, proving relative-path
+  extraction selects the longest exact-byte prefix before no-follow validation;
 - file-tree/sidebar activation, installed-workspace Save Copy, descriptor-canonical target
   inspection for `0200`/`000` leaves, cached/retired/editor ownership collision refusal,
   retained unanchored location/identity/loaded-digest proof after unlink, replacement, or same-inode
@@ -362,6 +385,9 @@ timing sleeps—to cover:
 - clean-session quarantine through LRU eviction, editor retirement/metadata cleanup, missing-file
   close, workspace close, and workspace switch, plus unlinked/replaced unanchored retirement,
   proving reconciliation context and captured membership outlive every lifecycle exit;
+- anchored and standalone delete/recreate Keep Mine resolution, proving detached/missing fences
+  clear and Cmd-S/autosave resume, plus a clean quarantine whose local and observed Unicode
+  spellings are canonically equivalent but byte-distinct, proving the session/LRU becomes dirty;
 - async authority capture cancellation that releases a live descriptor-backed authority;
 - post-capture root moved/symlink-replaced/directory-replaced normalized to `namespaceChanged`;
 - complete returned-metadata equality for existing replacement and missing creation;

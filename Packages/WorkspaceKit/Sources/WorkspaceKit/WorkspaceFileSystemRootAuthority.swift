@@ -169,20 +169,23 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         let fileComponents = try Self.literalPathComponents(
             WorkspaceLiteralFileURL.absolutePath(of: fileURL)
         )
-        for rootURL in [canonicalRootURL, originalRootURL] {
-            let rootComponents = Self.literalPathComponents(rootURL.path(percentEncoded: false))
-            guard fileComponents.count > rootComponents.count,
-                  zip(fileComponents, rootComponents).allSatisfy({
-                      $0.utf8.elementsEqual($1.utf8)
-                  })
-            else {
-                continue
+        let matchingRootComponents = [canonicalRootURL, originalRootURL]
+            .map { Self.literalPathComponents($0.path(percentEncoded: false)) }
+            .filter { rootComponents in
+                fileComponents.count > rootComponents.count
+                    && zip(fileComponents, rootComponents).allSatisfy {
+                        $0.utf8.elementsEqual($1.utf8)
+                    }
             }
-            let relativePath = fileComponents.dropFirst(rootComponents.count)
-                .joined(separator: "/")
-            return try WorkspaceRootContainment.normalizedRelativePath(relativePath)
+        guard let longestRootComponents = matchingRootComponents.max(by: {
+            $0.count < $1.count
+        }) else {
+            throw WorkspaceRootContainmentError.fileOutsideRoot
         }
-        throw WorkspaceRootContainmentError.fileOutsideRoot
+
+        let relativePath = fileComponents.dropFirst(longestRootComponents.count)
+            .joined(separator: "/")
+        return try WorkspaceRootContainment.normalizedRelativePath(relativePath)
     }
 
     private static func literalPathComponents(_ path: String) -> [Substring] {

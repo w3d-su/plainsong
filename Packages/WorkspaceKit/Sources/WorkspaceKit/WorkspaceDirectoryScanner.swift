@@ -147,7 +147,7 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 WorkspaceFileSnapshot.Entry(
                     relativePath: relativePath,
                     kind: WorkspaceFileKind(url: url, isDirectory: values.isDirectory == true),
-                    identity: Self.identity(from: values.fileResourceIdentifier, fallback: relativePath),
+                    identity: Self.identity(from: values.fileResourceIdentifier),
                     contentModificationDate: values.contentModificationDate
                 )
             )
@@ -174,9 +174,9 @@ public struct WorkspaceDirectoryScanner: Sendable {
         return WorkspaceLiteralFileURL.relativePath(of: filePath, containedIn: rootPath) ?? ""
     }
 
-    private static func identity(from identifier: Any?, fallback: String) -> String {
+    private static func identity(from identifier: Any?) -> String? {
         guard let identifier else {
-            return fallback
+            return nil
         }
         return String(describing: identifier)
     }
