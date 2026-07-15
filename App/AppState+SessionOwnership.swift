@@ -205,10 +205,11 @@ extension AppState {
             || pendingExternalFileVersions[canonicalURL] != nil
         let isDetached = detachedSessionURLs.contains(canonicalURL)
         let changed = observedRetainedFileVersionDiffers(observation, for: session)
+        let hasPendingEditorSource = hasPendingEditorSource(for: session)
         guard !hasPendingConflict,
               !isDetached,
               indeterminateSessionWrites[sessionIdentity] == nil,
-              !changed || !session.isDirty
+              !changed || (!session.isDirty && !hasPendingEditorSource)
         else {
             recordExternalChangeConflict(
                 observation,

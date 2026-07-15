@@ -175,6 +175,9 @@ extension AppState {
             metadata: readResult.metadata,
             sha256Digest: readResult.sha256Digest
         )
+        supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
+            anchoredActivation
+        )
         guard anchoredActivation.binding.identity == target.expectedIdentity,
               !hasConflictingPhysicalSessionOwnership(
                   target.expectedIdentity,
@@ -234,6 +237,23 @@ extension AppState {
                 for: prepared.session,
                 canonicalURL: prepared.canonicalURL
             )
+        }
+    }
+
+    /// A successful coherent load is the disk ordering boundary even when the retained
+    /// search result is rejected by a later fingerprint or range check. Retire older
+    /// observation work exactly once here, before any such validation can return early.
+    private func supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) {
+        switch activation.source {
+        case .cached, .retired:
+            supersedeExternalWorkAfterWorkspaceSearchObservation(
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            )
+        case .loaded:
+            break
         }
     }
 

@@ -56,6 +56,41 @@ extension MarkdownTextViewCoordinator {
         return requestWriterActivation(in: textView)
     }
 
+    /// Acquires exact installation authority before an asynchronous operation can
+    /// create external side effects. The App-owned pending-source fence is also the
+    /// persistent writer lease: another installation cannot take the writer until
+    /// every overlapping asynchronous mutation and native-source publication settles.
+    func beginAsynchronousTextMutationLease(in textView: STTextView) -> Bool {
+        guard !isUpdating,
+              !isSourceSynchronizationPending,
+              preflightTextMutation(in: textView)
+        else {
+            return false
+        }
+
+        let wasPending = hasPendingWriterLease
+        asynchronousTextMutationLeaseCount += 1
+        if !wasPending {
+            installedDocument.reportPendingSource(
+                EditorDocumentPendingSourceEvent.began,
+                installationID: documentBindingInstallationID
+            )
+        }
+        return true
+    }
+
+    func endAsynchronousTextMutationLease() {
+        guard asynchronousTextMutationLeaseCount > 0 else { return }
+        asynchronousTextMutationLeaseCount -= 1
+        guard !hasPendingWriterLease else { return }
+
+        installedDocument.reportPendingSource(
+            EditorDocumentPendingSourceEvent.synchronized,
+            installationID: documentBindingInstallationID
+        )
+        scheduleDeferredDocumentTransitionRetry()
+    }
+
     private func withWriterAuthorizedTextMutation<Result>(
         in textView: STTextView,
         _ mutation: () -> Result
@@ -152,20 +187,25 @@ extension MarkdownTextViewCoordinator {
 
     func beginSourceSynchronizationPending() {
         guard !isSourceSynchronizationPending else { return }
+        let wasPending = hasPendingWriterLease
         isSourceSynchronizationPending = true
-        installedDocument.reportPendingSource(
-            EditorDocumentPendingSourceEvent.began,
-            installationID: documentBindingInstallationID
-        )
+        if !wasPending {
+            installedDocument.reportPendingSource(
+                EditorDocumentPendingSourceEvent.began,
+                installationID: documentBindingInstallationID
+            )
+        }
     }
 
     func settleSourceSynchronizationPending() {
         guard isSourceSynchronizationPending else { return }
-        installedDocument.reportPendingSource(
-            EditorDocumentPendingSourceEvent.synchronized,
-            installationID: documentBindingInstallationID
-        )
         isSourceSynchronizationPending = false
+        if !hasPendingWriterLease {
+            installedDocument.reportPendingSource(
+                EditorDocumentPendingSourceEvent.synchronized,
+                installationID: documentBindingInstallationID
+            )
+        }
         scheduleDeferredDocumentTransitionRetry()
     }
 }

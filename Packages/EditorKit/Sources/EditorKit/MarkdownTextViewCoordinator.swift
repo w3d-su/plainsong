@@ -278,6 +278,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var completionWorkspace: CompletionWorkspace = .empty
     var imageAssetInserter: EditorImageAssetInserter?
     var imageAssetContextID: String?
+    var imageAssetInsertionGeneration: UInt64 = 0
     let imageThumbnailPresentationController = WYSIWYGImagePresentationController()
     var recentCompletionIDs: [String] = []
     var completionRequestID = 0
@@ -287,6 +288,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
     var isSourceSynchronizationPending = false
+    var asynchronousTextMutationLeaseCount = 0
     var isNativeSourceSynchronized = true
     private var preparedNativeSourceCandidateGeneration: UInt64?
     private var deferredDocumentTransitionCandidate: EditorDocumentTransitionCandidate?
@@ -294,6 +296,10 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     private var deferredDocumentTransitionRetryTask: Task<Void, Never>?
     private var deferredDocumentTransitionInstallationHandler:
         DeferredDocumentTransitionInstallationHandler?
+
+    var hasPendingWriterLease: Bool {
+        isSourceSynchronizationPending || asynchronousTextMutationLeaseCount > 0
+    }
 
     init(text: Binding<String>, selection: Binding<NSRange?>) {
         installedDocument = EditorInstalledDocumentState(text: text, selection: selection)
@@ -303,14 +309,14 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         for candidate: EditorDocumentTransitionCandidate
     ) -> Bool {
         isNativeSourceSynchronized &&
-            !isSourceSynchronizationPending &&
+            !hasPendingWriterLease &&
             installedDocument.canProveCurrentSource(for: candidate)
     }
 
     func canProveCurrentInstalledSource() -> Bool {
         installedDocument.hasSourceContract &&
             isNativeSourceSynchronized &&
-            !isSourceSynchronizationPending &&
+            !hasPendingWriterLease &&
             installedDocument.isSourceRevisionCurrent()
     }
 
@@ -360,7 +366,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         )
 
         guard installedDocument.isInstalled,
-              !isSourceSynchronizationPending,
+              !hasPendingWriterLease,
               !textView.hasMarkedText()
         else {
             return candidate
@@ -385,7 +391,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             return nil
         }
 
-        let isDeferredByInput = isSourceSynchronizationPending || textView.hasMarkedText()
+        let isDeferredByInput = hasPendingWriterLease || textView.hasMarkedText()
         let isExactCandidateInstalled = canProveCurrentInstalledSource(for: candidate) ||
             preparedNativeSourceCandidateGeneration == candidate.generation
         guard !isDeferredByInput else {
@@ -422,12 +428,14 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     func revokeInstalledDocumentBinding() {
         cancelDeferredDocumentTransition()
-        if isSourceSynchronizationPending {
+        imageAssetInsertionGeneration &+= 1
+        if hasPendingWriterLease {
             installedDocument.reportPendingSource(
                 EditorDocumentPendingSourceEvent.abandoned,
                 installationID: documentBindingInstallationID
             )
             isSourceSynchronizationPending = false
+            asynchronousTextMutationLeaseCount = 0
         }
         installedDocument.releaseWriter(installationID: documentBindingInstallationID)
         guard let registration = installedDocument.revokeDocumentBinding() else { return }
@@ -500,7 +508,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         guard let retainedCandidate = deferredDocumentTransitionCandidate,
               deferredDocumentTransitionTextView === textView,
               retainedCandidate.generation == installedDocument.preparedCandidateGeneration,
-              !isSourceSynchronizationPending,
+              !hasPendingWriterLease,
               !textView.hasMarkedText()
         else {
             return
@@ -510,7 +518,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         // The old document must be fully published to its still-installed binding before
         // replacing any view state with the destination candidate.
         _ = syncTextFromTextViewIfNeeded(textView)
-        guard !isSourceSynchronizationPending,
+        guard !hasPendingWriterLease,
               !textView.hasMarkedText()
         else {
             return
@@ -898,7 +906,7 @@ extension MarkdownTextViewCoordinator {
         _ snapshot: EditorDocumentSourceSnapshot,
         in textView: STTextView
     ) -> Bool {
-        guard !isSourceSynchronizationPending,
+        guard !hasPendingWriterLease,
               !textView.hasMarkedText()
         else {
             return false

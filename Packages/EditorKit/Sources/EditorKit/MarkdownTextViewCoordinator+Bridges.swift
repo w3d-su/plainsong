@@ -80,6 +80,9 @@ extension MarkdownTextViewCoordinator {
     }
 
     func updateImageAssetContextID(_ contextID: String?) {
+        if imageAssetContextID != contextID {
+            imageAssetInsertionGeneration &+= 1
+        }
         imageAssetContextID = contextID
     }
 

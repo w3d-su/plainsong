@@ -288,9 +288,9 @@ final class AppStateTests: XCTestCase {
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
         appState.setCurrentDocument(secondSession)
 
-        let relativePaths = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
+        let insertion = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
 
-        XCTAssertEqual(relativePaths, ["assets/image.png"])
+        XCTAssertEqual(insertion.relativePaths, ["assets/image.png"])
         XCTAssertTrue(FileManager.default
             .fileExists(atPath: firstDirectory.appendingPathComponent("assets/image.png").path))
         XCTAssertFalse(FileManager.default
@@ -646,11 +646,264 @@ final class AppStateTests: XCTestCase {
         appState.preferences.setAssetFolderRelativePath("media/images")
 
         let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
-        let relativePaths = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
+        let insertion = await inserter([.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
 
-        XCTAssertEqual(relativePaths, ["media/images/image.png"])
+        XCTAssertEqual(insertion.relativePaths, ["media/images/image.png"])
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: root.appendingPathComponent("media/images/image.png").path(percentEncoded: false)
+        ))
+    }
+
+    func testDiscardedEditorImageInsertionRemovesOnlyNewlyCreatedAssets() async throws {
+        let root = try makeTemporaryDirectory()
+        let externalDirectory = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        let externalImage = externalDirectory.appendingPathComponent("external.png")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        try Data([4, 5, 6]).write(to: externalImage)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+            .file(externalImage),
+        ])
+        let placedURLs = insertion.relativePaths.map {
+            root.appendingPathComponent($0).standardizedFileURL
+        }
+        XCTAssertEqual(insertion.relativePaths, ["assets/image.png", "assets/external.png"])
+        XCTAssertTrue(placedURLs.allSatisfy {
+            FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
+        })
+
+        await insertion.discard()
+
+        XCTAssertTrue(placedURLs.allSatisfy {
+            !FileManager.default.fileExists(atPath: $0.path(percentEncoded: false))
+        })
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: externalImage.path(percentEncoded: false)
+        ))
+    }
+
+    func testDiscardedEditorImageInsertionPreservesExistingWorkspaceReference() async throws {
+        let root = try makeTemporaryDirectory()
+        let assetsDirectory = root.appendingPathComponent("assets", isDirectory: true)
+        try FileManager.default.createDirectory(at: assetsDirectory, withIntermediateDirectories: true)
+        let currentFile = root.appendingPathComponent("post.md")
+        let existingImage = assetsDirectory.appendingPathComponent("existing.png")
+        let existingData = Data([1, 2, 3])
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        try existingData.write(to: existingImage)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([.file(existingImage)])
+        XCTAssertEqual(insertion.relativePaths, ["assets/existing.png"])
+
+        await insertion.discard()
+
+        XCTAssertEqual(try Data(contentsOf: existingImage), existingData)
+    }
+
+    func testDiscardedEditorImageInsertionPreservesIdentityReplacement() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+        let placedImage = root.appendingPathComponent("assets/image.png")
+        let retainedOriginal = root.appendingPathComponent("assets/receipt-original.png")
+        try FileManager.default.moveItem(at: placedImage, to: retainedOriginal)
+        let replacementData = Data([9, 8, 7])
+        try replacementData.write(to: placedImage)
+
+        await insertion.discard()
+
+        XCTAssertEqual(try Data(contentsOf: placedImage), replacementData)
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: retainedOriginal.path(percentEncoded: false)
+        ))
+    }
+
+    func testDiscardedEditorImageInsertionPreservesSameInodeRewrite() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+        ])
+        let placedImage = root.appendingPathComponent("assets/image.png")
+        let originalStatus = try fileStatus(at: placedImage)
+        let rewrittenData = Data([9, 8, 7])
+        let handle = try FileHandle(forWritingTo: placedImage)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: rewrittenData)
+        try handle.synchronize()
+        try handle.close()
+        let rewrittenStatus = try fileStatus(at: placedImage)
+        XCTAssertEqual(
+            rewrittenStatus.st_ino,
+            originalStatus.st_ino,
+            "test setup must rewrite the published asset through the same inode"
+        )
+
+        await insertion.discard()
+
+        XCTAssertEqual(try Data(contentsOf: placedImage), rewrittenData)
+        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), ["image.png"])
+    }
+
+    func testEditorImageAssetPlacementDoesNotOverwriteExclusiveCreateRaceWinner() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let winnerData = Data([9, 8, 7])
+        let insertedData = Data([1, 2, 3])
+
+        let placement = try placeEditorImageAssets(
+            assets: [.data(insertedData, suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case let .willPublish(candidateURL) = event,
+                  candidateURL.lastPathComponent == "image.png"
+            else {
+                return
+            }
+            guard FileManager.default.createFile(
+                atPath: candidateURL.path(percentEncoded: false),
+                contents: winnerData
+            ) else {
+                throw CocoaError(.fileWriteFileExists)
+            }
+        }
+
+        XCTAssertEqual(placement.relativePaths, ["assets/image-1.png"])
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("assets/image.png")),
+            winnerData
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: root.appendingPathComponent("assets/image-1.png")),
+            insertedData
+        )
+        XCTAssertEqual(
+            try imageAssetDirectoryEntries(in: root),
+            ["image-1.png", "image.png"]
+        )
+    }
+
+    func testEditorImageAssetPlacementRejectsReplacedStagingName() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let replacementData = Data([9, 8, 7])
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case let .willPublish(candidateURL) = event else { return }
+            let directory = candidateURL.deletingLastPathComponent()
+            let stagingURL = try XCTUnwrap(
+                FileManager.default.contentsOfDirectory(
+                    at: directory,
+                    includingPropertiesForKeys: nil
+                ).first { $0.lastPathComponent.hasPrefix(".plainsong-image-stage-") }
+            )
+            try FileManager.default.removeItem(at: stagingURL)
+            try replacementData.write(to: stagingURL)
+        })
+
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("assets/image.png").path(percentEncoded: false)
+        ))
+        let entries = try imageAssetDirectoryEntries(in: root)
+        let preservedName = try XCTUnwrap(entries.first)
+        let preservedURL = root.appendingPathComponent("assets/\(preservedName)")
+        XCTAssertEqual(try Data(contentsOf: preservedURL), replacementData)
+        XCTAssertEqual(entries, [preservedURL.lastPathComponent])
+    }
+
+    func testDidPublishFailureRollsBackCurrentEditorImageAssetAndArtifacts() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [.data(Data([1, 2, 3]), suggestedFilename: "image.png")],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case .didPublish = event else { return }
+            throw CocoaError(.fileWriteUnknown)
+        })
+
+        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), [])
+    }
+
+    func testSecondDidPublishFailureRollsBackAllEditorImageAssetsAndArtifacts() throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try placeEditorImageAssets(
+            assets: [
+                .data(Data([1, 2, 3]), suggestedFilename: "first.png"),
+                .data(Data([4, 5, 6]), suggestedFilename: "second.png"),
+            ],
+            assetFolderRelativePath: "assets",
+            rootURL: root,
+            currentFileURL: currentFile
+        ) { event in
+            guard case let .didPublish(publishedURL) = event,
+                  publishedURL.lastPathComponent == "second.png"
+            else {
+                return
+            }
+            throw CocoaError(.fileWriteUnknown)
+        })
+
+        XCTAssertEqual(try imageAssetDirectoryEntries(in: root), [])
+    }
+
+    func testFailedMultiAssetInsertionRollsBackEarlierCreatedAsset() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        appState.workspaceRootURL = root
+
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "image.png"),
+            .data(Data([4, 5, 6]), suggestedFilename: "not-an-image.txt"),
+        ])
+
+        XCTAssertTrue(insertion.relativePaths.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("assets/image.png").path(percentEncoded: false)
         ))
     }
 
@@ -5759,6 +6012,15 @@ final class AppStateTests: XCTestCase {
         return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 
+    private func imageAssetDirectoryEntries(in root: URL) throws -> [String] {
+        let directory = root.appendingPathComponent("assets", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else {
+            return []
+        }
+        return try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
+            .sorted()
+    }
+
     private func writeText(_ text: String, to url: URL, touchOffset: TimeInterval = 0) throws {
         try text.write(to: url, atomically: true, encoding: .utf8)
         if touchOffset != 0 {
@@ -10121,6 +10383,258 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), diskB)
     }
 
+    // swiftlint:disable:next function_body_length
+    func testPendingEditorSourceSearchActivationPreservesSourceAndAProofOnSameInodeRewrite() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let sourceA = "alpha needle"
+        let diskB = "disk B"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let originalBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        let sourceSnapshot = binding.sourceContract.snapshot()
+        XCTAssertEqual(
+            binding.sourceContract.writer(.activate(installation, from: sourceSnapshot)),
+            .activated(sourceSnapshot)
+        )
+        binding.sourceContract.pendingSource(.began(installation))
+        defer {
+            binding.sourceContract.pendingSource(.abandoned(installation))
+            binding.onLifecycle(.revoked(installation))
+        }
+        XCTAssertFalse(session.isDirty)
+        XCTAssertTrue(appState.hasPendingEditorSource(for: session))
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("pending-source search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "a.md",
+            text: sourceA,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("pending-source result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(diskB.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalBinding.identity)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertEqual(session.text, sourceA)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertTrue(appState.hasPendingEditorSource(for: session))
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskB)
+        XCTAssertEqual(appState.pendingExternalFileVersions[documentURL]?.file.text, diskB)
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, documentURL)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertThrowsError(try appState.save(session: session))
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), diskB)
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testSearchObservationEvictsOlderDiskInspectionBeforeAdoptingNewerVersion() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let sourceA = "source A"
+        let sourceB = "source B needle"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA],
+            currentPath: "a.md",
+            coherentFileReader: reader
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let originalIdentity = try regularIdentity(at: documentURL)
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("older disk inspection starts") { reader.requestCount == 1 }
+        let olderInspection = try XCTUnwrap(
+            appState.externalDiskInspectionTasks[sessionIdentity]
+        )
+        let olderGeneration = olderInspection.diskEventGeneration
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(sourceB.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalIdentity)
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("newer-version search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "a.md",
+            text: sourceB,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("newer-version result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertEqual(session.text, sourceB)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertNil(appState.externalDiskInspectionTasks[sessionIdentity])
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: session),
+            olderGeneration + 1,
+            "one coherent search observation must advance the generation exactly once"
+        )
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: sourceA, identity: originalIdentity))
+        )
+        await olderInspection.task.value
+
+        XCTAssertEqual(session.text, sourceB)
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertEqual(
+            appState.anchoredSessionFileBinding(for: session)?.sha256Digest,
+            WorkspaceSearchContentFingerprint(text: sourceB).sha256Digest
+        )
+        XCTAssertEqual(appState.lastKnownDiskHashes[documentURL], AppState.contentHash(sourceB))
+    }
+
+    // swiftlint:disable:next function_body_length
+    func testFingerprintMismatchSearchObservationEvictsOlderDiskInspection() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let resultSource = "source B needle"
+        let observedSource = "source C"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": resultSource],
+            currentPath: "a.md",
+            coherentFileReader: reader
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let originalBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("fingerprint-mismatch search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "a.md",
+            text: resultSource,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("fingerprint-mismatch result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        appState.handleExternalChange(for: session)
+        try await waitUntil("older fingerprint-mismatch inspection starts") {
+            reader.requestCount == 1
+        }
+        let olderInspection = try XCTUnwrap(
+            appState.externalDiskInspectionTasks[sessionIdentity]
+        )
+        let olderGeneration = olderInspection.diskEventGeneration
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(observedSource.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), originalBinding.identity)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertEqual(session.text, resultSource)
+        XCTAssertFalse(session.isDirty)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertNil(appState.externalDiskInspectionTasks[sessionIdentity])
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: session),
+            olderGeneration + 1
+        )
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(
+                text: "stale inspection",
+                identity: originalBinding.identity
+            ))
+        )
+        await olderInspection.task.value
+
+        XCTAssertEqual(session.text, resultSource)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), observedSource)
+    }
+
+    func testSearchObservationRestartsReloadAndKeepMineAgainstNewerConflictVersion() async throws {
+        for intent in [DeferredExternalChangeResolution.reload, .keepMine] {
+            try await assertSearchObservationSupersedesOlderExternalResolution(intent: intent)
+        }
+    }
+
+    func testSearchObservationSupersedesPartiallyAppliedReloadAndKeepMine() async throws {
+        for intent in [DeferredExternalChangeResolution.reload, .keepMine] {
+            try await assertSearchObservationSupersedesPendingExternalApplication(intent: intent)
+        }
+    }
+
     func testByteDifferentCanonicalEquivalentFingerprintCancelsNavigationAndRefreshesFreshOverlay() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let diskText = "cafe\u{0301} needle"
@@ -11613,6 +12127,280 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         var match: TextSearchMatch
     }
 
+    // swiftlint:disable function_body_length
+    private func assertSearchObservationSupersedesOlderExternalResolution(
+        intent: DeferredExternalChangeResolution
+    ) async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(30.0, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sourceA = "source A"
+        let localSource = "local needle"
+        let diskB = "older disk B"
+        let diskC = "newer disk C"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA],
+            currentPath: "a.md",
+            userDefaults: defaults,
+            coherentFileReader: reader
+        )
+        defer {
+            cleanUp(fixture)
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let identity = try regularIdentity(at: documentURL)
+        appState.replaceDocumentText(localSource, in: session)
+        appState.pendingExternalTexts[documentURL] = diskB
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentURL)
+        switch intent {
+        case .reload:
+            appState.reloadExternallyChangedFile()
+        case .keepMine:
+            appState.keepMineForExternallyChangedFile()
+        }
+        try await waitUntil("older external resolution starts") { reader.requestCount == 1 }
+        let olderOperation = try XCTUnwrap(appState.externalReloadTasks[sessionIdentity])
+        let olderGeneration = olderOperation.diskEventGeneration
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(diskC.utf8))
+        try handle.synchronize()
+        try handle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), identity)
+
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("conflicted-overlay search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "a.md",
+            text: localSource,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("conflicted-overlay result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        try await waitUntil("search observation restarts external resolution") {
+            reader.requestCount == 2
+        }
+        let freshOperation = try XCTUnwrap(appState.externalReloadTasks[sessionIdentity])
+        XCTAssertEqual(freshOperation.intent, intent)
+        XCTAssertGreaterThan(freshOperation.diskEventGeneration, olderGeneration)
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskC)
+        XCTAssertEqual(appState.pendingExternalFileVersions[documentURL]?.file.text, diskC)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: diskB, identity: identity))
+        )
+        await olderOperation.task.value
+        XCTAssertEqual(session.text, localSource)
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskC)
+        XCTAssertNotNil(appState.externalReloadTasks[sessionIdentity])
+
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: diskC, identity: identity))
+        )
+        await freshOperation.task.value
+        XCTAssertNil(appState.externalReloadTasks[sessionIdentity])
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(appState.lastKnownDiskHashes[documentURL], AppState.contentHash(diskC))
+        switch intent {
+        case .reload:
+            XCTAssertEqual(session.text, diskC)
+            XCTAssertFalse(session.isDirty)
+        case .keepMine:
+            XCTAssertEqual(session.text, localSource)
+            XCTAssertTrue(session.isDirty)
+        }
+    }
+
+    // swiftlint:enable function_body_length
+
+    // swiftlint:disable function_body_length
+    private func assertSearchObservationSupersedesPendingExternalApplication(
+        intent: DeferredExternalChangeResolution
+    ) async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let reader = ControlledCoherentFileReader()
+        let defaultsSuiteName = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defaults.set(30.0, forKey: "Plainsong.settings.autosaveIntervalSeconds")
+        let sourceA = "source A"
+        let localSource = "local needle"
+        let diskB = "older needle B"
+        let diskC = "newer disk C"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": sourceA],
+            currentPath: "a.md",
+            userDefaults: defaults,
+            coherentFileReader: reader
+        )
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let identity = try regularIdentity(at: documentURL)
+        let binding = appState.editorDocumentBinding(for: session)
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: binding.id,
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        binding.onLifecycle(.installed(installation))
+        binding.sourceContract.registerSourceSynchronizer(installation) { _ in false }
+        defer {
+            binding.sourceContract.unregisterSourceSynchronizer(installation)
+            binding.onLifecycle(.revoked(installation))
+            cleanUp(fixture)
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+
+        appState.replaceDocumentText(localSource, in: session)
+        let sourceRevisionBeforeResolution = session.version
+        appState.pendingExternalTexts[documentURL] = diskB
+        appState.externalChangePrompt = AppState.ExternalChangePrompt(fileURL: documentURL)
+        switch intent {
+        case .reload:
+            appState.reloadExternallyChangedFile()
+        case .keepMine:
+            appState.keepMineForExternallyChangedFile()
+        }
+        try await waitUntil("older partial external resolution starts") {
+            reader.requestCount == 1
+        }
+        let olderOperation = try XCTUnwrap(appState.externalReloadTasks[sessionIdentity])
+
+        let diskBHandle = try FileHandle(forWritingTo: documentURL)
+        try diskBHandle.truncate(atOffset: 0)
+        try diskBHandle.write(contentsOf: Data(diskB.utf8))
+        try diskBHandle.synchronize()
+        try diskBHandle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), identity)
+        reader.resolve(
+            request: 0,
+            with: .loaded(coherentSnapshot(text: diskB, identity: identity))
+        )
+        await olderOperation.task.value
+
+        let olderApplication = try XCTUnwrap(
+            appState.pendingExternalReloadApplications[sessionIdentity]
+        )
+        XCTAssertEqual(olderApplication.intent, intent)
+        XCTAssertEqual(
+            appState.externalResolutionIntentCaptures[documentURL]?.sourceSnapshot.revision,
+            sourceRevisionBeforeResolution
+        )
+        switch intent {
+        case .reload:
+            XCTAssertEqual(session.text, diskB)
+            XCTAssertGreaterThan(session.version, sourceRevisionBeforeResolution)
+            XCTAssertEqual(olderApplication.acceptedSourceSnapshot.revision, session.version)
+        case .keepMine:
+            XCTAssertEqual(session.text, localSource)
+            XCTAssertEqual(session.version, sourceRevisionBeforeResolution)
+        }
+
+        let searchSource = intent == .reload ? diskB : localSource
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("partial-application search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        let fileResult = result(
+            path: "a.md",
+            text: searchSource,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("partial-application search result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+
+        let diskCHandle = try FileHandle(forWritingTo: documentURL)
+        try diskCHandle.truncate(atOffset: 0)
+        try diskCHandle.write(contentsOf: Data(diskC.utf8))
+        try diskCHandle.synchronize()
+        try diskCHandle.close()
+        XCTAssertEqual(try regularIdentity(at: documentURL), identity)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        try await waitUntil("C observation restarts the partial external resolution") {
+            reader.requestCount == 2
+        }
+        let freshOperation = try XCTUnwrap(appState.externalReloadTasks[sessionIdentity])
+        XCTAssertNotEqual(freshOperation.token, olderApplication.token)
+        XCTAssertGreaterThan(freshOperation.generation, olderApplication.generation)
+        XCTAssertGreaterThan(
+            freshOperation.diskEventGeneration,
+            olderOperation.diskEventGeneration
+        )
+        XCTAssertNil(appState.pendingExternalReloadApplications[sessionIdentity])
+        XCTAssertEqual(
+            appState.externalResolutionIntentCaptures[documentURL]?.sourceSnapshot.revision,
+            session.version
+        )
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskC)
+        XCTAssertEqual(appState.pendingExternalFileVersions[documentURL]?.file.text, diskC)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+
+        binding.sourceContract.registerSourceSynchronizer(installation) { _ in true }
+        appState.synchronizePendingExternalReloadIfPossible(for: session)
+        XCTAssertNil(appState.pendingExternalReloadApplications[sessionIdentity])
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskC)
+        XCTAssertEqual(appState.pendingExternalFileVersions[documentURL]?.file.text, diskC)
+
+        reader.resolve(
+            request: 1,
+            with: .loaded(coherentSnapshot(text: diskC, identity: identity))
+        )
+        await freshOperation.task.value
+        XCTAssertNil(appState.externalReloadTasks[sessionIdentity])
+        XCTAssertNil(appState.pendingExternalReloadApplications[sessionIdentity])
+        XCTAssertNil(appState.pendingExternalTexts[documentURL])
+        XCTAssertNil(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertEqual(appState.lastKnownDiskHashes[documentURL], AppState.contentHash(diskC))
+        switch intent {
+        case .reload:
+            XCTAssertEqual(session.text, diskC)
+            XCTAssertFalse(session.isDirty)
+        case .keepMine:
+            XCTAssertEqual(session.text, localSource)
+            XCTAssertTrue(session.isDirty)
+        }
+    }
+
+    // swiftlint:enable function_body_length
+
     private func makeAcceptedActivationScenario() async throws -> AcceptedActivationScenario {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let fixture = try makeFixture(
@@ -11934,6 +12722,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         currentPath: String? = nil,
         debounceNanoseconds: UInt64 = 0,
         userDefaults: UserDefaults = .standard,
+        coherentFileReader: any WorkspaceCoherentFileReading = WorkspaceCoherentFileReader(),
         directoryScanner: any WorkspaceDirectoryScanning = ImmediateWorkspaceDirectoryScanner(
             snapshot: WorkspaceFileSnapshot(entries: [])
         )
@@ -11961,6 +12750,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         }
         let appState = AppState(
             currentDocument: currentDocument,
+            coherentFileReader: coherentFileReader,
             directoryScanner: directoryScanner,
             workspaceSearchStreamProvider: provider,
             workspaceSearchDebounceNanoseconds: debounceNanoseconds,

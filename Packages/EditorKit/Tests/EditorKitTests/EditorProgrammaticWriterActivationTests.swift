@@ -26,6 +26,98 @@ final class EditorProgrammaticWriterActivationTests: XCTestCase {
         try await waitForActivationCount(4) { scenario.model.writerEvents }
         assertOnlyPreflightSynchronizationOccurred(in: scenario)
     }
+
+    func testImageInsertionHoldsExactWriterLeaseAcrossAwait() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        let gate = ImageInsertionGate()
+        let firstURL = URL(fileURLWithPath: "/tmp/first.png")
+        scenario.first.coordinator.updateImageAssetInserter { assets in
+            await gate.insert(assets)
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+        scenario.first.textView.textSelection = NSRange(location: 12, length: 0)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [firstURL]
+        ), true)
+        try await waitForImageInsertionInvocation(gate)
+        XCTAssertEqual(gate.assets, [.file(firstURL)])
+        XCTAssertEqual(scenario.model.pendingWriterInstallations, [scenario.firstInstallation])
+
+        requestRejectedImageInsertion(in: scenario)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        XCTAssertEqual(scenario.model.imageInserterInvocationCount, 0)
+        XCTAssertEqual(scenario.model.activeWriterInstallation, scenario.firstInstallation)
+
+        gate.resume(relativePaths: ["assets/first.png"])
+        try await waitForSource(in: scenario.model, toEqual: "Stale source![](assets/first.png)")
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+        XCTAssertEqual(scenario.model.publications.count, 1)
+        XCTAssertEqual(gate.discardCount, 0)
+    }
+
+    func testDismantledImageInsertionDiscardsPlacedAsset() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        var didDismantleFirst = false
+        defer {
+            if !didDismantleFirst {
+                dismantle(scenario.first)
+            }
+            dismantle(scenario.second)
+        }
+        let gate = ImageInsertionGate()
+        scenario.first.coordinator.updateImageAssetInserter { assets in
+            await gate.insert(assets)
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/dismantled.png")]
+        ), true)
+        try await waitForImageInsertionInvocation(gate)
+
+        dismantle(scenario.first)
+        didDismantleFirst = true
+        gate.resume(relativePaths: ["assets/dismantled.png"])
+        try await waitForDiscardCount(1, in: gate)
+
+        XCTAssertEqual(scenario.model.source, "Stale source")
+        XCTAssertTrue(scenario.model.publications.isEmpty)
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+    }
+
+    func testRejectedImagePublicationDiscardsPlacedAsset() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        scenario.model.rejectNextPublication = true
+        scenario.first.coordinator.updateImageAssetInserter { _ in
+            EditorImageAssetInsertion(relativePaths: ["assets/rejected.png"]) {
+                scenario.model.imageDiscardCount += 1
+            }
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/rejected.png")]
+        ), true)
+        try await waitForImageDiscardCount(1, in: scenario.model)
+
+        XCTAssertEqual(scenario.model.source, "Stale source")
+        XCTAssertEqual(Self.text(in: scenario.first.textView), "Stale source")
+        XCTAssertEqual(scenario.model.publications.count, 1)
+        XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
+        XCTAssertNil(scenario.model.activeWriterInstallation)
+    }
 }
 
 @MainActor
@@ -34,9 +126,14 @@ private extension EditorProgrammaticWriterActivationTests {
         var source = "Stale source"
         var revision = 0
         var activeWriterInstallation: EditorDocumentBindingInstallation?
+        var pendingWriterInstallations: Set<EditorDocumentBindingInstallation> = []
         var lifecycleEvents: [EditorDocumentBindingLifecycleEvent] = []
         var writerEvents: [EditorDocumentWriterEvent] = []
+        var pendingSourceEvents: [EditorDocumentPendingSourceEvent] = []
         var publications: [EditorDocumentSourcePublication] = []
+        var imageInserterInvocationCount = 0
+        var imageDiscardCount = 0
+        var rejectNextPublication = false
         let bindingID = EditorDocumentBindingID()
 
         var snapshot: EditorDocumentSourceSnapshot {
@@ -54,7 +151,7 @@ private extension EditorProgrammaticWriterActivationTests {
                 snapshot: { self.snapshot },
                 lifecycle: { self.lifecycleEvents.append($0) },
                 writer: { self.handleWriterEvent($0) },
-                pendingSource: { _ in },
+                pendingSource: { self.handlePendingSourceEvent($0) },
                 publish: { self.handlePublication($0) }
             )
         }
@@ -64,19 +161,43 @@ private extension EditorProgrammaticWriterActivationTests {
         ) -> EditorDocumentWriterEventResult {
             writerEvents.append(event)
             switch event {
-            case let .activate(installation, _):
+            case let .activate(installation, base):
+                if base.revision != revision {
+                    if activeWriterInstallation == installation,
+                       !pendingWriterInstallations.contains(installation)
+                    {
+                        activeWriterInstallation = nil
+                    }
+                    return .synchronize(snapshot)
+                }
                 if let activeWriterInstallation,
-                   activeWriterInstallation != installation
+                   activeWriterInstallation != installation,
+                   pendingWriterInstallations.contains(activeWriterInstallation)
                 {
                     return .rejected(snapshot)
                 }
                 activeWriterInstallation = installation
                 return .activated(snapshot)
             case let .release(installation):
-                if activeWriterInstallation == installation {
-                    activeWriterInstallation = nil
+                guard activeWriterInstallation == installation,
+                      !pendingWriterInstallations.contains(installation)
+                else {
+                    return .releaseRejected
                 }
+                activeWriterInstallation = nil
                 return .released
+            }
+        }
+
+        private func handlePendingSourceEvent(_ event: EditorDocumentPendingSourceEvent) {
+            pendingSourceEvents.append(event)
+            switch event {
+            case let .began(installation):
+                if activeWriterInstallation == installation {
+                    pendingWriterInstallations.insert(installation)
+                }
+            case let .synchronized(installation), let .abandoned(installation):
+                pendingWriterInstallations.remove(installation)
             }
         }
 
@@ -84,6 +205,10 @@ private extension EditorProgrammaticWriterActivationTests {
             _ publication: EditorDocumentSourcePublication
         ) -> EditorDocumentSourcePublicationResult {
             publications.append(publication)
+            if rejectNextPublication {
+                rejectNextPublication = false
+                return .rejected(snapshot)
+            }
             source = publication.source
             revision += 1
             return .accepted(snapshot, sourceWasReconciled: false)
@@ -101,10 +226,11 @@ private extension EditorProgrammaticWriterActivationTests {
         let model: Model
         let first: Fixture
         let second: Fixture
+        let firstInstallation: EditorDocumentBindingInstallation
         let blockedInstallation: EditorDocumentBindingInstallation
     }
 
-    func makeScenario() throws -> Scenario {
+    func makeScenario(firstWriterIsPending: Bool = true) throws -> Scenario {
         let model = Model()
         let contract = model.makeContract()
         let source = Binding(get: { model.source }, set: { model.source = $0 })
@@ -112,11 +238,16 @@ private extension EditorProgrammaticWriterActivationTests {
         let second = try makeFixture(source: source, bindingID: model.bindingID, contract: contract)
         let installations = model.lifecycleEvents.compactMap(\.installedInstallation)
         XCTAssertEqual(installations.count, 2)
-        model.activeWriterInstallation = try XCTUnwrap(installations.first)
+        let firstInstallation = try XCTUnwrap(installations.first)
+        model.activeWriterInstallation = firstInstallation
+        if firstWriterIsPending {
+            model.pendingWriterInstallations.insert(firstInstallation)
+        }
         return try Scenario(
             model: model,
             first: first,
             second: second,
+            firstInstallation: firstInstallation,
             blockedInstallation: XCTUnwrap(installations.last)
         )
     }
@@ -162,9 +293,9 @@ private extension EditorProgrammaticWriterActivationTests {
 
     func requestRejectedImageInsertion(in scenario: Scenario) {
         let blockedURL = URL(fileURLWithPath: "/tmp/blocked.png")
-        scenario.second.coordinator.updateImageAssetInserter { assets in
-            XCTAssertEqual(assets, [.file(blockedURL)])
-            return ["assets/blocked.png"]
+        scenario.second.coordinator.updateImageAssetInserter { _ in
+            scenario.model.imageInserterInvocationCount += 1
+            return EditorImageAssetInsertion(relativePaths: ["assets/blocked.png"])
         }
         scenario.second.coordinator.attachPasteAndDragHandlers(to: scenario.second.textView)
         scenario.second.textView.textSelection = NSRange(location: 14, length: 0)
@@ -178,6 +309,7 @@ private extension EditorProgrammaticWriterActivationTests {
         XCTAssertEqual(Self.text(in: scenario.second.textView), "Current source")
         XCTAssertEqual(scenario.model.source, "Current source")
         XCTAssertTrue(scenario.model.publications.isEmpty)
+        XCTAssertEqual(scenario.model.imageInserterInvocationCount, 0)
         XCTAssertEqual(
             scenario.model.writerEvents.compactMap(\.activatedInstallation),
             Array(repeating: scenario.blockedInstallation, count: 4)
@@ -244,6 +376,38 @@ private extension EditorProgrammaticWriterActivationTests {
         XCTAssertEqual(writerEvents().compactMap(\.activatedInstallation).count, expectedCount)
     }
 
+    func waitForImageInsertionInvocation(_ gate: ImageInsertionGate) async throws {
+        for _ in 0 ..< 20 {
+            if gate.invocationCount == 1 { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(gate.invocationCount, 1)
+    }
+
+    func waitForSource(in model: Model, toEqual expected: String) async throws {
+        for _ in 0 ..< 20 {
+            if model.source == expected { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(model.source, expected)
+    }
+
+    func waitForDiscardCount(_ expected: Int, in gate: ImageInsertionGate) async throws {
+        for _ in 0 ..< 20 {
+            if gate.discardCount == expected { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(gate.discardCount, expected)
+    }
+
+    func waitForImageDiscardCount(_ expected: Int, in model: Model) async throws {
+        for _ in 0 ..< 20 {
+            if model.imageDiscardCount == expected { return }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(model.imageDiscardCount, expected)
+    }
+
     static func text(in textView: STTextView) -> String {
         MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
     }
@@ -252,6 +416,31 @@ private extension EditorProgrammaticWriterActivationTests {
         let pasteboard = NSPasteboard(name: NSPasteboard.Name("PlainsongTests.\(UUID().uuidString)"))
         pasteboard.clearContents()
         return pasteboard
+    }
+}
+
+@MainActor
+private final class ImageInsertionGate {
+    private var continuation: CheckedContinuation<EditorImageAssetInsertion, Never>?
+    private(set) var assets: [EditorImageAsset] = []
+    private(set) var invocationCount = 0
+    private(set) var discardCount = 0
+
+    func insert(_ assets: [EditorImageAsset]) async -> EditorImageAssetInsertion {
+        self.assets = assets
+        invocationCount += 1
+        return await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func resume(relativePaths: [String]) {
+        continuation?.resume(returning: EditorImageAssetInsertion(
+            relativePaths: relativePaths
+        ) { [weak self] in
+            self?.discardCount += 1
+        })
+        continuation = nil
     }
 }
 

@@ -173,6 +173,7 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator: Coordinator
     ) {
         guard !coordinator.canProveCurrentInstalledSource(for: candidate),
+              !coordinator.hasPendingWriterLease,
               !coordinator.isUserEditing,
               !textView.hasMarkedText()
         else {

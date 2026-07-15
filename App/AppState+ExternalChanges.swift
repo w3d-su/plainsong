@@ -201,33 +201,12 @@ extension AppState {
             : currentExternalDiskEventGeneration(for: session)
         externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
         if let intent = deferredExternalChangeResolutions[stateURL] {
-            let currentSourceSnapshot = EditorDocumentSourceSnapshot(
-                source: session.text,
-                revision: session.version
-            )
-            guard var intentCapture = externalResolutionIntentCaptures[stateURL],
-                  intentCapture.intent == intent
-            else {
-                abortExternalResolutionAfterUnexpectedSourceChange(for: session)
-                return
-            }
-            if intentCapture.sourceSnapshot.revision != session.version {
-                guard let pendingApplication = pendingExternalReloadApplications[sessionIdentity],
-                      pendingApplication.session === session,
-                      pendingApplication.intent == intent,
-                      pendingApplication.acceptedSourceSnapshot.revision == session.version
-                else {
-                    abortExternalResolutionAfterUnexpectedSourceChange(for: session)
-                    return
-                }
-                intentCapture = ExternalResolutionIntentCapture(
-                    intent: intent,
-                    sourceSnapshot: currentSourceSnapshot,
-                    diskEventGeneration: intentCapture.diskEventGeneration
-                )
-            }
-            intentCapture.diskEventGeneration = diskEventGeneration
-            externalResolutionIntentCaptures[stateURL] = intentCapture
+            guard refreshExternalResolutionIntentCapture(
+                for: session,
+                canonicalURL: stateURL,
+                intent: intent,
+                diskEventGeneration: diskEventGeneration
+            ) else { return }
             restartExternalResolutionIfNeeded(for: session)
             if session === currentDocument {
                 restoreRecoveryPrompt(for: session)
@@ -492,23 +471,6 @@ private extension AppState {
             intent: intent,
             task: task
         )
-    }
-
-    func supersedeExternalResolutionRead(for session: DocumentSession) {
-        let sessionIdentity = ObjectIdentifier(session)
-        nextExternalReloadGeneration += 1
-        externalReloadTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
-        pendingExternalReloadApplications[sessionIdentity] = nil
-    }
-
-    func abortExternalResolutionAfterUnexpectedSourceChange(for session: DocumentSession) {
-        let sessionIdentity = ObjectIdentifier(session)
-        externalReloadTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
-        pendingExternalReloadApplications[sessionIdentity] = nil
-        guard let stateURL = sessionStateURL(for: session) else { return }
-        deferredExternalChangeResolutions[stateURL] = nil
-        externalResolutionIntentCaptures[stateURL] = nil
-        restoreRecoveryPrompt(for: session)
     }
 
     func handleExternalResolutionRead(

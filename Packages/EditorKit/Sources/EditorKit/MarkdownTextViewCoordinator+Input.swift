@@ -184,42 +184,98 @@ extension MarkdownTextViewCoordinator {
         into textView: MarkdownSTTextView,
         replacementRange: NSRange
     ) {
-        guard let imageAssetInserter else { return }
+        guard let imageAssetInserter,
+              beginAsynchronousTextMutationLease(in: textView)
+        else {
+            return
+        }
         let capturedText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        let capturedRange = replacementRange.clamped(toLength: (capturedText as NSString).length)
-        let capturedContextID = imageAssetContextID
+        let context = EditorImageAssetInsertionContext(
+            text: capturedText,
+            replacementRange: replacementRange.clamped(toLength: (capturedText as NSString).length),
+            imageAssetContextID: imageAssetContextID,
+            generation: imageAssetInsertionGeneration,
+            requiresPublicationProof: installedDocument.hasSourceContract
+        )
 
-        Task { @MainActor [weak self, weak textView] in
-            guard let self, let textView else { return }
-            let relativePaths = await imageAssetInserter(assets)
-            guard !relativePaths.isEmpty,
-                  imageAssetContextID == capturedContextID,
-                  MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
-            else {
-                return
+        Task { @MainActor [self, weak textView] in
+            var isLeaseActive = true
+            defer {
+                if isLeaseActive {
+                    endAsynchronousTextMutationLease()
+                }
             }
-
-            let insertion = relativePaths
-                .map { SmartPaste.imageInsertion(relativePath: $0) }
-                .joined(separator: "\n")
-            let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-            guard ExactSourceText.matches(currentText, capturedText) else {
+            guard let textView else { return }
+            let transaction = await imageAssetInserter(assets)
+            endAsynchronousTextMutationLease()
+            isLeaseActive = false
+            guard commitImageAssetInsertion(
+                transaction,
+                in: textView,
+                context: context
+            ) else {
+                await transaction.discard()
                 return
-            }
-            let replacementRange = capturedRange.clamped(toLength: (currentText as NSString).length)
-            let newSelection = NSRange(
-                location: replacementRange.location + (insertion as NSString).length,
-                length: 0
-            )
-            performPreflightedTextMutation(in: textView) {
-                EditingBehaviorsSupport.applyReplacement(
-                    insertion,
-                    replacementRange: replacementRange,
-                    newSelection: newSelection,
-                    to: textView,
-                    editingGuard: self.editingBehaviorGuard
-                )
             }
         }
     }
+
+    private func commitImageAssetInsertion(
+        _ transaction: EditorImageAssetInsertion,
+        in textView: MarkdownSTTextView,
+        context: EditorImageAssetInsertionContext
+    ) -> Bool {
+        let relativePaths = transaction.relativePaths
+        guard !relativePaths.isEmpty,
+              imageAssetInsertionGeneration == context.generation,
+              imageAssetContextID == context.imageAssetContextID,
+              !context.requiresPublicationProof || installedDocument.hasSourceContract,
+              MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText())
+        else {
+            return false
+        }
+
+        let insertion = relativePaths
+            .map { SmartPaste.imageInsertion(relativePath: $0) }
+            .joined(separator: "\n")
+        let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        guard ExactSourceText.matches(currentText, context.text) else {
+            return false
+        }
+        let replacementRange = context.replacementRange.clamped(toLength: (currentText as NSString).length)
+        let newSelection = NSRange(
+            location: replacementRange.location + (insertion as NSString).length,
+            length: 0
+        )
+        let expectedText = (currentText as NSString).replacingCharacters(
+            in: replacementRange,
+            with: insertion
+        )
+        guard performPreflightedTextMutation(in: textView, {
+            EditingBehaviorsSupport.applyReplacement(
+                insertion,
+                replacementRange: replacementRange,
+                newSelection: newSelection,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        }) else {
+            return false
+        }
+
+        let finalText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
+        guard ExactSourceText.matches(finalText, expectedText) else { return false }
+        guard context.requiresPublicationProof else { return true }
+        guard let snapshot = currentInstalledSourceSnapshot else { return false }
+        return ExactSourceText.matches(snapshot.source, expectedText) &&
+            installedDocument.isSourceRevisionCurrent()
+    }
+}
+
+private struct EditorImageAssetInsertionContext {
+    let text: String
+    let replacementRange: NSRange
+    let imageAssetContextID: String?
+    let generation: UInt64
+    let requiresPublicationProof: Bool
 }

@@ -423,7 +423,7 @@ synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3
 only the headless App subset below and remains open at this landing point.
 
 **Implemented WS3B lifecycle foundation (gate still open).** MarkdownCore exposes one
-allocation-free exact UTF-16 source
+literal exact UTF-16 source
 comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
 raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
 headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
@@ -476,6 +476,15 @@ matched-offset alignment is unique; ambiguous offsets fail closed. Unsafe reconc
 the coherent current view, installed
 snapshot, model, writer/pending state, autosave eligibility, and dirty overlay rather than parking
 an accepted native edit indefinitely.
+Toolbar commands, completion, smart paste, and image insertion all acquire exact writer authority
+through the same preflight before mutating native source. Async image insertion completes that
+preflight before starting any asset side effect and carries the exact binding/installation-scoped
+authority across its suspension; a rejected, superseded, or stale window therefore creates no
+orphan asset and cannot later publish through another installation's authority.
+App placement is transactional: it stages with exclusive creation, publishes without replacing an
+existing name, and retains descriptor-bound identity, byte-count, and SHA-256 receipts. A failed
+publication or rejected Markdown mutation quarantines each created leaf before exact validation;
+changed or indeterminate bytes are preserved and surfaced instead of being unlinked.
 Marked-text commit provenance retains the initial selected replacement span for AppKit's
 `.notFound` path, but uses the exact delegate-confirmed replacement location when AppKit performs
 an explicit replacement before commit. Selection-only or rejected mutations discard an
@@ -498,7 +507,10 @@ changing cross-document destination can reinstall a frozen pre-composition value
 Pending editor source is tracked by exact installation from the first deferred synchronization
 until publication succeeds, composition is explicitly abandoned, or that installation revokes.
 Duplicate begin/end events are no-ops and teardown cannot strand pending state. Pending source
-blocks explicit save and autosave even while the model still appears clean.
+blocks explicit save and autosave even while the model still appears clean. Search-result
+activation likewise treats the exact pending editor/native source as local authority regardless of
+the session dirty flag: a differing coherent disk observation must enter external-change
+arbitration rather than replace the retained proof or install disk bytes over unpublished source.
 
 Retirement and active-session state share one session-owned exact-state-URL registry whose record owns
 the retained location and proof, exact
@@ -571,6 +583,13 @@ sessions, including delete/recreate recovery.
 A stateful retained A session (pending conflict, detachment, or indeterminate context) also blocks
 a replacement-parent B at the same lexical URL until A is resolved; B cannot inherit or clear A's
 URL-keyed fence merely by reusing its spelling.
+
+Every coherent retained-file observation made for search-result activation advances that
+session's external disk-event generation, even when the observed identity and digest still match.
+It therefore supersedes older initial-inspection, Reload, and Keep Mine work before any proof can
+be adopted. An explicit resolution intent survives or restarts only against a fresh coherent read
+under the newer generation; an older asynchronous result cannot finalize the observation or
+silently consume the user's choice.
 
 WS3B adds a multi-window convergence fence around that authority arbitration. Choosing Reload or
 Keep Mine captures the exact source revision and disk-event generation; input already authorized
@@ -717,8 +736,8 @@ pending.
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
-| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty-overlay activation arbitration before proof adoption; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across suspension with no rejected-window orphan; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
+| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty-overlay and clean pending-native activation arbitration before proof adoption; coherent search-observation generation supersession with explicit intent restarting only from a fresh read; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 

@@ -126,7 +126,12 @@ public enum EditorDocumentWriterEventResult: Equatable, Sendable {
     case releaseRejected
 }
 
-/// Installation-scoped source that is visible in EditorKit but not yet in the model.
+/// Installation-scoped pending writer work.
+///
+/// This fence covers both native source that is visible in EditorKit but not yet in
+/// the model and an authorized asynchronous mutation that may create external side
+/// effects before publishing source. `synchronized` is emitted only after every
+/// overlapping source or asynchronous mutation lease has settled.
 public enum EditorDocumentPendingSourceEvent: Equatable, Sendable {
     case began(EditorDocumentBindingInstallation)
     case synchronized(EditorDocumentBindingInstallation)
