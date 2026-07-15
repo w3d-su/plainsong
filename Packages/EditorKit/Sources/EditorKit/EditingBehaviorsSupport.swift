@@ -244,10 +244,7 @@ enum EditingBehaviorsSupport {
             return .allowNativeInput
         }
 
-        if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
-            return .selectionOnly(edit)
-        }
-        return .textMutation(edit)
+        return proposal(for: edit)
     }
 
     static func apply(
@@ -272,12 +269,28 @@ enum EditingBehaviorsSupport {
         to textView: STTextView,
         editingGuard: EditingBehaviorGuard
     ) {
-        guard !editingGuard.isApplying else { return }
-        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return }
-        let selection = textView.selectedRange()
-        guard let edit = edit(for: command, textView: textView, selection: selection) else { return }
+        guard let proposal = proposedCommand(
+            command,
+            in: textView,
+            editingGuard: editingGuard
+        ) else {
+            return
+        }
 
-        apply(edit, to: textView, editingGuard: editingGuard)
+        _ = apply(proposal, to: textView, editingGuard: editingGuard)
+    }
+
+    static func proposedCommand(
+        _ command: MarkdownEditCommand,
+        in textView: STTextView,
+        editingGuard: EditingBehaviorGuard
+    ) -> EditingBehaviorProposal? {
+        guard !editingGuard.isApplying else { return nil }
+        guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return nil }
+        let selection = textView.selectedRange()
+        guard let edit = edit(for: command, textView: textView, selection: selection) else { return nil }
+
+        return proposal(for: edit)
     }
 
     static func applyReplacement(
@@ -330,6 +343,13 @@ enum EditingBehaviorsSupport {
     ) -> MarkdownEditResult? {
         let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
         return MarkdownEditing.apply(command, to: text, selection: selection)
+    }
+
+    private static func proposal(for edit: MarkdownEditResult) -> EditingBehaviorProposal {
+        if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
+            return .selectionOnly(edit)
+        }
+        return .textMutation(edit)
     }
 
     private static func apply(

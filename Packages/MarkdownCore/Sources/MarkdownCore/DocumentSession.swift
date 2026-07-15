@@ -125,21 +125,13 @@ public final class DocumentSession: ObservableObject {
     }
 
     /// Applies a literal source mutation already authorized by the App-owned editor
-    /// revision fence. The caller proves this differs from the installed base, so the
-    /// ordinary keystroke path does not rescan either full source string.
+    /// revision fence. Authorization does not weaken the session invariants: an exact
+    /// no-op stays a no-op, and returning to the persisted baseline becomes clean.
     public func replaceTextFromAuthorizedEditor(
         _ newText: String,
         refreshStatistics: Bool = true
     ) {
-        text = newText
-        if refreshStatistics {
-            self.refreshStatistics()
-        }
-        if !isDirty {
-            isDirty = true
-        }
-        version += 1
-        emitTextChange()
+        replaceText(newText, refreshStatistics: refreshStatistics)
     }
 
     public func refreshStatistics() {

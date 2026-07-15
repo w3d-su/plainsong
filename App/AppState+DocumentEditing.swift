@@ -131,6 +131,9 @@ extension AppState {
                 return
             }
             try workspaceSearchPostActivationHook?()
+            guard reconcileWorkspaceSearchActivation(activation) else {
+                return
+            }
             cancelPendingEditorNavigationIfNeeded(force: true)
             commitWorkspaceSearchActivation(activation)
             issueEditorNavigation(
@@ -207,6 +210,31 @@ extension AppState {
                 rawValue: target.location.fileURL.absoluteString
             )
         )
+    }
+
+    /// A reusable session can still carry the disk proof from A while the activation load
+    /// observes B. Arbitrate that coherent observation before adopting its binding or changing
+    /// navigation/tree/task ownership, so a dirty overlay cannot make B writable by association.
+    private func reconcileWorkspaceSearchActivation(
+        _ activation: PreparedWorkspaceSearchActivation
+    ) -> Bool {
+        let prepared = activation.anchoredActivation
+        switch prepared.source {
+        case .loaded:
+            return true
+        case .cached, .retired:
+            let observation = ObservedRetainedFileVersion(
+                location: prepared.binding.location,
+                file: prepared.file,
+                identity: prepared.binding.identity,
+                sha256Digest: prepared.binding.sha256Digest
+            )
+            return reconcileObservedRetainedFileVersion(
+                observation,
+                for: prepared.session,
+                canonicalURL: prepared.canonicalURL
+            )
+        }
     }
 
     private func commitWorkspaceSearchActivation(_ activation: PreparedWorkspaceSearchActivation) {

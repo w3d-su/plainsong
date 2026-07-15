@@ -3,6 +3,32 @@ import XCTest
 
 @MainActor
 final class DocumentSessionTests: XCTestCase {
+    @MainActor
+    func testAuthorizedEditorExactNoOpPreservesVersionAndCleanState() {
+        let session = DocumentSession(text: "saved", fileKind: .markdown)
+
+        session.replaceTextFromAuthorizedEditor("saved")
+
+        XCTAssertEqual(session.text, "saved")
+        XCTAssertEqual(session.version, 0)
+        XCTAssertFalse(session.isDirty)
+    }
+
+    @MainActor
+    func testAuthorizedEditorUndoToPersistedBaselineRestoresCleanState() {
+        let session = DocumentSession(text: "saved", fileKind: .markdown)
+
+        session.replaceTextFromAuthorizedEditor("draft")
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+
+        session.replaceTextFromAuthorizedEditor("saved")
+
+        XCTAssertEqual(session.text, "saved")
+        XCTAssertEqual(session.version, 2)
+        XCTAssertFalse(session.isDirty)
+    }
+
     func testExactSourceTextMatchesOnlyLiteralCodeUnitIdentity() {
         let composed = "caf\u{00E9}"
         let decomposed = "cafe\u{0301}"
@@ -10,6 +36,8 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertTrue(composed == decomposed)
         XCTAssertTrue(ExactSourceText.matches(composed, composed))
         XCTAssertFalse(ExactSourceText.matches(composed, decomposed))
+        XCTAssertTrue(ExactSourceText.matches("\u{1F9EA}\0", "\u{1F9EA}\0"))
+        XCTAssertFalse(ExactSourceText.matches("line\r\n", "line\n"))
     }
 
     func testInitialSnapshotReflectsSessionState() {

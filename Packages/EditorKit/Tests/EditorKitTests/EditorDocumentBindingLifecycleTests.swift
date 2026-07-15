@@ -17,6 +17,32 @@ final class EditorDocumentBindingLifecycleTests: XCTestCase {
         XCTAssertNotEqual(composed, EditorDocumentSourceSnapshot(source: "\u{00E9}", revision: 8))
     }
 
+    func testSourcePublicationEqualityDistinguishesCanonicalEquivalentUTF16() {
+        let installation = EditorDocumentBindingInstallation(
+            bindingID: EditorDocumentBindingID(),
+            installationID: EditorDocumentBindingInstallationID()
+        )
+        let base = EditorDocumentSourceSnapshot(source: "base", revision: 3)
+        let composed = EditorDocumentSourcePublication(
+            installation: installation,
+            base: base,
+            source: "caf\u{00E9}"
+        )
+        let decomposed = EditorDocumentSourcePublication(
+            installation: installation,
+            base: base,
+            source: "cafe\u{0301}"
+        )
+
+        XCTAssertEqual(composed.source, decomposed.source)
+        XCTAssertNotEqual(composed, decomposed)
+        XCTAssertEqual(composed, EditorDocumentSourcePublication(
+            installation: installation,
+            base: base,
+            source: "caf\u{00E9}"
+        ))
+    }
+
     func testLeaseTransfersOnlyAfterCandidateInstallationAndRevokesOnTeardown() throws {
         let model = Model()
         let bindingA = EditorDocumentBindingID()

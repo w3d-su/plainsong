@@ -1,10 +1,10 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. Draft PR #85 closes the WS3B
-> filesystem-authority/write sub-gate. Draft PR #82 remains the headless multi-window lifecycle
-> hardening PR and still requires restacking onto that authority baseline; it was not superseded
-> by a visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item,
-> refresh work, WS3C, WS4, and the overall Definition of Done remain open.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. PR #85 merged the WS3B
+> filesystem-authority/write sub-gate, and Draft PR #82 is restacked directly onto that authority
+> baseline as the headless multi-window lifecycle hardening PR; it was not superseded by a
+> visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item, refresh
+> work, WS3C, WS4, and the overall Definition of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -150,8 +150,8 @@ produce only a prefix of the valid-request bound.
 | App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, future active-search FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
 | EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationCommand`, `EditorNavigationRequest` |
 
-The future WS3 App lifecycle must retain the `Task` that consumes each event stream and
-explicitly cancel that Task before replacing a query, closing or switching a workspace, or
+The implemented WS3B App lifecycle retains the `Task` that consumes each event stream and
+explicitly cancels that Task before replacing a query, closing or switching a workspace, or
 discarding search state. Merely breaking out of or abandoning `for await` iteration is not a
 supported producer-cancellation mechanism for the existing `AsyncStream` API.
 
@@ -451,8 +451,9 @@ AppState owns one exact writer installation per session. Every activation suppli
 coordinator's exact `EditorDocumentSourceSnapshot`; App returns its current snapshot and allows
 AppKit's native mutation only when that exact installation owns the writer role and its opaque
 App-owned monotonic revision is current. That current-revision proof is constant-time and performs
-no App-source or native-buffer scan; literal UTF-16 comparisons are reserved for stale
-synchronization, revision-only rekey, rejection, and recovery. A stale coordinator is synchronized
+no App-source or native-buffer scan. After authorization, `DocumentSession` uses optimized literal
+UTF-16 equality for exact no-op and persisted-baseline dirty checks; other literal comparisons serve
+stale synchronization, revision-only rekey, rejection, and recovery. A stale coordinator is synchronized
 and asked to retry before mutation, without stealing writer authority or leaving a rejected caller blocking another installation.
 When only session metadata advanced the revision while the raw source and native view remain exact,
 including same-session Save Copy rekey, EditorKit synchronizes and reacquires from the returned
@@ -469,8 +470,10 @@ informational under R15. Selection-only closing-delimiter skip-over never enters
 source-publication state and changes only the caret. A legitimately older marked-source
 publication uses
 literal UTF-16 three-way reconciliation so non-overlapping accepted edits survive exactly once;
-insertions exactly at either half-open replacement boundary merge deterministically, while only
-strict-interior overlap is rejected. Unsafe overlap restores the coherent current view, installed
+insertions exactly at either half-open replacement boundary merge deterministically, while
+strict-interior overlaps conflict. A repeated-source edit is merged only when its optimal
+matched-offset alignment is unique; ambiguous offsets fail closed. Unsafe reconciliation restores
+the coherent current view, installed
 snapshot, model, writer/pending state, autosave eligibility, and dirty overlay rather than parking
 an accepted native edit indefinitely.
 Marked-text commit provenance retains the initial selected replacement span for AppKit's
@@ -712,12 +715,12 @@ pending.
 
 | Target | Hard CI coverage |
 |---|---|
-| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; saved-baseline rebasing and half-open exact-source reconciliation across surrogate pairs and combining sequences |
+| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
-| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
+| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; dirty-overlay activation arbitration before proof adoption; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
-| PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero current-revision full-source/view comparisons and a local hard `<16 ms` gate; rapid cancellation; result/read byte caps; memory boundedness |
+| PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 
 New tests placed in existing SwiftPM, AppTests, and PerformanceTests directories are
 already picked up by `make test`. Adding the XCUITest target requires editing `project.yml`

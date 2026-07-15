@@ -7,6 +7,46 @@ import XCTest
 
 @MainActor
 final class AppBackedEditorPerformanceTests: XCTestCase {
+    func testAuthorizedDocumentPublicationInvariantsStayWithinFrameBudgetForOneMiBSource() throws {
+        let persistedSource = try Self.fixtureText("Fixtures/large-1mb.md") + "\nA"
+        XCTAssertGreaterThanOrEqual(persistedSource.utf8.count, 1_048_576)
+
+        // Build independent buffers before timing so each sample exercises literal
+        // source comparison without charging fixture allocation to the hot path.
+        let exactNoOpSource = String(decoding: Array(persistedSource.utf8), as: UTF8.self)
+        let editedSource = String(persistedSource.dropLast()) + "B"
+        let restoredSource = String(decoding: Array(persistedSource.utf8), as: UTF8.self)
+        let session = DocumentSession(text: persistedSource, fileKind: .markdown)
+
+        let exactNoOpLatency = measureDocumentSessionPublication {
+            session.replaceTextFromAuthorizedEditor(exactNoOpSource, refreshStatistics: false)
+        }
+        XCTAssertEqual(session.version, 0)
+        XCTAssertFalse(session.isDirty)
+
+        let sameLengthEditLatency = measureDocumentSessionPublication {
+            session.replaceTextFromAuthorizedEditor(editedSource, refreshStatistics: false)
+        }
+        XCTAssertEqual(session.version, 1)
+        XCTAssertTrue(session.isDirty)
+
+        let persistedBaselineLatency = measureDocumentSessionPublication {
+            session.replaceTextFromAuthorizedEditor(restoredSource, refreshStatistics: false)
+        }
+        XCTAssertEqual(session.version, 2)
+        XCTAssertFalse(session.isDirty)
+
+        print(String(
+            format: "WS3B PERF authorized publication 1 MiB no-op %.3f ms, tail edit %.3f ms, baseline %.3f ms",
+            exactNoOpLatency,
+            sameLengthEditLatency,
+            persistedBaselineLatency
+        ))
+        assertFrameBudget(exactNoOpLatency, label: "authorized exact no-op")
+        assertFrameBudget(sameLengthEditLatency, label: "authorized same-length tail edit")
+        assertFrameBudget(persistedBaselineLatency, label: "authorized persisted-baseline restore")
+    }
+
     func testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget() async throws {
         let source = try "AoldB" + (Self.fixtureText("Fixtures/large-1mb.md"))
         XCTAssertGreaterThanOrEqual(source.utf8.count, 1_048_576)
@@ -384,6 +424,12 @@ private extension AppBackedEditorPerformanceTests {
             line: line
         )
         return elapsed
+    }
+
+    func measureDocumentSessionPublication(_ operation: () -> Void) -> Double {
+        let start = DispatchTime.now().uptimeNanoseconds
+        operation()
+        return Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
     }
 
     func measureMarkedTextUpdates(in fixture: Fixture) async -> [Double] {

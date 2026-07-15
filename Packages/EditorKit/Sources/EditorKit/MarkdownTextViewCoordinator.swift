@@ -4,7 +4,7 @@ import STTextView
 import SwiftUI
 
 @MainActor
-private struct EditorInstalledDocumentState {
+struct EditorInstalledDocumentState {
     private var textBinding: Binding<String>
     private var selectionBinding: Binding<NSRange?>
     private var documentBinding: EditorDocumentBindingRegistration?
@@ -235,8 +235,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         MarkdownSTTextView
     ) -> Void
 
-    private let documentBindingInstallationID = EditorDocumentBindingInstallationID()
-    private var installedDocument: EditorInstalledDocumentState
+    let documentBindingInstallationID = EditorDocumentBindingInstallationID()
+    var installedDocument: EditorInstalledDocumentState
     var text: String {
         get { installedDocument.text }
         set { installedDocument.text = newValue }
@@ -273,6 +273,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var scrollProxy: EditorScrollProxy?
     var commandProxy: EditorCommandProxy?
     let editingBehaviorGuard = EditingBehaviorGuard()
+    var writerAuthorizedTextMutationDepth = 0
+    weak var writerAuthorizedTextView: STTextView?
     var completionWorkspace: CompletionWorkspace = .empty
     var imageAssetInserter: EditorImageAssetInserter?
     var imageAssetContextID: String?
@@ -284,8 +286,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
-    private var isSourceSynchronizationPending = false
-    private var isNativeSourceSynchronized = true
+    var isSourceSynchronizationPending = false
+    var isNativeSourceSynchronized = true
     private var preparedNativeSourceCandidateGeneration: UInt64?
     private var deferredDocumentTransitionCandidate: EditorDocumentTransitionCandidate?
     private weak var deferredDocumentTransitionTextView: MarkdownSTTextView?
@@ -471,7 +473,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         deferredDocumentTransitionTextView = nil
     }
 
-    private func scheduleDeferredDocumentTransitionRetry() {
+    func scheduleDeferredDocumentTransitionRetry() {
         guard deferredDocumentTransitionCandidate != nil,
               let textView = deferredDocumentTransitionTextView
         else {
@@ -708,8 +710,15 @@ extension MarkdownTextViewCoordinator {
         replacementString: String?
     ) -> Bool {
         if !isUpdating, editingBehaviorGuard.isApplying {
-            // The outer behavior already acquired writer authority before applying
-            // this re-entrant native replacement.
+            // EditingBehaviorGuard alone is not writer proof. Only a coordinator path
+            // that completed preflight may authorize this re-entrant replacement.
+            guard writerAuthorizedTextMutationDepth > 0,
+                  writerAuthorizedTextView === textView
+            else {
+                (textView as? MarkdownSTTextView)?
+                    .discardUnconfirmedMarkedTextReplacementRange()
+                return false
+            }
             isUserEditing = true
             return true
         }
@@ -750,12 +759,10 @@ extension MarkdownTextViewCoordinator {
         }
 
         if !isUpdating {
-            // A marked source already passed the activation fence when composition
-            // began. Its commit must publish from that retained base so App can perform
-            // the existing non-overlapping three-way reconciliation.
-            let continuesLegitimateStalePublication = isSourceSynchronizationPending &&
-                !installedDocument.isSourceRevisionCurrent()
-            guard continuesLegitimateStalePublication || requestWriterActivation(in: textView) else {
+            guard preflightTextMutation(
+                in: textView,
+                allowsPendingStalePublication: true
+            ) else {
                 (textView as? MarkdownSTTextView)?
                     .discardUnconfirmedMarkedTextReplacementRange()
                 return false
@@ -763,10 +770,9 @@ extension MarkdownTextViewCoordinator {
             isUserEditing = true
         }
 
-        let shouldAllowNativeInput = EditingBehaviorsSupport.apply(
+        let shouldAllowNativeInput = applyPreflightedEditingBehavior(
             proposedBehavior,
-            to: textView,
-            editingGuard: editingBehaviorGuard
+            to: textView
         )
 
         if shouldTriggerCompletion {
@@ -886,81 +892,6 @@ extension MarkdownTextViewCoordinator {
             scheduleDeferredDocumentTransitionRetry()
             return didRestoreSource
         }
-    }
-
-    private func requestWriterActivation(
-        in textView: STTextView,
-        retryingAfterSynchronization: Bool = false
-    ) -> Bool {
-        guard let result = installedDocument.requestWriterActivation(
-            installationID: documentBindingInstallationID
-        ) else {
-            return true
-        }
-
-        switch result {
-        case let .activated(snapshot):
-            // Matching App-owned revisions plus exact installation authorization are
-            // the constant-time proof for the ordinary native mutation path. The
-            // coordinator's buffer was installed from that retained revision, so do
-            // not scan the native storage again here.
-            installedDocument.synchronizeSourceSnapshot(snapshot)
-            isNativeSourceSynchronized = true
-            return true
-        case let .synchronize(snapshot):
-            let isExactViewBase = nativeTextMatches(
-                textView,
-                snapshot.source
-            )
-            if !isExactViewBase {
-                applyReconciledSource(snapshot.source, replacing: "", in: textView)
-            }
-            installedDocument.synchronizeSourceSnapshot(snapshot)
-            isNativeSourceSynchronized = true
-            settleSourceSynchronizationPending()
-            scheduleDeferredDocumentTransitionRetry()
-            // A URL or file-kind rekey can advance the session revision without
-            // changing its exact source. Reacquire from that synchronized snapshot
-            // before the native mutation; content-stale views still reject this event.
-            guard isExactViewBase, !retryingAfterSynchronization else {
-                return false
-            }
-            return requestWriterActivation(
-                in: textView,
-                retryingAfterSynchronization: true
-            )
-        case let .rejected(snapshot):
-            if !nativeTextMatches(textView, snapshot.source) {
-                applyReconciledSource(snapshot.source, replacing: "", in: textView)
-            }
-            installedDocument.synchronizeSourceSnapshot(snapshot)
-            isNativeSourceSynchronized = true
-            settleSourceSynchronizationPending()
-            scheduleDeferredDocumentTransitionRetry()
-            return false
-        case .released, .releaseRejected:
-            assertionFailure("Writer activation returned a release result")
-            return false
-        }
-    }
-
-    private func beginSourceSynchronizationPending() {
-        guard !isSourceSynchronizationPending else { return }
-        isSourceSynchronizationPending = true
-        installedDocument.reportPendingSource(
-            EditorDocumentPendingSourceEvent.began,
-            installationID: documentBindingInstallationID
-        )
-    }
-
-    private func settleSourceSynchronizationPending() {
-        guard isSourceSynchronizationPending else { return }
-        installedDocument.reportPendingSource(
-            EditorDocumentPendingSourceEvent.synchronized,
-            installationID: documentBindingInstallationID
-        )
-        isSourceSynchronizationPending = false
-        scheduleDeferredDocumentTransitionRetry()
     }
 
     private func synchronizeInstalledSource(

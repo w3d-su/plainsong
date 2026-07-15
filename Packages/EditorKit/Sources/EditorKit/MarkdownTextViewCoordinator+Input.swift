@@ -32,11 +32,32 @@ extension MarkdownTextViewCoordinator {
     }
 
     func performCommand(_ command: MarkdownEditCommand, in textView: STTextView) {
-        EditingBehaviorsSupport.applyCommand(
+        guard let proposal = EditingBehaviorsSupport.proposedCommand(
             command,
-            to: textView,
+            in: textView,
             editingGuard: editingBehaviorGuard
-        )
+        ) else {
+            return
+        }
+
+        switch proposal {
+        case .allowNativeInput:
+            return
+        case .selectionOnly:
+            _ = EditingBehaviorsSupport.apply(
+                proposal,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        case .textMutation:
+            performPreflightedTextMutation(in: textView) {
+                _ = EditingBehaviorsSupport.apply(
+                    proposal,
+                    to: textView,
+                    editingGuard: editingBehaviorGuard
+                )
+            }
+        }
     }
 
     func textView(
@@ -73,11 +94,19 @@ extension MarkdownTextViewCoordinator {
 
     func textView(_ textView: STTextView, insertCompletionItem item: any STCompletionItem) {
         guard let item = item as? MarkdownCompletionItem else { return }
+        guard performPreflightedTextMutation(in: textView, {
+            EditorCompletionSupport.insert(
+                item.completion,
+                into: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        }) else {
+            return
+        }
         recentCompletionIDs = EditorCompletionSupport.recentCompletionIDs(
             selecting: item.id,
             existing: recentCompletionIDs
         )
-        EditorCompletionSupport.insert(item.completion, into: textView, editingGuard: editingBehaviorGuard)
     }
 
     func requestCompletion(afterApplyingChangeIn textView: STTextView) {
@@ -126,13 +155,15 @@ extension MarkdownTextViewCoordinator {
             location: selectionRange.location + (replacement as NSString).length,
             length: 0
         )
-        EditingBehaviorsSupport.applyReplacement(
-            replacement,
-            replacementRange: selectionRange,
-            newSelection: newSelection,
-            to: textView,
-            editingGuard: editingBehaviorGuard
-        )
+        performPreflightedTextMutation(in: textView) {
+            EditingBehaviorsSupport.applyReplacement(
+                replacement,
+                replacementRange: selectionRange,
+                newSelection: newSelection,
+                to: textView,
+                editingGuard: editingBehaviorGuard
+            )
+        }
         return true
     }
 
@@ -172,7 +203,7 @@ extension MarkdownTextViewCoordinator {
                 .map { SmartPaste.imageInsertion(relativePath: $0) }
                 .joined(separator: "\n")
             let currentText = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-            guard currentText == capturedText else {
+            guard ExactSourceText.matches(currentText, capturedText) else {
                 return
             }
             let replacementRange = capturedRange.clamped(toLength: (currentText as NSString).length)
@@ -180,13 +211,15 @@ extension MarkdownTextViewCoordinator {
                 location: replacementRange.location + (insertion as NSString).length,
                 length: 0
             )
-            EditingBehaviorsSupport.applyReplacement(
-                insertion,
-                replacementRange: replacementRange,
-                newSelection: newSelection,
-                to: textView,
-                editingGuard: editingBehaviorGuard
-            )
+            performPreflightedTextMutation(in: textView) {
+                EditingBehaviorsSupport.applyReplacement(
+                    insertion,
+                    replacementRange: replacementRange,
+                    newSelection: newSelection,
+                    to: textView,
+                    editingGuard: self.editingBehaviorGuard
+                )
+            }
         }
     }
 }

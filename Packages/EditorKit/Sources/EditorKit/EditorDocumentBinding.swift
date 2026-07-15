@@ -80,6 +80,15 @@ public struct EditorDocumentSourcePublication: Equatable, Sendable {
         self.base = base
         self.source = source
     }
+
+    public static func == (
+        lhs: EditorDocumentSourcePublication,
+        rhs: EditorDocumentSourcePublication
+    ) -> Bool {
+        lhs.installation == rhs.installation
+            && lhs.base == rhs.base
+            && ExactSourceText.matches(lhs.source, rhs.source)
+    }
 }
 
 /// Synchronous publication result returned before EditorKit settles pending input.

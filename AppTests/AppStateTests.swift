@@ -10050,6 +10050,77 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(navigation.selection, scenario.match.range)
     }
 
+    // swiftlint:disable:next function_body_length
+    func testDirtyOverlaySearchActivationArbitratesSameInodeRewriteBeforeAdoptingProof() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let diskA = "disk A"
+        let localOverlay = "local needle"
+        let diskB = "disk B"
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": diskA],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        let documentURL = fixture.rootURL.appendingPathComponent("a.md")
+        let originalBinding = try XCTUnwrap(appState.anchoredSessionFileBinding(for: session))
+
+        appState.replaceDocumentText(localOverlay, in: session)
+        let pendingAutosave = try XCTUnwrap(appState.autosaveTask)
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitUntil("dirty-overlay search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+
+        let handle = try FileHandle(forWritingTo: documentURL)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(diskB.utf8))
+        try handle.synchronize()
+        try handle.close()
+        let rewrittenIdentity = try regularIdentity(at: documentURL)
+        XCTAssertEqual(rewrittenIdentity, originalBinding.identity, "test setup must retain the inode")
+
+        let fileResult = result(
+            path: "a.md",
+            text: localOverlay,
+            needle: "needle",
+            rootURL: fixture.rootURL
+        )
+        let match = try XCTUnwrap(fileResult.matches.first)
+        provider.yield(.fileResult(context(for: request), fileResult), to: 0)
+        try await waitUntil("dirty-overlay result applies") {
+            appState.workspaceSearchState.fileResults == [fileResult]
+        }
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
+
+        appState.activateWorkspaceSearchResult(
+            context: context(for: request),
+            fileResult: fileResult,
+            match: match
+        )
+
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(session.text, localOverlay)
+        XCTAssertTrue(session.isDirty)
+        XCTAssertEqual(appState.anchoredSessionFileBinding(for: session), originalBinding)
+        XCTAssertEqual(appState.pendingExternalTexts[documentURL], diskB)
+        let observedB = try XCTUnwrap(appState.pendingExternalFileVersions[documentURL])
+        XCTAssertEqual(observedB.location, originalBinding.location)
+        XCTAssertEqual(observedB.identity, originalBinding.identity)
+        XCTAssertEqual(observedB.file.text, diskB)
+        XCTAssertNotEqual(observedB.sha256Digest, originalBinding.sha256Digest)
+        XCTAssertEqual(appState.externalChangePrompt?.fileURL, documentURL)
+        XCTAssertEqual(appState.editorNavigationCommand, .navigate(olderNavigation))
+        XCTAssertTrue(pendingAutosave.isCancelled)
+        XCTAssertNil(appState.autosaveTask)
+        XCTAssertNil(appState.sessionAutosaveTasks[sessionIdentity])
+        XCTAssertFalse(appState.canAutosave(session: session))
+        XCTAssertThrowsError(try appState.save(session: session))
+        XCTAssertEqual(try String(contentsOf: documentURL, encoding: .utf8), diskB)
+    }
+
     func testByteDifferentCanonicalEquivalentFingerprintCancelsNavigationAndRefreshesFreshOverlay() async throws {
         let provider = ControlledWorkspaceSearchStreamProvider()
         let diskText = "cafe\u{0301} needle"

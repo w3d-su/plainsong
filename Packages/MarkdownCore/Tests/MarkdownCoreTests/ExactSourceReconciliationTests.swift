@@ -98,4 +98,60 @@ final class ExactSourceReconciliationTests: XCTestCase {
             proposed: "Ao\u{4E2D}ldB"
         ))
     }
+
+    func testRepeatedSourceInsertionWithAmbiguousOffsetIsRejected() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "aaaa",
+            current: "aaaaa",
+            proposed: "baaa"
+        ))
+    }
+
+    func testAmbiguousProposalAlignmentIsAlsoRejected() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "aaaa",
+            current: "baaa",
+            proposed: "aaaaa"
+        ))
+    }
+
+    func testDifferentMinimalAlignmentsAreRejected() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "ab",
+            current: "ba",
+            proposed: "aB"
+        ))
+    }
+
+    func testMultiUnitRepeatedInsertionAlignmentIsRejected() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "abx",
+            current: "ababx",
+            proposed: "zbx"
+        ))
+    }
+
+    func testSplitRepeatedInsertionAlignmentIsRejected() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "a",
+            current: "baa",
+            proposed: "A"
+        ))
+    }
+
+    func testIndependentInsertionsIntoEmptyBaseConflictWithoutCrashing() {
+        XCTAssertNil(ExactSourceText.reconciling(
+            base: "",
+            current: "current",
+            proposed: "proposed"
+        ))
+    }
+
+    func testUniquePrefixInsertionStillMergesWithDistantReplacement() {
+        XCTAssertEqual(ExactSourceText.reconciling(
+            base: "abcd",
+            current: "xabcd",
+            proposed: "abYd"
+        ), "xabYd")
+    }
 }
