@@ -239,7 +239,9 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
         textView.insertText("X", replacementRange: NSRange(location: 0, length: 0))
 
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitForCondition("delayed image paste cleanup") {
+            discardCount == 1
+        }
         XCTAssertEqual(Self.text(in: textView), "XBefore ")
         XCTAssertEqual(discardCount, 1)
     }
@@ -264,7 +266,9 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
         coordinator.updateImageAssetContextID("file-b")
 
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitForCondition("delayed image drop cleanup") {
+            discardCount == 1
+        }
         XCTAssertEqual(Self.text(in: textView), "Before ")
         XCTAssertEqual(discardCount, 1)
     }
@@ -387,6 +391,19 @@ private extension EditingBehaviorsSupportTests {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTAssertEqual(Self.text(in: textView), expected)
+    }
+
+    func waitForCondition(
+        _ description: String,
+        condition: @MainActor () -> Bool
+    ) async throws {
+        for _ in 0 ..< 100 {
+            if condition() {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
     }
 
     static var repoRoot: URL {
