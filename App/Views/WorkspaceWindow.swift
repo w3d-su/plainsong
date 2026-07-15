@@ -104,7 +104,9 @@ private struct EditorWorkspace: View {
                 isSaving: appState.isSaving
             )
 
-            if appState.missingFilePrompt != nil {
+            if appState.indeterminateFileWriteReconciliationPrompt != nil {
+                FileWriteReconciliationBanner()
+            } else if appState.missingFilePrompt != nil {
                 MissingFileBanner()
             } else if appState.externalChangePrompt != nil {
                 ExternalChangeBanner()
@@ -298,7 +300,7 @@ private struct DocumentEditor: View {
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
-            imageAssetContextID: session.fileURL?.standardizedFileURL.path(percentEncoded: false),
+            imageAssetContextID: appState.sessionStateURL(for: session)?.path(percentEncoded: false),
             _developmentPresentation: presentation,
             _developmentImageThumbnails: appState.editorImageThumbnailConfiguration(
                 for: session,

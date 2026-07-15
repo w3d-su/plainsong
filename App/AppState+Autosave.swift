@@ -28,6 +28,7 @@ extension AppState {
                 else {
                     return
                 }
+                autosaveTask = nil
                 autosaveIfNeeded()
             } catch {
                 return
@@ -117,13 +118,15 @@ extension AppState {
     }
 
     func canAutosave(session: DocumentSession) -> Bool {
-        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return false }
+        guard let url = sessionStateURL(for: session) else { return false }
+        guard indeterminateSessionWrites[ObjectIdentifier(session)] == nil else { return false }
         guard session === currentDocument || sessionCache[url] === session || isRetiredEditorSession(session) else {
             return false
         }
         return !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
-            externalChangePrompt?.fileURL.standardizedFileURL != url &&
-            missingFilePrompt?.fileURL.standardizedFileURL != url
+            pendingExternalFileVersions[url] == nil &&
+            externalChangePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false &&
+            missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }
 }

@@ -1,7 +1,10 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, WS3A, and the headless WS3B App lifecycle are
-> complete and locally verified; visible WS3 sidebar work and WS4 remain pending.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. Draft PR #85 closes the WS3B
+> filesystem-authority/write sub-gate. Draft PR #82 remains the headless multi-window lifecycle
+> hardening PR and still requires restacking onto that authority baseline; it was not superseded
+> by a visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item,
+> refresh work, WS3C, WS4, and the overall Definition of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -120,8 +123,9 @@ produce only a prefix of the valid-request bound.
   cancelled or stale scan before it can apply state.
 - The scanner skips hidden entries and package descendants but does not process
   `.gitignore`, `.ignore`, or common generated/vendor directories such as `node_modules`.
-- `WorkspaceRootContainment` is the shared symlink-resolving containment boundary used by
-  completion, assets, and workspace search rather than duplicating path-prefix logic.
+- `WorkspaceRootContainment` remains the shared symlink-resolving containment boundary for
+  completion, assets, and initial workspace-search candidate canonicalization. Search then
+  binds the canonical lexical path to the request's immutable no-follow filesystem authority.
 - `DocumentSession` owns canonical in-memory text, while `AppState.sessionCache` retains up
   to eight warm sessions keyed by the contained, symlink-resolved physical target URL.
   WorkspaceKit must receive immutable overlays rather than reading main-actor sessions
@@ -195,16 +199,51 @@ must not be enumerated one UTF-16 unit at a time.
 
 A request should contain only immutable, Sendable data:
 
-- standardized root URL;
+- one immutable `WorkspaceFileSystemRootAuthority` as the sole filesystem root; its captured
+  original URL may supply security-scoped access, but the request accepts no independent root
+  URL for candidate planning, ignore files, overlays, or reads;
 - immutable `WorkspaceFileSnapshot`;
-- root/workspace generation;
+- a root identity string plus workspace/query generations used only as App lifecycle tokens,
+  never as filesystem authority;
 - query and configurable limits;
-- a validated `WorkspaceSearchOverlayCollection` containing canonical relative paths and
-  immutable unsaved text.
+- a validated `WorkspaceSearchOverlayCollection` containing normalized relative paths,
+  indexed by their exact UTF-8 bytes, and immutable unsaved text.
 
 The service emits partial per-file results and a final summary. Result application is valid
 only when root identity, workspace generation, and query generation still match the active
 App state.
+
+The reusable WorkspaceKit filesystem foundation is specified in
+`docs/workspace-filesystem-contract.md`. Workspace reload captures one descriptor-backed root
+authority together with its snapshot off the main actor. When reload auto-opens a selected
+document, location construction and the exact file byte load remain rooted in
+`capture.rootAuthority`. The loaded descriptor identity and exact-byte digest become the
+session's anchored binding, and a cached current/warm session is reconciled from the loaded
+activation file instead of returning early. Because the load may suspend, the selected root
+spelling is proved a second time after the load and immediately before the prepared activation,
+capture, installed generation, and tree are committed without a main-actor suspension. A failed
+proof or activation installs none of the stale capture. A current-session/state-location change
+during that suspension cancels publication, and cached/retired activation source arbitration is
+repeated after the final proof before the uninterrupted commit. An external namespace mutation can still
+race after that last proof, so this is not claimed to be identity-atomic; retained authority and
+later fail-closed validation keep such a race from redirecting a consumer to root B. Main-actor
+search-request construction remains filesystem-free. Production reads walk lexical
+root-relative paths through a retained no-follow descriptor chain and validate the root, every
+ancestor, the final parent, and the leaf before publishing bytes.
+
+Each production disk result, and each overlay result whose physical destination was validated,
+carries `WorkspaceSearchFileAuthority`: the same retained location plus identity sampled from
+the exact read/validation descriptor. Workspace-search-result activation consumes that retained
+location and identity; after activation it compares the installed session binding's location
+with the accepted target before fingerprint/range navigation. File-tree/sidebar opening derives
+its location from the installed authority. Completion refresh retains the installed authority
+and current binding location for sibling reads; if the current session binding belongs to a
+previous authority, refresh fails closed to current-document-only completion and reads no
+siblings from the installed replacement root. Reload rejects a previous-authority location that
+lexically collides inside the new root, while treating an outgoing retained location outside the
+new root as unrelated so a normal workspace A-to-unrelated-workspace B switch can install B's
+first editable file. None of these paths decides what to read or save by resolving a mutable
+post-install root or session URL.
 
 Every `WorkspaceSearchFileResult` carries a `WorkspaceSearchContentFingerprint` computed
 from the exact `String` passed to `TextSearchEngine`. Its digest is the 64-character
@@ -217,31 +256,35 @@ version is retained by the WS2 result model. If a disk file changes after the sn
 before its read, its result fingerprints the newly read and searched content.
 
 Dirty overlays are validated before a request is built. `WorkspaceSearchOverlay` rejects
-empty, absolute, and traversing paths and stores a canonical workspace-relative path.
+empty, absolute, and traversing paths and stores a normalized workspace-relative path.
 `WorkspaceSearchOverlayCollection` rejects dictionary key/path mismatches and rejects every
-normalized collision instead of choosing a winner by input or dictionary iteration order;
-for example, `post.md` and `./post.md` cannot coexist. Valid canonical overlays continue to
-take precedence over disk content.
+exact-byte normalized collision instead of choosing a winner by input or dictionary iteration
+order; for example, `post.md` and `./post.md` cannot coexist. Canonically equivalent NFC and
+NFD spellings remain separate UTF-8 path keys, so an overlay can neither replace nor be applied
+to the other spelling. Valid overlays continue to take precedence over disk content. Candidate
+deduplication, ignore-file ancestor enumeration, and deterministic path ordering use the same
+byte-exact key. An anchored dirty session is eligible only when its retained
+root authority equals the installed authority used for the request; moving root A and placing B
+at the old spelling cannot inject a cached A session's dirty text into B's search.
+Completion metadata uses that byte key for current-file exclusion and ordering before the bounded
+50-sibling frontmatter read. A canonically equivalent but byte-distinct sibling therefore remains
+eligible, and snapshot insertion order cannot choose which siblings fall inside the read cap.
 
-Workspace document identity follows one physical-target policy. An in-root file URL is
-standardized, symlink-resolved, containment-checked, and then expressed relative to the
-resolved root. Session-cache keys, overlay paths, search candidate/result paths, activation,
-tree selection, and editor document identity all derive from that value. Snapshot aliases
-that resolve to the same target collapse to one path-ordered search candidate, so an unsaved
-edit opened through `alias.md -> target.md` overrides disk content and activates the same
-session as `target.md`. A link resolving outside the root remains a typed symlink escape;
-this policy does not relax `WorkspaceRootContainment`. Candidate planning and the immediate
-pre-read race check revalidate the resolved physical target's file kind after containment:
-only `.md`, `.markdown`, and `.mdx` targets remain searchable. Thus
-`alias.md -> target.txt` is a typed skipped candidate rather than an unopenable result, while
-`alias.md -> target.md` still deduplicates to `target.md`. Candidate, skipped, progress, and
-terminal counts use the post-deduplication plan and remain internally consistent.
+Workspace document identity keeps one physical-target policy. Initial in-root aliases are
+resolved and containment-checked during candidate planning, then expressed as one canonical
+lexical root-relative path; aliases to the same target collapse to that candidate, and an
+outside-root target remains a typed `symlinkEscape`. Once the canonical path is bound to the
+request's captured root authority, production reads never resolve the alias or another mutable
+URL again. Every component is opened no-follow through retained descriptors, so a symlink,
+rename, or replacement introduced after planning fails closed. Dirty overlays use the same
+byte-exact normalized candidate key and are accepted only after the exact physical leaf is validated.
+Candidate, skipped, progress, and terminal counts remain internally consistent.
 
 Search reads must:
 
 - accept only snapshot entries classified as editable Markdown;
 - resolve every candidate against the real workspace root;
-- reject `..` components and symlinks escaping the root;
+- reject `..`, outside-root alias targets, and any symlink substitution after authority binding;
 - prefer a dirty overlay to disk;
 - skip a file that disappears, becomes unreadable, is invalid UTF-8, or exceeds the byte
   cap while continuing other files;
@@ -303,7 +346,11 @@ rather than being read.
 Rules support blank lines, `#` comments, leading `/` rooted patterns, trailing `/`
 directory-only patterns, `*`, `?`, `**`, `!` negation, nested base directories, and
 last-matching-rule-wins behavior. `*` and `?` never span `/`; `**` spans zero or more path
-components. This is deliberately not complete Git ignore compatibility: bracket classes,
+components. Literal pattern characters match only identical UTF-8 bytes; Swift's canonical
+equivalence therefore cannot make an NFC ignore rule suppress an NFD candidate (or vice versa).
+Pattern `*` is recognized as a wildcard before literal-byte comparison, so an identical `*` byte
+in a filename cannot consume the pattern token and disable the wildcard's backtracking anchor.
+This is deliberately not complete Git ignore compatibility: bracket classes,
 backslash escaping, global/exclude files, and Git's traversal rule that prevents a child from
 being re-included beneath an ignored parent are unsupported. Because WS2 filters an immutable
 snapshot rather than pruning a filesystem walk, a later negation may re-include a child.
@@ -315,6 +362,10 @@ The sidebar gains two modes inside the existing stable shell:
 - **Files** preserves the current tree, file information, and frontmatter panel.
 - **Search** presents the field, case/word controls, progress, grouped results, and
   summary/error states.
+
+Files-tree parent grouping and default-filter ancestor visibility use UTF-8 byte keys. If a
+snapshot entry has no resource identity, its fallback node ID is a namespaced ASCII hex encoding
+of the exact relative-path bytes, so NFC/NFD directories neither share children nor expansion IDs.
 
 `Command-Shift-F` selects Search mode and increments a search-focus request token.
 `Command-F` remains the focused editor's single-file find action. Keyboard selection and
@@ -361,18 +412,26 @@ generation together only after the candidate's literal UTF-16 text is present. E
 UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
 ended and the editor is window-attached. Invalid ranges are rejected without clamping. At
 the WS3A landing point, App ownership, fingerprint arbitration, sidebar behavior, tree
-synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B closes
-only the headless App subset below.
+synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3B advances
+only the headless App subset below and remains open at this landing point.
 
-**Implemented WS3B subset.** MarkdownCore exposes one allocation-free exact UTF-16 source
+**Implemented WS3B lifecycle foundation (gate still open).** MarkdownCore exposes one
+allocation-free exact UTF-16 source
 comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
 raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
 headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
 debounce, and the exact Task consuming each stream. Query replacement, workspace generation
 changes, close/switch, empty-query clear, and teardown explicitly cancel that Task;
 root/workspace/query context checks gate every event, and task-token checks prevent an older
-cleanup from touching newer state. Requests capture a retained snapshot plus validated
-immutable dirty overlays from current and warm Markdown/MDX sessions on the main actor.
+cleanup from touching newer state. Workspace reload captures the retained snapshot and its
+single descriptor-backed filesystem authority together off the main actor, generation-fences
+installation, loads optional activation bytes/identity/digest through that same authority, and
+reconciles even a cached current session from that loaded file. A second selected-root proof runs
+after the activation load immediately before the uninterrupted main-actor commit. Cached or
+retired reuse additionally requires any retained binding or exact re-homed quarantine location
+to equal the prepared activation location; URL equality cannot rebind A to replacement B. Requests add
+validated immutable dirty overlays from current and warm Markdown/MDX sessions without
+selecting another root, and request construction on the main actor stays filesystem-free.
 
 The App/editor bridge also carries an opaque binding ID distinct from optional navigation
 identity. EditorKit reports installation only from a successful `finishDocumentTransition`
@@ -392,19 +451,110 @@ External-change conflicts are session-scoped by the canonical URL entry in
 `save(session:)` reject that exact session even while another document is current. LRU
 eviction, workspace retirement, and close paths retain or block on the dirty conflict rather
 than overwriting disk or silently dropping the session. Reload restores the external text as
-clean; Keep Mine clears the conflict and restores save/autosave eligibility. Binding
-registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
+clean; Keep Mine performs and adopts a fresh observation, accepts the latest observed version
+(for example C after an earlier B prompt), clears matching conflict, detached, and missing-file
+fences, and restores save/autosave eligibility. If a clean quarantined session's local source
+differs byte-for-byte from that observation, Keep Mine marks both the session and its LRU record
+dirty before scheduling autosave, so the UI cannot claim a false clean state. The accepted
+observation also becomes the session's saved-text baseline without replacing or publishing the
+current editor text: editing back to C becomes clean, while editing back to pre-conflict A remains
+dirty. If a detached cached or reusable retired session is reopened after the user switched to
+another file, activation retains its old authority/proof and routes the recreated leaf through
+this same arbitration; it does not reject the session before Reload/Keep Mine can be offered, and
+the detached fence remains until one of those explicit resolutions succeeds. This arbitration is
+required even when the restored leaf has the same descriptor identity, digest, and bytes as A,
+because detachment invalidated the session's saved baseline.
+
+Binding registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
 registration, while a matching revoke can still clear the installed lease after registration
 cleanup; unrelated or stale revokes cannot clear a newer lease.
 
-Workspace aliases use the one physical-target policy above. Activation accepts only a retained
-active result/match, emits a newer cancellation before every fallible execution step, selects
-and activates the canonical contained target, compares SHA-256 plus UTF-8 byte count, validates
-the raw range without clamping, then emits a newer URL-identified navigation. Fingerprint
-mismatch restarts with fresh overlays while leaving cancellation latest; every other accepted
-failure also leaves that cancellation latest. The command and binding lifecycle pass through
-`WorkspaceWindow`; sidebar UI, shortcuts/focus, rendering/accessibility, and general
-edit/FSEvent auto-refresh remain pending.
+Installed and standalone managed sessions retain the exact authority location, descriptor
+identity, and exact loaded-byte digest. Standalone proof also captures installed-workspace
+membership when present. Cmd-S/autosave uses typed `existingContent(identity, digest)` through
+that retained location instead of resolving or reinspecting a session URL; unavailable, deleted,
+replaced, or changed-content proof fails closed. Every Save Copy destination establishes one
+no-follow `WorkspaceFileSystemLocation` before writing and consumes the typed outcome directly.
+Save Copy reuses its one target inspection for both ownership arbitration and the first writer
+expectation: a regular file is `.existing(identity)` and an absent leaf is `.missing`; the first
+attempt is never widened to `.existingOrMissing`. Outside-workspace final symlinks are rejected
+instead of being followed by a legacy save. Descriptor-derived physical identity detects
+hard-link ownership across current, cached, retired, editor-bound, and unanchored standalone
+sessions. Arbitration never re-inspects mutable `session.fileURL`. A source session may Save Copy
+to a proven-missing destination only when its retained authority/location equals that destination;
+literal path spelling is compared by UTF-8 bytes, so NFC/NFD spellings do not become an accidental
+self-exemption. Canonically equivalent App-visible paths remain protected even when cached,
+retired, editor-bound, or quarantined owners belong to different authorities. Case folding is
+applied only when the destination parent reports a case-insensitive filesystem, so distinct case
+spellings remain valid on case-sensitive volumes. Existing aliases, hard links, and every other
+session remain protected. Only the source session's old state is removed after durable success.
+
+An external notification first performs one coherent authority-bound read through the retained
+anchored binding or standalone proof, then compares its literal location, descriptor identity,
+and SHA-256 digest before adopting anything. mtime, FNV, URL recapture, and a cache/retirement
+hit do not authorize a proof replacement. For a dirty session, any unaccepted identity or byte
+change (including a same-inode rewrite) enters the session conflict, cancels autosave, and keeps
+the prior proof intact; only an explicit Reload or Keep Mine performs a fresh read and adopts the
+accepted observation. Keep Mine resolves against that newest observation rather than retaining a
+stale B proof when the file has advanced to C. The rule is identical for anchored and standalone
+sessions, including delete/recreate recovery.
+A stateful retained A session (pending conflict, detachment, or indeterminate context) also blocks
+a replacement-parent B at the same lexical URL until A is resolved; B cannot inherit or clear A's
+URL-keyed fence merely by reusing its spelling.
+
+`WorkspaceFileSystemLocation.fileURL` is lexical and leaf-state-independent: construction never
+inspects the leaf, equal locations expose identical slash-free URLs, and literal relative-path
+bytes keep NFC/NFD locations distinct. Session binding/context lookup starts from retained session
+identity and stored spelling without standardizing or resolving mutable URLs. Any session write or Save Copy
+`committedButIndeterminate` outcome creates a per-session reconciliation quarantine:
+a readable Save Copy destination records its observed identity/digest as pending for Reload or Keep
+Mine while retaining the prior proof until that explicit resolution; a proven-missing destination
+exposes only exact-location `.missing` recovery. Symlink,
+non-regular, unreadable, and inspection-failure states remain quarantined with an actionable Check
+Again reconciliation that reclassifies only the retained location and authority. The exact
+location, URL spelling, result, and prepared digest remain retained even when the leaf becomes a
+directory; the location captures its URL once, so a later leaf-kind change cannot append a slash.
+That quarantine is independent of dirty state: LRU eviction, editor retirement and metadata
+cleanup, missing-file close, workspace close, and workspace switch retain or block rather than
+discarding a clean quarantined session. Cmd-S and autosave stay blocked; every
+differently spelled or broad Save Copy retry is refused before writer entry, and no legacy URL
+fallback is allowed.
+Root capture, `relativePath(forFileURL:)`, standalone capture, recovery, and LRU keys preserve
+literal UTF-8 path bytes rather than round-tripping through `standardizedFileURL`; only
+separator/dot traversal normalization remains. When both canonical and original root spellings
+are exact-byte prefixes, relative-path extraction chooses the longest component prefix, so an
+original symlink nested under the canonical root is not retained as a false path component.
+Non-file URLs and NUL-bearing raw paths are
+rejected before any C-string filesystem call. A descriptor-derived canonical parent may unify an
+alias cache key, but it does not alter an NFC leaf: an exact missing-source Save Copy reuses that
+retained NFC authority/location, while an NFD alternative remains non-exact and is refused.
+Durable retained/removal-indeterminate cleanup state is preserved separately from commit status:
+App completes the clean/re-home transition, retains the exact authority artifact notice, and
+presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact
+notice. An explicit acknowledgement API removes the notice and releases its retained authority
+lifetime without deleting the artifact; workspace close preserves unacknowledged notices. The
+legacy URL facade continues to map typed outcomes for external callers, but App ordinary save and
+Save Copy no longer discard those outcomes through that facade.
+
+Workspace retirement transfers the active security-scoped lease only when the retiring session's
+retained binding/quarantine authority or captured standalone workspace membership equals the
+installed workspace authority; it never reopens or reinspects the current path. Initial and final selected-root proof failures propagate their
+typed filesystem error to the normal reload error path. Only actual task/generation cancellation is
+silent.
+
+The two activation paths remain deliberately distinct but are both authority-bound. Reload
+activation consumes `capture.rootAuthority`, performs its second selected-root proof after the
+load, and installs nothing on failure. Workspace-search-result activation consumes the accepted
+result's retained `WorkspaceSearchFileAuthority`, activates its exact location/identity, and
+checks the installed binding location rather than resolving the result URL. Existing file-tree
+sidebar opens and completion reads likewise retain the installed authority; a context-only
+quarantined session is treated as authority-bound, so completion cannot derive sibling reads from
+replacement B and reload rejects a cross-authority disposition. The last proof does
+not prevent a later external namespace race; subsequent anchored operations detect disagreement
+and fail closed instead of being described as identity-atomic. Cancellation, fingerprint, exact
+range, command, and binding-lifecycle requirements otherwise remain unchanged. Visible sidebar
+UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent search refresh remain
+pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -444,6 +594,8 @@ edit/FSEvent auto-refresh remain pending.
   file results, final progress, and terminal state.
 - [x] Validate dirty overlays deterministically, rejecting invalid paths, key/path
   mismatches, and normalized collisions before search.
+- [x] Keep candidate, overlay, and ignore-ancestor path identity byte-exact so NFC/NFD
+  spellings remain independently searchable.
 
 ### WS3 — Sidebar and exact navigation
 
@@ -458,6 +610,11 @@ edit/FSEvent auto-refresh remain pending.
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.
+- [x] Bind reload, workspace-search-result and file-tree activation, completion reads, and
+  session save to the installed filesystem authority without post-install URL resolution.
+- [x] Preserve typed write outcomes through App save, including exact-digest expectations,
+  descriptor-canonical installed-workspace Save Copy ownership protection, exact cleanup-artifact
+  notices, and per-session indeterminate quarantine.
 - [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
 
 ### WS4 — CI, performance, and acceptance
@@ -476,10 +633,10 @@ edit/FSEvent auto-refresh remain pending.
 
 | Target | Hard CI coverage |
 |---|---|
-| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order |
-| WorkspaceKitTests | Markdown candidate filtering before and after symlink resolution; alias deduplication; ignore rules; dirty overlay precedence; containment and symlink escape; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
+| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; saved-baseline rebasing with exact-byte dirty state |
+| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; byte-distinct NFC/NFD synthetic candidates, overlays, ignore ancestors/literals/wildcard-token precedence, file-tree grouping/filtering/fallback IDs, completion current-file exclusion/50-read ordering, and longest matching root spelling; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
 | EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset; FSEvent refresh; session-scoped external conflicts; binding-ID retirement across workspace/standalone transitions and teardown; registration-before-revoke cleanup; symlink alias session reuse; result opens correct node/session; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; anchored and standalone cached delete/switch/same-proof restore activation plus Keep Mine detached-fence recovery; reusable retired anchored/standalone same-proof restore arbitration; fresh-C saved-baseline byte-exact dirty transitions; clean-quarantine Keep Mine exact-byte dirty/LRU restoration; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
 

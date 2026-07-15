@@ -35,7 +35,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             await reader.set(.data("needle \(path)"), at: root.appendingPathComponent(path).path)
         }
 
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -72,7 +72,7 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             root.appendingPathComponent("visible.md").path: .data("needle"),
         ])
 
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: request(root: root, paths: paths)
         )
@@ -92,8 +92,8 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             nestedIgnorePath: .data("*.md\n"),
             root.appendingPathComponent("nested/post.md").path: .data("needle"),
         ])
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("nested/post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -130,17 +130,17 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         XCTAssertThrowsError(try WorkspaceRootContainment.relativePath(for: outside, rootURL: root))
         XCTAssertThrowsError(try WorkspaceRootContainment.containedURL(rootURL: root, relativePath: "escape.md"))
 
-        let reader = IgnoreReader(responses: [:])
+        let reader = WorkspaceSearchDiskFileReader()
         let snapshot = WorkspaceFileSnapshot(entries: [
             entry("", kind: .markdown),
             entry("/outside.md", kind: .markdown),
             entry("../workspace-other/outside.md", kind: .markdown),
             entry("escape.md", kind: .markdown),
         ])
-        let events = await collectEvents(
+        let events = try await collectEvents(
             WorkspaceSearchService(reader: reader),
             request: WorkspaceSearchRequest(
-                rootURL: root,
+                rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
                 snapshot: snapshot,
                 workspaceGeneration: 1,
                 queryGeneration: 1,
@@ -183,8 +183,8 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         try "needle outside".write(to: outside, atomically: true, encoding: .utf8)
 
         let reader = ContainmentSwapReader()
-        let request = WorkspaceSearchRequest(
-            rootURL: root,
+        let request = try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             snapshot: WorkspaceFileSnapshot(entries: [entry("post.md")]),
             workspaceGeneration: 1,
             queryGeneration: 1,
@@ -207,9 +207,9 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
         XCTAssertEqual(candidateReadCount, 0)
     }
 
-    private func request(root: URL, paths: [String]) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    private func request(root: URL, paths: [String]) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "ignore-root",
             snapshot: WorkspaceFileSnapshot(entries: paths.map { entry($0) }),
             workspaceGeneration: 2,
@@ -267,11 +267,11 @@ final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
             .appendingPathComponent("WorkspaceSearchIgnoreAndContainmentTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }
 
-private actor IgnoreReader: WorkspaceSearchFileReading {
+private actor IgnoreReader: SyntheticWorkspaceSearchFileReading {
     enum Response {
         case data(String)
     }
@@ -329,6 +329,24 @@ private actor ContainmentSwapReader: WorkspaceSearchFileReading {
 
         candidateReads += 1
         return Data("needle".utf8.prefix(maximumByteCount))
+    }
+
+    func readFile(
+        at location: WorkspaceFileSystemLocation,
+        maximumByteCount: Int
+    ) async throws -> Data {
+        if location.fileURL.lastPathComponent.hasPrefix(".") {
+            return try await readFile(
+                at: location.fileURL,
+                maximumByteCount: maximumByteCount
+            )
+        }
+        let data = try await WorkspaceSearchDiskFileReader().readFile(
+            at: location,
+            maximumByteCount: maximumByteCount
+        )
+        candidateReads += 1
+        return data
     }
 
     func waitUntilIgnoreRead() async {

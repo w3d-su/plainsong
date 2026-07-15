@@ -28,6 +28,92 @@ final class WorkspaceKitTests: XCTestCase {
         XCTAssertEqual(savedText, "# Title\n\n<Component />\n")
     }
 
+    func testSaveReplacesExistingUTF8MarkdownFile() throws {
+        let directory = try makeTemporaryDirectory()
+        let url = directory.appendingPathComponent("post.md")
+        try "Original".write(to: url, atomically: true, encoding: .utf8)
+
+        try MarkdownFileStore().save(text: "Changed", to: url)
+
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "Changed")
+    }
+
+    func testLegacyURLSaveFinishesWhenSchedulingTaskCancelsItself() async throws {
+        let directory = try makeTemporaryDirectory()
+        let url = directory.appendingPathComponent("post.md")
+        try "Original".write(to: url, atomically: true, encoding: .utf8)
+
+        let error = await Task.detached { () -> Error? in
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                try MarkdownFileStore().save(text: "Changed", to: url)
+                return nil
+            } catch {
+                return error
+            }
+        }.value
+
+        XCTAssertNil(error)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "Changed")
+    }
+
+    func testLegacySaveOutcomeMappingPreservesCleanupArtifacts() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destinationURL = directory.appendingPathComponent("post.md")
+        try "Original".write(to: destinationURL, atomically: true, encoding: .utf8)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: directory)
+        let destination = try authority.location(relativePath: "post.md")
+        let artifact = try authority.location(relativePath: ".post.recovery")
+        let metadata = try MarkdownFileStore().loadResult(at: destination).metadata
+
+        XCTAssertNoThrow(
+            try MarkdownFileStore.mapLegacySaveOutcome(
+                .committedAndDurable(
+                    WorkspaceDurableFileWrite(metadata: metadata, cleanupState: .none)
+                ),
+                destinationURL: destinationURL
+            )
+        )
+
+        for cleanupState in [
+            WorkspaceFileWriteArtifactState.retained(artifact),
+            .removalIndeterminate(artifact),
+        ] {
+            let durable = WorkspaceDurableFileWrite(
+                metadata: metadata,
+                cleanupState: cleanupState
+            )
+            XCTAssertThrowsError(
+                try MarkdownFileStore.mapLegacySaveOutcome(
+                    .committedAndDurable(durable),
+                    destinationURL: destinationURL
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? MarkdownFileStoreError,
+                    .committedWithCleanupRequired(destinationURL, durable)
+                )
+            }
+        }
+
+        let notCommitted = WorkspaceNotCommittedFileWrite(
+            reason: .durabilityFailed,
+            artifactState: .retained(artifact)
+        )
+        XCTAssertThrowsError(
+            try MarkdownFileStore.mapLegacySaveOutcome(
+                .notCommitted(notCommitted),
+                destinationURL: destinationURL
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? MarkdownFileStoreError,
+                .writeNotCommittedWithCleanupRequired(destinationURL, notCommitted)
+            )
+        }
+    }
+
     func testRejectsUnsupportedExtensions() throws {
         let directory = try makeTemporaryDirectory()
         let url = directory.appendingPathComponent("notes.txt")

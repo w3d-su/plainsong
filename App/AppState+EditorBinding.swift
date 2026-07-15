@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 extension AppState {
     func editorDocumentBinding(for session: DocumentSession) -> AppEditorDocumentBinding {
+        retainUnanchoredManagedSessionOwnership(for: session)
         let sessionIdentity = ObjectIdentifier(session)
         let bindingID: EditorDocumentBindingID
         if let existing = registeredEditorDocumentBindingID(for: session) {
@@ -114,7 +115,7 @@ extension AppState {
     }
 
     func isManagedEditorSession(_ session: DocumentSession) -> Bool {
-        guard let fileURL = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else {
+        guard let fileURL = sessionStateURL(for: session) else {
             return session === currentDocument
         }
         guard !detachedSessionURLs.contains(fileURL) else { return false }
@@ -231,8 +232,15 @@ extension AppState {
         }
 
         let session = retirement.session
-        let canonicalURL = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
-        if let canonicalURL, pendingExternalTexts[canonicalURL] != nil {
+        let sessionIdentity = ObjectIdentifier(session)
+        let canonicalURL = sessionStateURL(for: session)
+        if indeterminateSessionWrites[sessionIdentity] != nil {
+            cancelAutosave(for: session)
+            return
+        }
+        if let canonicalURL,
+           pendingExternalTexts[canonicalURL] != nil || pendingExternalFileVersions[canonicalURL] != nil
+        {
             cancelAutosave(for: session)
             return
         }
@@ -261,6 +269,8 @@ extension AppState {
         for canonicalURL: URL?,
         session: DocumentSession
     ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard indeterminateSessionWrites[sessionIdentity] == nil else { return }
         guard let canonicalURL,
               currentDocument !== session,
               sessionCache[canonicalURL] !== session,
@@ -273,8 +283,12 @@ extension AppState {
 
         lastKnownDiskHashes[canonicalURL] = nil
         lastKnownDiskModificationDates[canonicalURL] = nil
-        pendingExternalTexts[canonicalURL] = nil
+        clearExternalChangeConflict(at: canonicalURL)
         detachedSessionURLs.remove(canonicalURL)
+        anchoredSessionFileBindings[sessionIdentity] = nil
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        indeterminateSessionWrites[sessionIdentity] = nil
+        indeterminateSessionWriteContexts[sessionIdentity] = nil
     }
 }
 

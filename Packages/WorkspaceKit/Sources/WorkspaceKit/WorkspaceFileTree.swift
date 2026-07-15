@@ -79,7 +79,11 @@ public struct WorkspaceFileSnapshot: Sendable, Equatable {
         }
 
         public var nodeID: WorkspaceFileNode.ID {
-            identity ?? relativePath
+            guard let identity else {
+                return workspaceFileTreeFallbackPathIDPrefix
+                    + WorkspacePathByteKey(relativePath).asciiHex
+            }
+            return identity
         }
 
         private static func normalized(_ path: String) -> String {
@@ -207,8 +211,14 @@ private struct WorkspaceFileTreeBuilder {
     let options: WorkspaceFileTree.Options
 
     func build() -> WorkspaceFileNode {
-        let entriesByParent = Dictionary(grouping: visibleEntries(), by: parentPath(of:))
-        let children = buildChildren(parentPath: "", entriesByParent: entriesByParent)
+        let entriesByParent = Dictionary(
+            grouping: visibleEntries(),
+            by: { WorkspacePathByteKey(parentPath(of: $0)) }
+        )
+        let children = buildChildren(
+            parentPath: WorkspacePathByteKey(""),
+            entriesByParent: entriesByParent
+        )
         return WorkspaceFileNode(
             id: workspaceFileTreeRootID,
             name: "",
@@ -224,20 +234,21 @@ private struct WorkspaceFileTreeBuilder {
             return snapshot.entries
         }
 
-        var directoryPaths: Set<String> = []
+        var directoryPaths: Set<WorkspacePathByteKey> = []
         let directlyVisible = snapshot.entries.filter { entry in
             guard entry.kind != .directory, entry.kind.isVisibleByDefault else { return false }
             insertAncestorPaths(of: entry.relativePath, into: &directoryPaths)
             return true
         }
-        let directlyVisiblePaths = Set(directlyVisible.map(\.relativePath))
+        let directlyVisiblePaths = Set(directlyVisible.map { WorkspacePathByteKey($0.relativePath) })
 
         return snapshot.entries.filter { entry in
-            switch entry.kind {
+            let pathKey = WorkspacePathByteKey(entry.relativePath)
+            return switch entry.kind {
             case .directory:
-                directoryPaths.contains(entry.relativePath)
+                directoryPaths.contains(pathKey)
             case .markdown, .mdx, .image:
-                directlyVisiblePaths.contains(entry.relativePath)
+                directlyVisiblePaths.contains(pathKey)
             case .other:
                 false
             }
@@ -245,8 +256,8 @@ private struct WorkspaceFileTreeBuilder {
     }
 
     private func buildChildren(
-        parentPath: String,
-        entriesByParent: [String: [WorkspaceFileSnapshot.Entry]]
+        parentPath: WorkspacePathByteKey,
+        entriesByParent: [WorkspacePathByteKey: [WorkspaceFileSnapshot.Entry]]
     ) -> [WorkspaceFileNode] {
         (entriesByParent[parentPath] ?? [])
             .sorted { first, second in
@@ -260,7 +271,10 @@ private struct WorkspaceFileTreeBuilder {
                     kind: entry.kind,
                     contentModificationDate: entry.contentModificationDate,
                     children: entry.kind == .directory
-                        ? buildChildren(parentPath: entry.relativePath, entriesByParent: entriesByParent)
+                        ? buildChildren(
+                            parentPath: WorkspacePathByteKey(entry.relativePath),
+                            entriesByParent: entriesByParent
+                        )
                         : []
                 )
             }
@@ -275,10 +289,14 @@ private struct WorkspaceFileTreeBuilder {
             }
         }
 
-        return first.relativePath.compare(
+        let pathComparison = first.relativePath.compare(
             second.relativePath,
             options: [.caseInsensitive, .numeric]
-        ) == .orderedAscending
+        )
+        if pathComparison != .orderedSame {
+            return pathComparison == .orderedAscending
+        }
+        return WorkspacePathByteKey(first.relativePath) < WorkspacePathByteKey(second.relativePath)
     }
 
     private func defaultFilterSortPriority(_ kind: WorkspaceFileKind) -> Int {
@@ -300,7 +318,10 @@ private struct WorkspaceFileTreeBuilder {
         return components.dropLast().joined(separator: "/")
     }
 
-    private func insertAncestorPaths(of relativePath: String, into paths: inout Set<String>) {
+    private func insertAncestorPaths(
+        of relativePath: String,
+        into paths: inout Set<WorkspacePathByteKey>
+    ) {
         let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
         guard components.count > 1 else { return }
 
@@ -311,7 +332,7 @@ private struct WorkspaceFileTreeBuilder {
             } else {
                 current += "/\(component)"
             }
-            paths.insert(current)
+            paths.insert(WorkspacePathByteKey(current))
         }
     }
 
@@ -321,6 +342,7 @@ private struct WorkspaceFileTreeBuilder {
 }
 
 private let workspaceFileTreeRootID = "__workspace_root__"
+private let workspaceFileTreeFallbackPathIDPrefix = "__workspace_path_bytes__:"
 
 private extension WorkspaceFileNode {
     func nodeIDs() -> Set<WorkspaceFileNode.ID> {

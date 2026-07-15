@@ -44,7 +44,7 @@ public struct WorkspaceSearchLimits: Sendable, Equatable {
 
 /// Immutable input for one workspace search.
 public struct WorkspaceSearchRequest: Sendable, Equatable {
-    public let rootURL: URL
+    public let rootAuthority: WorkspaceFileSystemRootAuthority
     public let rootIdentity: String
     public let snapshot: WorkspaceFileSnapshot
     public let workspaceGeneration: UInt64
@@ -53,8 +53,20 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
     public let dirtyOverlays: WorkspaceSearchOverlayCollection
     public let limits: WorkspaceSearchLimits
 
+    /// Derived canonical root spelling from `rootAuthority`. This is not an independent
+    /// namespace selector; filesystem work always uses the retained authority.
+    public var rootURL: URL {
+        rootAuthority.canonicalRootURL
+    }
+
+    /// Creates a request from a pre-captured root authority.
+    ///
+    /// - Important: Phase 3 intentional public API break. The previous nonthrowing
+    ///   `WorkspaceSearchRequest(rootURL:...)` initializer accepted an independent root URL
+    ///   and is removed. Callers must capture `WorkspaceFileSystemRootAuthority` first and
+    ///   pass that value; do not reintroduce an unsafe free-standing request root.
     public init(
-        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         rootIdentity: String? = nil,
         snapshot: WorkspaceFileSnapshot,
         workspaceGeneration: UInt64,
@@ -63,10 +75,9 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
         limits: WorkspaceSearchLimits = .init()
     ) {
-        let standardizedRoot = rootURL.standardizedFileURL
-        self.rootURL = standardizedRoot
+        self.rootAuthority = rootAuthority
         self.rootIdentity = rootIdentity
-            ?? standardizedRoot.resolvingSymlinksInPath().path(percentEncoded: false)
+            ?? rootAuthority.canonicalRootURL.path(percentEncoded: false)
         self.snapshot = snapshot
         self.workspaceGeneration = workspaceGeneration
         self.queryGeneration = queryGeneration
@@ -74,6 +85,44 @@ public struct WorkspaceSearchRequest: Sendable, Equatable {
         self.dirtyOverlays = dirtyOverlays
         self.limits = limits
     }
+
+    /// Optional pure spelling check against a pre-captured authority.
+    ///
+    /// Accepts `rootURL` only when it equals the authority's original or canonical spelling.
+    /// This is not a source-compatible replacement for the removed independent-root
+    /// initializer: it still requires `rootAuthority` and can throw, and it never opens or
+    /// re-resolves the URL as filesystem authority.
+    public init(
+        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        rootIdentity: String? = nil,
+        snapshot: WorkspaceFileSnapshot,
+        workspaceGeneration: UInt64,
+        queryGeneration: UInt64,
+        query: TextSearchQuery,
+        dirtyOverlays: WorkspaceSearchOverlayCollection = .empty,
+        limits: WorkspaceSearchLimits = .init()
+    ) throws {
+        guard WorkspaceLiteralFileURL.pathBytesMatch(rootURL, rootAuthority.originalRootURL)
+            || WorkspaceLiteralFileURL.pathBytesMatch(rootURL, rootAuthority.canonicalRootURL)
+        else {
+            throw WorkspaceSearchRequestError.rootAuthorityMismatch
+        }
+        self.init(
+            rootAuthority: rootAuthority,
+            rootIdentity: rootIdentity,
+            snapshot: snapshot,
+            workspaceGeneration: workspaceGeneration,
+            queryGeneration: queryGeneration,
+            query: query,
+            dirtyOverlays: dirtyOverlays,
+            limits: limits
+        )
+    }
+}
+
+public enum WorkspaceSearchRequestError: Error, Sendable, Equatable {
+    case rootAuthorityMismatch
 }
 
 /// Stable identity attached to every event from a search request.
@@ -89,22 +138,43 @@ public struct WorkspaceSearchContext: Sendable, Equatable {
     }
 }
 
+/// Exact physical file searched beneath an immutable root authority.
+///
+/// Activation must use `location` together with `identity` rather than deriving a new
+/// path authority from `relativePath`. The identity is sampled from the same descriptor
+/// used for the production bounded read or overlay eligibility validation.
+public struct WorkspaceSearchFileAuthority: Sendable, Equatable {
+    public let location: WorkspaceFileSystemLocation
+    public let identity: WorkspaceFileSystemIdentity
+
+    public init(
+        location: WorkspaceFileSystemLocation,
+        identity: WorkspaceFileSystemIdentity
+    ) {
+        self.location = location
+        self.identity = identity
+    }
+}
+
 public struct WorkspaceSearchFileResult: Sendable, Equatable {
     public let relativePath: String
     public let contentFingerprint: WorkspaceSearchContentFingerprint
     public let matches: [TextSearchMatch]
     public let isTruncated: Bool
+    public let fileAuthority: WorkspaceSearchFileAuthority?
 
     public init(
         relativePath: String,
         contentFingerprint: WorkspaceSearchContentFingerprint,
         matches: [TextSearchMatch],
-        isTruncated: Bool
+        isTruncated: Bool,
+        fileAuthority: WorkspaceSearchFileAuthority? = nil
     ) {
         self.relativePath = relativePath
         self.contentFingerprint = contentFingerprint
         self.matches = matches
         self.isTruncated = isTruncated
+        self.fileAuthority = fileAuthority
     }
 }
 

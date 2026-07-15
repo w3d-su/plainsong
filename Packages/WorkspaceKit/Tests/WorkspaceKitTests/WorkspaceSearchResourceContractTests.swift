@@ -6,7 +6,7 @@ import XCTest
 final class WorkspaceSearchResourceContractTests: XCTestCase {
     func testEmptySuccessEmitsFinalProgressAndExactlyOneCompletedTerminal() async throws {
         let root = try makeTemporaryDirectory()
-        let request = makeRequest(root: root, paths: [])
+        let request = try makeRequest(root: root, paths: [])
 
         let events = await collectEvents(
             WorkspaceSearchService(reader: MissingContractReader()),
@@ -31,7 +31,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             firstPath: "0000.md",
             firstDelayNanoseconds: 60_000_000_000
         )
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: paths,
             limits: WorkspaceSearchLimits(
@@ -65,7 +65,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             firstPath: expectedPaths[0],
             firstDelayNanoseconds: 200_000_000
         )
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: expectedPaths.reversed(),
             limits: WorkspaceSearchLimits(
@@ -94,7 +94,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
             firstPath: paths[0],
             firstDelayNanoseconds: 60_000_000_000
         )
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: paths,
             limits: WorkspaceSearchLimits(
@@ -128,7 +128,7 @@ final class WorkspaceSearchResourceContractTests: XCTestCase {
         let allPaths = matchingPaths + skippedPaths
         let skippedDetailLimit = 7
         let progressLimit = 5
-        let request = makeRequest(
+        let request = try makeRequest(
             root: root,
             paths: allPaths.reversed(),
             limits: WorkspaceSearchLimits(
@@ -182,9 +182,9 @@ extension WorkspaceSearchResourceContractTests {
         root: URL,
         paths: some Sequence<String>,
         limits: WorkspaceSearchLimits = .init()
-    ) -> WorkspaceSearchRequest {
-        WorkspaceSearchRequest(
-            rootURL: root,
+    ) throws -> WorkspaceSearchRequest {
+        try WorkspaceSearchRequest(
+            rootAuthority: WorkspaceFileSystemRootAuthority(rootURL: root),
             rootIdentity: "resource-contract-root",
             snapshot: WorkspaceFileSnapshot(entries: paths.map { path in
                 WorkspaceFileSnapshot.Entry(
@@ -280,6 +280,6 @@ extension WorkspaceSearchResourceContractTests {
             .appendingPathComponent("WorkspaceSearchResourceContractTests")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 }

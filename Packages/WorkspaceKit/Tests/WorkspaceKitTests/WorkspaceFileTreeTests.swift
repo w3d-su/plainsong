@@ -85,6 +85,63 @@ final class WorkspaceFileTreeTests: XCTestCase {
         XCTAssertEqual(reconciled.selectedNode?.relativePath, "posts/new-title.md")
     }
 
+    func testCanonicalEquivalentDirectorySpellingsKeepDistinctChildren() {
+        let nfcDirectory = "caf\u{00E9}"
+        let nfdDirectory = "cafe\u{0301}"
+        let tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: [
+                entry(nfcDirectory, kind: .directory, identity: "nfc-directory"),
+                entry("\(nfcDirectory)/nfc.md", kind: .markdown, identity: "nfc-child"),
+                entry(nfdDirectory, kind: .directory, identity: "nfd-directory"),
+                entry("\(nfdDirectory)/nfd.md", kind: .markdown, identity: "nfd-child"),
+            ]),
+            options: .init(showAllFiles: true)
+        )
+
+        XCTAssertEqual(tree.root.children.map(\.id), ["nfd-directory", "nfc-directory"])
+        XCTAssertEqual(tree.node(id: "nfc-directory")?.children.map(\.id), ["nfc-child"])
+        XCTAssertEqual(tree.node(id: "nfd-directory")?.children.map(\.id), ["nfd-child"])
+    }
+
+    func testDefaultFilterUsesByteExactAncestorPaths() {
+        let nfcDirectory = "caf\u{00E9}"
+        let nfdDirectory = "cafe\u{0301}"
+        let tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: [
+                entry(nfcDirectory, kind: .directory, identity: "nfc-directory"),
+                entry("\(nfcDirectory)/visible.md", kind: .markdown, identity: "visible"),
+                entry(nfdDirectory, kind: .directory, identity: "nfd-directory"),
+                entry("\(nfdDirectory)/hidden.txt", kind: .other, identity: "hidden"),
+            ]),
+            options: .init(showAllFiles: false)
+        )
+
+        XCTAssertEqual(tree.root.children.map(\.id), ["nfc-directory"])
+        XCTAssertEqual(tree.node(id: "nfc-directory")?.children.map(\.id), ["visible"])
+    }
+
+    func testFallbackNodeIDsDistinguishCanonicalEquivalentPaths() {
+        let nfcDirectory = "caf\u{00E9}"
+        let nfdDirectory = "cafe\u{0301}"
+        var tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: [
+                entry(nfcDirectory, kind: .directory, identity: nil),
+                entry(nfdDirectory, kind: .directory, identity: nil),
+            ]),
+            options: .init(showAllFiles: true)
+        )
+        let nodeIDs = tree.root.children.map(\.id)
+
+        XCTAssertEqual(nodeIDs.count, 2)
+        XCTAssertEqual(Set(nodeIDs).count, 2)
+        tree.setExpanded(true, for: nodeIDs[0])
+        XCTAssertTrue(tree.isExpanded(nodeIDs[0]))
+        XCTAssertFalse(tree.isExpanded(nodeIDs[1]))
+    }
+
     func testReconcileTwoThousandFilesStaysUnderBudget() {
         let entries = (0 ..< 2000).map { index in
             entry(
@@ -110,7 +167,7 @@ final class WorkspaceFileTreeTests: XCTestCase {
     private func entry(
         _ relativePath: String,
         kind: WorkspaceFileKind,
-        identity: String
+        identity: String?
     ) -> WorkspaceFileSnapshot.Entry {
         WorkspaceFileSnapshot.Entry(
             relativePath: relativePath,

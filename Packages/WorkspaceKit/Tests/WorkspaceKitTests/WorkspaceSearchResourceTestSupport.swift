@@ -1,13 +1,30 @@
 import Foundation
 @testable import WorkspaceKit
 
-struct MissingContractReader: WorkspaceSearchFileReading {
+protocol SyntheticWorkspaceSearchFileReading: WorkspaceSearchFileReading {}
+
+extension SyntheticWorkspaceSearchFileReading {
+    func physicalPreflightError(at _: URL) -> WorkspaceSearchFileReadError? {
+        nil
+    }
+
+    func validateFile(at _: WorkspaceFileSystemLocation) async throws {}
+
+    func readFile(
+        at location: WorkspaceFileSystemLocation,
+        maximumByteCount: Int
+    ) async throws -> Data {
+        try await readFile(at: location.fileURL, maximumByteCount: maximumByteCount)
+    }
+}
+
+struct MissingContractReader: SyntheticWorkspaceSearchFileReading {
     func readFile(at _: URL, maximumByteCount _: Int) async throws -> Data {
         throw WorkspaceSearchFileReadError.disappeared
     }
 }
 
-struct MixedContractReader: WorkspaceSearchFileReading {
+struct MixedContractReader: SyntheticWorkspaceSearchFileReading {
     func readFile(at url: URL, maximumByteCount: Int) async throws -> Data {
         if url.lastPathComponent.hasPrefix(".") {
             throw WorkspaceSearchFileReadError.disappeared
@@ -19,7 +36,7 @@ struct MixedContractReader: WorkspaceSearchFileReading {
     }
 }
 
-actor BulkReadWindowReader: WorkspaceSearchFileReading {
+actor BulkReadWindowReader: SyntheticWorkspaceSearchFileReading {
     private let firstPath: String
     private let firstDelayNanoseconds: UInt64
     private var activeReads = 0
@@ -122,7 +139,7 @@ actor BulkReadWindowReader: WorkspaceSearchFileReading {
     }
 }
 
-actor GlobalTruncationAccountingReader: WorkspaceSearchFileReading {
+actor GlobalTruncationAccountingReader: SyntheticWorkspaceSearchFileReading {
     static let overflowText = "needle needle needle"
     static let validText = "needle after cap"
 
@@ -179,7 +196,7 @@ actor GlobalTruncationAccountingReader: WorkspaceSearchFileReading {
     }
 }
 
-struct UnexpectedCancellationErrorReader: WorkspaceSearchFileReading {
+struct UnexpectedCancellationErrorReader: SyntheticWorkspaceSearchFileReading {
     func readFile(at url: URL, maximumByteCount _: Int) async throws -> Data {
         if url.lastPathComponent.hasPrefix(".") {
             throw WorkspaceSearchFileReadError.disappeared
@@ -188,7 +205,7 @@ struct UnexpectedCancellationErrorReader: WorkspaceSearchFileReading {
     }
 }
 
-actor BlockingCancellationReader: WorkspaceSearchFileReading {
+actor BlockingCancellationReader: SyntheticWorkspaceSearchFileReading {
     private var activeReads = 0
     private var candidateStarts = 0
     private var cancelledReads = 0

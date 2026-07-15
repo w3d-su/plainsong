@@ -31,7 +31,7 @@ extension AppState {
 
     func applyDocumentText(_ newText: String, to session: DocumentSession) {
         session.replaceText(newText, refreshStatistics: false)
-        if let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() {
+        if let url = sessionStateURL(for: session) {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
         scheduleStatisticsRefresh(for: session)
@@ -82,7 +82,9 @@ extension AppState {
     }
 
     var activeEditorDocumentIdentity: EditorDocumentIdentity? {
-        currentDocument.fileURL.map(Self.editorDocumentIdentity(for:))
+        sessionStateURL(for: currentDocument).map {
+            EditorDocumentIdentity(rawValue: $0.absoluteString)
+        }
     }
 
     func activateWorkspaceSearchResult(
@@ -127,25 +129,27 @@ extension AppState {
         workspaceTree = tree
 
         do {
-            try activateFileSession(url: target.fileURL)
+            try activateAnchoredFileSession(
+                at: target.location,
+                expecting: target.expectedIdentity
+            )
+            try workspaceSearchPostActivationHook?()
         } catch {
             workspaceTree = previousTree
             present(error, title: "Could Not Open Search Result")
             return
         }
 
-        guard let activatedURL = currentDocument.fileURL?.standardizedFileURL,
-              !detachedSessionURLs.contains(activatedURL)
+        guard let activatedBinding = anchoredSessionFileBinding(for: currentDocument),
+              activatedBinding.location == target.location,
+              !detachedSessionURLs.contains(activatedBinding.location.fileURL)
         else {
             workspaceTree = previousTree
             return
         }
-        let activatedIdentity = Self.editorDocumentIdentity(for: activatedURL)
-        let expectedIdentity = Self.editorDocumentIdentity(for: target.fileURL)
-        guard ExactSourceText.matches(activatedIdentity.rawValue, expectedIdentity.rawValue) else {
-            workspaceTree = previousTree
-            return
-        }
+        let activatedIdentity = EditorDocumentIdentity(
+            rawValue: activatedBinding.location.fileURL.absoluteString
+        )
 
         let activeFingerprint = WorkspaceSearchContentFingerprint(text: currentDocument.text)
         guard activeFingerprint.sha256Digest == fileResult.contentFingerprint.sha256Digest,
@@ -190,23 +194,43 @@ extension AppState {
         match: TextSearchMatch
     ) -> WorkspaceSearchActivationTarget? {
         guard Self.isStructurallyValidEditorRange(match.range),
-              let rootURL = workspaceRootURL?.standardizedFileURL,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
               let tree = workspaceTree,
-              let node = firstNode(
-                  in: tree.root,
-                  canonicalRelativePath: fileResult.relativePath,
-                  rootURL: rootURL
-              ),
-              node.isEditableMarkdown,
-              let fileURL = try? WorkspaceRootContainment.containedURL(
-                  rootURL: rootURL,
-                  relativePath: fileResult.relativePath
-              )
+              let node = firstNode(in: tree.root, relativePath: fileResult.relativePath),
+              node.isEditableMarkdown
         else {
             return nil
         }
 
-        return WorkspaceSearchActivationTarget(fileURL: fileURL, nodeID: node.id)
+        let location: WorkspaceFileSystemLocation
+        let expectedIdentity: WorkspaceFileSystemIdentity?
+        if let fileAuthority = fileResult.fileAuthority {
+            guard fileAuthority.location.rootAuthority == rootAuthority,
+                  ExactSourceText.matches(
+                      fileAuthority.location.relativePath,
+                      fileResult.relativePath
+                  )
+            else {
+                return nil
+            }
+            location = fileAuthority.location
+            expectedIdentity = fileAuthority.identity
+        } else {
+            guard let derivedLocation = try? rootAuthority.location(
+                relativePath: fileResult.relativePath
+            ) else {
+                return nil
+            }
+            location = derivedLocation
+            expectedIdentity = nil
+        }
+
+        return WorkspaceSearchActivationTarget(
+            location: location,
+            expectedIdentity: expectedIdentity,
+            nodeID: node.id
+        )
     }
 
     func cancelPendingEditorNavigationIfNeeded(force: Bool = false) {
@@ -337,7 +361,8 @@ extension AppState {
 }
 
 private struct WorkspaceSearchActivationTarget {
-    let fileURL: URL
+    let location: WorkspaceFileSystemLocation
+    let expectedIdentity: WorkspaceFileSystemIdentity?
     let nodeID: WorkspaceFileNode.ID
 }
 

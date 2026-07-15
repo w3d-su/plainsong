@@ -1,3 +1,4 @@
+import EditorKit
 import Foundation
 import MarkdownCore
 import WorkspaceKit
@@ -18,8 +19,7 @@ extension AppState {
         scheduleWorkspaceReload(
             root: workspaceRootURL,
             selectFirstIfNeeded: false,
-            errorTitle: "Could Not Refresh Workspace",
-            handlesExternalChanges: true
+            errorTitle: "Could Not Refresh Workspace"
         )
     }
 
@@ -27,16 +27,16 @@ extension AppState {
         guard var tree = workspaceTree,
               let node = tree.node(id: nodeID),
               node.isEditableMarkdown,
-              let workspaceRootURL
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
+              let fileURL = try? rootAuthority.location(relativePath: node.relativePath).fileURL
         else {
             return
         }
 
         tree.selectNode(id: nodeID)
         workspaceTree = tree
-        openWorkspaceFile(
-            workspaceRootURL.appendingPathComponent(node.relativePath, isDirectory: false)
-        )
+        openWorkspaceFile(fileURL)
     }
 
     func setWorkspaceNodeExpanded(_ isExpanded: Bool, id nodeID: WorkspaceFileNode.ID) {
@@ -113,7 +113,17 @@ extension AppState {
 
     func openWorkspaceFile(_ url: URL) {
         do {
-            try activateFileSession(url: url)
+            if workspaceRootURL != nil {
+                guard let rootAuthority = workspaceSearchRootAuthority,
+                      workspaceInstalledCaptureGeneration == workspaceGeneration
+                else {
+                    throw WorkspaceAnchoredFileSystemError.namespaceChanged
+                }
+                let location = try rootAuthority.canonicalizedLocation(forFileURL: url)
+                try activateAnchoredFileSession(at: location)
+            } else {
+                try activateFileSession(url: url)
+            }
         } catch {
             present(error, title: "Could Not Open File")
         }
@@ -126,7 +136,10 @@ extension AppState {
 
 extension AppState {
     func openWorkspace(url: URL, rememberAsLastOpened: Bool) throws {
-        let root = url.standardizedFileURL
+        // Keep the chosen root's literal spelling until descriptor capture proves its canonical
+        // physical location. Standardizing here loses precomposed Unicode before WS3B's
+        // authority layer can retain it.
+        let root = url
         try closeWorkspaceForReplacement()
         workspaceAccess = SecurityScopedAccess.startAccessing(root)
         workspaceRootURL = root
@@ -148,7 +161,8 @@ extension AppState {
         workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
             Task { @MainActor [weak self] in
                 guard let self,
-                      workspaceRootURL?.standardizedFileURL == root
+                      let currentRoot = workspaceRootURL,
+                      exactFileURLSpellingMatches(currentRoot, root)
                 else {
                     return
                 }
@@ -165,22 +179,35 @@ extension AppState {
     }
 
     func activateFileSession(url: URL) throws {
-        let key = try canonicalSessionURL(for: url)
+        let requestedURL = try canonicalSessionURL(for: url)
+        // The candidate location is only a cache discriminator. A cached or retired session
+        // must match it through its existing retained authority; its new authority/metadata is
+        // never adopted from this capture before external-change arbitration.
+        let location = try WorkspaceFileSystemLocation(fileURL: requestedURL)
+        let key = location.fileURL
+        // URL-keyed prompt/detachment state is only safe while it belongs to the same retained
+        // authority. Do not let a replacement parent B install at A's lexical spelling and
+        // inherit, clear, or overwrite a still-stateful retired/current A session.
+        guard !hasStatefulRetainedAuthorityCollision(
+            at: key,
+            candidateLocation: location
+        ) else {
+            throw AppStateError.invalidSessionIdentity(key)
+        }
         if let cachedSession = sessionCache[key] {
+            guard retainedManagedSessionLocation(for: cachedSession) == location else {
+                throw AppStateError.invalidSessionIdentity(key)
+            }
             if cachedSession === currentDocument {
                 synchronizeWorkspaceTreeSelection(for: cachedSession)
                 handleSessionAccess(url: key, isDirty: cachedSession.isDirty)
                 return
             }
-            guard let cachedURL = cachedSession.fileURL,
-                  try canonicalSessionURL(for: cachedURL) == key
+            guard let cachedURL = sessionStateURL(for: cachedSession),
+                  exactFileURLSpellingMatches(cachedURL, key)
             else {
                 throw AppStateError.invalidSessionIdentity(key)
             }
-            guard !detachedSessionURLs.contains(key) else {
-                throw AppStateError.missingFile(key)
-            }
-            _ = try fileStore.load(url: key)
             cancelForegroundDocumentTasks()
             setCurrentDocument(cachedSession)
             handleExternalChange(for: cachedSession)
@@ -188,8 +215,12 @@ extension AppState {
             return
         }
 
-        let file = try fileStore.load(url: key)
-        let recoveredSession = recoverRetiredSession(for: key)
+        let loaded = try fileStore.loadResult(at: location)
+        let file = loaded.file
+        let recoveredSession = recoverRetiredSession(
+            for: key,
+            matching: location
+        )
         let session = recoveredSession ?? DocumentSession(
             text: file.text,
             url: file.url,
@@ -197,12 +228,20 @@ extension AppState {
             isDirty: false
         )
         cancelForegroundDocumentTasks()
+        retainUnanchoredManagedSessionOwnership(
+            for: session,
+            location: location,
+            identity: loaded.metadata.identity,
+            sha256Digest: loaded.sha256Digest
+        )
         sessionCache[key] = session
-        detachedSessionURLs.remove(key)
-        if missingFilePrompt?.fileURL.standardizedFileURL == key {
-            missingFilePrompt = nil
-        }
         if recoveredSession == nil {
+            detachedSessionURLs.remove(key)
+            if let prompt = missingFilePrompt,
+               exactFileURLSpellingMatches(prompt.fileURL, key)
+            {
+                missingFilePrompt = nil
+            }
             recordKnownDiskText(file.text, for: key)
         }
         setCurrentDocument(session)
@@ -212,13 +251,21 @@ extension AppState {
         handleSessionAccess(url: key, isDirty: session.isDirty)
     }
 
-    func setCurrentDocument(_ session: DocumentSession) {
+    func setCurrentDocument(
+        _ session: DocumentSession,
+        synchronizingWorkspaceTree: Bool = true
+    ) {
         guard currentDocument !== session else { return }
         requestEditorFocus()
-        synchronizeWorkspaceTreeSelection(for: session)
+        if synchronizingWorkspaceTree {
+            synchronizeWorkspaceTreeSelection(for: session)
+        }
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
         clearPromptsNotMatchingCurrentDocument()
+        if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {
+            refreshIndeterminateFileWriteReconciliation(for: session)
+        }
         observeCurrentDocument()
         scheduleCompletionWorkspaceRefresh()
     }
@@ -233,14 +280,38 @@ extension AppState {
     }
 
     func save(session: DocumentSession) throws {
-        guard let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() else { return }
-        guard !detachedSessionURLs.contains(url),
-              missingFilePrompt?.fileURL.standardizedFileURL != url
+        guard session.fileURL != nil else { return }
+        let sessionIdentity = ObjectIdentifier(session)
+        let retainedBinding = anchoredSessionFileBinding(for: session)
+        let retainedUnanchoredProof: UnanchoredManagedSessionFileProof? =
+            if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
+                proof
+            } else {
+                nil
+            }
+        guard let url = retainedBinding?.location.fileURL
+            ?? retainedUnanchoredProof?.location.fileURL
+            ?? sessionStateURL(for: session)
         else {
+            return
+        }
+        if let indeterminate = indeterminateSessionWrites[sessionIdentity] {
+            let reconciliationURL = indeterminateSessionWriteContexts[sessionIdentity]?.location.fileURL
+                ?? url
+            throw MarkdownFileStoreError.writeRequiresReconciliation(reconciliationURL, indeterminate)
+        }
+        let hasMatchingMissingPrompt = missingFilePrompt.map {
+            exactFileURLSpellingMatches($0.fileURL, url)
+        } ?? false
+        guard !detachedSessionURLs.contains(url), !hasMatchingMissingPrompt else {
             throw AppStateError.missingFile(url)
         }
+        let hasMatchingExternalChangePrompt = externalChangePrompt.map {
+            exactFileURLSpellingMatches($0.fileURL, url)
+        } ?? false
         guard pendingExternalTexts[url] == nil,
-              externalChangePrompt?.fileURL.standardizedFileURL != url
+              pendingExternalFileVersions[url] == nil,
+              !hasMatchingExternalChangePrompt
         else {
             throw AppStateError.unresolvedExternalChange(url)
         }
@@ -250,16 +321,146 @@ extension AppState {
         defer { isSaving = false }
 
         let text = session.text
-        try SecurityScopedAccess.withAccess(to: url) {
-            try fileStore.save(text: text, to: url)
+        let location: WorkspaceFileSystemLocation
+        let expectation: WorkspaceNoFollowFileWriteExpectation
+        if let retainedBinding {
+            location = retainedBinding.location
+            expectation = .existingContent(
+                retainedBinding.identity,
+                sha256Digest: retainedBinding.sha256Digest
+            )
+        } else if let retainedUnanchoredProof {
+            location = retainedUnanchoredProof.location
+            expectation = .existingContent(
+                retainedUnanchoredProof.identity,
+                sha256Digest: retainedUnanchoredProof.sha256Digest
+            )
+        } else {
+            throw AppStateError.invalidSessionIdentity(url)
         }
-        session.markSaved(text: text, url: url)
-        sessionPolicy.updateDirtyState(for: url, isDirty: false)
-        detachedSessionURLs.remove(url)
-        recordKnownDiskText(text, for: url)
+        let destination = location.fileURL
+        let outcome = try performAnchoredFileSave(
+            text: text,
+            at: location,
+            expecting: expectation
+        )
+        let cleanupResult: WorkspaceDurableFileWrite?
+        switch outcome {
+        case let .committedAndDurable(result):
+            cleanupResult = result.cleanupState == .none ? nil : result
+            indeterminateSessionWrites[sessionIdentity] = nil
+            indeterminateSessionWriteContexts[sessionIdentity] = nil
+            anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
+                location: location,
+                identity: result.metadata.identity,
+                sha256Digest: WorkspaceSearchContentFingerprint(text: text).sha256Digest
+            )
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        case let .notCommitted(result):
+            handleExternalWritePreconditionFailure(result, for: session)
+            throw notCommittedFileWriteError(result, destinationURL: destination)
+        case let .committedButIndeterminate(result):
+            indeterminateSessionWrites[sessionIdentity] = result
+            indeterminateSessionWriteContexts[sessionIdentity] = IndeterminateSessionWriteContext(
+                location: location,
+                preparedSHA256Digest: WorkspaceSearchContentFingerprint(
+                    text: text
+                ).sha256Digest
+            )
+            cancelAutosave(for: session)
+            refreshIndeterminateFileWriteReconciliation(for: session)
+            throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
+        }
+        session.markSaved(text: text, url: destination)
+        sessionPolicy.updateDirtyState(for: destination, isDirty: false)
+        detachedSessionURLs.remove(destination)
+        lastKnownDiskHashes[destination] = Self.contentHash(text)
+        lastKnownDiskModificationDates[destination] = nil
+        if let cleanupResult {
+            presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
+        }
     }
 
-    private func cancelForegroundDocumentTasks() {
+    func performAnchoredFileSave(
+        text: String,
+        at location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation
+    ) throws -> WorkspaceFileWriteOutcome {
+        if let anchoredFileSaveOverride {
+            return try anchoredFileSaveOverride(text, location, expectation)
+        }
+        return try fileStore.save(text: text, at: location, expecting: expectation)
+    }
+
+    func notCommittedFileWriteError(
+        _ result: WorkspaceNotCommittedFileWrite,
+        destinationURL: URL
+    ) -> MarkdownFileStoreError {
+        guard result.artifactState != .none else {
+            return .unwritable(destinationURL)
+        }
+        retainFileWriteArtifactNotice(
+            destinationURL: destinationURL,
+            destinationWasCommitted: false,
+            artifactState: result.artifactState
+        )
+        return .writeNotCommittedWithCleanupRequired(destinationURL, result)
+    }
+
+    /// A typed writer precondition can discover the same external B version before an FSEvent
+    /// reaches `handleExternalChange`. Treat identity/content disagreement as the session-scoped
+    /// arbitration event, not merely an unwritable save: one fresh retained-authority
+    /// observation records the conflict and preserves A's proof.
+    private func handleExternalWritePreconditionFailure(
+        _ result: WorkspaceNotCommittedFileWrite,
+        for session: DocumentSession
+    ) {
+        switch result.reason {
+        case .changedIdentity, .changedContent:
+            handleExternalChange(for: session)
+        default:
+            break
+        }
+    }
+
+    func presentCommittedFileWriteCleanup(
+        _ result: WorkspaceDurableFileWrite,
+        destinationURL: URL
+    ) {
+        guard result.cleanupState != .none else { return }
+        retainFileWriteArtifactNotice(
+            destinationURL: destinationURL,
+            destinationWasCommitted: true,
+            artifactState: result.cleanupState
+        )
+        present(
+            MarkdownFileStoreError.committedWithCleanupRequired(destinationURL, result),
+            title: "File Saved; Cleanup Required"
+        )
+    }
+
+    private func retainFileWriteArtifactNotice(
+        destinationURL: URL,
+        destinationWasCommitted: Bool,
+        artifactState: WorkspaceFileWriteArtifactState
+    ) {
+        guard artifactState != .none else { return }
+        let notice = FileWriteArtifactNotice(
+            destinationURL: destinationURL.standardizedFileURL,
+            destinationWasCommitted: destinationWasCommitted,
+            artifactState: artifactState
+        )
+        guard !fileWriteArtifactNotices.contains(notice) else { return }
+        fileWriteArtifactNotices.append(notice)
+    }
+
+    /// Acknowledges one retained cleanup artifact without mutating the artifact itself. Removing
+    /// the notice also releases the notice's exact filesystem authority when no other owner needs it.
+    func acknowledgeFileWriteArtifactNotice(id: FileWriteArtifactNotice.ID) {
+        fileWriteArtifactNotices.removeAll { $0.id == id }
+    }
+
+    func cancelForegroundDocumentTasks() {
         autosaveTask?.cancel()
         autosaveTask = nil
         statisticsTask?.cancel()
@@ -293,11 +494,10 @@ extension AppState {
         do {
             let directoryURL = directoryID.flatMap(workspaceURL(for:))
             let resultingURL = try operation(root, directoryURL)
-            refreshWorkspaceAfterFileSystemChange()
-
             if openCreatedFile, FileKind(url: resultingURL) != nil {
                 openWorkspaceFile(resultingURL)
             }
+            refreshWorkspaceAfterFileSystemChange()
         } catch {
             present(error, title: "Workspace Operation Failed")
         }
@@ -305,6 +505,8 @@ extension AppState {
 
     func workspaceURL(for nodeID: WorkspaceFileNode.ID) -> URL? {
         guard let workspaceRootURL,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
               let node = workspaceTree?.node(id: nodeID)
         else {
             return nil
@@ -313,7 +515,7 @@ extension AppState {
         if node.relativePath.isEmpty {
             return workspaceRootURL
         }
-        return workspaceRootURL.appendingPathComponent(node.relativePath, isDirectory: node.isDirectory)
+        return try? rootAuthority.location(relativePath: node.relativePath).fileURL
     }
 
     func firstEditableNode(in node: WorkspaceFileNode) -> WorkspaceFileNode? {

@@ -14,6 +14,20 @@ public enum WorkspaceDirectoryScannerError: LocalizedError, Equatable {
     }
 }
 
+/// One off-main reload result whose snapshot and filesystem authority are installed together.
+public struct WorkspaceDirectorySnapshotCapture: Sendable {
+    public let snapshot: WorkspaceFileSnapshot
+    public let rootAuthority: WorkspaceFileSystemRootAuthority
+
+    public init(
+        snapshot: WorkspaceFileSnapshot,
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) {
+        self.snapshot = snapshot
+        self.rootAuthority = rootAuthority
+    }
+}
+
 public struct WorkspaceDirectoryScanner: Sendable {
     private let entryVisitHook: @Sendable (URL) -> Void
 
@@ -26,12 +40,19 @@ public struct WorkspaceDirectoryScanner: Sendable {
     }
 
     public func snapshot(root: URL) async throws -> WorkspaceFileSnapshot {
+        // Compatibility-only snapshot callers do not retain an authority. Keep their historic
+        // alias resolution; WS3B's authority-bearing `snapshotCapture` below deliberately
+        // receives the literal spelling unchanged.
         let root = root.standardizedFileURL
         try Task.checkCancellation()
 
         return try await withThrowingTaskGroup(of: WorkspaceFileSnapshot.self) { group in
             group.addTask(priority: .utility) {
-                try Self.makeSnapshot(root: root, entryVisitHook: entryVisitHook)
+                try Self.makeSnapshot(
+                    root: root,
+                    entryVisitHook: entryVisitHook,
+                    preservesLiteralEntrySpelling: false
+                )
             }
             defer { group.cancelAll() }
 
@@ -43,9 +64,40 @@ public struct WorkspaceDirectoryScanner: Sendable {
         }
     }
 
+    /// Captures root authority and enumerates its canonical spelling on the same utility task.
+    /// Namespace replacement during enumeration rejects the whole capture.
+    public func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        try Task.checkCancellation()
+
+        return try await withThrowingTaskGroup(of: WorkspaceDirectorySnapshotCapture.self) { group in
+            group.addTask(priority: .utility) {
+                let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+                try authority.validateCanonicalBinding()
+                let snapshot = try Self.makeSnapshot(
+                    root: authority.canonicalRootURL,
+                    entryVisitHook: entryVisitHook,
+                    preservesLiteralEntrySpelling: true
+                )
+                try authority.validateCanonicalBinding()
+                return WorkspaceDirectorySnapshotCapture(
+                    snapshot: snapshot,
+                    rootAuthority: authority
+                )
+            }
+            defer { group.cancelAll() }
+
+            guard let capture = try await group.next() else {
+                throw CancellationError()
+            }
+            try Task.checkCancellation()
+            return capture
+        }
+    }
+
     private static func makeSnapshot(
         root: URL,
-        entryVisitHook: @escaping @Sendable (URL) -> Void
+        entryVisitHook: @escaping @Sendable (URL) -> Void,
+        preservesLiteralEntrySpelling: Bool
     ) throws -> WorkspaceFileSnapshot {
         try Task.checkCancellation()
         var isDirectory: ObjCBool = false
@@ -84,14 +136,18 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 continue
             }
 
-            let relativePath = Self.relativePath(for: url, root: root)
+            let relativePath = Self.relativePath(
+                for: url,
+                root: root,
+                preservesLiteralEntrySpelling: preservesLiteralEntrySpelling
+            )
             guard !relativePath.isEmpty else { continue }
 
             entries.append(
                 WorkspaceFileSnapshot.Entry(
                     relativePath: relativePath,
                     kind: WorkspaceFileKind(url: url, isDirectory: values.isDirectory == true),
-                    identity: Self.identity(from: values.fileResourceIdentifier, fallback: relativePath),
+                    identity: Self.identity(from: values.fileResourceIdentifier),
                     contentModificationDate: values.contentModificationDate
                 )
             )
@@ -101,21 +157,26 @@ public struct WorkspaceDirectoryScanner: Sendable {
         return WorkspaceFileSnapshot(entries: entries)
     }
 
-    private static func relativePath(for url: URL, root: URL) -> String {
-        let rootPath = root.path(percentEncoded: false)
-        let filePath = url.standardizedFileURL.path(percentEncoded: false)
-        guard filePath.hasPrefix(rootPath) else { return "" }
-
-        var relativePath = String(filePath.dropFirst(rootPath.count))
-        if relativePath.hasPrefix("/") {
-            relativePath.removeFirst()
-        }
-        return relativePath
+    static func relativePath(
+        for url: URL,
+        root: URL,
+        preservesLiteralEntrySpelling: Bool
+    ) -> String {
+        // Strip only separator syntax; unlike `standardizedFileURL`, this preserves every
+        // Unicode code unit in the root and entry names.
+        let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(
+            root.path(percentEncoded: false)
+        )
+        let filePath = WorkspaceRootContainment.normalizedDirectoryPath(
+            (preservesLiteralEntrySpelling ? url : url.standardizedFileURL)
+                .path(percentEncoded: false)
+        )
+        return WorkspaceLiteralFileURL.relativePath(of: filePath, containedIn: rootPath) ?? ""
     }
 
-    private static func identity(from identifier: Any?, fallback: String) -> String {
+    private static func identity(from identifier: Any?) -> String? {
         guard let identifier else {
-            return fallback
+            return nil
         }
         return String(describing: identifier)
     }

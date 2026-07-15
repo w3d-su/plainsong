@@ -21,6 +21,9 @@ public enum WorkspaceRootContainment {
         guard !path.hasPrefix("/") else {
             throw WorkspaceRootContainmentError.absolutePath(path)
         }
+        guard !path.utf8.contains(0) else {
+            throw WorkspaceRootContainmentError.traversal(path)
+        }
 
         var components: [Substring] = []
         for component in path.split(separator: "/", omittingEmptySubsequences: true) {

@@ -136,6 +136,41 @@ final class DocumentSessionTests: XCTestCase {
         XCTAssertEqual(session.version, 2)
     }
 
+    func testRebaseSavedTextPreservesCurrentTextAndUsesExactBytesForDirtyState() {
+        let diskA = "cafe\u{0301}"
+        let diskC = "caf\u{00E9}"
+        let localText = "Local edits"
+        let session = DocumentSession(text: diskA, fileKind: .markdown)
+        session.replaceText(localText)
+        let editedVersion = session.version
+        let editedStatistics = session.statistics
+
+        session.rebaseSavedText(to: diskC)
+
+        XCTAssertTrue(ExactSourceText.matches(session.text, localText))
+        XCTAssertEqual(session.version, editedVersion)
+        XCTAssertEqual(session.statistics, editedStatistics)
+        XCTAssertTrue(session.isDirty)
+
+        session.replaceText(diskC)
+        XCTAssertFalse(session.isDirty)
+
+        session.replaceText(diskA)
+        XCTAssertTrue(session.isDirty)
+    }
+
+    func testRebaseSavedTextClearsDirtyWhenCurrentTextExactlyMatchesNewBaseline() {
+        let session = DocumentSession(text: "Disk A", fileKind: .markdown)
+        session.replaceText("Disk C")
+        let editedVersion = session.version
+
+        session.rebaseSavedText(to: "Disk C")
+
+        XCTAssertEqual(session.text, "Disk C")
+        XCTAssertEqual(session.version, editedVersion)
+        XCTAssertFalse(session.isDirty)
+    }
+
     func testApplyStatisticsReplacesStatistics() {
         let session = DocumentSession(text: "One two")
 

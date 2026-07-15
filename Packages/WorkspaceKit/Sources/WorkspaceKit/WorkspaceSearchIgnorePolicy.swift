@@ -5,7 +5,7 @@ struct WorkspaceSearchIgnorePolicy {
     private let rules: [WorkspaceSearchIgnoreRule]
 
     static func load(
-        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         candidatePaths: [String],
         limits: WorkspaceSearchLimits,
         reader: any WorkspaceSearchFileReading
@@ -25,17 +25,17 @@ struct WorkspaceSearchIgnorePolicy {
                 try Task.checkCancellation()
 
                 let relativePath = directory.isEmpty ? filename : "\(directory)/\(filename)"
-                guard let url = try? WorkspaceRootContainment.containedURL(
-                    rootURL: rootURL,
-                    relativePath: relativePath
-                ) else {
+                guard let location = try? rootAuthority.location(relativePath: relativePath) else {
                     continue
                 }
 
                 reads += 1
                 let data: Data
                 do {
-                    data = try await reader.readFile(at: url, maximumByteCount: readLimit)
+                    data = try await reader.readFile(
+                        at: location,
+                        maximumByteCount: readLimit
+                    )
                 } catch let error as CancellationError {
                     throw error
                 } catch {
@@ -63,7 +63,7 @@ struct WorkspaceSearchIgnorePolicy {
     }
 
     private static func ancestorDirectories(for paths: [String]) -> [String] {
-        var directories: Set = [""]
+        var directories = [WorkspacePathByteKey(""): ""]
         for path in paths {
             let components = path.split(separator: "/", omittingEmptySubsequences: true)
             guard components.count > 1 else { continue }
@@ -71,14 +71,16 @@ struct WorkspaceSearchIgnorePolicy {
             var directory = ""
             for component in components.dropLast() {
                 directory = directory.isEmpty ? String(component) : "\(directory)/\(component)"
-                directories.insert(directory)
+                directories[WorkspacePathByteKey(directory)] = directory
             }
         }
 
-        return directories.sorted { first, second in
+        return directories.values.sorted { first, second in
             let firstDepth = first.split(separator: "/", omittingEmptySubsequences: true).count
             let secondDepth = second.split(separator: "/", omittingEmptySubsequences: true).count
-            return firstDepth == secondDepth ? first < second : firstDepth < secondDepth
+            return firstDepth == secondDepth
+                ? WorkspacePathByteKey(first) < WorkspacePathByteKey(second)
+                : firstDepth < secondDepth
         }
     }
 
@@ -128,8 +130,9 @@ private struct WorkspaceSearchIgnoreRule {
 
     private func pathRelativeToBase(_ relativePath: String) -> String? {
         guard !baseDirectory.isEmpty else { return relativePath }
-        guard relativePath.hasPrefix("\(baseDirectory)/") else { return nil }
-        return String(relativePath.dropFirst(baseDirectory.count + 1))
+        let prefix = "\(baseDirectory)/"
+        guard relativePath.utf8.starts(with: prefix.utf8) else { return nil }
+        return String(relativePath.dropFirst(prefix.count))
     }
 
     private func directoryPrefixes(of path: String) -> [String] {
@@ -199,15 +202,16 @@ private enum WorkspaceSearchGlob {
         var retryValueIndex = 0
 
         while valueIndex < valueCharacters.count {
-            if patternIndex < patternCharacters.count,
-               patternCharacters[patternIndex] == "?" || patternCharacters[patternIndex] == valueCharacters[valueIndex]
-            {
-                patternIndex += 1
-                valueIndex += 1
-            } else if patternIndex < patternCharacters.count, patternCharacters[patternIndex] == "*" {
+            if patternIndex < patternCharacters.count, patternCharacters[patternIndex] == "*" {
                 starIndex = patternIndex
                 patternIndex += 1
                 retryValueIndex = valueIndex
+            } else if patternIndex < patternCharacters.count,
+                      patternCharacters[patternIndex] == "?"
+                      || utf8BytesMatch(patternCharacters[patternIndex], valueCharacters[valueIndex])
+            {
+                patternIndex += 1
+                valueIndex += 1
             } else if let starIndex {
                 patternIndex = starIndex + 1
                 retryValueIndex += 1
@@ -221,6 +225,12 @@ private enum WorkspaceSearchGlob {
             patternIndex += 1
         }
         return patternIndex == patternCharacters.count
+    }
+
+    private static func utf8BytesMatch(_ first: Character, _ second: Character) -> Bool {
+        // Keep wildcard consumption grapheme-based without inheriting Character's
+        // canonical-equivalent equality for literal path bytes.
+        String(first).utf8.elementsEqual(String(second).utf8)
     }
 }
 

@@ -15,17 +15,50 @@ public struct CompletionWorkspaceProvider: Sendable {
         currentText: String,
         snapshot: WorkspaceFileSnapshot
     ) throws -> CompletionWorkspace {
-        let currentRelativePath = try relativePath(for: currentFileURL, rootURL: rootURL)
+        let rootAuthority = try WorkspaceFileSystemRootAuthority(rootURL: rootURL)
+        let currentFileLocation: WorkspaceFileSystemLocation
+        do {
+            currentFileLocation = try rootAuthority.canonicalizedLocation(
+                forFileURL: currentFileURL
+            )
+        } catch {
+            throw CompletionWorkspaceProviderError.currentFileOutsideWorkspace
+        }
+        return try workspace(
+            rootAuthority: rootAuthority,
+            currentFileLocation: currentFileLocation,
+            currentText: currentText,
+            snapshot: snapshot
+        )
+    }
+
+    /// Builds completion metadata through the same retained root authority as the installed
+    /// workspace snapshot. Sibling contents are never reopened from a mutable root URL.
+    public func workspace(
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        currentFileLocation: WorkspaceFileSystemLocation,
+        currentText: String,
+        snapshot: WorkspaceFileSnapshot
+    ) throws -> CompletionWorkspace {
+        guard currentFileLocation.rootAuthority == rootAuthority else {
+            throw CompletionWorkspaceProviderError.currentFileOutsideWorkspace
+        }
+        let currentRelativePath = currentFileLocation.relativePath
         let markdownPaths = snapshot.entries
             .filter { $0.kind == .markdown || $0.kind == .mdx }
             .map(\.relativePath)
-            .sorted()
+            .sorted(by: byteOrderedPath)
         let imagePaths = snapshot.entries
             .filter { $0.kind == .image }
             .map(\.relativePath)
-            .sorted()
+            .sorted(by: byteOrderedPath)
+        for relativePath in markdownPaths + imagePaths {
+            guard (try? rootAuthority.location(relativePath: relativePath)) != nil else {
+                throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
+            }
+        }
         let frontmatterKeys = try siblingFrontmatterKeys(
-            rootURL: rootURL,
+            rootAuthority: rootAuthority,
             currentRelativePath: currentRelativePath,
             markdownPaths: markdownPaths
         )
@@ -36,7 +69,9 @@ public struct CompletionWorkspaceProvider: Sendable {
             imageFilePaths: imagePaths,
             currentFileHeadingAnchors: headingAnchors(in: currentText),
             frontmatterKeys: frontmatterKeys,
-            componentNames: FileKind(url: currentFileURL) == .mdx ? MDXImportParser.componentNames(in: currentText) : []
+            componentNames: FileKind(url: currentFileLocation.fileURL) == .mdx
+                ? MDXImportParser.componentNames(in: currentText)
+                : []
         )
     }
 
@@ -82,49 +117,38 @@ private extension CompletionWorkspaceProvider {
     }
 
     func siblingFrontmatterKeys(
-        rootURL: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         currentRelativePath: String,
         markdownPaths: [String]
     ) throws -> [String] {
         var keys: [String] = []
         var seen: Set<String> = []
+        let fileStore = MarkdownFileStore()
+        let currentPathKey = WorkspacePathByteKey(currentRelativePath)
 
-        try SecurityScopedAccess.withAccess(to: rootURL) {
-            let siblingPaths = markdownPaths.lazy
-                .filter { $0 != currentRelativePath }
-                // Keep completion metadata refresh bounded in large content workspaces.
-                .prefix(Self.siblingFrontmatterReadLimit)
+        let siblingPaths = markdownPaths.lazy
+            .filter { WorkspacePathByteKey($0) != currentPathKey }
+            // Keep completion metadata refresh bounded in large content workspaces.
+            .prefix(Self.siblingFrontmatterReadLimit)
 
-            for relativePath in siblingPaths {
-                let url = try containedURL(rootURL: rootURL, relativePath: relativePath)
-                guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-                    continue
-                }
+        for relativePath in siblingPaths {
+            guard let location = try? rootAuthority.location(relativePath: relativePath),
+                  let text = try? fileStore.load(at: location).text
+            else {
+                continue
+            }
 
-                for key in frontmatterKeys(in: text) where !seen.contains(key) {
-                    seen.insert(key)
-                    keys.append(key)
-                }
+            for key in frontmatterKeys(in: text) where !seen.contains(key) {
+                seen.insert(key)
+                keys.append(key)
             }
         }
 
         return keys
     }
 
-    func relativePath(for fileURL: URL, rootURL: URL) throws -> String {
-        do {
-            return try WorkspaceRootContainment.relativePath(for: fileURL, rootURL: rootURL)
-        } catch {
-            throw CompletionWorkspaceProviderError.currentFileOutsideWorkspace
-        }
-    }
-
-    func containedURL(rootURL: URL, relativePath: String) throws -> URL {
-        do {
-            return try WorkspaceRootContainment.containedURL(rootURL: rootURL, relativePath: relativePath)
-        } catch {
-            throw CompletionWorkspaceProviderError.workspaceEntryEscapesRoot(relativePath)
-        }
+    func byteOrderedPath(_ first: String, _ second: String) -> Bool {
+        WorkspacePathByteKey(first) < WorkspacePathByteKey(second)
     }
 
     func headingAnchors(in text: String) -> [String] {

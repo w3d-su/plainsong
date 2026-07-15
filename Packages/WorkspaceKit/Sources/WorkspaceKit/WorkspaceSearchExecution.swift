@@ -115,12 +115,13 @@ extension WorkspaceSearchPipeline {
         case let .skipped(skippedFile):
             try recordSkippedFile(skippedFile, state: &state)
 
-        case let .content(text, relativePath):
+        case let .content(text, relativePath, fileAuthority):
             state.searchedFileCount += 1
             guard state.mode == .matching else { return }
             try processTextMatches(
                 in: text,
                 relativePath: relativePath,
+                fileAuthority: fileAuthority,
                 state: &state
             )
         }
@@ -129,6 +130,7 @@ extension WorkspaceSearchPipeline {
     private func processTextMatches(
         in text: String,
         relativePath: String,
+        fileAuthority: WorkspaceSearchFileAuthority?,
         state: inout WorkspaceSearchExecutionState
     ) throws {
         try Task.checkCancellation()
@@ -159,7 +161,8 @@ extension WorkspaceSearchPipeline {
                     relativePath: relativePath,
                     contentFingerprint: contentFingerprint,
                     matches: emittedMatches,
-                    isTruncated: isPerFileTruncated || globalOverflow
+                    isTruncated: isPerFileTruncated || globalOverflow,
+                    fileAuthority: fileAuthority
                 )
             ))
             state.totalEmittedMatchCount += emittedMatches.count
@@ -304,6 +307,10 @@ struct WorkspaceSearchReadOutcome {
 }
 
 enum WorkspaceSearchReadPayload {
-    case content(text: String, relativePath: String)
+    case content(
+        text: String,
+        relativePath: String,
+        fileAuthority: WorkspaceSearchFileAuthority?
+    )
     case skipped(WorkspaceSearchSkippedFile)
 }

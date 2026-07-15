@@ -23,19 +23,23 @@ public struct WorkspaceSearchOverlay: Sendable, Equatable {
     }
 }
 
-/// Validated, canonical dirty overlays for one search request.
+/// Validated, normalized dirty overlays for one search request.
 ///
 /// Invalid paths, key/path mismatches, and multiple inputs that normalize to the same path
-/// are rejected. No winner is selected according to dictionary iteration order.
+/// bytes are rejected. Canonically equivalent Unicode spellings remain distinct filesystem
+/// paths. No winner is selected according to dictionary iteration order.
 public struct WorkspaceSearchOverlayCollection: Sendable, Equatable {
     public static let empty = WorkspaceSearchOverlayCollection(storage: [:])
 
-    private let storage: [String: WorkspaceSearchOverlay]
+    private let storage: [WorkspacePathByteKey: WorkspaceSearchOverlay]
 
     public init(_ overlays: [WorkspaceSearchOverlay]) throws {
-        var storage: [String: WorkspaceSearchOverlay] = [:]
-        for overlay in overlays.sorted(by: { $0.relativePath < $1.relativePath }) {
-            guard storage.updateValue(overlay, forKey: overlay.relativePath) == nil else {
+        var storage: [WorkspacePathByteKey: WorkspaceSearchOverlay] = [:]
+        for overlay in overlays.sorted(by: {
+            WorkspacePathByteKey($0.relativePath) < WorkspacePathByteKey($1.relativePath)
+        }) {
+            let pathKey = WorkspacePathByteKey(overlay.relativePath)
+            guard storage.updateValue(overlay, forKey: pathKey) == nil else {
                 throw WorkspaceSearchOverlayValidationError.normalizedCollision(
                     relativePath: overlay.relativePath
                 )
@@ -46,17 +50,20 @@ public struct WorkspaceSearchOverlayCollection: Sendable, Equatable {
 
     /// Validates legacy/keyed inputs without trusting either the dictionary key or value path.
     public init(validating overlays: [String: WorkspaceSearchOverlay]) throws {
-        var storage: [String: WorkspaceSearchOverlay] = [:]
-        for key in overlays.keys.sorted() {
+        var storage: [WorkspacePathByteKey: WorkspaceSearchOverlay] = [:]
+        for key in overlays.keys.sorted(by: {
+            WorkspacePathByteKey($0) < WorkspacePathByteKey($1)
+        }) {
             guard let overlay = overlays[key] else { continue }
             let normalizedKey = try Self.normalizedPath(key)
-            guard normalizedKey == overlay.relativePath else {
+            let pathKey = WorkspacePathByteKey(normalizedKey)
+            guard pathKey == WorkspacePathByteKey(overlay.relativePath) else {
                 throw WorkspaceSearchOverlayValidationError.keyPathMismatch(
                     key: key,
                     overlayRelativePath: overlay.relativePath
                 )
             }
-            guard storage.updateValue(overlay, forKey: normalizedKey) == nil else {
+            guard storage.updateValue(overlay, forKey: pathKey) == nil else {
                 throw WorkspaceSearchOverlayValidationError.normalizedCollision(
                     relativePath: normalizedKey
                 )
@@ -66,14 +73,14 @@ public struct WorkspaceSearchOverlayCollection: Sendable, Equatable {
     }
 
     public var overlays: [WorkspaceSearchOverlay] {
-        storage.values.sorted { $0.relativePath < $1.relativePath }
+        storage.sorted { $0.key < $1.key }.map(\.value)
     }
 
     subscript(relativePath: String) -> WorkspaceSearchOverlay? {
-        storage[relativePath]
+        storage[WorkspacePathByteKey(relativePath)]
     }
 
-    fileprivate init(storage: [String: WorkspaceSearchOverlay]) {
+    fileprivate init(storage: [WorkspacePathByteKey: WorkspaceSearchOverlay]) {
         self.storage = storage
     }
 

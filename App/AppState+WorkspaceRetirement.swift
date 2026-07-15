@@ -14,11 +14,35 @@ extension AppState {
 
     func closeWorkspaceForReplacement() throws {
         let retirementLease = editorDocumentBindingLeaseEligibleForRetirement()
+        let sessionsToClose = workspaceSessionsForClosure()
+        if let quarantinedSession = sessionsToClose.first(where: { session in
+            session !== retirementLease?.session
+                && indeterminateSessionWrites[ObjectIdentifier(session)] != nil
+        }) {
+            let sessionIdentity = ObjectIdentifier(quarantinedSession)
+            let result = indeterminateSessionWrites[sessionIdentity]!
+            guard let context = indeterminateSessionWriteContexts[sessionIdentity] else {
+                throw AppStateError.invalidSessionIdentity(
+                    sessionStateURL(for: quarantinedSession)
+                        ?? quarantinedSession.fileURL
+                        ?? URL(fileURLWithPath: "/")
+                )
+            }
+            throw MarkdownFileStoreError.writeRequiresReconciliation(
+                context.location.fileURL,
+                result
+            )
+        }
         if let conflictURL = firstUnretirableExternalConflict(excluding: retirementLease?.session) {
             throw AppStateError.unresolvedExternalChange(conflictURL)
         }
 
-        let sessionsToClose = workspaceSessionsForClosure()
+        if let retirementLease,
+           let retirementURL = sessionStateURL(for: retirementLease.session),
+           detachedSessionURLs.contains(retirementURL)
+        {
+            throw AppStateError.missingFile(retirementURL)
+        }
         for session in sessionsToClose where session !== retirementLease?.session && session.isDirty {
             try save(session: session)
         }
@@ -33,6 +57,11 @@ extension AppState {
 private extension AppState {
     func workspaceSessionsForClosure() -> [DocumentSession] {
         var sessions = Array(sessionCache.values)
+        sessions.append(contentsOf: retiredEditorDocumentBindings.values.map(\.session))
+        sessions.append(contentsOf: editorDocumentBindingSessions.values)
+        if let installedSession = installedEditorDocumentBindingLease?.session {
+            sessions.append(installedSession)
+        }
         if currentDocument.fileURL != nil {
             sessions.append(currentDocument)
         }
@@ -47,7 +76,7 @@ private extension AppState {
     }
 
     func sessionClosureIdentity(_ session: DocumentSession) -> String {
-        session.fileURL?.standardizedFileURL.resolvingSymlinksInPath().absoluteString ?? ""
+        sessionStateURL(for: session)?.absoluteString ?? ""
     }
 
     func commitWorkspaceClosure(
@@ -91,10 +120,23 @@ private extension AppState {
         requiredBy retirementLease: InstalledEditorDocumentBindingLease?
     ) -> SecurityScopedResourceAccess? {
         guard let retirementLease,
-              let workspaceRootURL,
-              let fileURL = retirementLease.session.fileURL,
-              WorkspaceRootContainment.isContained(fileURL, in: workspaceRootURL)
+              let installedAuthority = workspaceSearchRootAuthority
         else {
+            return nil
+        }
+        if let retainedLocation = retainedAnchoredSessionLocation(
+            for: retirementLease.session
+        ) {
+            guard retainedLocation.rootAuthority == installedAuthority else { return nil }
+            return authority
+        }
+        let sessionIdentity = ObjectIdentifier(retirementLease.session)
+        guard case let .proven(proof) =
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity]
+        else {
+            return nil
+        }
+        guard proof.installedWorkspaceLocation?.rootAuthority == installedAuthority else {
             return nil
         }
         return authority
@@ -107,6 +149,8 @@ private extension AppState {
         workspaceRootURL = nil
         workspaceTree = nil
         workspaceSnapshot = nil
+        workspaceSearchRootAuthority = nil
+        workspaceInstalledCaptureGeneration = nil
         completionWorkspace = .empty
         if retirementLease?.session !== currentDocument {
             autosaveTask?.cancel()
@@ -123,5 +167,12 @@ private extension AppState {
         retainMetadataOnlyForRetiredEditorSessions()
         externalChangePrompt = nil
         missingFilePrompt = nil
+        indeterminateFileWriteReconciliationPrompt = nil
+        if let retirementLease,
+           retirementLease.session === currentDocument,
+           indeterminateSessionWrites[ObjectIdentifier(currentDocument)] != nil
+        {
+            refreshIndeterminateFileWriteReconciliation(for: currentDocument)
+        }
     }
 }

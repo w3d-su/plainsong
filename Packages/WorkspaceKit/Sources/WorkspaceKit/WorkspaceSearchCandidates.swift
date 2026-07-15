@@ -36,7 +36,7 @@ enum WorkspaceSearchCandidatePlanner {
         var invalidItems: [WorkspaceSearchCandidatePlanItem] = []
         var validEntries: [WorkspaceSearchCandidate] = []
         var hardIgnoredItems: [WorkspaceSearchCandidatePlanItem] = []
-        var seenCanonicalCandidatePaths: Set<String> = []
+        var seenCandidatePathKeys: Set<WorkspacePathByteKey> = []
 
         for entry in entries {
             switch try classify(entry, request: request) {
@@ -45,14 +45,14 @@ enum WorkspaceSearchCandidatePlanner {
             case let .hardIgnored(item):
                 hardIgnoredItems.append(item)
             case let .candidate(candidate):
-                if seenCanonicalCandidatePaths.insert(candidate.relativePath).inserted {
+                if seenCandidatePathKeys.insert(WorkspacePathByteKey(candidate.relativePath)).inserted {
                     validEntries.append(candidate)
                 }
             }
         }
 
         let ignorePolicy = try await WorkspaceSearchIgnorePolicy.load(
-            rootURL: request.rootURL,
+            rootAuthority: request.rootAuthority,
             candidatePaths: validEntries.map(\.relativePath),
             limits: request.limits,
             reader: reader
@@ -68,10 +68,7 @@ enum WorkspaceSearchCandidatePlanner {
                 items.append(.candidate(sortKey: candidate.relativePath, candidate: candidate))
             }
         }
-        items.sort { first, second in
-            first.sortKey == second.sortKey ? planItemRank(first) < planItemRank(second) : first.sortKey < second
-                .sortKey
-        }
+        items.sort(by: comparePlanItems)
 
         return WorkspaceSearchCandidatePlan(
             items: items,
@@ -103,17 +100,16 @@ enum WorkspaceSearchCandidatePlanner {
             ))
         }
 
-        let canonicalRelativePath: String
-        let containedURL: URL
+        let canonicalLocation: WorkspaceFileSystemLocation
         do {
-            containedURL = try WorkspaceRootContainment.containedURL(
-                rootURL: request.rootURL,
+            canonicalLocation = try request.rootAuthority.canonicalizedLocation(
                 relativePath: relativePath
             )
-            canonicalRelativePath = try WorkspaceRootContainment.relativePath(
-                for: containedURL,
-                rootURL: request.rootURL
-            )
+        } catch WorkspaceAnchoredFileSystemError.missing {
+            // A stale snapshot entry remains a candidate so the production anchored read
+            // owns the typed `disappeared` decision. A dangling alias is still rejected by
+            // that no-follow read rather than being followed through another namespace.
+            canonicalLocation = try request.rootAuthority.location(relativePath: relativePath)
         } catch {
             return .invalid(.skipped(
                 sortKey: relativePath,
@@ -124,7 +120,8 @@ enum WorkspaceSearchCandidatePlanner {
             ))
         }
 
-        guard FileKind(url: containedURL) != nil else {
+        let canonicalRelativePath = canonicalLocation.relativePath
+        guard FileKind(url: canonicalLocation.fileURL) != nil else {
             return .invalid(.skipped(
                 sortKey: relativePath,
                 skippedFile: WorkspaceSearchSkippedFile(
@@ -147,8 +144,10 @@ enum WorkspaceSearchCandidatePlanner {
         _ first: WorkspaceFileSnapshot.Entry,
         _ second: WorkspaceFileSnapshot.Entry
     ) -> Bool {
-        if first.relativePath != second.relativePath {
-            return first.relativePath < second.relativePath
+        let firstPathKey = WorkspacePathByteKey(first.relativePath)
+        let secondPathKey = WorkspacePathByteKey(second.relativePath)
+        if firstPathKey != secondPathKey {
+            return firstPathKey < secondPathKey
         }
         return (first.identity ?? "") < (second.identity ?? "")
     }
@@ -164,6 +163,17 @@ enum WorkspaceSearchCandidatePlanner {
         }
     }
 
+    private static func comparePlanItems(
+        _ first: WorkspaceSearchCandidatePlanItem,
+        _ second: WorkspaceSearchCandidatePlanItem
+    ) -> Bool {
+        let firstPathKey = WorkspacePathByteKey(first.sortKey)
+        let secondPathKey = WorkspacePathByteKey(second.sortKey)
+        return firstPathKey == secondPathKey
+            ? planItemRank(first) < planItemRank(second)
+            : firstPathKey < secondPathKey
+    }
+
     private static func skipReason(for error: Error) -> WorkspaceSearchSkipReason {
         switch error {
         case WorkspaceRootContainmentError.emptyRelativePath:
@@ -176,6 +186,12 @@ enum WorkspaceSearchCandidatePlanner {
             .symlinkEscape
         case WorkspaceRootContainmentError.fileOutsideRoot:
             .symlinkEscape
+        case WorkspaceAnchoredFileSystemError.symbolicLink,
+             WorkspaceAnchoredFileSystemError.changedIdentity,
+             WorkspaceAnchoredFileSystemError.namespaceChanged:
+            .symlinkEscape
+        case WorkspaceAnchoredFileSystemError.notRegularFile:
+            .unsupportedPhysicalFileKind
         default:
             .pathTraversal
         }

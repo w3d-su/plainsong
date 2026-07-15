@@ -6,6 +6,13 @@ import WorkspaceKit
 @MainActor
 extension AppState {
     func canonicalSessionURL(for url: URL) throws -> URL {
+        // Standalone sessions establish their descriptor-bound parent authority in
+        // `activateFileSession`. Do not normalize the panel URL first:
+        // `standardizedFileURL` silently decomposes NFC path components to NFD before that
+        // capture can preserve the literal leaf spelling.
+        guard workspaceRootURL != nil else {
+            return url
+        }
         let resolvedURL = url.standardizedFileURL.resolvingSymlinksInPath()
         if let workspaceRootURL {
             _ = try WorkspaceRootContainment.relativePath(
@@ -48,7 +55,7 @@ extension AppState {
         if lease.session === currentDocument {
             return lease
         }
-        guard let fileURL = lease.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath(),
+        guard let fileURL = sessionStateURL(for: lease.session),
               sessionCache[fileURL] === lease.session
         else {
             return nil
@@ -106,8 +113,8 @@ extension AppState {
             }
             .compactMap { session -> URL? in
                 guard session.isDirty,
-                      let url = session.fileURL?.standardizedFileURL.resolvingSymlinksInPath(),
-                      pendingExternalTexts[url] != nil
+                      let url = sessionStateURL(for: session),
+                      pendingExternalTexts[url] != nil || pendingExternalFileVersions[url] != nil
                 else {
                     return nil
                 }
@@ -117,11 +124,16 @@ extension AppState {
             .first
     }
 
-    func recoverRetiredSession(for canonicalURL: URL) -> DocumentSession? {
+    func recoverRetiredSession(
+        for canonicalURL: URL,
+        matching candidateLocation: WorkspaceFileSystemLocation
+    ) -> DocumentSession? {
         var matches: [(EditorDocumentBindingID, RetiredEditorDocumentBinding)] = []
         for (bindingID, retirement) in retiredEditorDocumentBindings {
             if !retirement.isAwaitingBindingEnd,
-               retirement.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath() == canonicalURL
+               retainedManagedSessionLocation(for: retirement.session) == candidateLocation,
+               let retiredURL = sessionStateURL(for: retirement.session),
+               exactFileURLSpellingMatches(retiredURL, canonicalURL)
             {
                 matches.append((bindingID, retirement))
             }
@@ -131,6 +143,75 @@ extension AppState {
         retiredEditorDocumentBindings[match.0] = nil
         match.1.securityScopedAuthority?.stop()
         return match.1.session
+    }
+
+    /// `pendingExternal*` and `detachedSessionURLs` intentionally use the exact retained URL
+    /// spelling as their App-state key. Before another session can use that same lexical key,
+    /// prove that any stateful owner has the same retained authority; a replacement parent B
+    /// must never inherit or clear A's conflict/detachment/quarantine state merely because the
+    /// pathname is identical.
+    func hasStatefulRetainedAuthorityCollision(
+        at canonicalURL: URL,
+        candidateLocation: WorkspaceFileSystemLocation
+    ) -> Bool {
+        let hasURLKeyedState = pendingExternalTexts[canonicalURL] != nil
+            || pendingExternalFileVersions[canonicalURL] != nil
+            || detachedSessionURLs.contains(canonicalURL)
+        var sessions = Array(sessionCache.values)
+        sessions.append(contentsOf: retiredEditorDocumentBindings.values.map(\.session))
+        sessions.append(contentsOf: editorDocumentBindingSessions.values)
+        if let installedSession = installedEditorDocumentBindingLease?.session {
+            sessions.append(installedSession)
+        }
+        if currentDocument.fileURL != nil {
+            sessions.append(currentDocument)
+        }
+
+        var seen: Set<ObjectIdentifier> = []
+        var foundURLKeyedStateOwner = false
+        for session in sessions where seen.insert(ObjectIdentifier(session)).inserted {
+            let sessionIdentity = ObjectIdentifier(session)
+            guard let stateURL = sessionStateURL(for: session),
+                  exactFileURLSpellingMatches(stateURL, canonicalURL)
+            else {
+                continue
+            }
+            if hasURLKeyedState {
+                foundURLKeyedStateOwner = true
+            }
+            let hasSessionState = hasURLKeyedState
+                || indeterminateSessionWrites[sessionIdentity] != nil
+                || indeterminateSessionWriteContexts[sessionIdentity] != nil
+            guard hasSessionState else { continue }
+
+            guard let retainedLocation = retainedManagedSessionLocation(for: session) else {
+                // An unavailable proof cannot establish that B is distinct from the stateful A.
+                return true
+            }
+            if retainedLocation != candidateLocation {
+                return true
+            }
+        }
+        // A URL-keyed fence with no retained owner is itself unprovable authority state; do not
+        // let a new capture consume it just because no mutable session URL happened to match.
+        return hasURLKeyedState && !foundURLKeyedStateOwner
+    }
+
+    /// The only authority location eligible to identify an already-managed session. This never
+    /// reconstructs a location from the mutable display URL: a cache/retirement hit without a
+    /// retained proof must fail closed rather than bind a replacement namespace.
+    func retainedManagedSessionLocation(
+        for session: DocumentSession
+    ) -> WorkspaceFileSystemLocation? {
+        if let location = retainedAnchoredSessionLocation(for: session) {
+            return location
+        }
+        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[
+            ObjectIdentifier(session)
+        ] {
+            return proof.location
+        }
+        return nil
     }
 
     func cancelWorkspaceSessionTasks(except retainedSession: DocumentSession?) {
@@ -156,15 +237,33 @@ extension AppState {
     }
 
     func retainMetadataOnlyForRetiredEditorSessions() {
-        let retainedURLs = Set(retiredEditorDocumentBindings.values.compactMap { retirement in
-            retirement.session.fileURL?.standardizedFileURL.resolvingSymlinksInPath()
-        })
+        var retainedSessions = retiredEditorDocumentBindings.values.map(\.session)
+        if currentDocument.fileURL != nil {
+            retainedSessions.append(currentDocument)
+        }
+        let retainedURLs = Set(retainedSessions.compactMap(sessionStateURL(for:)))
         pendingExternalTexts = pendingExternalTexts.filter { retainedURLs.contains($0.key) }
+        pendingExternalFileVersions = pendingExternalFileVersions.filter {
+            retainedURLs.contains($0.key)
+        }
         lastKnownDiskHashes = lastKnownDiskHashes.filter { retainedURLs.contains($0.key) }
         lastKnownDiskModificationDates = lastKnownDiskModificationDates.filter {
             retainedURLs.contains($0.key)
         }
         detachedSessionURLs = Set(detachedSessionURLs.filter(retainedURLs.contains))
+        let retainedSessionIdentities = Set(retainedSessions.map(ObjectIdentifier.init))
+        anchoredSessionFileBindings = anchoredSessionFileBindings.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        unanchoredManagedSessionOwnershipProofs = unanchoredManagedSessionOwnershipProofs.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        indeterminateSessionWrites = indeterminateSessionWrites.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
+        indeterminateSessionWriteContexts = indeterminateSessionWriteContexts.filter {
+            retainedSessionIdentities.contains($0.key)
+        }
     }
 
     func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {
@@ -180,30 +279,20 @@ extension AppState {
 
     func protectedSessionURLs() -> Set<URL> {
         var urls: Set<URL> = []
-        if let currentURL = currentDocument.fileURL?.standardizedFileURL.resolvingSymlinksInPath() {
+        if let currentURL = sessionStateURL(for: currentDocument) {
             urls.insert(currentURL)
         }
-        if let installedURL = installedEditorDocumentBindingLease?.session.fileURL?
-            .standardizedFileURL.resolvingSymlinksInPath()
+        if let installedSession = installedEditorDocumentBindingLease?.session,
+           let installedURL = sessionStateURL(for: installedSession)
         {
             urls.insert(installedURL)
         }
-        return urls
-    }
-
-    func nodeForCurrentDocument(in tree: WorkspaceFileTree, root: URL) -> WorkspaceFileNode? {
-        guard let currentURL = currentDocument.fileURL?.standardizedFileURL,
-              Self.isDescendant(currentURL, of: root),
-              let relativePath = Self.workspaceRelativePath(for: currentURL, root: root)
-        else {
-            return nil
+        for (sessionIdentity, context) in indeterminateSessionWriteContexts
+            where indeterminateSessionWrites[sessionIdentity] != nil
+        {
+            urls.insert(context.location.fileURL)
         }
-
-        return firstNode(
-            in: tree.root,
-            canonicalRelativePath: relativePath,
-            rootURL: root
-        )
+        return urls
     }
 
     func firstNode(
@@ -238,6 +327,15 @@ extension AppState {
         _ eviction: WorkspaceSessionEviction,
         session: DocumentSession
     ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        if indeterminateSessionWrites[sessionIdentity] != nil {
+            _ = sessionPolicy.access(
+                eviction.url,
+                isDirty: session.isDirty,
+                protectedURLs: protectedSessionURLs().union([eviction.url])
+            )
+            return
+        }
         if eviction.requiresSave {
             do {
                 try save(session: session)
@@ -254,6 +352,10 @@ extension AppState {
             }
         }
         cancelAutosave(for: session)
+        anchoredSessionFileBindings[sessionIdentity] = nil
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        indeterminateSessionWrites[sessionIdentity] = nil
+        indeterminateSessionWriteContexts[sessionIdentity] = nil
         sessionCache[eviction.url] = nil
         removeEditorDocumentBindingRegistration(for: session)
     }
