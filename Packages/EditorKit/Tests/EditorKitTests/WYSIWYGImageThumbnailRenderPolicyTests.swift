@@ -235,7 +235,12 @@ extension WYSIWYGImageThumbnailPresentationTests {
             range: imageRange,
             matching: { $0.visualState == .loading }
         )
-        try await Task.sleep(nanoseconds: 100_000_000)
+        let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+        while imageMarker(in: fixture.textView, range: imageRange) != nil,
+              DispatchTime.now().uptimeNanoseconds < deadline
+        {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         XCTAssertNil(imageMarker(in: fixture.textView, range: imageRange))
         let line = try lineFragment(containing: imageRange, in: fixture.textView)
         XCTAssertTrue(line.attributedString.string.contains("![alt](art.svg)"))
