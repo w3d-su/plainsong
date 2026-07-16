@@ -1,6 +1,33 @@
 import Combine
 import Foundation
 
+/// A full-source transition prepared away from the main actor.
+///
+/// The destination source, literal equality result, and statistics stay together so a
+/// caller cannot accidentally apply metadata computed for different text. A session
+/// accepts the transition only while it is still at `sourceRevision`.
+public struct DocumentSessionTextTransition: Sendable {
+    fileprivate let sourceRevision: Int
+    fileprivate let destinationText: String
+    fileprivate let destinationDiffers: Bool
+    fileprivate let destinationStatistics: TextStatistics
+
+    public var changesText: Bool {
+        destinationDiffers
+    }
+
+    public init(
+        sourceText: String,
+        sourceRevision: Int,
+        destinationText: String
+    ) {
+        self.sourceRevision = sourceRevision
+        self.destinationText = destinationText
+        destinationDiffers = !ExactSourceText.matches(sourceText, destinationText)
+        destinationStatistics = TextStatistics(text: destinationText)
+    }
+}
+
 /// Main-actor document model for one editable Markdown or MDX file.
 @MainActor
 public final class DocumentSession: ObservableObject {
@@ -97,6 +124,16 @@ public final class DocumentSession: ObservableObject {
         emitTextChange()
     }
 
+    /// Applies a literal source mutation already authorized by the App-owned editor
+    /// revision fence. Authorization does not weaken the session invariants: an exact
+    /// no-op stays a no-op, and returning to the persisted baseline becomes clean.
+    public func replaceTextFromAuthorizedEditor(
+        _ newText: String,
+        refreshStatistics: Bool = true
+    ) {
+        replaceText(newText, refreshStatistics: refreshStatistics)
+    }
+
     public func refreshStatistics() {
         applyStatistics(TextStatistics(text: text))
     }
@@ -139,24 +176,50 @@ public final class DocumentSession: ObservableObject {
         text newText: String,
         url newURL: URL?,
         fileKind newFileKind: FileKind,
-        isDirty newIsDirty: Bool
+        isDirty newIsDirty: Bool,
+        statistics precomputedStatistics: TextStatistics? = nil
     ) {
         applyState(
             text: newText,
             url: newURL,
             fileKind: newFileKind,
-            isDirty: newIsDirty
+            isDirty: newIsDirty,
+            statistics: precomputedStatistics
         )
         savedText = newIsDirty ? nil : newText
+    }
+
+    /// Applies a transition whose literal comparison and statistics were computed away
+    /// from the main actor. Returns `false` if the session changed after preparation.
+    @discardableResult
+    public func reset(
+        precomputedTextTransition transition: DocumentSessionTextTransition,
+        url newURL: URL?,
+        fileKind newFileKind: FileKind,
+        isDirty newIsDirty: Bool
+    ) -> Bool {
+        guard version == transition.sourceRevision else { return false }
+        applyState(
+            text: transition.destinationText,
+            url: newURL,
+            fileKind: newFileKind,
+            isDirty: newIsDirty,
+            statistics: transition.destinationStatistics,
+            knownTextChanged: transition.destinationDiffers
+        )
+        savedText = newIsDirty ? nil : transition.destinationText
+        return true
     }
 
     private func applyState(
         text newText: String,
         url newURL: URL?,
         fileKind newFileKind: FileKind,
-        isDirty newIsDirty: Bool
+        isDirty newIsDirty: Bool,
+        statistics precomputedStatistics: TextStatistics? = nil,
+        knownTextChanged: Bool? = nil
     ) {
-        let textChanged = !ExactSourceText.matches(text, newText)
+        let textChanged = knownTextChanged ?? !ExactSourceText.matches(text, newText)
         let renderableStateChanged = textChanged || fileURL != newURL || fileKind != newFileKind
         if renderableStateChanged {
             version += 1
@@ -164,7 +227,7 @@ public final class DocumentSession: ObservableObject {
 
         if textChanged {
             text = newText
-            statistics = TextStatistics(text: newText)
+            statistics = precomputedStatistics ?? TextStatistics(text: newText)
         }
 
         if fileURL != newURL {

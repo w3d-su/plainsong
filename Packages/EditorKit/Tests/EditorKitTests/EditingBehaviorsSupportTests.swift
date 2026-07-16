@@ -185,7 +185,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
     func testClipboardImagePasteUsesAssetInserterAndMarkdownImageBuilder() async throws {
         let inserter: EditorImageAssetInserter = { assets in
             XCTAssertEqual(assets, [.data(Data([1, 2, 3]), suggestedFilename: "image.png")])
-            return ["assets/image.png"]
+            return EditorImageAssetInsertion(relativePaths: ["assets/image.png"])
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",
@@ -205,7 +205,7 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
         let inserter: EditorImageAssetInserter = { assets in
             XCTAssertEqual(assets, [.file(droppedURL)])
-            return ["assets/hero.png"]
+            return EditorImageAssetInsertion(relativePaths: ["assets/hero.png"])
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",
@@ -220,9 +220,15 @@ final class EditingBehaviorsSupportTests: XCTestCase {
     }
 
     func testDelayedImagePasteAbortsWhenEditorTextChangesBeforeInserterReturns() async throws {
+        var discardCount = 0
         let inserter: EditorImageAssetInserter = { _ in
             try? await Task.sleep(nanoseconds: 50_000_000)
-            return ["assets/image.png"]
+            return EditorImageAssetInsertion(
+                relativePaths: ["assets/image.png"],
+                discard: {
+                    discardCount += 1
+                }
+            )
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",
@@ -236,15 +242,24 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(textView.pasteHandler?(textView, pasteboard), true)
         textView.insertText("X", replacementRange: NSRange(location: 0, length: 0))
 
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitForCondition("delayed image paste cleanup") {
+            discardCount == 1
+        }
         XCTAssertEqual(Self.text(in: textView), "XBefore ")
+        XCTAssertEqual(discardCount, 1)
     }
 
     func testDelayedImageDropAbortsWhenEditorContextChangesBeforeInserterReturns() async throws {
         let droppedURL = URL(fileURLWithPath: "/tmp/hero.png")
+        var discardCount = 0
         let inserter: EditorImageAssetInserter = { _ in
             try? await Task.sleep(nanoseconds: 50_000_000)
-            return ["assets/hero.png"]
+            return EditorImageAssetInsertion(
+                relativePaths: ["assets/hero.png"],
+                discard: {
+                    discardCount += 1
+                }
+            )
         }
         let (textView, coordinator) = makeInterceptingTextView(
             text: "Before ",
@@ -257,8 +272,11 @@ final class EditingBehaviorsSupportTests: XCTestCase {
         XCTAssertEqual(textView.imageFileDropHandler?(textView, [droppedURL]), true)
         coordinator.updateImageAssetContextID("file-b")
 
-        try await Task.sleep(nanoseconds: 100_000_000)
+        try await waitForCondition("delayed image drop cleanup") {
+            discardCount == 1
+        }
         XCTAssertEqual(Self.text(in: textView), "Before ")
+        XCTAssertEqual(discardCount, 1)
     }
 
     func testPlainTypingHotPathOnLargeFixtureStaysUnderFrameBudget() throws {
@@ -379,6 +397,19 @@ private extension EditingBehaviorsSupportTests {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTAssertEqual(Self.text(in: textView), expected)
+    }
+
+    func waitForCondition(
+        _ description: String,
+        condition: @MainActor () -> Bool
+    ) async throws {
+        for _ in 0 ..< 100 {
+            if condition() {
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("Timed out waiting for \(description)")
     }
 
     static var repoRoot: URL {

@@ -29,24 +29,32 @@ struct ObservedRetainedFileVersion: Equatable {
     let file: MarkdownFile
     let identity: WorkspaceFileSystemIdentity
     let sha256Digest: String
+    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
 
-    init(location: WorkspaceFileSystemLocation, result: MarkdownFileReadResult) {
+    init(
+        location: WorkspaceFileSystemLocation,
+        result: MarkdownFileReadResult,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
+    ) {
         self.location = location
         file = result.file
         identity = result.metadata.identity
         sha256Digest = result.sha256Digest
+        self.preparedImageAssetAuthority = preparedImageAssetAuthority
     }
 
     init(
         location: WorkspaceFileSystemLocation,
         file: MarkdownFile,
         identity: WorkspaceFileSystemIdentity,
-        sha256Digest: String
+        sha256Digest: String,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
     ) {
         self.location = location
         self.file = file
         self.identity = identity
         self.sha256Digest = sha256Digest
+        self.preparedImageAssetAuthority = preparedImageAssetAuthority
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -55,6 +63,24 @@ struct ObservedRetainedFileVersion: Equatable {
             && lhs.file.fileKind == rhs.file.fileKind
             && lhs.identity == rhs.identity
             && lhs.sha256Digest == rhs.sha256Digest
+            && preparedAuthorityMatches(
+                lhs.preparedImageAssetAuthority,
+                rhs.preparedImageAssetAuthority
+            )
+    }
+
+    private static func preparedAuthorityMatches(
+        _ lhs: PreparedEditorImageAssetDocumentAuthority?,
+        _ rhs: PreparedEditorImageAssetDocumentAuthority?
+    ) -> Bool {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?):
+            lhs.location == rhs.location && lhs.identity == rhs.identity
+        case (nil, nil):
+            true
+        default:
+            false
+        }
     }
 }
 
@@ -65,41 +91,58 @@ extension AppState {
     /// session's mutable display URL.
     func retainUnanchoredManagedSessionOwnership(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
-        guard anchoredSessionFileBindings[sessionIdentity] == nil,
-              indeterminateSessionWriteContexts[sessionIdentity] == nil
-        else {
+        if anchoredSessionFileBindings[sessionIdentity] != nil {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
             return
         }
-        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
-            retainInstalledWorkspaceMembershipIfAvailable(
-                for: sessionIdentity,
-                proof: proof
-            )
+        guard indeterminateSessionWriteContexts[sessionIdentity] == nil else {
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+            discardEditorImageAssetDocumentAuthority(for: session)
             return
         }
+        // This runs only at explicit session lifecycle boundaries. SwiftUI body evaluation
+        // consumes retained proof/cache state and never calls this filesystem path.
+        if case .proven? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] { return }
         guard unanchoredManagedSessionOwnershipProofs[sessionIdentity] == nil else { return }
         guard let fileURL = session.fileURL else {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .unavailable(fileURL: nil)
+            discardEditorImageAssetDocumentAuthority(for: session)
             return
         }
 
         do {
             let location = try WorkspaceFileSystemLocation(fileURL: fileURL)
-            let loaded = try fileStore.loadResult(at: location)
+            let preparedRead = try prepareEditorImageAssetDocumentRead(
+                fileStore: fileStore,
+                at: location
+            )
+            let loaded = preparedRead.result
+            let installedLocation = installedWorkspaceLocation(
+                for: location.fileURL,
+                identity: loaded.metadata.identity
+            )
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(
                 UnanchoredManagedSessionFileProof(
                     location: location,
                     identity: loaded.metadata.identity,
                     sha256Digest: loaded.sha256Digest,
-                    installedWorkspaceLocation: installedWorkspaceLocation(
-                        for: location.fileURL,
-                        identity: loaded.metadata.identity
-                    )
+                    installedWorkspaceLocation: installedLocation
                 )
             )
+            if let installedLocation {
+                installEditorImageAssetDocumentAuthority(
+                    for: session,
+                    location: installedLocation,
+                    identity: loaded.metadata.identity,
+                    preparedAuthority: preparedRead.preparedAuthority,
+                    allowsBootstrapWithoutRetainedLineage: true
+                )
+            } else {
+                discardEditorImageAssetDocumentAuthority(for: session)
+            }
         } catch {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .unavailable(fileURL: fileURL)
+            discardEditorImageAssetDocumentAuthority(for: session)
         }
     }
 
@@ -107,34 +150,50 @@ extension AppState {
         for session: DocumentSession,
         location: WorkspaceFileSystemLocation,
         identity: WorkspaceFileSystemIdentity,
-        sha256Digest: String
+        sha256Digest: String,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        guard anchoredSessionFileBindings[sessionIdentity] == nil,
-              indeterminateSessionWriteContexts[sessionIdentity] == nil
-        else {
+        if anchoredSessionFileBindings[sessionIdentity] != nil {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+            return
+        }
+        guard indeterminateSessionWriteContexts[sessionIdentity] == nil else {
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+            discardEditorImageAssetDocumentAuthority(for: session)
             return
         }
         if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
             retainInstalledWorkspaceMembershipIfAvailable(
-                for: sessionIdentity,
+                for: session,
                 proof: proof
             )
             return
         }
         guard unanchoredManagedSessionOwnershipProofs[sessionIdentity] == nil else { return }
+        let installedLocation = installedWorkspaceLocation(
+            for: location.fileURL,
+            identity: identity
+        )
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(
             UnanchoredManagedSessionFileProof(
                 location: location,
                 identity: identity,
                 sha256Digest: sha256Digest,
-                installedWorkspaceLocation: installedWorkspaceLocation(
-                    for: location.fileURL,
-                    identity: identity
-                )
+                installedWorkspaceLocation: installedLocation
             )
         )
+        if let installedLocation {
+            installEditorImageAssetDocumentAuthority(
+                for: session,
+                location: installedLocation,
+                identity: identity,
+                preparedAuthority: preparedImageAssetAuthority,
+                allowsBootstrapWithoutRetainedLineage: true
+            )
+        } else {
+            discardEditorImageAssetDocumentAuthority(for: session)
+        }
     }
 
     func exactFileURLSpellingMatches(_ lhs: URL, _ rhs: URL) -> Bool {
@@ -165,9 +224,14 @@ extension AppState {
         } else {
             throw AppStateError.invalidSessionIdentity(sessionStateURL(for: session) ?? URL(fileURLWithPath: "/"))
         }
-        return try ObservedRetainedFileVersion(
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: fileStore,
+            at: location
+        )
+        return ObservedRetainedFileVersion(
             location: location,
-            result: fileStore.loadResult(at: location)
+            result: preparedRead.result,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
         )
     }
 
@@ -205,10 +269,11 @@ extension AppState {
             || pendingExternalFileVersions[canonicalURL] != nil
         let isDetached = detachedSessionURLs.contains(canonicalURL)
         let changed = observedRetainedFileVersionDiffers(observation, for: session)
+        let hasPendingEditorSource = hasPendingEditorSource(for: session)
         guard !hasPendingConflict,
               !isDetached,
               indeterminateSessionWrites[sessionIdentity] == nil,
-              !changed || !session.isDirty
+              !changed || (!session.isDirty && !hasPendingEditorSource)
         else {
             recordExternalChangeConflict(
                 observation,
@@ -271,36 +336,54 @@ extension AppState {
         if let context = indeterminateSessionWriteContexts[sessionIdentity],
            context.location == observation.location
         {
-            anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
-                location: context.location,
-                identity: observation.identity,
-                sha256Digest: observation.sha256Digest
+            adoptAnchoredFileBinding(
+                AnchoredWorkspaceSessionFileBinding(
+                    location: context.location,
+                    identity: observation.identity,
+                    sha256Digest: observation.sha256Digest
+                ),
+                for: session,
+                preparedImageAssetAuthority: observation.preparedImageAssetAuthority
             )
-            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
             return true
         }
         if let binding = anchoredSessionFileBindings[sessionIdentity] {
             guard binding.location == observation.location else { return false }
-            anchoredSessionFileBindings[sessionIdentity] = AnchoredWorkspaceSessionFileBinding(
-                location: binding.location,
-                identity: observation.identity,
-                sha256Digest: observation.sha256Digest
+            adoptAnchoredFileBinding(
+                AnchoredWorkspaceSessionFileBinding(
+                    location: binding.location,
+                    identity: observation.identity,
+                    sha256Digest: observation.sha256Digest
+                ),
+                for: session,
+                preparedImageAssetAuthority: observation.preparedImageAssetAuthority
             )
-            unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
             return true
         }
         if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
             guard proof.location == observation.location else { return false }
+            let installedLocation = proof.identity == observation.identity
+                ? proof.installedWorkspaceLocation
+                : nil
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = .proven(
                 UnanchoredManagedSessionFileProof(
                     location: proof.location,
                     identity: observation.identity,
                     sha256Digest: observation.sha256Digest,
-                    installedWorkspaceLocation: proof.identity == observation.identity
-                        ? proof.installedWorkspaceLocation
-                        : nil
+                    installedWorkspaceLocation: installedLocation
                 )
             )
+            if let installedLocation {
+                installEditorImageAssetDocumentAuthority(
+                    for: session,
+                    location: installedLocation,
+                    identity: observation.identity,
+                    preparedAuthority: observation.preparedImageAssetAuthority,
+                    allowsBootstrapWithoutRetainedLineage: false
+                )
+            } else {
+                discardEditorImageAssetDocumentAuthority(for: session)
+            }
             return true
         }
         return false
@@ -308,11 +391,24 @@ extension AppState {
 
     func adoptAnchoredFileBinding(
         _ binding: AnchoredWorkspaceSessionFileBinding,
-        for session: DocumentSession
+        for session: DocumentSession,
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil,
+        allowsImageAssetAuthorityBootstrap: Bool? = nil
     ) {
         let sessionIdentity = ObjectIdentifier(session)
+        let hadRetainedOwnership = anchoredSessionFileBindings[sessionIdentity] != nil
+            || unanchoredManagedSessionOwnershipProofs[sessionIdentity] != nil
+            || indeterminateSessionWriteContexts[sessionIdentity] != nil
         anchoredSessionFileBindings[sessionIdentity] = binding
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+        installEditorImageAssetDocumentAuthority(
+            for: session,
+            location: binding.location,
+            identity: binding.identity,
+            preparedAuthority: preparedImageAssetAuthority,
+            allowsBootstrapWithoutRetainedLineage: allowsImageAssetAuthorityBootstrap
+                ?? !hadRetainedOwnership
+        )
     }
 
     /// Handles a background-observed possible external change to an unanchored (single-file,
@@ -363,14 +459,15 @@ extension AppState {
     }
 
     private func retainInstalledWorkspaceMembershipIfAvailable(
-        for sessionIdentity: ObjectIdentifier,
+        for session: DocumentSession,
         proof: UnanchoredManagedSessionFileProof
     ) {
-        guard proof.installedWorkspaceLocation == nil,
-              let installedWorkspaceLocation = installedWorkspaceLocation(
-                  for: proof.location.fileURL,
-                  identity: proof.identity
-              )
+        let sessionIdentity = ObjectIdentifier(session)
+        if proof.installedWorkspaceLocation != nil { return }
+        guard let installedWorkspaceLocation = installedWorkspaceLocation(
+            for: proof.location.fileURL,
+            identity: proof.identity
+        )
         else {
             return
         }
@@ -381,6 +478,13 @@ extension AppState {
                 sha256Digest: proof.sha256Digest,
                 installedWorkspaceLocation: installedWorkspaceLocation
             )
+        )
+        installEditorImageAssetDocumentAuthority(
+            for: session,
+            location: installedWorkspaceLocation,
+            identity: proof.identity,
+            preparedAuthority: nil,
+            allowsBootstrapWithoutRetainedLineage: false
         )
     }
 

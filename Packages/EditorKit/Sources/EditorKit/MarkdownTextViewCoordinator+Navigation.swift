@@ -4,7 +4,9 @@ import STTextView
 extension MarkdownTextViewCoordinator {
     func observeNavigationCommand(_ command: EditorNavigationCommand?) {
         switch navigationState.observe(command) {
-        case .acceptedNavigation, .acceptedCancellation:
+        case .acceptedNavigation:
+            cancelPendingNavigationTasks()
+        case .acceptedCancellation:
             cancelPendingNavigationTasks()
         case .ignored:
             break
@@ -30,7 +32,7 @@ extension MarkdownTextViewCoordinator {
            request.documentIdentity == currentDocumentIdentity,
            isPreparedDocumentInstalled,
            !hasMarkedText,
-           MarkdownTextView.plainTextMatches(textView, text),
+           canProveCurrentInstalledSource() || nativeTextMatches(textView, text),
            let textStorage = MarkdownTextView.textStorage(of: textView)
         {
             isDocumentTextInstalled = true

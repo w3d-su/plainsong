@@ -1,10 +1,10 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. Draft PR #85 closes the WS3B
-> filesystem-authority/write sub-gate. Draft PR #82 remains the headless multi-window lifecycle
-> hardening PR and still requires restacking onto that authority baseline; it was not superseded
-> by a visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item,
-> refresh work, WS3C, WS4, and the overall Definition of Done remain open.**
+> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. PR #85 merged the WS3B
+> filesystem-authority/write sub-gate, and Draft PR #82 is restacked directly onto that authority
+> baseline as the headless multi-window lifecycle hardening PR; it was not superseded by a
+> visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item, refresh
+> work, WS3C, WS4, and the overall Definition of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -147,11 +147,11 @@ produce only a prefix of the valid-request bound.
 |---|---|---|
 | MarkdownCore | Pure query semantics, text matching, UTF-16 ranges, line mapping, bounded snippets | `TextSearchQuery`, `TextSearchMatch`, `TextSearchEngine` |
 | WorkspaceKit | Candidate selection, ignore policy, containment, reads, cancellation, streaming, limits, deterministic aggregation | `WorkspaceSearchRequest`, `WorkspaceSearchEvent`, `WorkspaceSearchSummary`, `WorkspaceSearchService` |
-| App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
+| App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, future active-search FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
 | EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationCommand`, `EditorNavigationRequest` |
 
-The future WS3 App lifecycle must retain the `Task` that consumes each event stream and
-explicitly cancel that Task before replacing a query, closing or switching a workspace, or
+The implemented WS3B App lifecycle retains the `Task` that consumes each event stream and
+explicitly cancels that Task before replacing a query, closing or switching a workspace, or
 discarding search state. Merely breaking out of or abandoning `for await` iteration is not a
 supported producer-cancellation mechanism for the existing `AsyncStream` API.
 
@@ -254,6 +254,15 @@ byte count. Disk text and dirty overlays use this identical algorithm. The publi
 Swift `hashValue`/`Hasher`, and caller session versions are not content identity; no session
 version is retained by the WS2 result model. If a disk file changes after the snapshot but
 before its read, its result fingerprints the newly read and searched content.
+
+Every production result also carries the exact immutable `WorkspaceSearchFileAuthority`
+used for its searched content: the retained root authority and byte-exact normalized relative-path
+key plus the physical device/inode identity sampled from the descriptor that read disk bytes
+or validated an overlay. App activation must consume this token rather than reconstructing
+authority from a mutable URL. It performs one anchored load that still expects that physical
+identity, then prepares the session fingerprint and exact range before any transactional commit.
+Compatibility readers used by tests may omit the token; App activation fails closed when a
+retained result does not have one.
 
 Dirty overlays are validated before a request is built. `WorkspaceSearchOverlay` rejects
 empty, absolute, and traversing paths and stores a normalized workspace-relative path.
@@ -383,30 +392,40 @@ Opening a result is a two-stage action:
    older or repeated navigation and cancellation commands are ignored.
 
 Acceptance and execution are separate. A stale root/workspace/query context or an event that
-is not the retained result/match is ignored without disturbing unrelated navigation. Once an
-active retained result and match are accepted as a new intent, App emits a newer cancellation
-before resolving a node, opening a file, checking document identity or fingerprint, or
-validating the final UTF-16 range. Success emits an even newer navigation. Missing nodes,
-open/detach/identity failures, fingerprint mismatch, and invalid ranges leave the cancellation
-as the latest command, so an older pending navigation cannot execute afterward.
-Destination lookup/readability and cached-session identity are validated before committing a
-document switch. A missing or unreadable destination therefore leaves the current document's
-autosave, statistics, completion work, prompts, and editor state intact. Reactivating the
-already-current session is a document-transition no-op; successful result navigation still
-uses the newer exact-range command.
+is not the retained result/match is ignored without disturbing unrelated navigation. Structural
+target checks and failures before a retained-file read remain side-effect free. Once App has made
+one coherent retained-authority read for a reusable cached or retired session, however, that read
+is also an external disk observation: before fingerprint or range validation can reject navigation,
+App advances the session's disk-event generation and either adopts the accepted observation and
+its proof or records a conflict while retaining the prior proof. That observation may therefore
+update the destination session's external-change state and cancel that session's autosave under
+the normal conflict rule; it still cannot change the current document, tree selection, navigation
+command, search task, or unrelated session work/prompts. Cancellation is forwarded into every
+detached authority-capture/read/preparation child and is checked again before publication, so an
+evicted task cannot finish later with a usable prepared observation. Missing nodes and pre-read
+open/detach/identity failures leave all prior state unchanged. If that coherent read instead proves
+that a cached or retired B now names an inode already owned by A, App marks B detached and
+save-blocked before advancing its disk-event generation and cancelling B's older inspection; a
+late stale B result cannot restore it. A newly loaded candidate has no reusable state to detach and
+remains invisible. Fingerprint mismatch and invalid
+ranges preserve the navigation/UI transaction,
+but cannot erase an observation already read from disk. Only a fully validated attempt emits a
+newer cancellation, commits the session/tree switch and task transfer, then emits an even newer
+exact-range navigation. Reactivating the already-current session remains a document-transition
+no-op before that successful navigation.
 
-The result carries the exact searched-content fingerprint. If fingerprinting the activated
-session's current text does not produce the same digest and UTF-8 byte count, the App
-refreshes the active query instead of jumping to a stale offset. A document/session version
-may still arbitrate lifecycle elsewhere, but it is never proof of content equality. In
-Experimental WYSIWYG, programmatic selection must reveal the matching source region without
-mutating source text.
+The result carries the exact searched-content fingerprint. App fingerprints the prepared
+destination source before activation; a digest or UTF-8 byte-count mismatch rejects that attempt
+without jumping, cancelling navigation, or implicitly replacing the active search. A
+document/session version may still arbitrate lifecycle elsewhere, but it is never proof of
+content equality. In Experimental WYSIWYG, programmatic selection must reveal the matching
+source region without mutating source text.
 
 **Implemented WS3A subset.** EditorKit now accepts an optional opaque document identity and
 a monotonic `EditorNavigationCommand` carrying either an `EditorNavigationRequest` or a
 cancellation ID. A newer command supersedes older pending work; cancellation clears pending
-navigation and coordinator retry/deferral tasks, while older and repeated commands are idempotently
-ignored. Per-update candidate generations, not optional-identity equality, keep the installed
+range-navigation effects and their retry tasks but does not cancel a prepared document transition,
+while older and repeated commands are idempotently ignored. Per-update candidate generations, not optional-identity equality, keep the installed
 model bindings pinned through IME composition and replace the binding, identity, and installed
 generation together only after the candidate's literal UTF-16 text is present. Exact raw
 UTF-16 selection, scrolling, and focus occur only for that installed candidate after IME has
@@ -416,7 +435,7 @@ synchronization, shortcuts, and refresh lifecycle remained pending WS3 work; WS3
 only the headless App subset below and remains open at this landing point.
 
 **Implemented WS3B lifecycle foundation (gate still open).** MarkdownCore exposes one
-allocation-free exact UTF-16 source
+literal exact UTF-16 source
 comparison used by every `DocumentSession`/App text gate, so canonically equivalent but
 raw-different edits advance versions, dirty state, and text delivery. AppState owns a focused
 headless `WorkspaceSearchState`, an injected stream provider, the approximately 200 ms
@@ -433,18 +452,149 @@ to equal the prepared activation location; URL equality cannot rebind A to repla
 validated immutable dirty overlays from current and warm Markdown/MDX sessions without
 selecting another root, and request construction on the main actor stays filesystem-free.
 
-The App/editor bridge also carries an opaque binding ID distinct from optional navigation
-identity. EditorKit reports installation only from a successful `finishDocumentTransition`
-after marked text ends and exact candidate source is live, does not transfer during prepare,
-and revokes on dismantle. If workspace/file retirement occurs first, App transfers only that
-exact binding's session, registration, session-specific autosave/statistics work, and old
-security-scoped authority into a binding-ID-keyed retirement. Unrelated sessions close
-normally. The old authority is released only after the binding is replaced or revoked and its
-latest source has been saved; an unresolved external conflict or save failure keeps the exact
-session recoverable instead of discarding it. App generic writes remain current-session-only.
-The installed binding may commit to its exact non-current active or retired session only while
-the registration and lease both match. Such a commit updates that session's raw source,
-version, and dirty state once without touching the current document's text or tasks.
+The App/editor bridge carries an opaque binding ID distinct from optional navigation identity,
+plus a second opaque installation ID generated once per EditorKit coordinator lifetime.
+Installed/revoked events carry the exact pair and remain idempotent, but installation membership
+alone does not grant source-write authority. Every editor publication now carries that exact pair,
+the App-owned model revision and literal raw source on which the buffer was based, and the new raw
+source. The ordinary `Binding<String>` setter has no App mutation authority.
+
+AppState owns one exact writer installation per session. Every activation supplies the
+coordinator's exact `EditorDocumentSourceSnapshot`; App returns its current snapshot and allows
+AppKit's native mutation only when that exact installation owns the writer role and its opaque
+App-owned monotonic revision is current. That current-revision proof is constant-time and performs
+no App-source or native-buffer scan. After authorization, `DocumentSession` uses optimized literal
+UTF-16 equality for exact no-op and persisted-baseline dirty checks; other literal comparisons serve
+stale synchronization, revision-only rekey, rejection, and recovery. A stale coordinator is synchronized
+and asked to retry before mutation, without stealing writer authority or leaving a rejected caller blocking another installation.
+When only session metadata advanced the revision while the raw source and native view remain exact,
+including same-session Save Copy rekey, EditorKit synchronizes and reacquires from the returned
+snapshot inside that same pre-mutation request. A content-stale view instead restores App's current
+source and rejects the native event before it can edit an unintended range.
+Transfer is also refused while the previous writer has marked or other unsynchronized source, and
+exact release/revoke cannot consume another coordinator's ownership. Two coordinators may stay
+installed and mirror the model, but only the current writer can publish. The current-revision path
+also skips eager whole-buffer UTF-8 transcoding and is covered through the real App source contract,
+coordinator, and native view by a hosted public `MarkdownEditorView` local hard `<16 ms` 1 MiB
+gate covering ordinary input, re-entrant pair insertion, and several scheduled marked-text
+updates with zero App-source or native-storage full comparisons; hosted timing remains
+informational under R15. Selection-only closing-delimiter skip-over never enters writer or
+source-publication state and changes only the caret. A legitimately older marked-source
+publication uses
+literal UTF-16 three-way reconciliation so non-overlapping accepted edits survive exactly once;
+insertions exactly at either half-open replacement boundary merge deterministically, while
+strict-interior overlaps conflict. A repeated-source edit is merged only when its optimal
+matched-offset alignment is unique; ambiguous offsets fail closed. Unsafe reconciliation restores
+the coherent current view, installed
+snapshot, model, writer/pending state, autosave eligibility, and dirty overlay rather than parking
+an accepted native edit indefinitely.
+Toolbar commands, completion, smart paste, and image insertion all acquire exact writer authority
+through the same preflight before mutating native source. Async image insertion completes that
+preflight before starting any asset side effect and carries the exact binding/installation-scoped
+authority across its suspension; an initially rejected window therefore creates no asset, while a
+later supersession cannot publish through another installation's authority and moves any placed
+bytes out of their Markdown-visible name into a surfaced recovery artifact.
+App placement is transactional: it stages with exclusive creation, publishes without replacing an
+existing name, and retains descriptor-bound identity, byte-count, and SHA-256 receipts. Before
+quarantining cleanup, it first proves that the published leaf still names the created inode; an
+obvious replacement is preserved in place. The recovery rename is fsynced before any open or
+validation, but Darwin cannot atomically return a descriptor for the entry it renamed. Every
+successful recovery rename therefore reports an unknown/unavailable rename-acquired artifact and
+separately reports any post-fsync current occupant—including a hard link to the known created
+inode—from its own snapshot and retained descriptor. The same split applies when directory `fsync`
+fails. Cleanup never performs a second check-then-rename restore because `RENAME_EXCL` protects only
+the destination, not the mutable source identity. The retained created-asset descriptor is reported
+separately whenever that inode is still linked elsewhere. Darwin also has no identity-conditional
+unlink, so exact created bytes and same-inode rewrites remain surfaced under a recovery name instead
+of entering a check-then-unlink race.
+Descriptor-current path resolution reports a moved assets directory accurately; if its current
+visible path cannot be proven, the issue reports an unavailable path plus retained identity and
+leaf hint rather than the stale captured URL. Symlink, directory, and otherwise unopenable racers
+derive their visible parent-plus-leaf location from the retained directory descriptor only while
+that leaf still proves its observed identity; a later occupant never supplies the rename-acquired
+artifact's reported path. Namespace and descriptor-link inspection are explicit three-state results: only
+`ENOENT` or a successful `st_nlink == 0` proves absence, while other filesystem errors surface an
+indeterminate artifact. A successful recovery rename always triggers a workspace refresh, including
+when placement itself fails and carries the rollback disposition back to App state. A placement
+rollback that preserves original or preflight-discovered artifacts also carries refresh provenance:
+the successful-placement refresh has not happened yet, even when cleanup itself performed no
+additional namespace mutation.
+Changed, indeterminate, or race-replaced bytes are never hidden or unlinked.
+The App-provided inserter reads an exact document-authority cache keyed to the retained session
+location and identity. Descriptor-chain construction occurs before each coherent document read,
+is post-validated against the loaded identity and namespace, and travels with that observation into
+binding adoption; adoption itself never reopens the path. An exact existing cache remains the
+authority for a reusable session, so a same-inode replacement observation cannot substitute a new
+parent chain; a changed leaf can advance only when its prepared authority has the same retained
+parent lineage. An existing session with no lineage cache stays fail-closed. A durable atomic save
+rebinds the new leaf identity through the already retained parent descriptor or clears the cache on
+failure. Save Copy captures and validates the destination parent before its writer starts, binds the
+durable leaf through that retained parent, and installs the resulting authority before session
+adoption. If a durable commit can no longer bind that leaf, the exact session is re-homed into
+write-blocking reconciliation with the durable metadata and cleanup artifact retained; it is not
+reported as an uncommitted save, and the reconciliation error includes retained or
+removal-indeterminate recovery-artifact location details. SwiftUI document-binding and
+image-inserter getter reads perform no security-scope, open,
+or validation work, and a cache miss stays fail-closed rather than recapturing a replacement path.
+The captured authority includes the
+descriptor identities of the workspace-root-to-document-parent chain before suspension and never
+re-derives placement authority from a later occupant of mutable `currentFileURL`. The
+asset-directory lease similarly retains every root-to-assets component identity and proves that
+the live namespace still names its terminal descriptor immediately before and after publication.
+Moving or replacing the document parent or asset directory therefore fails closed; a post-publish
+failure rolls back through the leased descriptor into a visible surfaced recovery name and returns
+no Markdown path for bytes that landed under a displaced directory. The placement transaction keeps that document authority, every
+created-asset receipt, and every existing in-workspace file reference alive. While the async writer
+lease remains held, EditorKit asks the App to revalidate every component chain, leaf identity, and
+content digest off-main immediately before the Markdown mutation, then rechecks exact editor
+context/source and commits synchronously in the same MainActor turn. A moved/replaced namespace
+therefore discards the transaction without publishing a stale Markdown path. A workspace-local
+file reference captures its descriptor authority before reading size or bytes, hashes only through
+that descriptor, and validates the parent/leaf namespace before and after the read and again before
+publication. File-based insertion also keeps the supplied literal URL through
+containment and no-follow validation, avoiding a Foundation `/private/var` to `/var` rewrite that
+would turn a valid descriptor-canonical spelling into an `O_NOFOLLOW_ANY` failure.
+Marked-text commit provenance retains the initial selected replacement span for AppKit's
+`.notFound` path, but uses the exact delegate-confirmed replacement location when AppKit performs
+an explicit replacement before commit. Selection-only or rejected mutations discard an
+unconfirmed capture, and a direct unmark clears it after the native callback turn, so no stale
+replacement range can redirect a later composition.
+
+EditorKit still reports installation only from a successful `finishDocumentTransition` after the
+exact candidate source is live; prepare does not transfer ownership. If marked or pending source
+defers that finish, the coordinator retains the newest complete candidate generation including its
+exact source snapshot, selection, document identity, binding/lifecycle callback, and navigation
+command. After the old document's IME source publishes to its exact active or retired session, an
+explicit yielded retry installs the destination source, binding, identity, selection, and lifecycle
+once without another representable update. A newer candidate supersedes the older one, and
+dismantle or explicit editor teardown discards the deferred candidate and retry task. A newer
+`EditorNavigationCommand.cancel` clears only obsolete range-selection work: it never suppresses the
+destination installation. Contract-free public Binding candidates refresh source and the
+non-navigation selection from their live Bindings before retry, so neither same-document IME nor a
+changing cross-document destination can reinstall a frozen pre-composition value.
+
+Pending editor source is tracked by exact installation from the first deferred synchronization
+until publication succeeds, composition is explicitly abandoned, or that installation revokes.
+Duplicate begin/end events are no-ops and teardown cannot strand pending state. Pending source
+blocks explicit save and autosave even while the model still appears clean. Search-result
+activation likewise treats the exact pending editor/native source as local authority regardless of
+the session dirty flag: a differing coherent disk observation must enter external-change
+arbitration rather than replace the retained proof or install disk bytes over unpublished source.
+
+Retirement and active-session state share one session-owned exact-state-URL registry whose record owns
+the retained location and proof, exact
+`DocumentSession`, binding IDs, awaiting installation pairs, task state, and any required shared
+old-workspace authority owner. Close/switch collects every live installation across sessions,
+including standalone files with no workspace authority. Several retirements from one workspace
+share one reference lifetime, and the underlying security-scoped authority stops exactly once
+after the final dependent retirement saves, resolves, or is deliberately discarded. Reopening a
+retired URL consults this registry before disk loading and reactivates the exact session; duplicate
+active/retired ownership is an invariant failure. Later workspace or standalone transitions
+preserve older retirements and their autosave/statistics work. No deferred conflict, prompt,
+autosave, save, recovery, or retirement lookup re-resolves the mutable filesystem path after this
+authority is retained; only validated Save Copy atomically rehomes it. App generic writes remain
+current-session-only, while an exact authorized writer may commit raw source to its own active,
+detached-current, or retired session without touching the replacement document.
 
 External-change conflicts are session-scoped by the canonical URL entry in
 `pendingExternalTexts`, not by whichever banner is currently visible. Autosave and explicit
@@ -465,9 +615,10 @@ the detached fence remains until one of those explicit resolutions succeeds. Thi
 required even when the restored leaf has the same descriptor identity, digest, and bytes as A,
 because detachment invalidated the session's saved baseline.
 
-Binding registration cleanup is exact and idempotent: retired, evicted, and closed sessions lose their
-registration, while a matching revoke can still clear the installed lease after registration
-cleanup; unrelated or stale revokes cannot clear a newer lease.
+Binding registration cleanup is exact and idempotent. A live retired installation retains its
+registration; completed, discarded, evicted, and otherwise closed sessions release only their own
+registration. A matching exact revoke can finish its retirement, while duplicate or stale revokes
+cannot clear another installation.
 
 Installed and standalone managed sessions retain the exact authority location, descriptor
 identity, and exact loaded-byte digest. Standalone proof also captures installed-workspace
@@ -502,6 +653,29 @@ A stateful retained A session (pending conflict, detachment, or indeterminate co
 a replacement-parent B at the same lexical URL until A is resolved; B cannot inherit or clear A's
 URL-keyed fence merely by reusing its spelling.
 
+Every coherent retained-file observation made for search-result activation advances that
+session's external disk-event generation, even when the observed identity and digest still match.
+It therefore supersedes older initial-inspection, Reload, and Keep Mine work before any proof can
+be adopted. The same observation is then reconciled before fingerprint/range navigation checks:
+an accepted clean version updates the retained proof even if a stale search result is rejected,
+while dirty or pending local source records a conflict and keeps its previous proof. A reusable
+retired session follows the same rule so rejection cannot strand cleanup behind an unrecorded disk
+version. An explicit resolution intent survives or restarts only against a fresh coherent read
+under the newer generation; an older asynchronous result cannot finalize the observation or
+silently consume the user's choice.
+
+WS3B adds a multi-window convergence fence around that authority arbitration. Choosing Reload or
+Keep Mine captures the exact source revision and disk-event generation; input already authorized
+before the choice may settle, but any changed revision stale-drops the choice and restores the
+prompt without losing accepted source. Initial inspection and explicit-resolution reads run
+off-main at the retained location, and a newer watcher event or explicit choice supersedes older
+work. Retirement or reactivation advances the session lifecycle and restarts still-valid intent;
+obsolete lifecycle, source, event, and request tokens cannot finalize state. Reload application
+preparation, exact comparison, hashing, and statistics remain off-main. Save, autosave, writer
+eligibility, and native mutation stay fenced until every live exact editor installation accepts the
+source snapshot or revokes. Partial convergence therefore cannot publish a mixed model/native state,
+and a stale installation cannot clear a newer installation's fence.
+
 `WorkspaceFileSystemLocation.fileURL` is lexical and leaf-state-independent: construction never
 inspects the leaf, equal locations expose identical slash-free URLs, and literal relative-path
 bytes keep NFC/NFD locations distinct. Session binding/context lookup starts from retained session
@@ -533,6 +707,9 @@ App completes the clean/re-home transition, retains the exact authority artifact
 presents a committed-cleanup warning. Proven noncommit remains dirty while preserving its artifact
 notice. An explicit acknowledgement API removes the notice and releases its retained authority
 lifetime without deleting the artifact; workspace close preserves unacknowledged notices. The
+same retained/removal-indeterminate location is included in a committed-but-unadoptable Save Copy's
+user-visible reconciliation error, so resolving the document cannot silently strand its artifact.
+The
 legacy URL facade continues to map typed outcomes for external callers, but App ordinary save and
 Save Copy no longer discard those outcomes through that facade.
 
@@ -633,12 +810,12 @@ pending.
 
 | Target | Hard CI coverage |
 |---|---|
-| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; saved-baseline rebasing with exact-byte dirty state |
-| WorkspaceKitTests | Markdown candidate filtering before and after initial alias canonicalization; alias deduplication and outside-root rejection; byte-distinct NFC/NFD synthetic candidates, overlays, ignore ancestors/literals/wildcard-token precedence, file-tree grouping/filtering/fallback IDs, completion current-file exclusion/50-read ordering, and longest matching root spelling; no-follow root/intermediate/leaf substitution rejection after authority binding; immutable authority and descriptor identity; A/B completion-read separation; terminal destination proof after every cleanup-to-`notCommitted` path; tri-state cleanup inspection; write-only/no-access cleanup; ignore rules; dirty overlay precedence; invalid UTF-8; injected unreadable file; deletion race; oversized files; actual Task cancellation versus reader-thrown `CancellationError`; per-file/global caps; post-cap accounting; stable sorting and internally consistent terminal counts |
-| EditorKitTests | Same-file and cross-file navigation, including nil identities during IME; monotonic navigation/cancellation IDs and task cleanup; exact selection; reveal/scroll/focus; stale document request ignored; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce; latest-query-wins; workspace close/switch reset, including a real anchored A session switching to unrelated B; FSEvent refresh; cached-current reconciliation from loaded activation bytes; typed initial/final root-proof failures; final-suspension selection preservation and cached-source re-arbitration; independently exercised cached/retired same-spelling authority-mismatch refusal; stale-A dirty-overlay exclusion and current-document-only completion for binding- and context-only sessions after B replaces A's spelling; missing-current autosave suppression; exact BOM digest save; session-scoped external conflicts; anchored and standalone cached delete/switch/same-proof restore activation plus Keep Mine detached-fence recovery; reusable retired anchored/standalone same-proof restore arbitration; fresh-C saved-baseline byte-exact dirty transitions; clean-quarantine Keep Mine exact-byte dirty/LRU restoration; unanchored ordinary-save replacement-inode/content-digest/unavailable-proof refusal; exact-location indeterminate-write quarantine with readable Reload/Keep Mine, proven-missing literal-spelling retry, actionable invalid-state reconciliation, and differently spelled retry refusal; clean quarantine retention through LRU, editor retirement/cleanup, missing close, workspace close, and switch; authority-exact original-path anchored/unanchored recovery; A-to-B same-spelling, NFC/NFD, and cross-authority cached/retired/editor/context ownership refusal; exact-inspection Save Copy create/replacement races; outside-leaf symlink refusal; descriptor-physical ownership across cached/retired/editor-bound/unanchored sessions; lexical directory-leaf and stable-state-URL behavior; unlinked/replaced retirement from captured membership; durable/noncommit cleanup-artifact notice acknowledgement across workspace close; binding-ID retirement authority after selected-root retarget; registration-before-revoke cleanup; symlink alias session reuse; result opens exact authority location; post-activation A/B rejection; activation task preservation; accepted-failure cancellation; stale fingerprint refresh |
+| MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
+| WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
+| EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
+| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
-| PerformanceTests | 2,000-file workspace; 512 KiB admitted file plus a 1 MiB MarkdownCore stress probe; rapid cancellation; result/read byte caps; memory boundedness |
+| PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 
 New tests placed in existing SwiftPM, AppTests, and PerformanceTests directories are
 already picked up by `make test`. Adding the XCUITest target requires editing `project.yml`

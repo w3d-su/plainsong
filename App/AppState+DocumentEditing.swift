@@ -11,6 +11,7 @@ extension AppState {
 
     func replaceDocumentText(_ newText: String, in session: DocumentSession) {
         guard session === currentDocument,
+              !isExternalSourceMutationFenced(for: session),
               !ExactSourceText.matches(newText, session.text)
         else {
             return
@@ -31,6 +32,15 @@ extension AppState {
 
     func applyDocumentText(_ newText: String, to session: DocumentSession) {
         session.replaceText(newText, refreshStatistics: false)
+        scheduleDocumentTextSideEffects(for: session)
+    }
+
+    func applyAuthorizedEditorText(_ newText: String, to session: DocumentSession) {
+        session.replaceTextFromAuthorizedEditor(newText, refreshStatistics: false)
+        scheduleDocumentTextSideEffects(for: session)
+    }
+
+    private func scheduleDocumentTextSideEffects(for session: DocumentSession) {
         if let url = sessionStateURL(for: session) {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
@@ -82,7 +92,11 @@ extension AppState {
     }
 
     var activeEditorDocumentIdentity: EditorDocumentIdentity? {
-        sessionStateURL(for: currentDocument).map {
+        editorDocumentIdentity(for: currentDocument)
+    }
+
+    func editorDocumentIdentity(for session: DocumentSession) -> EditorDocumentIdentity? {
+        sessionStateURL(for: session).map {
             EditorDocumentIdentity(rawValue: $0.absoluteString)
         }
     }
@@ -100,8 +114,6 @@ extension AppState {
             return
         }
 
-        cancelPendingEditorNavigationIfNeeded(force: true)
-
         guard let target = workspaceSearchActivationTarget(
             fileResult: fileResult,
             match: match
@@ -110,66 +122,265 @@ extension AppState {
             return
         }
 
-        executeWorkspaceSearchActivation(
-            target,
-            fileResult: fileResult,
-            match: match
-        )
+        do {
+            guard let activation = try prepareWorkspaceSearchActivation(
+                target,
+                fileResult: fileResult,
+                match: match
+            ) else {
+                return
+            }
+            try workspaceSearchPostActivationHook?()
+            cancelPendingEditorNavigationIfNeeded(force: true)
+            commitWorkspaceSearchActivation(activation)
+            issueEditorNavigation(
+                documentIdentity: activation.documentIdentity,
+                selection: match.range
+            )
+        } catch {
+            present(error, title: "Could Not Open Search Result")
+        }
     }
 
-    private func executeWorkspaceSearchActivation(
+    private func prepareWorkspaceSearchActivation(
         _ target: WorkspaceSearchActivationTarget,
         fileResult: WorkspaceSearchFileResult,
         match: TextSearchMatch
-    ) {
-        guard var tree = workspaceTree else { return }
-
-        let previousTree = tree
-        tree.selectNode(id: target.nodeID)
-        workspaceTree = tree
-
-        do {
-            try activateAnchoredFileSession(
-                at: target.location,
-                expecting: target.expectedIdentity
-            )
-            try workspaceSearchPostActivationHook?()
-        } catch {
-            workspaceTree = previousTree
-            present(error, title: "Could Not Open Search Result")
-            return
-        }
-
-        guard let activatedBinding = anchoredSessionFileBinding(for: currentDocument),
-              activatedBinding.location == target.location,
-              !detachedSessionURLs.contains(activatedBinding.location.fileURL)
+    ) throws -> PreparedWorkspaceSearchActivation? {
+        guard workspaceTree != nil,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
+              let fileAuthority = fileResult.fileAuthority,
+              fileAuthority.location.rootAuthority == rootAuthority,
+              fileAuthority.location == target.location,
+              fileAuthority.identity == target.expectedIdentity,
+              ExactSourceText.matches(
+                  fileAuthority.location.relativePath,
+                  fileResult.relativePath
+              )
         else {
-            workspaceTree = previousTree
-            return
+            return nil
         }
-        let activatedIdentity = EditorDocumentIdentity(
-            rawValue: activatedBinding.location.fileURL.absoluteString
-        )
 
-        let activeFingerprint = WorkspaceSearchContentFingerprint(text: currentDocument.text)
+        let preparedRead = try prepareEditorImageAssetDocumentRead(
+            fileStore: fileStore,
+            at: target.location,
+            expecting: target.expectedIdentity
+        )
+        let readResult = preparedRead.result
+        let anchoredActivation = try prepareAnchoredFileSessionActivation(
+            file: readResult.file,
+            at: target.location,
+            metadata: readResult.metadata,
+            sha256Digest: readResult.sha256Digest,
+            preparedImageAssetAuthority: preparedRead.preparedAuthority
+        )
+        var shouldFinishRejectedRetiredSession = switch anchoredActivation.source {
+        case .retired:
+            true
+        case .cached, .loaded:
+            false
+        }
+        defer {
+            if shouldFinishRejectedRetiredSession {
+                finishRetiredEditorDocumentSessionIfPossible(for: anchoredActivation.session)
+            }
+        }
+        guard anchoredActivation.binding.identity == target.expectedIdentity else {
+            return nil
+        }
+        if hasConflictingPhysicalSessionOwnership(
+            target.expectedIdentity,
+            excluding: anchoredActivation.session
+        ) {
+            accountForReusableWorkspaceSearchPhysicalOwnershipCollision(
+                anchoredActivation
+            )
+            return nil
+        }
+        supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
+            anchoredActivation
+        )
+        guard reconcileReusableWorkspaceSearchObservation(anchoredActivation) else {
+            return nil
+        }
+
+        let usesLoadedSource = workspaceSearchActivationUsesLoadedSource(anchoredActivation)
+        let preparedText = usesLoadedSource
+            ? anchoredActivation.file.text
+            : anchoredActivation.session.text
+        let activeFingerprint = WorkspaceSearchContentFingerprint(text: preparedText)
         guard activeFingerprint.sha256Digest == fileResult.contentFingerprint.sha256Digest,
               activeFingerprint.utf8ByteCount == fileResult.contentFingerprint.utf8ByteCount
         else {
-            restartActiveWorkspaceSearchWithFreshOverlays()
-            return
+            return nil
         }
 
         guard Self.isValidEditorRange(
             match.range,
-            textUTF16Length: currentDocument.text.utf16.count
+            textUTF16Length: preparedText.utf16.count
         ) else {
-            return
+            return nil
         }
 
-        issueEditorNavigation(
-            documentIdentity: activatedIdentity,
-            selection: match.range
+        let activation = PreparedWorkspaceSearchActivation(
+            nodeID: target.nodeID,
+            anchoredActivation: anchoredActivation,
+            documentIdentity: EditorDocumentIdentity(
+                rawValue: target.location.fileURL.absoluteString
+            )
         )
+        shouldFinishRejectedRetiredSession = false
+        return activation
+    }
+
+    /// A reusable session can still carry the disk proof from A while the coherent activation
+    /// load observes C. Account for C before fingerprint/range validation can reject navigation:
+    /// a clean session adopts C, while dirty or pending source retains A and records a conflict.
+    private func reconcileReusableWorkspaceSearchObservation(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) -> Bool {
+        switch activation.source {
+        case .loaded:
+            return true
+        case .cached, .retired:
+            let observation = ObservedRetainedFileVersion(
+                location: activation.binding.location,
+                file: activation.file,
+                identity: activation.binding.identity,
+                sha256Digest: activation.binding.sha256Digest
+            )
+            guard reconcileObservedRetainedFileVersion(
+                observation,
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            ) else {
+                return false
+            }
+            adoptAnchoredFileBinding(
+                activation.binding,
+                for: activation.session,
+                preparedImageAssetAuthority: activation.preparedImageAssetAuthority
+            )
+            return true
+        }
+    }
+
+    /// A successful coherent load is the disk ordering boundary even when the retained
+    /// search result is rejected by a later fingerprint or range check. Retire older
+    /// observation work exactly once here, before any such validation can return early.
+    private func supersedeExternalWorkAfterReusableWorkspaceSearchObservation(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) {
+        switch activation.source {
+        case .cached, .retired:
+            supersedeExternalWorkAfterWorkspaceSearchObservation(
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            )
+        case .loaded:
+            break
+        }
+    }
+
+    /// A cached or retired B whose path now names an inode already owned by A cannot adopt
+    /// that observation. Treat the replacement as B losing its retained namespace, then
+    /// advance the disk-event fence so an older inspection cannot later restore stale state.
+    /// A newly loaded candidate owns no reusable state and remains transactionally invisible.
+    private func accountForReusableWorkspaceSearchPhysicalOwnershipCollision(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) {
+        switch activation.source {
+        case .cached, .retired:
+            markSessionDetachedFromMissingFile(
+                activation.session,
+                url: activation.canonicalURL
+            )
+            supersedeExternalWorkAfterWorkspaceSearchObservation(
+                for: activation.session,
+                canonicalURL: activation.canonicalURL
+            )
+        case .loaded:
+            break
+        }
+    }
+
+    private func commitWorkspaceSearchActivation(_ activation: PreparedWorkspaceSearchActivation) {
+        let prepared = activation.anchoredActivation
+        let session = prepared.session
+        let canonicalURL = prepared.canonicalURL
+        let sessionIdentity = ObjectIdentifier(session)
+        var reactivatedRetiredSession = false
+        var shouldRestartRetiredInspection = false
+
+        if case let .retired(retiredURL) = prepared.source {
+            guard let retirement = retiredEditorDocumentSessions[retiredURL],
+                  retirement.session === session
+            else {
+                preconditionFailure("Prepared retired search activation changed before commit")
+            }
+            reactivatedRetiredSession = true
+            shouldRestartRetiredInspection = externalDiskInspectionTasks[sessionIdentity] != nil
+            _ = advanceSessionLifecycle(for: session)
+        }
+
+        if session !== currentDocument {
+            moveCurrentDocumentWorkToBackgroundForSearchActivation()
+        }
+        sessionCache[canonicalURL] = session
+
+        switch prepared.source {
+        case .loaded:
+            session.reset(
+                text: prepared.file.text,
+                url: canonicalURL,
+                fileKind: prepared.file.fileKind,
+                isDirty: false
+            )
+            clearExternalChangeConflict(at: canonicalURL)
+            detachedSessionURLs.remove(canonicalURL)
+            adoptAnchoredFileBinding(
+                prepared.binding,
+                for: session,
+                preparedImageAssetAuthority: prepared.preparedImageAssetAuthority
+            )
+            recordKnownSessionDiskText(
+                prepared.file.text,
+                for: session,
+                canonicalURL: canonicalURL
+            )
+        case .cached, .retired:
+            // Reusable observations were reconciled and, when accepted, adopted before
+            // fingerprint/range validation. Commit only changes activation ownership here.
+            break
+        }
+
+        if session !== currentDocument {
+            setCurrentDocument(session, synchronizingWorkspaceTree: false)
+        }
+        handleSessionAccess(url: canonicalURL, isDirty: session.isDirty)
+
+        if reactivatedRetiredSession {
+            restoreRecoveryPrompt(for: session)
+        }
+        if shouldRestartRetiredInspection ||
+            deferredExternalChangeResolutions[canonicalURL] != nil
+        {
+            handleExternalChange(for: session, advancingDiskEvent: false)
+        }
+        if reactivatedRetiredSession {
+            finishRetiredEditorDocumentSessionIfPossible(for: session)
+        }
+        if var tree = workspaceTree {
+            tree.selectNode(id: activation.nodeID)
+            workspaceTree = tree
+        }
+    }
+
+    private func moveCurrentDocumentWorkToBackgroundForSearchActivation() {
+        let previousSession = currentDocument
+        moveCurrentAutosaveToBackground(for: previousSession)
+        moveCurrentStatisticsToBackground(for: previousSession)
     }
 
     private func isAcceptedWorkspaceSearchActivation(
@@ -198,39 +409,63 @@ extension AppState {
               workspaceInstalledCaptureGeneration == workspaceGeneration,
               let tree = workspaceTree,
               let node = firstNode(in: tree.root, relativePath: fileResult.relativePath),
-              node.isEditableMarkdown
+              node.isEditableMarkdown,
+              !hasConflictingWorkspaceTreeIdentity(
+                  in: tree.root,
+                  nodeID: node.id,
+                  expectedRelativePath: fileResult.relativePath
+              ),
+              let fileAuthority = fileResult.fileAuthority,
+              fileAuthority.location.rootAuthority == rootAuthority,
+              ExactSourceText.matches(
+                  fileAuthority.location.relativePath,
+                  fileResult.relativePath
+              )
         else {
             return nil
         }
 
-        let location: WorkspaceFileSystemLocation
-        let expectedIdentity: WorkspaceFileSystemIdentity?
-        if let fileAuthority = fileResult.fileAuthority {
-            guard fileAuthority.location.rootAuthority == rootAuthority,
-                  ExactSourceText.matches(
-                      fileAuthority.location.relativePath,
-                      fileResult.relativePath
-                  )
-            else {
-                return nil
-            }
-            location = fileAuthority.location
-            expectedIdentity = fileAuthority.identity
-        } else {
-            guard let derivedLocation = try? rootAuthority.location(
-                relativePath: fileResult.relativePath
-            ) else {
-                return nil
-            }
-            location = derivedLocation
-            expectedIdentity = nil
-        }
-
         return WorkspaceSearchActivationTarget(
-            location: location,
-            expectedIdentity: expectedIdentity,
+            location: fileAuthority.location,
+            expectedIdentity: fileAuthority.identity,
             nodeID: node.id
         )
+    }
+
+    private func workspaceSearchActivationUsesLoadedSource(
+        _ activation: PreparedAnchoredFileSessionActivation
+    ) -> Bool {
+        if case .loaded = activation.source {
+            return true
+        }
+        let session = activation.session
+        let sessionIdentity = ObjectIdentifier(session)
+        let canonicalURL = activation.canonicalURL
+        return !session.isDirty &&
+            !hasPendingEditorSource(for: session) &&
+            pendingExternalTexts[canonicalURL] == nil &&
+            pendingExternalFileVersions[canonicalURL] == nil &&
+            !detachedSessionURLs.contains(canonicalURL) &&
+            indeterminateSessionWrites[sessionIdentity] == nil
+    }
+
+    private func hasConflictingWorkspaceTreeIdentity(
+        in node: WorkspaceFileNode,
+        nodeID: WorkspaceFileNode.ID,
+        expectedRelativePath: String
+    ) -> Bool {
+        if node.id == nodeID,
+           !ExactSourceText.matches(node.relativePath, expectedRelativePath)
+        {
+            return true
+        }
+        return node.children.contains { child in
+            hasConflictingWorkspaceTreeIdentity(
+                in: child,
+                nodeID: nodeID,
+                expectedRelativePath: expectedRelativePath
+            )
+        }
     }
 
     func cancelPendingEditorNavigationIfNeeded(force: Bool = false) {
@@ -246,9 +481,11 @@ extension AppState {
     }
 
     static func editorDocumentIdentity(for url: URL) -> EditorDocumentIdentity {
-        EditorDocumentIdentity(
-            rawValue: url.standardizedFileURL.resolvingSymlinksInPath().absoluteString
-        )
+        EditorDocumentIdentity(rawValue: url.absoluteString)
+    }
+
+    static func editorDocumentIdentity(forCanonicalURL url: URL) -> EditorDocumentIdentity {
+        EditorDocumentIdentity(rawValue: url.absoluteString)
     }
 
     private func issueEditorNavigation(
@@ -338,12 +575,13 @@ extension AppState {
 
             // Counting a large document is O(n); keep it off the main thread.
             let text = session.text
+            let revision = session.version
             let statistics = await Task.detached(priority: .utility) {
                 TextStatistics(text: text)
             }.value
 
             guard !Task.isCancelled,
-                  ExactSourceText.matches(session.text, text)
+                  session.version == revision
             else {
                 return
             }
@@ -362,8 +600,15 @@ extension AppState {
 
 private struct WorkspaceSearchActivationTarget {
     let location: WorkspaceFileSystemLocation
-    let expectedIdentity: WorkspaceFileSystemIdentity?
+    let expectedIdentity: WorkspaceFileSystemIdentity
     let nodeID: WorkspaceFileNode.ID
+}
+
+@MainActor
+private struct PreparedWorkspaceSearchActivation {
+    let nodeID: WorkspaceFileNode.ID
+    let anchoredActivation: PreparedAnchoredFileSessionActivation
+    let documentIdentity: EditorDocumentIdentity
 }
 
 private extension String {

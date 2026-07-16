@@ -1,3 +1,5 @@
+import CryptoKit
+import Darwin
 import EditorKit
 import Foundation
 import MarkdownCore
@@ -102,84 +104,195 @@ extension AppState {
     }
 
     var editorImageAssetInserter: EditorImageAssetInserter? {
-        guard let rootURL = workspaceRootURL,
-              let currentFileURL = currentDocument.fileURL
+        let sessionIdentity = ObjectIdentifier(currentDocument)
+        guard workspaceRootURL != nil,
+              indeterminateSessionWrites[sessionIdentity] == nil,
+              indeterminateSessionWriteContexts[sessionIdentity] == nil,
+              let installedRootAuthority = workspaceSearchRootAuthority,
+              let retainedProof = retainedEditorImageAssetDocumentProof(
+                  for: currentDocument
+              ),
+              retainedProof.location.rootAuthority == installedRootAuthority,
+              let retainedAuthority = editorImageAssetDocumentAuthorities[sessionIdentity],
+              retainedAuthority.matches(
+                  location: retainedProof.location,
+                  identity: retainedProof.identity
+              )
         else {
             return nil
         }
 
-        return { [weak self, rootURL, currentFileURL] assets in
+        // SwiftUI reads this property during body reevaluation. Capture only the exact cached
+        // authority here; descriptor construction preceded the coherent read adopted as binding.
+        return { [weak self, authority = retainedAuthority.authority] assets in
             await self?.insertEditorImageAssets(
                 assets,
-                rootURL: rootURL,
-                currentFileURL: currentFileURL
-            ) ?? []
+                documentAuthority: authority
+            ) ?? EditorImageAssetInsertion(relativePaths: [])
+        }
+    }
+
+    private func retainedEditorImageAssetDocumentProof(
+        for session: DocumentSession
+    ) -> (location: WorkspaceFileSystemLocation, identity: WorkspaceFileSystemIdentity)? {
+        let sessionIdentity = ObjectIdentifier(session)
+        if let binding = anchoredSessionFileBindings[sessionIdentity] {
+            return (binding.location, binding.identity)
+        }
+        if case let .proven(proof)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+           let installedLocation = proof.installedWorkspaceLocation
+        {
+            return (installedLocation, proof.identity)
+        }
+        return nil
+    }
+
+    /// Publishes only an authority captured before the coherent load that produced this binding.
+    /// With no prepared authority, an exact existing cache may survive; otherwise insertion is
+    /// fail-closed. A replacement may advance only through the cached parent lineage. Bootstrap
+    /// is reserved for an initial binding or an explicitly preauthorized destination.
+    func installEditorImageAssetDocumentAuthority(
+        for session: DocumentSession,
+        location: WorkspaceFileSystemLocation,
+        identity: WorkspaceFileSystemIdentity,
+        preparedAuthority: PreparedEditorImageAssetDocumentAuthority?,
+        allowsBootstrapWithoutRetainedLineage: Bool
+    ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        let retainedAuthority = editorImageAssetDocumentAuthorities[sessionIdentity]
+        // A reusable session's exact cache owns the original namespace. A new observation may
+        // reach the same inode through a replacement parent/hard link; never let that same-value
+        // proof replace the older descriptor chain.
+        if retainedAuthority?.matches(
+            location: location,
+            identity: identity
+        ) == true {
+            return
+        }
+
+        guard let preparedAuthority,
+              preparedAuthority.matches(location: location, identity: identity)
+        else {
+            return
+        }
+        if let retainedAuthority {
+            guard retainedAuthority.authority.hasSameRetainedParentLineage(
+                as: preparedAuthority.authority
+            ) else {
+                // Keep the older chain as lineage evidence. It no longer matches the adopted
+                // leaf proof, so the inserter getter remains unavailable.
+                return
+            }
+        } else if !allowsBootstrapWithoutRetainedLineage {
+            return
+        }
+        editorImageAssetDocumentAuthorities[sessionIdentity] =
+            RetainedEditorImageAssetDocumentAuthority(preparedAuthority)
+    }
+
+    func discardEditorImageAssetDocumentAuthority(for session: DocumentSession) {
+        editorImageAssetDocumentAuthorities[ObjectIdentifier(session)] = nil
+    }
+
+    func rebindEditorImageAssetDocumentAuthorityAfterSave(
+        for session: DocumentSession,
+        location: WorkspaceFileSystemLocation,
+        replacing previousIdentity: WorkspaceFileSystemIdentity,
+        with identity: WorkspaceFileSystemIdentity
+    ) -> PreparedEditorImageAssetDocumentAuthority? {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard identity != previousIdentity,
+              let retainedAuthority = editorImageAssetDocumentAuthorities[sessionIdentity],
+              retainedAuthority.matches(
+                  location: location,
+                  identity: previousIdentity
+              )
+        else {
+            return nil
+        }
+
+        return try? SecurityScopedAccess.withAccess(to: location.securityScopedURL) {
+            let authority = try retainedAuthority.authority.rebindDocument(
+                expectedIdentity: identity
+            )
+            return PreparedEditorImageAssetDocumentAuthority(
+                location: location,
+                identity: identity,
+                authority: authority
+            )
         }
     }
 
     private func insertEditorImageAssets(
         _ assets: [EditorImageAsset],
-        rootURL: URL,
-        currentFileURL: URL
-    ) async -> [String] {
-        let workspaceSources = assets.map { asset in
-            switch asset {
-            case let .data(data, suggestedFilename):
-                WorkspaceImageAssetSource.data(data, suggestedFilename: suggestedFilename)
-            case let .file(url):
-                WorkspaceImageAssetSource.file(url)
-            }
-        }
+        documentAuthority: EditorImageAssetDocumentAuthority
+    ) async -> EditorImageAssetInsertion {
         let assetFolderRelativePath = preferences.assetFolderRelativePath
 
         do {
-            let paths = try await Task.detached(priority: .userInitiated) {
-                try WorkspaceImageAssetStore(
-                    assetFolderRelativePath: assetFolderRelativePath
-                ).place(
-                    workspaceSources,
-                    rootURL: rootURL,
-                    currentFileURL: currentFileURL
-                )
+            let placement = try await Task.detached(priority: .userInitiated) {
+                try SecurityScopedAccess.withAccess(
+                    to: documentAuthority.location.securityScopedURL
+                ) {
+                    try placeEditorImageAssets(
+                        assets: assets,
+                        assetFolderRelativePath: assetFolderRelativePath,
+                        documentAuthority: documentAuthority,
+                        eventHandler: nil,
+                        managesSecurityScope: false
+                    )
+                }
             }.value
 
             refreshWorkspaceAfterFileSystemChange()
-            return paths
-        } catch {
-            present(error, title: "Could Not Insert Image")
-            return []
-        }
-    }
-}
-
-enum WorkspaceImageThumbnailRefreshPaths {
-    static func changedRasterPaths(
-        from previousSnapshot: WorkspaceFileSnapshot,
-        to currentSnapshot: WorkspaceFileSnapshot
-    ) -> [String] {
-        let previousEntries = entriesByPath(previousSnapshot)
-        let currentEntries = entriesByPath(currentSnapshot)
-        return Set(previousEntries.keys)
-            .union(currentEntries.keys)
-            .filter { path in
-                guard previousEntries[path] != currentEntries[path],
-                      MarkdownImageAssetPolicy.isAllowedPathExtension(
-                          (path as NSString).pathExtension
-                      )
-                else {
-                    return false
+            let cleanupSecurityScopedURL = placement.createdAssets.first?
+                .directory.rootAuthority.securityScopedURL
+                ?? placement.documentAuthority.location.securityScopedURL
+            return EditorImageAssetInsertion(
+                relativePaths: placement.relativePaths,
+                validateBeforeCommit: { [weak self] in
+                    let isValid = await Task.detached(priority: .userInitiated) {
+                        do {
+                            try SecurityScopedAccess.withAccess(
+                                to: placement.documentAuthority.location.securityScopedURL
+                            ) {
+                                try validateEditorImageAssetPlacementForCommit(placement)
+                            }
+                            return true
+                        } catch {
+                            return false
+                        }
+                    }.value
+                    if !isValid {
+                        self?.present(
+                            WorkspaceAnchoredFileSystemError.namespaceChanged,
+                            title: "Image Location Changed"
+                        )
+                    }
+                    return isValid
                 }
-                return previousEntries[path]?.kind == .image
-                    || currentEntries[path]?.kind == .image
+            ) { [weak self] in
+                let outcome = await Task.detached(priority: .utility) {
+                    discardEditorImageAssets(
+                        placement.createdAssets,
+                        rootURL: cleanupSecurityScopedURL
+                    )
+                }.value
+                if outcome.didChangeWorkspace {
+                    self?.refreshWorkspaceAfterFileSystemChange()
+                }
+                if let issue = outcome.userFacingIssue {
+                    self?.present(issue, title: "Image Cleanup Needs Attention")
+                }
             }
-            .sorted()
-    }
-
-    private static func entriesByPath(
-        _ snapshot: WorkspaceFileSnapshot
-    ) -> [String: WorkspaceFileSnapshot.Entry] {
-        snapshot.entries.reduce(into: [:]) { entries, entry in
-            entries[entry.relativePath] = entry
+        } catch {
+            if let rollbackError = error as? EditorImageAssetPlacementRollbackError,
+               rollbackError.didChangeWorkspace
+            {
+                refreshWorkspaceAfterFileSystemChange()
+            }
+            present(error, title: "Could Not Insert Image")
+            return EditorImageAssetInsertion(relativePaths: [])
         }
     }
 }
