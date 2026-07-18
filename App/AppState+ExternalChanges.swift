@@ -181,6 +181,11 @@ extension AppState {
         advancingDiskEvent: Bool = true
     ) {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !workspaceMutationWriteFences.contains(sessionIdentity),
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
+        else {
+            return
+        }
         if indeterminateSessionWrites[sessionIdentity] != nil {
             refreshIndeterminateFileWriteReconciliation(for: session)
             return
@@ -298,31 +303,48 @@ extension AppState {
         externalDiskEventGenerations[sessionIdentity] = nil
 
         for key in stateKeys {
-            if sessionCache[key] === session {
-                sessionCache[key] = nil
+            clearURLKeyedSessionState(at: key, removing: session)
+        }
+    }
+
+    private func clearURLKeyedSessionState(
+        at key: URL,
+        removing session: DocumentSession
+    ) {
+        if sessionCache[key] === session {
+            sessionCache[key] = nil
+        }
+        guard !workspaceMutationManagedSessions().contains(where: { candidate in
+            guard candidate !== session,
+                  let candidateStateURL = sessionStateURL(for: candidate)
+            else {
+                return false
             }
-            sessionPolicy.remove(key)
-            lastKnownDiskHashes[key] = nil
-            lastKnownDiskModificationDates[key] = nil
-            clearExternalChangeConflict(at: key)
-            deferredExternalChangeResolutions[key] = nil
-            externalResolutionIntentCaptures[key] = nil
-            detachedSessionURLs.remove(key)
-            if let prompt = externalChangePrompt,
-               exactFileURLSpellingMatches(prompt.fileURL, key)
-            {
-                externalChangePrompt = nil
-            }
-            if let prompt = missingFilePrompt,
-               exactFileURLSpellingMatches(prompt.fileURL, key)
-            {
-                missingFilePrompt = nil
-            }
-            if let prompt = indeterminateFileWriteReconciliationPrompt,
-               exactFileURLSpellingMatches(prompt.fileURL, key)
-            {
-                indeterminateFileWriteReconciliationPrompt = nil
-            }
+            return exactFileURLSpellingMatches(candidateStateURL, key)
+        }) else {
+            return
+        }
+        sessionPolicy.remove(key)
+        lastKnownDiskHashes[key] = nil
+        lastKnownDiskModificationDates[key] = nil
+        clearExternalChangeConflict(at: key)
+        deferredExternalChangeResolutions[key] = nil
+        externalResolutionIntentCaptures[key] = nil
+        detachedSessionURLs.remove(key)
+        if let prompt = externalChangePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
+            externalChangePrompt = nil
+        }
+        if let prompt = missingFilePrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
+            missingFilePrompt = nil
+        }
+        if let prompt = indeterminateFileWriteReconciliationPrompt,
+           exactFileURLSpellingMatches(prompt.fileURL, key)
+        {
+            indeterminateFileWriteReconciliationPrompt = nil
         }
     }
 

@@ -14,7 +14,29 @@ extension AppState {
     }
 
     func closeWorkspaceForReplacement() throws {
+        try validateWorkspaceMutationRecoveryStoresLoaded(
+            at: workspaceRootURL ?? sessionStateURL(for: currentDocument)
+        )
+        guard workspaceMutationNamespaceDepth == 0 else {
+            throw AppStateError.workspaceMutationInProgress(
+                workspaceRootURL ?? sessionStateURL(for: currentDocument) ?? currentDocument.fileURL
+                    ?? URL(fileURLWithPath: "/")
+            )
+        }
+        if let recovery = nextWorkspaceMutationRecovery() {
+            throw WorkspaceMutationError.indeterminateSession(recovery.sourceURL)
+        }
         let sessionsToClose = workspaceSessionsForClosure()
+        if let quarantinedSession = sessionsToClose.first(where: {
+            indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier($0))
+        }) {
+            throw WorkspaceMutationError.indeterminateSession(
+                sessionStateURL(for: quarantinedSession)
+                    ?? quarantinedSession.fileURL
+                    ?? workspaceRootURL
+                    ?? URL(fileURLWithPath: "/")
+            )
+        }
         let retirementPlans = workspaceRetirementPlans(for: sessionsToClose)
         var retiringSessionIdentities = Set(retirementPlans.map {
             ObjectIdentifier($0.session)
@@ -72,6 +94,7 @@ private extension AppState {
         sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
         sessions.append(contentsOf: editorDocumentBindingSessions.values)
         sessions.append(contentsOf: editorBindingInstallations.values)
+        sessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
         if currentDocument.fileURL != nil {
             sessions.append(currentDocument)
         }

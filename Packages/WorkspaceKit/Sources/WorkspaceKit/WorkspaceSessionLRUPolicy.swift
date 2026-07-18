@@ -10,6 +10,11 @@ public struct WorkspaceSessionEviction: Sendable, Equatable {
     }
 }
 
+public enum WorkspaceSessionRelocationError: Error, Sendable, Equatable {
+    case sourceMissing(URL)
+    case destinationOccupied(URL)
+}
+
 public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
     public let limit: Int
 
@@ -54,6 +59,27 @@ public struct WorkspaceSessionLRUPolicy: Sendable, Equatable {
         let key = url
         entries[key] = nil
         leastRecentURLs.removeAll { $0 == key }
+    }
+
+    /// Rekeys an existing warm-session entry without changing dirty state or recency.
+    ///
+    /// Destination ownership is exclusive. Failing before either collection is changed keeps
+    /// the policy suitable for the App's larger all-or-nothing session relocation transaction.
+    public mutating func relocate(from sourceURL: URL, to destinationURL: URL) throws {
+        guard sourceURL != destinationURL else { return }
+        guard let entry = entries[sourceURL] else {
+            throw WorkspaceSessionRelocationError.sourceMissing(sourceURL)
+        }
+        guard entries[destinationURL] == nil else {
+            throw WorkspaceSessionRelocationError.destinationOccupied(destinationURL)
+        }
+        guard let recencyIndex = leastRecentURLs.firstIndex(of: sourceURL) else {
+            preconditionFailure("Workspace session LRU entry has no recency record")
+        }
+
+        entries[sourceURL] = nil
+        entries[destinationURL] = entry
+        leastRecentURLs[recencyIndex] = destinationURL
     }
 
     public mutating func trim(protectedURLs: Set<URL> = []) -> [WorkspaceSessionEviction] {

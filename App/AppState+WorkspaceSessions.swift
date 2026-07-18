@@ -115,6 +115,11 @@ extension AppState {
         _ session: DocumentSession,
         canonicalURL: URL
     ) {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else {
+            cancelAutosave(for: session)
+            return
+        }
         if let retirement = retiredEditorDocumentSessions[canonicalURL],
            retirement.session === session
         {
@@ -131,20 +136,20 @@ extension AppState {
             pendingEditorSourceInstallations[installation] = nil
             editorBindingInstallations[installation] = nil
         }
-        editorWriterInstallations[ObjectIdentifier(session)] = nil
-        externalDiskInspectionTasks.removeValue(forKey: ObjectIdentifier(session))?.task.cancel()
-        externalReloadTasks.removeValue(forKey: ObjectIdentifier(session))?.task.cancel()
-        pendingExternalReloadApplications[ObjectIdentifier(session)] = nil
+        editorWriterInstallations[sessionIdentity] = nil
+        externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
+        externalReloadTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
+        pendingExternalReloadApplications[sessionIdentity] = nil
         deferredExternalChangeResolutions[canonicalURL] = nil
         externalResolutionIntentCaptures[canonicalURL] = nil
         clearExternalChangeConflict(at: canonicalURL)
         detachedSessionURLs.remove(canonicalURL)
-        let sessionIdentity = ObjectIdentifier(session)
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
         discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
+        indeterminateWorkspaceMutationSessions.remove(sessionIdentity)
         removeEditorDocumentBindingRegistration(for: session)
     }
 
@@ -228,8 +233,15 @@ extension AppState {
     /// pathname is identical.
     func hasStatefulRetainedAuthorityCollision(
         at canonicalURL: URL,
-        candidateLocation: WorkspaceFileSystemLocation
+        candidateLocation: WorkspaceFileSystemLocation,
+        excludingRecoveryID: UUID? = nil
     ) -> Bool {
+        if isWorkspaceMutationRecoveryCandidate(
+            candidateLocation,
+            excludingRecoveryID: excludingRecoveryID
+        ) {
+            return true
+        }
         let hasURLKeyedState = pendingExternalTexts[canonicalURL] != nil
             || pendingExternalFileVersions[canonicalURL] != nil
             || detachedSessionURLs.contains(canonicalURL)
@@ -237,6 +249,7 @@ extension AppState {
         sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
         sessions.append(contentsOf: editorDocumentBindingSessions.values)
         sessions.append(contentsOf: editorBindingInstallations.values)
+        sessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
         if currentDocument.fileURL != nil {
             sessions.append(currentDocument)
         }
@@ -256,7 +269,12 @@ extension AppState {
             let hasSessionState = hasURLKeyedState
                 || indeterminateSessionWrites[sessionIdentity] != nil
                 || indeterminateSessionWriteContexts[sessionIdentity] != nil
+                || indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
             guard hasSessionState else { continue }
+
+            if indeterminateWorkspaceMutationSessions.contains(sessionIdentity) {
+                return true
+            }
 
             guard let retainedLocation = retainedManagedSessionLocation(for: session) else {
                 // An unavailable proof cannot establish that B is distinct from the stateful A.
@@ -319,9 +337,20 @@ extension AppState {
 
     func retainMetadataOnlyForRetiredEditorSessions() {
         var retainedSessions = retiredEditorDocumentSessions.values.map(\.session)
+        retainedSessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
         if currentDocument.fileURL != nil {
             retainedSessions.append(currentDocument)
         }
+        var managedSessions = Array(sessionCache.values)
+        managedSessions.append(contentsOf: editorDocumentBindingSessions.values)
+        managedSessions.append(contentsOf: editorBindingInstallations.values)
+        managedSessions.append(contentsOf: workspaceMutationRetainedRecoverySessions())
+        var seenManagedSessionIdentities = Set<ObjectIdentifier>()
+        retainedSessions.append(contentsOf: managedSessions.filter { session in
+            let identity = ObjectIdentifier(session)
+            return seenManagedSessionIdentities.insert(identity).inserted
+                && indeterminateWorkspaceMutationSessions.contains(identity)
+        })
         let retainedURLs = Set(retainedSessions.compactMap(sessionStateURL(for:)))
         pendingExternalTexts = pendingExternalTexts.filter { retainedURLs.contains($0.key) }
         pendingExternalFileVersions = pendingExternalFileVersions.filter {
@@ -354,6 +383,9 @@ extension AppState {
         indeterminateSessionWriteContexts = indeterminateSessionWriteContexts.filter {
             retainedSessionIdentities.contains($0.key)
         }
+        indeterminateWorkspaceMutationSessions = Set(
+            indeterminateWorkspaceMutationSessions.filter(retainedSessionIdentities.contains)
+        )
     }
 
     func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {
@@ -381,6 +413,25 @@ extension AppState {
             where indeterminateSessionWrites[sessionIdentity] != nil
         {
             urls.insert(context.location.fileURL)
+        }
+        var managedSessions = Array(sessionCache.values)
+        managedSessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
+        managedSessions.append(contentsOf: editorDocumentBindingSessions.values)
+        managedSessions.append(contentsOf: editorBindingInstallations.values)
+        if currentDocument.fileURL != nil {
+            managedSessions.append(currentDocument)
+        }
+        var seenSessionIdentities = Set<ObjectIdentifier>()
+        for session in managedSessions {
+            let identity = ObjectIdentifier(session)
+            guard seenSessionIdentities.insert(identity).inserted,
+                  indeterminateWorkspaceMutationSessions.contains(identity)
+                  || workspaceMutationWriteFences.contains(identity),
+                  let stateURL = sessionStateURL(for: session)
+            else {
+                continue
+            }
+            urls.insert(stateURL)
         }
         return urls
     }
@@ -436,7 +487,10 @@ private extension AppState {
         session: DocumentSession
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        if indeterminateSessionWrites[sessionIdentity] != nil {
+        if indeterminateSessionWrites[sessionIdentity] != nil ||
+            indeterminateWorkspaceMutationSessions.contains(sessionIdentity) ||
+            workspaceMutationWriteFences.contains(sessionIdentity)
+        {
             _ = sessionPolicy.access(
                 eviction.url,
                 isDirty: session.isDirty,
@@ -465,6 +519,7 @@ private extension AppState {
         discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
+        indeterminateWorkspaceMutationSessions.remove(sessionIdentity)
         sessionCache[eviction.url] = nil
         if !isRetiredEditorSession(session) {
             removeEditorDocumentBindingRegistration(for: session)

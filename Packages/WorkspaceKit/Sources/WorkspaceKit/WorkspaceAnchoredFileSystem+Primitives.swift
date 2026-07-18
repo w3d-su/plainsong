@@ -212,6 +212,17 @@ extension WorkspaceAnchoredFileSystem {
         )
     }
 
+    static func validateDirectoryMutationExpectation(
+        parentDescriptor: Int32,
+        expectation: WorkspaceItemMutationExpectation
+    ) throws {
+        guard expectation.kind == .directory,
+              try directoryDescriptorIdentity(parentDescriptor) == expectation.identity
+        else {
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
+        }
+    }
+
     static func regularFileMetadata(descriptor: Int32) throws -> WorkspaceCoherentFileMetadata {
         var status = stat()
         guard Darwin.fstat(descriptor, &status) == 0 else {

@@ -91,6 +91,7 @@ extension AppState {
     /// session's mutable display URL.
     func retainUnanchoredManagedSessionOwnership(for session: DocumentSession) {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else { return }
         if anchoredSessionFileBindings[sessionIdentity] != nil {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
             return
@@ -154,6 +155,7 @@ extension AppState {
         preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
     ) {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else { return }
         if anchoredSessionFileBindings[sessionIdentity] != nil {
             unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
             return
@@ -273,6 +275,7 @@ extension AppState {
         guard !hasPendingConflict,
               !isDetached,
               indeterminateSessionWrites[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
               !changed || (!session.isDirty && !hasPendingEditorSource)
         else {
             recordExternalChangeConflict(
@@ -331,6 +334,9 @@ extension AppState {
         for session: DocumentSession
     ) -> Bool {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else {
+            return false
+        }
         // An explicit Reload/Keep Mine resolves the indeterminate destination itself. Only
         // now may it replace any prior source binding/proof with the destination observation.
         if let context = indeterminateSessionWriteContexts[sessionIdentity],
@@ -396,6 +402,7 @@ extension AppState {
         allowsImageAssetAuthorityBootstrap: Bool? = nil
     ) {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else { return }
         let hadRetainedOwnership = anchoredSessionFileBindings[sessionIdentity] != nil
             || unanchoredManagedSessionOwnershipProofs[sessionIdentity] != nil
             || indeterminateSessionWriteContexts[sessionIdentity] != nil
@@ -418,7 +425,11 @@ extension AppState {
         // An indeterminate write's own reconciliation flow owns this session's disk state;
         // `save`/autosave already refuse independently while it is pending, and any retained
         // proof here predates the indeterminate write, so this must not act on it.
-        guard indeterminateSessionWrites[sessionIdentity] == nil else { return }
+        guard indeterminateSessionWrites[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
+        else {
+            return
+        }
         guard case let .proven(proof)? =
             unanchoredManagedSessionOwnershipProofs[sessionIdentity]
         else {

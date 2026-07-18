@@ -24,6 +24,12 @@ extension AppState {
 
     func closeMissingFile() {
         guard let prompt = missingFilePrompt else { return }
+        do {
+            try validateWorkspaceMutationRecoveryStoresLoaded(at: prompt.fileURL)
+        } catch {
+            present(error, title: "Could Not Close File")
+            return
+        }
         let key = prompt.fileURL
         guard let currentStateURL = sessionStateURL(for: currentDocument),
               exactFileURLSpellingMatches(currentStateURL, key)
@@ -46,14 +52,24 @@ extension AppState {
             )
             return
         }
+        guard clearWorkspaceMutationTextRecovery(for: closingSession) else { return }
         discardRetiredEditorDocumentSession(closingSession, canonicalURL: key)
         clearSessionState(for: closingSession, fallbackURL: key)
         currentDocument = DocumentSession()
         observeCurrentDocument()
+        promoteNextWorkspaceMutationRecoverySessionIfNeeded()
     }
 
     func restoreRecoveryPrompt(for session: DocumentSession) {
         guard session === currentDocument else { return }
+        if workspaceMutationRecoveryIDBySession[ObjectIdentifier(session)] != nil {
+            externalChangePrompt = nil
+            missingFilePrompt = nil
+            indeterminateFileWriteReconciliationPrompt = nil
+            refreshWorkspaceMutationReconciliationPrompt()
+            return
+        }
+        refreshWorkspaceMutationReconciliationPrompt()
         guard let stateURL = sessionStateURL(for: session) else {
             externalChangePrompt = nil
             missingFilePrompt = nil
@@ -86,8 +102,10 @@ extension AppState {
             externalChangePrompt = nil
             missingFilePrompt = nil
             indeterminateFileWriteReconciliationPrompt = nil
+            refreshWorkspaceMutationReconciliationPrompt()
             return
         }
+        refreshWorkspaceMutationReconciliationPrompt()
 
         if let prompt = externalChangePrompt,
            !exactFileURLSpellingMatches(prompt.fileURL, url)
@@ -106,6 +124,7 @@ extension AppState {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     func saveDetachedCurrentDocument(to destinationURL: URL) throws {
         guard let oldURL = missingFilePrompt?.fileURL,
               let currentStateURL = sessionStateURL(for: currentDocument),
@@ -113,6 +132,7 @@ extension AppState {
         else {
             return
         }
+        try validateWorkspaceMutationRecoveryStoresLoaded(at: oldURL)
 
         let session = currentDocument
         let sessionIdentity = ObjectIdentifier(session)
@@ -141,6 +161,17 @@ extension AppState {
             at: saveCopyLocation,
             excluding: session
         )
+        if let recovery = workspaceMutationTextRecoveryContexts[sessionIdentity],
+           workspaceSaveCopyFileURLsMayAlias(
+               recovery.originalURL,
+               saveCopyLocation.fileURL,
+               parentIsCaseSensitive: saveCopyInspection.parentIsCaseSensitive
+           )
+        {
+            throw AppStateError.recoveryDestinationConflictsOriginal(
+                saveCopyLocation.fileURL
+            )
+        }
         let destinationImageAssetAuthority =
             try prepareEditorImageAssetDocumentDestinationAuthority(
                 at: saveCopyLocation
@@ -265,6 +296,7 @@ private extension AppState {
         )
         _ = advanceSessionLifecycle(for: completed.session)
         completed.session.markSaved(text: completed.text, url: destination)
+        _ = clearWorkspaceMutationTextRecovery(for: completed.session)
         sessionCache[destination] = completed.session
         adoptAnchoredFileBinding(
             completed.binding,
@@ -281,6 +313,7 @@ private extension AppState {
         if let cleanupResult = completed.cleanupResult {
             presentCommittedFileWriteCleanup(cleanupResult, destinationURL: destination)
         }
+        promoteNextWorkspaceMutationRecoverySessionIfNeeded()
     }
 
     func validatedRetirementForSaveCopy(
@@ -345,6 +378,9 @@ private extension AppState {
         case let .regular(identity): identity
         case .missing: nil
         }
+        if isWorkspaceMutationRecoveryCandidate(location) {
+            throw AppStateError.invalidSessionIdentity(location.fileURL)
+        }
         var inspectedSessions: Set<ObjectIdentifier> = []
         for candidate in workspaceSaveCopyOwnershipCandidates() {
             let sessionIdentity = ObjectIdentifier(candidate)
@@ -364,7 +400,10 @@ private extension AppState {
             case let .proven(proof):
                 unanchoredProofValue = proof
             case .unavailable:
-                throw AppStateError.invalidSessionIdentity(location.fileURL)
+                guard candidate === sourceSession else {
+                    throw AppStateError.invalidSessionIdentity(location.fileURL)
+                }
+                unanchoredProofValue = nil
             case .none:
                 guard binding != nil || context != nil else {
                     throw AppStateError.invalidSessionIdentity(location.fileURL)
@@ -388,7 +427,7 @@ private extension AppState {
             guard !isExactMissingSourceRecovery else { continue }
 
             let ownsDestinationByLocation = retainedLocations.contains { retainedLocation in
-                workspaceSaveCopyLocationsMayAlias(
+                workspaceSaveCopyLocationsOverlap(
                     retainedLocation,
                     location,
                     parentIsCaseSensitive: inspection.parentIsCaseSensitive
@@ -412,10 +451,14 @@ private extension AppState {
         candidates.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
         candidates.append(contentsOf: editorDocumentBindingSessions.values)
         candidates.append(contentsOf: editorBindingInstallations.values)
+        candidates.append(contentsOf: workspaceMutationRetainedRecoverySessions())
         candidates.append(currentDocument)
         return candidates
     }
+}
 
+@MainActor
+extension AppState {
     func workspaceSaveCopyLocationsMayAlias(
         _ lhs: WorkspaceFileSystemLocation,
         _ rhs: WorkspaceFileSystemLocation,
@@ -437,6 +480,42 @@ private extension AppState {
             parentIsCaseSensitive: parentIsCaseSensitive
         )
         return lhsKey.utf8.elementsEqual(rhsKey.utf8)
+    }
+
+    /// Save Copy must not turn an ancestor of another retained location into a regular file or
+    /// publish below an owned path. Either shape can make the existing authority unreachable,
+    /// so ownership uses the same component-bounded symmetric reservation as namespace moves.
+    func workspaceSaveCopyLocationsOverlap(
+        _ lhs: WorkspaceFileSystemLocation,
+        _ rhs: WorkspaceFileSystemLocation,
+        parentIsCaseSensitive: Bool
+    ) -> Bool {
+        let lhsPath: String
+        let rhsPath: String
+        if lhs.rootAuthority == rhs.rootAuthority {
+            lhsPath = lhs.relativePath
+            rhsPath = rhs.relativePath
+        } else {
+            lhsPath = lhs.fileURL.path(percentEncoded: false)
+            rhsPath = rhs.fileURL.path(percentEncoded: false)
+        }
+        let lhsKey = workspaceSaveCopyAliasKey(
+            lhsPath,
+            parentIsCaseSensitive: parentIsCaseSensitive
+        )
+        let rhsKey = workspaceSaveCopyAliasKey(
+            rhsPath,
+            parentIsCaseSensitive: parentIsCaseSensitive
+        )
+        return workspaceMutationRelativePathIsAffected(
+            lhsKey,
+            source: rhsKey,
+            sourceIsDirectory: true
+        ) || workspaceMutationRelativePathIsAffected(
+            rhsKey,
+            source: lhsKey,
+            sourceIsDirectory: true
+        )
     }
 
     func workspaceSaveCopyAliasKey(
@@ -465,7 +544,10 @@ private extension AppState {
         )
         return lhsKey.utf8.elementsEqual(rhsKey.utf8)
     }
+}
 
+@MainActor
+private extension AppState {
     func workspaceSaveCopyExpectation(
         for session: DocumentSession,
         at location: WorkspaceFileSystemLocation,
@@ -557,17 +639,24 @@ private extension AppState {
     func workspaceSaveCopyLocation(
         for destinationURL: URL
     ) throws -> WorkspaceFileSystemLocation {
-        guard workspaceRootURL != nil else {
+        guard let workspaceRootURL else {
             return try WorkspaceFileSystemLocation(fileURL: destinationURL)
         }
-        guard let rootAuthority = workspaceSearchRootAuthority,
-              workspaceInstalledCaptureGeneration == workspaceGeneration
-        else {
+        if let rootAuthority = workspaceSearchRootAuthority,
+           let relativePath = try? rootAuthority.relativePath(forFileURL: destinationURL)
+        {
+            guard workspaceInstalledCaptureGeneration == workspaceGeneration else {
+                throw WorkspaceAnchoredFileSystemError.namespaceChanged
+            }
+            return try rootAuthority.location(relativePath: relativePath)
+        }
+        guard !Self.isDescendant(destinationURL, of: workspaceRootURL) else {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
-        guard let relativePath = try? rootAuthority.relativePath(forFileURL: destinationURL) else {
+        do {
             return try WorkspaceFileSystemLocation(fileURL: destinationURL)
+        } catch {
+            throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
-        return try rootAuthority.location(relativePath: relativePath)
     }
 }

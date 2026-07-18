@@ -85,6 +85,28 @@ final class WorkspaceFileTreeTests: XCTestCase {
         XCTAssertEqual(reconciled.selectedNode?.relativePath, "posts/new-title.md")
     }
 
+    func testTreePreservesSnapshotMutationExpectation() {
+        let expectation = WorkspaceItemMutationExpectation(
+            identity: WorkspaceFileSystemIdentity(device: 12, inode: 34),
+            kind: .regularFile
+        )
+        let tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: [
+                WorkspaceFileSnapshot.Entry(
+                    relativePath: "post.md",
+                    kind: .markdown,
+                    identity: "post",
+                    contentModificationDate: nil,
+                    mutationExpectation: expectation
+                ),
+            ]),
+            options: .init(showAllFiles: true)
+        )
+
+        XCTAssertEqual(tree.node(id: "post")?.mutationExpectation, expectation)
+    }
+
     func testCanonicalEquivalentDirectorySpellingsKeepDistinctChildren() {
         let nfcDirectory = "caf\u{00E9}"
         let nfdDirectory = "cafe\u{0301}"
@@ -140,6 +162,24 @@ final class WorkspaceFileTreeTests: XCTestCase {
         tree.setExpanded(true, for: nodeIDs[0])
         XCTAssertTrue(tree.isExpanded(nodeIDs[0]))
         XCTAssertFalse(tree.isExpanded(nodeIDs[1]))
+    }
+
+    func testDuplicatePhysicalIdentitiesReceivePathDisambiguatedActionIDs() {
+        let tree = WorkspaceFileTree.reconcile(
+            previous: nil,
+            snapshot: WorkspaceFileSnapshot(entries: [
+                entry("first.md", kind: .markdown, identity: "shared-inode"),
+                entry("second.md", kind: .markdown, identity: "shared-inode"),
+            ]),
+            options: .init(showAllFiles: true)
+        )
+        let nodes = tree.root.children
+
+        XCTAssertEqual(nodes.map(\.relativePath), ["first.md", "second.md"])
+        XCTAssertEqual(Set(nodes.map(\.id)).count, 2)
+        for node in nodes {
+            XCTAssertEqual(tree.node(id: node.id)?.relativePath, node.relativePath)
+        }
     }
 
     func testReconcileTwoThousandFilesStaysUnderBudget() {

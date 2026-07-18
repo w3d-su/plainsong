@@ -299,6 +299,7 @@ final class AppStateTests: XCTestCase {
             .fileExists(atPath: firstDirectory.appendingPathComponent("assets/image.png").path))
         XCTAssertFalse(FileManager.default
             .fileExists(atPath: secondDirectory.appendingPathComponent("assets/image.png").path))
+        insertion.commit()
     }
 
     func testCapturedImageAssetInserterRejectsReplacedDocumentParentWithOriginalHardLink() async throws {
@@ -994,6 +995,80 @@ final class AppStateTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: root.appendingPathComponent("media/images/image.png").path(percentEncoded: false)
         ))
+        insertion.commit()
+    }
+
+    func testImageNamespaceLeaseStaysHeldThroughCommitValidationAndTerminalOutcome() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+
+        let committed = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "committed.png"),
+        ])
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 1)
+        XCTAssertThrowsError(try appState.beginWorkspaceNamespaceMutation([]))
+        let isCommitValid = await committed.validateBeforeCommit()
+        XCTAssertTrue(isCommitValid)
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 1)
+        committed.commit()
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
+        await committed.discard()
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
+
+        let discarded = await inserter([
+            .data(Data([4, 5, 6]), suggestedFilename: "discarded.png"),
+        ])
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 1)
+        await discarded.discard()
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
+        discarded.commit()
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
+    }
+
+    func testTerminationRejectsWhileImageDiscardCleanupOwnsNamespaceLease() async throws {
+        let root = try makeTemporaryDirectory()
+        let currentFile = root.appendingPathComponent("post.md")
+        try "Body".write(to: currentFile, atomically: true, encoding: .utf8)
+        let session = DocumentSession(text: "Body", url: currentFile, fileKind: .markdown)
+        let appState = AppState(currentDocument: session)
+        try configureImageAssetWorkspace(
+            appState,
+            rootURL: root,
+            currentSession: session
+        )
+        let cleanupGate = EditorImageAssetDiscardGate()
+        appState.editorImageAssetDiscardEventHandler = { event in
+            guard case .willRename = event else { return }
+            cleanupGate.beginAndWait()
+        }
+        let inserter = try XCTUnwrap(appState.editorImageAssetInserter)
+        let insertion = await inserter([
+            .data(Data([1, 2, 3]), suggestedFilename: "discarded.png"),
+        ])
+
+        let discardTask = Task { @MainActor in
+            await insertion.discard()
+        }
+        try await waitUntil("image discard cleanup reaches its rename boundary") {
+            cleanupGate.hasBegun
+        }
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 1)
+        XCTAssertFalse(appState.prepareForTermination())
+        XCTAssertEqual(appState.presentedError?.title, "Could Not Quit")
+
+        cleanupGate.release()
+        await discardTask.value
+        XCTAssertEqual(appState.workspaceImageAssetInsertionCount, 0)
+        XCTAssertTrue(appState.prepareForTermination())
     }
 
     func testDiscardedEditorImageInsertionMovesCreatedAssetsToVisibleRecovery() async throws {
@@ -15012,6 +15087,25 @@ private final class ExternalReloadPreparationGate: @unchecked Sendable {
             finishedCount += 1
             finishedAt = DispatchTime.now().uptimeNanoseconds
         }
+    }
+}
+
+private final class EditorImageAssetDiscardGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let gate = DispatchSemaphore(value: 0)
+    private var began = false
+
+    var hasBegun: Bool {
+        lock.withLock { began }
+    }
+
+    func beginAndWait() {
+        lock.withLock { began = true }
+        gate.wait()
+    }
+
+    func release() {
+        gate.signal()
     }
 }
 

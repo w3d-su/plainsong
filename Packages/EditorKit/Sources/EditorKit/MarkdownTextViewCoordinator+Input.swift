@@ -243,6 +243,7 @@ extension MarkdownTextViewCoordinator {
                 await transaction.discard()
                 return
             }
+            transaction.commit()
         }
     }
 

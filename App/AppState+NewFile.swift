@@ -8,6 +8,12 @@ extension AppState {
     /// File > New (⌘N). In a workspace, creates a deduplicated `Untitled.md` at the
     /// workspace root and opens it; in single-file mode, asks for a location first.
     func newFile() {
+        do {
+            try validateWorkspaceMutationRecoveryStoresLoaded()
+        } catch {
+            present(error, title: "Could Not Create File")
+            return
+        }
         if let workspaceRootURL {
             let name = Self.untitledFileName(
                 in: workspaceRootURL,

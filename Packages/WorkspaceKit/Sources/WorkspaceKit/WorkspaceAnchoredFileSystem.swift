@@ -226,13 +226,16 @@ public enum WorkspaceFileWriteArtifactState: Sendable, Equatable {
 public struct WorkspaceNotCommittedFileWrite: Sendable, Equatable {
     public let reason: WorkspaceAnchoredFileSystemError
     public let artifactState: WorkspaceFileWriteArtifactState
+    public let retainedArtifactIdentity: WorkspaceFileSystemIdentity?
 
     public init(
         reason: WorkspaceAnchoredFileSystemError,
-        artifactState: WorkspaceFileWriteArtifactState
+        artifactState: WorkspaceFileWriteArtifactState,
+        retainedArtifactIdentity: WorkspaceFileSystemIdentity? = nil
     ) {
         self.reason = reason
         self.artifactState = artifactState
+        self.retainedArtifactIdentity = retainedArtifactIdentity
     }
 }
 

@@ -22,6 +22,37 @@ final class WorkspaceDirectoryScannerTests: XCTestCase {
         XCTAssertFalse(snapshot.entries.contains { $0.relativePath.hasPrefix("/") })
     }
 
+    func testSnapshotCaptureCarriesNoFollowMutationExpectations() async throws {
+        let root = try makeTemporaryDirectory()
+        let file = root.appendingPathComponent("post.md")
+        let target = root.appendingPathComponent("target.md")
+        let link = root.appendingPathComponent("alias.md")
+        try "Post".write(to: file, atomically: false, encoding: .utf8)
+        try "Target".write(to: target, atomically: false, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: link.path,
+            withDestinationPath: target.lastPathComponent
+        )
+
+        let capture = try await WorkspaceDirectoryScanner().snapshotCapture(root: root)
+        let entries = Dictionary(uniqueKeysWithValues: capture.snapshot.entries.map {
+            ($0.relativePath, $0)
+        })
+
+        XCTAssertEqual(entries["post.md"]?.mutationExpectation?.kind, .regularFile)
+        XCTAssertEqual(entries["alias.md"]?.mutationExpectation?.kind, .symbolicLink)
+        XCTAssertNotEqual(
+            entries["alias.md"]?.mutationExpectation?.identity,
+            entries["target.md"]?.mutationExpectation?.identity
+        )
+        XCTAssertEqual(
+            try WorkspaceNoFollowItemInspector.inspect(
+                at: capture.rootAuthority.location(relativePath: "post.md")
+            ),
+            entries["post.md"]?.mutationExpectation
+        )
+    }
+
     func testCancellationPropagatesIntoEnumerationWorker() async throws {
         let root = try makeTemporaryDirectory()
         try "Body".write(

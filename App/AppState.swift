@@ -115,6 +115,21 @@ struct AppStateUserVisibleError: Identifiable {
     let message: String
 }
 
+struct WorkspaceTrashCleanupNotice: Identifiable, Equatable {
+    let id = UUID()
+    let stagingLocation: WorkspaceFileSystemLocation
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.stagingLocation == rhs.stagingLocation
+    }
+}
+
+enum WorkspaceMutationRecoveryBannerPlacement: Equatable {
+    case global
+    case editor
+    case hidden
+}
+
 /// Top-level app state for the current editor window.
 @MainActor
 final class AppState: ObservableObject {
@@ -152,7 +167,10 @@ final class AppState: ObservableObject {
     @Published var missingFilePrompt: MissingFilePrompt?
     @Published var indeterminateFileWriteReconciliationPrompt:
         IndeterminateFileWriteReconciliationPrompt?
+    @Published var workspaceMutationReconciliationPrompt:
+        WorkspaceMutationReconciliationPrompt?
     @Published var fileWriteArtifactNotices: [FileWriteArtifactNotice] = []
+    @Published var workspaceTrashCleanupNotices: [WorkspaceTrashCleanupNotice] = []
     @Published private(set) var wysiwygFallbackMessage: String?
     @Published private(set) var editorFocusRequestID = 0
 
@@ -166,6 +184,10 @@ final class AppState: ObservableObject {
     let workspaceSearchLimits: WorkspaceSearchLimits
     let workspaceSearchDebounceNanoseconds: UInt64
     let fileOperations: WorkspaceFileOperations
+    let workspaceMutationOperationRecoveryStore:
+        any WorkspaceMutationOperationRecoveryPersisting
+    let workspaceMutationTextRecoveryStore: any WorkspaceMutationTextRecoveryPersisting
+    let reportedTrashBookmarkAccess: any ReportedTrashBookmarkAccessing
     let userDefaults: UserDefaults
     let editorImageThumbnailAdapter: WorkspaceEditorImageThumbnailAdapter
     let editorImageThumbnailRefreshProxy: EditorImageThumbnailRefreshProxy
@@ -251,6 +273,48 @@ final class AppState: ObservableObject {
     var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:]
     /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
     var indeterminateSessionWriteContexts: [ObjectIdentifier: IndeterminateSessionWriteContext] = [:]
+    /// Sessions whose retained namespace is being mutated. Save/autosave must not enter while
+    /// their authority is between the old and new lexical locations.
+    var workspaceMutationWriteFences: Set<ObjectIdentifier> = []
+    /// A namespace mutation fences image placement across the workspace, including mutations
+    /// whose selected item is not itself an open document (for example an asset directory).
+    var workspaceMutationNamespaceDepth = 0
+    /// Watcher and App-owned namespace refreshes must not publish a tree captured while a
+    /// rename/move/Trash transaction has temporarily staged or relocated entries.
+    var workspaceMutationRefreshPending = false
+    /// True only when a deferred refresh came from the ordinary watcher/App refresh path and
+    /// therefore must replay external-change inspection after the namespace fence.
+    var workspaceMutationExternalRefreshPending = false
+    /// Retains the pre-mutation root proof so a watcher event deferred across the generation
+    /// fence can still inspect every managed session, not only the current document.
+    var workspaceMutationRefreshRootAuthority: WorkspaceFileSystemRootAuthority?
+    /// Image placement performs filesystem work away from the main actor. A workspace mutation
+    /// must not start while that placement owns the namespace.
+    var workspaceImageAssetInsertionCount = 0
+    /// Test seam for holding descriptor-relative image cleanup at a namespace boundary.
+    var editorImageAssetDiscardEventHandler: EditorImageAssetDiscardEventHandler?
+    /// An indeterminate rename/move/Trash result cannot authorize either spelling. Keep the
+    /// affected sessions quarantined until operation-level recovery proves one exact outcome
+    /// or the user explicitly promotes the editor source to detached recovery.
+    var indeterminateWorkspaceMutationSessions: Set<ObjectIdentifier> = []
+    var workspaceMutationRecoveries: [UUID: WorkspaceMutationRecoveryContext] = [:]
+    var workspaceMutationOperationRecoveryRecords:
+        [UUID: WorkspaceMutationOperationRecoveryRecord] = [:]
+    var workspaceMutationOperationRecoveryIDsWithUnpromotedText: Set<UUID> = []
+    var workspaceMutationRecoveryIDBySession: [ObjectIdentifier: UUID] = [:]
+    var workspaceMutationTextRecoveryContexts:
+        [ObjectIdentifier: WorkspaceMutationTextRecoveryContext] = [:]
+    var workspaceMutationTextRecoverySessions: [UUID: DocumentSession] = [:]
+    var workspaceMutationTextRecoveryTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
+    var pendingWorkspaceMutationTextRecoveryRecords:
+        [WorkspaceMutationTextRecoveryRecord] = []
+    var pendingWorkspaceMutationOperationRecoveryRecords:
+        [WorkspaceMutationOperationRecoveryRecord] = []
+    var workspaceMutationRecoveryLoadErrors: [Error] = []
+    var workspaceMutationOperationRecoveryLoadError: Error?
+    var workspaceMutationTextRecoveryLoadError: Error?
+    @Published var workspaceMutationOperationRecoveryLoadFailed = false
+    @Published var workspaceMutationTextRecoveryLoadFailed = false
     let preferences: PlainsongPreferences
     private(set) var isWYSIWYGMechanismHealthy = true
 
@@ -268,6 +332,12 @@ final class AppState: ObservableObject {
         workspaceSearchDebounceNanoseconds: UInt64 = 200_000_000,
         workspaceImageThumbnailProvider: any WorkspaceImageThumbnailLoading = WorkspaceImageThumbnailProvider(),
         fileOperations: WorkspaceFileOperations = WorkspaceFileOperations(),
+        workspaceMutationOperationRecoveryStore:
+        (any WorkspaceMutationOperationRecoveryPersisting)? = nil,
+        workspaceMutationTextRecoveryStore:
+        (any WorkspaceMutationTextRecoveryPersisting)? = nil,
+        reportedTrashBookmarkAccess: any ReportedTrashBookmarkAccessing =
+            ProductionReportedTrashBookmarkAccess(),
         shouldRestoreLastOpenedFile: Bool = !AppState.isRunningUnderXCTest,
         userDefaults: UserDefaults = .standard
     ) {
@@ -286,6 +356,15 @@ final class AppState: ObservableObject {
         )
         editorImageThumbnailRefreshProxy = EditorImageThumbnailRefreshProxy()
         self.fileOperations = fileOperations
+        let operationRecoveryStore =
+            workspaceMutationOperationRecoveryStore
+                ?? Self.makeDefaultWorkspaceMutationOperationRecoveryStore()
+        let textRecoveryStore =
+            workspaceMutationTextRecoveryStore
+                ?? Self.makeDefaultWorkspaceMutationTextRecoveryStore()
+        self.workspaceMutationOperationRecoveryStore = operationRecoveryStore
+        self.workspaceMutationTextRecoveryStore = textRecoveryStore
+        self.reportedTrashBookmarkAccess = reportedTrashBookmarkAccess
         self.userDefaults = userDefaults
         self.shouldRestoreLastOpenedFile = shouldRestoreLastOpenedFile
         preferences = PlainsongPreferences(userDefaults: userDefaults)
@@ -296,6 +375,22 @@ final class AppState: ObservableObject {
         layoutMode = restoredLayout.mode
         wysiwygFallbackMessage = restoredLayout.fallbackMessage
         recentItemURLs = (try? recentItemStore.restore()) ?? []
+        do {
+            pendingWorkspaceMutationOperationRecoveryRecords =
+                try operationRecoveryStore.load()
+        } catch {
+            workspaceMutationOperationRecoveryLoadFailed = true
+            workspaceMutationOperationRecoveryLoadError = error
+            workspaceMutationRecoveryLoadErrors.append(error)
+        }
+        do {
+            pendingWorkspaceMutationTextRecoveryRecords =
+                try textRecoveryStore.load()
+        } catch {
+            workspaceMutationTextRecoveryLoadFailed = true
+            workspaceMutationTextRecoveryLoadError = error
+            workspaceMutationRecoveryLoadErrors.append(error)
+        }
         preferences.onChange = { [weak self] in
             self?.handlePreferencesChanged()
         }
@@ -319,6 +414,9 @@ final class AppState: ObservableObject {
         }
         for task in sessionStatisticsTasks.values {
             task.task.cancel()
+        }
+        for task in workspaceMutationTextRecoveryTasks.values {
+            task.cancel()
         }
         var stoppedOwners: Set<ObjectIdentifier> = []
         for retirement in retiredEditorDocumentSessions.values {
@@ -388,18 +486,42 @@ extension AppState {
     }
 
     func restoreLastOpenedFileIfNeeded() {
-        guard shouldRestoreLastOpenedFile, !didAttemptRestore, currentDocument.fileURL == nil else { return }
+        guard !didAttemptRestore else { return }
         didAttemptRestore = true
 
+        restoreWorkspaceMutationOperationRecoveryIfNeeded()
+        restoreWorkspaceMutationTextRecoveryIfNeeded()
+
+        if let recoveryLoadError = workspaceMutationRecoveryLoadErrors.first {
+            present(recoveryLoadError, title: "Could Not Load Workspace Recovery")
+            return
+        }
+        guard workspaceMutationRecoveries.isEmpty,
+              pendingWorkspaceMutationOperationRecoveryRecords.isEmpty,
+              pendingWorkspaceMutationTextRecoveryRecords.isEmpty,
+              workspaceMutationTextRecoveryContexts.isEmpty
+        else {
+            return
+        }
+        guard shouldRestoreLastOpenedFile, currentDocument.fileURL == nil else {
+            return
+        }
         do {
-            guard let url = try lastOpenedFileStore.restore() else { return }
-            try open(url: url, rememberAsLastOpened: false, preserveWorkspace: false)
+            if let url = try lastOpenedFileStore.restore() {
+                try open(url: url, rememberAsLastOpened: false, preserveWorkspace: false)
+            }
         } catch {
             present(error, title: "Could Not Reopen Last File")
         }
     }
 
     func openFile() {
+        do {
+            try validateWorkspaceMutationRecoveryStoresLoaded()
+        } catch {
+            present(error, title: "Could Not Open File")
+            return
+        }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
@@ -570,6 +692,24 @@ extension AppState {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
+    private static func makeDefaultWorkspaceMutationOperationRecoveryStore()
+        -> any WorkspaceMutationOperationRecoveryPersisting
+    {
+        if isRunningUnderXCTest {
+            return TransientMutationOperationStore()
+        }
+        return WorkspaceMutationOperationRecoveryStore()
+    }
+
+    private static func makeDefaultWorkspaceMutationTextRecoveryStore()
+        -> any WorkspaceMutationTextRecoveryPersisting
+    {
+        if isRunningUnderXCTest {
+            return TransientMutationTextStore()
+        }
+        return WorkspaceMutationTextRecoveryStore()
+    }
+
     static let layoutModeDefaultsKey = "Plainsong.layout.mode"
     static let legacyPreviewVisibleDefaultsKey = "Plainsong.preview.isVisible"
 
@@ -613,10 +753,13 @@ extension AppState {
         guard let url = sessionStateURL(for: currentDocument) else {
             return false
         }
-        return !isSaving &&
+        return !hasWorkspaceMutationRecoveryLoadFailure &&
+            !isSaving &&
             !hasPendingEditorSource(for: currentDocument) &&
             externalReloadTasks[ObjectIdentifier(currentDocument)] == nil &&
             indeterminateSessionWrites[ObjectIdentifier(currentDocument)] == nil &&
+            !workspaceMutationWriteFences.contains(ObjectIdentifier(currentDocument)) &&
+            !indeterminateWorkspaceMutationSessions.contains(ObjectIdentifier(currentDocument)) &&
             !detachedSessionURLs.contains(url) &&
             pendingExternalTexts[url] == nil &&
             pendingExternalFileVersions[url] == nil &&
@@ -812,6 +955,10 @@ enum AppStateError: LocalizedError {
     case duplicateSessionOwnership(URL)
     case pendingEditorSource(URL)
     case unsafeWriteTarget(URL)
+    case workspaceMutationInProgress(URL)
+    case workspaceMutationRecoveryUnavailable(URL)
+    case unsavedChangesPreventTermination(URL)
+    case recoveryDestinationConflictsOriginal(URL)
 
     var errorDescription: String? {
         switch self {
@@ -829,6 +976,16 @@ enum AppStateError: LocalizedError {
             "\(url.lastPathComponent) still has editor input waiting to synchronize."
         case let .unsafeWriteTarget(url):
             "\(url.lastPathComponent) no longer refers to the file owned by this editor session."
+        case let .workspaceMutationInProgress(url):
+            "\(url.lastPathComponent) is being moved. Wait for the workspace operation to finish."
+        case let .workspaceMutationRecoveryUnavailable(url):
+            "Saved recovery information for \(url.lastPathComponent) could not be loaded. " +
+                "Stop tracking the unreadable recovery before reading or writing files."
+        case let .unsavedChangesPreventTermination(url):
+            "\(url.lastPathComponent) still has changes that are not safely saved or recovered."
+        case let .recoveryDestinationConflictsOriginal(url):
+            "Choose a different name or folder for the recovery copy; " +
+                "\(url.lastPathComponent) may belong to another file."
         }
     }
 }

@@ -182,7 +182,7 @@ extension WorkspaceAnchoredFileSystem {
         )
     }
 
-    private static func directoryIsCaseSensitive(_ descriptor: Int32) throws -> Bool {
+    static func directoryIsCaseSensitive(_ descriptor: Int32) throws -> Bool {
         errno = 0
         let value = Darwin.fpathconf(descriptor, _PC_CASE_SENSITIVE)
         guard value >= 0 else {
@@ -222,6 +222,24 @@ extension WorkspaceAnchoredFileSystem {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
         return matchingName
+    }
+
+    /// Returns only an entry whose directory spelling is byte-for-byte equal to `leaf`.
+    /// `fstatat` alone is insufficient on case/normalization-insensitive filesystems because
+    /// an equivalent spelling can resolve to the same inode even when that literal name is absent.
+    static func exactDirectoryEntry(
+        parentDescriptor: Int32,
+        leaf: String
+    ) throws -> DirectoryEntryIdentity? {
+        let candidates = try leafNameCandidates(
+            parentDescriptor: parentDescriptor,
+            requestedLeaf: leaf
+        )
+        guard let exact = candidates.exact else { return nil }
+        return try existingDirectoryEntry(
+            parentDescriptor: parentDescriptor,
+            leaf: exact
+        )
     }
 
     private static func existingDirectoryEntry(

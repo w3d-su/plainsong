@@ -63,6 +63,29 @@ final class WorkspaceEditorImageThumbnailAdapter: EditorImageThumbnailLoading {
 }
 
 @MainActor
+private final class WorkspaceImageAssetInsertionLease {
+    private weak var appState: AppState?
+    private var isActive = true
+
+    init(appState: AppState) {
+        self.appState = appState
+        appState.workspaceImageAssetInsertionCount += 1
+    }
+
+    func release() {
+        guard isActive else {
+            return
+        }
+        isActive = false
+        guard let appState else {
+            return
+        }
+        precondition(appState.workspaceImageAssetInsertionCount > 0)
+        appState.workspaceImageAssetInsertionCount -= 1
+    }
+}
+
+@MainActor
 extension AppState {
     func editorImageThumbnailConfiguration(
         for session: DocumentSession,
@@ -106,8 +129,12 @@ extension AppState {
     var editorImageAssetInserter: EditorImageAssetInserter? {
         let sessionIdentity = ObjectIdentifier(currentDocument)
         guard workspaceRootURL != nil,
+              !hasWorkspaceMutationRecoveryLoadFailure,
+              workspaceMutationNamespaceDepth == 0,
+              workspaceMutationRecoveries.isEmpty,
               indeterminateSessionWrites[sessionIdentity] == nil,
               indeterminateSessionWriteContexts[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
               let installedRootAuthority = workspaceSearchRootAuthority,
               let retainedProof = retainedEditorImageAssetDocumentProof(
                   for: currentDocument
@@ -124,9 +151,21 @@ extension AppState {
 
         // SwiftUI reads this property during body reevaluation. Capture only the exact cached
         // authority here; descriptor construction preceded the coherent read adopted as binding.
-        return { [weak self, authority = retainedAuthority.authority] assets in
-            await self?.insertEditorImageAssets(
+        return { [
+            weak self,
+            weak session = currentDocument,
+            location = retainedAuthority.location,
+            identity = retainedAuthority.identity,
+            authority = retainedAuthority.authority
+        ] assets in
+            guard let session else {
+                return EditorImageAssetInsertion(relativePaths: [])
+            }
+            return await self?.insertEditorImageAssetsIfWorkspaceMutationAllows(
                 assets,
+                session: session,
+                location: location,
+                identity: identity,
                 documentAuthority: authority
             ) ?? EditorImageAssetInsertion(relativePaths: [])
         }
@@ -227,7 +266,9 @@ extension AppState {
         _ assets: [EditorImageAsset],
         documentAuthority: EditorImageAssetDocumentAuthority
     ) async -> EditorImageAssetInsertion {
+        let namespaceLease = WorkspaceImageAssetInsertionLease(appState: self)
         let assetFolderRelativePath = preferences.assetFolderRelativePath
+        let discardEventHandler = editorImageAssetDiscardEventHandler
 
         do {
             let placement = try await Task.detached(priority: .userInitiated) {
@@ -270,22 +311,31 @@ extension AppState {
                         )
                     }
                     return isValid
+                },
+                commit: {
+                    namespaceLease.release()
+                },
+                discard: { [weak self] in
+                    defer {
+                        namespaceLease.release()
+                    }
+                    let outcome = await Task.detached(priority: .utility) {
+                        discardEditorImageAssets(
+                            placement.createdAssets,
+                            rootURL: cleanupSecurityScopedURL,
+                            eventHandler: discardEventHandler
+                        )
+                    }.value
+                    if outcome.didChangeWorkspace {
+                        self?.refreshWorkspaceAfterFileSystemChange()
+                    }
+                    if let issue = outcome.userFacingIssue {
+                        self?.present(issue, title: "Image Cleanup Needs Attention")
+                    }
                 }
-            ) { [weak self] in
-                let outcome = await Task.detached(priority: .utility) {
-                    discardEditorImageAssets(
-                        placement.createdAssets,
-                        rootURL: cleanupSecurityScopedURL
-                    )
-                }.value
-                if outcome.didChangeWorkspace {
-                    self?.refreshWorkspaceAfterFileSystemChange()
-                }
-                if let issue = outcome.userFacingIssue {
-                    self?.present(issue, title: "Image Cleanup Needs Attention")
-                }
-            }
+            )
         } catch {
+            namespaceLease.release()
             if let rollbackError = error as? EditorImageAssetPlacementRollbackError,
                rollbackError.didChangeWorkspace
             {
@@ -294,5 +344,37 @@ extension AppState {
             present(error, title: "Could Not Insert Image")
             return EditorImageAssetInsertion(relativePaths: [])
         }
+    }
+
+    private func insertEditorImageAssetsIfWorkspaceMutationAllows(
+        _ assets: [EditorImageAsset],
+        session: DocumentSession,
+        location: WorkspaceFileSystemLocation,
+        identity: WorkspaceFileSystemIdentity,
+        documentAuthority: EditorImageAssetDocumentAuthority
+    ) async -> EditorImageAssetInsertion {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard !hasWorkspaceMutationRecoveryLoadFailure,
+              workspaceMutationNamespaceDepth == 0,
+              workspaceMutationRecoveries.isEmpty,
+              workspaceRootURL != nil,
+              indeterminateSessionWrites[sessionIdentity] == nil,
+              indeterminateSessionWriteContexts[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
+              let installedRootAuthority = workspaceSearchRootAuthority,
+              location.rootAuthority == installedRootAuthority,
+              let retainedProof = retainedEditorImageAssetDocumentProof(for: session),
+              retainedProof.location == location,
+              retainedProof.identity == identity,
+              let retainedAuthority = editorImageAssetDocumentAuthorities[sessionIdentity],
+              retainedAuthority.matches(location: location, identity: identity),
+              retainedAuthority.authority === documentAuthority
+        else {
+            return EditorImageAssetInsertion(relativePaths: [])
+        }
+        return await insertEditorImageAssets(
+            assets,
+            documentAuthority: documentAuthority
+        )
     }
 }

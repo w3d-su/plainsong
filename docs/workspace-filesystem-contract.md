@@ -2,8 +2,10 @@
 
 > **Status:** implemented as a Phase 3 WS3B WorkspaceKit foundation plus transactional App
 > reload capture/install, authority-bound reload and workspace-search activation, file-tree
-> opening, completion metadata, and session writes. Visible Files/Search sidebar UI,
-> workspace item rename/move/Trash, and session relocation remain follow-ups.
+> opening, completion metadata, and session writes. Draft PR #84 adds workspace item
+> rename/move/Trash and transactional session relocation on that retained-authority baseline.
+> Validation is tracked against the exact PR tip; visible Files/Search sidebar expansion remains
+> a follow-up.
 
 ## Authority
 
@@ -331,6 +333,372 @@ an exact authority-backed artifact notice and presents “File Saved; Cleanup Re
 Artifacts are not auto-deleted because the public artifact state does not carry an expected
 identity for a safe later unlink.
 
+## Workspace item creation
+
+New files and folders use the retained directory node from the installed workspace snapshot, not a
+URL containment check followed by `FileManager` creation. App passes that directory's exact
+no-follow `(device, inode, directory)` expectation to WorkspaceKit and fences all concurrent
+namespace mutation and image placement before the first filesystem call. If the selected directory
+is unavailable or its snapshot expectation no longer matches, creation fails without falling back
+to the workspace root. App also checks destination ownership independently of any source session:
+a missing spelling retained by a current, cached, retired, detached, editor-bound, LRU, prompt,
+observation, indeterminate-write, or operation/text-recovery owner cannot be recreated. Every
+requested destination entry reserves its byte-component-bounded namespace subtree regardless of
+whether that entry would be a file or directory: if recovery owns `archive/post.md`, neither create
+nor relocation may publish an ordinary file named `archive`. Prefix-only siblings such as
+`archive-copy/post.md` remain independent.
+
+Before the first creating syscall, App durably records the logical destination, a
+security-scoped bookmark for its exact parent plus the literal destination leaf, and one unique
+root-level `.plainsong-create-<uuid>` staging location. A bookmark is accepted only after it
+resolves to the expected no-follow parent identity. The staging name is therefore known across a
+restart before it can contain an item, while the display URL remains diagnostics rather than
+authority.
+
+WorkspaceKit creates the new item only at that root staging leaf. Empty-file creation uses
+`openat(O_CREAT | O_EXCL | O_NOFOLLOW_ANY)` relative to the retained root, captures the returned
+descriptor identity, fsyncs the file, fsyncs the retained root directory, and revalidates the
+exact entry. It creates no unjournaled writer temporary. `O_EXCL` preserves a racing creator and
+`O_NOFOLLOW_ANY` rejects symlink traversal.
+
+Darwin has no flag-bearing `mkdirat` equivalent. Folder creation therefore obtains a same-device
+`.itemReplacementDirectory` while the workspace security scope is active, opens the exact
+OS-created random entry, and proves its descriptor identity through two immediately adjacent
+named-path validations. WorkspaceKit requires current-user ownership, exact mode `0700`, zero
+flags, an empty directory, and an allowlist limited to `com.apple.macl`,
+`com.apple.provenance`, and `com.apple.quarantine`. The first descriptor read may lazily
+materialize system-managed xattr state and advance ctime, so that read is completed before choosing
+the stable baseline. Readable allowed xattrs are retained as exact bytes; an allowed value that
+returns `EPERM` or `EACCES` is retained as `accessControlled` and guarded by the exact name set
+plus ctime stability rather than a false byte-value claim.
+
+After the final named proof, WorkspaceKit removes the OS random name, proves that path missing,
+and captures a post-removal ctime/xattr and kernel-reported-path baseline from the still-open
+descriptor. Removal may legitimately advance ctime, so identity, ownership, mode, flags, and
+xattrs must remain equal across that boundary before the new baseline is installed. A
+process-lifetime per-device registry retains only the descriptor and its post-removal baseline;
+it does not depend on reopening the temporary name.
+
+WorkspaceKit then uses that exact descriptor as the source of an atomic `fclonefileat` into the
+root staging path. Immediately before and after every clone,
+the source must still satisfy its device, owner, mode, flags, emptiness, ctime/xattr, and
+kernel-reported-path baseline.
+`CLONE_NOFOLLOW_ANY | CLONE_NOOWNERCOPY` makes staging creation symlink-free and exclusive without
+copying source ownership. Cross-device or non-clone-capable volumes fail closed. After the clone,
+WorkspaceKit opens the exact staging directory, captures its stable empty-directory policy, fsyncs
+it and the root, and repeatedly validates its descriptor/name and allowed xattrs.
+
+Only after either staging artifact is durable does WorkspaceKit invoke the App callback. App
+captures and resolves a second security-scoped bookmark for that exact item identity, then advances
+the same journal from `planned` to `prepared` before returning. A callback or journal failure
+aborts publication and leaves the root-relative staging artifact fenced. Once the callback returns,
+WorkspaceKit publishes from the retained root staging parent and literal leaf to the complete
+root-relative destination with `renameatx_np(RENAME_EXCL | RENAME_NOFOLLOW_ANY)`. The selected
+destination parent expectation, destination absence, exact moved identity, both parent syncs, and
+terminal namespace are revalidated. A collision is never overwritten and the staging artifact is
+retained for recovery.
+
+After durable publication, App resolves both bookmarks again. It advances `prepared` to
+`committed` only when the retained destination-parent authority still maps the literal logical
+destination, the item bookmark resolves to that exact destination identity, and the staging leaf
+is proven missing. The committed record is durable before editor activation and is re-proven
+before journal removal. `unknown`, `planned`, `prepared`, and `committed` are explicit persisted
+phases; a legacy record with no phase is `unknown` and cannot be inferred from mutable paths.
+
+macOS 14 and 15 expose no conditional `rmdir` by descriptor. A same-user swap between the final
+temporary-name proof and `rmdir` can therefore cause an empty replacement at that OS random name
+to be removed. Post-removal kernel-reported-path validation rejects an ordinarily moved original
+descriptor, but cannot make a synchronized name swap identity-atomic. This residual never targets
+a workspace name or editor data, and every later source validation still fails closed on a changed
+reported path, policy, or contents.
+
+Darwin has no directory equivalent of `openat(O_CREAT | O_EXCL)` that both creates the directory
+and returns its descriptor, and rename remains name-based rather than expected-inode-conditional.
+A same-user process can therefore replace a newly cloned staging directory before its first open,
+or substitute the staging leaf after validation but before rename. WorkspaceKit never name-based
+deletes or reverses such an entry: it records the actual moved identity when observable, while the
+pre-publication item bookmark continues locating the expected identity. Likewise, if the
+destination parent is replaced for the final root-relative rename and later leaves the workspace,
+the item locator remains durable but App refuses to adopt or release it outside the jointly proven
+logical destination. These cases stay actionable through Check Again or explicit Stop Tracking;
+they cannot be collapsed into “staging missing.”
+
+Creation reports one of three typed outcomes:
+
+- `notCreated` proves the requested item did not commit;
+- `createdAndDurable` returns the exact created location and no-follow identity that App may
+  activate without reopening a mutable URL. For a folder, this is the exact published destination
+  identity after the unavoidable staging clone-to-open interval, not a provenance claim
+  that Darwin cannot supply; and
+- `creationStateIndeterminate` retains the expected created identity when known and distinguishes
+  a proven recovery location from an unknown location. It never labels a replacement directory as
+  Plainsong's recovery artifact.
+
+An indeterminate creation enters the same global recovery queue as rename, move, and Trash. Until
+it is reconciled or explicitly released, all later workspace namespace mutations are blocked.
+Before the first creating syscall, App persists a planned operation containing the destination
+parent locator, literal leaf, and root staging path. After the staged identity is captured, the
+same operation ID is durably advanced to prepared with its item locator before publication. A
+restart that sees only the planned form may automatically release it only when both logical and
+staging candidates are proven missing under the retained parent authorities. Any occupant,
+identity uncertainty, unavailable locator, or inspection failure remains fail-closed for manual
+reconciliation; it is never adopted or removed as Plainsong-owned material.
+
+## Workspace item namespace mutations
+
+Rename, move, and Trash begin from the installed workspace snapshot and its retained root
+authority. A mutable node carries a no-follow expectation containing the selected entry's exact
+`(device, inode, kind)`. App does not replace that expectation by inspecting the selected URL
+again: a source that disappeared, changed kind, or now names a different identity is a stale
+snapshot and must fail closed before the replacement can be adopted as the selected item.
+
+User-entered names are single lexical components. Empty names, `.`, `..`, embedded `/`, and
+embedded NUL are rejected before a filesystem call. A name whose whitespace-and-newline-trimmed
+form is empty is also rejected, including space-only, tab-only, newline-only, or mixed-whitespace
+spellings. That trim is validation-only: every accepted UTF-8 spelling, including leading or
+trailing whitespace, is returned and published literally without rewriting its bytes. Names and
+affected-session paths are compared as literal UTF-8 bytes. A directory affects itself plus a
+descendant only when the retained relative path is byte-equal or begins with the source bytes
+followed by `/`; canonically equivalent NFC/NFD spellings and prefix-only siblings remain
+independent App-state keys.
+
+Source and destination locations must belong to the same retained
+`WorkspaceFileSystemRootAuthority`. The mutation layer anchors both parent chains with
+descriptor-relative, no-follow traversal, validates the snapshot expectation and destination
+absence, rejects moving a directory inside its own retained descendant, and publishes with an
+exclusive `renameatx_np(RENAME_EXCL | RENAME_NOFOLLOW_ANY)` whose complete source and destination
+paths are resolved from one retained root descriptor. The final syscall therefore cannot publish
+through a child descriptor that another process moved outside the workspace after preflight. A
+destination racer is never overwritten. On a filesystem that resolves a case-only or NFC/NFD-only
+alternative spelling to the same source entry in the same physical parent, that one equivalent
+entry is admitted as a spelling-only rename; postflight requires the requested literal directory
+entry to exist and the old literal entry to be absent. No unrelated equivalent owner is admitted.
+A selected symbolic link is treated as the lexical link entry; rename, move, and Trash never
+resolve it to the target.
+
+Namespace mutation has three semantic outcomes:
+
+| Outcome | Proven state | Caller action |
+|---|---|---|
+| durable move | The expected entry is proven at the destination, the source transition and retained parent namespaces validate, and required directory syncs completed. | Commit the prepared App relocation. |
+| not moved | The expected entry is proven not to have committed at the destination. | Preserve every App owner and old key unchanged. |
+| indeterminate | A rename became visible, or its identity, namespace continuity, App preparation, or durability could not be proven. | Do not guess or partially rekey; stop blind retries and surface reconciliation/recovery state. |
+
+Destination-dependent App preparation may run only while the relocated identity is proven at the
+destination. Once the forward rename succeeds, a later preparation, postflight, or durability
+failure is always indeterminate. WorkspaceKit does not attempt an automatic reverse rename: Darwin
+cannot make that reverse operation conditional on the already captured inode, so a final-boundary
+replacement could otherwise be moved into the source name.
+
+Darwin's namespace primitives remain name-based. `renameatx_np` has no expected-inode or
+source-descriptor operand, so validation immediately before a rename does not make the syscall
+identity-conditional. WorkspaceKit therefore captures the actual destination entry immediately
+after a successful exclusive rename and retains that expectation in the recovery context. If the
+identity differs from the authorized source, the operation remains indeterminate; no automatic
+rollback or recovery retry moves that name again. “Check Again” is observational for an unexpected
+identity: it may clear the marker only after external action has independently restored the entry
+to its recorded safe slot. Otherwise the operation remains fenced for an explicit recovery action.
+
+Before the forward rename, App write-ahead persists security-scoped bookmarks for both exact
+parents plus their literal leaves and no-follow directory expectations. It also captures a
+mandatory bookmark for the selected item identity. Bookmark creation, resolution, and identity
+validation must complete before mutation. The parent-entry locators authorize any recovery move;
+the item bookmark is supplemental location evidence and never authorizes a name-based mutation by
+itself. These authorities survive either parent moving after rename, including after `.didRename`
+when both recorded workspace paths disappear. Any separately recorded display URL is never
+authority and is never reopened to adopt an escaped location.
+For this escaped-parent case, recovery may only use the verified parent authority to perform an
+exclusive, no-follow anchored move back to the proven-missing original source under its still-valid
+workspace parent. The outside location is never committed as a workspace destination. An
+unresolvable, stale, mismatched, occupied-source, cross-device, failed, or indeterminate recovery
+keeps the operation quarantined and “Check Again” actionable.
+
+## App relocation and Trash transaction
+
+Before a durable rename or move can publish to App state, App prepares one all-or-nothing
+relocation for every affected current, cached, retired, and editor-bound session, deduplicated by
+session identity and selected through retained locations. Destination ownership collisions,
+unavailable or indeterminate authority, and any preparation failure reject the filesystem
+transaction before App state changes. The destination scan is App-global rather than driven by
+the affected-source records, so an unopened source cannot overwrite a cached, retired, detached,
+editor-bound, LRU, prompt, observation, indeterminate-write, or operation/text-recovery spelling;
+that includes pending multi-record text recovery, pending operation bundles, and operation records
+whose retained bookmark could not yet be restored. Display-root candidates reserve App ownership
+only and never become filesystem authority. Runtime ownership includes every resolved parent-entry,
+item, staging, and reported-Trash locator in that locator's own retained-root coordinate system,
+even when a bookmark followed the item outside the original workspace. Save Copy, creation, and
+relocation all use symmetric, component-bounded overlap, with the retained filesystem's
+case-sensitivity policy and canonical-equivalence folding: any requested entry, including an
+ordinary file, conflicts with owned ancestors and descendants. An entry at `archive` therefore
+cannot shadow owned recovery at `archive/post.md`, and a missing case/NFC alias cannot claim the
+same recovery slot. Persisted display candidates provide the same fail-closed reservation before
+bookmarks are restored but never authorize filesystem access.
+Source-state exclusions use the exact old literal spelling, so a
+spelling-only rename does not hide a distinct destination-state owner. The nonthrowing commit then
+updates together:
+
+- `DocumentSession` location and file kind while preserving exact source, saved-text baseline,
+  dirty state, and object identity;
+- session-cache keys, retired-session keys and canonical locations, and LRU dirty/recency state;
+- anchored bindings or an explicitly authorized promotion from installed unanchored membership;
+- autosave, external-inspection, external-resolution, and pending-application tasks plus their
+  lifecycle and disk-event generations, so late work for the old location cannot commit;
+- pending conflict text and coherent observed versions, deferred resolution intent, detached
+  state, and current external/missing prompts;
+- editor binding/installations and synchronizers, while retiring stale writer activation so the
+  installation must reacquire against the relocated session revision; and
+- a destination-prepared image document authority for the same retained file identity. The old
+  parent/leaf authority is never carried across a move.
+
+Legacy last-known hash or modification-date entries may be rekeyed only as bookkeeping when their
+owning session relocates. PR #84 does not reintroduce the old URL-based save, external-change,
+mtime, or hash authorization logic: writes and observations continue to use the retained
+location/identity/digest contracts merged through PR #85 and PR #82.
+
+Image placement holds an App namespace lease from its first filesystem side effect through the
+last commit validation and synchronous Markdown publication. EditorKit reports one exactly-once
+terminal result: a successful publication commits and releases the lease in that same MainActor
+turn; every rejected, superseded, or dismantled path finishes asset cleanup before discard releases
+it. Create, rename, move, Trash, and App termination therefore cannot enter or interrupt the
+terminal interval and commit a now-invalid relative image path or abandon cleanup mid-rename/fsync.
+
+Trash first rejects any affected dirty session or pending editor source before invoking the
+recycler. Before staging, App durably records a pending phase with the exact source-parent
+bookmark plus literal leaf, a mandatory expected-item bookmark, the root staging location, and
+the affected text/session bundle. WorkspaceKit then creates and verifies a Core Foundation
+file-reference URL for the exact selected identity, moves the exact selected lexical entry to a
+unique hidden root-level staging leaf, and fences autosave, observation, writer-to-disk, and image
+side effects for every affected session. The recycler receives the retained file reference through
+`FileManager.trashItem`, not a reconstructed mutable staging-path URL. Controlled tests prove that
+the reference continues to resolve the original object when the lexical staging path is replaced.
+The Foundation handoff is nevertheless opaque and Darwin exposes no expected-inode Trash syscall,
+so the final reference-resolution-to-namespace-mutation interval remains a platform residual rather
+than an identity-atomic guarantee. Completion is postflight-validated against the reported Trash
+result, source, and staging namespace. Before App/session cleanup, the returned Trash location must
+produce a bookmark that resolves to the exact expected identity and the journal advances to
+committed. Check Again re-resolves every parent/item/reported bookmark on each attempt;
+present-but-unresolved locator data blocks release instead of falling back to a display URL. A
+failed or unproven handoff retains the exact staged recovery when known; an unexpected identity is
+never moved by an unsafe automatic reverse rename.
+
+The Trash fence does not block native editor publication. Input accepted while the asynchronous
+recycler is in flight stays in its existing `DocumentSession`. After a proven Trash commit,
+unchanged clean sessions release their cache, retirement, binding, task, prompt, observation, and
+image authority. Any session whose source revision changed during the handoff becomes
+save-blocked detached recovery at its original exact URL; a background recovery session is
+promoted when necessary so the newly typed source remains reachable, and autosave cannot recreate
+the trashed path.
+
+## Mutation recovery and termination
+
+Creation, relocation, and Trash persist operation-level write-ahead context before the first
+namespace-mutating syscall: exact source/destination locations, Trash staging, item and parent
+expectations, failure and cleanup state, and all affected session records. Relocation additionally
+persists both validated parent-entry locators and a mandatory item locator before the forward
+rename, so a post-rename parent move cannot erase the only locator for the moved entry. Creation
+persists its destination-parent locator and root staging path in `planned`, its exact staged-item
+locator in `prepared`, and the jointly proven destination state in `committed` before activation.
+Trash similarly distinguishes pending session commit from committed cleanup and retains the
+verified reported-Trash locator.
+Rename/move and Trash bundle their initial affected-session text before the rename or staging move.
+The operation record
+is removed only after the filesystem result and App/session/text state have committed.
+
+Recovery is global rather than current-document-only. The banner continues to represent the oldest
+deterministic operation after the user switches documents; “Show Editor Copy” returns to a
+quarantined session, “Check Again” revalidates the exact retained candidates, and a zero-session
+operation offers an explicit stop-tracking path after manual inspection. Resolving one operation
+promotes the next. No new create, rename, move, or Trash may start while any operation remains
+unresolved.
+
+`WorkspaceWindow` renders recovery at the global window level when no document is open or recovery
+storage failed to load. With an open document, an ordinary operation prompt uses the editor
+placement. A restored zero-session operation therefore still exposes Check Again and Stop Tracking
+without requiring a document to open successfully.
+
+Reconciliation releases quarantine only for a proven state. A prepared or committed creation
+requires its destination-parent and item authorities to agree on the literal logical destination
+while the root staging entry is proven clear; an item located outside, at retained staging, or
+behind an unresolved bookmark remains fenced. A relocation may restore the source
+authority or transactionally commit the proven destination across session cache, retirement,
+bindings, LRU, prompts, observation, writer activation, and image authority. Trash may restore a
+proven staging identity to the source or finish a proven recycler destination. Ambiguous
+source/destination pairs stay quarantined; “Keep Editor Copy” first persists exact editor source,
+then converts only that session into detached missing-file recovery.
+
+Operation and text recovery are stored outside the workspace under Application Support as
+atomically replaced binary-property-list records. A write uses an exclusive temporary file, file
+`fsync`, atomic rename, and recovery-directory `fsync`. On first creation, every new
+`Application Support/Plainsong/<Recovery>` directory edge is created separately and the child and
+parent are synced; a failed attempt is not considered repaired until retry re-syncs the full
+Recovery → Plainsong → Application Support chain. Record removal syncs the directory even when an
+idempotent retry observes `ENOENT`. Quarantine likewise re-syncs its parent when retry observes
+that the prior rename already took effect. Because unlink can take effect before its directory
+sync reports failure, App also immediately rewrites the exact current text or operation record on
+any remove error; unresolved release durably reinstalls its operation context before returning the
+cleanup error.
+
+Successful operation-record removal and runtime release are one logical transition. Terminal
+proof helpers may have reinstalled a freshly resolved context while validating the ordinary
+success path, so App clears that exact installed context, its per-session recovery ownership, and
+the indeterminate-session fence immediately after—and never before—the durable removal succeeds.
+This prevents a completed operation from permanently blocking later saves, mutations, or quit.
+
+If Save Copy has already committed and the session is clean and anchored, a text-record removal
+failure remains visible and actionable instead of becoming a hidden permanent quit fence. The
+exact recovery context is marked as requiring explicit Stop Tracking, later termination attempts
+do not silently retry removal, and the current or globally queued recovery banner continues to
+reach that session. Stop Tracking first durably upserts the latest exact text revision, then
+renames only that record to a unique non-`.plist` quarantine sibling with descriptor-relative
+`RENAME_EXCL | RENAME_NOFOLLOW_ANY` and fsyncs the recovery directory. App clears that record's
+runtime context only after the quarantine is durable; any failure preserves the prompt, record,
+and termination fence.
+
+Text records preserve exact UTF-8 source, monotonic logical revision, original URL, file kind, and
+reason. Runtime recovery sessions are strongly retained and promoted in a deterministic queue,
+including multiple files edited during one directory Trash. If a standalone text upsert fails
+while its operation journal remains, App synchronously advances only that session's bundled
+snapshot without dropping sibling sessions. Promotion chooses the newest bundled, pending
+standalone, restored, or live record by logical revision and then timestamp; every record in a
+multi-session operation must succeed before the bundle is considered promoted. The bundle is not
+cleared before durable operation-record removal, so a removal failure followed by new input still
+has a journal fallback.
+
+Rename and move establish the same dual-store guarantee before their namespace syscall. The
+operation journal is attempted with every affected editor snapshot bundled, and every unique
+session's standalone text record is attempted synchronously even if a sibling write fails. A
+successful operation record therefore covers standalone failure; if the operation upsert fails,
+sessions are quarantined only when every standalone snapshot is known durable. If neither store
+can prove all snapshots durable, the relocation aborts before mutation without installing the
+autosave fence, while the in-memory recovery remains actionable and termination stays blocked.
+
+On restart each text record opens as dirty detached source with unavailable ownership proof, so it
+cannot overwrite or adopt a replacement at the original path. Save Copy uses a newly anchored
+destination parent; an explicit destination outside a temporarily stale workspace capture remains
+available, while any destination that may be inside that workspace still requires the current
+retained root authority.
+
+A malformed or mismatched operation/text store is preserved untouched and globally fences save,
+autosave, Save Copy, open/new/close, namespace mutation, image insertion, and termination. Native
+editor input may remain memory-resident. The persistent recovery banner offers an explicit
+stop-tracking action that atomically renames the entire unreadable store to a unique sibling,
+fsyncs the parent, and never deletes the corrupt bytes. Only after that quarantine succeeds are
+normal recovery loading and file access resumed.
+
+A recycler-reported Trash URL is display-only after restart. When possible App stores a
+security-scoped bookmark only after the reported entry matches the expected device, inode, and
+kind. Restart must resolve that bookmark and reproduce the same expectation before the location
+can prove Trash completion. Missing, stale-unrefreshable, unresolvable, or mismatched bookmark
+authority keeps the operation actionable rather than recapturing the displayed URL. A stale
+bookmark whose live resolved location is already proven remains usable for the current launch even
+if refreshing its bookmark fails.
+
+`applicationShouldTerminate` synchronously rejects termination when editor source is pending,
+recovery persistence fails, a namespace mutation is active, or operation reconciliation remains.
+Before a successful quit it saves ordinary writable sessions and verifies every dirty fenced or
+detached session has a recovery record at its exact current revision. Thus input accepted while
+Trash is in flight is either durably saved/recovered or the App remains open.
+
 ## Deterministic regression boundary
 
 WorkspaceKit tests use synchronous event hooks and injected syscall-boundary failures—never
@@ -413,6 +781,38 @@ timing sleeps—to cover:
 - canonical bytes, moved/replacement bytes, destination identities, outside sentinels, and
   absent or intentionally retained artifacts for every adversarial path.
 
+The PR #84 suites additionally cover invalid creation and relocation names, snapshot-parent
+replacement, symlink traversal, root-staged exclusive file creation without an unjournaled writer
+temporary, planned creation persisted before its first syscall, callback-before-publication,
+planned/prepared/committed restart, stale and unresolved item/parent locators, and a retained-root
+folder clone from a same-device `.itemReplacementDirectory` descriptor, source-name removal without a leaked temporary
+path, pre-removal replacement preservation, final-removal-gap moved-source rejection, source mode
+and readable-xattr mutation, repeated destination ctime/xattr policy validation, signed App
+Sandbox folder creation with system xattrs, callback failure with exact root staging preserved,
+startup zero-session reconstruction and global reconciliation/release UI, planned restart with
+missing and occupied candidates, destination replacement before and after descriptor capture
+without moving or deleting the replacement, staging substitution, destination-parent replacement
+and post-rename escape, committed journal-removal failure, committed rename failures without reverse rollback,
+actual moved-entry recovery, final rename with a destination parent moved outside the retained
+root before publication, post-rename destination-parent escape with bookmark-authorized recovery,
+literal leading/trailing whitespace creation and rename plus all-whitespace rejection, case-only
+and NFC/NFD-only exact spelling publication with transactional App rekeying, App-global destination
+ownership for unopened-source rename and creation including normal-file shadowing of a
+recovery-owned descendant, a component-prefix sibling control, a detached equivalent-spelling
+collision, escaped creation/relocation/Trash item-locator Save Copy ownership, missing
+case/NFC-equivalent recovery ownership, dual-store relocation write-ahead failure in both
+directions without short-circuiting sibling sessions, an image namespace
+lease held through validation plus Markdown commit or cleanup, and Trash-in-flight typing observed
+past the production minimum autosave delay,
+file-reference
+Trash with a replaced staging path, retained failed-handoff recovery, multi-owner App relocation,
+dirty and pending-source Trash refusal, input accepted during Trash, global operation/text
+recovery, multi-session fallback and newest-wins promotion, remove/reinstall fallback retention,
+reported Trash bookmark proof, corrupt-store global fencing and byte-preserving quarantine,
+actionable per-record cleanup failure and Stop Tracking quarantine, nested recovery-directory
+fsync failure/retry, idempotent remove/quarantine durability, and termination veto.
+
 The focused suites live in `WorkspaceAnchoredFileSystemTests`,
 `WorkspaceNamespaceAuthorityTests`, `WorkspaceCoherentFileReaderTests`, and the
-`WorkspaceFileWrite*Tests` files.
+`WorkspaceFileWrite*Tests` files, plus `WorkspaceAnchoredItem*Tests`,
+`AppStateWorkspaceDataIntegrityTests`, and `WorkspaceMutationTextRecoveryStoreTests`.
