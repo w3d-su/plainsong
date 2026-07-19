@@ -12053,8 +12053,31 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 return false
             }
 
-            // (4) Real click on the last backing table row: selection binding claims focus,
-            // activation flows through retained authority, click-then-↑ uses the reducer.
+            // (4a) Real Escape on the List → query field first responder; query/results kept.
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("real Escape returns to search field") {
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            }
+            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
+            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
+
+            // (4b) Real Escape in the field → editor focus request; query/results kept.
+            let editorFocusBefore = appState.editorFocusRequestID
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("real Escape in field requests editor focus") {
+                appState.editorFocusRequestID == editorFocusBefore + 1
+            }
+            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
+            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
+
+            // (5) Real click on the last backing table row while results focus is lowered:
+            // the selection binding must raise a genuine `FocusState` false→true transition
+            // (matching a user clicking into an unfocused list — headless runners do not
+            // re-install key delivery for a no-op true→true write), activation flows through
+            // retained authority, and click-then-↑ routes through the selection surface.
             let tableView = try XCTUnwrap(
                 findSubview(ofType: NSTableView.self, in: host.window.contentView),
                 "results List must be backed by an NSTableView"
@@ -12076,29 +12099,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 return false
             }
             sendSmokeUpArrow(to: host.window)
-            try await waitUntil("click-then-↑ routes through the reducer") {
+            try await waitUntil(
+                "click-then-↑ routes through the selection surface",
+                timeoutNanoseconds: 10_000_000_000
+            ) {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
-
-            // (5a) Real Escape on the List → query field first responder; query/results kept.
-            sendSmokeEscape(to: host.window)
-            try await waitUntil("real Escape returns to search field") {
-                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
-                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
-            }
-            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
-            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
-            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
-
-            // (5b) Real Escape in the field → editor focus request; query/results kept.
-            let editorFocusBefore = appState.editorFocusRequestID
-            sendSmokeEscape(to: host.window)
-            try await waitUntil("real Escape in field requests editor focus") {
-                appState.editorFocusRequestID == editorFocusBefore + 1
-            }
-            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
-            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
-            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
         #endif
     }
 
