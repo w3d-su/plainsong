@@ -11906,6 +11906,174 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
     }
 
+    /// Owner keyboard smoke (WS3C PR C merge gate), hosted on a real `NSWindow`.
+    ///
+    /// Covers: field ↓ into list, ↑/↓ without wrap, Return activation, Escape results→field and
+    /// field→editor (query/results retained), click-then-keyboard claims results focus.
+    func testHostedOwnerKeyboardSmokeFiveScenarios() async throws {
+        #if !DEBUG
+            throw XCTSkip("Keyboard smoke probe is Debug-only")
+        #else
+            WorkspaceSearchKeyboardSmokeProbe.reset()
+
+            let provider = ControlledWorkspaceSearchStreamProvider()
+            let fixture = try makeFixture(
+                provider: provider,
+                files: [
+                    "a.md": "needle one\nneedle two",
+                    "b.md": "needle three",
+                ],
+                currentPath: "a.md",
+                debounceNanoseconds: 0
+            )
+            defer {
+                WorkspaceSearchKeyboardSmokeProbe.reset()
+                cleanUp(fixture)
+            }
+            let appState = fixture.appState
+            appState.selectWorkspaceSidebarMode(.search)
+
+            let host = try await makeSearchSidebarHost(appState: appState, makeKey: true)
+            defer {
+                appState.workspaceSearchFocusKeyWindowCheck = nil
+                host.window.orderOut(nil)
+            }
+            installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: host.window)
+
+            // Seed a completed multi-match search with authority-backed results.
+            appState.updateWorkspaceSearchQueryText("needle")
+            try await waitUntil("search starts") { provider.requests.count == 1 }
+            let request = provider.requests[0]
+            let searchContext = context(for: request)
+            let resultA = multiMatchResult(
+                path: "a.md",
+                text: "needle one\nneedle two",
+                needle: "needle",
+                rootURL: fixture.rootURL
+            )
+            let resultB = multiMatchResult(
+                path: "b.md",
+                text: "needle three",
+                needle: "needle",
+                rootURL: fixture.rootURL
+            )
+            XCTAssertNotNil(resultA.fileAuthority)
+            XCTAssertNotNil(resultB.fileAuthority)
+            provider.yield(.fileResult(searchContext, resultA), to: 0)
+            provider.yield(.fileResult(searchContext, resultB), to: 0)
+            provider.yield(
+                .completed(
+                    searchContext,
+                    summary(candidateFileCount: 2, searchedFileCount: 2, totalMatchCount: 3)
+                ),
+                to: 0
+            )
+            try await waitUntil("three matches apply") {
+                appState.workspaceSearchState.phase == .completed
+                    && appState.workspaceSearchState.fileResults.count == 2
+                    && appState.workspaceSearchState.fileResults.reduce(0) { $0 + $1.matches.count } == 3
+            }
+
+            let presentation = WorkspaceSearchResultsPresenter.make(
+                searchState: appState.workspaceSearchState,
+                queryText: appState.workspaceSearchUI.queryText,
+                canUseWorkspaceSearch: true,
+                isWorkspaceSearchReady: true
+            )
+            let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: presentation)
+            XCTAssertEqual(ordered.count, 3)
+
+            appState.focusWorkspaceSearch()
+            let focusRequest = appState.workspaceSearchUI.focusRequestID
+            try await waitUntil("search field focused for smoke") {
+                appState.workspaceSearchUI.focusAppliedID == focusRequest
+                    && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+            }
+
+            // (1) Field ↓ → first result selected, results surface focused.
+            WorkspaceSearchKeyboardSmokeProbe.post(.moveDownFromQueryField, to: appState)
+            try await waitUntil("field ↓ selects first and claims results focus") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+            }
+            XCTAssertEqual(WorkspaceSearchKeyboardSmokeProbe.selectedRowID, ordered[0])
+            XCTAssertTrue(WorkspaceSearchKeyboardSmokeProbe.isResultsFocused)
+
+            // (2) ↑/↓ without wrap.
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveDown), to: appState)
+            try await waitUntil("move down to second") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
+            }
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveDown), to: appState)
+            try await waitUntil("move down to third") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[2]
+            }
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveDown), to: appState)
+            // Allow a turn; selection must stay on last (no wrap).
+            try await Task.sleep(nanoseconds: 50_000_000)
+            XCTAssertEqual(
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
+                ordered[2],
+                "↓ at end must not wrap"
+            )
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveUp), to: appState)
+            try await waitUntil("move up from last") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
+            }
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.selectFirst), to: appState)
+            try await waitUntil("back to first") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+            }
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveUp), to: appState)
+            try await Task.sleep(nanoseconds: 50_000_000)
+            XCTAssertEqual(
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
+                ordered[0],
+                "↑ at start must not wrap"
+            )
+
+            // (3) Return activates authority-backed exact match (editor navigation issued).
+            appState.editorNavigationCommand = nil
+            WorkspaceSearchKeyboardSmokeProbe.post(.activateSelection, to: appState)
+            try await waitUntil("Return activates search result navigation") {
+                if case .navigate = appState.editorNavigationCommand { return true }
+                return false
+            }
+
+            // (4a) Escape from results → query field (selection may remain; query/results kept).
+            WorkspaceSearchKeyboardSmokeProbe.post(.escapeFromResults, to: appState)
+            try await waitUntil("Escape results returns to search field") {
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            }
+            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
+            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
+
+            // (4b) Escape from field → editor focus; query/results still retained.
+            let editorFocusBefore = appState.editorFocusRequestID
+            WorkspaceSearchKeyboardSmokeProbe.post(.escapeFromQueryField, to: appState)
+            try await waitUntil("Escape field requests editor focus") {
+                appState.editorFocusRequestID == editorFocusBefore + 1
+            }
+            XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+            XCTAssertEqual(appState.workspaceSearchState.fileResults.count, 2)
+            XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
+
+            // (5) Click modality: claim a non-first row → results focused; ↓ uses reducer (no wrap path).
+            WorkspaceSearchKeyboardSmokeProbe.post(.claimSelection(ordered[1]), to: appState)
+            try await waitUntil("click claims selection and results focus") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+            }
+            WorkspaceSearchKeyboardSmokeProbe.post(.resultsAction(.moveDown), to: appState)
+            try await waitUntil("click-then-↓ moves via reducer") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[2]
+            }
+            XCTAssertEqual(WorkspaceSearchKeyboardSmokeProbe.selectedRowID, ordered[2])
+        #endif
+    }
+
     func testFocusWorkspaceSearchDisabledWithoutFolderWorkspace() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         XCTAssertFalse(appState.canUseWorkspaceSearch)
@@ -15733,6 +15901,40 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             )],
             isTruncated: truncated,
             fileAuthority: fileAuthority
+        )
+    }
+
+    /// All non-overlapping occurrences of `needle` (for keyboard no-wrap smoke).
+    private func multiMatchResult(
+        path: String,
+        text: String,
+        needle: String,
+        rootURL: URL
+    ) -> WorkspaceSearchFileResult {
+        let ns = text as NSString
+        var matches: [TextSearchMatch] = []
+        var searchRange = NSRange(location: 0, length: ns.length)
+        while searchRange.length > 0 {
+            let found = ns.range(of: needle, options: [], range: searchRange)
+            if found.location == NSNotFound { break }
+            let line = ns.substring(to: found.location).components(separatedBy: .newlines).count
+            matches.append(
+                TextSearchMatch(
+                    range: found,
+                    line: line,
+                    preview: ns.substring(with: found),
+                    previewMatchRange: NSRange(location: 0, length: found.length)
+                )
+            )
+            let next = found.location + max(found.length, 1)
+            searchRange = NSRange(location: next, length: max(0, ns.length - next))
+        }
+        return WorkspaceSearchFileResult(
+            relativePath: path,
+            contentFingerprint: WorkspaceSearchContentFingerprint(text: text),
+            matches: matches,
+            isTruncated: false,
+            fileAuthority: makeSearchFileAuthority(rootURL: rootURL, relativePath: path)
         )
     }
 

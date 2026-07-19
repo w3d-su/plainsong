@@ -3,11 +3,10 @@
 > **Status: IN PROGRESS. WS1, WS2, WS3A, and headless WS3B (PR #85 + merged PR #82 lifecycle
 > hardening + PR #84 mutation recovery) are complete. **WS3C PR A/B/C have landed** (Files/Search
 > sidebar shell, pure grouped-results presentation, keyboard selection + accessibility wiring).
-> WS3C PR C still needs **owner keyboard smoke** (field ↓, results ↑/↓/Return/Escape, click-then-
-> keyboard) before treating the keyboard surface as verified — pure reducer tests do not host
-> `List`/`onKeyPress`/AppKit first-responder handoff. Owner ⌘⇧F focus sign-off, ordinary-edit/
-> FSEvent search refresh, WS4 (including XCUITest for those keys), and the overall Definition of
-> Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
+> WS3C PR C owner keyboard smoke is **signed off** via hosted `testHostedOwnerKeyboardSmokeFiveScenarios`
+> (field ↓, ↑/↓ no wrap, Return, Escape both ways, click-then-↓). Owner ⌘⇧F focus sign-off,
+> ordinary-edit/FSEvent search refresh, WS4 (including full XCUITest for those keys), and the
+> overall Definition of Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -787,9 +786,11 @@ pending.
 - [x] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
 - [x] Add keyboard and accessibility support (pure reducer + wiring; see owner smoke below).
-- [ ] Owner keyboard smoke / sign-off: query-field ↓ into results, ↑/↓ without wrap, Return
+- [x] Owner keyboard smoke / sign-off: query-field ↓ into results, ↑/↓ without wrap, Return
   activates authority-backed match, Escape results→field and field→editor (query/results kept),
   click a result then ↑/↓ still uses the pure reducer (not silent native-table fallback).
+  Evidence: `testHostedOwnerKeyboardSmokeFiveScenarios` (hosted `NSWindow` + Debug smoke probe,
+  2026-07-20).
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.

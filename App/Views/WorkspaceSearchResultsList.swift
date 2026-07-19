@@ -297,6 +297,12 @@ struct WorkspaceSearchResultsList: View {
             orderedIDs: orderedRowIDs,
             queryGeneration: queryGeneration
         )
+        #if DEBUG
+            WorkspaceSearchKeyboardSmokeProbe.publish(
+                selection: selectedRowID,
+                resultsFocused: isResultsFocused.wrappedValue
+            )
+        #endif
     }
 
     private func activateSelection() {

@@ -17,6 +17,55 @@ enum WorkspaceSearchSelectionAction: Equatable {
     case clear
 }
 
+#if DEBUG
+    /// Hosted keyboard-smoke commands + observability (Debug / XCTest only).
+    @MainActor
+    enum WorkspaceSearchKeyboardSmokeCommand {
+        case moveDownFromQueryField
+        case resultsAction(WorkspaceSearchSelectionAction)
+        case activateSelection
+        case escapeFromResults
+        case escapeFromQueryField
+        /// Simulates a list/button selection claim (click modality).
+        case claimSelection(WorkspaceSearchResultRowID)
+    }
+
+    extension Notification.Name {
+        static let plainsongWorkspaceSearchKeyboardSmoke = Notification.Name(
+            "plainsong.workspaceSearch.keyboardSmoke"
+        )
+    }
+
+    @MainActor
+    enum WorkspaceSearchKeyboardSmokeProbe {
+        static var selectedRowID: WorkspaceSearchResultRowID?
+        static var isResultsFocused = false
+        /// Bumped whenever selection or results-focus claims change (for `waitUntil`).
+        static var epoch: UInt64 = 0
+
+        static func reset() {
+            selectedRowID = nil
+            isResultsFocused = false
+            epoch = 0
+        }
+
+        static func publish(selection: WorkspaceSearchResultRowID?, resultsFocused: Bool) {
+            selectedRowID = selection
+            isResultsFocused = resultsFocused
+            epoch &+= 1
+        }
+
+        /// Posts a smoke command to every hosted Search sidebar observing `appState`.
+        static func post(_ command: WorkspaceSearchKeyboardSmokeCommand, to appState: AppState) {
+            NotificationCenter.default.post(
+                name: .plainsongWorkspaceSearchKeyboardSmoke,
+                object: appState,
+                userInfo: ["command": command]
+            )
+        }
+    }
+#endif
+
 /// Pure selection reducer for ordered search-result rows.
 ///
 /// Order is the presentation order already established by the App event path
