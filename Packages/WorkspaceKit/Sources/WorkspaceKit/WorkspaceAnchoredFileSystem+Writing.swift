@@ -106,9 +106,32 @@ extension WorkspaceAnchoredFileSystem {
         expecting expectation: WorkspaceNoFollowFileWriteExpectation,
         hooks: Hooks
     ) -> WorkspaceFileWriteOutcome {
+        write(
+            data,
+            to: location,
+            expecting: expectation,
+            parentExpectation: nil,
+            hooks: hooks
+        )
+    }
+
+    static func write(
+        _ data: Data,
+        to location: WorkspaceFileSystemLocation,
+        expecting expectation: WorkspaceNoFollowFileWriteExpectation,
+        parentExpectation: WorkspaceItemMutationExpectation?,
+        hooks: Hooks
+    ) -> WorkspaceFileWriteOutcome {
         do {
             return try withAnchoredParent(at: location, hooks: hooks) { chain, parentDescriptor, leaf in
-                try performWrite(
+                if let parentExpectation {
+                    try validateDirectoryMutationExpectation(
+                        parentDescriptor: parentDescriptor,
+                        expectation: parentExpectation
+                    )
+                    try chain.validateNamespace()
+                }
+                return try performWrite(
                     data,
                     to: location,
                     expectation: expectation,

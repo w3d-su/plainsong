@@ -44,6 +44,7 @@ extension AppState {
         if let url = sessionStateURL(for: session) {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
+        scheduleWorkspaceMutationTextRecovery(for: session)
         scheduleStatisticsRefresh(for: session)
         if session === currentDocument {
             scheduleCompletionWorkspaceRefresh(debounceNanoseconds: 250_000_000)
@@ -413,7 +414,8 @@ extension AppState {
               !hasConflictingWorkspaceTreeIdentity(
                   in: tree.root,
                   nodeID: node.id,
-                  expectedRelativePath: fileResult.relativePath
+                  expectedRelativePath: fileResult.relativePath,
+                  expectedMutationExpectation: node.mutationExpectation
               ),
               let fileAuthority = fileResult.fileAuthority,
               fileAuthority.location.rootAuthority == rootAuthority,
@@ -446,24 +448,32 @@ extension AppState {
             pendingExternalTexts[canonicalURL] == nil &&
             pendingExternalFileVersions[canonicalURL] == nil &&
             !detachedSessionURLs.contains(canonicalURL) &&
-            indeterminateSessionWrites[sessionIdentity] == nil
+            indeterminateSessionWrites[sessionIdentity] == nil &&
+            !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
     }
 
     private func hasConflictingWorkspaceTreeIdentity(
         in node: WorkspaceFileNode,
         nodeID: WorkspaceFileNode.ID,
-        expectedRelativePath: String
+        expectedRelativePath: String,
+        expectedMutationExpectation: WorkspaceItemMutationExpectation?
     ) -> Bool {
-        if node.id == nodeID,
-           !ExactSourceText.matches(node.relativePath, expectedRelativePath)
-        {
-            return true
+        if !ExactSourceText.matches(node.relativePath, expectedRelativePath) {
+            if node.id == nodeID {
+                return true
+            }
+            if let expectedMutationExpectation,
+               node.mutationExpectation == expectedMutationExpectation
+            {
+                return true
+            }
         }
         return node.children.contains { child in
             hasConflictingWorkspaceTreeIdentity(
                 in: child,
                 nodeID: nodeID,
-                expectedRelativePath: expectedRelativePath
+                expectedRelativePath: expectedRelativePath,
+                expectedMutationExpectation: expectedMutationExpectation
             )
         }
     }

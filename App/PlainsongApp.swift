@@ -3,17 +3,27 @@ import EditorKit
 import MarkdownCore
 import SwiftUI
 
+@MainActor
+private func makePlainsongAppState() -> AppState {
+    AppState()
+}
+
 /// App entry point. Scenes only — state lives in `AppState` (agent.md §4).
 @main
 struct PlainsongApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var appState = AppState()
+    @NSApplicationDelegateAdaptor(PlainsongApplicationDelegate.self)
+    private var appDelegate
+    @StateObject private var appState = makePlainsongAppState()
 
     var body: some Scene {
         WindowGroup {
             WorkspaceWindow()
                 .environmentObject(appState)
                 .tint(.accentColor)
+                .onAppear {
+                    appDelegate.appState = appState
+                }
                 .onOpenURL { url in
                     appState.openExternalFile(url)
                 }

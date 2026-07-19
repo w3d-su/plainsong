@@ -48,11 +48,16 @@ public struct WorkspaceDirectoryScanner: Sendable {
 
         return try await withThrowingTaskGroup(of: WorkspaceFileSnapshot.self) { group in
             group.addTask(priority: .utility) {
-                try Self.makeSnapshot(
+                let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+                try authority.validateCanonicalBinding()
+                let snapshot = try Self.makeSnapshot(
                     root: root,
+                    rootAuthority: authority,
                     entryVisitHook: entryVisitHook,
                     preservesLiteralEntrySpelling: false
                 )
+                try authority.validateCanonicalBinding()
+                return snapshot
             }
             defer { group.cancelAll() }
 
@@ -75,6 +80,7 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 try authority.validateCanonicalBinding()
                 let snapshot = try Self.makeSnapshot(
                     root: authority.canonicalRootURL,
+                    rootAuthority: authority,
                     entryVisitHook: entryVisitHook,
                     preservesLiteralEntrySpelling: true
                 )
@@ -96,6 +102,7 @@ public struct WorkspaceDirectoryScanner: Sendable {
 
     private static func makeSnapshot(
         root: URL,
+        rootAuthority: WorkspaceFileSystemRootAuthority,
         entryVisitHook: @escaping @Sendable (URL) -> Void,
         preservesLiteralEntrySpelling: Bool
     ) throws -> WorkspaceFileSnapshot {
@@ -109,7 +116,6 @@ public struct WorkspaceDirectoryScanner: Sendable {
 
         let keys: [URLResourceKey] = [
             .contentModificationDateKey,
-            .fileResourceIdentifierKey,
             .isDirectoryKey,
             .isHiddenKey,
         ]
@@ -142,13 +148,19 @@ public struct WorkspaceDirectoryScanner: Sendable {
                 preservesLiteralEntrySpelling: preservesLiteralEntrySpelling
             )
             guard !relativePath.isEmpty else { continue }
+            let location = try rootAuthority.location(relativePath: relativePath)
+            let mutationExpectation = try WorkspaceNoFollowItemInspector.inspect(at: location)
 
             entries.append(
                 WorkspaceFileSnapshot.Entry(
                     relativePath: relativePath,
-                    kind: WorkspaceFileKind(url: url, isDirectory: values.isDirectory == true),
-                    identity: Self.identity(from: values.fileResourceIdentifier),
-                    contentModificationDate: values.contentModificationDate
+                    kind: WorkspaceFileKind(
+                        url: url,
+                        isDirectory: mutationExpectation.kind == .directory
+                    ),
+                    identity: Self.identity(from: mutationExpectation),
+                    contentModificationDate: values.contentModificationDate,
+                    mutationExpectation: mutationExpectation
                 )
             )
         }
@@ -174,10 +186,17 @@ public struct WorkspaceDirectoryScanner: Sendable {
         return WorkspaceLiteralFileURL.relativePath(of: filePath, containedIn: rootPath) ?? ""
     }
 
-    private static func identity(from identifier: Any?) -> String? {
-        guard let identifier else {
-            return nil
+    private static func identity(from expectation: WorkspaceItemMutationExpectation) -> String {
+        let kind = switch expectation.kind {
+        case .regularFile:
+            "file"
+        case .directory:
+            "directory"
+        case .symbolicLink:
+            "symlink"
+        case .other:
+            "other"
         }
-        return String(describing: identifier)
+        return "fs:\(expectation.identity.device):\(expectation.identity.inode):\(kind)"
     }
 }

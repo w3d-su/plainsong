@@ -3,6 +3,10 @@
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests Scripts
+# SwiftFormat 0.62 enabled these wrapping rules by default. Keep the repository's
+# existing 0.61 layout until a deliberate repo-wide migration, without breaking
+# older SwiftFormat versions that do not recognize the rule names.
+SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wrapIfStatementBodies && echo --disable wrapIfStatementBodies,wrapIfExpressionBodies)
 
 .PHONY: bootstrap generate build run test format lint preview-bundle release clean
 
@@ -37,11 +41,11 @@ release:
 	Scripts/release.sh
 
 format:
-	swiftformat $(SWIFT_FORMAT_PATHS)
+	swiftformat $(SWIFT_FORMAT_PATHS) $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint --fix --quiet
 
 lint:
-	swiftformat $(SWIFT_FORMAT_PATHS) --lint
+	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint
 
 clean:

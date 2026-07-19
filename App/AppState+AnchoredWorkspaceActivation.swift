@@ -12,7 +12,8 @@ extension AppState {
         at location: WorkspaceFileSystemLocation,
         metadata: WorkspaceCoherentFileMetadata,
         sha256Digest: String,
-        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil
+        preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority? = nil,
+        excludingRecoveryID: UUID? = nil
     ) throws -> PreparedAnchoredFileSessionActivation {
         let key = location.fileURL
         guard file.url == key else {
@@ -29,7 +30,8 @@ extension AppState {
         // through to a newly loaded session and erase or inherit that state.
         guard !hasStatefulRetainedAuthorityCollision(
             at: key,
-            candidateLocation: location
+            candidateLocation: location,
+            excludingRecoveryID: excludingRecoveryID
         ) else {
             throw AppStateError.invalidSessionIdentity(key)
         }
@@ -91,6 +93,9 @@ extension AppState {
         at location: WorkspaceFileSystemLocation
     ) throws {
         let sessionIdentity = ObjectIdentifier(session)
+        guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else {
+            throw AppStateError.invalidSessionIdentity(location.fileURL)
+        }
         if let retainedBinding = anchoredSessionFileBindings[sessionIdentity],
            retainedBinding.location != location
         {

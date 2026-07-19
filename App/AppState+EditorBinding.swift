@@ -575,7 +575,9 @@ private extension AppState {
             externalReloadTasks[sessionIdentity] != nil ||
             pendingExternalReloadApplications[sessionIdentity] != nil ||
             deferredExternalChangeResolutions[canonicalURL] != nil ||
-            indeterminateSessionWrites[sessionIdentity] != nil
+            indeterminateSessionWrites[sessionIdentity] != nil ||
+            indeterminateWorkspaceMutationSessions.contains(sessionIdentity) ||
+            workspaceMutationWriteFences.contains(sessionIdentity)
         {
             cancelAutosave(for: session)
             return
@@ -624,7 +626,12 @@ private extension AppState {
         session: DocumentSession
     ) {
         let sessionIdentity = ObjectIdentifier(session)
-        guard indeterminateSessionWrites[sessionIdentity] == nil else { return }
+        guard indeterminateSessionWrites[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
+              !workspaceMutationWriteFences.contains(sessionIdentity)
+        else {
+            return
+        }
         guard currentDocument !== session,
               sessionCache[canonicalURL] !== session,
               !retiredEditorDocumentSessions.values.contains(where: { $0.session === session })
@@ -646,6 +653,7 @@ private extension AppState {
         discardEditorImageAssetDocumentAuthority(for: session)
         indeterminateSessionWrites[sessionIdentity] = nil
         indeterminateSessionWriteContexts[sessionIdentity] = nil
+        indeterminateWorkspaceMutationSessions.remove(sessionIdentity)
     }
 }
 

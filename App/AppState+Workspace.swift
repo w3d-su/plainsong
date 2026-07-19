@@ -11,6 +11,18 @@ extension AppState {
     }
 
     func refreshWorkspaceAfterFileSystemChange() {
+        guard workspaceMutationNamespaceDepth == 0 else {
+            workspaceMutationRefreshPending = true
+            workspaceMutationExternalRefreshPending = true
+            if let rootAuthority = workspaceMutationRefreshRootAuthority
+                ?? workspaceSearchRootAuthority
+            {
+                supersedeManagedWorkspaceSessionsExternalWork(
+                    rootAuthority: rootAuthority
+                )
+            }
+            return
+        }
         guard let workspaceRootURL else {
             handleCurrentDocumentExternalChange()
             return
@@ -29,6 +41,39 @@ extension AppState {
         )
     }
 
+    func refreshWorkspaceAfterNamespaceMutation(
+        using retainedRootAuthority: WorkspaceFileSystemRootAuthority,
+        inspectManagedSessions: Bool
+    ) {
+        guard workspaceMutationNamespaceDepth == 0 else {
+            workspaceMutationRefreshPending = true
+            workspaceMutationExternalRefreshPending =
+                workspaceMutationExternalRefreshPending || inspectManagedSessions
+            return
+        }
+        guard let workspaceRootURL else {
+            if inspectManagedSessions {
+                handleCurrentDocumentExternalChange()
+            }
+            return
+        }
+
+        if inspectManagedSessions {
+            if workspaceSearchRootAuthority == retainedRootAuthority {
+                handleManagedWorkspaceSessionsExternalChange(
+                    rootAuthority: retainedRootAuthority
+                )
+            } else {
+                handleCurrentDocumentExternalChange()
+            }
+        }
+        scheduleWorkspaceReload(
+            root: workspaceRootURL,
+            selectFirstIfNeeded: false,
+            errorTitle: "Could Not Refresh Workspace"
+        )
+    }
+
     private func handleManagedWorkspaceSessionsExternalChange() {
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration
@@ -37,12 +82,36 @@ extension AppState {
             return
         }
 
-        var sessions = [currentDocument]
-        sessions.append(contentsOf: sessionCache.values)
-        sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
-        var seen = Set<ObjectIdentifier>()
-        sessions = sessions.filter { session in
-            guard seen.insert(ObjectIdentifier(session)).inserted else { return false }
+        handleManagedWorkspaceSessionsExternalChange(rootAuthority: rootAuthority)
+    }
+
+    private func handleManagedWorkspaceSessionsExternalChange(
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) {
+        for session in managedWorkspaceSessions(rootAuthority: rootAuthority) {
+            handleExternalChange(for: session)
+        }
+    }
+
+    private func supersedeManagedWorkspaceSessionsExternalWork(
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) {
+        for session in managedWorkspaceSessions(rootAuthority: rootAuthority) {
+            let sessionIdentity = ObjectIdentifier(session)
+            guard !indeterminateWorkspaceMutationSessions.contains(sessionIdentity) else {
+                continue
+            }
+            workspaceMutationWriteFences.insert(sessionIdentity)
+            _ = advanceExternalDiskEventGeneration(for: session)
+            externalDiskInspectionTasks.removeValue(forKey: sessionIdentity)?.task.cancel()
+            supersedeExternalResolutionRead(for: session)
+        }
+    }
+
+    private func managedWorkspaceSessions(
+        rootAuthority: WorkspaceFileSystemRootAuthority
+    ) -> [DocumentSession] {
+        var sessions = workspaceMutationManagedSessions().filter { session in
             if retainedManagedSessionLocation(for: session)?.rootAuthority == rootAuthority {
                 return true
             }
@@ -58,9 +127,7 @@ extension AppState {
                 (sessionStateURL(for: $1)?.absoluteString ?? "").utf8
             )
         }
-        for session in sessions {
-            handleExternalChange(for: session)
-        }
+        return sessions
     }
 
     func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID) {
@@ -84,42 +151,102 @@ extension AppState {
     }
 
     func createWorkspaceFile(named name: String, inDirectoryID directoryID: WorkspaceFileNode.ID?) {
-        performWorkspaceOperation(openCreatedFile: true, directoryID: directoryID) { root, directory in
-            try fileOperations.createFile(named: name, in: directory ?? root)
-        }
+        performWorkspaceCreation(
+            named: name,
+            kind: .file,
+            directoryID: directoryID
+        )
     }
 
     func createWorkspaceFolder(named name: String, inDirectoryID directoryID: WorkspaceFileNode.ID?) {
-        performWorkspaceOperation(openCreatedFile: false, directoryID: directoryID) { root, directory in
-            try fileOperations.createFolder(named: name, in: directory ?? root)
-        }
+        performWorkspaceCreation(
+            named: name,
+            kind: .folder,
+            directoryID: directoryID
+        )
     }
 
     func renameWorkspaceItem(id nodeID: WorkspaceFileNode.ID, to newName: String) {
-        guard let url = workspaceURL(for: nodeID) else { return }
-        performWorkspaceOperation(openCreatedFile: false, directoryID: nil) { _, _ in
-            try fileOperations.rename(url, to: newName)
+        guard let tree = workspaceTree,
+              let node = tree.node(id: nodeID),
+              let expectation = node.mutationExpectation,
+              let rootAuthority = workspaceSearchRootAuthority,
+              let sourceParentExpectation = workspaceMutationParentExpectation(
+                  for: node.relativePath,
+                  tree: tree,
+                  rootAuthority: rootAuthority
+              ),
+              workspaceInstalledCaptureGeneration == workspaceGeneration
+        else {
+            return
+        }
+        do {
+            try renameWorkspaceItem(
+                at: rootAuthority.location(relativePath: node.relativePath),
+                to: newName,
+                expecting: expectation,
+                sourceParentExpectation: sourceParentExpectation
+            )
+        } catch {
+            present(error, title: "Could Not Rename Item")
         }
     }
 
     func moveWorkspaceItem(id nodeID: WorkspaceFileNode.ID, toDirectoryID directoryID: WorkspaceFileNode.ID) {
-        guard let sourceURL = workspaceURL(for: nodeID),
-              let directoryURL = workspaceURL(for: directoryID)
+        guard let tree = workspaceTree,
+              let sourceNode = tree.node(id: nodeID),
+              let destinationNode = tree.node(id: directoryID),
+              destinationNode.isDirectory,
+              let expectation = sourceNode.mutationExpectation,
+              let rootAuthority = workspaceSearchRootAuthority,
+              let sourceParentExpectation = workspaceMutationParentExpectation(
+                  for: sourceNode.relativePath,
+                  tree: tree,
+                  rootAuthority: rootAuthority
+              ),
+              let destinationParentExpectation = destinationNode.relativePath.isEmpty
+              ? rootAuthority.directoryMutationExpectation
+              : destinationNode.mutationExpectation,
+              workspaceInstalledCaptureGeneration == workspaceGeneration
         else {
             return
         }
-        performWorkspaceOperation(openCreatedFile: false, directoryID: nil) { _, _ in
-            try fileOperations.move(sourceURL, toDirectory: directoryURL)
+        do {
+            try moveWorkspaceItem(
+                at: rootAuthority.location(relativePath: sourceNode.relativePath),
+                toDirectoryRelativePath: destinationNode.relativePath,
+                expecting: expectation,
+                sourceParentExpectation: sourceParentExpectation,
+                destinationParentExpectation: destinationParentExpectation
+            )
+        } catch {
+            present(error, title: "Could Not Move Item")
         }
     }
 
     func trashWorkspaceItem(id nodeID: WorkspaceFileNode.ID) {
-        guard let url = workspaceURL(for: nodeID) else { return }
+        guard let tree = workspaceTree,
+              let node = tree.node(id: nodeID),
+              let expectation = node.mutationExpectation,
+              let rootAuthority = workspaceSearchRootAuthority,
+              let sourceParentExpectation = workspaceMutationParentExpectation(
+                  for: node.relativePath,
+                  tree: tree,
+                  rootAuthority: rootAuthority
+              ),
+              workspaceInstalledCaptureGeneration == workspaceGeneration,
+              let source = try? rootAuthority.location(relativePath: node.relativePath)
+        else {
+            return
+        }
         Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                try await fileOperations.trash(url)
-                refreshWorkspaceAfterFileSystemChange()
+                try await trashWorkspaceItem(
+                    at: source,
+                    expecting: expectation,
+                    sourceParentExpectation: sourceParentExpectation
+                )
             } catch {
                 present(error, title: "Could Not Move to Trash")
             }
@@ -127,6 +254,7 @@ extension AppState {
     }
 
     func open(url: URL, rememberAsLastOpened: Bool, preserveWorkspace: Bool) throws {
+        try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
         let isDirectory = try SecurityScopedAccess.withAccess(to: url) {
             try Self.isDirectory(url)
         }
@@ -153,6 +281,7 @@ extension AppState {
 
     func openWorkspaceFile(_ url: URL) {
         do {
+            try validateWorkspaceMutationRecoveryStoresLoaded(at: url)
             if workspaceRootURL != nil {
                 guard let rootAuthority = workspaceSearchRootAuthority,
                       workspaceInstalledCaptureGeneration == workspaceGeneration
@@ -318,6 +447,7 @@ extension AppState {
         synchronizingWorkspaceTree: Bool = true
     ) {
         guard currentDocument !== session else { return }
+        moveCurrentDocumentWorkToBackgroundBeforeSwitch()
         requestEditorFocus()
         if synchronizingWorkspaceTree {
             synchronizeWorkspaceTreeSelection(for: session)
@@ -343,9 +473,17 @@ extension AppState {
     }
 
     func save(session: DocumentSession) throws {
+        try validateWorkspaceMutationRecoveryStoresLoaded(
+            at: sessionStateURL(for: session) ?? session.fileURL
+        )
         guard let writeContext = try managedSessionWriteContext(for: session) else { return }
         let sessionIdentity = writeContext.sessionIdentity
         let url = writeContext.stateURL
+        guard !workspaceMutationWriteFences.contains(sessionIdentity),
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)
+        else {
+            throw AppStateError.workspaceMutationInProgress(url)
+        }
         guard !hasPendingEditorSource(for: session) else {
             throw AppStateError.pendingEditorSource(url)
         }
@@ -429,6 +567,7 @@ extension AppState {
             throw MarkdownFileStoreError.writeRequiresReconciliation(destination, result)
         }
         session.markSaved(text: text, url: destination)
+        _ = clearWorkspaceMutationTextRecovery(for: session)
         sessionPolicy.updateDirtyState(for: destination, isDirty: false)
         detachedSessionURLs.remove(destination)
         lastKnownDiskHashes[destination] = Self.contentHash(text)
@@ -570,7 +709,7 @@ extension AppState {
         statisticsTask = nil
     }
 
-    private func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {
+    func moveCurrentDocumentWorkToBackgroundBeforeSwitch() {
         let previousSession = currentDocument
         moveCurrentAutosaveToBackground(for: previousSession)
         moveCurrentStatisticsToBackground(for: previousSession)
@@ -611,38 +750,90 @@ extension AppState {
         }
     }
 
-    func performWorkspaceOperation(
-        openCreatedFile: Bool,
-        directoryID: WorkspaceFileNode.ID?,
-        operation: (URL, URL?) throws -> URL
+    func performWorkspaceCreation(
+        named name: String,
+        kind: WorkspaceCreationKind,
+        directoryID: WorkspaceFileNode.ID?
     ) {
-        guard let root = workspaceRootURL else { return }
-
         do {
-            let directoryURL = directoryID.flatMap(workspaceURL(for:))
-            let resultingURL = try operation(root, directoryURL)
-            if openCreatedFile, FileKind(url: resultingURL) != nil {
-                openWorkspaceFile(resultingURL)
+            try validateWorkspaceMutationRecoveryStoresLoaded()
+            guard workspaceMutationNamespaceDepth == 0 else {
+                throw WorkspaceMutationError.operationAlreadyInProgress
             }
-            refreshWorkspaceAfterFileSystemChange()
+            guard workspaceImageAssetInsertionCount == 0 else {
+                throw WorkspaceMutationError.imageInsertionInProgress
+            }
+            guard let tree = workspaceTree,
+                  let rootAuthority = workspaceSearchRootAuthority,
+                  workspaceInstalledCaptureGeneration == workspaceGeneration
+            else {
+                throw WorkspaceMutationError.unavailableWorkspaceDirectory
+            }
+            let directory = try workspaceCreationDirectory(
+                directoryID: directoryID,
+                tree: tree,
+                rootAuthority: rootAuthority
+            )
+            let creationPlan = switch kind {
+            case .file:
+                try fileOperations.makeFileCreationPlan(
+                    named: name,
+                    inDirectoryRelativePath: directory.relativePath,
+                    rootAuthority: rootAuthority,
+                    expectingDirectory: directory.expectation
+                )
+            case .folder:
+                try fileOperations.makeFolderCreationPlan(
+                    named: name,
+                    inDirectoryRelativePath: directory.relativePath,
+                    rootAuthority: rootAuthority,
+                    expectingDirectory: directory.expectation
+                )
+            }
+            try validateWorkspaceMutationDestinationOwnership(creationPlan.destination)
+
+            let fencedSessions: [DocumentSession] = []
+            try beginWorkspaceNamespaceMutation(fencedSessions)
+            var mutationEnded = false
+            defer {
+                if !mutationEnded {
+                    endWorkspaceNamespaceMutation(fencedSessions)
+                    drainWorkspaceMutationRefreshIfNeeded()
+                }
+            }
+            var recoveryIntent = try prepareWorkspaceCreationRecoveryIntent(
+                plan: creationPlan,
+                kind: kind
+            )
+            let outcome = switch kind {
+            case .file:
+                fileOperations.createFile(
+                    using: creationPlan,
+                    recordingCreatedArtifact: { artifact in
+                        try self.recordWorkspaceCreatedArtifact(
+                            artifact,
+                            recoveryIntent: &recoveryIntent
+                        )
+                    }
+                )
+            case .folder:
+                fileOperations.createFolder(
+                    using: creationPlan,
+                    recordingCreatedArtifact: { artifact in
+                        try self.recordWorkspaceCreatedArtifact(
+                            artifact,
+                            recoveryIntent: &recoveryIntent
+                        )
+                    }
+                )
+            }
+            endWorkspaceNamespaceMutation(fencedSessions)
+            mutationEnded = true
+            drainWorkspaceMutationRefreshIfNeeded()
+            try finishWorkspaceCreation(outcome, recoveryIntent: recoveryIntent)
         } catch {
             present(error, title: "Workspace Operation Failed")
         }
-    }
-
-    func workspaceURL(for nodeID: WorkspaceFileNode.ID) -> URL? {
-        guard let workspaceRootURL,
-              let rootAuthority = workspaceSearchRootAuthority,
-              workspaceInstalledCaptureGeneration == workspaceGeneration,
-              let node = workspaceTree?.node(id: nodeID)
-        else {
-            return nil
-        }
-
-        if node.relativePath.isEmpty {
-            return workspaceRootURL
-        }
-        return try? rootAuthority.location(relativePath: node.relativePath).fileURL
     }
 
     func firstEditableNode(in node: WorkspaceFileNode) -> WorkspaceFileNode? {

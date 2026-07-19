@@ -14,16 +14,20 @@ public enum EditorImageAsset: Equatable, Sendable {
 public struct EditorImageAssetInsertion: Sendable {
     public let relativePaths: [String]
     private let validateBeforeCommitHandler: @MainActor @Sendable () async -> Bool
-    private let discardHandler: @MainActor @Sendable () async -> Void
+    private let terminal: EditorImageAssetInsertionTerminal
 
     public init(
         relativePaths: [String],
         validateBeforeCommit: @escaping @MainActor @Sendable () async -> Bool = { true },
+        commit: @escaping @MainActor @Sendable () -> Void = {},
         discard: @escaping @MainActor @Sendable () async -> Void = {}
     ) {
         self.relativePaths = relativePaths
         validateBeforeCommitHandler = validateBeforeCommit
-        discardHandler = discard
+        terminal = EditorImageAssetInsertionTerminal(
+            commit: commit,
+            discard: discard
+        )
     }
 
     @MainActor
@@ -32,7 +36,50 @@ public struct EditorImageAssetInsertion: Sendable {
     }
 
     @MainActor
+    func commit() {
+        terminal.commit()
+    }
+
+    @MainActor
     func discard() async {
+        await terminal.discard()
+    }
+}
+
+private final class EditorImageAssetInsertionTerminal: @unchecked Sendable {
+    private enum State {
+        case active
+        case committed
+        case discarded
+    }
+
+    private var state = State.active
+    private let commitHandler: @MainActor @Sendable () -> Void
+    private let discardHandler: @MainActor @Sendable () async -> Void
+
+    init(
+        commit: @escaping @MainActor @Sendable () -> Void,
+        discard: @escaping @MainActor @Sendable () async -> Void
+    ) {
+        commitHandler = commit
+        discardHandler = discard
+    }
+
+    @MainActor
+    func commit() {
+        guard state == .active else {
+            return
+        }
+        state = .committed
+        commitHandler()
+    }
+
+    @MainActor
+    func discard() async {
+        guard state == .active else {
+            return
+        }
+        state = .discarded
         await discardHandler()
     }
 }

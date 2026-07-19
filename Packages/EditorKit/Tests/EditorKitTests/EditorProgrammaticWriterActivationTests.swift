@@ -58,7 +58,47 @@ final class EditorProgrammaticWriterActivationTests: XCTestCase {
         try await waitForSource(in: scenario.model, toEqual: "Stale source![](assets/first.png)")
         XCTAssertTrue(scenario.model.pendingWriterInstallations.isEmpty)
         XCTAssertEqual(scenario.model.publications.count, 1)
+        XCTAssertEqual(gate.commitCount, 1)
         XCTAssertEqual(gate.discardCount, 0)
+    }
+
+    func testImageInsertionSignalsCommitAfterPlacementValidationAndMarkdownPublication() async throws {
+        let scenario = try makeScenario(firstWriterIsPending: false)
+        defer {
+            dismantle(scenario.first)
+            dismantle(scenario.second)
+        }
+        let gate = ImagePlacementValidationGate()
+        scenario.first.coordinator.updateImageAssetInserter { _ in
+            EditorImageAssetInsertion(
+                relativePaths: ["assets/first.png"],
+                validateBeforeCommit: {
+                    await gate.validate()
+                },
+                commit: {
+                    gate.commitCount += 1
+                },
+                discard: {
+                    gate.discardCount += 1
+                }
+            )
+        }
+        scenario.first.coordinator.attachPasteAndDragHandlers(to: scenario.first.textView)
+        scenario.first.textView.textSelection = NSRange(location: 12, length: 0)
+
+        XCTAssertEqual(scenario.first.textView.imageFileDropHandler?(
+            scenario.first.textView,
+            [URL(fileURLWithPath: "/tmp/first.png")]
+        ), true)
+        try await waitForPlacementValidationInvocation(gate)
+        XCTAssertEqual(gate.commitCount, 0)
+
+        gate.resume(isValid: true)
+        try await waitForSource(in: scenario.model, toEqual: "Stale source![](assets/first.png)")
+
+        XCTAssertEqual(gate.commitCount, 1)
+        XCTAssertEqual(gate.discardCount, 0)
+        XCTAssertEqual(scenario.model.publications.count, 1)
     }
 
     func testImageInsertionHoldsWriterLeaseThroughPlacementCommitValidation() async throws {
@@ -569,6 +609,7 @@ private final class ImageInsertionGate {
     private var continuation: CheckedContinuation<EditorImageAssetInsertion, Never>?
     private(set) var assets: [EditorImageAsset] = []
     private(set) var invocationCount = 0
+    private(set) var commitCount = 0
     private(set) var discardCount = 0
 
     func insert(_ assets: [EditorImageAsset]) async -> EditorImageAssetInsertion {
@@ -582,6 +623,9 @@ private final class ImageInsertionGate {
     func resume(relativePaths: [String]) {
         continuation?.resume(returning: EditorImageAssetInsertion(
             relativePaths: relativePaths,
+            commit: { [weak self] in
+                self?.commitCount += 1
+            },
             discard: { [weak self] in
                 self?.discardCount += 1
             }
@@ -594,6 +638,7 @@ private final class ImageInsertionGate {
 private final class ImagePlacementValidationGate {
     private var continuation: CheckedContinuation<Bool, Never>?
     private(set) var invocationCount = 0
+    var commitCount = 0
     var discardCount = 0
 
     func validate() async -> Bool {

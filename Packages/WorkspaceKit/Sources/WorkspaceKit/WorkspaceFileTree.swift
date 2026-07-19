@@ -65,17 +65,20 @@ public struct WorkspaceFileSnapshot: Sendable, Equatable {
         public let kind: WorkspaceFileKind
         public let identity: String?
         public let contentModificationDate: Date?
+        public let mutationExpectation: WorkspaceItemMutationExpectation?
 
         public init(
             relativePath: String,
             kind: WorkspaceFileKind,
             identity: String?,
-            contentModificationDate: Date?
+            contentModificationDate: Date?,
+            mutationExpectation: WorkspaceItemMutationExpectation? = nil
         ) {
             self.relativePath = Self.normalized(relativePath)
             self.kind = kind
             self.identity = identity
             self.contentModificationDate = contentModificationDate
+            self.mutationExpectation = mutationExpectation
         }
 
         public var nodeID: WorkspaceFileNode.ID {
@@ -113,6 +116,7 @@ public struct WorkspaceFileNode: Identifiable, Sendable, Equatable {
     public let relativePath: String
     public let kind: WorkspaceFileKind
     public let contentModificationDate: Date?
+    public let mutationExpectation: WorkspaceItemMutationExpectation?
     public var children: [WorkspaceFileNode]
 
     public var isDirectory: Bool {
@@ -129,6 +133,7 @@ public struct WorkspaceFileNode: Identifiable, Sendable, Equatable {
         relativePath: String,
         kind: WorkspaceFileKind,
         contentModificationDate: Date?,
+        mutationExpectation: WorkspaceItemMutationExpectation? = nil,
         children: [WorkspaceFileNode] = []
     ) {
         self.id = id
@@ -136,6 +141,7 @@ public struct WorkspaceFileNode: Identifiable, Sendable, Equatable {
         self.relativePath = relativePath
         self.kind = kind
         self.contentModificationDate = contentModificationDate
+        self.mutationExpectation = mutationExpectation
         self.children = children
     }
 }
@@ -211,13 +217,19 @@ private struct WorkspaceFileTreeBuilder {
     let options: WorkspaceFileTree.Options
 
     func build() -> WorkspaceFileNode {
+        let entries = visibleEntries()
+        let duplicateNodeIDs = Set(
+            Dictionary(grouping: entries, by: \.nodeID)
+                .compactMap { nodeID, matches in matches.count > 1 ? nodeID : nil }
+        )
         let entriesByParent = Dictionary(
-            grouping: visibleEntries(),
+            grouping: entries,
             by: { WorkspacePathByteKey(parentPath(of: $0)) }
         )
         let children = buildChildren(
             parentPath: WorkspacePathByteKey(""),
-            entriesByParent: entriesByParent
+            entriesByParent: entriesByParent,
+            duplicateNodeIDs: duplicateNodeIDs
         )
         return WorkspaceFileNode(
             id: workspaceFileTreeRootID,
@@ -225,6 +237,7 @@ private struct WorkspaceFileTreeBuilder {
             relativePath: "",
             kind: .directory,
             contentModificationDate: nil,
+            mutationExpectation: nil,
             children: children
         )
     }
@@ -257,7 +270,8 @@ private struct WorkspaceFileTreeBuilder {
 
     private func buildChildren(
         parentPath: WorkspacePathByteKey,
-        entriesByParent: [WorkspacePathByteKey: [WorkspaceFileSnapshot.Entry]]
+        entriesByParent: [WorkspacePathByteKey: [WorkspaceFileSnapshot.Entry]],
+        duplicateNodeIDs: Set<WorkspaceFileNode.ID>
     ) -> [WorkspaceFileNode] {
         (entriesByParent[parentPath] ?? [])
             .sorted { first, second in
@@ -265,19 +279,33 @@ private struct WorkspaceFileTreeBuilder {
             }
             .map { entry in
                 WorkspaceFileNode(
-                    id: entry.nodeID,
+                    id: uniqueNodeID(for: entry, duplicateNodeIDs: duplicateNodeIDs),
                     name: lastPathComponent(of: entry.relativePath),
                     relativePath: entry.relativePath,
                     kind: entry.kind,
                     contentModificationDate: entry.contentModificationDate,
+                    mutationExpectation: entry.mutationExpectation,
                     children: entry.kind == .directory
                         ? buildChildren(
                             parentPath: WorkspacePathByteKey(entry.relativePath),
-                            entriesByParent: entriesByParent
+                            entriesByParent: entriesByParent,
+                            duplicateNodeIDs: duplicateNodeIDs
                         )
                         : []
                 )
             }
+    }
+
+    private func uniqueNodeID(
+        for entry: WorkspaceFileSnapshot.Entry,
+        duplicateNodeIDs: Set<WorkspaceFileNode.ID>
+    ) -> WorkspaceFileNode.ID {
+        let nodeID = entry.nodeID
+        guard duplicateNodeIDs.contains(nodeID) else { return nodeID }
+        return workspaceFileTreeDuplicateIdentityIDPrefix
+            + WorkspacePathByteKey(nodeID).asciiHex
+            + ":"
+            + WorkspacePathByteKey(entry.relativePath).asciiHex
     }
 
     private func compare(_ first: WorkspaceFileSnapshot.Entry, _ second: WorkspaceFileSnapshot.Entry) -> Bool {
@@ -343,6 +371,7 @@ private struct WorkspaceFileTreeBuilder {
 
 private let workspaceFileTreeRootID = "__workspace_root__"
 private let workspaceFileTreeFallbackPathIDPrefix = "__workspace_path_bytes__:"
+private let workspaceFileTreeDuplicateIdentityIDPrefix = "__workspace_duplicate_identity__:"
 
 private extension WorkspaceFileNode {
     func nodeIDs() -> Set<WorkspaceFileNode.ID> {

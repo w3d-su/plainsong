@@ -8,15 +8,21 @@ extension WorkspaceAnchoredFileSystem {
         prepared: PreparedRecoveryMaterial,
         context: PostCleanupDestinationContext
     ) -> WorkspaceFileWriteOutcome {
+        let evidence = preparedRecoveryEvidence(prepared)
         var observation: PostCleanupDestinationObservation?
         do {
             try provePostCleanupDestination(
                 context: context,
                 observation: &observation
             )
-            return notCommitted(reason: reason, artifactState: artifactState)
+            return notCommitted(
+                reason: reason,
+                artifactState: artifactState,
+                retainedArtifactIdentity: artifactState.retainsExactLocation
+                    ? evidence.identity
+                    : nil
+            )
         } catch {
-            let evidence = preparedRecoveryEvidence(prepared)
             let recoveryArtifact: WorkspaceFileWriteArtifactState = if case let .entry(entry) = observation,
                                                                        entry.isRegularFile,
                                                                        let preparedIdentity = evidence.identity,
@@ -338,11 +344,13 @@ extension WorkspaceAnchoredFileSystem {
 extension WorkspaceAnchoredFileSystem {
     static func notCommitted(
         reason: WorkspaceAnchoredFileSystemError,
-        artifactState: WorkspaceFileWriteArtifactState
+        artifactState: WorkspaceFileWriteArtifactState,
+        retainedArtifactIdentity: WorkspaceFileSystemIdentity? = nil
     ) -> WorkspaceFileWriteOutcome {
         .notCommitted(WorkspaceNotCommittedFileWrite(
             reason: reason,
-            artifactState: artifactState
+            artifactState: artifactState,
+            retainedArtifactIdentity: retainedArtifactIdentity
         ))
     }
 
@@ -366,5 +374,14 @@ extension WorkspaceAnchoredFileSystem {
             preparedMetadata: preparedMetadata,
             recoveryArtifact: artifactState
         ))
+    }
+}
+
+private extension WorkspaceFileWriteArtifactState {
+    var retainsExactLocation: Bool {
+        if case .retained = self {
+            return true
+        }
+        return false
     }
 }

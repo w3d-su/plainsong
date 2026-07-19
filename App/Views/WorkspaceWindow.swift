@@ -9,20 +9,26 @@ struct WorkspaceWindow: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        HStack(spacing: 0) {
-            WorkspaceSidebar()
-                .frame(width: 220)
-
-            Divider()
-
-            Group {
-                if appState.hasOpenDocument {
-                    EditorWorkspace()
-                } else {
-                    EmptyEditorState()
-                }
+        VStack(spacing: 0) {
+            if appState.workspaceMutationRecoveryBannerPlacement == .global {
+                WorkspaceMutationRecoveryBanner()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            HStack(spacing: 0) {
+                WorkspaceSidebar()
+                    .frame(width: 220)
+
+                Divider()
+
+                Group {
+                    if appState.hasOpenDocument {
+                        EditorWorkspace()
+                    } else {
+                        EmptyEditorState()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .frame(minWidth: 760, minHeight: 420)
         .toolbar {
@@ -104,7 +110,9 @@ private struct EditorWorkspace: View {
                 isSaving: appState.isSaving
             )
 
-            if appState.indeterminateFileWriteReconciliationPrompt != nil {
+            if appState.workspaceMutationRecoveryBannerPlacement == .editor {
+                WorkspaceMutationRecoveryBanner()
+            } else if appState.indeterminateFileWriteReconciliationPrompt != nil {
                 FileWriteReconciliationBanner()
             } else if appState.missingFilePrompt != nil {
                 MissingFileBanner()

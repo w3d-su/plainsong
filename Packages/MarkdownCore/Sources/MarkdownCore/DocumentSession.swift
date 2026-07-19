@@ -171,6 +171,20 @@ public final class DocumentSession: ObservableObject {
         }
     }
 
+    /// Retargets the session after an authority-safe filesystem relocation.
+    ///
+    /// Relocation changes only the document identity presented to consumers. The current
+    /// source and persisted baseline stay intact, so an already-dirty session remains dirty
+    /// and a clean session remains clean while Markdown/MDX presentation follows the new name.
+    public func relocate(to newURL: URL) {
+        applyState(
+            text: text,
+            url: newURL,
+            fileKind: FileKind(url: newURL) ?? fileKind,
+            isDirty: isDirty
+        )
+    }
+
     /// Replaces the full session state when opening or restoring a document.
     public func reset(
         text newText: String,

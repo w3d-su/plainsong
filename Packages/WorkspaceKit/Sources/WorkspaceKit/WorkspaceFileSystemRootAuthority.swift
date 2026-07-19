@@ -35,6 +35,11 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
     let physicalIdentity: WorkspaceFileSystemIdentity
     private let descriptorLifetime: WorkspaceRootDescriptorLifetime
 
+    /// The exact retained root directory identity for snapshot-authorized namespace mutations.
+    public var directoryMutationExpectation: WorkspaceItemMutationExpectation {
+        WorkspaceItemMutationExpectation(identity: physicalIdentity, kind: .directory)
+    }
+
     public init(rootURL: URL, securityScopedURL: URL? = nil) throws {
         try self.init(
             rootURL: rootURL,
@@ -283,6 +288,21 @@ public struct WorkspaceFileSystemRootAuthority: Sendable, Hashable {
         } catch {
             throw WorkspaceAnchoredFileSystemError.namespaceChanged
         }
+    }
+
+    /// Borrows the descriptor that defines this retained physical root.
+    ///
+    /// Callers pass a normalized root-relative path and use `O_NOFOLLOW_ANY` or
+    /// `CLONE_NOFOLLOW_ANY` so resolution cannot follow a replaced symlink component. Resolving
+    /// the complete path here also avoids committing through a child descriptor that was moved
+    /// outside the root after validation. macOS 14 and 15 expose no public "beneath" flag, so an
+    /// in-root namespace replacement can still redirect the syscall to another real directory.
+    /// Callers must postflight the published identity and report uncertain outcomes as
+    /// indeterminate rather than claiming stronger kernel confinement.
+    func withRetainedRootDescriptor<T>(
+        _ body: (Int32) throws -> T
+    ) rethrows -> T {
+        try descriptorLifetime.withDescriptor(body)
     }
 
     private struct DescriptorCapture {
