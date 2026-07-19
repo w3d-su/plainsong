@@ -5,7 +5,8 @@ import SwiftUI
 ///
 /// Query publication goes through AppState UI helpers into the existing
 /// `setWorkspaceSearchQuery` / `clearWorkspaceSearch` contract.
-/// Grouped results, keyboard activation, and detailed status land in later WS3C PRs.
+/// Results use a pure presentation model (`WorkspaceSearchResultsPresentation`) rendered in a
+/// lazy `List` (WS3C PR B). Keyboard result navigation lands in a later PR.
 ///
 /// Focus is AppKit first-responder routing on the owned Search `NSTextField`
 /// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState`. Only the hosting key window may
@@ -17,18 +18,34 @@ struct WorkspaceSearchSidebar: View {
     @StateObject private var windowKeyState = WindowKeyStateTracker()
     /// Cancelable attempt for the latest focus request observed by this window.
     @State private var focusAttemptTask: Task<Void, Never>?
+    /// Selected match row stays view-local (activation uses retained search payload lookup).
+    @State private var selectedResultRowID: WorkspaceSearchResultRowID?
+    /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
+    /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
+    /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
+    @State private var presentationMemoInputs: WorkspaceSearchResultsPresentationInputs?
+    @State private var presentationMemoValue = WorkspaceSearchResultsPresentation.empty
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            queryField
-            optionToggles
-            hintSection
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                queryField
+                optionToggles
+            }
+            .padding(12)
+
+            Divider()
+
+            WorkspaceSearchResultsList(
+                presentation: resultsPresentation,
+                selectedRowID: $selectedResultRowID
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(WindowKeyStateReader(tracker: windowKeyState))
         .onAppear {
+            refreshResultsPresentationMemo()
             scheduleFocusAttempt()
         }
         .onDisappear {
@@ -48,6 +65,42 @@ struct WorkspaceSearchSidebar: View {
         .onChange(of: appState.workspaceSearchFocusKeyEpoch) { _, _ in
             scheduleFocusAttempt()
         }
+        .onChange(of: appState.workspaceSearchState.queryGeneration) { _, _ in
+            selectedResultRowID = nil
+            refreshResultsPresentationMemo()
+        }
+        .onChange(of: appState.workspaceSearchState) { _, _ in
+            refreshResultsPresentationMemo()
+        }
+        .onChange(of: appState.workspaceSearchUI.queryText) { _, newValue in
+            // clearWorkspaceSearch does not advance queryGeneration; still drop selection.
+            if newValue.isEmpty {
+                selectedResultRowID = nil
+            }
+            refreshResultsPresentationMemo()
+        }
+        .onChange(of: appState.canUseWorkspaceSearch) { _, _ in
+            refreshResultsPresentationMemo()
+        }
+        .onChange(of: appState.isWorkspaceSearchReady) { _, _ in
+            refreshResultsPresentationMemo()
+        }
+    }
+
+    private var resultsPresentation: WorkspaceSearchResultsPresentation {
+        presentationMemoValue
+    }
+
+    private func refreshResultsPresentationMemo() {
+        let inputs = WorkspaceSearchResultsPresentationInputs(
+            searchState: appState.workspaceSearchState,
+            queryText: appState.workspaceSearchUI.queryText,
+            canUseWorkspaceSearch: appState.canUseWorkspaceSearch,
+            isWorkspaceSearchReady: appState.isWorkspaceSearchReady
+        )
+        guard presentationMemoInputs != inputs else { return }
+        presentationMemoInputs = inputs
+        presentationMemoValue = WorkspaceSearchResultsPresenter.make(inputs)
     }
 
     private var queryField: some View {
@@ -105,23 +158,6 @@ struct WorkspaceSearchSidebar: View {
             .help("Match whole words only")
             .accessibilityLabel("Whole Word")
             .disabled(!appState.canUseWorkspaceSearch)
-        }
-    }
-
-    @ViewBuilder
-    private var hintSection: some View {
-        if !appState.canUseWorkspaceSearch {
-            Text("Open a folder workspace to search.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        } else if !appState.isWorkspaceSearchReady {
-            Text("Preparing workspace…")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        } else if appState.workspaceSearchUI.queryText.isEmpty {
-            Text("Type to search Markdown and MDX files.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
         }
     }
 
