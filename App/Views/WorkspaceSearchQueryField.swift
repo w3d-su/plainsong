@@ -6,13 +6,23 @@ import SwiftUI
 /// Owns the concrete `NSTextField` so focus identity never depends on sibling hierarchy scans.
 /// The field is stamped with `WorkspaceSearchFieldFocus.accessibilityIdentifier` at creation and
 /// registered on the window's `WindowKeyStateTracker`.
+///
+/// Keyboard (WS3C PR C):
+/// - ↓ → move selection/focus into the results list (`onMoveDownToResults`)
+/// - Escape → return focus to the editor without clearing query/results (`onEscapeToEditor`)
 struct WorkspaceSearchQueryField: NSViewRepresentable {
     @Binding var text: String
     @ObservedObject var windowKeyState: WindowKeyStateTracker
     var isEnabled: Bool
+    var onMoveDownToResults: (() -> Void)?
+    var onEscapeToEditor: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(
+            text: $text,
+            onMoveDownToResults: onMoveDownToResults,
+            onEscapeToEditor: onEscapeToEditor
+        )
     }
 
     func makeNSView(context: Context) -> NSTextField {
@@ -35,6 +45,8 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.text = $text
         context.coordinator.field = field
+        context.coordinator.onMoveDownToResults = onMoveDownToResults
+        context.coordinator.onEscapeToEditor = onEscapeToEditor
 
         if field.stringValue != text {
             field.stringValue = text
@@ -51,10 +63,18 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var text: Binding<String>
+        var onMoveDownToResults: (() -> Void)?
+        var onEscapeToEditor: (() -> Void)?
         weak var field: NSTextField?
 
-        init(text: Binding<String>) {
+        init(
+            text: Binding<String>,
+            onMoveDownToResults: (() -> Void)?,
+            onEscapeToEditor: (() -> Void)?
+        ) {
             self.text = text
+            self.onMoveDownToResults = onMoveDownToResults
+            self.onEscapeToEditor = onEscapeToEditor
         }
 
         func controlTextDidChange(_ obj: Notification) {
@@ -62,6 +82,22 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
             if text.wrappedValue != field.stringValue {
                 text.wrappedValue = field.stringValue
             }
+        }
+
+        func control(
+            _: NSControl,
+            textView _: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            if commandSelector == #selector(NSResponder.moveDown(_:)) {
+                onMoveDownToResults?()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                onEscapeToEditor?()
+                return true
+            }
+            return false
         }
     }
 }

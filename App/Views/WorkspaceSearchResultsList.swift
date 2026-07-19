@@ -2,15 +2,18 @@ import MarkdownCore
 import SwiftUI
 import WorkspaceKit
 
-/// Lazy grouped results list for workspace search (WS3C PR B).
+/// Lazy grouped results list for workspace search (WS3C PR B/C).
 ///
-/// Presentation is pure (`WorkspaceSearchResultsPresentation`); this view only renders and
-/// forwards activation through `activateWorkspaceSearchResult` with the retained context,
-/// file result, and match — never URL reconstruction.
+/// Presentation is pure (`WorkspaceSearchResultsPresentation`); this view only renders,
+/// routes keyboard selection through `WorkspaceSearchSelectionNavigation`, and forwards
+/// activation through `activateWorkspaceSearchResult` with the retained context, file result,
+/// and match — never URL reconstruction.
 struct WorkspaceSearchResultsList: View {
     @EnvironmentObject private var appState: AppState
     let presentation: WorkspaceSearchResultsPresentation
     @Binding var selectedRowID: WorkspaceSearchResultRowID?
+    var isResultsFocused: FocusState<Bool>.Binding
+    var onEscapeToQueryField: () -> Void
 
     var body: some View {
         List(selection: $selectedRowID) {
@@ -19,7 +22,45 @@ struct WorkspaceSearchResultsList: View {
             resultSections
         }
         .listStyle(.sidebar)
+        .accessibilityIdentifier(WorkspaceSearchAccessibility.resultsList)
+        .accessibilityLabel("Search results")
+        .focusable(presentationHasRows)
+        .focused(isResultsFocused)
+        .onKeyPress(.upArrow) {
+            guard isResultsFocused.wrappedValue else { return .ignored }
+            applySelection(.moveUp)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            guard isResultsFocused.wrappedValue else { return .ignored }
+            applySelection(.moveDown)
+            return .handled
+        }
+        .onKeyPress(.return) {
+            guard isResultsFocused.wrappedValue else { return .ignored }
+            activateSelection()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            guard isResultsFocused.wrappedValue else { return .ignored }
+            onEscapeToQueryField()
+            return .handled
+        }
     }
+
+    private var presentationHasRows: Bool {
+        presentation.sections.contains { !$0.rows.isEmpty }
+    }
+
+    private var orderedRowIDs: [WorkspaceSearchResultRowID] {
+        WorkspaceSearchSelectionNavigation.orderedRowIDs(in: presentation)
+    }
+
+    private var queryGeneration: UInt64 {
+        appState.workspaceSearchState.queryGeneration
+    }
+
+    // MARK: - Status / banners
 
     @ViewBuilder
     private var statusRows: some View {
@@ -27,64 +68,61 @@ struct WorkspaceSearchResultsList: View {
         case .hidden:
             EmptyView()
         case let .prompt(message):
-            Section {
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            statusSection(message)
         case .waiting:
-            Section {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Waiting to search…")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            statusSection("Waiting to search…")
         case let .searching(completed, total):
-            Section {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    if total > 0 {
-                        Text("Searching \(completed)/\(total)…")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Searching…")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            let text = total > 0 ? "Searching \(completed)/\(total)…" : "Searching…"
+            statusSection(text, showsProgress: true)
         case .noResults:
-            Section {
-                Text("No Results")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            statusSection("No Results")
         case let .validationFailure(message):
-            Section {
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
+            statusSection(message, isError: true)
         case let .serviceFailure(message):
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(message)
                         .font(.callout)
                         .foregroundStyle(.red)
+                        .accessibilityIdentifier(WorkspaceSearchAccessibility.status)
+                        .accessibilityLabel(
+                            WorkspaceSearchAccessibility.statusLabel(presentation.status) ?? message
+                        )
                     if presentation.showsRetry {
                         Button("Retry") {
                             retrySearch()
                         }
                         .buttonStyle(.bordered)
+                        .accessibilityIdentifier(WorkspaceSearchAccessibility.retry)
+                        .accessibilityLabel("Retry search")
                     }
                 }
             }
+        }
+    }
+
+    private func statusSection(
+        _ message: String,
+        showsProgress: Bool = false,
+        isError: Bool = false
+    ) -> some View {
+        Section {
+            HStack(spacing: 8) {
+                if showsProgress {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityHidden(true)
+                }
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(isError ? .red : .secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.status)
+            .accessibilityLabel(
+                WorkspaceSearchAccessibility.statusLabel(presentation.status) ?? message
+            )
         }
     }
 
@@ -96,6 +134,7 @@ struct WorkspaceSearchResultsList: View {
                     bannerView(banner)
                 }
             }
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.banners)
         }
     }
 
@@ -120,10 +159,15 @@ struct WorkspaceSearchResultsList: View {
                 }
             }
             .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.banner(banner))
+            .accessibilityLabel(WorkspaceSearchAccessibility.bannerLabel(banner))
         case .globalTruncation:
             Label("Results truncated (global match limit)", systemImage: "exclamationmark.triangle")
                 .font(.caption)
                 .foregroundStyle(.orange)
+                .accessibilityIdentifier(WorkspaceSearchAccessibility.banner(banner))
+                .accessibilityLabel(WorkspaceSearchAccessibility.bannerLabel(banner))
         case let .perFileTruncation(pathCount):
             Label(
                 "Results truncated in \(pathCount) file\(pathCount == 1 ? "" : "s")",
@@ -131,6 +175,8 @@ struct WorkspaceSearchResultsList: View {
             )
             .font(.caption)
             .foregroundStyle(.orange)
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.banner(banner))
+            .accessibilityLabel(WorkspaceSearchAccessibility.bannerLabel(banner))
         }
     }
 
@@ -153,15 +199,27 @@ struct WorkspaceSearchResultsList: View {
                         Image(systemName: "ellipsis.circle")
                             .font(.caption)
                             .foregroundStyle(.orange)
+                            .accessibilityLabel("Truncated")
                             .help("Matches truncated in this file")
                     }
                     if !section.canActivate {
                         Image(systemName: "nosign")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
+                            .accessibilityLabel("Unavailable")
                             .help("This result can’t be opened")
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(WorkspaceSearchAccessibility.section(section.id))
+                .accessibilityLabel(
+                    WorkspaceSearchAccessibility.sectionLabel(
+                        relativePath: section.relativePath,
+                        matchCount: section.matchCount,
+                        isTruncated: section.isTruncated,
+                        canActivate: section.canActivate
+                    )
+                )
             }
         }
     }
@@ -170,7 +228,14 @@ struct WorkspaceSearchResultsList: View {
         _ row: WorkspaceSearchResultRowModel,
         section: WorkspaceSearchResultFileSectionModel
     ) -> some View {
-        Button {
+        let isSelected = selectedRowID == row.id
+        let label = WorkspaceSearchAccessibility.rowLabel(
+            relativePath: section.relativePath,
+            lineNumber: row.lineNumber,
+            snippet: row.snippet
+        )
+
+        return Button {
             activate(row)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -201,8 +266,52 @@ struct WorkspaceSearchResultsList: View {
                 ? "Open \(section.relativePath) at line \(row.lineNumber)"
                 : "This result can’t be opened"
         )
-        .accessibilityLabel(
-            "\(section.relativePath), line \(row.lineNumber), \(row.snippet)"
+        .accessibilityIdentifier(WorkspaceSearchAccessibility.row(row.id))
+        .accessibilityLabel(label)
+        .accessibilityValue(WorkspaceSearchAccessibility.rowValue(canActivate: row.canActivate))
+        .accessibilityAddTraits(rowTraits(isSelected: isSelected, canActivate: row.canActivate))
+    }
+
+    private func rowTraits(
+        isSelected: Bool,
+        canActivate: Bool
+    ) -> AccessibilityTraits {
+        switch (canActivate, isSelected) {
+        case (true, true):
+            [.isButton, .isSelected]
+        case (true, false):
+            .isButton
+        case (false, true):
+            .isSelected
+        case (false, false):
+            []
+        }
+    }
+
+    // MARK: - Keyboard actions
+
+    private func applySelection(_ action: WorkspaceSearchSelectionAction) {
+        selectedRowID = WorkspaceSearchSelectionNavigation.reduce(
+            selection: selectedRowID,
+            action: action,
+            orderedIDs: orderedRowIDs,
+            queryGeneration: queryGeneration
+        )
+    }
+
+    private func activateSelection() {
+        guard let selectedRowID else { return }
+        // Only activate a result still held by the current search state.
+        guard let payload = WorkspaceSearchResultsPresenter.activationLookup(
+            rowID: selectedRowID,
+            searchState: appState.workspaceSearchState
+        ) else {
+            return
+        }
+        appState.activateWorkspaceSearchResult(
+            context: payload.context,
+            fileResult: payload.fileResult,
+            match: payload.match
         )
     }
 

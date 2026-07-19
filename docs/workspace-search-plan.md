@@ -1,14 +1,11 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, WS3A, and headless WS3B (PR #85 + merged PR #82 lifecycle
-> hardening + PR #84 mutation recovery) are complete. WS3C PR A adds a **visible** Files/Search
-> sidebar on the stable `HStack` shell, generation-scoped pending UI queries for open-scan
-> readiness, and `Command-Shift-F` → Search with AppKit key-window first-responder routing on an
-> owned Search `NSTextField` (not SwiftUI `FocusState`). WS3C PR B adds pure
-> `WorkspaceSearchResultsPresentation` + lazy grouped results (partial/searching/error retention,
-> skipped/truncation banners, UTF-16-safe highlights, authority-gated activation). Owner focus
-> sign-off, keyboard result navigation, and ordinary-edit/FSEvent refresh remain open. WS4 and
-> the overall Definition of Done remain open.**
+> **Status: IN PROGRESS. WS1, WS2, WS3A, headless WS3B (PR #85 + merged PR #82 lifecycle
+> hardening + PR #84 mutation recovery), and **WS3C** (sidebar shell, grouped results, keyboard
+> + accessibility) are complete. WS3C PR C adds pure selection navigation (no wrap), query-field
+> ↓ / results ↑↓ReturnEscape routing, stable accessibility identifiers/labels, and authority-gated
+> Return activation. Owner ⌘⇧F focus sign-off, ordinary-edit/FSEvent search refresh, WS4, and
+> the overall Definition of Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -787,7 +784,7 @@ pending.
 - [ ] Add `Command-Shift-F` and search-field focus arbitration.
 - [x] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
-- [ ] Add keyboard and accessibility support.
+- [x] Add keyboard and accessibility support.
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.

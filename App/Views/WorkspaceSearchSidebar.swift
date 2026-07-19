@@ -6,13 +6,15 @@ import SwiftUI
 /// Query publication goes through AppState UI helpers into the existing
 /// `setWorkspaceSearchQuery` / `clearWorkspaceSearch` contract.
 /// Results use a pure presentation model (`WorkspaceSearchResultsPresentation`) rendered in a
-/// lazy `List` (WS3C PR B). Keyboard result navigation lands in a later PR.
+/// lazy `List` (WS3C PR B). Keyboard routing (PR C): query-field ↓ selects the first result and
+/// focuses the list; ↑/↓ move without wrapping; Return activates via authority-gated lookup;
+/// Escape returns field→editor (keeps query/results) or results→field.
 ///
-/// Focus is AppKit first-responder routing on the owned Search `NSTextField`
-/// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState`. Only the hosting key window may
-/// apply a `focusRequestID`; key state and field binding are re-read live after every suspension
-/// (`WindowKeyStateTracker`). A cancelable, request-scoped retry loop covers the first `⌘⇧F`
-/// path where mode flips `.files → .search` while the field is still mounting.
+/// Query-field focus is AppKit first-responder routing on the owned Search `NSTextField`
+/// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState` for that control. Only the
+/// hosting key window may apply a `focusRequestID`; key state and field binding are re-read live
+/// after every suspension (`WindowKeyStateTracker`). Results list focus uses SwiftUI
+/// `FocusState` only as a secondary surface for ↑/↓/Return/Escape after ↓ from the field.
 struct WorkspaceSearchSidebar: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var windowKeyState = WindowKeyStateTracker()
@@ -20,6 +22,8 @@ struct WorkspaceSearchSidebar: View {
     @State private var focusAttemptTask: Task<Void, Never>?
     /// Selected match row stays view-local (activation uses retained search payload lookup).
     @State private var selectedResultRowID: WorkspaceSearchResultRowID?
+    /// Results-list keyboard focus (secondary to AppKit query-field first responder).
+    @FocusState private var isResultsFocused: Bool
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -38,7 +42,9 @@ struct WorkspaceSearchSidebar: View {
 
             WorkspaceSearchResultsList(
                 presentation: resultsPresentation,
-                selectedRowID: $selectedResultRowID
+                selectedRowID: $selectedResultRowID,
+                isResultsFocused: $isResultsFocused,
+                onEscapeToQueryField: { focusQueryFieldFromResults() }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -53,6 +59,8 @@ struct WorkspaceSearchSidebar: View {
             focusAttemptTask = nil
         }
         .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
+            // ⌘⇧F always targets the query field, not the results list.
+            isResultsFocused = false
             scheduleFocusAttempt()
         }
         .onChange(of: windowKeyState.keyEpoch) { _, _ in
@@ -71,6 +79,7 @@ struct WorkspaceSearchSidebar: View {
         }
         .onChange(of: appState.workspaceSearchState) { _, _ in
             refreshResultsPresentationMemo()
+            dropStaleSelectionIfNeeded()
         }
         .onChange(of: appState.workspaceSearchUI.queryText) { _, newValue in
             // clearWorkspaceSearch does not advance queryGeneration; still drop selection.
@@ -112,7 +121,9 @@ struct WorkspaceSearchSidebar: View {
             WorkspaceSearchQueryField(
                 text: queryTextBinding,
                 windowKeyState: windowKeyState,
-                isEnabled: appState.canUseWorkspaceSearch
+                isEnabled: appState.canUseWorkspaceSearch,
+                onMoveDownToResults: { moveDownFromQueryField() },
+                onEscapeToEditor: { escapeFromQueryFieldToEditor() }
             )
             .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
 
@@ -148,6 +159,7 @@ struct WorkspaceSearchSidebar: View {
             .toggleStyle(.button)
             .help("Match Case (off = smart case)")
             .accessibilityLabel("Match Case")
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.matchCase)
             .disabled(!appState.canUseWorkspaceSearch)
 
             Toggle(isOn: wholeWordBinding) {
@@ -157,8 +169,51 @@ struct WorkspaceSearchSidebar: View {
             .toggleStyle(.button)
             .help("Match whole words only")
             .accessibilityLabel("Whole Word")
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.wholeWord)
             .disabled(!appState.canUseWorkspaceSearch)
         }
+    }
+
+    // MARK: - Keyboard surfaces (PR C)
+
+    /// Query-field ↓: select first result and move keyboard focus into the list.
+    private func moveDownFromQueryField() {
+        refreshResultsPresentationMemo()
+        let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
+        guard !ordered.isEmpty else { return }
+
+        selectedResultRowID = WorkspaceSearchSelectionNavigation.reduce(
+            selection: selectedResultRowID,
+            action: .selectFirst,
+            orderedIDs: ordered,
+            queryGeneration: appState.workspaceSearchState.queryGeneration
+        )
+        isResultsFocused = true
+        // Drop AppKit field-editor first responder so list key presses are not swallowed.
+        if let window = windowKeyState.window {
+            window.makeFirstResponder(nil)
+        }
+    }
+
+    /// Query-field Escape: focus editor; keep query text and search results intact.
+    private func escapeFromQueryFieldToEditor() {
+        isResultsFocused = false
+        appState.requestEditorFocus()
+    }
+
+    /// Results Escape: return focus to the owned Search field without clearing selection state.
+    private func focusQueryFieldFromResults() {
+        isResultsFocused = false
+        scheduleFocusAttempt(forceQueryField: true)
+    }
+
+    private func dropStaleSelectionIfNeeded() {
+        let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
+        selectedResultRowID = WorkspaceSearchSelectionNavigation.resolvedSelection(
+            selectedResultRowID,
+            orderedIDs: ordered,
+            queryGeneration: appState.workspaceSearchState.queryGeneration
+        )
     }
 
     private var queryTextBinding: Binding<String> {
@@ -187,33 +242,45 @@ struct WorkspaceSearchSidebar: View {
     }
 
     /// Starts or replaces a cancelable, request-scoped focus attempt for this window.
-    private func scheduleFocusAttempt() {
+    ///
+    /// - Parameter forceQueryField: When true (Escape from results), focus the owned Search field
+    ///   even when the global `focusRequestID` was already marked applied (⌘⇧F receipt).
+    private func scheduleFocusAttempt(forceQueryField: Bool = false) {
         let tracker = windowKeyState
         let requestID = appState.workspaceSearchUI.focusRequestID
         let appliedID = appState.workspaceSearchUI.focusAppliedID
-        guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-            requestID: requestID,
-            appliedID: appliedID,
-            isKeyWindow: isLiveKeyWindow(tracker: tracker)
-        ) else {
-            return
+
+        if !forceQueryField {
+            guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: requestID,
+                appliedID: appliedID,
+                isKeyWindow: isLiveKeyWindow(tracker: tracker)
+            ) else {
+                return
+            }
+        } else {
+            guard isLiveKeyWindow(tracker: tracker) else { return }
         }
 
         focusAttemptTask?.cancel()
         let attemptID = requestID
+        let force = forceQueryField
         focusAttemptTask = Task { @MainActor in
             // Bounded retries: covers late TextField mount after `.files → .search` without
             // depending solely on a single 16 ms sleep or keyEpoch changes.
             for _ in 0 ..< 40 {
                 guard !Task.isCancelled else { return }
                 guard isLiveKeyWindow(tracker: tracker) else { return }
-                guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
-                guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-                    requestID: attemptID,
-                    appliedID: appState.workspaceSearchUI.focusAppliedID,
-                    isKeyWindow: isLiveKeyWindow(tracker: tracker)
-                ) else {
-                    return
+
+                if !force {
+                    guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
+                    guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                        requestID: attemptID,
+                        appliedID: appState.workspaceSearchUI.focusAppliedID,
+                        isKeyWindow: isLiveKeyWindow(tracker: tracker)
+                    ) else {
+                        return
+                    }
                 }
 
                 // Keep resolving the concrete Search field; layout may install it mid-loop.
@@ -226,7 +293,16 @@ struct WorkspaceSearchSidebar: View {
                     )
                 }
 
-                if confirmAndMarkFocusIfNeeded(attemptID: attemptID, tracker: tracker) {
+                if force {
+                    if let window = tracker.window,
+                       WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                           in: window,
+                           expectedField: tracker.resolvedSearchField()
+                       )
+                    {
+                        return
+                    }
+                } else if confirmAndMarkFocusIfNeeded(attemptID: attemptID, tracker: tracker) {
                     return
                 }
 

@@ -1,0 +1,91 @@
+import Foundation
+
+// MARK: - Keyboard selection (pure, no AppKit/SwiftUI)
+
+/// Focus surface for workspace search keyboard routing (WS3C PR C).
+enum WorkspaceSearchFocusSurface: Equatable {
+    case queryField
+    case results
+}
+
+/// Navigation actions for the results list. Movement does not wrap.
+enum WorkspaceSearchSelectionAction: Equatable {
+    case selectFirst
+    case selectLast
+    case moveUp
+    case moveDown
+    case clear
+}
+
+/// Pure selection reducer for ordered search-result rows.
+///
+/// Order is the presentation order already established by the App event path
+/// (path-ordered sections, then source-range order within each file). Navigation never cycles.
+enum WorkspaceSearchSelectionNavigation {
+    /// Flattens section rows into a single ordered identity list.
+    static func orderedRowIDs(
+        in presentation: WorkspaceSearchResultsPresentation
+    ) -> [WorkspaceSearchResultRowID] {
+        presentation.sections.flatMap { $0.rows.map(\.id) }
+    }
+
+    /// Returns the next selection for `action`. Stale IDs (missing from `orderedIDs` or
+    /// mismatched `queryGeneration`) are treated as no selection before applying the action.
+    static func reduce(
+        selection: WorkspaceSearchResultRowID?,
+        action: WorkspaceSearchSelectionAction,
+        orderedIDs: [WorkspaceSearchResultRowID],
+        queryGeneration: UInt64
+    ) -> WorkspaceSearchResultRowID? {
+        let validSelection = resolvedSelection(
+            selection,
+            orderedIDs: orderedIDs,
+            queryGeneration: queryGeneration
+        )
+
+        switch action {
+        case .clear:
+            return nil
+
+        case .selectFirst:
+            return orderedIDs.first
+
+        case .selectLast:
+            return orderedIDs.last
+
+        case .moveDown:
+            guard !orderedIDs.isEmpty else { return nil }
+            guard let current = validSelection,
+                  let index = orderedIDs.firstIndex(of: current)
+            else {
+                return orderedIDs.first
+            }
+            let next = orderedIDs.index(after: index)
+            return next < orderedIDs.endIndex ? orderedIDs[next] : current
+
+        case .moveUp:
+            guard !orderedIDs.isEmpty else { return nil }
+            guard let current = validSelection,
+                  let index = orderedIDs.firstIndex(of: current)
+            else {
+                return orderedIDs.last
+            }
+            if index == orderedIDs.startIndex {
+                return current
+            }
+            return orderedIDs[orderedIDs.index(before: index)]
+        }
+    }
+
+    /// Keeps `selection` only when it is present for the current generation.
+    static func resolvedSelection(
+        _ selection: WorkspaceSearchResultRowID?,
+        orderedIDs: [WorkspaceSearchResultRowID],
+        queryGeneration: UInt64
+    ) -> WorkspaceSearchResultRowID? {
+        guard let selection else { return nil }
+        guard selection.queryGeneration == queryGeneration else { return nil }
+        guard orderedIDs.contains(selection) else { return nil }
+        return selection
+    }
+}
