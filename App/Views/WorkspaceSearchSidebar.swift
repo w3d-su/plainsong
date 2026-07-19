@@ -6,13 +6,22 @@ import SwiftUI
 /// Query publication goes through AppState UI helpers into the existing
 /// `setWorkspaceSearchQuery` / `clearWorkspaceSearch` contract.
 /// Results use a pure presentation model (`WorkspaceSearchResultsPresentation`) rendered in a
-/// lazy `List` (WS3C PR B). Keyboard result navigation lands in a later PR.
+/// lazy `List` (WS3C PR B). Keyboard routing (PR C): query-field ↓ selects the first result and
+/// focuses the list; ↑/↓ move without wrapping; Return activates via authority-gated lookup;
+/// Escape returns field→editor (keeps query/results) or results→field.
 ///
-/// Focus is AppKit first-responder routing on the owned Search `NSTextField`
-/// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState`. Only the hosting key window may
-/// apply a `focusRequestID`; key state and field binding are re-read live after every suspension
-/// (`WindowKeyStateTracker`). A cancelable, request-scoped retry loop covers the first `⌘⇧F`
-/// path where mode flips `.files → .search` while the field is still mounting.
+/// Query-field focus is AppKit first-responder routing on the owned Search `NSTextField`
+/// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState` for that control. Only the
+/// hosting key window may apply a `focusRequestID`; key state and field binding are re-read live
+/// after every suspension (`WindowKeyStateTracker`). Results list focus uses SwiftUI
+/// `FocusState` only as a secondary surface for ↑/↓/Return/Escape after ↓ from the field
+/// **or** after a mouse selection into the list (click modality must match keyboard).
+///
+/// **Keyboard smoke (merge gate for PR C):** the hosted smoke drives **real `NSEvent`s**
+/// (`window.sendEvent`) — field ↓ through the field editor's `doCommandBy`, ↑/↓/Return/Escape
+/// through the focused List's `onKeyPress`, and a real click on a backing table row — so the
+/// gate detects silent native-table fallback. XCUITest in WS4 re-covers the same keys out of
+/// process.
 struct WorkspaceSearchSidebar: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var windowKeyState = WindowKeyStateTracker()
@@ -20,6 +29,12 @@ struct WorkspaceSearchSidebar: View {
     @State private var focusAttemptTask: Task<Void, Never>?
     /// Selected match row stays view-local (activation uses retained search payload lookup).
     @State private var selectedResultRowID: WorkspaceSearchResultRowID?
+    /// Results-list keyboard focus (secondary to AppKit query-field first responder).
+    @FocusState private var isResultsFocused: Bool
+    /// Monotonic focus intent: every deliberate raise/lower bumps it so the queued
+    /// post-handoff re-assert in `moveDownFromQueryField` cannot override a newer intent
+    /// (Escape, ⌘⇧F, or generation change landing between queueing and running).
+    @State private var resultsFocusIntentToken: UInt64 = 0
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -38,7 +53,9 @@ struct WorkspaceSearchSidebar: View {
 
             WorkspaceSearchResultsList(
                 presentation: resultsPresentation,
-                selectedRowID: $selectedResultRowID
+                selectedRowID: resultsSelectionBinding,
+                isResultsFocused: $isResultsFocused,
+                onEscapeToQueryField: { focusQueryFieldFromResults() }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -47,12 +64,15 @@ struct WorkspaceSearchSidebar: View {
         .onAppear {
             refreshResultsPresentationMemo()
             scheduleFocusAttempt()
+            publishKeyboardSmokeProbe()
         }
         .onDisappear {
             focusAttemptTask?.cancel()
             focusAttemptTask = nil
         }
         .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
+            // ⌘⇧F always targets the query field, not the results list.
+            lowerResultsFocus()
             scheduleFocusAttempt()
         }
         .onChange(of: windowKeyState.keyEpoch) { _, _ in
@@ -67,15 +87,24 @@ struct WorkspaceSearchSidebar: View {
         }
         .onChange(of: appState.workspaceSearchState.queryGeneration) { _, _ in
             selectedResultRowID = nil
+            lowerResultsFocus()
             refreshResultsPresentationMemo()
+        }
+        .onChange(of: isResultsFocused) { _, _ in
+            publishKeyboardSmokeProbe()
+        }
+        .onChange(of: selectedResultRowID) { _, _ in
+            publishKeyboardSmokeProbe()
         }
         .onChange(of: appState.workspaceSearchState) { _, _ in
             refreshResultsPresentationMemo()
+            dropStaleSelectionIfNeeded()
         }
         .onChange(of: appState.workspaceSearchUI.queryText) { _, newValue in
             // clearWorkspaceSearch does not advance queryGeneration; still drop selection.
             if newValue.isEmpty {
                 selectedResultRowID = nil
+                lowerResultsFocus()
             }
             refreshResultsPresentationMemo()
         }
@@ -89,6 +118,38 @@ struct WorkspaceSearchSidebar: View {
 
     private var resultsPresentation: WorkspaceSearchResultsPresentation {
         presentationMemoValue
+    }
+
+    /// List/button selection also claims the results keyboard surface so click-then-↑/↓
+    /// uses the pure reducer (stale-gating) instead of native table navigation alone.
+    private var resultsSelectionBinding: Binding<WorkspaceSearchResultRowID?> {
+        Binding(
+            get: { selectedResultRowID },
+            set: { newValue in
+                selectedResultRowID = newValue
+                if newValue != nil {
+                    resultsFocusIntentToken &+= 1
+                    isResultsFocused = true
+                }
+                publishKeyboardSmokeProbe()
+            }
+        )
+    }
+
+    /// Deliberately releases the results keyboard surface and invalidates any queued re-assert.
+    private func lowerResultsFocus() {
+        resultsFocusIntentToken &+= 1
+        isResultsFocused = false
+        publishKeyboardSmokeProbe()
+    }
+
+    private func publishKeyboardSmokeProbe() {
+        #if DEBUG
+            WorkspaceSearchKeyboardSmokeProbe.publish(
+                selection: selectedResultRowID,
+                resultsFocused: isResultsFocused
+            )
+        #endif
     }
 
     private func refreshResultsPresentationMemo() {
@@ -112,7 +173,9 @@ struct WorkspaceSearchSidebar: View {
             WorkspaceSearchQueryField(
                 text: queryTextBinding,
                 windowKeyState: windowKeyState,
-                isEnabled: appState.canUseWorkspaceSearch
+                isEnabled: appState.canUseWorkspaceSearch,
+                onMoveDownToResults: { moveDownFromQueryField() },
+                onEscapeToEditor: { escapeFromQueryFieldToEditor() }
             )
             .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
 
@@ -148,6 +211,7 @@ struct WorkspaceSearchSidebar: View {
             .toggleStyle(.button)
             .help("Match Case (off = smart case)")
             .accessibilityLabel("Match Case")
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.matchCase)
             .disabled(!appState.canUseWorkspaceSearch)
 
             Toggle(isOn: wholeWordBinding) {
@@ -157,7 +221,72 @@ struct WorkspaceSearchSidebar: View {
             .toggleStyle(.button)
             .help("Match whole words only")
             .accessibilityLabel("Whole Word")
+            .accessibilityIdentifier(WorkspaceSearchAccessibility.wholeWord)
             .disabled(!appState.canUseWorkspaceSearch)
+        }
+    }
+
+    // MARK: - Keyboard surfaces (PR C)
+
+    /// Query-field ↓: select first result and move keyboard focus into the list.
+    ///
+    /// Focus handoff: (1) clear AppKit field-editor first responder, (2) write selection,
+    /// (3) claim results `FocusState`, (4) re-assert focus on the next main turn so SwiftUI
+    /// can install key delivery after `makeFirstResponder(nil)` (field editor otherwise keeps
+    /// arrows). Owner / hosted smoke verifies this sequence; WS4 XCUITest remains the long-term
+    /// automation home.
+    private func moveDownFromQueryField() {
+        refreshResultsPresentationMemo()
+        let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
+        guard !ordered.isEmpty else { return }
+
+        // Drop the field editor before claiming results focus so ↓ is not re-handled by NSText.
+        if let window = windowKeyState.window {
+            window.makeFirstResponder(nil)
+        }
+
+        selectedResultRowID = WorkspaceSearchSelectionNavigation.reduce(
+            selection: selectedResultRowID,
+            action: .selectFirst,
+            orderedIDs: ordered,
+            queryGeneration: appState.workspaceSearchState.queryGeneration
+        )
+        resultsFocusIntentToken &+= 1
+        let intentToken = resultsFocusIntentToken
+        isResultsFocused = true
+        publishKeyboardSmokeProbe()
+
+        // Re-assert after the current AppKit turn so FocusState can become key after nil FR.
+        // Guarded by the intent token: a newer Escape/⌘⇧F/generation intent wins.
+        Task { @MainActor in
+            guard resultsFocusIntentToken == intentToken else { return }
+            isResultsFocused = true
+            publishKeyboardSmokeProbe()
+        }
+    }
+
+    /// Query-field Escape: focus editor; keep query text and search results intact.
+    private func escapeFromQueryFieldToEditor() {
+        lowerResultsFocus()
+        appState.requestEditorFocus()
+    }
+
+    /// Results Escape: return focus to the owned Search field without clearing selection state.
+    private func focusQueryFieldFromResults() {
+        lowerResultsFocus()
+        scheduleFocusAttempt(forceQueryField: true)
+    }
+
+    private func dropStaleSelectionIfNeeded() {
+        let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
+        let resolved = WorkspaceSearchSelectionNavigation.resolvedSelection(
+            selectedResultRowID,
+            orderedIDs: ordered,
+            queryGeneration: appState.workspaceSearchState.queryGeneration
+        )
+        if resolved != selectedResultRowID {
+            selectedResultRowID = resolved
+            publishKeyboardSmokeProbe()
         }
     }
 
@@ -182,96 +311,44 @@ struct WorkspaceSearchSidebar: View {
         )
     }
 
-    private func isLiveKeyWindow(tracker: WindowKeyStateTracker) -> Bool {
-        appState.isWorkspaceSearchFocusKeyWindow(tracker.window)
-    }
-
     /// Starts or replaces a cancelable, request-scoped focus attempt for this window.
-    private func scheduleFocusAttempt() {
+    /// The bounded retry loop lives in `WorkspaceSearchFocusAttemptLoop`.
+    ///
+    /// - Parameter forceQueryField: When true (Escape from results), focus the owned Search field
+    ///   even when the global `focusRequestID` was already marked applied (⌘⇧F receipt).
+    private func scheduleFocusAttempt(forceQueryField: Bool = false) {
         let tracker = windowKeyState
+        let appState = appState
         let requestID = appState.workspaceSearchUI.focusRequestID
         let appliedID = appState.workspaceSearchUI.focusAppliedID
-        guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-            requestID: requestID,
-            appliedID: appliedID,
-            isKeyWindow: isLiveKeyWindow(tracker: tracker)
-        ) else {
-            return
+
+        if !forceQueryField {
+            guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: requestID,
+                appliedID: appliedID,
+                isKeyWindow: WorkspaceSearchFocusAttemptLoop.isLiveKeyWindow(
+                    appState: appState,
+                    tracker: tracker
+                )
+            ) else {
+                return
+            }
+        } else {
+            guard WorkspaceSearchFocusAttemptLoop.isLiveKeyWindow(
+                appState: appState,
+                tracker: tracker
+            ) else { return }
         }
 
         focusAttemptTask?.cancel()
-        let attemptID = requestID
+        let force = forceQueryField
         focusAttemptTask = Task { @MainActor in
-            // Bounded retries: covers late TextField mount after `.files → .search` without
-            // depending solely on a single 16 ms sleep or keyEpoch changes.
-            for _ in 0 ..< 40 {
-                guard !Task.isCancelled else { return }
-                guard isLiveKeyWindow(tracker: tracker) else { return }
-                guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
-                guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-                    requestID: attemptID,
-                    appliedID: appState.workspaceSearchUI.focusAppliedID,
-                    isKeyWindow: isLiveKeyWindow(tracker: tracker)
-                ) else {
-                    return
-                }
-
-                // Keep resolving the concrete Search field; layout may install it mid-loop.
-                tracker.refreshBoundSearchFieldIfNeeded()
-
-                if let window = tracker.window, isLiveKeyWindow(tracker: tracker) {
-                    WorkspaceSearchFieldFocus.makeSearchFieldFirstResponder(
-                        in: window,
-                        preferredField: tracker.resolvedSearchField()
-                    )
-                }
-
-                if confirmAndMarkFocusIfNeeded(attemptID: attemptID, tracker: tracker) {
-                    return
-                }
-
-                try? await Task.sleep(nanoseconds: 16_000_000)
-            }
+            await WorkspaceSearchFocusAttemptLoop.run(
+                appState: appState,
+                tracker: tracker,
+                attemptID: requestID,
+                force: force
+            )
         }
-    }
-
-    /// Returns `true` when the global applied receipt was advanced for `attemptID`.
-    @discardableResult
-    private func confirmAndMarkFocusIfNeeded(
-        attemptID: UInt64,
-        tracker: WindowKeyStateTracker
-    ) -> Bool {
-        guard isLiveKeyWindow(tracker: tracker) else { return false }
-        guard appState.workspaceSearchUI.focusRequestID == attemptID else { return false }
-        guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-            requestID: attemptID,
-            appliedID: appState.workspaceSearchUI.focusAppliedID,
-            isKeyWindow: isLiveKeyWindow(tracker: tracker)
-        ) else {
-            return false
-        }
-        guard let window = tracker.window else { return false }
-        let searchField = tracker.resolvedSearchField()
-
-        if !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-            in: window,
-            expectedField: searchField
-        ) {
-            guard isLiveKeyWindow(tracker: tracker),
-                  WorkspaceSearchFieldFocus.makeSearchFieldFirstResponder(
-                      in: window,
-                      preferredField: searchField
-                  ),
-                  WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                      in: window,
-                      expectedField: tracker.resolvedSearchField()
-                  )
-            else {
-                return false
-            }
-        }
-        guard isLiveKeyWindow(tracker: tracker) else { return false }
-        appState.markWorkspaceSearchFocusApplied(attemptID)
-        return true
     }
 }

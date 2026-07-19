@@ -35,6 +35,7 @@ struct WorkspaceSidebar: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .accessibilityLabel("Sidebar Mode")
+        .accessibilityIdentifier(WorkspaceSearchAccessibility.modePicker)
         .disabled(!appState.canUseWorkspaceSearch && appState.workspaceSearchUI.mode == .files)
         .help(
             appState.canUseWorkspaceSearch
