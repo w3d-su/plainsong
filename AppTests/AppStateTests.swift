@@ -11436,6 +11436,751 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .searching)
     }
 
+    func testSidebarModeSwitchDoesNotMutateFilesTreeSelectionOrDirectoryExpansion() throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha", "nested/b.md": "beta"],
+            currentPath: "a.md"
+        )
+        defer { cleanUp(fixture) }
+
+        // makeFixture's path-only snapshot omits directory entries; install an explicit tree
+        // that includes the nested folder so selection/expansion are meaningful.
+        let hierarchicalSnapshot = WorkspaceFileSnapshot(entries: [
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "a.md",
+                kind: .markdown,
+                identity: "id:a.md",
+                contentModificationDate: nil
+            ),
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "nested",
+                kind: .directory,
+                identity: "id:nested",
+                contentModificationDate: nil
+            ),
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "nested/b.md",
+                kind: .markdown,
+                identity: "id:nested/b.md",
+                contentModificationDate: nil
+            ),
+        ])
+        fixture.appState.workspaceSnapshot = hierarchicalSnapshot
+        fixture.appState.workspaceTree = WorkspaceFileTree.reconcile(
+            previous: fixture.appState.workspaceTree,
+            snapshot: hierarchicalSnapshot,
+            options: .init(showAllFiles: false)
+        )
+
+        let treeBefore = try XCTUnwrap(fixture.appState.workspaceTree)
+        let nestedDirectory = try XCTUnwrap(
+            treeBefore.root.children.first { $0.isDirectory && $0.relativePath == "nested" }
+        )
+        let nestedFile = try XCTUnwrap(
+            nestedDirectory.children.first {
+                $0.isEditableMarkdown && $0.relativePath == "nested/b.md"
+            }
+        )
+        XCTAssertNotEqual(nestedDirectory.id, nestedFile.id)
+        XCTAssertNotEqual(treeBefore.selectedNodeID, nestedFile.id)
+
+        fixture.appState.setWorkspaceNodeExpanded(true, id: nestedDirectory.id)
+        fixture.appState.selectWorkspaceNode(id: nestedFile.id)
+
+        let treeAfterSelect = try XCTUnwrap(fixture.appState.workspaceTree)
+        XCTAssertEqual(treeAfterSelect.selectedNodeID, nestedFile.id)
+        XCTAssertTrue(treeAfterSelect.isExpanded(nestedDirectory.id))
+        XCTAssertEqual(fixture.appState.currentDocument.fileURL?.lastPathComponent, "b.md")
+
+        fixture.appState.selectWorkspaceSidebarMode(.search)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .search)
+
+        fixture.appState.selectWorkspaceSidebarMode(.files)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .files)
+
+        let treeAfterModeCycle = try XCTUnwrap(fixture.appState.workspaceTree)
+        XCTAssertEqual(treeAfterModeCycle.selectedNodeID, nestedFile.id)
+        XCTAssertTrue(treeAfterModeCycle.isExpanded(nestedDirectory.id))
+        XCTAssertEqual(
+            Set(treeAfterModeCycle.root.children.map(\.relativePath)),
+            Set(["a.md", "nested"])
+        )
+        XCTAssertEqual(fixture.appState.currentDocument.fileURL?.lastPathComponent, "b.md")
+    }
+
+    func testRepeatedFocusWorkspaceSearchIncrementsTokenAndConsumedTokenDoesNotReplay() throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 0)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 0)
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 0,
+                appliedID: 0,
+                isKeyWindow: true
+            )
+        )
+        // Background windows must never apply, even for a fresh token.
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 1,
+                appliedID: 0,
+                isKeyWindow: false
+            )
+        )
+
+        appState.focusWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 1)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 0)
+        XCTAssertTrue(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 1,
+                appliedID: 0,
+                isKeyWindow: true
+            )
+        )
+
+        // Only a key-window success marks the global receipt (background must not consume).
+        appState.markWorkspaceSearchFocusApplied(1)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 1)
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 1,
+                appliedID: 1,
+                isKeyWindow: true
+            )
+        )
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 1,
+                appliedID: 1,
+                isKeyWindow: false
+            )
+        )
+
+        // Files → Search via picker must not replay the spent token.
+        appState.selectWorkspaceSidebarMode(.files)
+        appState.selectWorkspaceSidebarMode(.search)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 1)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 1)
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: appState.workspaceSearchUI.focusRequestID,
+                appliedID: appState.workspaceSearchUI.focusAppliedID,
+                isKeyWindow: true
+            )
+        )
+
+        // Workspace reset keeps the request id but marks it fully applied (no replay after reopen).
+        appState.resetWorkspaceSearchUIState()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 1)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 1)
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: appState.workspaceSearchUI.focusRequestID,
+                appliedID: appState.workspaceSearchUI.focusAppliedID,
+                isKeyWindow: true
+            )
+        )
+
+        // A new shortcut request after re-enabling search focus is required.
+        appState.workspaceRootURL = fixture.rootURL
+        appState.focusWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 2)
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, 1)
+        XCTAssertTrue(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 2,
+                appliedID: 1,
+                isKeyWindow: true
+            )
+        )
+        // Non-key windows still must not treat the new token as theirs to consume.
+        XCTAssertFalse(
+            WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: 2,
+                appliedID: 1,
+                isKeyWindow: false
+            )
+        )
+
+        appState.focusWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 3)
+    }
+
+    func testSearchFieldIdentityIsIdentifierOnlyNotLabelOrPlaceholder() {
+        // Same human-facing strings as Search, but a different accessibility identifier.
+        let decoy = NSTextField(string: "")
+        decoy.isEditable = true
+        decoy.placeholderString = WorkspaceSearchFieldFocus.placeholder
+        decoy.setAccessibilityLabel(WorkspaceSearchFieldFocus.accessibilityLabel)
+        decoy.setAccessibilityIdentifier("plainsong.frontmatter.title")
+
+        // Unlabeled sibling: old binder path would have stamped this as Search.
+        let unlabeled = NSTextField(string: "")
+        unlabeled.isEditable = true
+        unlabeled.placeholderString = WorkspaceSearchFieldFocus.placeholder
+        unlabeled.setAccessibilityLabel(WorkspaceSearchFieldFocus.accessibilityLabel)
+        // Intentionally no accessibility identifier.
+
+        let search = NSTextField(string: "")
+        search.isEditable = true
+        search.placeholderString = WorkspaceSearchFieldFocus.placeholder
+        search.setAccessibilityLabel(WorkspaceSearchFieldFocus.accessibilityLabel)
+        search.setAccessibilityIdentifier(WorkspaceSearchFieldFocus.accessibilityIdentifier)
+
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 100))
+        // Decys first so a non-identifier matcher would wrongly prefer them.
+        root.addSubview(unlabeled)
+        root.addSubview(decoy)
+        root.addSubview(search)
+
+        XCTAssertTrue(WorkspaceSearchFieldFocus.matchesSearchField(search))
+        XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
+        XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(unlabeled))
+        XCTAssertTrue(WorkspaceSearchFieldFocus.findSearchTextField(in: root) === search)
+        XCTAssertNil(
+            [decoy, unlabeled].first { WorkspaceSearchFieldFocus.findSearchTextField(in: root) === $0 }
+        )
+    }
+
+    func testHostedSearchFieldHasStableIdentifierAndAdjacentUnlabeledDecoyIsUntouched() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        appState.selectWorkspaceSidebarMode(.search)
+
+        // Container holds an unstamped decoy *outside* the SwiftUI Search TextField host, so a
+        // scoped binder must not see it, while a recursive sibling-subtree scan would.
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 400))
+        let decoy = NSTextField(string: "")
+        decoy.isEditable = true
+        decoy.isBezeled = true
+        decoy.placeholderString = WorkspaceSearchFieldFocus.placeholder
+        decoy.setAccessibilityLabel(WorkspaceSearchFieldFocus.accessibilityLabel)
+        decoy.frame = NSRect(x: 8, y: 360, width: 264, height: 24)
+        // No accessibility identifier — the forbidden binder path would stamp this.
+
+        let searchRoot = WorkspaceSearchSidebar()
+            .environmentObject(appState)
+            .frame(width: 280, height: 340)
+        let hostingView = NSHostingView(rootView: AnyView(searchRoot))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 280, height: 340)
+
+        container.addSubview(decoy)
+        container.addSubview(hostingView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 40, y: 40, width: 280, height: 400),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = container
+        window.makeKeyAndOrderFront(nil)
+        defer {
+            appState.workspaceSearchFocusKeyWindowCheck = nil
+            window.orderOut(nil)
+        }
+
+        try await waitUntil("Search field is discoverable by identifier") {
+            WorkspaceSearchFieldFocus.findSearchTextField(in: window.contentView) != nil
+        }
+
+        let searchField = try XCTUnwrap(
+            WorkspaceSearchFieldFocus.findSearchTextField(in: window.contentView)
+        )
+        XCTAssertEqual(
+            searchField.accessibilityIdentifier(),
+            WorkspaceSearchFieldFocus.accessibilityIdentifier
+        )
+        XCTAssertFalse(searchField === decoy)
+
+        // Decoy remains unstamped before and after focus.
+        XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
+        XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: window)
+        appState.focusWorkspaceSearch()
+        let requestID = appState.workspaceSearchUI.focusRequestID
+
+        try await waitUntil("Search field receives focus receipt") {
+            appState.workspaceSearchUI.focusAppliedID == requestID
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: window)
+        }
+
+        XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
+        XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
+        XCTAssertFalse(window.firstResponder === decoy)
+        if let fieldEditor = window.firstResponder as? NSTextView, fieldEditor.isFieldEditor {
+            XCTAssertFalse(decoy.currentEditor() === fieldEditor)
+        }
+        XCTAssertTrue(
+            WorkspaceSearchFieldFocus.findSearchTextField(in: window.contentView) === searchField
+        )
+    }
+
+    func testHostedSearchFocusFromFilesModeMountsFieldAndAppliesFirstCommandShiftF() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        // Product path: start on Files; ⌘⇧F flips mode and focus token together.
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+
+        let host = try await makeWorkspaceSidebarHost(appState: appState, makeKey: true)
+        defer {
+            appState.workspaceSearchFocusKeyWindowCheck = nil
+            host.window.orderOut(nil)
+        }
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: host.window)
+
+        // Search field must not exist yet while Files mode is showing.
+        XCTAssertNil(WorkspaceSearchFieldFocus.findSearchTextField(in: host.window.contentView))
+
+        appState.focusWorkspaceSearch()
+        let requestID = appState.workspaceSearchUI.focusRequestID
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+        XCTAssertGreaterThan(requestID, 0)
+
+        try await waitUntil("first ⌘⇧F mounts Search field and applies key-window focus") {
+            appState.workspaceSearchUI.focusAppliedID == requestID
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+        }
+        XCTAssertNotNil(WorkspaceSearchFieldFocus.findSearchTextField(in: host.window.contentView))
+    }
+
+    func testHostedSearchFocusOnlyKeyWindowBecomesFirstResponder() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+
+        // Mount both hosts while still on Files, then fire focus so Search mounts under load.
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        let hostA = try await makeWorkspaceSidebarHost(appState: appState, makeKey: true)
+        let hostB = try await makeWorkspaceSidebarHost(appState: appState, makeKey: false)
+        defer {
+            appState.workspaceSearchFocusKeyWindowCheck = nil
+            hostA.window.orderOut(nil)
+            hostB.window.orderOut(nil)
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: hostA.window)
+
+        appState.focusWorkspaceSearch()
+        let requestID = appState.workspaceSearchUI.focusRequestID
+        XCTAssertGreaterThan(requestID, 0)
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+
+        try await waitUntil("key window search field is first responder and receipt advances") {
+            appState.workspaceSearchUI.focusAppliedID == requestID
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostA.window)
+        }
+        XCTAssertFalse(
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostB.window)
+        )
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, requestID)
+    }
+
+    func testHostedSearchFocusDoesNotMarkAppliedAfterLosingKeyBeforeReceipt() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        appState.selectWorkspaceSidebarMode(.search)
+
+        let hostA = try await makeSearchSidebarHost(appState: appState, makeKey: true)
+        let hostB = try await makeSearchSidebarHost(appState: appState, makeKey: false)
+        defer {
+            appState.workspaceSearchFocusKeyWindowCheck = nil
+            hostA.window.orderOut(nil)
+            hostB.window.orderOut(nil)
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: hostA.window)
+
+        appState.focusWorkspaceSearch()
+        let requestID = appState.workspaceSearchUI.focusRequestID
+
+        // Immediately transfer designated key so any delayed task from A must re-read live
+        // eligibility and refuse to mark the global receipt after losing key routing.
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: hostB.window)
+
+        // Give A's delayed focus task time to run post-await checks against the new routing.
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        if appState.workspaceSearchUI.focusAppliedID == requestID {
+            // B became designated key and legitimately finished the pending request.
+            XCTAssertTrue(
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostB.window)
+            )
+            XCTAssertFalse(
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostA.window)
+            )
+        } else {
+            // Receipt still open: A must not have stolen it after losing key routing.
+            XCTAssertLessThan(appState.workspaceSearchUI.focusAppliedID, requestID)
+            XCTAssertFalse(
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostA.window)
+            )
+            // B is designated key with an open receipt — key-routing refresh should let B claim it.
+            appState.refreshWorkspaceSearchFocusKeyRouting()
+            try await waitUntil("new key window claims the still-open focus receipt") {
+                appState.workspaceSearchUI.focusAppliedID == requestID
+                    && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostB.window)
+            }
+        }
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, requestID)
+        XCTAssertFalse(
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostA.window)
+        )
+    }
+
+    func testHostedSearchFocusNewRequestGoesToNewlyKeyWindow() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"]
+        )
+        defer { cleanUp(fixture) }
+        let appState = fixture.appState
+        appState.selectWorkspaceSidebarMode(.search)
+
+        let hostA = try await makeSearchSidebarHost(appState: appState, makeKey: true)
+        let hostB = try await makeSearchSidebarHost(appState: appState, makeKey: false)
+        defer {
+            appState.workspaceSearchFocusKeyWindowCheck = nil
+            hostA.window.orderOut(nil)
+            hostB.window.orderOut(nil)
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: hostA.window)
+
+        appState.focusWorkspaceSearch()
+        let firstRequest = appState.workspaceSearchUI.focusRequestID
+        try await waitUntil("first key window applies focus") {
+            appState.workspaceSearchUI.focusAppliedID == firstRequest
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostA.window)
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: hostB.window)
+        appState.focusWorkspaceSearch()
+        let secondRequest = appState.workspaceSearchUI.focusRequestID
+        XCTAssertGreaterThan(secondRequest, firstRequest)
+
+        try await waitUntil("new key window applies the newer focus request") {
+            appState.workspaceSearchUI.focusAppliedID == secondRequest
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostB.window)
+        }
+        // Receipt belongs to the second request (B). Non-key window firstResponder can be stale
+        // under XCTest; the key guarantee is B is first responder with the latest receipt.
+        XCTAssertEqual(appState.workspaceSearchUI.focusAppliedID, secondRequest)
+        XCTAssertTrue(
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: hostB.window)
+        )
+    }
+
+    func testFocusWorkspaceSearchDisabledWithoutFolderWorkspace() {
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        XCTAssertFalse(appState.canUseWorkspaceSearch)
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 0)
+
+        appState.focusWorkspaceSearch()
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 0)
+
+        appState.selectWorkspaceSidebarMode(.search)
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+    }
+
+    func testSingleFileModeCannotStartWorkspaceSearchFromUI() throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("plainsong-single-\(UUID().uuidString).md")
+        try "needle body".write(to: fileURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let session = DocumentSession(text: "needle body", url: fileURL, fileKind: .markdown)
+        let appState = AppState(
+            currentDocument: session,
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: 0,
+            shouldRestoreLastOpenedFile: false
+        )
+        XCTAssertNil(appState.workspaceRootURL)
+        XCTAssertFalse(appState.canUseWorkspaceSearch)
+        XCTAssertFalse(appState.isWorkspaceSearchReady)
+
+        appState.updateWorkspaceSearchQueryText("needle")
+        XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+        XCTAssertNil(appState.workspaceSearchUI.pendingResumeGeneration)
+        XCTAssertTrue(provider.requests.isEmpty)
+        XCTAssertEqual(appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(appState.workspaceSearchState.activeQuery)
+    }
+
+    func testQueryTypedDuringOpenScanResumesOnceWhenScanCompletes() async throws {
+        let rootURL = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        try "needle body".write(
+            to: rootURL.appendingPathComponent("a.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let appState = AppState(
+            directoryScanner: scanner,
+            workspaceSearchStreamProvider: provider,
+            workspaceSearchDebounceNanoseconds: 0,
+            shouldRestoreLastOpenedFile: false
+        )
+
+        appState.openExternalFile(rootURL)
+        await scanner.waitForRequestCount(1)
+        XCTAssertTrue(appState.canUseWorkspaceSearch)
+        XCTAssertFalse(appState.isWorkspaceSearchReady)
+        let pendingGeneration = appState.workspaceGeneration
+        XCTAssertGreaterThan(pendingGeneration, 0)
+
+        appState.updateWorkspaceSearchQueryText("needle")
+        XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+        XCTAssertEqual(appState.workspaceSearchUI.pendingResumeGeneration, pendingGeneration)
+        XCTAssertTrue(provider.requests.isEmpty)
+        XCTAssertEqual(appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(appState.workspaceSearchState.activeQuery)
+
+        await scanner.completeRequest(at: 0, with: WorkspaceFileSnapshot(entries: [
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "a.md",
+                kind: .markdown,
+                identity: "id:a.md",
+                contentModificationDate: nil
+            ),
+        ]))
+        try await waitUntil("pending open-scan query starts exactly once after install") {
+            provider.requests.count == 1 && appState.isWorkspaceSearchReady
+        }
+        XCTAssertEqual(provider.requests[0].query.pattern, "needle")
+        XCTAssertEqual(provider.requests[0].query.caseSensitivity, .smart)
+        XCTAssertNil(appState.workspaceSearchUI.pendingResumeGeneration)
+        XCTAssertEqual(appState.workspaceSearchState.activeQuery?.pattern, "needle")
+
+        // A later ordinary reload (FSEvent-style) must not re-arm search from the non-empty field.
+        let requestCountAfterPendingResume = provider.requests.count
+        appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(2)
+        await scanner.completeRequest(at: 1, with: WorkspaceFileSnapshot(entries: [
+            WorkspaceFileSnapshot.Entry(
+                relativePath: "a.md",
+                kind: .markdown,
+                identity: "id:a.md",
+                contentModificationDate: nil
+            ),
+        ]))
+        try await waitUntil("second snapshot installs") {
+            appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+                && appState.isWorkspaceSearchReady
+        }
+        // Give any accidental resume a chance to race; it must not fire.
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(provider.requests.count, requestCountAfterPendingResume)
+        XCTAssertNil(appState.workspaceSearchUI.pendingResumeGeneration)
+        // Invalidate cleared the active search; refresh is intentionally not implemented here.
+        XCTAssertNil(appState.workspaceSearchState.activeQuery)
+        XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
+    }
+
+    func testSearchUIMapsCaseAndWholeWordOntoTextSearchQuery() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "Hello hello"],
+            debounceNanoseconds: 0
+        )
+        defer { cleanUp(fixture) }
+
+        // Default smart case + no whole word
+        fixture.appState.updateWorkspaceSearchQueryText("hello")
+        try await waitUntil("smart-case request starts") { provider.requests.count == 1 }
+        XCTAssertEqual(provider.requests[0].query.pattern, "hello")
+        XCTAssertEqual(provider.requests[0].query.caseSensitivity, .smart)
+        XCTAssertFalse(provider.requests[0].query.wholeWord)
+
+        // Aa forces sensitive
+        fixture.appState.setWorkspaceSearchMatchCase(true)
+        try await waitUntil("match-case request starts") { provider.requests.count == 2 }
+        XCTAssertEqual(provider.requests[1].query.caseSensitivity, .sensitive)
+        XCTAssertEqual(provider.requests[1].query.pattern, "hello")
+        XCTAssertFalse(provider.requests[1].query.wholeWord)
+
+        // Whole word independent toggle
+        fixture.appState.setWorkspaceSearchWholeWord(true)
+        try await waitUntil("whole-word request starts") { provider.requests.count == 3 }
+        XCTAssertEqual(provider.requests[2].query.caseSensitivity, .sensitive)
+        XCTAssertTrue(provider.requests[2].query.wholeWord)
+
+        // Turning Aa off restores smart case while keeping whole word
+        fixture.appState.setWorkspaceSearchMatchCase(false)
+        try await waitUntil("smart-case restore request starts") { provider.requests.count == 4 }
+        XCTAssertEqual(provider.requests[3].query.caseSensitivity, .smart)
+        XCTAssertTrue(provider.requests[3].query.wholeWord)
+
+        var ui = WorkspaceSearchUIState(queryText: "AbC", matchCase: false, wholeWord: true)
+        XCTAssertEqual(
+            ui.makeTextSearchQuery(),
+            TextSearchQuery(pattern: "AbC", caseSensitivity: .smart, wholeWord: true)
+        )
+        ui.matchCase = true
+        XCTAssertEqual(
+            ui.makeTextSearchQuery(),
+            TextSearchQuery(pattern: "AbC", caseSensitivity: .sensitive, wholeWord: true)
+        )
+    }
+
+    func testEmptySearchUIQueryClearsActiveSearchWithoutDestroyingMode() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"],
+            debounceNanoseconds: 0
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.focusWorkspaceSearch()
+        fixture.appState.updateWorkspaceSearchQueryText("alpha")
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .search)
+
+        fixture.appState.updateWorkspaceSearchQueryText("")
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.queryText, "")
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .search)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
+        XCTAssertTrue(fixture.appState.workspaceSearchState.fileResults.isEmpty)
+    }
+
+    func testSwitchingToFilesKeepsValidSearchResultsAndQuery() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"],
+            debounceNanoseconds: 0
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.focusWorkspaceSearch()
+        fixture.appState.updateWorkspaceSearchQueryText("alpha")
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+        let request = provider.requests[0]
+        provider.yield(
+            .fileResult(context(for: request), result(path: "a.md", text: "alpha", needle: "alpha")),
+            to: 0
+        )
+        provider.yield(
+            .completed(
+                context(for: request),
+                summary(candidateFileCount: 1, searchedFileCount: 1, totalMatchCount: 1)
+            ),
+            to: 0
+        )
+        try await waitUntil("result applies") {
+            fixture.appState.workspaceSearchState.phase == .completed
+                && fixture.appState.workspaceSearchState.fileResults.count == 1
+        }
+
+        fixture.appState.selectWorkspaceSidebarMode(.files)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.queryText, "alpha")
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .completed)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.fileResults.map(\.relativePath), ["a.md"])
+    }
+
+    func testWorkspaceCloseClearsSearchUIQueryResultsAndMode() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "alpha"],
+            debounceNanoseconds: 0
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.focusWorkspaceSearch()
+        let focusBeforeClose = fixture.appState.workspaceSearchUI.focusRequestID
+        fixture.appState.markWorkspaceSearchFocusApplied(focusBeforeClose)
+        fixture.appState.updateWorkspaceSearchQueryText("alpha")
+        fixture.appState.setWorkspaceSearchMatchCase(true)
+        fixture.appState.setWorkspaceSearchWholeWord(true)
+        try await waitUntil("search starts") { provider.requests.count == 1 }
+
+        fixture.appState.closeWorkspace()
+
+        XCTAssertNil(fixture.appState.workspaceRootURL)
+        XCTAssertFalse(fixture.appState.canUseWorkspaceSearch)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.queryText, "")
+        XCTAssertFalse(fixture.appState.workspaceSearchUI.matchCase)
+        XCTAssertFalse(fixture.appState.workspaceSearchUI.wholeWord)
+        // Request id is preserved but marked applied so picker/reopen cannot replay it.
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.focusRequestID, focusBeforeClose)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.focusAppliedID, focusBeforeClose)
+        XCTAssertNil(fixture.appState.workspaceSearchUI.pendingResumeGeneration)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.phase, .idle)
+        XCTAssertTrue(fixture.appState.workspaceSearchState.fileResults.isEmpty)
+    }
+
+    func testRapidUIQueryChangesStillUseDebounceAndLatestQueryContract() async throws {
+        let provider = ControlledWorkspaceSearchStreamProvider()
+        let fixture = try makeFixture(
+            provider: provider,
+            files: ["a.md": "first second third"],
+            debounceNanoseconds: 50_000_000
+        )
+        defer { cleanUp(fixture) }
+
+        fixture.appState.updateWorkspaceSearchQueryText("first")
+        fixture.appState.updateWorkspaceSearchQueryText("second")
+        fixture.appState.setWorkspaceSearchWholeWord(true)
+        fixture.appState.updateWorkspaceSearchQueryText("third")
+
+        try await waitUntil("latest debounced UI query starts") { provider.requests.count == 1 }
+        let request = try XCTUnwrap(provider.requests.first)
+        XCTAssertEqual(request.query.pattern, "third")
+        XCTAssertEqual(request.query.caseSensitivity, .smart)
+        XCTAssertTrue(request.query.wholeWord)
+        // first → second → whole-word retarget of second → third
+        XCTAssertEqual(request.queryGeneration, 4)
+        XCTAssertEqual(fixture.appState.workspaceSearchState.activeQuery?.pattern, "third")
+    }
+
     func testSearchDoesNotPrepareRequestWithAuthorityFromAnotherWorkspace() throws {
         let rootA = try makeTemporaryDirectory()
         let rootB = try makeTemporaryDirectory()
@@ -14434,6 +15179,82 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             textView: textView,
             coordinator: coordinator
         )
+    }
+
+    private struct SearchSidebarHost {
+        let window: NSWindow
+        let hostingView: NSHostingView<AnyView>
+    }
+
+    /// Hosts the full Files/Search sidebar shell (starts in Files unless mode already changed).
+    private func makeWorkspaceSidebarHost(
+        appState: AppState,
+        makeKey: Bool
+    ) async throws -> SearchSidebarHost {
+        let root = WorkspaceSidebar()
+            .environmentObject(appState)
+            .frame(width: 280, height: 420)
+        let hostingView = NSHostingView(rootView: AnyView(root))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 280, height: 420)
+        let window = NSWindow(
+            contentRect: NSRect(x: 40, y: 40, width: 280, height: 420),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = hostingView
+        if makeKey {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            window.orderFront(nil)
+        }
+        // Let SwiftUI install the shell; Search field is not required yet (Files mode).
+        try await Task.sleep(nanoseconds: 30_000_000)
+        return SearchSidebarHost(window: window, hostingView: hostingView)
+    }
+
+    /// Hosts `WorkspaceSearchSidebar` only (already on Search). Used for mid-flight key routing.
+    private func makeSearchSidebarHost(
+        appState: AppState,
+        makeKey: Bool
+    ) async throws -> SearchSidebarHost {
+        let root = WorkspaceSearchSidebar()
+            .environmentObject(appState)
+            .frame(width: 280, height: 360)
+        let hostingView = NSHostingView(rootView: AnyView(root))
+        hostingView.frame = NSRect(x: 0, y: 0, width: 280, height: 360)
+        let window = NSWindow(
+            contentRect: NSRect(x: 40, y: 40, width: 280, height: 360),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = hostingView
+        if makeKey {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            window.orderFront(nil)
+        }
+
+        try await waitUntil("search text field mounts in hosted window") {
+            WorkspaceSearchFieldFocus.findSearchTextField(in: window.contentView) != nil
+        }
+        return SearchSidebarHost(window: window, hostingView: hostingView)
+    }
+
+    /// XCTest hosts often cannot acquire real `NSWindow.isKeyWindow`. Route focus eligibility
+    /// through a designated-window override that still exercises live post-await re-queries.
+    private func installDesignatedKeyWindowRouting(
+        on appState: AppState,
+        designatedKeyWindow: NSWindow
+    ) {
+        let designated = designatedKeyWindow
+        appState.workspaceSearchFocusKeyWindowCheck = { window in
+            window === designated
+        }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
     }
 
     private struct Fixture {

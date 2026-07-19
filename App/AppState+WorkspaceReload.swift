@@ -23,6 +23,7 @@ extension AppState {
 
     func teardownWorkspaceSearch() {
         clearWorkspaceSearch()
+        resetWorkspaceSearchUIState()
     }
 
     func restartActiveWorkspaceSearchWithFreshOverlays() {
@@ -90,6 +91,9 @@ extension AppState {
         invalidateWorkspaceSearchForWorkspaceGenerationAdvance()
         precondition(workspaceGeneration < .max, "Workspace generation exhausted")
         workspaceGeneration += 1
+        // Only rebind an already-pending pre-authority query; do not create pending from a
+        // non-empty field alone (that would silently implement FSEvent refresh).
+        rebindPendingWorkspaceSearchUIResumeAfterGenerationAdvance()
         return workspaceGeneration
     }
 
@@ -209,6 +213,9 @@ extension AppState {
         )
         workspaceTree = tree
         scheduleCompletionWorkspaceRefresh(workspaceGeneration: generation)
+        // Only generation-scoped pending pre-authority queries resume here — not every non-empty
+        // query field after ordinary FSEvent / filter reloads (refresh is a later WS3C item).
+        resumePendingWorkspaceSearchFromUIIfNeeded()
     }
 
     private func prepareWorkspaceReloadFile(

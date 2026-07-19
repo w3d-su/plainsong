@@ -216,6 +216,8 @@ private extension AppState {
         workspaceSearchRootAuthority = nil
         workspaceInstalledCaptureGeneration = nil
         completionWorkspace = .empty
+        // Close/switch clears query chrome and mode; Files/Search mode flip does not.
+        resetWorkspaceSearchUIState()
 
         let retainedSessionIdentities = Set(retiredEditorDocumentSessions.values.map {
             ObjectIdentifier($0.session)

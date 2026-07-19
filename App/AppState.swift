@@ -158,6 +158,15 @@ final class AppState: ObservableObject {
     var workspaceInstalledCaptureGeneration: UInt64?
     var workspaceGeneration: UInt64 = 0
     @Published var workspaceSearchState = WorkspaceSearchState()
+    /// Sidebar mode, query chrome, and focus request/applied tokens.
+    /// Focus is AppKit first-responder routing on the owned Search `NSTextField`, not SwiftUI `FocusState`.
+    @Published var workspaceSearchUI = WorkspaceSearchUIState()
+    /// Test seam / multi-window key routing refresh. Bumped when key eligibility may have changed
+    /// without a new `focusRequestID` (window activation, or a test override flip).
+    @Published var workspaceSearchFocusKeyEpoch: UInt64 = 0
+    /// When non-`nil`, replaces `NSWindow.isKeyWindow` for workspace-search focus eligibility.
+    /// Production leaves this `nil` so live AppKit key state is used after every suspension.
+    var workspaceSearchFocusKeyWindowCheck: ((NSWindow) -> Bool)?
     @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false
     @Published var completionWorkspace: CompletionWorkspace = .empty
