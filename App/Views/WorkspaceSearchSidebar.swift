@@ -14,7 +14,12 @@ import SwiftUI
 /// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState` for that control. Only the
 /// hosting key window may apply a `focusRequestID`; key state and field binding are re-read live
 /// after every suspension (`WindowKeyStateTracker`). Results list focus uses SwiftUI
-/// `FocusState` only as a secondary surface for ↑/↓/Return/Escape after ↓ from the field.
+/// `FocusState` only as a secondary surface for ↑/↓/Return/Escape after ↓ from the field
+/// **or** after a mouse selection into the list (click modality must match keyboard).
+///
+/// **Owner keyboard smoke (merge gate for PR C):** field ↓ → results; ↑/↓ no wrap; Return
+/// activates; Escape results→field and field→editor (query/results retained); click a row
+/// then ↑/↓ still uses the pure reducer. Full hosted coverage is deferred to WS4 XCUITest.
 struct WorkspaceSearchSidebar: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var windowKeyState = WindowKeyStateTracker()
@@ -42,7 +47,7 @@ struct WorkspaceSearchSidebar: View {
 
             WorkspaceSearchResultsList(
                 presentation: resultsPresentation,
-                selectedRowID: $selectedResultRowID,
+                selectedRowID: resultsSelectionBinding,
                 isResultsFocused: $isResultsFocused,
                 onEscapeToQueryField: { focusQueryFieldFromResults() }
             )
@@ -75,6 +80,7 @@ struct WorkspaceSearchSidebar: View {
         }
         .onChange(of: appState.workspaceSearchState.queryGeneration) { _, _ in
             selectedResultRowID = nil
+            isResultsFocused = false
             refreshResultsPresentationMemo()
         }
         .onChange(of: appState.workspaceSearchState) { _, _ in
@@ -85,6 +91,7 @@ struct WorkspaceSearchSidebar: View {
             // clearWorkspaceSearch does not advance queryGeneration; still drop selection.
             if newValue.isEmpty {
                 selectedResultRowID = nil
+                isResultsFocused = false
             }
             refreshResultsPresentationMemo()
         }
@@ -98,6 +105,20 @@ struct WorkspaceSearchSidebar: View {
 
     private var resultsPresentation: WorkspaceSearchResultsPresentation {
         presentationMemoValue
+    }
+
+    /// List/button selection also claims the results keyboard surface so click-then-↑/↓
+    /// uses the pure reducer (stale-gating) instead of native table navigation alone.
+    private var resultsSelectionBinding: Binding<WorkspaceSearchResultRowID?> {
+        Binding(
+            get: { selectedResultRowID },
+            set: { newValue in
+                selectedResultRowID = newValue
+                if newValue != nil {
+                    isResultsFocused = true
+                }
+            }
+        )
     }
 
     private func refreshResultsPresentationMemo() {
@@ -177,6 +198,10 @@ struct WorkspaceSearchSidebar: View {
     // MARK: - Keyboard surfaces (PR C)
 
     /// Query-field ↓: select first result and move keyboard focus into the list.
+    ///
+    /// Focus handoff is deliberately: (1) write selection, (2) set SwiftUI results focus,
+    /// (3) clear AppKit first responder so the field editor does not keep arrow keys.
+    /// Hosted verification is an owner smoke / WS4 XCUITest item — not covered by pure tests.
     private func moveDownFromQueryField() {
         refreshResultsPresentationMemo()
         let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)

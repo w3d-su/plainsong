@@ -320,6 +320,11 @@ final class WorkspaceSearchSelectionTests: XCTestCase {
         XCTAssertEqual(WorkspaceSearchAccessibility.rowValue(canActivate: true), "Available")
         XCTAssertEqual(WorkspaceSearchAccessibility.rowValue(canActivate: false), "Unavailable")
 
+        // Single source of truth with the AppKit query-field stamp (no duplicated literal drift).
+        XCTAssertEqual(
+            WorkspaceSearchAccessibility.queryField,
+            WorkspaceSearchFieldFocus.accessibilityIdentifier
+        )
         XCTAssertEqual(WorkspaceSearchAccessibility.queryField, "plainsong.workspaceSearch.queryField")
         XCTAssertEqual(WorkspaceSearchAccessibility.modePicker, "plainsong.workspaceSearch.mode")
         XCTAssertEqual(WorkspaceSearchAccessibility.matchCase, "plainsong.workspaceSearch.matchCase")

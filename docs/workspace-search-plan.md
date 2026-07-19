@@ -1,11 +1,13 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, WS3A, headless WS3B (PR #85 + merged PR #82 lifecycle
-> hardening + PR #84 mutation recovery), and **WS3C** (sidebar shell, grouped results, keyboard
-> + accessibility) are complete. WS3C PR C adds pure selection navigation (no wrap), query-field
-> ↓ / results ↑↓ReturnEscape routing, stable accessibility identifiers/labels, and authority-gated
-> Return activation. Owner ⌘⇧F focus sign-off, ordinary-edit/FSEvent search refresh, WS4, and
-> the overall Definition of Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
+> **Status: IN PROGRESS. WS1, WS2, WS3A, and headless WS3B (PR #85 + merged PR #82 lifecycle
+> hardening + PR #84 mutation recovery) are complete. **WS3C PR A/B/C have landed** (Files/Search
+> sidebar shell, pure grouped-results presentation, keyboard selection + accessibility wiring).
+> WS3C PR C still needs **owner keyboard smoke** (field ↓, results ↑/↓/Return/Escape, click-then-
+> keyboard) before treating the keyboard surface as verified — pure reducer tests do not host
+> `List`/`onKeyPress`/AppKit first-responder handoff. Owner ⌘⇧F focus sign-off, ordinary-edit/
+> FSEvent search refresh, WS4 (including XCUITest for those keys), and the overall Definition of
+> Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -781,10 +783,13 @@ pending.
   workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
   producer.
 - [x] Add Files/Search sidebar modes without changing the stable `HStack` shell.
-- [ ] Add `Command-Shift-F` and search-field focus arbitration.
+- [ ] Owner sign-off: `Command-Shift-F` and search-field focus arbitration (code landed in PR A).
 - [x] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
-- [x] Add keyboard and accessibility support.
+- [x] Add keyboard and accessibility support (pure reducer + wiring; see owner smoke below).
+- [ ] Owner keyboard smoke / sign-off: query-field ↓ into results, ↑/↓ without wrap, Return
+  activates authority-backed match, Escape results→field and field→editor (query/results kept),
+  click a result then ↑/↓ still uses the pure reducer (not silent native-table fallback).
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.
@@ -815,7 +820,7 @@ pending.
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
 | EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
 | PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
-| PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility |
+| PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility; keyboard: field ↓ selects first result, ↑/↓ move without wrap, Return activates, Escape results→field and field→editor without clearing query/results; click a result then ↑/↓ still routes through search selection (not only native table) |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 
 New tests placed in existing SwiftPM, AppTests, and PerformanceTests directories are

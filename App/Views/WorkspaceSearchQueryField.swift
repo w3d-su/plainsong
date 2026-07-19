@@ -89,12 +89,17 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
             textView _: NSTextView,
             doCommandBy commandSelector: Selector
         ) -> Bool {
-            if commandSelector == #selector(NSResponder.moveDown(_:)) {
-                onMoveDownToResults?()
+            // Only swallow when a callback is installed; otherwise let AppKit handle the key.
+            if commandSelector == #selector(NSResponder.moveDown(_:)),
+               let onMoveDownToResults
+            {
+                onMoveDownToResults()
                 return true
             }
-            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-                onEscapeToEditor?()
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)),
+               let onEscapeToEditor
+            {
+                onEscapeToEditor()
                 return true
             }
             return false

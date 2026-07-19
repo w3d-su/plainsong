@@ -6,8 +6,11 @@ import Foundation
 ///
 /// Identifiers are ASCII and path-byte based so NFC/NFD relatives stay distinct.
 enum WorkspaceSearchAccessibility {
-    /// Must stay identical to `WorkspaceSearchFieldFocus.accessibilityIdentifier`.
-    static let queryField = "plainsong.workspaceSearch.queryField"
+    /// Shared with `WorkspaceSearchFieldFocus.accessibilityIdentifier` (single source of truth).
+    static var queryField: String {
+        WorkspaceSearchFieldFocus.accessibilityIdentifier
+    }
+
     static let modePicker = "plainsong.workspaceSearch.mode"
     static let matchCase = "plainsong.workspaceSearch.matchCase"
     static let wholeWord = "plainsong.workspaceSearch.wholeWord"
