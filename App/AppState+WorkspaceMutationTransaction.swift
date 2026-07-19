@@ -231,6 +231,33 @@ extension AppState {
                     .namespaceChanged
                 )
             }
+            // Session commit rekeys live recovery to the destination. Standalone may still
+            // hold only the pre-move locator, and a failed standalone rekey may have advanced
+            // only the operation journal. Clearing the unpromoted marker and deleting the
+            // journal here would discard the only durable recovery that points at the new path.
+            do {
+                try ensureWorkspaceMutationRecoveryTextIsDurable(
+                    .relocation(verifiedCommittedIntent)
+                )
+            } catch {
+                do {
+                    try persistWorkspaceMutationRecoveryIntent(
+                        .relocation(verifiedCommittedIntent)
+                    )
+                } catch {
+                    present(error, title: "Could Not Preserve Workspace Recovery")
+                }
+                workspaceMutationOperationRecoveryIDsWithUnpromotedText.insert(
+                    recoveryIntent.id
+                )
+                var cleanupIntent = verifiedCommittedIntent
+                cleanupIntent.reason = .namespaceChanged
+                installWorkspaceRelocationCleanupRecovery(cleanupIntent)
+                throw WorkspaceMutationError.indeterminateOperation(
+                    relocation.destination.fileURL,
+                    .namespaceChanged
+                )
+            }
             markWorkspaceMutationRecoveryBundledTextCommitted(id: recoveryIntent.id)
             do {
                 try removePersistedWorkspaceMutationRecovery(id: recoveryIntent.id)

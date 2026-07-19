@@ -193,6 +193,81 @@ final class AppStateWorkspaceDataIntegrityTests: XCTestCase {
         XCTAssertTrue(relaunched.currentDocument.isDirty)
     }
 
+    func testDirtyRelocationKeepsRekeyedJournalWhenStandaloneRekeyFails() throws {
+        let operationStore = RecordingWorkspaceMutationOperationRecoveryStore()
+        let textStore = RecordingWorkspaceMutationTextRecoveryStore()
+        let destinationName = "renamed.md"
+        // Pre-move snapshots at post.md must succeed so the namespace rename can commit.
+        // Only the post-commit rekey to renamed.md fails on the standalone store.
+        textStore.upsertShouldFail = { record in
+            record.originalURL.lastPathComponent == destinationName
+        }
+        let bookmarkAccess = PassthroughWorkspaceMutationBookmarkAccess()
+        let fixture = try makeFixture(
+            files: ["post.md": "Original"],
+            currentPath: "post.md",
+            operationRecoveryStore: operationStore,
+            recoveryStore: textStore,
+            reportedTrashBookmarkAccess: bookmarkAccess
+        )
+        defer { cleanUp(fixture) }
+        let source = try fixture.location("post.md")
+        let destination = try fixture.location(destinationName)
+        fixture.appState.applyDocumentText(
+            "Dirty after edit",
+            to: fixture.appState.currentDocument
+        )
+
+        XCTAssertThrowsError(
+            try fixture.appState.renameWorkspaceItem(
+                at: source,
+                to: destinationName,
+                expecting: fixture.expectation("post.md"),
+                sourceParentExpectation: fixture.parentExpectation("post.md")
+            )
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.fileURL.path))
+        XCTAssertEqual(fixture.appState.currentDocument.fileURL, destination.fileURL)
+        XCTAssertTrue(fixture.appState.currentDocument.isDirty)
+
+        // Standalone still only holds the pre-move locator.
+        let standalone = try XCTUnwrap(textStore.records.values.first)
+        XCTAssertEqual(standalone.originalURL, source.fileURL)
+        XCTAssertEqual(standalone.source, "Dirty after edit")
+
+        // The operation journal must retain the rekeyed destination locator — the only
+        // durable recovery that points at renamed.md after the standalone rekey failed.
+        let durableOperation = try XCTUnwrap(operationStore.records.values.first)
+        XCTAssertEqual(
+            durableOperation.textRecoveryRecords.first?.originalURL,
+            destination.fileURL
+        )
+        XCTAssertEqual(
+            durableOperation.textRecoveryRecords.first?.source,
+            "Dirty after edit"
+        )
+        XCTAssertTrue(
+            fixture.appState.workspaceMutationOperationRecoveryIDsWithUnpromotedText
+                .contains(durableOperation.id)
+        )
+        XCTAssertNotNil(fixture.appState.workspaceMutationRecoveries[durableOperation.id])
+
+        textStore.upsertShouldFail = nil
+        let relaunched = AppState(
+            workspaceMutationOperationRecoveryStore: operationStore,
+            workspaceMutationTextRecoveryStore: textStore,
+            reportedTrashBookmarkAccess: bookmarkAccess,
+            shouldRestoreLastOpenedFile: false
+        )
+        relaunched.restoreLastOpenedFileIfNeeded()
+
+        XCTAssertEqual(relaunched.currentDocument.text, "Dirty after edit")
+        XCTAssertTrue(relaunched.currentDocument.isDirty)
+        XCTAssertEqual(relaunched.currentDocument.fileURL, destination.fileURL)
+    }
+
     func testCommittedRelocationPhaseRekeysBundledTextBeforeSessionCommit() throws {
         let operationStore = RecordingWorkspaceMutationOperationRecoveryStore()
         let fixture = try makeFixture(
@@ -7320,6 +7395,7 @@ private final class RecordingWorkspaceMutationTextRecoveryStore:
     var loadError: Error?
     var upsertError: Error?
     var upsertErrorsByID: [UUID: Error] = [:]
+    var upsertShouldFail: ((WorkspaceMutationTextRecoveryRecord) -> Bool)?
     var removeError: Error?
     var removeRecordBeforeThrow = false
     var recordQuarantineError: Error?
@@ -7345,6 +7421,9 @@ private final class RecordingWorkspaceMutationTextRecoveryStore:
     func upsert(_ record: WorkspaceMutationTextRecoveryRecord) throws {
         if let upsertError = upsertErrorsByID[record.id] {
             throw upsertError
+        }
+        if let upsertShouldFail, upsertShouldFail(record) {
+            throw TestWorkspaceMutationRecoveryStoreError.failed
         }
         if let upsertError { throw upsertError }
         records[record.id] = record
