@@ -4,10 +4,11 @@
 > hardening + PR #84 mutation recovery) are complete. WS3C PR A adds a **visible** Files/Search
 > sidebar on the stable `HStack` shell, generation-scoped pending UI queries for open-scan
 > readiness, and `Command-Shift-F` → Search with AppKit key-window first-responder routing on an
-> owned Search `NSTextField` (not SwiftUI `FocusState`). Hosted dual-window first-responder tests
-> cover key-only apply; owner focus sign-off remains open. Remaining WS3C items (focus sign-off,
-> grouped results, keyboard/a11y, ordinary-edit/FSEvent refresh), WS4, and the overall Definition
-> of Done remain open.**
+> owned Search `NSTextField` (not SwiftUI `FocusState`). WS3C PR B adds pure
+> `WorkspaceSearchResultsPresentation` + lazy grouped results (partial/searching/error retention,
+> skipped/truncation banners, UTF-16-safe highlights, authority-gated activation). Owner focus
+> sign-off, keyboard result navigation, and ordinary-edit/FSEvent refresh remain open. WS4 and
+> the overall Definition of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -784,7 +785,7 @@ pending.
   producer.
 - [x] Add Files/Search sidebar modes without changing the stable `HStack` shell.
 - [ ] Add `Command-Shift-F` and search-field focus arbitration.
-- [ ] Render grouped partial results with loading, empty, skipped, error, and truncated
+- [x] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
 - [ ] Add keyboard and accessibility support.
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
