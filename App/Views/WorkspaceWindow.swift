@@ -16,7 +16,8 @@ struct WorkspaceWindow: View {
 
             HStack(spacing: 0) {
                 WorkspaceSidebar()
-                    .frame(width: 220)
+                    // Files and Search share one fixed width; R17 keeps this HStack shell (not NavigationSplitView).
+                    .frame(width: 280)
 
                 Divider()
 

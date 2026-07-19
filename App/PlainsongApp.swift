@@ -73,6 +73,14 @@ struct PlainsongApp: App {
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
                 .disabled(!appState.hasOpenDocument)
+
+                Divider()
+
+                Button("Find in Workspace…") {
+                    appState.focusWorkspaceSearch()
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!appState.canUseWorkspaceSearch)
             }
 
             CommandMenu("Format") {

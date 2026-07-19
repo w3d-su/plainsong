@@ -1,15 +1,18 @@
 # Phase 3 Workspace Search Plan
 
-> **Status: IN PROGRESS. WS1, WS2, and WS3A are complete. PR #85 merged the WS3B
-> filesystem-authority/write sub-gate, and Draft PR #82 is restacked directly onto that authority
-> baseline as the headless multi-window lifecycle hardening PR; it was not superseded by a
-> visible-sidebar branch. Headless WS3B overall, every visible Files/Search sidebar item, refresh
-> work, WS3C, WS4, and the overall Definition of Done remain open.**
+> **Status: IN PROGRESS. WS1, WS2, WS3A, and headless WS3B (PR #85 + merged PR #82 lifecycle
+> hardening + PR #84 mutation recovery) are complete. WS3C PR A adds a **visible** Files/Search
+> sidebar on the stable `HStack` shell, generation-scoped pending UI queries for open-scan
+> readiness, and `Command-Shift-F` → Search with AppKit key-window first-responder routing on an
+> owned Search `NSTextField` (not SwiftUI `FocusState`). Hosted dual-window first-responder tests
+> cover key-only apply; owner focus sign-off remains open. Remaining WS3C items (focus sign-off,
+> grouped results, keyboard/a11y, ordinary-edit/FSEvent refresh), WS4, and the overall Definition
+> of Done remain open.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
-> WS2 is a package and AppState orchestration layer only; workspace search is not yet
-> user-facing until WS3 adds the sidebar and navigation integration.
+> WS2 alone was package and AppState orchestration only (not user-facing). WS3 owns sidebar
+> chrome, navigation integration, and user-visible search.
 
 Created 2026-07-10. This is a Phase 3 candidate from `agent.md` section 14. It does not
 change the accepted M0-M5 or Experimental WYSIWYG status.
@@ -779,7 +782,7 @@ pending.
 - [x] Own the stream-consuming App Task and explicitly cancel it on query replacement,
   workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
   producer.
-- [ ] Add Files/Search sidebar modes without changing the stable `HStack` shell.
+- [x] Add Files/Search sidebar modes without changing the stable `HStack` shell.
 - [ ] Add `Command-Shift-F` and search-field focus arbitration.
 - [ ] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
