@@ -26,15 +26,19 @@ extension WorkspaceAnchoredFileSystem {
         private(set) var directories: [Directory]
         private let rootIndex: Int
         private let expectedRootIdentity: WorkspaceFileSystemIdentity
+        /// Granted root spelling used to re-prove lexical root binding without opening "/".
+        private let rootBindingURL: URL
 
         init(
             directories: [Directory],
             rootIndex: Int,
-            expectedRootIdentity: WorkspaceFileSystemIdentity
+            expectedRootIdentity: WorkspaceFileSystemIdentity,
+            rootBindingURL: URL
         ) {
             self.directories = directories
             self.rootIndex = rootIndex
             self.expectedRootIdentity = expectedRootIdentity
+            self.rootBindingURL = rootBindingURL
         }
 
         deinit {
@@ -70,6 +74,10 @@ extension WorkspaceAnchoredFileSystem {
 
         func validateNamespace() throws {
             do {
+                // Open root fds follow moved inodes; re-open the granted root spelling
+                // (sandbox-allowed) so rename/replace of the lexical root still fails closed
+                // without a "/"-anchored ancestor walk.
+                try revalidateRootBinding()
                 guard directories[rootIndex].identity == expectedRootIdentity else {
                     throw WorkspaceAnchoredFileSystemError.namespaceChanged
                 }
@@ -96,6 +104,33 @@ extension WorkspaceAnchoredFileSystem {
                 throw WorkspaceAnchoredFileSystemError.namespaceChanged
             }
         }
+
+        private func revalidateRootBinding() throws {
+            // Do not check Task cancellation here: callers place explicit
+            // `checkCancellation` around mutation boundaries, and cleanup after a
+            // cancelled write must still revalidate open-fd namespace state.
+            let path = try WorkspaceLiteralFileURL.absolutePath(of: rootBindingURL)
+            let descriptor = path.withCString {
+                Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+            }
+            guard descriptor >= 0 else {
+                // ENOENT/ENOTDIR: lexical root is gone or no longer a directory → binding lost.
+                // EACCES/EPERM/other: skip lexical re-proof (e.g. chmod'd cleanup race) and
+                // rely on open root-fd identity checks so an earlier fault is not masked as
+                // namespaceChanged. Sandbox EPERM on absolute ancestors is avoided because
+                // this opens the granted root spelling, not "/".
+                let openError = errno
+                if openError == ENOENT || openError == ENOTDIR {
+                    throw WorkspaceAnchoredFileSystemError.namespaceChanged
+                }
+                return
+            }
+            defer { Darwin.close(descriptor) }
+            let identity = try WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(descriptor)
+            guard identity == expectedRootIdentity else {
+                throw WorkspaceAnchoredFileSystemError.namespaceChanged
+            }
+        }
     }
 
     static func withAnchoredParent<T>(
@@ -104,28 +139,38 @@ extension WorkspaceAnchoredFileSystem {
         _ body: (DirectoryDescriptorChain, Int32, String) throws -> T
     ) throws -> T {
         try checkCancellation()
+        // Prove the retained root still names the captured identity via the granted
+        // root URL. The App Sandbox permits reopening a Powerbox-selected root, but
+        // denies openat from "/" into ancestor components such as "Users".
         try location.rootAuthority.validateCanonicalBinding()
         let expectedRootIdentity = location.rootAuthority.physicalIdentity
 
-        let slashDescriptor = Darwin.open(
-            "/",
-            O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
-        )
-        guard slashDescriptor >= 0 else {
-            throw WorkspaceAnchoredFileSystemError.unreadable
+        // Dup the retained root descriptor so the chain owns an independent fd and
+        // can close it without releasing the authority's lifetime token. Walk only
+        // `relativePath` components from that root — never absolute ancestors.
+        let rootDescriptor = try location.rootAuthority.withRetainedRootDescriptor { retained in
+            let duplicated = Darwin.dup(retained)
+            guard duplicated >= 0 else {
+                throw WorkspaceAnchoredFileSystemError.unreadable
+            }
+            return duplicated
         }
-        let slashIdentity: WorkspaceFileSystemIdentity
+        let rootIdentity: WorkspaceFileSystemIdentity
         do {
-            slashIdentity = try directoryDescriptorIdentity(slashDescriptor)
+            rootIdentity = try directoryDescriptorIdentity(rootDescriptor)
         } catch {
-            Darwin.close(slashDescriptor)
+            Darwin.close(rootDescriptor)
             throw error
         }
+        guard rootIdentity == expectedRootIdentity else {
+            Darwin.close(rootDescriptor)
+            throw WorkspaceAnchoredFileSystemError.changedIdentity
+        }
 
-        var openedDirectories = [DirectoryDescriptorChain.Directory(
-            descriptor: slashDescriptor,
+        let openedDirectories = [DirectoryDescriptorChain.Directory(
+            descriptor: rootDescriptor,
             componentFromParent: nil,
-            identity: slashIdentity
+            identity: rootIdentity
         )]
         var shouldCloseOpenedDirectories = true
         defer {
@@ -135,42 +180,16 @@ extension WorkspaceAnchoredFileSystem {
                 }
             }
         }
-        let canonicalComponents = location.rootURL.pathComponents.filter { $0 != "/" }
 
-        for component in canonicalComponents {
-            try checkCancellation()
-            let next = try openDirectory(
-                parentDescriptor: openedDirectories[openedDirectories.count - 1].descriptor,
-                component: component
-            )
-            do {
-                let identity = try directoryDescriptorIdentity(next)
-                let entry = try directoryEntryIdentity(
-                    parentDescriptor: openedDirectories[openedDirectories.count - 1].descriptor,
-                    component: component
-                )
-                guard entry.isDirectory, entry.identity == identity else {
-                    throw WorkspaceAnchoredFileSystemError.changedIdentity
-                }
-                openedDirectories.append(.init(
-                    descriptor: next,
-                    componentFromParent: component,
-                    identity: identity
-                ))
-            } catch {
-                Darwin.close(next)
-                throw error
-            }
-        }
-
-        let rootIndex = openedDirectories.count - 1
-        guard openedDirectories[rootIndex].identity == expectedRootIdentity else {
-            throw WorkspaceAnchoredFileSystemError.changedIdentity
-        }
+        // Chain covers root → parent only. Ancestor-of-root validation is the root
+        // authority's own binding proof above, not a "/"-anchored open walk. Mid-op
+        // `validateNamespace` re-opens `canonicalRootURL` to detect root rename/replace.
+        let rootIndex = 0
         let chain = DirectoryDescriptorChain(
             directories: openedDirectories,
             rootIndex: rootIndex,
-            expectedRootIdentity: expectedRootIdentity
+            expectedRootIdentity: expectedRootIdentity,
+            rootBindingURL: location.rootAuthority.canonicalRootURL
         )
         shouldCloseOpenedDirectories = false
         hooks.emit(.rootAnchored)
@@ -329,6 +348,10 @@ extension WorkspaceAnchoredFileSystem {
         return switch openError {
         case ENOENT, ENOTDIR: .missing
         case ELOOP: .symbolicLink
+        // Sandbox denial (EPERM) and discretionary ACL denial (EACCES) both surface as
+        // unreadable. Never invent a distinct "permission denied" path that would let
+        // callers treat Powerbox-out-of-scope ancestors as recoverable missing leaves.
+        case EPERM, EACCES: .unreadable
         default: .unreadable
         }
     }
