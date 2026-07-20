@@ -23,6 +23,9 @@ struct PlainsongApp: App {
         let state = makePlainsongAppState()
         _appState = StateObject(wrappedValue: state)
         _menuBarState = StateObject(wrappedValue: MenuBarState(appState: state))
+        // AppKit ⇧⌘F hook cannot cast NSApp.delegate under SwiftUI; publish AppState here.
+        PlainsongAppServices.appState = state
+        PlainsongApplicationSendEventHook.installIfNeeded()
     }
 
     var body: some Scene {
@@ -31,7 +34,9 @@ struct PlainsongApp: App {
                 .environmentObject(appState)
                 .tint(.accentColor)
                 .onAppear {
+                    // Keep both the adaptor delegate and the AppKit sendEvent hook in sync.
                     appDelegate.appState = appState
+                    PlainsongAppServices.appState = appState
                 }
                 .onOpenURL { url in
                     appState.openExternalFile(url)

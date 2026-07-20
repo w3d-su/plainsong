@@ -4,13 +4,17 @@ import XCTest
 
 @MainActor
 final class PlainsongMenuKeyBindingTests: XCTestCase {
+    override func tearDown() {
+        PlainsongAppServices.appState = nil
+        super.tearDown()
+    }
+
     func testMatchesExactShiftCommandFByKeyCode() throws {
         let event = try keyEvent(keyCode: PlainsongMenuKeyBinding.ansiFKeyCode, flags: [.command, .shift])
         XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
 
     func testMatchesExactShiftCommandFByCharacters() throws {
-        // Non-ANSI key code still matches when charactersIgnoringModifiers is "f".
         let event = try keyEvent(keyCode: 0, flags: [.command, .shift], characters: "f")
         XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
@@ -28,6 +32,14 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
         XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
 
+    func testAllowsSpuriousOptionWithShiftCommandF() throws {
+        let event = try keyEvent(
+            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
+            flags: [.command, .shift, .option]
+        )
+        XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
+    }
+
     func testRejectsControlCommandFFullScreenShape() throws {
         let event = try keyEvent(
             keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
@@ -36,8 +48,15 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
         XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
 
+    func testRejectsControlShiftCommandF() throws {
+        let event = try keyEvent(
+            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
+            flags: [.command, .shift, .control]
+        )
+        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
+    }
+
     func testRejectsShiftCommandP() throws {
-        // P is keyCode 35 on ANSI.
         let event = try keyEvent(keyCode: 35, flags: [.command, .shift], characters: "p")
         XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
@@ -50,44 +69,23 @@ final class PlainsongMenuKeyBindingTests: XCTestCase {
         XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
     }
 
-    /// AppKit local monitor path: when a folder workspace is open, ⇧⌘F increments the
-    /// Search focus token (the SwiftUI menu key-equivalent path is insufficient live).
-    func testLocalMonitorFocusesWorkspaceSearchWhenFolderIsOpen() throws {
+    func testActionFocusesSearchWhenFolderIsOpen() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
         appState.workspaceRootURL = URL(fileURLWithPath: "/tmp/plainsong-find-key-test")
-        XCTAssertTrue(appState.canUseWorkspaceSearch)
-
-        let delegate = PlainsongApplicationDelegate()
-        delegate.appState = appState
-        delegate.installFindInWorkspaceKeyMonitorIfNeeded()
-
+        PlainsongAppServices.appState = appState
         let before = appState.workspaceSearchUI.focusRequestID
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .shift]
-        )
-        // Local monitors run from NSApp's event pipeline, not window.sendEvent.
-        NSApp.sendEvent(event)
 
+        XCTAssertTrue(PlainsongFindInWorkspaceKeyAction.performIfAvailable())
         XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
         XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before &+ 1)
     }
 
-    func testLocalMonitorDoesNotConsumeWhenSearchUnavailable() throws {
+    func testActionNoOpsWhenSearchUnavailable() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
-        XCTAssertFalse(appState.canUseWorkspaceSearch)
-
-        let delegate = PlainsongApplicationDelegate()
-        delegate.appState = appState
-        delegate.installFindInWorkspaceKeyMonitorIfNeeded()
-
+        PlainsongAppServices.appState = appState
         let before = appState.workspaceSearchUI.focusRequestID
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .shift]
-        )
-        NSApp.sendEvent(event)
 
+        XCTAssertFalse(PlainsongFindInWorkspaceKeyAction.performIfAvailable())
         XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
         XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before)
     }
