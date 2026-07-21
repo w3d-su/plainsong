@@ -20,7 +20,7 @@ struct WorkspaceSearchUIState: Equatable {
     /// When true, force case-sensitive matching; when false, use smart case.
     var matchCase: Bool = false
     var wholeWord: Bool = false
-    /// Monotonic focus *request* token. Each `Command-Shift-F` increments it.
+    /// Monotonic focus *request* token. Each request to open or re-focus Search increments it.
     var focusRequestID: UInt64 = 0
     /// Last focus request successfully applied by a **key** window. Background windows must not
     /// advance this; only a key-window receipt after the owned Search `NSTextField` is first

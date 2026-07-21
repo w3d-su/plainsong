@@ -1,114 +1,104 @@
-import AppKit
+import Carbon
+import Foundation
 @testable import Plainsong
 import XCTest
 
 @MainActor
 final class PlainsongMenuKeyBindingTests: XCTestCase {
-    override func tearDown() {
-        PlainsongAppServices.appState = nil
-        super.tearDown()
+    func testBindingUsesExactPhysicalShiftCommandF() {
+        XCTAssertEqual(PlainsongMenuKeyBinding.ansiFKeyCode, UInt32(kVK_ANSI_F))
+        XCTAssertEqual(PlainsongMenuKeyBinding.carbonModifiers, UInt32(cmdKey | shiftKey))
+        XCTAssertEqual(PlainsongMenuKeyBinding.carbonModifiers & UInt32(optionKey), 0)
+        XCTAssertEqual(PlainsongMenuKeyBinding.carbonModifiers & UInt32(controlKey), 0)
     }
 
-    func testMatchesExactShiftCommandFByKeyCode() throws {
-        let event = try keyEvent(keyCode: PlainsongMenuKeyBinding.ansiFKeyCode, flags: [.command, .shift])
-        XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
+    func testIdentifierMatchesOnlyPlainsongWorkspaceSearchHotKey() {
+        let expected = EventHotKeyID(signature: 0x504C_534E, id: 1)
+        let wrongSignature = EventHotKeyID(signature: 0x4F54_4845, id: 1)
+        let wrongID = EventHotKeyID(signature: 0x504C_534E, id: 2)
+
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.matches(expected))
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.matches(wrongSignature))
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.matches(wrongID))
     }
 
-    func testMatchesExactShiftCommandFByCharacters() throws {
-        let event = try keyEvent(keyCode: 0, flags: [.command, .shift], characters: "f")
-        XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
+    func testRegistrationLifecycleIsIdempotentAndRecoverable() {
+        PlainsongWorkspaceSearchHotKey.tearDown()
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
+
+        PlainsongWorkspaceSearchHotKey.activate()
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.isRegistered)
+        PlainsongWorkspaceSearchHotKey.activate()
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.isRegistered)
+
+        PlainsongWorkspaceSearchHotKey.deactivate()
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
+        PlainsongWorkspaceSearchHotKey.deactivate()
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
+
+        PlainsongWorkspaceSearchHotKey.activate()
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.isRegistered)
+        PlainsongWorkspaceSearchHotKey.tearDown()
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
     }
 
-    func testRejectsCommandOnlyF() throws {
-        let event = try keyEvent(keyCode: PlainsongMenuKeyBinding.ansiFKeyCode, flags: [.command])
-        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
+    func testApplicationDelegateRegistersOnlyWhileActive() {
+        let delegate = PlainsongApplicationDelegate()
+        PlainsongWorkspaceSearchHotKey.tearDown()
+
+        delegate.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.isRegistered)
+
+        delegate.applicationWillResignActive(Notification(name: NSApplication.willResignActiveNotification))
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
+
+        delegate.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        XCTAssertTrue(PlainsongWorkspaceSearchHotKey.isRegistered)
+        delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+        XCTAssertFalse(PlainsongWorkspaceSearchHotKey.isRegistered)
     }
 
-    func testRejectsOptionCommandFFormatTableShape() throws {
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .option]
-        )
-        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testAllowsSpuriousOptionWithShiftCommandF() throws {
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .shift, .option]
-        )
-        XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testRejectsControlCommandFFullScreenShape() throws {
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .control]
-        )
-        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testRejectsControlShiftCommandF() throws {
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .shift, .control]
-        )
-        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testRejectsShiftCommandP() throws {
-        let event = try keyEvent(keyCode: 35, flags: [.command, .shift], characters: "p")
-        XCTAssertFalse(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testIgnoresCapsLockAlongsideShiftCommandF() throws {
-        let event = try keyEvent(
-            keyCode: PlainsongMenuKeyBinding.ansiFKeyCode,
-            flags: [.command, .shift, .capsLock]
-        )
-        XCTAssertTrue(PlainsongMenuKeyBinding.matchesFindInWorkspace(event))
-    }
-
-    func testActionFocusesSearchWhenFolderIsOpen() {
+    func testActionTogglesSearchFilesSearchAndFocusesEachOpen() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
-        appState.workspaceRootURL = URL(fileURLWithPath: "/tmp/plainsong-find-key-test")
+        appState.workspaceRootURL = URL(fileURLWithPath: "/tmp/plainsong-workspace-search-key-test")
+        let previousAppState = PlainsongAppServices.appState
         PlainsongAppServices.appState = appState
+        defer { PlainsongAppServices.appState = previousAppState }
         let before = appState.workspaceSearchUI.focusRequestID
 
-        XCTAssertTrue(PlainsongFindInWorkspaceKeyAction.performIfAvailable())
+        XCTAssertTrue(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
         XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
         XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before &+ 1)
+
+        XCTAssertTrue(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before &+ 1)
+
+        XCTAssertTrue(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .search)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before &+ 2)
     }
 
     func testActionNoOpsWhenSearchUnavailable() {
         let appState = AppState(shouldRestoreLastOpenedFile: false)
+        let previousAppState = PlainsongAppServices.appState
         PlainsongAppServices.appState = appState
+        defer { PlainsongAppServices.appState = previousAppState }
         let before = appState.workspaceSearchUI.focusRequestID
 
-        XCTAssertFalse(PlainsongFindInWorkspaceKeyAction.performIfAvailable())
+        XCTAssertFalse(PlainsongWorkspaceSearchKeyAction.performIfAvailable())
         XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
         XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, before)
     }
 
-    // MARK: - Helpers
+    func testHotKeyConsumesUnavailableSearchWithoutChangingState() {
+        let appState = AppState(shouldRestoreLastOpenedFile: false)
+        let previousAppState = PlainsongAppServices.appState
+        PlainsongAppServices.appState = appState
+        defer { PlainsongAppServices.appState = previousAppState }
 
-    private func keyEvent(
-        keyCode: UInt16,
-        flags: NSEvent.ModifierFlags,
-        characters: String = "f"
-    ) throws -> NSEvent {
-        let event = NSEvent.keyEvent(
-            with: .keyDown,
-            location: .zero,
-            modifierFlags: flags,
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            characters: characters,
-            charactersIgnoringModifiers: characters,
-            isARepeat: false,
-            keyCode: keyCode
-        )
-        return try XCTUnwrap(event)
+        XCTAssertEqual(PlainsongWorkspaceSearchHotKey.handlePress(), noErr)
+        XCTAssertEqual(appState.workspaceSearchUI.mode, .files)
+        XCTAssertEqual(appState.workspaceSearchUI.focusRequestID, 0)
     }
 }

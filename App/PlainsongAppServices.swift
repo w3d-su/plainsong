@@ -1,11 +1,10 @@
 import Foundation
 
-/// Process-wide App services that AppKit hooks can reach without casting `NSApp.delegate`.
+/// Process-wide App services that the Carbon hot-key callback can reach.
 ///
-/// SwiftUI's `@NSApplicationDelegateAdaptor` does not always expose the concrete
-/// `PlainsongApplicationDelegate` as `NSApp.delegate` (live ⇧⌘F logging saw the cast fail
-/// while the menu still worked). The SwiftUI app root assigns `appState` here on appear.
+/// The SwiftUI app root assigns `appState` during initialization, before the app-active
+/// `Command-Shift-F` registration can deliver a callback.
 enum PlainsongAppServices {
     @MainActor
-    static weak var appState: AppState?
+    weak static var appState: AppState?
 }

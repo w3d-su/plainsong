@@ -11,12 +11,16 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationWillFinishLaunching(_: Notification) {
-        PlainsongApplicationSendEventHook.installIfNeeded()
+    func applicationDidBecomeActive(_: Notification) {
+        PlainsongWorkspaceSearchHotKey.activate()
     }
 
-    func applicationDidFinishLaunching(_: Notification) {
-        PlainsongApplicationSendEventHook.installIfNeeded()
+    func applicationWillResignActive(_: Notification) {
+        PlainsongWorkspaceSearchHotKey.deactivate()
+    }
+
+    func applicationWillTerminate(_: Notification) {
+        PlainsongWorkspaceSearchHotKey.tearDown()
     }
 
     func applicationShouldTerminate(

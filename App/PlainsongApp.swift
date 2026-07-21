@@ -23,9 +23,8 @@ struct PlainsongApp: App {
         let state = makePlainsongAppState()
         _appState = StateObject(wrappedValue: state)
         _menuBarState = StateObject(wrappedValue: MenuBarState(appState: state))
-        // AppKit ⇧⌘F hook cannot cast NSApp.delegate under SwiftUI; publish AppState here.
+        // Publish state before the app-active Carbon ⇧⌘F handler can receive an event.
         PlainsongAppServices.appState = state
-        PlainsongApplicationSendEventHook.installIfNeeded()
     }
 
     var body: some Scene {
@@ -34,7 +33,7 @@ struct PlainsongApp: App {
                 .environmentObject(appState)
                 .tint(.accentColor)
                 .onAppear {
-                    // Keep both the adaptor delegate and the AppKit sendEvent hook in sync.
+                    // Keep both the adaptor delegate and the Carbon key action in sync.
                     appDelegate.appState = appState
                     PlainsongAppServices.appState = appState
                 }

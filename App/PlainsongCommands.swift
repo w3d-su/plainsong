@@ -65,8 +65,8 @@ struct PlainsongCommands: Commands {
             .keyboardShortcut("p", modifiers: [.command, .shift])
             .disabled(!snapshot.hasOpenDocument)
 
-            Button("Find in Workspace…") {
-                appState.focusWorkspaceSearch()
+            Button("Toggle Workspace Search") {
+                PlainsongWorkspaceSearchKeyAction.performIfAvailable()
             }
             .keyboardShortcut("f", modifiers: [.command, .shift])
             .disabled(!snapshot.canUseWorkspaceSearch)
