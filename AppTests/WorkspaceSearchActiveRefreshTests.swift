@@ -1,4 +1,5 @@
 // swiftlint:disable type_body_length
+import EditorKit
 import MarkdownCore
 @testable import Plainsong
 import WorkspaceKit
@@ -6,6 +7,54 @@ import XCTest
 
 @MainActor
 final class WorkspaceSearchActiveRefreshTests: XCTestCase {
+    func testEditCancelsOnlyPendingNavigationTargetingEditedSession() async throws {
+        let provider = ActiveSearchRefreshProvider()
+        let fixture = try makeActiveSearchRefreshFixture(
+            provider: provider,
+            scanner: ActiveSearchRefreshScanner(),
+            files: ["current.md": "current", "warm.md": "warm"],
+            currentPath: "current.md"
+        )
+        defer { cleanUpActiveSearchRefreshFixture(fixture) }
+        let warm = try addActiveSearchRefreshWarmSession(path: "warm.md", text: "warm", to: fixture)
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
+
+        let warmIdentity = try XCTUnwrap(fixture.appState.editorDocumentIdentity(for: warm))
+        let warmNavigation = EditorNavigationRequest(
+            id: 7,
+            documentIdentity: warmIdentity,
+            selection: NSRange(location: 0, length: 1)
+        )
+        fixture.appState.editorNavigationGeneration = warmNavigation.id
+        fixture.appState.editorNavigationCommand = .navigate(warmNavigation)
+        fixture.appState.applyAuthorizedEditorText(
+            "current needle",
+            to: fixture.appState.currentDocument
+        )
+        XCTAssertEqual(fixture.appState.editorNavigationCommand, .navigate(warmNavigation))
+
+        let currentIdentity = try XCTUnwrap(
+            fixture.appState.editorDocumentIdentity(for: fixture.appState.currentDocument)
+        )
+        let currentNavigation = EditorNavigationRequest(
+            id: 8,
+            documentIdentity: currentIdentity,
+            selection: NSRange(location: 0, length: 1)
+        )
+        fixture.appState.editorNavigationGeneration = currentNavigation.id
+        fixture.appState.editorNavigationCommand = .navigate(currentNavigation)
+        fixture.appState.applyAuthorizedEditorText(
+            "newest current needle",
+            to: fixture.appState.currentDocument
+        )
+
+        guard case let .cancel(cancellationID)? = fixture.appState.editorNavigationCommand else {
+            return XCTFail("Expected the edited navigation target to be cancelled")
+        }
+        XCTAssertGreaterThan(cancellationID, currentNavigation.id)
+    }
+
     func testCurrentAndWarmSessionEditsRefreshWithLatestOverlays() async throws {
         let provider = ActiveSearchRefreshProvider()
         let scanner = ActiveSearchRefreshScanner()
@@ -58,6 +107,7 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
         try await waitForActiveSearchRefresh("initial producer") { provider.requests.count == 1 }
         let oldRequest = provider.requests[0]
+        let oldTaskToken = try XCTUnwrap(fixture.appState.workspaceSearchTaskToken)
 
         fixture.appState.applyAuthorizedEditorText("needle one", to: fixture.appState.currentDocument)
         fixture.appState.applyAuthorizedEditorText("needle two", to: fixture.appState.currentDocument)
@@ -66,12 +116,20 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
         try await waitForActiveSearchRefresh("old producer cancellation and one refresh") {
             provider.terminatedIndices.contains(0) && provider.requests.count == 2
         }
-        provider.yield(
-            .fileResult(
-                activeSearchRefreshContext(oldRequest),
-                activeSearchRefreshResult(path: "a.md", text: "needle stale", needle: "needle")
-            ),
-            to: 0
+        let currentTaskToken = try XCTUnwrap(fixture.appState.workspaceSearchTaskToken)
+        let staleEvent = WorkspaceSearchEvent.fileResult(
+            activeSearchRefreshContext(oldRequest),
+            activeSearchRefreshResult(path: "a.md", text: "needle stale", needle: "needle")
+        )
+        fixture.appState.applyWorkspaceSearchEvent(
+            staleEvent,
+            expectedContext: activeSearchRefreshContext(oldRequest),
+            taskToken: oldTaskToken
+        )
+        fixture.appState.applyWorkspaceSearchEvent(
+            staleEvent,
+            expectedContext: activeSearchRefreshContext(oldRequest),
+            taskToken: currentTaskToken
         )
         try await Task.sleep(nanoseconds: 30_000_000)
         XCTAssertTrue(fixture.appState.workspaceSearchState.fileResults.isEmpty)
@@ -110,9 +168,15 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
             let fixture = try makeActiveSearchRefreshFixture(
                 provider: provider,
                 scanner: scanner,
-                files: ["a.md": "needle"]
+                files: ["a.md": "needle"],
+                debounceNanoseconds: 30_000_000
             )
             defer { cleanUpActiveSearchRefreshFixture(fixture) }
+            let warm = try addActiveSearchRefreshWarmSession(
+                path: "a.md",
+                text: "needle",
+                to: fixture
+            )
 
             fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
             try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
@@ -150,15 +214,46 @@ final class WorkspaceSearchActiveRefreshTests: XCTestCase {
 
             fixture.appState.refreshWorkspaceAfterFileSystemChange()
             await scanner.waitForRequestCount(1)
+            let scannerAuthority = await scanner.rootAuthority(at: 0)
+            let capturedAuthority = try XCTUnwrap(scannerAuthority)
+            fixture.appState.applyDocumentText("reload pending needle latest", to: warm)
             XCTAssertEqual(provider.requests.count, 1)
             XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
 
-            await scanner.complete(0, with: fixture.snapshot)
+            let replacementSnapshot = WorkspaceFileSnapshot(entries: [
+                WorkspaceFileSnapshot.Entry(
+                    relativePath: "a.md",
+                    kind: .markdown,
+                    identity: "replacement:a.md",
+                    contentModificationDate: Date(timeIntervalSince1970: 42)
+                ),
+                WorkspaceFileSnapshot.Entry(
+                    relativePath: "new.mdx",
+                    kind: .mdx,
+                    identity: "replacement:new.mdx",
+                    contentModificationDate: Date(timeIntervalSince1970: 43)
+                ),
+            ])
+            XCTAssertNotEqual(replacementSnapshot, fixture.snapshot)
+            await scanner.complete(0, with: replacementSnapshot)
             try await waitForActiveSearchRefresh("post-install search") {
                 provider.requests.count == 2
             }
-            XCTAssertEqual(provider.requests[1].workspaceGeneration, fixture.appState.workspaceGeneration)
-            XCTAssertEqual(provider.requests[1].query.pattern, "needle")
+            let refreshedRequest = provider.requests[1]
+            XCTAssertEqual(refreshedRequest.snapshot, replacementSnapshot)
+            XCTAssertEqual(fixture.appState.workspaceSnapshot, replacementSnapshot)
+            XCTAssertEqual(refreshedRequest.workspaceGeneration, fixture.appState.workspaceGeneration)
+            XCTAssertEqual(
+                refreshedRequest.workspaceGeneration,
+                fixture.appState.workspaceInstalledCaptureGeneration
+            )
+            XCTAssertEqual(refreshedRequest.rootAuthority, capturedAuthority)
+            XCTAssertEqual(refreshedRequest.rootAuthority, fixture.appState.workspaceSearchRootAuthority)
+            XCTAssertEqual(refreshedRequest.query.pattern, "needle")
+            let overlay = try XCTUnwrap(refreshedRequest.dirtyOverlays.overlays.first)
+            XCTAssertEqual(refreshedRequest.dirtyOverlays.overlays.count, 1)
+            XCTAssertEqual(overlay.relativePath, "a.md")
+            XCTAssertEqual(overlay.text, "reload pending needle latest")
         }
     }
 

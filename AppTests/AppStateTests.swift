@@ -13764,10 +13764,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     func testAcceptedActivationFingerprintMismatchPreservesEntirePreviousTransaction() async throws {
         let scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
-        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
         let appState = scenario.fixture.appState
         let previousSession = appState.currentDocument
         appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
         let statistics = try XCTUnwrap(appState.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)
@@ -14006,10 +14006,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     func testAcceptedActivationInvalidRangePreservesEntirePreviousTransaction() async throws {
         var scenario = try await makeAcceptedActivationScenario()
         defer { cleanUp(scenario.fixture) }
-        let olderNavigation = seedOlderPendingNavigation(in: scenario.fixture.appState)
         let appState = scenario.fixture.appState
         let previousSession = appState.currentDocument
         appState.replaceDocumentText("alpha dirty", in: previousSession)
+        let olderNavigation = seedOlderPendingNavigation(in: appState)
         let autosave = try XCTUnwrap(appState.autosaveTask)
         let statistics = try XCTUnwrap(appState.statisticsTask)
         let completion = try XCTUnwrap(appState.completionWorkspaceTask)

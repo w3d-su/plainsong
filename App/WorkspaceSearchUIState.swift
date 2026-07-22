@@ -28,7 +28,8 @@ struct WorkspaceSearchUIState: Equatable {
     var focusAppliedID: UInt64 = 0
     /// When non-`nil`, a non-empty UI query was deferred because search was not ready for this
     /// workspace generation. Only that pending install may auto-resume; ordinary reloads do not
-    /// re-arm this from a mere non-empty query field (refresh remains a later WS3C item).
+    /// re-arm this from a mere non-empty query field. Active-query refresh uses a separate,
+    /// root-bound intent.
     var pendingResumeGeneration: UInt64?
 
     /// Maps UI case/word toggles onto the existing `TextSearchQuery` contract.

@@ -114,46 +114,106 @@ extension WorkspaceSearchActiveRefreshTests {
         try await waitForActiveSearchRefresh("alpha search") { provider.requests.count == 1 }
         fixture.appState.refreshWorkspaceAfterFileSystemChange()
         await scanner.waitForRequestCount(1)
-        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "beta"))
-        XCTAssertEqual(fixture.appState.workspaceSearchRefreshIntent?.query.pattern, "beta")
+        fixture.appState.updateWorkspaceSearchQueryText("beta")
+        fixture.appState.setWorkspaceSearchMatchCase(true)
+        fixture.appState.setWorkspaceSearchWholeWord(true)
+        XCTAssertEqual(
+            fixture.appState.workspaceSearchUI.pendingResumeGeneration,
+            fixture.appState.workspaceGeneration
+        )
 
         await scanner.complete(0, with: fixture.snapshot)
         try await waitForActiveSearchRefresh("replacement search") { provider.requests.count == 2 }
         XCTAssertEqual(provider.requests[1].query.pattern, "beta")
+        XCTAssertEqual(provider.requests[1].query.caseSensitivity, .sensitive)
+        XCTAssertTrue(provider.requests[1].query.wholeWord)
+        XCTAssertNil(fixture.appState.workspaceSearchUI.pendingResumeGeneration)
         XCTAssertNil(fixture.appState.workspaceSearchRefreshIntent)
 
         fixture.appState.refreshWorkspaceAfterFileSystemChange()
         await scanner.waitForRequestCount(2)
+        let emptyQueryGeneration = fixture.appState.workspaceGeneration
         fixture.appState.updateWorkspaceSearchQueryText("")
         await scanner.complete(1, with: fixture.snapshot)
+        try await waitForActiveSearchRefresh("empty-query snapshot installation") {
+            fixture.appState.workspaceInstalledCaptureGeneration == emptyQueryGeneration
+        }
         try await Task.sleep(nanoseconds: 30_000_000)
         XCTAssertEqual(provider.requests.count, 2)
         XCTAssertNil(fixture.appState.workspaceSearchRefreshIntent)
         XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
     }
 
-    func testCloseSwitchTeardownAndPreviousRootOverlaysCannotReplay() async throws {
+    func testTeardownDuringReloadClearsIntentWithoutReplay() async throws {
         let provider = ActiveSearchRefreshProvider()
         let scanner = ActiveSearchRefreshScanner()
         let fixture = try makeActiveSearchRefreshFixture(
             provider: provider,
             scanner: scanner,
-            files: ["a.md": "saved A"],
-            currentPath: "a.md"
+            files: ["a.md": "needle"]
         )
         defer { cleanUpActiveSearchRefreshFixture(fixture) }
 
-        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "A"))
-        try await waitForActiveSearchRefresh("root A search") { provider.requests.count == 1 }
-        fixture.appState.applyAuthorizedEditorText("dirty A", to: fixture.appState.currentDocument)
-        try await waitForActiveSearchRefresh("root A overlay refresh") { provider.requests.count == 2 }
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
         fixture.appState.refreshWorkspaceAfterFileSystemChange()
         await scanner.waitForRequestCount(1)
         fixture.appState.teardownWorkspaceSearch()
         await scanner.complete(0, with: fixture.snapshot)
         try await Task.sleep(nanoseconds: 30_000_000)
-        XCTAssertEqual(provider.requests.count, 2)
+
+        XCTAssertEqual(provider.requests.count, 1)
         XCTAssertNil(fixture.appState.workspaceSearchRefreshIntent)
+        XCTAssertNil(fixture.appState.workspaceSearchState.activeQuery)
+    }
+
+    func testCloseDuringReloadClearsIntentWithoutReplay() async throws {
+        let provider = ActiveSearchRefreshProvider()
+        let scanner = ActiveSearchRefreshScanner()
+        let fixture = try makeActiveSearchRefreshFixture(
+            provider: provider,
+            scanner: scanner,
+            files: ["a.md": "needle"]
+        )
+        defer { cleanUpActiveSearchRefreshFixture(fixture) }
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        try await waitForActiveSearchRefresh("initial search") { provider.requests.count == 1 }
+        fixture.appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(1)
+        fixture.appState.closeWorkspace()
+        await scanner.complete(0, with: fixture.snapshot)
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        XCTAssertEqual(provider.requests.count, 1)
+        XCTAssertNil(fixture.appState.workspaceRootURL)
+        XCTAssertNil(fixture.appState.workspaceSearchRefreshIntent)
+        XCTAssertEqual(fixture.appState.workspaceSearchUI.queryText, "")
+    }
+
+    func testSwitchDuringReloadCannotReplayPreviousRootOverlay() async throws {
+        let provider = ActiveSearchRefreshProvider()
+        let scanner = ActiveSearchRefreshScanner()
+        let fixture = try makeActiveSearchRefreshFixture(
+            provider: provider,
+            scanner: scanner,
+            files: ["a.md": "saved A"]
+        )
+        defer { cleanUpActiveSearchRefreshFixture(fixture) }
+        let warmA = try addActiveSearchRefreshWarmSession(
+            path: "a.md",
+            text: "saved A",
+            to: fixture
+        )
+
+        fixture.appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "A"))
+        try await waitForActiveSearchRefresh("root A search") { provider.requests.count == 1 }
+        fixture.appState.applyDocumentText("dirty A", to: warmA)
+        try await waitForActiveSearchRefresh("root A overlay refresh") { provider.requests.count == 2 }
+        XCTAssertEqual(provider.requests[1].dirtyOverlays.overlays.map(\.text), ["dirty A"])
+        fixture.appState.applyDocumentText("saved A", to: warmA)
+        fixture.appState.refreshWorkspaceAfterFileSystemChange()
+        await scanner.waitForRequestCount(1)
 
         let rootB = try makeActiveSearchRefreshTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: rootB) }
@@ -164,6 +224,9 @@ extension WorkspaceSearchActiveRefreshTests {
         )
         try fixture.appState.openWorkspace(url: rootB, rememberAsLastOpened: false)
         await scanner.waitForRequestCount(2)
+        await scanner.complete(0, with: fixture.snapshot)
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertEqual(provider.requests.count, 2)
         let snapshotB = activeSearchRefreshSnapshot(paths: ["b.md"], rootURL: rootB)
         await scanner.complete(1, with: snapshotB)
         try await waitForActiveSearchRefresh("root B installation") {

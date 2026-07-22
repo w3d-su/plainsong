@@ -64,6 +64,7 @@ extension AppState {
             scheduleAutosave(for: session)
         }
         if shouldRefreshWorkspaceSearch {
+            cancelPendingEditorNavigationIfNeeded(targeting: session)
             restartActiveWorkspaceSearchAfterRelevantEdit(in: session)
         }
     }
@@ -499,6 +500,17 @@ extension AppState {
             else {
                 return
             }
+        }
+
+        editorNavigationCommand = .cancel(id: advanceEditorNavigationGeneration())
+    }
+
+    func cancelPendingEditorNavigationIfNeeded(targeting session: DocumentSession) {
+        guard case let .navigate(request)? = editorNavigationCommand,
+              let documentIdentity = editorDocumentIdentity(for: session),
+              request.documentIdentity == documentIdentity
+        else {
+            return
         }
 
         editorNavigationCommand = .cancel(id: advanceEditorNavigationGeneration())

@@ -76,6 +76,11 @@ actor ActiveSearchRefreshScanner: WorkspaceDirectoryScanning {
         }
     }
 
+    func rootAuthority(at index: Int) -> WorkspaceFileSystemRootAuthority? {
+        guard requests.indices.contains(index) else { return nil }
+        return requests[index].rootAuthority
+    }
+
     func complete(_ index: Int, with snapshot: WorkspaceFileSnapshot) {
         guard requests.indices.contains(index),
               let continuation = requests[index].continuation
