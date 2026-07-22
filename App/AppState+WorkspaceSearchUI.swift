@@ -36,14 +36,24 @@ extension AppState {
         workspaceSearchUI = ui
     }
 
-    /// `Command-Shift-F`: switch to Search and request field focus. Repeated presses always
-    /// increment the focus token so the field re-focuses even when already in Search mode.
+    /// Switches to Search and requests field focus. Repeated calls always increment the focus
+    /// token so callers can explicitly re-focus the field even when already in Search mode.
     func focusWorkspaceSearch() {
         guard canUseWorkspaceSearch else { return }
         var ui = workspaceSearchUI
         ui.mode = .search
         ui.focusRequestID &+= 1
         workspaceSearchUI = ui
+    }
+
+    /// `Command-Shift-F`: toggle Search/Files, focusing the query whenever Search is opened.
+    func toggleWorkspaceSearch() {
+        guard canUseWorkspaceSearch else { return }
+        if workspaceSearchUI.mode == .search {
+            selectWorkspaceSidebarMode(.files)
+        } else {
+            focusWorkspaceSearch()
+        }
     }
 
     /// Marks a focus request as consumed after the **key** window's owned Search `NSTextField`
