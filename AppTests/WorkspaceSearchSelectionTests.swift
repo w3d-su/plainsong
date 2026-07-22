@@ -347,9 +347,10 @@ final class WorkspaceSearchSelectionTests: XCTestCase {
         )
     }
 
-    func testCommandFAndEditorFocusRemainIndependentOfSearchSelection() {
-        // ⌘F is editor find; search selection / ⌘⇧F use separate tokens. Escaping the search
-        // field calls `requestEditorFocus()` without clearing search UI state.
+    func testEditorFocusAndSearchFocusRemainIndependentOfSearchSelection() {
+        // Command-F remains reserved for unfinished editor find. Search selection / Command-Shift-F
+        // use separate tokens. Escaping the search field calls `requestEditorFocus()` without
+        // clearing search UI state.
         let appState = AppState()
         let beforeEditor = appState.editorFocusRequestID
         let beforeSearchFocus = appState.workspaceSearchUI.focusRequestID
