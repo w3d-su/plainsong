@@ -10,8 +10,9 @@
 > the gate. **Owner physical ⇧⌘F / search-field focus sign-off is complete** (PR #89): app-active
 > Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
 > owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
-> ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh**, WS4 (including out-of-process
-> XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
+> ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
+> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4
+> (including out-of-process XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
 > remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
@@ -155,7 +156,7 @@ produce only a prefix of the valid-request bound.
 |---|---|---|
 | MarkdownCore | Pure query semantics, text matching, UTF-16 ranges, line mapping, bounded snippets | `TextSearchQuery`, `TextSearchMatch`, `TextSearchEngine` |
 | WorkspaceKit | Candidate selection, ignore policy, containment, reads, cancellation, streaming, limits, deterministic aggregation | `WorkspaceSearchRequest`, `WorkspaceSearchEvent`, `WorkspaceSearchSummary`, `WorkspaceSearchService` |
-| App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, future active-search FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
+| App | Debounce, task lifecycle, dirty overlays, latest-generation arbitration, sidebar state, active-search edit/FSEvent refresh | `AppState+WorkspaceSearch`, `WorkspaceSearchState` |
 | EditorKit | Apply an exact selection only after the requested document text is installed, then reveal and focus it | `EditorNavigationCommand`, `EditorNavigationRequest` |
 
 The implemented WS3B App lifecycle retains the `Task` that consumes each event stream and
@@ -741,7 +742,14 @@ not prevent a later external namespace race; subsequent anchored operations dete
 and fail closed instead of being described as identity-atomic. Cancellation, fingerprint, exact
 range, command, and binding-lifecycle requirements otherwise remain unchanged. Visible sidebar
 UI, keyboard selection/accessibility (PR #88), and physical ⇧⌘F focus delivery (PR #89) have
-landed; ordinary-edit/FSEvent **active-search refresh** remains pending.
+landed. Active-search refresh now restarts relevant current/warm Markdown or MDX edits through the
+existing debounce and captures dirty overlays only after that debounce, so rapid edits coalesce and
+undoing to the saved baseline removes the overlay. FSEvent and namespace reloads retain only the
+exact active query plus App-owned root spelling/physical expectation; they never retain the old root
+descriptor authority. Superseding same-root generations carry that intent, while only the newest
+successful transactional snapshot/authority install may consume it once. Explicit replacement,
+empty clear, close/switch, teardown, root mismatch, cancellation, failure, and stale generations
+either win or fail closed without replay. Bare non-empty UI text that never ran remains inactive.
 
 ## 5. Review-Sized Work Packages
 
@@ -818,7 +826,12 @@ landed; ordinary-edit/FSEvent **active-search refresh** remains pending.
 - [x] Preserve typed write outcomes through App save, including exact-digest expectations,
   descriptor-canonical installed-workspace Save Copy ownership protection, exact cleanup-artifact
   notices, and per-session indeterminate quarantine.
-- [ ] Refresh an active search after FSEvents or relevant in-memory document edits.
+- [x] Refresh an active search after FSEvents, namespace reloads, or relevant in-memory document
+  edits. Evidence: deterministic controlled-scanner App tests cover current/warm latest overlays,
+  coalescing and late producers, undo-to-baseline, completed/in-flight restart timing, overlapping
+  and failed reloads, namespace refresh, root mismatch, replacement/empty query, close/switch/
+  teardown/root isolation, inactive/no-query/irrelevant edits, and preserved mode/options/focus
+  receipts.
 
 ### WS4 — CI, performance, and acceptance
 
@@ -839,7 +852,7 @@ landed; ordinary-edit/FSEvent **active-search refresh** remains pending.
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
 | WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
 | EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce/latest-query wins; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| PlainsongTests | Debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after newest snapshot/root-authority install; failed/stale/cancelled reload and late-producer rejection; explicit/empty query and close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility; keyboard: field ↓ selects first result, ↑/↓ move without wrap, Return activates, Escape results→field and field→editor without clearing query/results; click a result then ↑/↓ still routes through search selection (not only native table) |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
 
@@ -856,7 +869,7 @@ CI gates.
 
 - [ ] `make lint`, `make test`, and `make build` pass.
 - [ ] No functional acceptance item depends on a manual-only checklist.
-- [ ] A newly typed unsaved string appears in workspace search results after debounce.
+- [x] A newly typed unsaved string appears in workspace search results after debounce.
 - [ ] Clicking a result in another file selects the exact UTF-16 match and scrolls it
   into view.
 - [ ] Repeating the same result activation works because navigation uses a monotonic ID.

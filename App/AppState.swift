@@ -182,7 +182,6 @@ final class AppState: ObservableObject {
     @Published var workspaceTrashCleanupNotices: [WorkspaceTrashCleanupNotice] = []
     @Published private(set) var wysiwygFallbackMessage: String?
     @Published private(set) var editorFocusRequestID = 0
-
     let fileStore: MarkdownFileStore
     let coherentFileReader: any WorkspaceCoherentFileReading
     let externalReloadApplicationPreparer: any ExternalReloadApplicationPreparing
@@ -220,6 +219,7 @@ final class AppState: ObservableObject {
     var workspaceSearchTask: Task<Void, Never>?
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
+    var workspaceSearchRefreshIntent: WorkspaceSearchRefreshIntent?
     var editorNavigationGeneration: UInt64 = 0
     var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
     var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]

@@ -31,16 +31,27 @@ extension AppState {
     }
 
     func applyDocumentText(_ newText: String, to session: DocumentSession) {
+        let previousVersion = session.version
         session.replaceText(newText, refreshStatistics: false)
-        scheduleDocumentTextSideEffects(for: session)
+        scheduleDocumentTextSideEffects(
+            for: session,
+            shouldRefreshWorkspaceSearch: session.version != previousVersion
+        )
     }
 
     func applyAuthorizedEditorText(_ newText: String, to session: DocumentSession) {
+        let previousVersion = session.version
         session.replaceTextFromAuthorizedEditor(newText, refreshStatistics: false)
-        scheduleDocumentTextSideEffects(for: session)
+        scheduleDocumentTextSideEffects(
+            for: session,
+            shouldRefreshWorkspaceSearch: session.version != previousVersion
+        )
     }
 
-    private func scheduleDocumentTextSideEffects(for session: DocumentSession) {
+    private func scheduleDocumentTextSideEffects(
+        for session: DocumentSession,
+        shouldRefreshWorkspaceSearch: Bool
+    ) {
         if let url = sessionStateURL(for: session) {
             sessionPolicy.updateDirtyState(for: url, isDirty: session.isDirty)
         }
@@ -51,6 +62,9 @@ extension AppState {
             scheduleAutosave()
         } else {
             scheduleAutosave(for: session)
+        }
+        if shouldRefreshWorkspaceSearch {
+            restartActiveWorkspaceSearchAfterRelevantEdit(in: session)
         }
     }
 

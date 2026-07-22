@@ -122,7 +122,8 @@ extension AppState {
     ///
     /// Empty text calls `clearWorkspaceSearch()`. Non-empty text only starts when the workspace
     /// search root is ready. While not ready, records `pendingResumeGeneration` for the current
-    /// workspace generation so only that install may auto-resume (not every later FSEvent reload).
+    /// workspace generation so only that install may auto-resume. Ordinary reload refresh is
+    /// separately armed only by a query that was actually active, never by UI text alone.
     func publishWorkspaceSearchQueryFromUI() {
         let text = workspaceSearchUI.queryText
         guard !text.isEmpty else {
@@ -149,7 +150,8 @@ extension AppState {
     ///
     /// No-ops when there is no pending generation, the generation does not match the installed
     /// workspace generation, or the field was cleared. Does **not** re-search solely because the
-    /// query field is non-empty after an ordinary reload (refresh is a later WS3C item).
+    /// query field is non-empty after an ordinary reload; active-query refresh uses a separate,
+    /// root-bound intent installed only after the newest successful capture.
     func resumePendingWorkspaceSearchFromUIIfNeeded() {
         guard let pendingGeneration = workspaceSearchUI.pendingResumeGeneration else { return }
         guard isWorkspaceSearchReady else { return }

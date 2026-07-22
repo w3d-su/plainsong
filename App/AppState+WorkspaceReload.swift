@@ -2,6 +2,12 @@ import Foundation
 import MarkdownCore
 import WorkspaceKit
 
+struct WorkspaceSearchRefreshIntent: Equatable {
+    let query: TextSearchQuery
+    let rootURL: URL
+    let rootExpectation: WorkspaceItemMutationExpectation
+}
+
 @MainActor
 extension AppState {
     func setWorkspaceSearchQuery(_ query: TextSearchQuery) {
@@ -10,10 +16,28 @@ extension AppState {
             return
         }
 
+        if let refreshIntent = workspaceSearchRefreshIntent,
+           !isWorkspaceSearchReady
+        {
+            cancelWorkspaceSearchTask()
+            cancelPendingEditorNavigationIfNeeded()
+            workspaceSearchRefreshIntent = WorkspaceSearchRefreshIntent(
+                query: query,
+                rootURL: refreshIntent.rootURL,
+                rootExpectation: refreshIntent.rootExpectation
+            )
+            workspaceSearchState = WorkspaceSearchState(
+                queryGeneration: workspaceSearchQueryGeneration
+            )
+            return
+        }
+
+        workspaceSearchRefreshIntent = nil
         startWorkspaceSearch(query, cancellingPendingEditorNavigation: true)
     }
 
     func clearWorkspaceSearch() {
+        workspaceSearchRefreshIntent = nil
         cancelWorkspaceSearchTask()
         cancelPendingEditorNavigationIfNeeded()
         workspaceSearchState = WorkspaceSearchState(
@@ -29,6 +53,37 @@ extension AppState {
     func restartActiveWorkspaceSearchWithFreshOverlays() {
         guard let query = workspaceSearchState.activeQuery else { return }
         startWorkspaceSearch(query, cancellingPendingEditorNavigation: false)
+    }
+
+    func restartActiveWorkspaceSearchAfterRelevantEdit(in session: DocumentSession) {
+        guard workspaceSearchState.activeQuery != nil,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
+              session === currentDocument || sessionCache.values.contains(where: { $0 === session })
+        else {
+            return
+        }
+
+        let sessionIdentity = ObjectIdentifier(session)
+        let unanchoredWorkspaceLocation: WorkspaceFileSystemLocation? =
+            if case let .proven(proof)? =
+            unanchoredManagedSessionOwnershipProofs[sessionIdentity] {
+                proof.installedWorkspaceLocation
+            } else {
+                nil
+            }
+        let retainedLocation = anchoredSessionFileBinding(for: session)?.location
+            ?? unanchoredWorkspaceLocation
+        guard retainedLocation?.rootAuthority == rootAuthority,
+              let fileURL = retainedLocation?.fileURL,
+              !detachedSessionURLs.contains(fileURL),
+              let inferredKind = FileKind(url: fileURL),
+              inferredKind == session.fileKind
+        else {
+            return
+        }
+
+        restartActiveWorkspaceSearchWithFreshOverlays()
     }
 
     func invalidateWorkspaceSearchForWorkspaceGenerationAdvance() {
@@ -88,13 +143,30 @@ extension AppState {
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {
+        retainActiveWorkspaceSearchRefreshIntent()
         invalidateWorkspaceSearchForWorkspaceGenerationAdvance()
         precondition(workspaceGeneration < .max, "Workspace generation exhausted")
         workspaceGeneration += 1
-        // Only rebind an already-pending pre-authority query; do not create pending from a
-        // non-empty field alone (that would silently implement FSEvent refresh).
+        // Only rebind an already-pending pre-authority query; active-query reload refresh is
+        // carried separately by `workspaceSearchRefreshIntent`, never inferred from UI text.
         rebindPendingWorkspaceSearchUIResumeAfterGenerationAdvance()
         return workspaceGeneration
+    }
+
+    private func retainActiveWorkspaceSearchRefreshIntent() {
+        guard let query = workspaceSearchState.activeQuery,
+              let rootAuthority = workspaceSearchRootAuthority,
+              workspaceSearchAuthorityMatchesCurrentRoot(rootAuthority),
+              let rootURL = workspaceRootURL
+        else {
+            return
+        }
+
+        workspaceSearchRefreshIntent = WorkspaceSearchRefreshIntent(
+            query: query,
+            rootURL: rootURL,
+            rootExpectation: rootAuthority.directoryMutationExpectation
+        )
     }
 
     private func applyWorkspaceReload(
@@ -213,9 +285,28 @@ extension AppState {
         )
         workspaceTree = tree
         scheduleCompletionWorkspaceRefresh(workspaceGeneration: generation)
-        // Only generation-scoped pending pre-authority queries resume here — not every non-empty
-        // query field after ordinary FSEvent / filter reloads (refresh is a later WS3C item).
+        // A newer explicit pre-authority query is resumed first and clears any older retained
+        // refresh intent. A merely non-empty inactive field has neither mechanism and stays idle.
         resumePendingWorkspaceSearchFromUIIfNeeded()
+        resumeWorkspaceSearchRefreshIntentIfNeeded(
+            installedRootAuthority: capture.rootAuthority
+        )
+    }
+
+    private func resumeWorkspaceSearchRefreshIntentIfNeeded(
+        installedRootAuthority: WorkspaceFileSystemRootAuthority
+    ) {
+        guard let intent = workspaceSearchRefreshIntent else { return }
+        guard exactFileURLSpellingMatches(intent.rootURL, installedRootAuthority.originalRootURL),
+              intent.rootExpectation == installedRootAuthority.directoryMutationExpectation,
+              workspaceSearchAuthorityMatchesCurrentRoot(installedRootAuthority)
+        else {
+            workspaceSearchRefreshIntent = nil
+            return
+        }
+
+        workspaceSearchRefreshIntent = nil
+        startWorkspaceSearch(intent.query, cancellingPendingEditorNavigation: false)
     }
 
     private func prepareWorkspaceReloadFile(
