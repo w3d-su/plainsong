@@ -104,6 +104,7 @@ targets:
         com.apple.security.network.client: true
     scheme:
       testTargets:
+        - PlainsongUITests
         - PlainsongTests
         - PerformanceTests
 
@@ -135,4 +136,16 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.performance-tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  PlainsongUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: PlainsongUITests
+    dependencies:
+      - target: Plainsong
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ui-tests
         GENERATE_INFOPLIST_FILE: YES

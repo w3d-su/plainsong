@@ -14,6 +14,7 @@ struct WorkspaceSearchResultsList: View {
     @Binding var selectedRowID: WorkspaceSearchResultRowID?
     var isResultsFocused: FocusState<Bool>.Binding
     var onEscapeToQueryField: () -> Void
+    var onActivationRequested: () -> Void
 
     var body: some View {
         List(selection: $selectedRowID) {
@@ -314,11 +315,17 @@ struct WorkspaceSearchResultsList: View {
         ) else {
             return
         }
-        appState.activateWorkspaceSearchResult(
-            context: payload.context,
-            fileResult: payload.fileResult,
-            match: payload.match
-        )
+        let appState = appState
+        let onActivationRequested = onActivationRequested
+        Task { @MainActor in
+            await Task.yield()
+            appState.activateWorkspaceSearchResult(
+                context: payload.context,
+                fileResult: payload.fileResult,
+                match: payload.match
+            )
+            onActivationRequested()
+        }
     }
 
     private func skippedTitle(count: Int, omitted: Int) -> String {
@@ -343,6 +350,7 @@ struct WorkspaceSearchResultsList: View {
             fileResult: payload.fileResult,
             match: payload.match
         )
+        onActivationRequested()
     }
 
     private func retrySearch() {

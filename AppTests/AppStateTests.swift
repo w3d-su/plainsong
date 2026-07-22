@@ -12052,6 +12052,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 if case .navigate = appState.editorNavigationCommand { return true }
                 return false
             }
+            try await waitUntil("results focus returns after Return activation") {
+                WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+            }
 
             // (4a) Real Escape on the List → query field first responder; query/results kept.
             sendSmokeEscape(to: host.window)
@@ -12097,6 +12100,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             try await waitUntil("real click activates through retained authority") {
                 if case .navigate = appState.editorNavigationCommand { return true }
                 return false
+            }
+            try await waitUntil("results focus returns after click activation") {
+                WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
             }
             sendSmokeUpArrow(to: host.window)
             try await waitUntil(

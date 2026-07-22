@@ -11,8 +11,9 @@
 > Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
 > owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
-> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4
-> (including out-of-process XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
+> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
+> now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
+> events are not additional physical-keyboard evidence. WS4 performance probes/budgets and the overall Definition of Done
 > remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
@@ -840,9 +841,19 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 
 - [ ] Add MarkdownCore, WorkspaceKit, AppState, and EditorKit regression suites from the
   matrix below.
-- [ ] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
+- [x] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
   flow, using a deterministic Debug-only fixture inside the app container rather than
-  automating `NSOpenPanel`.
+  automating `NSOpenPanel`. Evidence: `PlainsongUITests` launches the real app with a unique,
+  app-container-owned Markdown/MDX fixture; drives ⇧⌘F, exact CJK paste, grouped results,
+  no-wrap arrows, Return, both Escape transitions, and click-then-arrow routing through
+  accessibility identifiers; and observes the activated filename plus native-verified UTF-16
+  selection. Native AX state verifies actual query-field focus; Debug support creates/removes
+  only fixture files and publishes accepted navigation, and does not set query, results,
+  selection, or App state.
+  Result routing is proven by the subsequent keys themselves. App-level ASCII input without a
+  field click proves shortcut focus before the exact CJK query replaces it. All waits are
+  predicate-based and every test fixture remains unique.
+  XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only

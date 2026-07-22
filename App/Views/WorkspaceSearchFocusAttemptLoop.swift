@@ -4,8 +4,8 @@ import SwiftUI
 /// Request-scoped retry loop that makes the owned Search `NSTextField` first responder in the
 /// designated key window (WS3C PR A; scheduled from `WorkspaceSearchSidebar`).
 ///
-/// Bounded retries (40 × 16 ms) cover the `.files → .search` mount race without depending on a
-/// single sleep or key-epoch change. In `force` mode (Escape from results) the loop re-focuses
+/// Bounded retries (180 × 16 ms) cover a loaded CI runner's `.files → .search` mount race without
+/// depending on a single sleep or key-epoch change. In `force` mode (Escape from results) the loop re-focuses
 /// the field even when the global `focusRequestID` receipt was already consumed, and never
 /// marks new receipts. Key-window eligibility is re-read live on every iteration — never
 /// captured across an `await`.
@@ -21,9 +21,12 @@ enum WorkspaceSearchFocusAttemptLoop {
         attemptID: UInt64,
         force: Bool
     ) async {
-        for _ in 0 ..< 40 {
+        for _ in 0 ..< 180 {
             guard !Task.isCancelled else { return }
-            guard isLiveKeyWindow(appState: appState, tracker: tracker) else { return }
+            guard isLiveKeyWindow(appState: appState, tracker: tracker) else {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+                continue
+            }
 
             if !force {
                 guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }

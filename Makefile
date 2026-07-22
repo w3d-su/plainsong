@@ -2,7 +2,7 @@
 # Requires: Xcode 16+, Homebrew. Run `make bootstrap` once after cloning.
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
-SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests Scripts
+SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Scripts
 # SwiftFormat 0.62 enabled these wrapping rules by default. Keep the repository's
 # existing 0.61 layout until a deliberate repo-wide migration, without breaking
 # older SwiftFormat versions that do not recognize the rule names.
