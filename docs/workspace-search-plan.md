@@ -12,7 +12,7 @@
 > owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh**, WS4 (including out-of-process
 > XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
-> remain open. Workspace Search as a whole stays **IN PROGRESS**.
+> remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
