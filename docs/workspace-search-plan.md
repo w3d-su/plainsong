@@ -7,9 +7,12 @@
 > which drives **real `NSEvent`s** through `window.sendEvent` — field ↓/Escape through the field
 > editor's `doCommandBy`, ↑/↓/Return/Escape through the focused List's `onKeyPress`, and a real
 > click on a backing table row — so silent native-table fallback or a broken focus handoff fails
-> the gate. Owner ⌘⇧F focus sign-off, ordinary-edit/FSEvent search refresh, WS4 (including
-> out-of-process XCUITest for the same keys), and the overall Definition of Done remain open.
-> Workspace Search as a whole stays **IN PROGRESS**.**
+> the gate. **Owner physical ⇧⌘F / search-field focus sign-off is complete** (PR #89): app-active
+> Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
+> owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
+> ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh**, WS4 (including out-of-process
+> XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
+> remain open. Workspace Search as a whole stays **IN PROGRESS**.
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -381,10 +384,12 @@ Files-tree parent grouping and default-filter ancestor visibility use UTF-8 byte
 snapshot entry has no resource identity, its fallback node ID is a namespaced ASCII hex encoding
 of the exact relative-path bytes, so NFC/NFD directories neither share children nor expansion IDs.
 
-`Command-Shift-F` selects Search mode and increments a search-focus request token.
-`Command-F` remains the focused editor's single-file find action. Keyboard selection and
-Return should open results; every result row needs an accessibility label containing the
-path, line, and snippet.
+`Command-Shift-F` (physical ⇧⌘F via the app-active Carbon hot key from PR #89) toggles
+Files↔Search: opening Search advances the search-focus request token onto the owned query
+field; a second press returns to Files without clearing query/results. The menu item remains
+for discovery and mouse. `Command-F` remains the focused editor's single-file find action.
+Keyboard selection and Return should open results; every result row needs an accessibility
+label containing the path, line, and snippet.
 
 Opening a result is a two-stage action:
 
@@ -735,8 +740,8 @@ replacement B and reload rejects a cross-authority disposition. The last proof d
 not prevent a later external namespace race; subsequent anchored operations detect disagreement
 and fail closed instead of being described as identity-atomic. Cancellation, fingerprint, exact
 range, command, and binding-lifecycle requirements otherwise remain unchanged. Visible sidebar
-UI, shortcuts/focus, rendering/accessibility, and general edit/FSEvent search refresh remain
-pending.
+UI, keyboard selection/accessibility (PR #88), and physical ⇧⌘F focus delivery (PR #89) have
+landed; ordinary-edit/FSEvent **active-search refresh** remains pending.
 
 ## 5. Review-Sized Work Packages
 
@@ -785,7 +790,17 @@ pending.
   workspace close/switch, and search-state teardown; never rely on loop `break` to stop the
   producer.
 - [x] Add Files/Search sidebar modes without changing the stable `HStack` shell.
-- [ ] Owner sign-off: `Command-Shift-F` and search-field focus arbitration (code landed in PR A).
+- [x] Owner sign-off: physical `Command-Shift-F` (⇧⌘F) and search-field focus arbitration.
+  Delivery is PR #89's app-active Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` only while
+  the app is active; unregisters on resign/termination), which toggles Files→Search→Files:
+  opening Search advances the owned-field focus token; returning to Files preserves
+  query/results. Focus targets the owned AppKit query field
+  (`plainsong.workspaceSearch.queryField`), not a SwiftUI `FocusState` field. Evidence:
+  owner physical-keyboard smoke on the built-in keyboard under **ABC** and **Zhuyin**
+  (seven consecutive Carbon callbacks with correct odd-toggle final Search state and owned
+  field focus; bidirectional toggle; clean-build Zhuyin Search→Files closeout), plus
+  targeted hot-key/lifecycle/focus tests. Menu item retained for discovery/mouse. ⌘F remains
+  independently unfinished (editor find), not a regression of this gate.
 - [x] Render grouped partial results with loading, empty, skipped, error, and truncated
   states.
 - [x] Add keyboard and accessibility support (pure reducer + wiring; see owner smoke below).
