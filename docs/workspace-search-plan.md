@@ -859,7 +859,10 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   predicate-based and every test fixture remains unique. Post-activation focus restoration
   recognizes the actual `STTextView` editor through EditorKit's stable accessibility identity,
   observes its first-responder handoff, and is cancelled by newer focus intent or sidebar
-  disappearance before it can publish results readiness.
+  disappearance before it can publish results readiness. Results→query Escape confirms the
+  owned field remains first responder across multiple main-run-loop turns after results focus
+  is lowered; the UI gate then requires both the app-side responder observation and native AX
+  keyboard focus.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

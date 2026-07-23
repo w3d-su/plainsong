@@ -21,29 +21,33 @@ enum WorkspaceSearchFocusAttemptLoop {
         attemptID: UInt64,
         force: Bool
     ) async {
+        if force {
+            await runForced(appState: appState, tracker: tracker)
+        } else {
+            await runRequested(appState: appState, tracker: tracker, attemptID: attemptID)
+        }
+    }
+
+    private static func runForced(
+        appState: AppState,
+        tracker: WindowKeyStateTracker
+    ) async {
+        var consecutiveForcedFocusConfirmations = 0
         for _ in 0 ..< 180 {
             guard !Task.isCancelled else { return }
             guard isLiveKeyWindow(appState: appState, tracker: tracker) else {
-                try? await Task.sleep(nanoseconds: 16_000_000)
+                consecutiveForcedFocusConfirmations = 0
+                guard await pauseBeforeRetry() else { return }
                 continue
             }
 
-            if !force {
-                guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
-                guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-                    requestID: attemptID,
-                    appliedID: appState.workspaceSearchUI.focusAppliedID,
-                    isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
-                ) else {
-                    return
-                }
-            }
-
-            // Keep resolving the concrete Search field; layout may install it mid-loop.
             tracker.refreshBoundSearchFieldIfNeeded()
-
             if let window = tracker.window,
-               isLiveKeyWindow(appState: appState, tracker: tracker)
+               isLiveKeyWindow(appState: appState, tracker: tracker),
+               !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: tracker.resolvedSearchField()
+               )
             {
                 WorkspaceSearchFieldFocus.makeSearchFieldFirstResponder(
                     in: window,
@@ -51,24 +55,64 @@ enum WorkspaceSearchFocusAttemptLoop {
                 )
             }
 
-            if force {
-                if let window = tracker.window,
-                   WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                       in: window,
-                       expectedField: tracker.resolvedSearchField()
-                   )
-                {
+            if let window = tracker.window,
+               WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: tracker.resolvedSearchField()
+               )
+            {
+                consecutiveForcedFocusConfirmations += 1
+                // Lowering the results FocusState can apply after the key handler returns.
+                // Confirm across multiple main-run-loop turns so a transient field claim
+                // cannot be reported as the completed Escape transition.
+                if consecutiveForcedFocusConfirmations >= 3 {
                     return
                 }
-            } else if confirmAndMarkFocusIfNeeded(
+            } else {
+                consecutiveForcedFocusConfirmations = 0
+            }
+            guard await pauseBeforeRetry() else { return }
+        }
+    }
+
+    private static func runRequested(
+        appState: AppState,
+        tracker: WindowKeyStateTracker,
+        attemptID: UInt64
+    ) async {
+        for _ in 0 ..< 180 {
+            guard !Task.isCancelled else { return }
+            guard isLiveKeyWindow(appState: appState, tracker: tracker) else {
+                guard await pauseBeforeRetry() else { return }
+                continue
+            }
+            guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
+            guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: attemptID,
+                appliedID: appState.workspaceSearchUI.focusAppliedID,
+                isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
+            ) else {
+                return
+            }
+
+            tracker.refreshBoundSearchFieldIfNeeded()
+            if confirmAndMarkFocusIfNeeded(
                 appState: appState,
                 tracker: tracker,
                 attemptID: attemptID
             ) {
                 return
             }
+            guard await pauseBeforeRetry() else { return }
+        }
+    }
 
-            try? await Task.sleep(nanoseconds: 16_000_000)
+    private static func pauseBeforeRetry() async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: 16_000_000)
+            return true
+        } catch {
+            return false
         }
     }
 

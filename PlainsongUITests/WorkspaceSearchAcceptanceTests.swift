@@ -104,6 +104,13 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         )
 
         app.typeKey(.escape, modifierFlags: [])
+        waitForLabel(
+            "Workspace search focus query",
+            of: workspaceWindow.descendants(matching: .any)[
+                "plainsong.debug.workspaceSearch.focusSurface"
+            ],
+            description: "query-field routing after results Escape"
+        )
         waitForKeyboardFocus(queryField)
         assertQueryAndResultsRemain(queryField: queryField, target: target)
 

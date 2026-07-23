@@ -12079,9 +12079,16 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
             // (4a) Real Escape on the List → query field first responder; query/results kept.
             sendSmokeEscape(to: host.window)
-            try await waitUntil("real Escape returns to search field") {
-                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
-                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            var stableQueryFocusConfirmations = 0
+            try await waitUntil("real Escape stably returns to search field") {
+                if WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window),
+                   WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+                {
+                    stableQueryFocusConfirmations += 1
+                } else {
+                    stableQueryFocusConfirmations = 0
+                }
+                return stableQueryFocusConfirmations >= 3
             }
             XCTAssertEqual(appState.workspaceSearchUI.queryText, "needle")
             XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
