@@ -848,11 +848,18 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   no-wrap arrows, Return, both Escape transitions, and click-then-arrow routing through
   accessibility identifiers; and observes the activated filename plus native-verified UTF-16
   selection. Native AX state verifies actual query-field focus; Debug support creates/removes
-  only fixture files and publishes accepted navigation, and does not set query, results,
-  selection, or App state.
-  Result routing is proven by the subsequent keys themselves. App-level ASCII input without a
+  only fixture files, cleans expired `ws4a-*` fixture directories at launch, and publishes
+  accepted navigation without setting query, results, selection, or App state. Fixture opening
+  deliberately bypasses last-opened/recent-item persistence while retaining the production
+  workspace-open, indexing, search, and activation paths.
+  Result routing is proven by the subsequent keys themselves, and a Debug-only reducer-event
+  observation proves click-then-arrow events reached the custom no-wrap reducer rather than
+  merely producing the same native `List` selection. App-level ASCII input without a
   field click proves shortcut focus before the exact CJK query replaces it. All waits are
-  predicate-based and every test fixture remains unique.
+  predicate-based and every test fixture remains unique. Post-activation focus restoration
+  recognizes the actual `STTextView` editor through EditorKit's stable accessibility identity,
+  observes its first-responder handoff, and is cancelled by newer focus intent or sidebar
+  disappearance before it can publish results readiness.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

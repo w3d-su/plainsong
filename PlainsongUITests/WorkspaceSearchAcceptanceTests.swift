@@ -41,7 +41,7 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         // Explicitly click the title bar: clicking content in a foreground-but-not-key window
         // can be delivered by XCUITest without AppKit promoting that window first.
         workspaceWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)).click()
-        let editor = workspaceWindow.textViews["plainsong.debug.editor.textView"]
+        let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.click()
         app.activate()
@@ -108,7 +108,7 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         assertQueryAndResultsRemain(queryField: queryField, target: target)
 
         app.typeKey(.escape, modifierFlags: [])
-        let editor = workspaceWindow.textViews["plainsong.debug.editor.textView"]
+        let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         waitForKeyboardFocus(editor)
         assertQueryAndResultsRemain(queryField: queryField, target: target)
@@ -125,21 +125,43 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
 
         target.click()
         waitForSelected(target)
+        let reducerProbe = workspaceWindow.descendants(matching: .any)[
+            "plainsong.debug.workspaceSearch.reducerEvent"
+        ]
+        XCTAssertTrue(reducerProbe.waitForExistence(timeout: 5))
         app.typeKey(.upArrow, modifierFlags: [])
+        waitForLabel(
+            "Workspace search reducer moveUp",
+            of: reducerProbe,
+            description: "custom results reducer receiving Up"
+        )
         waitForSelected(first)
         app.typeKey(.upArrow, modifierFlags: [])
         waitForSelected(first)
         app.typeKey(.downArrow, modifierFlags: [])
+        waitForLabel(
+            "Workspace search reducer moveDown",
+            of: reducerProbe,
+            description: "custom results reducer receiving Down"
+        )
         waitForSelected(target)
     }
 
     private func openSearchWithShortcut() -> XCUIElement {
         makeFixtureWindowKey()
-        let editor = workspaceWindow.textViews["plainsong.debug.editor.textView"]
+        let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.typeKey("f", modifierFlags: [.command, .shift])
         let queryField = workspaceWindow.textFields["plainsong.workspaceSearch.queryField"]
         XCTAssertTrue(queryField.waitForExistence(timeout: 5))
+        let focusProbe = workspaceWindow.descendants(matching: .any)[
+            "plainsong.debug.workspaceSearch.focusSurface"
+        ]
+        waitForLabel(
+            "Workspace search focus query",
+            of: focusProbe,
+            description: "query-field routing after shortcut"
+        )
         waitForKeyboardFocus(queryField)
         app.typeKey("x", modifierFlags: [])
         waitForValue("x", of: queryField, description: "shortcut-focused query field")

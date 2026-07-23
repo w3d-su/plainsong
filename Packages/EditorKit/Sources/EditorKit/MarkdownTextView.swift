@@ -109,9 +109,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isEditable = isEnabled
         textView.isSelectable = isEnabled
-        #if DEBUG
-            textView.setAccessibilityIdentifier("plainsong.debug.editor.textView")
-        #endif
+        textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
 
         context.coordinator.isUpdating = true
         textView.text = text

@@ -1,4 +1,5 @@
 import AppKit
+import EditorKit
 import MarkdownCore
 import SwiftUI
 
@@ -42,6 +43,8 @@ struct WorkspaceSearchSidebar: View {
     /// post-handoff re-assert in `moveDownFromQueryField` cannot override a newer intent
     /// (Escape, ⌘⇧F, or generation change landing between queueing and running).
     @State private var resultsFocusIntentToken: UInt64 = 0
+    /// View-instance epoch invalidates work that resumes after this sidebar disappears.
+    @State private var resultsFocusLifecycleEpoch: UInt64 = 0
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -49,6 +52,7 @@ struct WorkspaceSearchSidebar: View {
     @State private var presentationMemoValue = WorkspaceSearchResultsPresentation.empty
     #if DEBUG
         @State private var debugFocusSurface = "unknown"
+        @State private var debugReducerEvent = "none"
     #endif
 
     var body: some View {
@@ -66,7 +70,8 @@ struct WorkspaceSearchSidebar: View {
                 selectedRowID: resultsSelectionBinding,
                 isResultsFocused: $isResultsFocused,
                 onEscapeToQueryField: { focusQueryFieldFromResults() },
-                onActivationRequested: { restoreResultsFocusAfterActivation() }
+                onActivationRequested: { restoreResultsFocusAfterActivation() },
+                onKeyboardSelectionHandled: { recordKeyboardSelectionHandled($0) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -82,6 +87,9 @@ struct WorkspaceSearchSidebar: View {
             scheduleFocusAttempt()
         }
         .onDisappear {
+            resultsFocusLifecycleEpoch &+= 1
+            resultsFocusIntentToken &+= 1
+            isResultsRoutingReady = false
             focusAttemptController.cancel()
             resultsFocusRestorationController.cancel()
         }
@@ -134,13 +142,20 @@ struct WorkspaceSearchSidebar: View {
         }
         #if DEBUG
         .overlay(alignment: .topLeading) {
-                Text("Workspace search focus \(debugFocusSurface)")
-                    .font(.system(size: 1))
-                    .frame(width: 1, height: 1)
-                    .opacity(0.001)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityIdentifier("plainsong.debug.workspaceSearch.focusSurface")
-                    .accessibilityLabel("Workspace search focus \(debugFocusSurface)")
+                ZStack {
+                    Text("Workspace search focus \(debugFocusSurface)")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityIdentifier("plainsong.debug.workspaceSearch.focusSurface")
+                        .accessibilityLabel("Workspace search focus \(debugFocusSurface)")
+                    Text("Workspace search reducer \(debugReducerEvent)")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityIdentifier("plainsong.debug.workspaceSearch.reducerEvent")
+                        .accessibilityLabel("Workspace search reducer \(debugReducerEvent)")
+                }
+                .font(.system(size: 1))
+                .frame(width: 1, height: 1)
+                .opacity(0.001)
+                .allowsHitTesting(false)
             }
         #endif
     }
@@ -196,6 +211,23 @@ struct WorkspaceSearchSidebar: View {
                 debugFocusSurface = "query"
             } else {
                 debugFocusSurface = "other"
+            }
+        #endif
+    }
+
+    private func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
+        #if DEBUG
+            switch action {
+            case .selectFirst:
+                debugReducerEvent = "selectFirst"
+            case .selectLast:
+                debugReducerEvent = "selectLast"
+            case .moveUp:
+                debugReducerEvent = "moveUp"
+            case .moveDown:
+                debugReducerEvent = "moveDown"
+            case .clear:
+                debugReducerEvent = "clear"
             }
         #endif
     }
@@ -330,70 +362,6 @@ struct WorkspaceSearchSidebar: View {
         scheduleFocusAttempt(forceQueryField: true)
     }
 
-    /// Editor navigation must briefly claim first responder to install and reveal the exact
-    /// range. Restore the Search results surface on the next main turn so the activation key or
-    /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
-    /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
-    private func restoreResultsFocusAfterActivation() {
-        resultsFocusIntentToken &+= 1
-        let intentToken = resultsFocusIntentToken
-        isResultsRoutingReady = false
-        isResultsFocused = false
-        publishKeyboardSmokeProbe()
-        let tracker = windowKeyState
-        resultsFocusRestorationController.replace {
-            if tracker.window?.containsEditorTextView != true {
-                isResultsFocused = true
-                await Task.yield()
-                guard resultsFocusIntentToken == intentToken else { return }
-                isResultsRoutingReady = true
-                publishKeyboardSmokeProbe()
-                refreshDebugFocusSurface()
-                return
-            }
-
-            var observedEditorResponder = false
-            for _ in 0 ..< 180 {
-                guard resultsFocusIntentToken == intentToken else { return }
-                if let window = tracker.window,
-                   window.firstResponder is NSTextView,
-                   !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                       in: window,
-                       expectedField: tracker.resolvedSearchField()
-                   )
-                {
-                    observedEditorResponder = true
-                }
-
-                if observedEditorResponder {
-                    isResultsFocused = false
-                    await Task.yield()
-                    guard resultsFocusIntentToken == intentToken else { return }
-                    isResultsFocused = true
-                    await Task.yield()
-                    guard resultsFocusIntentToken == intentToken else { return }
-                    if (tracker.window?.firstResponder is NSTextView) == false {
-                        isResultsRoutingReady = true
-                        publishKeyboardSmokeProbe()
-                        refreshDebugFocusSurface()
-                        return
-                    }
-                }
-                try? await Task.sleep(nanoseconds: 16_000_000)
-            }
-
-            // Navigation may be rejected before claiming the editor. Restore the result surface
-            // after the bounded observation window so activation never strands keyboard input.
-            guard resultsFocusIntentToken == intentToken else { return }
-            isResultsFocused = true
-            await Task.yield()
-            guard resultsFocusIntentToken == intentToken else { return }
-            isResultsRoutingReady = true
-            publishKeyboardSmokeProbe()
-            refreshDebugFocusSurface()
-        }
-    }
-
     private func dropStaleSelectionIfNeeded() {
         let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
         let resolved = WorkspaceSearchSelectionNavigation.resolvedSelection(
@@ -430,6 +398,105 @@ struct WorkspaceSearchSidebar: View {
 }
 
 private extension WorkspaceSearchSidebar {
+    /// Editor navigation must briefly claim first responder to install and reveal the exact
+    /// range. Restore the Search results surface on the next main turn so the activation key or
+    /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
+    /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
+    func restoreResultsFocusAfterActivation() {
+        resultsFocusIntentToken &+= 1
+        let intentToken = resultsFocusIntentToken
+        let lifecycleEpoch = resultsFocusLifecycleEpoch
+        isResultsRoutingReady = false
+        isResultsFocused = false
+        publishKeyboardSmokeProbe()
+        let tracker = windowKeyState
+        resultsFocusRestorationController.replace {
+            guard !Task.isCancelled,
+                  resultsFocusIntentToken == intentToken,
+                  resultsFocusLifecycleEpoch == lifecycleEpoch
+            else {
+                return
+            }
+            if tracker.window?.containsMarkdownEditor != true {
+                isResultsFocused = true
+                await Task.yield()
+                guard !Task.isCancelled,
+                      resultsFocusIntentToken == intentToken,
+                      resultsFocusLifecycleEpoch == lifecycleEpoch
+                else {
+                    return
+                }
+                isResultsRoutingReady = true
+                publishKeyboardSmokeProbe()
+                refreshDebugFocusSurface()
+                return
+            }
+
+            var observedEditorResponder = false
+            for _ in 0 ..< 180 {
+                guard !Task.isCancelled,
+                      resultsFocusIntentToken == intentToken,
+                      resultsFocusLifecycleEpoch == lifecycleEpoch
+                else {
+                    return
+                }
+                if tracker.window?.isMarkdownEditorFirstResponder == true {
+                    observedEditorResponder = true
+                }
+
+                if observedEditorResponder {
+                    isResultsFocused = false
+                    await Task.yield()
+                    guard !Task.isCancelled,
+                          resultsFocusIntentToken == intentToken,
+                          resultsFocusLifecycleEpoch == lifecycleEpoch
+                    else {
+                        return
+                    }
+                    isResultsFocused = true
+                    await Task.yield()
+                    guard !Task.isCancelled,
+                          resultsFocusIntentToken == intentToken,
+                          resultsFocusLifecycleEpoch == lifecycleEpoch
+                    else {
+                        return
+                    }
+                    if tracker.window?.isMarkdownEditorFirstResponder == false {
+                        isResultsRoutingReady = true
+                        publishKeyboardSmokeProbe()
+                        refreshDebugFocusSurface()
+                        return
+                    }
+                }
+                do {
+                    try await Task.sleep(nanoseconds: 16_000_000)
+                } catch {
+                    return
+                }
+            }
+
+            // Navigation may be rejected before claiming the editor. Restore the result surface
+            // after the bounded observation window so activation never strands keyboard input.
+            guard !Task.isCancelled,
+                  resultsFocusIntentToken == intentToken,
+                  resultsFocusLifecycleEpoch == lifecycleEpoch
+            else {
+                return
+            }
+            isResultsFocused = true
+            await Task.yield()
+            guard !Task.isCancelled,
+                  resultsFocusIntentToken == intentToken,
+                  resultsFocusLifecycleEpoch == lifecycleEpoch
+            else {
+                return
+            }
+            isResultsRoutingReady = true
+            publishKeyboardSmokeProbe()
+            refreshDebugFocusSurface()
+        }
+    }
+
     /// Starts or replaces a cancelable, request-scoped focus attempt for this window.
     /// The bounded retry loop lives in `WorkspaceSearchFocusAttemptLoop`.
     ///
@@ -468,14 +535,27 @@ private extension NSWindow {
     /// The hosted keyboard smoke mounts only the Search sidebar. In the real app, an editor
     /// text view is already present and navigation must be observed claiming it before results
     /// focus is restored; without an editor surface there is no later responder handoff to wait for.
-    var containsEditorTextView: Bool {
-        func containsTextView(_ root: NSView?) -> Bool {
+    var containsMarkdownEditor: Bool {
+        func containsEditor(_ root: NSView?) -> Bool {
             guard let root else { return false }
-            if root is NSTextView { return true }
-            return root.subviews.contains(where: containsTextView)
+            if root.accessibilityIdentifier() == EditorAccessibility.textViewIdentifier {
+                return true
+            }
+            return root.subviews.contains(where: containsEditor)
         }
 
-        return containsTextView(contentView)
+        return containsEditor(contentView)
+    }
+
+    var isMarkdownEditorFirstResponder: Bool {
+        guard var view = firstResponder as? NSView else { return false }
+        while true {
+            if view.accessibilityIdentifier() == EditorAccessibility.textViewIdentifier {
+                return true
+            }
+            guard let parent = view.superview else { return false }
+            view = parent
+        }
     }
 }
 

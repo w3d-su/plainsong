@@ -667,6 +667,27 @@ final class AppStateTests: XCTestCase {
         XCTAssertNil(appState.presentedError)
     }
 
+    func testDebugWorkspaceSearchFixtureDoesNotPersistSessionMetadata() throws {
+        let directory = try makeTemporaryDirectory()
+        let lastOpenedFileStore = SpyLastOpenedFileStore()
+        let recentItemStore = SpyRecentItemStore()
+        let appState = AppState(
+            lastOpenedFileStore: lastOpenedFileStore,
+            recentItemStore: recentItemStore,
+            shouldRestoreLastOpenedFile: false
+        )
+
+        appState.openDebugWorkspaceSearchFixture(directory)
+
+        XCTAssertEqual(
+            appState.workspaceRootURL?.standardizedFileURL,
+            directory.standardizedFileURL
+        )
+        XCTAssertTrue(lastOpenedFileStore.savedURLs.isEmpty)
+        XCTAssertTrue(recentItemStore.savedURLs.isEmpty)
+        XCTAssertNil(appState.presentedError)
+    }
+
     func testPreviewCheckboxWritebackUpdatesOnlyRequestedTaskLine() {
         let appState = AppState(
             currentDocument: DocumentSession(
@@ -16545,16 +16566,18 @@ private final class SpyLastOpenedFileStore: LastOpenedFilePersisting {
 private final class SpyRecentItemStore: RecentItemPersisting {
     private let saveError: Error?
     private let restoredURLs: [URL]
+    private(set) var savedURLs: [URL] = []
 
     init(saveError: Error? = nil, restoredURLs: [URL] = []) {
         self.saveError = saveError
         self.restoredURLs = restoredURLs
     }
 
-    func save(_: URL) throws {
+    func save(_ url: URL) throws {
         if let saveError {
             throw saveError
         }
+        savedURLs.append(url)
     }
 
     func restore() throws -> [URL] {

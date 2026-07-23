@@ -7,10 +7,13 @@
     /// `AppState`, `WorkspaceKit`, retained-authority, and editor-navigation paths.
     enum DebugWorkspaceSearchFixture {
         static let environmentKey = "PLAINSONG_DEBUG_WORKSPACE_SEARCH_FIXTURE"
+        static let identifierPrefix = "ws4a-"
+        static let staleFixtureAge: TimeInterval = 60 * 60
 
         static func create(
             identifier: String,
-            fileManager: FileManager = .default
+            fileManager: FileManager = .default,
+            now: Date = Date()
         ) throws -> URL {
             let safeIdentifier = identifier
                 .unicodeScalars
@@ -26,6 +29,12 @@
 
             let fixturesRoot = fileManager.temporaryDirectory
                 .appendingPathComponent("PlainsongUITests", isDirectory: true)
+            try removeStaleFixtures(
+                in: fixturesRoot,
+                excluding: String(String.UnicodeScalarView(Array(safeIdentifier))),
+                fileManager: fileManager,
+                now: now
+            )
             let workspaceURL = fixturesRoot
                 .appendingPathComponent(
                     String(String.UnicodeScalarView(Array(safeIdentifier))),
@@ -52,6 +61,43 @@
             )
 
             return workspaceURL
+        }
+
+        static func removeStaleFixtures(
+            in fixturesRoot: URL,
+            excluding currentIdentifier: String,
+            fileManager: FileManager = .default,
+            now: Date = Date()
+        ) throws {
+            guard fileManager.fileExists(atPath: fixturesRoot.path) else { return }
+            let keys: Set<URLResourceKey> = [
+                .contentModificationDateKey,
+                .isDirectoryKey,
+                .isSymbolicLinkKey,
+            ]
+            let candidates = try fileManager.contentsOfDirectory(
+                at: fixturesRoot,
+                includingPropertiesForKeys: Array(keys),
+                options: [.skipsHiddenFiles]
+            )
+            let staleBefore = now.addingTimeInterval(-staleFixtureAge)
+
+            for candidate in candidates {
+                guard candidate.lastPathComponent.hasPrefix(identifierPrefix),
+                      candidate.lastPathComponent != currentIdentifier
+                else {
+                    continue
+                }
+                let values = try candidate.resourceValues(forKeys: keys)
+                guard values.isDirectory == true,
+                      values.isSymbolicLink != true,
+                      let modificationDate = values.contentModificationDate,
+                      modificationDate <= staleBefore
+                else {
+                    continue
+                }
+                try fileManager.removeItem(at: candidate)
+            }
         }
 
         private static func write(

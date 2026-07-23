@@ -15,6 +15,7 @@ struct WorkspaceSearchResultsList: View {
     var isResultsFocused: FocusState<Bool>.Binding
     var onEscapeToQueryField: () -> Void
     var onActivationRequested: () -> Void
+    var onKeyboardSelectionHandled: (WorkspaceSearchSelectionAction) -> Void
 
     var body: some View {
         List(selection: $selectedRowID) {
@@ -299,6 +300,7 @@ struct WorkspaceSearchResultsList: View {
             queryGeneration: queryGeneration
         )
         #if DEBUG
+            onKeyboardSelectionHandled(action)
             WorkspaceSearchKeyboardSmokeProbe.publish(
                 selection: selectedRowID,
                 resultsFocused: isResultsFocused.wrappedValue
@@ -315,17 +317,12 @@ struct WorkspaceSearchResultsList: View {
         ) else {
             return
         }
-        let appState = appState
-        let onActivationRequested = onActivationRequested
-        Task { @MainActor in
-            await Task.yield()
-            appState.activateWorkspaceSearchResult(
-                context: payload.context,
-                fileResult: payload.fileResult,
-                match: payload.match
-            )
-            onActivationRequested()
-        }
+        onActivationRequested()
+        appState.activateWorkspaceSearchResult(
+            context: payload.context,
+            fileResult: payload.fileResult,
+            match: payload.match
+        )
     }
 
     private func skippedTitle(count: Int, omitted: Int) -> String {
@@ -345,12 +342,12 @@ struct WorkspaceSearchResultsList: View {
             return
         }
         selectedRowID = row.id
+        onActivationRequested()
         appState.activateWorkspaceSearchResult(
             context: payload.context,
             fileResult: payload.fileResult,
             match: payload.match
         )
-        onActivationRequested()
     }
 
     private func retrySearch() {
