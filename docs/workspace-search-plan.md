@@ -5,7 +5,7 @@
 > sidebar shell, pure grouped-results presentation, keyboard selection + accessibility wiring).
 > WS3C PR C owner keyboard smoke is **signed off** via hosted `testHostedOwnerKeyboardSmokeFiveScenarios`,
 > which drives **real `NSEvent`s** through `window.sendEvent` — field ↓/Escape through the field
-> editor's `doCommandBy`, ↑/↓/Return/Escape through the focused List's `onKeyPress`, and a real
+> editor's `doCommandBy`, ↑/↓/Return/Escape through the concrete results key responder, and a real
 > click on a backing table row — so silent native-table fallback or a broken focus handoff fails
 > the gate. **Owner physical ⇧⌘F / search-field focus sign-off is complete** (PR #89): app-active
 > Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
@@ -818,8 +818,8 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   activates authority-backed match, Escape results→field and field→editor (query/results kept),
   click a result then ↑/↓ still uses the pure reducer (not silent native-table fallback).
   Evidence: `testHostedOwnerKeyboardSmokeFiveScenarios` (hosted `NSWindow`, **real `NSEvent`
-  key/click delivery** via `window.sendEvent` through `doCommandBy`/`onKeyPress`/backing table
-  rows; Debug probe is observability only, 2026-07-20).
+  key/click delivery** via `window.sendEvent` through `doCommandBy`/the concrete results key
+  responder/backing table rows; Debug probe is observability only, updated 2026-07-23).
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.
@@ -863,12 +863,16 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   recognizes the actual `STTextView` editor through EditorKit's stable accessibility identity,
   observes its first-responder handoff, and is cancelled by newer focus intent or sidebar
   disappearance before it can publish results readiness. Rejected activation immediately keeps
-  results routing live and creates no delayed fallback; successful restoration first observes
-  editor focus and rechecks that the user has not moved elsewhere before reclaiming results.
-  The hosted real-event gate also sends a second Escape while the first forced query-focus loop
-  is still active and proves that loop is cancelled. XCUITest sends the two Escapes without an
-  intervening query-focus wait, then requires native editor keyboard focus with query/results
-  unchanged.
+  results routing live and creates no delayed fallback. Success immediately invalidates the
+  pre-Return results-ready claim, then requires consecutive turns with the same intent, live
+  sidebar, and the concrete window-local results key responder before republishing readiness.
+  That responder sends Up/Down/Return/Escape through the existing reducer/authority path;
+  logical SwiftUI focus cannot publish readiness or later steal routing.
+  XCUITest requires a monotonic activation probe for this Return before accepting restoration,
+  and a separate routing probe proves its back-to-back Escapes traversed results→query→editor
+  before native editor focus is accepted. The hosted real-event gate proves that a second
+  Escape, query-field Down, or row click after the first forced query-focus confirmation cancels
+  that loop and remains outside query focus across consecutive turns.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

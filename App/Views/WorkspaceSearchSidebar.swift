@@ -15,15 +15,14 @@ import SwiftUI
 /// Query-field focus is AppKit first-responder routing on the owned Search `NSTextField`
 /// (`WorkspaceSearchQueryField`), **not** SwiftUI `FocusState` for that control. Only the
 /// hosting key window may apply a `focusRequestID`; key state and field binding are re-read live
-/// after every suspension (`WindowKeyStateTracker`). Results list focus uses SwiftUI
-/// `FocusState` only as a secondary surface for ↑/↓/Return/Escape after ↓ from the field
-/// **or** after a mouse selection into the list (click modality must match keyboard).
+/// after every suspension (`WindowKeyStateTracker`). Results routing uses a concrete, window-local
+/// AppKit responder for ↑/↓/Return/Escape after ↓ from the field or a mouse activation; SwiftUI
+/// logical focus cannot claim readiness without that responder (click modality matches keyboard).
 ///
 /// **Keyboard smoke (merge gate for PR C):** the hosted smoke drives **real `NSEvent`s**
 /// (`window.sendEvent`) — field ↓ through the field editor's `doCommandBy`, ↑/↓/Return/Escape
-/// through the focused List's `onKeyPress`, and a real click on a backing table row — so the
-/// gate detects silent native-table fallback. XCUITest in WS4 re-covers the same keys out of
-/// process.
+/// through the results key responder, and a real click on a backing table row — so the gate
+/// detects silent native-table fallback. XCUITest in WS4 re-covers the same keys out of process.
 struct WorkspaceSearchSidebar: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var windowKeyState = WindowKeyStateTracker()
@@ -32,12 +31,13 @@ struct WorkspaceSearchSidebar: View {
     @StateObject private var focusAttemptController = WorkspaceSearchFocusAttemptController()
     @StateObject private var resultsFocusRestorationController =
         WorkspaceSearchFocusAttemptController()
+    @StateObject private var resultsKeyRouter = WorkspaceSearchKeyRouterController()
     /// Selected match row stays view-local (activation uses retained search payload lookup).
     @State private var selectedResultRowID: WorkspaceSearchResultRowID?
-    /// Results-list keyboard focus (secondary to AppKit query-field first responder).
-    @FocusState private var isResultsFocused: Bool
-    /// `FocusState` becomes true before SwiftUI necessarily installs key delivery. Keep the
-    /// observable routing claim false until the AppKit editor responder has been displaced.
+    /// Logical results-route ownership; the concrete AppKit key router below is authoritative.
+    @State private var isResultsFocused = false
+    /// Keep the observable routing claim false until the concrete AppKit results responder owns
+    /// key delivery.
     @State private var isResultsRoutingReady = false
     /// Monotonic focus intent: every deliberate raise/lower bumps it so the queued
     /// post-handoff re-assert in `moveDownFromQueryField` cannot override a newer intent
@@ -53,6 +53,9 @@ struct WorkspaceSearchSidebar: View {
     #if DEBUG
         @State private var debugFocusSurface = "unknown"
         @State private var debugReducerEvent = "none"
+        @State private var debugActivationSequence: UInt64 = 0
+        @State private var debugActivationState = "idle"
+        @State private var debugEscapeState = "idle"
     #endif
 
     var body: some View {
@@ -69,6 +72,7 @@ struct WorkspaceSearchSidebar: View {
                 presentation: resultsPresentation,
                 selectedRowID: resultsSelectionBinding,
                 isResultsFocused: $isResultsFocused,
+                keyRouter: resultsKeyRouter,
                 onEscapeToQueryField: { focusQueryFieldFromResults() },
                 onActivationResolved: { restoreResultsFocusAfterActivation($0) },
                 onKeyboardSelectionHandled: { recordKeyboardSelectionHandled($0) }
@@ -151,6 +155,20 @@ struct WorkspaceSearchSidebar: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityIdentifier("plainsong.debug.workspaceSearch.reducerEvent")
                         .accessibilityLabel("Workspace search reducer \(debugReducerEvent)")
+                    Text(
+                        "Workspace search activation \(debugActivationSequence) "
+                            + debugActivationState
+                    )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("plainsong.debug.workspaceSearch.activation")
+                    .accessibilityLabel(
+                        "Workspace search activation \(debugActivationSequence) "
+                            + debugActivationState
+                    )
+                    Text("Workspace search escape \(debugEscapeState)")
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityIdentifier("plainsong.debug.workspaceSearch.escape")
+                        .accessibilityLabel("Workspace search escape \(debugEscapeState)")
                 }
                 .font(.system(size: 1))
                 .frame(width: 1, height: 1)
@@ -170,11 +188,17 @@ struct WorkspaceSearchSidebar: View {
         Binding(
             get: { selectedResultRowID },
             set: { newValue in
+                let selectionChanged = newValue != selectedResultRowID
                 selectedResultRowID = newValue
                 if newValue != nil {
-                    resultsFocusIntentToken &+= 1
-                    isResultsRoutingReady = false
+                    // A click is a newer results intent than an in-flight results→query
+                    // Escape. Stop that forced loop before it can reclaim the query field.
+                    focusAttemptController.cancel()
+                    if selectionChanged {
+                        resultsFocusIntentToken &+= 1
+                    }
                     isResultsFocused = true
+                    isResultsRoutingReady = resultsKeyRouter.requestFocus()
                 }
                 publishKeyboardSmokeProbe()
             }
@@ -193,14 +217,14 @@ struct WorkspaceSearchSidebar: View {
         #if DEBUG
             WorkspaceSearchKeyboardSmokeProbe.publish(
                 selection: selectedResultRowID,
-                resultsFocused: isResultsFocused && isResultsRoutingReady
+                resultsFocused: resultsKeyRouter.isFirstResponder && isResultsRoutingReady
             )
         #endif
     }
 
     private func refreshDebugFocusSurface() {
         #if DEBUG
-            if isResultsFocused, isResultsRoutingReady {
+            if resultsKeyRouter.isFirstResponder, isResultsRoutingReady {
                 debugFocusSurface = "results"
             } else if let window = windowKeyState.window,
                       WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
@@ -311,14 +335,17 @@ struct WorkspaceSearchSidebar: View {
     /// Query-field ↓: select first result and move keyboard focus into the list.
     ///
     /// Focus handoff: (1) clear AppKit field-editor first responder, (2) write selection,
-    /// (3) claim results `FocusState`, (4) re-assert focus on the next main turn so SwiftUI
-    /// can install key delivery after `makeFirstResponder(nil)` (field editor otherwise keeps
-    /// arrows). Owner / hosted smoke verifies this sequence; WS4 XCUITest remains the long-term
-    /// automation home.
+    /// (3) claim the concrete results responder on the next AppKit turn after
+    /// `makeFirstResponder(nil)` (field editor otherwise keeps arrows). Owner / hosted smoke
+    /// verifies this sequence; WS4 XCUITest remains the long-term automation home.
     private func moveDownFromQueryField() {
         refreshResultsPresentationMemo()
         let ordered = WorkspaceSearchSelectionNavigation.orderedRowIDs(in: resultsPresentation)
         guard !ordered.isEmpty else { return }
+
+        // Down is a newer results intent than any forced results→query retry still confirming
+        // the field. Cancellation prevents its next turn from stealing focus back to Search.
+        focusAttemptController.cancel()
 
         // Drop the field editor before claiming results focus so ↓ is not re-handled by NSText.
         if let window = windowKeyState.window {
@@ -337,13 +364,13 @@ struct WorkspaceSearchSidebar: View {
         isResultsFocused = true
         publishKeyboardSmokeProbe()
 
-        // Re-assert after the current AppKit turn so FocusState can become key after nil FR.
+        // Claim the concrete AppKit router after the current field-editor command returns.
         // Guarded by the intent token: a newer Escape/⌘⇧F/generation intent wins.
         Task { @MainActor in
             guard resultsFocusIntentToken == intentToken else { return }
-            isResultsFocused = true
             await Task.yield()
             guard resultsFocusIntentToken == intentToken else { return }
+            guard resultsKeyRouter.requestFocus() else { return }
             isResultsRoutingReady = true
             publishKeyboardSmokeProbe()
             refreshDebugFocusSurface()
@@ -357,12 +384,18 @@ struct WorkspaceSearchSidebar: View {
         focusAttemptController.cancel()
         resultsFocusRestorationController.cancel()
         lowerResultsFocus()
+        #if DEBUG
+            debugEscapeState = "editor"
+        #endif
         appState.requestEditorFocus()
     }
 
     /// Results Escape: return focus to the owned Search field without clearing selection state.
     private func focusQueryFieldFromResults() {
         lowerResultsFocus()
+        #if DEBUG
+            debugEscapeState = "query"
+        #endif
         scheduleFocusAttempt(forceQueryField: true)
     }
 
@@ -407,22 +440,35 @@ private extension WorkspaceSearchSidebar {
     /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
     /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
     func restoreResultsFocusAfterActivation(_ didActivate: Bool) {
+        #if DEBUG
+            debugActivationSequence &+= 1
+            debugActivationState = didActivate ? "restoring" : "rejected"
+        #endif
+
         // A rejected authority/fingerprint/read never transfers focus to the editor. Reassert
-        // the current results route in this event turn (Return itself can lower SwiftUI's
-        // focus claim), but never schedule a delayed fallback that could steal later clicks.
+        // the current results route in this event turn, but never schedule a delayed fallback
+        // that could steal later clicks.
         guard didActivate else {
+            focusAttemptController.cancel()
             resultsFocusRestorationController.cancel()
             resultsFocusIntentToken &+= 1
             isResultsFocused = true
-            isResultsRoutingReady = true
+            isResultsRoutingReady = resultsKeyRouter.requestFocus()
             publishKeyboardSmokeProbe()
             refreshDebugFocusSurface()
             return
         }
 
+        // Invalidate the pre-Return routing claim immediately. The acceptance probe may only
+        // publish a new "results" state after this activation's editor handoff completes.
+        focusAttemptController.cancel()
         resultsFocusIntentToken &+= 1
         let intentToken = resultsFocusIntentToken
         let lifecycleEpoch = resultsFocusLifecycleEpoch
+        isResultsRoutingReady = false
+        isResultsFocused = false
+        publishKeyboardSmokeProbe()
+        refreshDebugFocusSurface()
         let tracker = windowKeyState
         resultsFocusRestorationController.replace {
             guard !Task.isCancelled,
@@ -432,30 +478,10 @@ private extension WorkspaceSearchSidebar {
                 return
             }
             if tracker.window?.containsMarkdownEditor != true {
-                // Hosted sidebar tests have no editor responder to hand off through. A click's
-                // binding write and activation callback occur in the same SwiftUI update, so
-                // force the same false→true results transition without fabricating editor focus.
-                isResultsRoutingReady = false
-                isResultsFocused = false
-                publishKeyboardSmokeProbe()
-                await Task.yield()
-                guard !Task.isCancelled,
-                      resultsFocusIntentToken == intentToken,
-                      resultsFocusLifecycleEpoch == lifecycleEpoch
-                else {
-                    return
-                }
-                isResultsFocused = true
-                await Task.yield()
-                guard !Task.isCancelled,
-                      resultsFocusIntentToken == intentToken,
-                      resultsFocusLifecycleEpoch == lifecycleEpoch
-                else {
-                    return
-                }
-                isResultsRoutingReady = true
-                publishKeyboardSmokeProbe()
-                refreshDebugFocusSurface()
+                await restoreHostedResultsFocus(
+                    intentToken: intentToken,
+                    lifecycleEpoch: lifecycleEpoch
+                )
                 return
             }
 
@@ -467,31 +493,12 @@ private extension WorkspaceSearchSidebar {
                     return
                 }
                 if tracker.window?.isMarkdownEditorFirstResponder == true {
-                    isResultsRoutingReady = false
-                    isResultsFocused = false
-                    publishKeyboardSmokeProbe()
-                    await Task.yield()
-                    guard !Task.isCancelled,
-                          resultsFocusIntentToken == intentToken,
-                          resultsFocusLifecycleEpoch == lifecycleEpoch,
-                          tracker.window?.isMarkdownEditorFirstResponder == true
-                    else {
-                        return
-                    }
-                    isResultsFocused = true
-                    await Task.yield()
-                    guard !Task.isCancelled,
-                          resultsFocusIntentToken == intentToken,
-                          resultsFocusLifecycleEpoch == lifecycleEpoch
-                    else {
-                        return
-                    }
-                    if tracker.window?.isMarkdownEditorFirstResponder == false {
-                        isResultsRoutingReady = true
-                        publishKeyboardSmokeProbe()
-                        refreshDebugFocusSurface()
-                        return
-                    }
+                    await restoreResultsFocusAfterEditorHandoff(
+                        tracker: tracker,
+                        intentToken: intentToken,
+                        lifecycleEpoch: lifecycleEpoch
+                    )
+                    return
                 }
                 do {
                     try await Task.sleep(nanoseconds: 16_000_000)
@@ -500,6 +507,81 @@ private extension WorkspaceSearchSidebar {
                 }
             }
         }
+    }
+
+    func restoreHostedResultsFocus(
+        intentToken: UInt64,
+        lifecycleEpoch: UInt64
+    ) async {
+        // Hosted sidebar tests have no editor responder to hand off through. Claim the same
+        // concrete results responder without fabricating editor focus.
+        await Task.yield()
+        guard isCurrentResultsFocusIntent(intentToken, lifecycleEpoch: lifecycleEpoch) else {
+            return
+        }
+        isResultsFocused = true
+        guard resultsKeyRouter.requestFocus() else {
+            return
+        }
+        publishCompletedActivationResultsFocus()
+    }
+
+    func restoreResultsFocusAfterEditorHandoff(
+        tracker: WindowKeyStateTracker,
+        intentToken: UInt64,
+        lifecycleEpoch: UInt64
+    ) async {
+        await Task.yield()
+        guard isCurrentResultsFocusIntent(intentToken, lifecycleEpoch: lifecycleEpoch),
+              tracker.window?.isMarkdownEditorFirstResponder == true
+        else {
+            return
+        }
+        isResultsFocused = true
+        guard resultsKeyRouter.requestFocus() else {
+            return
+        }
+
+        // Require consecutive observations of the exact router, not merely "not editor", so a
+        // click into another control can never produce a restoration false-green.
+        var consecutiveResultsConfirmations = 0
+        for _ in 0 ..< 180 {
+            guard isCurrentResultsFocusIntent(intentToken, lifecycleEpoch: lifecycleEpoch) else {
+                return
+            }
+            if resultsKeyRouter.isFirstResponder {
+                consecutiveResultsConfirmations += 1
+                if consecutiveResultsConfirmations >= 2 {
+                    publishCompletedActivationResultsFocus()
+                    return
+                }
+            } else {
+                consecutiveResultsConfirmations = 0
+            }
+            do {
+                try await Task.sleep(nanoseconds: 16_000_000)
+            } catch {
+                return
+            }
+        }
+    }
+
+    func isCurrentResultsFocusIntent(
+        _ intentToken: UInt64,
+        lifecycleEpoch: UInt64
+    ) -> Bool {
+        !Task.isCancelled
+            && resultsFocusIntentToken == intentToken
+            && resultsFocusLifecycleEpoch == lifecycleEpoch
+    }
+
+    func publishCompletedActivationResultsFocus() {
+        isResultsRoutingReady = true
+        #if DEBUG
+            debugActivationState = "results"
+        #endif
+        publishKeyboardSmokeProbe()
+        refreshDebugFocusSurface()
     }
 
     /// Starts or replaces a cancelable, request-scoped focus attempt for this window.

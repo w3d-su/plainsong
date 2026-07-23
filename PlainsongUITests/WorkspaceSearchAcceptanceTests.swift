@@ -96,11 +96,11 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
             description: "native editor UTF-16 selected range"
         )
         waitForLabel(
-            "Workspace search focus results",
+            "Workspace search activation 1 results",
             of: workspaceWindow.descendants(matching: .any)[
-                "plainsong.debug.workspaceSearch.focusSurface"
+                "plainsong.debug.workspaceSearch.activation"
             ],
-            description: "results focus restored after activation"
+            description: "this activation completing its results-focus restoration"
         )
 
         // Deliberately do not wait for the first Escape's forced query-focus confirmation
@@ -108,6 +108,13 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         // focused rather than allowing Search to reclaim first responder.
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])
+        waitForLabel(
+            "Workspace search escape editor",
+            of: workspaceWindow.descendants(matching: .any)[
+                "plainsong.debug.workspaceSearch.escape"
+            ],
+            description: "results→query→editor Escape event routing"
+        )
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         waitForKeyboardFocus(editor)

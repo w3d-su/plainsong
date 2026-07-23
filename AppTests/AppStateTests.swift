@@ -11929,7 +11929,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
 
     /// Owner keyboard smoke (WS3C PR C merge gate), hosted on a real `NSWindow` and driven by
     /// **real `NSEvent`s** through `window.sendEvent`: field ↓/Escape route through the field
-    /// editor's `doCommandBy`, ↑/↓/Return/Escape route through the focused List's `onKeyPress`,
+    /// editor's `doCommandBy`, ↑/↓/Return/Escape route through the results key responder,
     /// and the click scenario clicks a real backing table row — so silent native-table fallback
     /// or a broken focus handoff fails this test instead of passing synthetically.
     ///
@@ -12033,7 +12033,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                     && !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
             }
 
-            // (2) Real ↑/↓ on the focused List (`onKeyPress` → reducer) without wrap.
+            // (2) Real ↑/↓ on the results key responder → reducer without wrap.
             sendSmokeDownArrow(to: host.window)
             try await waitUntil("real ↓ moves to second") {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
@@ -12105,10 +12105,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             XCTAssertEqual(appState.workspaceSearchState.phase, .completed)
 
             // (5) Real click on the last backing table row while results focus is lowered:
-            // the selection binding must raise a genuine `FocusState` false→true transition
-            // (matching a user clicking into an unfocused list — headless runners do not
-            // re-install key delivery for a no-op true→true write), activation flows through
-            // retained authority, and click-then-↑ routes through the selection surface.
+            // the selection binding must claim the concrete results responder, activation flows
+            // through retained authority, and click-then-↑ routes through the selection surface.
             let tableView = try XCTUnwrap(
                 findSubview(ofType: NSTableView.self, in: host.window.contentView),
                 "results List must be backed by an NSTableView"
@@ -12140,6 +12138,57 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
 
+            // Down after the first forced query confirmation is a newer results intent. It
+            // must cancel the still-running loop instead of letting its next turn reclaim query.
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("forced query loop reaches first Down-race confirmation") {
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            }
+            sendSmokeDownArrow(to: host.window)
+            try await waitUntil("Down supersedes forced query loop") {
+                WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+                    && WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+            }
+            var stableDownResultsConfirmations = 0
+            try await waitUntil("forced loop cannot reclaim query after Down") {
+                if !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window),
+                   WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+                {
+                    stableDownResultsConfirmations += 1
+                } else {
+                    stableDownResultsConfirmations = 0
+                }
+                return stableDownResultsConfirmations >= 6
+            }
+
+            // A row click during the same confirmation window is also a newer results intent.
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("forced query loop reaches first click-race confirmation") {
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            }
+            let raceClickRowRect = tableView.rect(ofRow: tableView.numberOfRows - 1)
+            let raceClickPoint = tableView.convert(
+                NSPoint(x: raceClickRowRect.midX, y: raceClickRowRect.midY),
+                to: nil
+            )
+            sendSmokeClick(at: raceClickPoint, to: host.window)
+            try await waitUntil("click supersedes forced query loop") {
+                WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+            }
+            var stableClickResultsConfirmations = 0
+            try await waitUntil("forced loop cannot reclaim query after click") {
+                if !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window),
+                   WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+                {
+                    stableClickResultsConfirmations += 1
+                } else {
+                    stableClickResultsConfirmations = 0
+                }
+                return stableClickResultsConfirmations >= 6
+            }
+
             // A stale authority/generation rejects activation synchronously. Results routing
             // must remain live; there is no editor handoff and no delayed fallback focus write.
             appState.editorNavigationCommand = nil
@@ -12154,7 +12203,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             }
             sendSmokeUpArrow(to: host.window)
             try await waitUntil("rejected activation keeps arrow routing live") {
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
 
             // A rapid double Escape must let the second intent cancel the first Escape's
@@ -12179,6 +12228,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 }
                 return stableNonQueryConfirmations >= 6
             }
+
         #endif
     }
 
