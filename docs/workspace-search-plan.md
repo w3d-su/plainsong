@@ -873,6 +873,13 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   before native editor focus is accepted. The hosted real-event gate proves that a second
   Escape, query-field Down, or row click after the first forced query-focus confirmation cancels
   that loop and remains outside query focus across consecutive turns.
+  The concrete results responder participates in the AppKit key-view loop: `insertTab:` and
+  `insertBacktab:` select the next/previous key view, with hosted real-`NSEvent` coverage for
+  Tab and Shift-Tab. Results→query records a synchronous handoff-pending intent, so two Escape
+  event pairs delivered without yielding still complete results→query→editor even while the
+  router remains first responder. Every XCUITest arrow assertion also requires the exact next
+  monotonic reducer receipt before accepting selection, including unchanged first+Up and
+  last+Down boundaries.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

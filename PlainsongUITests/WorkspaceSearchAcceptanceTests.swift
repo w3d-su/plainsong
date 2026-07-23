@@ -68,18 +68,24 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         assertGroupedResultsExist()
 
         queryField.typeKey(.downArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 1, action: "selectFirst")
         waitForSelected(first)
 
         app.typeKey(.upArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 2, action: "moveUp")
         waitForSelected(first)
 
         app.typeKey(.downArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 3, action: "moveDown")
         waitForSelected(target)
         app.typeKey(.downArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 4, action: "moveDown")
         waitForSelected(last)
         app.typeKey(.downArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 5, action: "moveDown")
         waitForSelected(last)
         app.typeKey(.upArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 6, action: "moveUp")
         waitForSelected(target)
 
         app.typeKey(.return, modifierFlags: [])
@@ -137,20 +143,13 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         ]
         XCTAssertTrue(reducerProbe.waitForExistence(timeout: 5))
         app.typeKey(.upArrow, modifierFlags: [])
-        waitForLabel(
-            "Workspace search reducer moveUp",
-            of: reducerProbe,
-            description: "custom results reducer receiving Up"
-        )
+        waitForReducerReceipt(sequence: 1, action: "moveUp", probe: reducerProbe)
         waitForSelected(first)
         app.typeKey(.upArrow, modifierFlags: [])
+        waitForReducerReceipt(sequence: 2, action: "moveUp", probe: reducerProbe)
         waitForSelected(first)
         app.typeKey(.downArrow, modifierFlags: [])
-        waitForLabel(
-            "Workspace search reducer moveDown",
-            of: reducerProbe,
-            description: "custom results reducer receiving Down"
-        )
+        waitForReducerReceipt(sequence: 3, action: "moveDown", probe: reducerProbe)
         waitForSelected(target)
     }
 
@@ -291,6 +290,21 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
             XCTWaiter.wait(for: [label], timeout: timeout),
             .completed,
             "Unexpected \(description): \(element.label)"
+        )
+    }
+
+    private func waitForReducerReceipt(
+        sequence: UInt64,
+        action: String,
+        probe: XCUIElement? = nil
+    ) {
+        let reducerProbe = probe ?? workspaceWindow.descendants(matching: .any)[
+            "plainsong.debug.workspaceSearch.reducerEvent"
+        ]
+        waitForLabel(
+            "Workspace search reducer \(sequence) \(action)",
+            of: reducerProbe,
+            description: "reducer receipt \(sequence) for \(action)"
         )
     }
 

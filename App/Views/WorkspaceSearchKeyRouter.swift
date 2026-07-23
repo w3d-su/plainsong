@@ -68,6 +68,14 @@ final class WorkspaceSearchKeyRouterView: NSView {
         onCommand?(.activate)
     }
 
+    override func insertTab(_: Any?) {
+        window?.selectNextKeyView(self)
+    }
+
+    override func insertBacktab(_: Any?) {
+        window?.selectPreviousKeyView(self)
+    }
+
     override func cancelOperation(_: Any?) {
         onCommand?(.escape)
     }

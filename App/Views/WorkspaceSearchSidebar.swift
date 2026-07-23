@@ -45,6 +45,10 @@ struct WorkspaceSearchSidebar: View {
     @State private var resultsFocusIntentToken: UInt64 = 0
     /// View-instance epoch invalidates work that resumes after this sidebar disappears.
     @State private var resultsFocusLifecycleEpoch: UInt64 = 0
+    /// The first results Escape owns an asynchronous results→query handoff. Until the query
+    /// field actually owns first responder, a second Escape can still arrive at the results
+    /// router and must complete the query→editor transition directly.
+    @State private var isResultsToQueryHandoffPending = false
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -53,6 +57,7 @@ struct WorkspaceSearchSidebar: View {
     #if DEBUG
         @State private var debugFocusSurface = "unknown"
         @State private var debugReducerEvent = "none"
+        @State private var debugReducerSequence: UInt64 = 0
         @State private var debugActivationSequence: UInt64 = 0
         @State private var debugActivationState = "idle"
         @State private var debugEscapeState = "idle"
@@ -93,12 +98,14 @@ struct WorkspaceSearchSidebar: View {
         .onDisappear {
             resultsFocusLifecycleEpoch &+= 1
             resultsFocusIntentToken &+= 1
+            isResultsToQueryHandoffPending = false
             isResultsRoutingReady = false
             focusAttemptController.cancel()
             resultsFocusRestorationController.cancel()
         }
         .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
             // ⌘⇧F always targets the query field, not the results list.
+            isResultsToQueryHandoffPending = false
             lowerResultsFocus()
             scheduleFocusAttempt()
         }
@@ -151,10 +158,14 @@ struct WorkspaceSearchSidebar: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityIdentifier("plainsong.debug.workspaceSearch.focusSurface")
                         .accessibilityLabel("Workspace search focus \(debugFocusSurface)")
-                    Text("Workspace search reducer \(debugReducerEvent)")
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityIdentifier("plainsong.debug.workspaceSearch.reducerEvent")
-                        .accessibilityLabel("Workspace search reducer \(debugReducerEvent)")
+                    Text(
+                        "Workspace search reducer \(debugReducerSequence) \(debugReducerEvent)"
+                    )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("plainsong.debug.workspaceSearch.reducerEvent")
+                    .accessibilityLabel(
+                        "Workspace search reducer \(debugReducerSequence) \(debugReducerEvent)"
+                    )
                     Text(
                         "Workspace search activation \(debugActivationSequence) "
                             + debugActivationState
@@ -194,6 +205,7 @@ struct WorkspaceSearchSidebar: View {
                     // A click is a newer results intent than an in-flight results→query
                     // Escape. Stop that forced loop before it can reclaim the query field.
                     focusAttemptController.cancel()
+                    isResultsToQueryHandoffPending = false
                     if selectionChanged {
                         resultsFocusIntentToken &+= 1
                     }
@@ -235,23 +247,6 @@ struct WorkspaceSearchSidebar: View {
                 debugFocusSurface = "query"
             } else {
                 debugFocusSurface = "other"
-            }
-        #endif
-    }
-
-    private func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
-        #if DEBUG
-            switch action {
-            case .selectFirst:
-                debugReducerEvent = "selectFirst"
-            case .selectLast:
-                debugReducerEvent = "selectLast"
-            case .moveUp:
-                debugReducerEvent = "moveUp"
-            case .moveDown:
-                debugReducerEvent = "moveDown"
-            case .clear:
-                debugReducerEvent = "clear"
             }
         #endif
     }
@@ -346,6 +341,7 @@ struct WorkspaceSearchSidebar: View {
         // Down is a newer results intent than any forced results→query retry still confirming
         // the field. Cancellation prevents its next turn from stealing focus back to Search.
         focusAttemptController.cancel()
+        isResultsToQueryHandoffPending = false
 
         // Drop the field editor before claiming results focus so ↓ is not re-handled by NSText.
         if let window = windowKeyState.window {
@@ -358,6 +354,7 @@ struct WorkspaceSearchSidebar: View {
             orderedIDs: ordered,
             queryGeneration: appState.workspaceSearchState.queryGeneration
         )
+        recordKeyboardSelectionHandled(.selectFirst)
         resultsFocusIntentToken &+= 1
         let intentToken = resultsFocusIntentToken
         isResultsRoutingReady = false
@@ -383,6 +380,7 @@ struct WorkspaceSearchSidebar: View {
         // query-field retry loop. Cancel it before asking the editor to become first responder.
         focusAttemptController.cancel()
         resultsFocusRestorationController.cancel()
+        isResultsToQueryHandoffPending = false
         lowerResultsFocus()
         #if DEBUG
             debugEscapeState = "editor"
@@ -392,6 +390,11 @@ struct WorkspaceSearchSidebar: View {
 
     /// Results Escape: return focus to the owned Search field without clearing selection state.
     private func focusQueryFieldFromResults() {
+        if isResultsToQueryHandoffPending {
+            escapeFromQueryFieldToEditor()
+            return
+        }
+        isResultsToQueryHandoffPending = true
         lowerResultsFocus()
         #if DEBUG
             debugEscapeState = "query"
@@ -435,11 +438,30 @@ struct WorkspaceSearchSidebar: View {
 }
 
 private extension WorkspaceSearchSidebar {
+    func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
+        #if DEBUG
+            debugReducerSequence &+= 1
+            switch action {
+            case .selectFirst:
+                debugReducerEvent = "selectFirst"
+            case .selectLast:
+                debugReducerEvent = "selectLast"
+            case .moveUp:
+                debugReducerEvent = "moveUp"
+            case .moveDown:
+                debugReducerEvent = "moveDown"
+            case .clear:
+                debugReducerEvent = "clear"
+            }
+        #endif
+    }
+
     /// Editor navigation must briefly claim first responder to install and reveal the exact
     /// range. Restore the Search results surface on the next main turn so the activation key or
     /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
     /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
     func restoreResultsFocusAfterActivation(_ didActivate: Bool) {
+        isResultsToQueryHandoffPending = false
         #if DEBUG
             debugActivationSequence &+= 1
             debugActivationState = didActivate ? "restoring" : "rejected"
@@ -606,6 +628,7 @@ private extension WorkspaceSearchSidebar {
         }
 
         let force = forceQueryField
+        let handoffIntentToken = resultsFocusIntentToken
         focusAttemptController.replace {
             await WorkspaceSearchFocusAttemptLoop.run(
                 appState: appState,
@@ -613,6 +636,16 @@ private extension WorkspaceSearchSidebar {
                 attemptID: requestID,
                 force: force
             )
+            if force,
+               resultsFocusIntentToken == handoffIntentToken,
+               let window = tracker.window,
+               WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: tracker.resolvedSearchField()
+               )
+            {
+                isResultsToQueryHandoffPending = false
+            }
             refreshDebugFocusSurface()
         }
     }

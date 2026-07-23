@@ -12206,14 +12206,10 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
 
-            // A rapid double Escape must let the second intent cancel the first Escape's
-            // still-running three-confirmation forced query-focus loop.
-            sendSmokeEscape(to: host.window)
-            try await waitUntil("first rapid Escape reaches search field") {
-                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
-                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
-            }
+            // Two Escape events delivered synchronously, without yielding to the scheduled
+            // results→query task, must still complete results→query→editor.
             let rapidEditorFocusBefore = appState.editorFocusRequestID
+            sendSmokeEscape(to: host.window)
             sendSmokeEscape(to: host.window)
             try await waitUntil("second rapid Escape requests editor focus") {
                 appState.editorFocusRequestID == rapidEditorFocusBefore + 1
@@ -12228,6 +12224,38 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 }
                 return stableNonQueryConfirmations >= 6
             }
+
+            // The invisible results responder participates in the normal key-view loop.
+            // Real Tab / Shift-Tab events must leave it instead of being swallowed by
+            // `interpretKeyEvents`.
+            let keyRouter = try XCTUnwrap(
+                findSubview(ofType: WorkspaceSearchKeyRouterView.self, in: host.window.contentView)
+            )
+            let searchField = try XCTUnwrap(
+                WorkspaceSearchFieldFocus.findSearchTextField(in: host.window.contentView)
+            )
+            searchField.nextKeyView = keyRouter
+            keyRouter.nextKeyView = searchField
+
+            XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+            sendSmokeTab(to: host.window)
+            XCTAssertTrue(
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                    in: host.window,
+                    expectedField: searchField
+                ),
+                "Tab must advance out of the invisible results responder"
+            )
+
+            XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+            sendSmokeBacktab(to: host.window)
+            XCTAssertTrue(
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                    in: host.window,
+                    expectedField: searchField
+                ),
+                "Shift-Tab must move backward out of the invisible results responder"
+            )
 
         #endif
     }
@@ -12252,24 +12280,42 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         sendSmokeKeyEvent(keyCode: 53, characters: "\u{1B}", to: window)
     }
 
+    @MainActor
+    private func sendSmokeTab(to window: NSWindow) {
+        sendSmokeKeyEvent(keyCode: 48, characters: "\t", to: window)
+    }
+
+    @MainActor
+    private func sendSmokeBacktab(to window: NSWindow) {
+        sendSmokeKeyEvent(
+            keyCode: 48,
+            characters: "\u{19}",
+            charactersIgnoringModifiers: "\t",
+            modifierFlags: .shift,
+            to: window
+        )
+    }
+
     /// Sends a synthesized keyDown + keyUp pair through `window.sendEvent`, exactly as the
     /// responder chain would receive a physical key press.
     @MainActor
     private func sendSmokeKeyEvent(
         keyCode: UInt16,
         characters: String,
+        charactersIgnoringModifiers: String? = nil,
+        modifierFlags: NSEvent.ModifierFlags = [],
         to window: NSWindow
     ) {
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             guard let event = NSEvent.keyEvent(
                 with: type,
                 location: NSPoint(x: 5, y: 5),
-                modifierFlags: [],
+                modifierFlags: modifierFlags,
                 timestamp: ProcessInfo.processInfo.systemUptime,
                 windowNumber: window.windowNumber,
                 context: nil,
                 characters: characters,
-                charactersIgnoringModifiers: characters,
+                charactersIgnoringModifiers: charactersIgnoringModifiers ?? characters,
                 isARepeat: false,
                 keyCode: keyCode
             ) else {
