@@ -12139,6 +12139,46 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             ) {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
+
+            // A stale authority/generation rejects activation synchronously. Results routing
+            // must remain live; there is no editor handoff and no delayed fallback focus write.
+            appState.editorNavigationCommand = nil
+            appState.workspaceGeneration &+= 1
+            sendSmokeReturn(to: host.window)
+            XCTAssertNil(appState.editorNavigationCommand)
+            try await waitUntil(
+                "rejected activation preserves results routing",
+                timeoutNanoseconds: 500_000_000
+            ) {
+                WorkspaceSearchKeyboardSmokeProbe.isResultsFocused
+            }
+            sendSmokeUpArrow(to: host.window)
+            try await waitUntil("rejected activation keeps arrow routing live") {
+                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+            }
+
+            // A rapid double Escape must let the second intent cancel the first Escape's
+            // still-running three-confirmation forced query-focus loop.
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("first rapid Escape reaches search field") {
+                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
+                    && WorkspaceSearchKeyboardSmokeProbe.isResultsFocused == false
+            }
+            let rapidEditorFocusBefore = appState.editorFocusRequestID
+            sendSmokeEscape(to: host.window)
+            try await waitUntil("second rapid Escape requests editor focus") {
+                appState.editorFocusRequestID == rapidEditorFocusBefore + 1
+            }
+            host.window.makeFirstResponder(nil)
+            var stableNonQueryConfirmations = 0
+            try await waitUntil("cancelled forced loop does not reclaim query focus") {
+                if !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window) {
+                    stableNonQueryConfirmations += 1
+                } else {
+                    stableNonQueryConfirmations = 0
+                }
+                return stableNonQueryConfirmations >= 6
+            }
         #endif
     }
 

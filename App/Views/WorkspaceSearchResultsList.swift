@@ -14,7 +14,7 @@ struct WorkspaceSearchResultsList: View {
     @Binding var selectedRowID: WorkspaceSearchResultRowID?
     var isResultsFocused: FocusState<Bool>.Binding
     var onEscapeToQueryField: () -> Void
-    var onActivationRequested: () -> Void
+    var onActivationResolved: (Bool) -> Void
     var onKeyboardSelectionHandled: (WorkspaceSearchSelectionAction) -> Void
 
     var body: some View {
@@ -317,12 +317,12 @@ struct WorkspaceSearchResultsList: View {
         ) else {
             return
         }
-        onActivationRequested()
-        appState.activateWorkspaceSearchResult(
+        let didActivate = appState.activateWorkspaceSearchResult(
             context: payload.context,
             fileResult: payload.fileResult,
             match: payload.match
         )
+        onActivationResolved(didActivate)
     }
 
     private func skippedTitle(count: Int, omitted: Int) -> String {
@@ -342,12 +342,12 @@ struct WorkspaceSearchResultsList: View {
             return
         }
         selectedRowID = row.id
-        onActivationRequested()
-        appState.activateWorkspaceSearchResult(
+        let didActivate = appState.activateWorkspaceSearchResult(
             context: payload.context,
             fileResult: payload.fileResult,
             match: payload.match
         )
+        onActivationResolved(didActivate)
     }
 
     private func retrySearch() {

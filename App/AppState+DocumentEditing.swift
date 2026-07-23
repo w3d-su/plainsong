@@ -117,17 +117,18 @@ extension AppState {
         }
     }
 
+    @discardableResult
     func activateWorkspaceSearchResult(
         context: WorkspaceSearchContext,
         fileResult: WorkspaceSearchFileResult,
         match: TextSearchMatch
-    ) {
+    ) -> Bool {
         guard isAcceptedWorkspaceSearchActivation(
             context: context,
             fileResult: fileResult,
             match: match
         ) else {
-            return
+            return false
         }
 
         guard let target = workspaceSearchActivationTarget(
@@ -135,7 +136,7 @@ extension AppState {
             match: match
         )
         else {
-            return
+            return false
         }
 
         do {
@@ -144,7 +145,7 @@ extension AppState {
                 fileResult: fileResult,
                 match: match
             ) else {
-                return
+                return false
             }
             try workspaceSearchPostActivationHook?()
             cancelPendingEditorNavigationIfNeeded(force: true)
@@ -153,8 +154,10 @@ extension AppState {
                 documentIdentity: activation.documentIdentity,
                 selection: match.range
             )
+            return true
         } catch {
             present(error, title: "Could Not Open Search Result")
+            return false
         }
     }
 

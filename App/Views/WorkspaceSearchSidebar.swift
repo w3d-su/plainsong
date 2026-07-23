@@ -70,7 +70,7 @@ struct WorkspaceSearchSidebar: View {
                 selectedRowID: resultsSelectionBinding,
                 isResultsFocused: $isResultsFocused,
                 onEscapeToQueryField: { focusQueryFieldFromResults() },
-                onActivationRequested: { restoreResultsFocusAfterActivation() },
+                onActivationResolved: { restoreResultsFocusAfterActivation($0) },
                 onKeyboardSelectionHandled: { recordKeyboardSelectionHandled($0) }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -352,6 +352,10 @@ struct WorkspaceSearchSidebar: View {
 
     /// Query-field Escape: focus editor; keep query text and search results intact.
     private func escapeFromQueryFieldToEditor() {
+        // A rapid second Escape is a newer focus intent than the first Escape's forced
+        // query-field retry loop. Cancel it before asking the editor to become first responder.
+        focusAttemptController.cancel()
+        resultsFocusRestorationController.cancel()
         lowerResultsFocus()
         appState.requestEditorFocus()
     }
@@ -402,13 +406,23 @@ private extension WorkspaceSearchSidebar {
     /// range. Restore the Search results surface on the next main turn so the activation key or
     /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
     /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
-    func restoreResultsFocusAfterActivation() {
+    func restoreResultsFocusAfterActivation(_ didActivate: Bool) {
+        // A rejected authority/fingerprint/read never transfers focus to the editor. Reassert
+        // the current results route in this event turn (Return itself can lower SwiftUI's
+        // focus claim), but never schedule a delayed fallback that could steal later clicks.
+        guard didActivate else {
+            resultsFocusRestorationController.cancel()
+            resultsFocusIntentToken &+= 1
+            isResultsFocused = true
+            isResultsRoutingReady = true
+            publishKeyboardSmokeProbe()
+            refreshDebugFocusSurface()
+            return
+        }
+
         resultsFocusIntentToken &+= 1
         let intentToken = resultsFocusIntentToken
         let lifecycleEpoch = resultsFocusLifecycleEpoch
-        isResultsRoutingReady = false
-        isResultsFocused = false
-        publishKeyboardSmokeProbe()
         let tracker = windowKeyState
         resultsFocusRestorationController.replace {
             guard !Task.isCancelled,
@@ -418,6 +432,19 @@ private extension WorkspaceSearchSidebar {
                 return
             }
             if tracker.window?.containsMarkdownEditor != true {
+                // Hosted sidebar tests have no editor responder to hand off through. A click's
+                // binding write and activation callback occur in the same SwiftUI update, so
+                // force the same false→true results transition without fabricating editor focus.
+                isResultsRoutingReady = false
+                isResultsFocused = false
+                publishKeyboardSmokeProbe()
+                await Task.yield()
+                guard !Task.isCancelled,
+                      resultsFocusIntentToken == intentToken,
+                      resultsFocusLifecycleEpoch == lifecycleEpoch
+                else {
+                    return
+                }
                 isResultsFocused = true
                 await Task.yield()
                 guard !Task.isCancelled,
@@ -432,7 +459,6 @@ private extension WorkspaceSearchSidebar {
                 return
             }
 
-            var observedEditorResponder = false
             for _ in 0 ..< 180 {
                 guard !Task.isCancelled,
                       resultsFocusIntentToken == intentToken,
@@ -441,15 +467,14 @@ private extension WorkspaceSearchSidebar {
                     return
                 }
                 if tracker.window?.isMarkdownEditorFirstResponder == true {
-                    observedEditorResponder = true
-                }
-
-                if observedEditorResponder {
+                    isResultsRoutingReady = false
                     isResultsFocused = false
+                    publishKeyboardSmokeProbe()
                     await Task.yield()
                     guard !Task.isCancelled,
                           resultsFocusIntentToken == intentToken,
-                          resultsFocusLifecycleEpoch == lifecycleEpoch
+                          resultsFocusLifecycleEpoch == lifecycleEpoch,
+                          tracker.window?.isMarkdownEditorFirstResponder == true
                     else {
                         return
                     }
@@ -474,26 +499,6 @@ private extension WorkspaceSearchSidebar {
                     return
                 }
             }
-
-            // Navigation may be rejected before claiming the editor. Restore the result surface
-            // after the bounded observation window so activation never strands keyboard input.
-            guard !Task.isCancelled,
-                  resultsFocusIntentToken == intentToken,
-                  resultsFocusLifecycleEpoch == lifecycleEpoch
-            else {
-                return
-            }
-            isResultsFocused = true
-            await Task.yield()
-            guard !Task.isCancelled,
-                  resultsFocusIntentToken == intentToken,
-                  resultsFocusLifecycleEpoch == lifecycleEpoch
-            else {
-                return
-            }
-            isResultsRoutingReady = true
-            publishKeyboardSmokeProbe()
-            refreshDebugFocusSurface()
         }
     }
 

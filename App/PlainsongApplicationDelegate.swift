@@ -30,6 +30,7 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             if let debugWorkspaceFixtureURL {
                 try? FileManager.default.removeItem(at: debugWorkspaceFixtureURL)
             }
+            DebugWorkspaceSearchFixture.clearIsolatedDefaults()
         #endif
     }
 

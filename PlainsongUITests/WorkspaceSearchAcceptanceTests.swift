@@ -103,17 +103,10 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
             description: "results focus restored after activation"
         )
 
+        // Deliberately do not wait for the first Escape's forced query-focus confirmation
+        // loop. The second Escape must supersede that in-flight intent and leave the editor
+        // focused rather than allowing Search to reclaim first responder.
         app.typeKey(.escape, modifierFlags: [])
-        waitForLabel(
-            "Workspace search focus query",
-            of: workspaceWindow.descendants(matching: .any)[
-                "plainsong.debug.workspaceSearch.focusSurface"
-            ],
-            description: "query-field routing after results Escape"
-        )
-        waitForKeyboardFocus(queryField)
-        assertQueryAndResultsRemain(queryField: queryField, target: target)
-
         app.typeKey(.escape, modifierFlags: [])
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))

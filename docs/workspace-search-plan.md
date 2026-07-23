@@ -849,9 +849,12 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   accessibility identifiers; and observes the activated filename plus native-verified UTF-16
   selection. Native AX state verifies actual query-field focus; Debug support creates/removes
   only fixture files, cleans expired `ws4a-*` fixture directories at launch, and publishes
-  accepted navigation without setting query, results, selection, or App state. Fixture opening
-  deliberately bypasses last-opened/recent-item persistence while retaining the production
-  workspace-open, indexing, search, and activation paths.
+  accepted navigation without setting query, results, selection, or App state. Before ordinary
+  `AppState` construction, fixture launch selects a cleared test-only defaults suite, no-op
+  last-opened/recent stores, transient mutation-recovery stores, and disables restore; the real
+  app-launch factory regression proves production session/recovery metadata is never loaded.
+  Fixture opening still retains the production workspace-open, indexing, search, and activation
+  paths.
   Result routing is proven by the subsequent keys themselves, and a Debug-only reducer-event
   observation proves click-then-arrow events reached the custom no-wrap reducer rather than
   merely producing the same native `List` selection. App-level ASCII input without a
@@ -859,10 +862,13 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   predicate-based and every test fixture remains unique. Post-activation focus restoration
   recognizes the actual `STTextView` editor through EditorKit's stable accessibility identity,
   observes its first-responder handoff, and is cancelled by newer focus intent or sidebar
-  disappearance before it can publish results readiness. Results→query Escape confirms the
-  owned field remains first responder across multiple main-run-loop turns after results focus
-  is lowered; the UI gate then requires both the app-side responder observation and native AX
-  keyboard focus.
+  disappearance before it can publish results readiness. Rejected activation immediately keeps
+  results routing live and creates no delayed fallback; successful restoration first observes
+  editor focus and rechecks that the user has not moved elsewhere before reclaiming results.
+  The hosted real-event gate also sends a second Escape while the first forced query-focus loop
+  is still active and proves that loop is cancelled. XCUITest sends the two Escapes without an
+  intervening query-focus wait, then requires native editor keyboard focus with query/results
+  unchanged.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

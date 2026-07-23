@@ -3,6 +3,43 @@
     import XCTest
 
     final class DebugWorkspaceSearchFixtureTests: XCTestCase {
+        @MainActor
+        func testAppLaunchFactoryUsesOnlyIsolatedFixturePersistence() throws {
+            let suiteName = DebugWorkspaceSearchFixture.userDefaultsSuiteName
+            let fixtureDefaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            defer { DebugWorkspaceSearchFixture.clearIsolatedDefaults(fixtureDefaults) }
+            fixtureDefaults.set(
+                EditorLayoutMode.sourcePreview.rawValue,
+                forKey: AppState.layoutModeDefaultsKey
+            )
+            fixtureDefaults.set("leftover", forKey: "fixture.interrupted-run")
+
+            let appState = makePlainsongAppState(environment: [
+                DebugWorkspaceSearchFixture.environmentKey: "ws4a-launch-path",
+            ])
+
+            XCTAssertTrue(appState.lastOpenedFileStore is DebugLastOpenedFileStore)
+            XCTAssertTrue(appState.recentItemStore is DebugRecentItemStore)
+            XCTAssertTrue(
+                appState.workspaceMutationOperationRecoveryStore
+                    is TransientMutationOperationStore
+            )
+            XCTAssertTrue(
+                appState.workspaceMutationTextRecoveryStore is TransientMutationTextStore
+            )
+            XCTAssertFalse(appState.shouldRestoreLastOpenedFile)
+            XCTAssertTrue(appState.recentItemURLs.isEmpty)
+            XCTAssertTrue(appState.pendingWorkspaceMutationOperationRecoveryRecords.isEmpty)
+            XCTAssertTrue(appState.pendingWorkspaceMutationTextRecoveryRecords.isEmpty)
+            XCTAssertEqual(appState.layoutMode, .sourceOnly)
+            XCTAssertNil(appState.userDefaults.string(forKey: "fixture.interrupted-run"))
+            XCTAssertFalse(appState.userDefaults === UserDefaults.standard)
+
+            appState.restoreLastOpenedFileIfNeeded()
+            XCTAssertNil(appState.currentDocument.fileURL)
+            XCTAssertNil(appState.presentedError)
+        }
+
         func testRemoveStaleFixturesOnlyDeletesExpiredWS4ADirectories() throws {
             let fileManager = FileManager.default
             let root = fileManager.temporaryDirectory

@@ -9,6 +9,30 @@
         static let environmentKey = "PLAINSONG_DEBUG_WORKSPACE_SEARCH_FIXTURE"
         static let identifierPrefix = "ws4a-"
         static let staleFixtureAge: TimeInterval = 60 * 60
+        static let userDefaultsSuiteName =
+            "app.plainsong.editor.DebugWorkspaceSearchFixture"
+
+        @MainActor
+        static func makeIsolatedAppState() -> AppState {
+            let userDefaults = UserDefaults(suiteName: userDefaultsSuiteName)!
+            // A fixed, test-only suite lets the next launch remove state left by an interrupted
+            // XCUITest. It is never present in the normal AppState construction path.
+            clearIsolatedDefaults(userDefaults)
+            return AppState(
+                lastOpenedFileStore: DebugLastOpenedFileStore(),
+                recentItemStore: DebugRecentItemStore(),
+                workspaceMutationOperationRecoveryStore: TransientMutationOperationStore(),
+                workspaceMutationTextRecoveryStore: TransientMutationTextStore(),
+                shouldRestoreLastOpenedFile: false,
+                userDefaults: userDefaults
+            )
+        }
+
+        static func clearIsolatedDefaults(
+            _ userDefaults: UserDefaults? = UserDefaults(suiteName: userDefaultsSuiteName)
+        ) {
+            userDefaults?.removePersistentDomain(forName: userDefaultsSuiteName)
+        }
 
         static func create(
             identifier: String,
@@ -109,6 +133,20 @@
 
         enum FixtureError: Error {
             case invalidIdentifier
+        }
+    }
+
+    final class DebugLastOpenedFileStore: LastOpenedFilePersisting {
+        func save(_: URL) {}
+        func restore() -> URL? {
+            nil
+        }
+    }
+
+    final class DebugRecentItemStore: RecentItemPersisting {
+        func save(_: URL) {}
+        func restore() -> [URL] {
+            []
         }
     }
 #endif
