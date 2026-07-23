@@ -12164,6 +12164,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             // A stale authority/generation rejects activation synchronously. Results routing
             // must remain live; there is no editor handoff and no delayed fallback focus write.
             appState.editorNavigationCommand = nil
+            let acceptedWorkspaceGeneration = appState.workspaceGeneration
             appState.workspaceGeneration &+= 1
             sendSmokeReturn(to: host.window)
             XCTAssertNil(appState.editorNavigationCommand)
@@ -12177,6 +12178,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             try await waitUntil("rejected activation keeps arrow routing live") {
                 WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
             }
+            appState.workspaceGeneration = acceptedWorkspaceGeneration
 
             // Two Escape events delivered synchronously, without yielding to the scheduled
             // results→query task, must still complete results→query→editor.
@@ -12313,7 +12315,23 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             forwardResponder: forwardResponder,
             backwardResponder: backwardResponder
         )
+        try await verifyQueryFieldTraversalCancelsConfirmedHandoff(
+            host: host,
+            keyRouter: keyRouter,
+            searchField: searchField,
+            forwardResponder: forwardResponder,
+            backwardResponder: backwardResponder
+        )
+        backwardResponder.nextKeyView = keyRouter
+        keyRouter.nextKeyView = forwardResponder
+        forwardResponder.nextKeyView = backwardResponder
         try await verifyExhaustedHandoffRetiresPending(
+            host: host,
+            appState: appState,
+            keyRouter: keyRouter,
+            searchField: searchField
+        )
+        try await verifyQueryChangeRetiresPendingHandoff(
             host: host,
             appState: appState,
             keyRouter: keyRouter,
@@ -12367,6 +12385,127 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     }
 
     @MainActor
+    private func verifyQueryFieldTraversalCancelsConfirmedHandoff(
+        host: SearchSidebarHost,
+        keyRouter: WorkspaceSearchKeyRouterView,
+        searchField: NSTextField,
+        forwardResponder: WorkspaceSearchSmokeKeyView,
+        backwardResponder: WorkspaceSearchSmokeKeyView
+    ) async throws {
+        backwardResponder.nextKeyView = searchField
+        searchField.nextKeyView = forwardResponder
+        forwardResponder.nextKeyView = backwardResponder
+
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("forced handoff reaches first query confirmation before Tab") {
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                in: host.window,
+                expectedField: searchField
+            ) && WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+        sendSmokeTab(to: host.window)
+        try await requireStableFirstResponder(
+            forwardResponder,
+            excluding: searchField,
+            in: host.window,
+            description: "Tab after query confirmation cannot be reclaimed"
+        )
+
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("forced handoff reaches first query confirmation before Shift-Tab") {
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                in: host.window,
+                expectedField: searchField
+            ) && WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+        sendSmokeBacktab(to: host.window)
+        try await requireStableFirstResponder(
+            backwardResponder,
+            excluding: searchField,
+            in: host.window,
+            description: "Shift-Tab after query confirmation cannot be reclaimed"
+        )
+    }
+
+    @MainActor
+    private func requireStableFirstResponder(
+        _ expectedResponder: NSResponder,
+        excluding searchField: NSTextField,
+        in window: NSWindow,
+        description: String
+    ) async throws {
+        var stableConfirmations = 0
+        try await waitUntil(description) {
+            if window.firstResponder === expectedResponder,
+               !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: searchField
+               )
+            {
+                stableConfirmations += 1
+            } else {
+                stableConfirmations = 0
+            }
+            return stableConfirmations >= 6
+        }
+    }
+
+    @MainActor
+    private func verifyQueryChangeRetiresPendingHandoff(
+        host: SearchSidebarHost,
+        appState: AppState,
+        keyRouter: WorkspaceSearchKeyRouterView,
+        searchField: NSTextField
+    ) async throws {
+        appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("generation race forced handoff becomes pending") {
+            WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+
+        let previousGeneration = appState.workspaceSearchState.queryGeneration
+        appState.updateWorkspaceSearchQueryText("needle updated")
+        try await waitUntil("query generation advances during pending forced handoff") {
+            appState.workspaceSearchState.queryGeneration > previousGeneration
+        }
+        try await waitUntil("query generation retires pending forced handoff") {
+            !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: host.window)
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        let editorFocusBeforeRetry = appState.editorFocusRequestID
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("post-generation Escape returns to Search") {
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                in: host.window,
+                expectedField: searchField
+            )
+        }
+        try await waitUntil("post-generation replacement handoff completes") {
+            !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+        XCTAssertEqual(appState.editorFocusRequestID, editorFocusBeforeRetry)
+
+        appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("clear-query race forced handoff becomes pending") {
+            WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+        appState.updateWorkspaceSearchQueryText("")
+        try await waitUntil("clear query retires pending forced handoff") {
+            appState.workspaceSearchUI.queryText.isEmpty
+                && !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+    }
+
+    @MainActor
     private func verifyExhaustedHandoffRetiresPending(
         host: SearchSidebarHost,
         appState: AppState,
@@ -12396,6 +12535,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                 in: host.window,
                 expectedField: searchField
             )
+        }
+        try await waitUntil("post-exhaustion replacement handoff completes") {
+            !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
         }
         XCTAssertEqual(appState.editorFocusRequestID, editorFocusBeforeRetry)
     }

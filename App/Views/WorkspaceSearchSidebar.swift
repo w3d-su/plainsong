@@ -121,6 +121,7 @@ struct WorkspaceSearchSidebar: View {
             scheduleFocusAttempt()
         }
         .onChange(of: appState.workspaceSearchState.queryGeneration) { _, _ in
+            cancelResultsToQueryHandoff()
             selectedResultRowID = nil
             lowerResultsFocus()
             refreshResultsPresentationMemo()
@@ -141,6 +142,7 @@ struct WorkspaceSearchSidebar: View {
         .onChange(of: appState.workspaceSearchUI.queryText) { _, newValue in
             // clearWorkspaceSearch does not advance queryGeneration; still drop selection.
             if newValue.isEmpty {
+                cancelResultsToQueryHandoff()
                 selectedResultRowID = nil
                 lowerResultsFocus()
             }
@@ -275,7 +277,8 @@ struct WorkspaceSearchSidebar: View {
                 windowKeyState: windowKeyState,
                 isEnabled: appState.canUseWorkspaceSearch,
                 onMoveDownToResults: { moveDownFromQueryField() },
-                onEscapeToEditor: { escapeFromQueryFieldToEditor() }
+                onEscapeToEditor: { escapeFromQueryFieldToEditor() },
+                onFocusTraversal: { cancelResultsToQueryHandoffForTraversal() }
             )
             .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
 
@@ -443,9 +446,13 @@ private extension WorkspaceSearchSidebar {
     /// cancel that forced loop before AppKit chooses the adjacent key view, or its next retry can
     /// overwrite the traversal.
     func cancelResultsToQueryHandoffForTraversal() {
+        cancelResultsToQueryHandoff()
+        lowerResultsFocus()
+    }
+
+    func cancelResultsToQueryHandoff() {
         focusAttemptController.cancel()
         setResultsToQueryHandoffPending(false)
-        lowerResultsFocus()
     }
 
     func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
