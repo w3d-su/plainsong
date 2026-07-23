@@ -79,6 +79,7 @@ struct WorkspaceSearchSidebar: View {
                 isResultsFocused: $isResultsFocused,
                 keyRouter: resultsKeyRouter,
                 onEscapeToQueryField: { focusQueryFieldFromResults() },
+                onFocusTraversal: { cancelResultsToQueryHandoffForTraversal() },
                 onActivationResolved: { restoreResultsFocusAfterActivation($0) },
                 onKeyboardSelectionHandled: { recordKeyboardSelectionHandled($0) }
             )
@@ -98,14 +99,14 @@ struct WorkspaceSearchSidebar: View {
         .onDisappear {
             resultsFocusLifecycleEpoch &+= 1
             resultsFocusIntentToken &+= 1
-            isResultsToQueryHandoffPending = false
+            setResultsToQueryHandoffPending(false)
             isResultsRoutingReady = false
             focusAttemptController.cancel()
             resultsFocusRestorationController.cancel()
         }
         .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
             // ⌘⇧F always targets the query field, not the results list.
-            isResultsToQueryHandoffPending = false
+            setResultsToQueryHandoffPending(false)
             lowerResultsFocus()
             scheduleFocusAttempt()
         }
@@ -205,7 +206,7 @@ struct WorkspaceSearchSidebar: View {
                     // A click is a newer results intent than an in-flight results→query
                     // Escape. Stop that forced loop before it can reclaim the query field.
                     focusAttemptController.cancel()
-                    isResultsToQueryHandoffPending = false
+                    setResultsToQueryHandoffPending(false)
                     if selectionChanged {
                         resultsFocusIntentToken &+= 1
                     }
@@ -341,7 +342,7 @@ struct WorkspaceSearchSidebar: View {
         // Down is a newer results intent than any forced results→query retry still confirming
         // the field. Cancellation prevents its next turn from stealing focus back to Search.
         focusAttemptController.cancel()
-        isResultsToQueryHandoffPending = false
+        setResultsToQueryHandoffPending(false)
 
         // Drop the field editor before claiming results focus so ↓ is not re-handled by NSText.
         if let window = windowKeyState.window {
@@ -380,7 +381,7 @@ struct WorkspaceSearchSidebar: View {
         // query-field retry loop. Cancel it before asking the editor to become first responder.
         focusAttemptController.cancel()
         resultsFocusRestorationController.cancel()
-        isResultsToQueryHandoffPending = false
+        setResultsToQueryHandoffPending(false)
         lowerResultsFocus()
         #if DEBUG
             debugEscapeState = "editor"
@@ -394,7 +395,7 @@ struct WorkspaceSearchSidebar: View {
             escapeFromQueryFieldToEditor()
             return
         }
-        isResultsToQueryHandoffPending = true
+        setResultsToQueryHandoffPending(true)
         lowerResultsFocus()
         #if DEBUG
             debugEscapeState = "query"
@@ -438,9 +439,19 @@ struct WorkspaceSearchSidebar: View {
 }
 
 private extension WorkspaceSearchSidebar {
+    /// Tab traversal is a newer focus intent than a pending results→query Escape. Invalidate and
+    /// cancel that forced loop before AppKit chooses the adjacent key view, or its next retry can
+    /// overwrite the traversal.
+    func cancelResultsToQueryHandoffForTraversal() {
+        focusAttemptController.cancel()
+        setResultsToQueryHandoffPending(false)
+        lowerResultsFocus()
+    }
+
     func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
         #if DEBUG
             debugReducerSequence &+= 1
+            WorkspaceSearchKeyboardSmokeProbe.recordReducer(action)
             switch action {
             case .selectFirst:
                 debugReducerEvent = "selectFirst"
@@ -456,12 +467,19 @@ private extension WorkspaceSearchSidebar {
         #endif
     }
 
+    func setResultsToQueryHandoffPending(_ isPending: Bool) {
+        isResultsToQueryHandoffPending = isPending
+        #if DEBUG
+            WorkspaceSearchKeyboardSmokeProbe.publishHandoffPending(isPending)
+        #endif
+    }
+
     /// Editor navigation must briefly claim first responder to install and reveal the exact
     /// range. Restore the Search results surface on the next main turn so the activation key or
     /// click does not strand subsequent arrows/Escape in the editor. The intent token prevents a
     /// newer Escape, shortcut, or generation change from being overwritten by this handoff.
     func restoreResultsFocusAfterActivation(_ didActivate: Bool) {
-        isResultsToQueryHandoffPending = false
+        setResultsToQueryHandoffPending(false)
         #if DEBUG
             debugActivationSequence &+= 1
             debugActivationState = didActivate ? "restoring" : "rejected"
@@ -636,15 +654,10 @@ private extension WorkspaceSearchSidebar {
                 attemptID: requestID,
                 force: force
             )
-            if force,
-               resultsFocusIntentToken == handoffIntentToken,
-               let window = tracker.window,
-               WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                   in: window,
-                   expectedField: tracker.resolvedSearchField()
-               )
-            {
-                isResultsToQueryHandoffPending = false
+            // Pending describes only this live forced attempt. Clear it for every terminal path
+            // (success, cancellation, or exhausted retries) while protecting a newer intent.
+            if force, resultsFocusIntentToken == handoffIntentToken {
+                setResultsToQueryHandoffPending(false)
             }
             refreshDebugFocusSurface()
         }

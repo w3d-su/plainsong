@@ -27,18 +27,35 @@ enum WorkspaceSearchSelectionAction: Equatable {
     enum WorkspaceSearchKeyboardSmokeProbe {
         static var selectedRowID: WorkspaceSearchResultRowID?
         static var isResultsFocused = false
+        static var reducerSequence: UInt64 = 0
+        static var lastReducerAction: WorkspaceSearchSelectionAction?
+        static var isResultsToQueryHandoffPending = false
         /// Bumped whenever selection or results-focus claims change (for `waitUntil`).
         static var epoch: UInt64 = 0
 
         static func reset() {
             selectedRowID = nil
             isResultsFocused = false
+            reducerSequence = 0
+            lastReducerAction = nil
+            isResultsToQueryHandoffPending = false
             epoch = 0
         }
 
         static func publish(selection: WorkspaceSearchResultRowID?, resultsFocused: Bool) {
             selectedRowID = selection
             isResultsFocused = resultsFocused
+            epoch &+= 1
+        }
+
+        static func recordReducer(_ action: WorkspaceSearchSelectionAction) {
+            reducerSequence &+= 1
+            lastReducerAction = action
+            epoch &+= 1
+        }
+
+        static func publishHandoffPending(_ isPending: Bool) {
+            isResultsToQueryHandoffPending = isPending
             epoch &+= 1
         }
     }

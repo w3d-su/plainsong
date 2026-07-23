@@ -15,6 +15,7 @@ struct WorkspaceSearchResultsList: View {
     @Binding var isResultsFocused: Bool
     @ObservedObject var keyRouter: WorkspaceSearchKeyRouterController
     var onEscapeToQueryField: () -> Void
+    var onFocusTraversal: () -> Void
     var onActivationResolved: (Bool) -> Void
     var onKeyboardSelectionHandled: (WorkspaceSearchSelectionAction) -> Void
 
@@ -51,7 +52,8 @@ struct WorkspaceSearchResultsList: View {
         .background(
             WorkspaceSearchResultsKeyRouterReader(
                 controller: keyRouter,
-                onCommand: handleKeyRouterCommand
+                onCommand: handleKeyRouterCommand,
+                onFocusTraversal: onFocusTraversal
             )
         )
     }

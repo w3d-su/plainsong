@@ -27,22 +27,26 @@ enum WorkspaceSearchResultsKeyCommand {
 struct WorkspaceSearchResultsKeyRouterReader: NSViewRepresentable {
     @ObservedObject var controller: WorkspaceSearchKeyRouterController
     let onCommand: (WorkspaceSearchResultsKeyCommand) -> Void
+    let onFocusTraversal: () -> Void
 
     func makeNSView(context _: Context) -> WorkspaceSearchKeyRouterView {
         let view = WorkspaceSearchKeyRouterView()
         view.onCommand = onCommand
+        view.onFocusTraversal = onFocusTraversal
         controller.view = view
         return view
     }
 
     func updateNSView(_ view: WorkspaceSearchKeyRouterView, context _: Context) {
         view.onCommand = onCommand
+        view.onFocusTraversal = onFocusTraversal
         controller.view = view
     }
 }
 
 final class WorkspaceSearchKeyRouterView: NSView {
     var onCommand: ((WorkspaceSearchResultsKeyCommand) -> Void)?
+    var onFocusTraversal: (() -> Void)?
 
     override var acceptsFirstResponder: Bool {
         true
@@ -69,10 +73,12 @@ final class WorkspaceSearchKeyRouterView: NSView {
     }
 
     override func insertTab(_: Any?) {
+        onFocusTraversal?()
         window?.selectNextKeyView(self)
     }
 
     override func insertBacktab(_: Any?) {
+        onFocusTraversal?()
         window?.selectPreviousKeyView(self)
     }
 

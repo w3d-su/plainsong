@@ -12033,37 +12033,9 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
                     && !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
             }
 
-            // (2) Real ↑/↓ on the results key responder → reducer without wrap.
-            sendSmokeDownArrow(to: host.window)
-            try await waitUntil("real ↓ moves to second") {
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
-            }
-            sendSmokeDownArrow(to: host.window)
-            try await waitUntil("real ↓ moves to third") {
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[2]
-            }
-            sendSmokeDownArrow(to: host.window)
-            // Allow a turn; selection must stay on last (no wrap).
-            try await Task.sleep(nanoseconds: 50_000_000)
-            XCTAssertEqual(
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
-                ordered[2],
-                "real ↓ at end must not wrap"
-            )
-            sendSmokeUpArrow(to: host.window)
-            try await waitUntil("real ↑ moves up from last") {
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
-            }
-            sendSmokeUpArrow(to: host.window)
-            try await waitUntil("real ↑ moves to first") {
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
-            }
-            sendSmokeUpArrow(to: host.window)
-            try await Task.sleep(nanoseconds: 50_000_000)
-            XCTAssertEqual(
-                WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
-                ordered[0],
-                "real ↑ at start must not wrap"
+            try await verifyHostedNoWrapKeyboardSelection(
+                window: host.window,
+                ordered: ordered
             )
 
             // (3) Real Return activates the authority-backed current-state match.
@@ -12234,30 +12206,198 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             let searchField = try XCTUnwrap(
                 WorkspaceSearchFieldFocus.findSearchTextField(in: host.window.contentView)
             )
-            searchField.nextKeyView = keyRouter
-            keyRouter.nextKeyView = searchField
-
-            XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
-            sendSmokeTab(to: host.window)
-            XCTAssertTrue(
-                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                    in: host.window,
-                    expectedField: searchField
-                ),
-                "Tab must advance out of the invisible results responder"
-            )
-
-            XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
-            sendSmokeBacktab(to: host.window)
-            XCTAssertTrue(
-                WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                    in: host.window,
-                    expectedField: searchField
-                ),
-                "Shift-Tab must move backward out of the invisible results responder"
+            try await verifyResultsRouterTraversal(
+                host: host,
+                appState: appState,
+                keyRouter: keyRouter,
+                searchField: searchField
             )
 
         #endif
+    }
+
+    @MainActor
+    private func verifyHostedNoWrapKeyboardSelection(
+        window: NSWindow,
+        ordered: [WorkspaceSearchResultRowID]
+    ) async throws {
+        sendSmokeDownArrow(to: window)
+        try await waitUntil("real ↓ moves to second") {
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
+        }
+        sendSmokeDownArrow(to: window)
+        try await waitUntil("real ↓ moves to third") {
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[2]
+        }
+        sendSmokeDownArrow(to: window)
+        try await waitUntil("real boundary ↓ reaches reducer receipt 4") {
+            WorkspaceSearchKeyboardSmokeProbe.reducerSequence == 4
+                && WorkspaceSearchKeyboardSmokeProbe.lastReducerAction == .moveDown
+        }
+        XCTAssertEqual(
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
+            ordered[2],
+            "real ↓ at end must not wrap"
+        )
+
+        sendSmokeUpArrow(to: window)
+        try await waitUntil("real ↑ moves up from last") {
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[1]
+        }
+        sendSmokeUpArrow(to: window)
+        try await waitUntil("real ↑ moves to first") {
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID == ordered[0]
+        }
+        sendSmokeUpArrow(to: window)
+        try await waitUntil("real boundary ↑ reaches reducer receipt 7") {
+            WorkspaceSearchKeyboardSmokeProbe.reducerSequence == 7
+                && WorkspaceSearchKeyboardSmokeProbe.lastReducerAction == .moveUp
+        }
+        XCTAssertEqual(
+            WorkspaceSearchKeyboardSmokeProbe.selectedRowID,
+            ordered[0],
+            "real ↑ at start must not wrap"
+        )
+    }
+
+    @MainActor
+    private func verifyResultsRouterTraversal(
+        host: SearchSidebarHost,
+        appState: AppState,
+        keyRouter: WorkspaceSearchKeyRouterView,
+        searchField: NSTextField
+    ) async throws {
+        let container = NSView(frame: host.hostingView.frame)
+        host.window.contentView = container
+        host.hostingView.frame = container.bounds
+        host.hostingView.autoresizingMask = [.width, .height]
+        container.addSubview(host.hostingView)
+
+        let backwardResponder = WorkspaceSearchSmokeKeyView(
+            frame: NSRect(x: 4, y: 4, width: 40, height: 20)
+        )
+        let forwardResponder = WorkspaceSearchSmokeKeyView(
+            frame: NSRect(x: 48, y: 4, width: 40, height: 20)
+        )
+        container.addSubview(backwardResponder)
+        container.addSubview(forwardResponder)
+        let autorecalculatesKeyViewLoop = host.window.autorecalculatesKeyViewLoop
+        defer {
+            host.window.autorecalculatesKeyViewLoop = autorecalculatesKeyViewLoop
+            backwardResponder.removeFromSuperview()
+            forwardResponder.removeFromSuperview()
+        }
+        host.window.autorecalculatesKeyViewLoop = false
+        backwardResponder.nextKeyView = keyRouter
+        keyRouter.nextKeyView = forwardResponder
+        forwardResponder.nextKeyView = backwardResponder
+
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeTab(to: host.window)
+        XCTAssertTrue(
+            host.window.firstResponder === forwardResponder,
+            "Tab must advance out of the invisible results responder"
+        )
+
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeBacktab(to: host.window)
+        XCTAssertTrue(
+            host.window.firstResponder === backwardResponder,
+            "Shift-Tab must move backward out of the invisible results responder"
+        )
+
+        try await verifyTraversalCancelsForcedHandoff(
+            host: host,
+            keyRouter: keyRouter,
+            searchField: searchField,
+            forwardResponder: forwardResponder,
+            backwardResponder: backwardResponder
+        )
+        try await verifyExhaustedHandoffRetiresPending(
+            host: host,
+            appState: appState,
+            keyRouter: keyRouter,
+            searchField: searchField
+        )
+    }
+
+    @MainActor
+    private func verifyTraversalCancelsForcedHandoff(
+        host: SearchSidebarHost,
+        keyRouter: WorkspaceSearchKeyRouterView,
+        searchField: NSTextField,
+        forwardResponder: WorkspaceSearchSmokeKeyView,
+        backwardResponder: WorkspaceSearchSmokeKeyView
+    ) async throws {
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        sendSmokeTab(to: host.window)
+        var stableForwardConfirmations = 0
+        try await waitUntil("Tab traversal cannot be reclaimed by forced query focus") {
+            if host.window.firstResponder === forwardResponder,
+               !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: host.window,
+                   expectedField: searchField
+               )
+            {
+                stableForwardConfirmations += 1
+            } else {
+                stableForwardConfirmations = 0
+            }
+            return stableForwardConfirmations >= 6
+        }
+
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        sendSmokeBacktab(to: host.window)
+        var stableBackwardConfirmations = 0
+        try await waitUntil("Shift-Tab traversal cannot be reclaimed by forced query focus") {
+            if host.window.firstResponder === backwardResponder,
+               !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: host.window,
+                   expectedField: searchField
+               )
+            {
+                stableBackwardConfirmations += 1
+            } else {
+                stableBackwardConfirmations = 0
+            }
+            return stableBackwardConfirmations >= 6
+        }
+    }
+
+    @MainActor
+    private func verifyExhaustedHandoffRetiresPending(
+        host: SearchSidebarHost,
+        appState: AppState,
+        keyRouter: WorkspaceSearchKeyRouterView,
+        searchField: NSTextField
+    ) async throws {
+        appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("ineligible forced handoff becomes pending") {
+            WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+        try await waitUntil(
+            "exhausted forced handoff retires pending intent",
+            timeoutNanoseconds: 5_000_000_000
+        ) {
+            !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+
+        installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: host.window)
+        XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
+        let editorFocusBeforeRetry = appState.editorFocusRequestID
+        sendSmokeEscape(to: host.window)
+        try await waitUntil("post-exhaustion Escape returns to Search") {
+            WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                in: host.window,
+                expectedField: searchField
+            )
+        }
+        XCTAssertEqual(appState.editorFocusRequestID, editorFocusBeforeRetry)
     }
 
     @MainActor
@@ -12290,7 +12430,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         sendSmokeKeyEvent(
             keyCode: 48,
             characters: "\u{19}",
-            charactersIgnoringModifiers: "\t",
+            charactersIgnoringModifiers: "\u{19}",
             modifierFlags: .shift,
             to: window
         )
@@ -16690,6 +16830,13 @@ private actor ControlledWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
         }
         continuations[index] = nil
         continuation.resume(returning: snapshot)
+    }
+}
+
+@MainActor
+private final class WorkspaceSearchSmokeKeyView: NSView {
+    override var acceptsFirstResponder: Bool {
+        true
     }
 }
 

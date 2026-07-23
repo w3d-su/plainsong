@@ -880,6 +880,13 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   router remains first responder. Every XCUITest arrow assertion also requires the exact next
   monotonic reducer receipt before accepting selection, including unchanged first+Up and
   last+Down boundaries.
+  Tab and Shift-Tab are newer focus intents: the router notifies the sidebar before AppKit
+  traversal, canceling and invalidating any forced query-focus loop. Hosted real-event coverage
+  uses distinct forward/backward responders and proves neither traversal is reclaimed. A forced
+  handoff clears its token-matched pending state on success, cancellation, or retry exhaustion;
+  the hosted gate waits for an ineligible-window exhaustion and proves the next Escape is again
+  results→query. Hosted no-wrap boundaries require the same monotonic reducer receipts as
+  XCUITest rather than accepting an already-true selection.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.
