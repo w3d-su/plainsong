@@ -191,6 +191,16 @@ Raw in-run samples for the first Release run: workspace search
 search `[1137.147, 1227.007, 1292.670]`; admitted file `[39.105, 38.837, 38.790]`; cancellation
 drain `[0.213, 0.168, 0.107, 0.238, 0.172]`.
 
+### First hosted CI observation
+
+GitHub Actions `build-and-test` on `macos-15` for PR #93 commit
+`d47404392cc64bcc0480e828aa79e509b6fe7f2c` produced these medians: workspace search
+1239.690 ms (samples `[1126.512, 1239.690, 1386.824]`), admitted file 43.802 ms,
+`ascii-suffix` 46.440 ms, `unicode-periodic` 985.311 ms, cancel-to-drain 0.137 ms. Every value
+was under budget, so no R15 informational line was printed on that run. This is recorded as a
+hosted datapoint only; per R15 the local values above remain the acceptance evidence, and these
+budgets stay informational on CI regardless.
+
 ### Budget selection
 
 Budgets are frozen against the **Debug** medians because `make test` runs the Debug
