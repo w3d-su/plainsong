@@ -451,8 +451,15 @@ private extension WorkspaceSearchSidebar {
     }
 
     func cancelResultsToQueryHandoff() {
-        focusAttemptController.cancel()
+        #if DEBUG
+            WorkspaceSearchKeyboardSmokeProbe.recordHandoffCancellationCheck()
+        #endif
+        guard isResultsToQueryHandoffPending else { return }
+        focusAttemptController.cancel(kind: .forcedHandoff)
         setResultsToQueryHandoffPending(false)
+        #if DEBUG
+            WorkspaceSearchKeyboardSmokeProbe.recordHandoffCancellation()
+        #endif
     }
 
     func recordKeyboardSelectionHandled(_ action: WorkspaceSearchSelectionAction) {
@@ -654,7 +661,14 @@ private extension WorkspaceSearchSidebar {
 
         let force = forceQueryField
         let handoffIntentToken = resultsFocusIntentToken
-        focusAttemptController.replace {
+        let attemptKind: WorkspaceSearchFocusAttemptController.AttemptKind =
+            force ? .forcedHandoff : .requestedFocus
+        #if DEBUG
+            if attemptKind == .requestedFocus {
+                WorkspaceSearchKeyboardSmokeProbe.recordRequestedFocusAttempt()
+            }
+        #endif
+        focusAttemptController.replace(kind: attemptKind) {
             await WorkspaceSearchFocusAttemptLoop.run(
                 appState: appState,
                 tracker: tracker,
@@ -701,18 +715,32 @@ private extension NSWindow {
 
 @MainActor
 private final class WorkspaceSearchFocusAttemptController: ObservableObject {
-    private var task: Task<Void, Never>?
+    enum AttemptKind: Equatable {
+        case requestedFocus
+        case forcedHandoff
+    }
 
-    func replace(operation: @escaping @MainActor () async -> Void) {
+    private var task: Task<Void, Never>?
+    private var kind: AttemptKind?
+
+    func replace(
+        kind: AttemptKind? = nil,
+        operation: @escaping @MainActor () async -> Void
+    ) {
         task?.cancel()
+        self.kind = kind
         task = Task { @MainActor in
             await operation()
         }
     }
 
-    func cancel() {
+    func cancel(kind expectedKind: AttemptKind? = nil) {
+        if let expectedKind, kind != expectedKind {
+            return
+        }
         task?.cancel()
         task = nil
+        kind = nil
     }
 
     deinit {

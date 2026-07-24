@@ -30,6 +30,9 @@ enum WorkspaceSearchSelectionAction: Equatable {
         static var reducerSequence: UInt64 = 0
         static var lastReducerAction: WorkspaceSearchSelectionAction?
         static var isResultsToQueryHandoffPending = false
+        static var handoffCancellationCheckSequence: UInt64 = 0
+        static var handoffCancellationSequence: UInt64 = 0
+        static var requestedFocusAttemptSequence: UInt64 = 0
         /// Bumped whenever selection or results-focus claims change (for `waitUntil`).
         static var epoch: UInt64 = 0
 
@@ -39,6 +42,9 @@ enum WorkspaceSearchSelectionAction: Equatable {
             reducerSequence = 0
             lastReducerAction = nil
             isResultsToQueryHandoffPending = false
+            handoffCancellationCheckSequence = 0
+            handoffCancellationSequence = 0
+            requestedFocusAttemptSequence = 0
             epoch = 0
         }
 
@@ -56,6 +62,21 @@ enum WorkspaceSearchSelectionAction: Equatable {
 
         static func publishHandoffPending(_ isPending: Bool) {
             isResultsToQueryHandoffPending = isPending
+            epoch &+= 1
+        }
+
+        static func recordHandoffCancellation() {
+            handoffCancellationSequence &+= 1
+            epoch &+= 1
+        }
+
+        static func recordHandoffCancellationCheck() {
+            handoffCancellationCheckSequence &+= 1
+            epoch &+= 1
+        }
+
+        static func recordRequestedFocusAttempt() {
+            requestedFocusAttemptSequence &+= 1
             epoch &+= 1
         }
     }

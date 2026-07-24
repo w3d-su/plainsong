@@ -12468,12 +12468,21 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         }
 
         let previousGeneration = appState.workspaceSearchState.queryGeneration
+        let cancellationCheckBeforeGeneration =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+        let cancellationBeforeGeneration =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
         appState.updateWorkspaceSearchQueryText("needle updated")
-        try await waitUntil("query generation advances during pending forced handoff") {
+        try await waitUntil(
+            "query generation causally cancels pending forced handoff",
+            timeoutNanoseconds: 500_000_000
+        ) {
             appState.workspaceSearchState.queryGeneration > previousGeneration
-        }
-        try await waitUntil("query generation retires pending forced handoff") {
-            !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+                == cancellationCheckBeforeGeneration + 1
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
+                == cancellationBeforeGeneration + 1
+                && !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
         }
 
         installDesignatedKeyWindowRouting(on: appState, designatedKeyWindow: host.window)
@@ -12491,6 +12500,12 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         }
         XCTAssertEqual(appState.editorFocusRequestID, editorFocusBeforeRetry)
 
+        try await verifyQueryGenerationPreservesRequestedFocus(
+            host: host,
+            appState: appState,
+            searchField: searchField
+        )
+
         appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
         appState.refreshWorkspaceSearchFocusKeyRouting()
         XCTAssertTrue(host.window.makeFirstResponder(keyRouter))
@@ -12498,10 +12513,72 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         try await waitUntil("clear-query race forced handoff becomes pending") {
             WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
         }
+        let cancellationCheckBeforeClear =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+        let cancellationBeforeClear =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
         appState.updateWorkspaceSearchQueryText("")
-        try await waitUntil("clear query retires pending forced handoff") {
+        try await waitUntil(
+            "clear query causally cancels pending forced handoff",
+            timeoutNanoseconds: 500_000_000
+        ) {
             appState.workspaceSearchUI.queryText.isEmpty
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+                == cancellationCheckBeforeClear + 1
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
+                == cancellationBeforeClear + 1
                 && !WorkspaceSearchKeyboardSmokeProbe.isResultsToQueryHandoffPending
+        }
+    }
+
+    @MainActor
+    private func verifyQueryGenerationPreservesRequestedFocus(
+        host: SearchSidebarHost,
+        appState: AppState,
+        searchField: NSTextField
+    ) async throws {
+        appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+        host.window.makeFirstResponder(nil)
+
+        let focusAttemptBefore =
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
+        appState.focusWorkspaceSearch()
+        let focusRequest = appState.workspaceSearchUI.focusRequestID
+        try await waitUntil("ineligible shortcut installs requested focus retry") {
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence > focusAttemptBefore
+                && appState.workspaceSearchUI.focusAppliedID != focusRequest
+        }
+
+        let cancellationCheckBeforeGeneration =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+        let cancellationBeforeGeneration =
+            WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
+        let previousGeneration = appState.workspaceSearchState.queryGeneration
+        appState.updateWorkspaceSearchQueryText("needle shortcut")
+        try await waitUntil(
+            "shortcut-time generation does not cancel requested retry",
+            timeoutNanoseconds: 500_000_000
+        ) {
+            appState.workspaceSearchState.queryGeneration > previousGeneration
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
+                == cancellationCheckBeforeGeneration + 1
+                && WorkspaceSearchKeyboardSmokeProbe.handoffCancellationSequence
+                == cancellationBeforeGeneration
+        }
+
+        // Do not publish a key-routing epoch: the already-running requested retry must observe
+        // eligibility live and finish without a replacement schedule.
+        appState.workspaceSearchFocusKeyWindowCheck = { $0 === host.window }
+        try await waitUntil(
+            "requested shortcut retry survives query generation",
+            timeoutNanoseconds: 1_000_000_000
+        ) {
+            appState.workspaceSearchUI.focusAppliedID == focusRequest
+                && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                    in: host.window,
+                    expectedField: searchField
+                )
         }
     }
 

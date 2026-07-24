@@ -890,9 +890,13 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   The query-field delegate applies the same cancellation before returning `insertTab:` and
   `insertBacktab:` to AppKit; hosted real-event coverage waits for the field's first forced-focus
   confirmation before traversing and proves the next retry cannot reclaim it. Query-generation
-  changes and empty-query clearing cancel the forced task and clear pending before lowering
-  results focus. The hosted gate makes the window ineligible, drives both production query paths,
-  and proves neither transition strands a stale second-Escape intent.
+  changes and empty-query clearing cancel only a pending, controller-typed forced handoff and
+  clear pending before lowering results focus; an unapplied shortcut retry has distinct requested
+  ownership and cannot be canceled. The hosted gate makes the window ineligible, drives both
+  production query paths, and requires an exact cancellation receipt within 500 ms, well before
+  natural retry exhaustion. A separate race advances generation during a requested shortcut
+  retry, restores eligibility without a reschedule signal, and proves the original task focuses
+  Search and applies its exact receipt.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.
