@@ -891,12 +891,16 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   `insertBacktab:` to AppKit; hosted real-event coverage waits for the field's first forced-focus
   confirmation before traversing and proves the next retry cannot reclaim it. Traversal cancels
   either attempt kind and records the exact superseded request ID so the delayed `.task(id:)`
-  path cannot replay a repeated/programmatic focus request. Controller identity deduplicates the
-  `.onChange` and `.task(id:)` schedulers for the same request and is cleared only by that
-  installation's completion. Hosted coverage drives both traversal directions after repeated
-  `focusWorkspaceSearch()`, requires the receipt to remain unapplied, and proves the exact attempt
-  sequence never changes; Debug observability also binds that sequence to the exact request ID so
-  an older queued attempt cannot satisfy the predicate. Query-generation changes and empty-query
+  path cannot replay a repeated/programmatic focus request. That exact superseded receipt lives
+  in shared `WorkspaceSearchUIState`, distinct from the applied receipt, so Files→Search remount
+  and a second window sharing `AppState` also reject it while a newer explicit request remains
+  eligible. Controller identity deduplicates the `.onChange` and `.task(id:)` schedulers for the
+  same request and is cleared only by that installation's completion. Hosted coverage drives both
+  traversal directions after repeated `focusWorkspaceSearch()`, then separately remounts Search
+  and transfers key-window eligibility to another hosted window; each gate requires the traversal
+  destination to remain first responder, the receipt to remain unapplied, and the exact attempt
+  sequence never to change. Debug observability also binds that sequence to the exact request ID
+  so an older queued attempt cannot satisfy the predicate. Query-generation changes and empty-query
   clearing cancel only a pending, controller-typed forced handoff and
   clear pending before lowering results focus; an unapplied shortcut retry has distinct requested
   ownership and cannot be canceled. The hosted gate makes the window ineligible, drives both

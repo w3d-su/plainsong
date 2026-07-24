@@ -49,9 +49,6 @@ struct WorkspaceSearchSidebar: View {
     /// field actually owns first responder, a second Escape can still arrive at the results
     /// router and must complete the query→editor transition directly.
     @State private var isResultsToQueryHandoffPending = false
-    /// A Tab traversal explicitly supersedes this request in this sidebar instance. Keep the
-    /// exact ID so the delayed `.task(id:)` path cannot replay it after the controller is canceled.
-    @State private var traversalSupersededFocusRequestID: UInt64?
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -442,11 +439,8 @@ struct WorkspaceSearchSidebar: View {
 }
 
 private extension WorkspaceSearchSidebar {
-    func handleFocusRequestChange(_ newRequestID: UInt64) {
+    func handleFocusRequestChange(_: UInt64) {
         // ⌘⇧F always targets the query field, not the results list.
-        if traversalSupersededFocusRequestID != newRequestID {
-            traversalSupersededFocusRequestID = nil
-        }
         setResultsToQueryHandoffPending(false)
         lowerResultsFocus()
         scheduleFocusAttempt()
@@ -458,7 +452,9 @@ private extension WorkspaceSearchSidebar {
     func cancelResultsToQueryHandoffForTraversal() {
         // Traversal is newer than either kind of Search-focus intent. Unlike generation changes,
         // it must also retire a repeated/programmatic requested-focus retry.
-        traversalSupersededFocusRequestID = appState.workspaceSearchUI.focusRequestID
+        appState.supersedeWorkspaceSearchFocusRequest(
+            appState.workspaceSearchUI.focusRequestID
+        )
         focusAttemptController.cancel()
         if isResultsToQueryHandoffPending {
             setResultsToQueryHandoffPending(false)
@@ -669,14 +665,13 @@ private extension WorkspaceSearchSidebar {
         let appliedID = appState.workspaceSearchUI.focusAppliedID
 
         if !forceQueryField {
-            guard traversalSupersededFocusRequestID != requestID else {
-                return
-            }
             guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
                 requestID: requestID,
                 appliedID: appliedID,
+                supersededID: appState.workspaceSearchUI.focusSupersededID,
                 isKeyWindow: true
             ) else {
+                focusAttemptController.cancel(kind: .requestedFocus)
                 return
             }
         }

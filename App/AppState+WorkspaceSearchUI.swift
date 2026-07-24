@@ -66,6 +66,7 @@ extension AppState {
               WorkspaceSearchFocusArbitration.shouldApplyFocus(
                   requestID: requestID,
                   appliedID: workspaceSearchUI.focusAppliedID,
+                  supersededID: workspaceSearchUI.focusSupersededID,
                   isKeyWindow: true
               )
         else {
@@ -73,6 +74,24 @@ extension AppState {
         }
         var ui = workspaceSearchUI
         ui.focusAppliedID = requestID
+        workspaceSearchUI = ui
+    }
+
+    /// Resolves an unapplied focus request as superseded by a newer Tab traversal. Unlike an
+    /// applied receipt, this does not claim that any Search field became first responder.
+    ///
+    /// The shared receipt prevents remounted sidebars and other windows from replaying the
+    /// request after the originating view-local controller is canceled. Every live retry
+    /// re-reads this receipt after each suspension.
+    func supersedeWorkspaceSearchFocusRequest(_ requestID: UInt64) {
+        guard requestID == workspaceSearchUI.focusRequestID,
+              requestID > workspaceSearchUI.focusAppliedID,
+              requestID > workspaceSearchUI.focusSupersededID
+        else {
+            return
+        }
+        var ui = workspaceSearchUI
+        ui.focusSupersededID = requestID
         workspaceSearchUI = ui
     }
 

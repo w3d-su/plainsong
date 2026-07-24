@@ -90,6 +90,7 @@ enum WorkspaceSearchFocusAttemptLoop {
             guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
                 requestID: attemptID,
                 appliedID: appState.workspaceSearchUI.focusAppliedID,
+                supersededID: appState.workspaceSearchUI.focusSupersededID,
                 isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
             ) else {
                 return
@@ -128,6 +129,7 @@ enum WorkspaceSearchFocusAttemptLoop {
         guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
             requestID: attemptID,
             appliedID: appState.workspaceSearchUI.focusAppliedID,
+            supersededID: appState.workspaceSearchUI.focusSupersededID,
             isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
         ) else {
             return false
