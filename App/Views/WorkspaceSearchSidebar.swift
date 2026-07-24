@@ -49,6 +49,9 @@ struct WorkspaceSearchSidebar: View {
     /// field actually owns first responder, a second Escape can still arrive at the results
     /// router and must complete the query→editor transition directly.
     @State private var isResultsToQueryHandoffPending = false
+    /// A Tab traversal explicitly supersedes this request in this sidebar instance. Keep the
+    /// exact ID so the delayed `.task(id:)` path cannot replay it after the controller is canceled.
+    @State private var traversalSupersededFocusRequestID: UInt64?
     /// Memoized pure presentation. Rebuilds only when the exact presenter inputs change
     /// (plain `Equatable`, copy-on-write-cheap while arrays are untouched), so streaming
     /// re-renders skip full section rebuilds and in-place rewrites can never serve stale rows.
@@ -104,11 +107,8 @@ struct WorkspaceSearchSidebar: View {
             focusAttemptController.cancel()
             resultsFocusRestorationController.cancel()
         }
-        .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, _ in
-            // ⌘⇧F always targets the query field, not the results list.
-            setResultsToQueryHandoffPending(false)
-            lowerResultsFocus()
-            scheduleFocusAttempt()
+        .onChange(of: appState.workspaceSearchUI.focusRequestID) { _, newRequestID in
+            handleFocusRequestChange(newRequestID)
         }
         .onChange(of: windowKeyState.keyEpoch) { _, _ in
             scheduleFocusAttempt()
@@ -442,11 +442,30 @@ struct WorkspaceSearchSidebar: View {
 }
 
 private extension WorkspaceSearchSidebar {
+    func handleFocusRequestChange(_ newRequestID: UInt64) {
+        // ⌘⇧F always targets the query field, not the results list.
+        if traversalSupersededFocusRequestID != newRequestID {
+            traversalSupersededFocusRequestID = nil
+        }
+        setResultsToQueryHandoffPending(false)
+        lowerResultsFocus()
+        scheduleFocusAttempt()
+    }
+
     /// Tab traversal is a newer focus intent than a pending results→query Escape. Invalidate and
     /// cancel that forced loop before AppKit chooses the adjacent key view, or its next retry can
     /// overwrite the traversal.
     func cancelResultsToQueryHandoffForTraversal() {
-        cancelResultsToQueryHandoff()
+        // Traversal is newer than either kind of Search-focus intent. Unlike generation changes,
+        // it must also retire a repeated/programmatic requested-focus retry.
+        traversalSupersededFocusRequestID = appState.workspaceSearchUI.focusRequestID
+        focusAttemptController.cancel()
+        if isResultsToQueryHandoffPending {
+            setResultsToQueryHandoffPending(false)
+            #if DEBUG
+                WorkspaceSearchKeyboardSmokeProbe.recordHandoffCancellation()
+            #endif
+        }
         lowerResultsFocus()
     }
 
@@ -650,6 +669,9 @@ private extension WorkspaceSearchSidebar {
         let appliedID = appState.workspaceSearchUI.focusAppliedID
 
         if !forceQueryField {
+            guard traversalSupersededFocusRequestID != requestID else {
+                return
+            }
             guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
                 requestID: requestID,
                 appliedID: appliedID,
@@ -663,12 +685,11 @@ private extension WorkspaceSearchSidebar {
         let handoffIntentToken = resultsFocusIntentToken
         let attemptKind: WorkspaceSearchFocusAttemptController.AttemptKind =
             force ? .forcedHandoff : .requestedFocus
-        #if DEBUG
-            if attemptKind == .requestedFocus {
-                WorkspaceSearchKeyboardSmokeProbe.recordRequestedFocusAttempt()
-            }
-        #endif
-        focusAttemptController.replace(kind: attemptKind) {
+        let attemptToken = force ? handoffIntentToken : requestID
+        let didInstall = focusAttemptController.replace(
+            kind: attemptKind,
+            token: attemptToken
+        ) {
             await WorkspaceSearchFocusAttemptLoop.run(
                 appState: appState,
                 tracker: tracker,
@@ -682,6 +703,13 @@ private extension WorkspaceSearchSidebar {
             }
             refreshDebugFocusSurface()
         }
+        #if DEBUG
+            if didInstall, attemptKind == .requestedFocus {
+                WorkspaceSearchKeyboardSmokeProbe.recordRequestedFocusAttempt(
+                    requestID: requestID
+                )
+            }
+        #endif
     }
 }
 
@@ -722,16 +750,30 @@ private final class WorkspaceSearchFocusAttemptController: ObservableObject {
 
     private var task: Task<Void, Never>?
     private var kind: AttemptKind?
+    private var token: UInt64?
+    private var installationSequence: UInt64 = 0
+    private var activeInstallation: UInt64?
 
+    @discardableResult
     func replace(
         kind: AttemptKind? = nil,
+        token: UInt64? = nil,
         operation: @escaping @MainActor () async -> Void
-    ) {
+    ) -> Bool {
+        if kind != nil, self.kind == kind, self.token == token, task != nil {
+            return false
+        }
         task?.cancel()
         self.kind = kind
+        self.token = token
+        installationSequence &+= 1
+        let installation = installationSequence
+        activeInstallation = installation
         task = Task { @MainActor in
             await operation()
+            finish(installation: installation)
         }
+        return true
     }
 
     func cancel(kind expectedKind: AttemptKind? = nil) {
@@ -741,6 +783,16 @@ private final class WorkspaceSearchFocusAttemptController: ObservableObject {
         task?.cancel()
         task = nil
         kind = nil
+        token = nil
+        activeInstallation = nil
+    }
+
+    private func finish(installation: UInt64) {
+        guard activeInstallation == installation else { return }
+        task = nil
+        kind = nil
+        token = nil
+        activeInstallation = nil
     }
 
     deinit {

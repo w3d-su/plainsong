@@ -12317,6 +12317,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         )
         try await verifyQueryFieldTraversalCancelsConfirmedHandoff(
             host: host,
+            appState: appState,
             keyRouter: keyRouter,
             searchField: searchField,
             forwardResponder: forwardResponder,
@@ -12387,6 +12388,7 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
     @MainActor
     private func verifyQueryFieldTraversalCancelsConfirmedHandoff(
         host: SearchSidebarHost,
+        appState: AppState,
         keyRouter: WorkspaceSearchKeyRouterView,
         searchField: NSTextField,
         forwardResponder: WorkspaceSearchSmokeKeyView,
@@ -12426,6 +12428,83 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             excluding: searchField,
             in: host.window,
             description: "Shift-Tab after query confirmation cannot be reclaimed"
+        )
+
+        try await verifyRepeatedRequestedFocusTraversal(
+            host: host,
+            appState: appState,
+            searchField: searchField,
+            forwardResponder: forwardResponder,
+            backwardResponder: backwardResponder
+        )
+    }
+
+    @MainActor
+    private func verifyRepeatedRequestedFocusTraversal(
+        host: SearchSidebarHost,
+        appState: AppState,
+        searchField: NSTextField,
+        forwardResponder: WorkspaceSearchSmokeKeyView,
+        backwardResponder: WorkspaceSearchSmokeKeyView
+    ) async throws {
+        try await verifyRepeatedRequestedFocusTraversal(
+            host: host,
+            appState: appState,
+            searchField: searchField,
+            expectedResponder: forwardResponder,
+            sendTraversal: { self.sendSmokeTab(to: host.window) },
+            description: "Tab supersedes repeated requested focus"
+        )
+        try await verifyRepeatedRequestedFocusTraversal(
+            host: host,
+            appState: appState,
+            searchField: searchField,
+            expectedResponder: backwardResponder,
+            sendTraversal: { self.sendSmokeBacktab(to: host.window) },
+            description: "Shift-Tab supersedes repeated requested focus"
+        )
+    }
+
+    @MainActor
+    private func verifyRepeatedRequestedFocusTraversal(
+        host: SearchSidebarHost,
+        appState: AppState,
+        searchField: NSTextField,
+        expectedResponder: WorkspaceSearchSmokeKeyView,
+        sendTraversal: () -> Void,
+        description: String
+    ) async throws {
+        XCTAssertTrue(host.window.makeFirstResponder(searchField))
+        appState.workspaceSearchFocusKeyWindowCheck = { _ in false }
+        appState.refreshWorkspaceSearchFocusKeyRouting()
+
+        let attemptBefore = WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
+        appState.focusWorkspaceSearch()
+        let requestID = appState.workspaceSearchUI.focusRequestID
+        try await waitUntil("\(description) installs exact attempt") {
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence == attemptBefore + 1
+                && WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptRequestID == requestID
+                && appState.workspaceSearchUI.focusAppliedID != requestID
+        }
+        let exactAttempt = WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
+
+        sendTraversal()
+        appState.workspaceSearchFocusKeyWindowCheck = { $0 === host.window }
+        try await requireStableFirstResponder(
+            expectedResponder,
+            excluding: searchField,
+            in: host.window,
+            description: description
+        )
+        XCTAssertEqual(
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence,
+            exactAttempt,
+            "delayed scheduling must not replace the traversal-superseded attempt"
+        )
+        XCTAssertNotEqual(
+            appState.workspaceSearchUI.focusAppliedID,
+            requestID,
+            "traversal-superseded request must not replay"
         )
     }
 
@@ -12546,9 +12625,14 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         appState.focusWorkspaceSearch()
         let focusRequest = appState.workspaceSearchUI.focusRequestID
         try await waitUntil("ineligible shortcut installs requested focus retry") {
-            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence > focusAttemptBefore
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
+                == focusAttemptBefore + 1
+                && WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptRequestID
+                == focusRequest
                 && appState.workspaceSearchUI.focusAppliedID != focusRequest
         }
+        let exactFocusAttempt =
+            WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
 
         let cancellationCheckBeforeGeneration =
             WorkspaceSearchKeyboardSmokeProbe.handoffCancellationCheckSequence
@@ -12575,6 +12659,8 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
             timeoutNanoseconds: 1_000_000_000
         ) {
             appState.workspaceSearchUI.focusAppliedID == focusRequest
+                && WorkspaceSearchKeyboardSmokeProbe.requestedFocusAttemptSequence
+                == exactFocusAttempt
                 && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
                     in: host.window,
                     expectedField: searchField

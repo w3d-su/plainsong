@@ -889,14 +889,21 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   XCUITest rather than accepting an already-true selection.
   The query-field delegate applies the same cancellation before returning `insertTab:` and
   `insertBacktab:` to AppKit; hosted real-event coverage waits for the field's first forced-focus
-  confirmation before traversing and proves the next retry cannot reclaim it. Query-generation
-  changes and empty-query clearing cancel only a pending, controller-typed forced handoff and
+  confirmation before traversing and proves the next retry cannot reclaim it. Traversal cancels
+  either attempt kind and records the exact superseded request ID so the delayed `.task(id:)`
+  path cannot replay a repeated/programmatic focus request. Controller identity deduplicates the
+  `.onChange` and `.task(id:)` schedulers for the same request and is cleared only by that
+  installation's completion. Hosted coverage drives both traversal directions after repeated
+  `focusWorkspaceSearch()`, requires the receipt to remain unapplied, and proves the exact attempt
+  sequence never changes; Debug observability also binds that sequence to the exact request ID so
+  an older queued attempt cannot satisfy the predicate. Query-generation changes and empty-query
+  clearing cancel only a pending, controller-typed forced handoff and
   clear pending before lowering results focus; an unapplied shortcut retry has distinct requested
   ownership and cannot be canceled. The hosted gate makes the window ineligible, drives both
   production query paths, and requires an exact cancellation receipt within 500 ms, well before
   natural retry exhaustion. A separate race advances generation during a requested shortcut
-  retry, restores eligibility without a reschedule signal, and proves the original task focuses
-  Search and applies its exact receipt.
+  retry, restores eligibility without a reschedule signal, and proves the same exact attempt and
+  request ID focus Search and apply its receipt.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.

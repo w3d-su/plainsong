@@ -33,6 +33,7 @@ enum WorkspaceSearchSelectionAction: Equatable {
         static var handoffCancellationCheckSequence: UInt64 = 0
         static var handoffCancellationSequence: UInt64 = 0
         static var requestedFocusAttemptSequence: UInt64 = 0
+        static var requestedFocusAttemptRequestID: UInt64?
         /// Bumped whenever selection or results-focus claims change (for `waitUntil`).
         static var epoch: UInt64 = 0
 
@@ -45,6 +46,7 @@ enum WorkspaceSearchSelectionAction: Equatable {
             handoffCancellationCheckSequence = 0
             handoffCancellationSequence = 0
             requestedFocusAttemptSequence = 0
+            requestedFocusAttemptRequestID = nil
             epoch = 0
         }
 
@@ -75,8 +77,9 @@ enum WorkspaceSearchSelectionAction: Equatable {
             epoch &+= 1
         }
 
-        static func recordRequestedFocusAttempt() {
+        static func recordRequestedFocusAttempt(requestID: UInt64) {
             requestedFocusAttemptSequence &+= 1
+            requestedFocusAttemptRequestID = requestID
             epoch &+= 1
         }
     }
