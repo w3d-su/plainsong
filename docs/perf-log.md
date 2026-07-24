@@ -117,6 +117,114 @@ Current sweep values from `make test`:
 | Result | Pass |
 | Notes | `WYSIWYGImageThumbnailI8PerformanceGateTests.testI8VisibleRangeRecomputeWithImageFoldingStaysUnderFiftyMilliseconds` measures post-edit visible-range parse/fold (incl. image regions), highlight attribute apply (preserving image markers), image-marker presentation apply, and display. Decode isolation asserted by `testI8LoaderDecodePathRunsOffMainThread`. Production fix: image presentation source identity no longer walks full UTF-16 of multi-MB documents on every apply. |
 
+## Phase 3 WS4B Workspace Search Performance Gates
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-25 |
+| Branch | `phase3-search-ws4b-performance-gates` (branched from `main` at `fe953db`) |
+| Commit | Working tree for the WS4B performance-gate PR |
+| macOS | Darwin 27.0.0 |
+| Machine | Apple Silicon, arm64, 16 GB RAM |
+| Test file | `PerformanceTests/WorkspaceSearchPerformanceTests.swift` |
+| Local Release command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release ENABLE_TESTABILITY=YES -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
+| Local Debug command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
+| Measurement provenance | The Release medians below were taken before PR #94 landed, when `AppTests` still forced `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG'` onto the Release test build. They were **not** re-measured after that override was removed, and the Release command above is the post-#94 command. Accepted without a re-run because the override never changed optimization level — the measured code was built `-O` either way — and `Packages/MarkdownCore` and `Packages/WorkspaceKit` contain no `#if DEBUG` code at all, so the extra compilation condition could not reach the measured search path. Owner decision on 2026-07-25. Anything that later moves a budget close to its limit should be re-measured with the command as written. |
+
+### Procedure
+
+1. Every probe drives the real `WorkspaceSearchService` over a real on-disk workspace. The four
+   search probes use the production `WorkspaceSearchDiskFileReader`, so the measurement includes
+   candidate planning, ignore-policy probes, anchored no-follow reads, UTF-8 decoding,
+   MarkdownCore matching, snippet construction, and stream delivery. The cancellation probe is
+   the one deliberate exception: it substitutes a controlled reader that blocks every candidate
+   read, because a deterministic cancel-to-drain measurement needs a saturated read window that
+   cannot finish on its own. Its `.gitignore` / `.ignore` probes still resolve as missing exactly
+   as they do against the real fixture, so only candidate reads are controlled.
+2. Fixture creation and `WorkspaceDirectoryScanner.snapshotCapture` run before timing starts and
+   are never inside a measured region.
+3. Each timed search probe runs one unmeasured warm-up request, then three measured requests. The
+   warm-up is asserted with the same deterministic predicates as the measured samples, so a
+   warm-up that searched nothing cannot make later samples cheap. The cancellation probe has no
+   warm-up; it repeats five independent cancellations and reports their median.
+4. Every sample hard-asserts the ordered result set, per-file match ranges/lines, exact summary
+   accounting, exact event counts, and read-window ceilings. Timing is only recorded after those
+   assertions hold.
+5. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
+   cancellation behavior, and resource ceilings stay hard everywhere, including CI.
+
+### Fixtures
+
+| Fixture | Shape |
+|---|---|
+| 2,000-file workspace | 20 directories x 100 files, `.md` and `.mdx`, 2,893,000 bytes total; 500 files contain the query token exactly twice (1,000 matches) |
+| Admitted file | exactly 524,288 bytes (the `WorkspaceSearchLimits` admission cap) with the only match in the final line |
+| Admission boundary | the same 524,288-byte file plus a 524,289-byte sibling |
+| Dense whole-word (`ascii-suffix`) | 524,288 bytes of ASCII whose every literal hit is rejected by a trailing word character |
+| Dense whole-word (`unicode-periodic`) | 524,288 bytes of composed `e`+U+0301 periodic text searched with a 192-UTF-16-unit whole-word pattern; every overlapping candidate is examined and rejected |
+| Cancellation | the 2,000-file workspace with a controlled reader that blocks every candidate read |
+
+### Measurements and frozen budgets
+
+Each cell is the median of three measured samples within one run; three runs per configuration.
+
+| Metric | Budget | Release medians (3 runs) | Debug medians (3 runs) | Result |
+|---|---:|---|---|---|
+| Workspace search, 2,000 files | < 3,000 ms | 713.694, 680.838, 680.895 | 1227.007, 1085.104, 1092.670 | Pass |
+| Admitted 524,288-byte file | < 150 ms | 7.825, 7.701, 7.630 | 38.837, 38.883, 39.508 | Pass |
+| Dense whole-word `ascii-suffix` | < 200 ms | 5.420, 5.665, 5.282 | 48.837, 47.080, 46.710 | Pass |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 611.946, 628.251, 610.962 | 1144.527, 1068.369, 1060.272 | Pass |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.185, 0.157, 0.173 | 0.172, 0.161, 0.192 | Pass |
+
+Final-tree verification, run after the last source edit (medians): Release workspace search
+650.747 ms, admitted file 7.121 ms, `ascii-suffix` 5.029 ms, `unicode-periodic` 592.165 ms,
+cancel-to-drain 0.145 ms; Debug workspace search 1040.001 ms, admitted file 37.661 ms,
+`ascii-suffix` 45.089 ms, `unicode-periodic` 1146.458 ms, cancel-to-drain 0.115 ms. The three
+Release and three Debug runs tabulated above were taken while budgets were being chosen; the
+tree changed only in assertions after them, and the final-tree values fall inside the same
+ranges.
+
+Raw in-run samples for the first Release run: workspace search
+`[713.694, 681.521, 753.233]`; admitted file `[7.861, 7.825, 7.762]`; `ascii-suffix`
+`[5.743, 5.420, 5.403]`; `unicode-periodic` `[611.946, 611.456, 614.041]`; cancellation drain
+`[0.222, 0.195, 0.138, 0.091, 0.185]`. Raw in-run samples for the first Debug run: workspace
+search `[1137.147, 1227.007, 1292.670]`; admitted file `[39.105, 38.837, 38.790]`; cancellation
+drain `[0.213, 0.168, 0.107, 0.238, 0.172]`.
+
+### First hosted CI observation
+
+GitHub Actions `build-and-test` on `macos-15` for PR #93 commit
+`d47404392cc64bcc0480e828aa79e509b6fe7f2c` produced these medians: workspace search
+1239.690 ms (samples `[1126.512, 1239.690, 1386.824]`), admitted file 43.802 ms,
+`ascii-suffix` 46.440 ms, `unicode-periodic` 985.311 ms, cancel-to-drain 0.137 ms. Every value
+was under budget, so no R15 informational line was printed on that run. This is recorded as a
+hosted datapoint only; per R15 the local values above remain the acceptance evidence, and these
+budgets stay informational on CI regardless.
+
+### Budget selection
+
+Budgets are frozen against the **Debug** medians because `make test` runs the Debug
+configuration, and Debug is roughly 2x slower than Release on these paths. Each budget keeps
+about 2.4x-3.8x headroom over its measured Debug median. No budget was chosen to rescue a
+failing run: the first Debug run of the `unicode-periodic` shape exceeded an initial 750 ms
+guess, and the response was to measure Release, confirm the cost is the documented worst case
+behind the 512 KiB admission cap, and freeze an evidence-based budget instead.
+
+### Notes
+
+- The `unicode-periodic` result is production-shaped confirmation of the
+  `docs/workspace-search-plan.md` §2.3 admission cap: 612 ms in Release at exactly 512 KiB. A
+  1 MiB cap would put a single adversarial file over one second in Release, which is why the cap
+  was not raised.
+- Memory boundedness is asserted structurally rather than with a resident-memory threshold: the
+  four-read window (concurrent, buffered, and outstanding), the finite event bound
+  (`results + progress + terminal`, exactly 601 events for the 2,000-file fixture), the
+  per-file/per-query match caps, the bounded snippet size, and the exact admitted byte count are
+  all hard assertions. No RSS assertion was added, because RSS on this path is dominated by
+  allocator and page-cache behavior that is not stable enough for a gate.
+- The cancellation probe proves that after cancelling the consuming Task, all four blocked reads
+  are released, no further read starts, and no `completed` or `failed` terminal event is emitted.
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`
