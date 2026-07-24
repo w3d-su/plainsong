@@ -4,8 +4,8 @@ import SwiftUI
 /// Request-scoped retry loop that makes the owned Search `NSTextField` first responder in the
 /// designated key window (WS3C PR A; scheduled from `WorkspaceSearchSidebar`).
 ///
-/// Bounded retries (40 × 16 ms) cover the `.files → .search` mount race without depending on a
-/// single sleep or key-epoch change. In `force` mode (Escape from results) the loop re-focuses
+/// Bounded retries (180 × 16 ms) cover a loaded CI runner's `.files → .search` mount race without
+/// depending on a single sleep or key-epoch change. In `force` mode (Escape from results) the loop re-focuses
 /// the field even when the global `focusRequestID` receipt was already consumed, and never
 /// marks new receipts. Key-window eligibility is re-read live on every iteration — never
 /// captured across an `await`.
@@ -21,26 +21,33 @@ enum WorkspaceSearchFocusAttemptLoop {
         attemptID: UInt64,
         force: Bool
     ) async {
-        for _ in 0 ..< 40 {
-            guard !Task.isCancelled else { return }
-            guard isLiveKeyWindow(appState: appState, tracker: tracker) else { return }
+        if force {
+            await runForced(appState: appState, tracker: tracker)
+        } else {
+            await runRequested(appState: appState, tracker: tracker, attemptID: attemptID)
+        }
+    }
 
-            if !force {
-                guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
-                guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
-                    requestID: attemptID,
-                    appliedID: appState.workspaceSearchUI.focusAppliedID,
-                    isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
-                ) else {
-                    return
-                }
+    private static func runForced(
+        appState: AppState,
+        tracker: WindowKeyStateTracker
+    ) async {
+        var consecutiveForcedFocusConfirmations = 0
+        for _ in 0 ..< 180 {
+            guard !Task.isCancelled else { return }
+            guard isLiveKeyWindow(appState: appState, tracker: tracker) else {
+                consecutiveForcedFocusConfirmations = 0
+                guard await pauseBeforeRetry() else { return }
+                continue
             }
 
-            // Keep resolving the concrete Search field; layout may install it mid-loop.
             tracker.refreshBoundSearchFieldIfNeeded()
-
             if let window = tracker.window,
-               isLiveKeyWindow(appState: appState, tracker: tracker)
+               isLiveKeyWindow(appState: appState, tracker: tracker),
+               !WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: tracker.resolvedSearchField()
+               )
             {
                 WorkspaceSearchFieldFocus.makeSearchFieldFirstResponder(
                     in: window,
@@ -48,24 +55,65 @@ enum WorkspaceSearchFocusAttemptLoop {
                 )
             }
 
-            if force {
-                if let window = tracker.window,
-                   WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
-                       in: window,
-                       expectedField: tracker.resolvedSearchField()
-                   )
-                {
+            if let window = tracker.window,
+               WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(
+                   in: window,
+                   expectedField: tracker.resolvedSearchField()
+               )
+            {
+                consecutiveForcedFocusConfirmations += 1
+                // Lowering the results FocusState can apply after the key handler returns.
+                // Confirm across multiple main-run-loop turns so a transient field claim
+                // cannot be reported as the completed Escape transition.
+                if consecutiveForcedFocusConfirmations >= 3 {
                     return
                 }
-            } else if confirmAndMarkFocusIfNeeded(
+            } else {
+                consecutiveForcedFocusConfirmations = 0
+            }
+            guard await pauseBeforeRetry() else { return }
+        }
+    }
+
+    private static func runRequested(
+        appState: AppState,
+        tracker: WindowKeyStateTracker,
+        attemptID: UInt64
+    ) async {
+        for _ in 0 ..< 180 {
+            guard !Task.isCancelled else { return }
+            guard isLiveKeyWindow(appState: appState, tracker: tracker) else {
+                guard await pauseBeforeRetry() else { return }
+                continue
+            }
+            guard appState.workspaceSearchUI.focusRequestID == attemptID else { return }
+            guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
+                requestID: attemptID,
+                appliedID: appState.workspaceSearchUI.focusAppliedID,
+                supersededID: appState.workspaceSearchUI.focusSupersededID,
+                isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
+            ) else {
+                return
+            }
+
+            tracker.refreshBoundSearchFieldIfNeeded()
+            if confirmAndMarkFocusIfNeeded(
                 appState: appState,
                 tracker: tracker,
                 attemptID: attemptID
             ) {
                 return
             }
+            guard await pauseBeforeRetry() else { return }
+        }
+    }
 
-            try? await Task.sleep(nanoseconds: 16_000_000)
+    private static func pauseBeforeRetry() async -> Bool {
+        do {
+            try await Task.sleep(nanoseconds: 16_000_000)
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -81,6 +129,7 @@ enum WorkspaceSearchFocusAttemptLoop {
         guard WorkspaceSearchFocusArbitration.shouldApplyFocus(
             requestID: attemptID,
             appliedID: appState.workspaceSearchUI.focusAppliedID,
+            supersededID: appState.workspaceSearchUI.focusSupersededID,
             isKeyWindow: isLiveKeyWindow(appState: appState, tracker: tracker)
         ) else {
             return false

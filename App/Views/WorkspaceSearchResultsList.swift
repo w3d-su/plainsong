@@ -12,8 +12,12 @@ struct WorkspaceSearchResultsList: View {
     @EnvironmentObject private var appState: AppState
     let presentation: WorkspaceSearchResultsPresentation
     @Binding var selectedRowID: WorkspaceSearchResultRowID?
-    var isResultsFocused: FocusState<Bool>.Binding
+    @Binding var isResultsFocused: Bool
+    @ObservedObject var keyRouter: WorkspaceSearchKeyRouterController
     var onEscapeToQueryField: () -> Void
+    var onFocusTraversal: () -> Void
+    var onActivationResolved: (Bool) -> Void
+    var onKeyboardSelectionHandled: (WorkspaceSearchSelectionAction) -> Void
 
     var body: some View {
         List(selection: $selectedRowID) {
@@ -25,27 +29,33 @@ struct WorkspaceSearchResultsList: View {
         .accessibilityIdentifier(WorkspaceSearchAccessibility.resultsList)
         .accessibilityLabel("Search results")
         .focusable(presentationHasRows)
-        .focused(isResultsFocused)
         .onKeyPress(.upArrow) {
-            guard isResultsFocused.wrappedValue else { return .ignored }
+            guard isResultsFocused else { return .ignored }
             applySelection(.moveUp)
             return .handled
         }
         .onKeyPress(.downArrow) {
-            guard isResultsFocused.wrappedValue else { return .ignored }
+            guard isResultsFocused else { return .ignored }
             applySelection(.moveDown)
             return .handled
         }
         .onKeyPress(.return) {
-            guard isResultsFocused.wrappedValue else { return .ignored }
+            guard isResultsFocused else { return .ignored }
             activateSelection()
             return .handled
         }
         .onKeyPress(.escape) {
-            guard isResultsFocused.wrappedValue else { return .ignored }
+            guard isResultsFocused else { return .ignored }
             onEscapeToQueryField()
             return .handled
         }
+        .background(
+            WorkspaceSearchResultsKeyRouterReader(
+                controller: keyRouter,
+                onCommand: handleKeyRouterCommand,
+                onFocusTraversal: onFocusTraversal
+            )
+        )
     }
 
     private var presentationHasRows: Bool {
@@ -298,11 +308,25 @@ struct WorkspaceSearchResultsList: View {
             queryGeneration: queryGeneration
         )
         #if DEBUG
+            onKeyboardSelectionHandled(action)
             WorkspaceSearchKeyboardSmokeProbe.publish(
                 selection: selectedRowID,
-                resultsFocused: isResultsFocused.wrappedValue
+                resultsFocused: keyRouter.isFirstResponder
             )
         #endif
+    }
+
+    private func handleKeyRouterCommand(_ command: WorkspaceSearchResultsKeyCommand) {
+        switch command {
+        case .moveUp:
+            applySelection(.moveUp)
+        case .moveDown:
+            applySelection(.moveDown)
+        case .activate:
+            activateSelection()
+        case .escape:
+            onEscapeToQueryField()
+        }
     }
 
     private func activateSelection() {
@@ -314,11 +338,12 @@ struct WorkspaceSearchResultsList: View {
         ) else {
             return
         }
-        appState.activateWorkspaceSearchResult(
+        let didActivate = appState.activateWorkspaceSearchResult(
             context: payload.context,
             fileResult: payload.fileResult,
             match: payload.match
         )
+        onActivationResolved(didActivate)
     }
 
     private func skippedTitle(count: Int, omitted: Int) -> String {
@@ -338,11 +363,12 @@ struct WorkspaceSearchResultsList: View {
             return
         }
         selectedRowID = row.id
-        appState.activateWorkspaceSearchResult(
+        let didActivate = appState.activateWorkspaceSearchResult(
             context: payload.context,
             fileResult: payload.fileResult,
             match: payload.match
         )
+        onActivationResolved(didActivate)
     }
 
     private func retrySearch() {

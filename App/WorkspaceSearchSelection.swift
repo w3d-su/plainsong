@@ -27,18 +27,59 @@ enum WorkspaceSearchSelectionAction: Equatable {
     enum WorkspaceSearchKeyboardSmokeProbe {
         static var selectedRowID: WorkspaceSearchResultRowID?
         static var isResultsFocused = false
+        static var reducerSequence: UInt64 = 0
+        static var lastReducerAction: WorkspaceSearchSelectionAction?
+        static var isResultsToQueryHandoffPending = false
+        static var handoffCancellationCheckSequence: UInt64 = 0
+        static var handoffCancellationSequence: UInt64 = 0
+        static var requestedFocusAttemptSequence: UInt64 = 0
+        static var requestedFocusAttemptRequestID: UInt64?
         /// Bumped whenever selection or results-focus claims change (for `waitUntil`).
         static var epoch: UInt64 = 0
 
         static func reset() {
             selectedRowID = nil
             isResultsFocused = false
+            reducerSequence = 0
+            lastReducerAction = nil
+            isResultsToQueryHandoffPending = false
+            handoffCancellationCheckSequence = 0
+            handoffCancellationSequence = 0
+            requestedFocusAttemptSequence = 0
+            requestedFocusAttemptRequestID = nil
             epoch = 0
         }
 
         static func publish(selection: WorkspaceSearchResultRowID?, resultsFocused: Bool) {
             selectedRowID = selection
             isResultsFocused = resultsFocused
+            epoch &+= 1
+        }
+
+        static func recordReducer(_ action: WorkspaceSearchSelectionAction) {
+            reducerSequence &+= 1
+            lastReducerAction = action
+            epoch &+= 1
+        }
+
+        static func publishHandoffPending(_ isPending: Bool) {
+            isResultsToQueryHandoffPending = isPending
+            epoch &+= 1
+        }
+
+        static func recordHandoffCancellation() {
+            handoffCancellationSequence &+= 1
+            epoch &+= 1
+        }
+
+        static func recordHandoffCancellationCheck() {
+            handoffCancellationCheckSequence &+= 1
+            epoch &+= 1
+        }
+
+        static func recordRequestedFocusAttempt(requestID: UInt64) {
+            requestedFocusAttemptSequence &+= 1
+            requestedFocusAttemptRequestID = requestID
             epoch &+= 1
         }
     }

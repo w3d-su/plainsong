@@ -14,6 +14,9 @@ public struct MarkdownEditorView: View {
     @State private var highlightRevision = 0
     @State private var selection: NSRange?
     @State private var visibleTextRange: NSRange?
+    #if DEBUG
+        @StateObject private var debugNavigationProbe = EditorNavigationDebugProbe.shared
+    #endif
     @StateObject private var defaultCommandProxy = EditorCommandProxy()
 
     private static let highlightService = MarkdownHighlightService()
@@ -147,7 +150,29 @@ public struct MarkdownEditorView: View {
             activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
         }
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+                Text("Editor navigation selection")
+                    .font(.system(size: 1))
+                    .frame(width: 1, height: 1)
+                    .opacity(0.001)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("plainsong.debug.editor.selectedRange")
+                    .accessibilityLabel("Editor UTF-16 selection \(debugAppliedSelectionValue)")
+            }
+        #endif
     }
+
+    #if DEBUG
+        private var debugAppliedSelectionValue: String {
+            guard let observation = debugNavigationProbe.observation,
+                  observation.documentIdentity == documentIdentity
+            else {
+                return "none"
+            }
+            return "\(observation.selection.location):\(observation.selection.length)"
+        }
+    #endif
 
     /// Every text, file-kind, or viewport change bumps the revision; `.task(id:)`
     /// restarts after a short debounce so rapid typing cancels stale visible-range

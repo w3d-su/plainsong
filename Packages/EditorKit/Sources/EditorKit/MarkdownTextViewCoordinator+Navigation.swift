@@ -1,6 +1,10 @@
 import AppKit
 import STTextView
 
+#if DEBUG
+    import Combine
+#endif
+
 extension MarkdownTextViewCoordinator {
     func observeNavigationCommand(_ command: EditorNavigationCommand?) {
         switch navigationState.observe(command) {
@@ -137,6 +141,14 @@ extension MarkdownTextViewCoordinator {
         }
 
         selection = request.selection
+        #if DEBUG
+            Task { @MainActor in
+                EditorNavigationDebugProbe.shared.publish(
+                    documentIdentity: request.documentIdentity,
+                    selection: request.selection
+                )
+            }
+        #endif
         didComplete = true
         return true
     }
@@ -198,3 +210,23 @@ extension MarkdownTextViewCoordinator {
         }
     }
 }
+
+#if DEBUG
+    @MainActor
+    final class EditorNavigationDebugProbe: ObservableObject {
+        struct Observation: Equatable {
+            let documentIdentity: EditorDocumentIdentity
+            let selection: NSRange
+        }
+
+        static let shared = EditorNavigationDebugProbe()
+        @Published private(set) var observation: Observation?
+
+        func publish(documentIdentity: EditorDocumentIdentity, selection: NSRange) {
+            observation = Observation(
+                documentIdentity: documentIdentity,
+                selection: selection
+            )
+        }
+    }
+#endif

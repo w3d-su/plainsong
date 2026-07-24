@@ -16,12 +16,14 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
     var isEnabled: Bool
     var onMoveDownToResults: (() -> Void)?
     var onEscapeToEditor: (() -> Void)?
+    var onFocusTraversal: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $text,
             onMoveDownToResults: onMoveDownToResults,
-            onEscapeToEditor: onEscapeToEditor
+            onEscapeToEditor: onEscapeToEditor,
+            onFocusTraversal: onFocusTraversal
         )
     }
 
@@ -47,6 +49,7 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
         context.coordinator.field = field
         context.coordinator.onMoveDownToResults = onMoveDownToResults
         context.coordinator.onEscapeToEditor = onEscapeToEditor
+        context.coordinator.onFocusTraversal = onFocusTraversal
 
         if field.stringValue != text {
             field.stringValue = text
@@ -65,16 +68,19 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
         var text: Binding<String>
         var onMoveDownToResults: (() -> Void)?
         var onEscapeToEditor: (() -> Void)?
+        var onFocusTraversal: (() -> Void)?
         weak var field: NSTextField?
 
         init(
             text: Binding<String>,
             onMoveDownToResults: (() -> Void)?,
-            onEscapeToEditor: (() -> Void)?
+            onEscapeToEditor: (() -> Void)?,
+            onFocusTraversal: (() -> Void)?
         ) {
             self.text = text
             self.onMoveDownToResults = onMoveDownToResults
             self.onEscapeToEditor = onEscapeToEditor
+            self.onFocusTraversal = onFocusTraversal
         }
 
         func controlTextDidChange(_ obj: Notification) {
@@ -101,6 +107,13 @@ struct WorkspaceSearchQueryField: NSViewRepresentable {
             {
                 onEscapeToEditor()
                 return true
+            }
+            if commandSelector == #selector(NSResponder.insertTab(_:))
+                || commandSelector == #selector(NSResponder.insertBacktab(_:))
+            {
+                onFocusTraversal?()
+                // Preserve AppKit's native next/previous key-view traversal.
+                return false
             }
             return false
         }

@@ -5,14 +5,15 @@
 > sidebar shell, pure grouped-results presentation, keyboard selection + accessibility wiring).
 > WS3C PR C owner keyboard smoke is **signed off** via hosted `testHostedOwnerKeyboardSmokeFiveScenarios`,
 > which drives **real `NSEvent`s** through `window.sendEvent` — field ↓/Escape through the field
-> editor's `doCommandBy`, ↑/↓/Return/Escape through the focused List's `onKeyPress`, and a real
+> editor's `doCommandBy`, ↑/↓/Return/Escape through the concrete results key responder, and a real
 > click on a backing table row — so silent native-table fallback or a broken focus handoff fails
 > the gate. **Owner physical ⇧⌘F / search-field focus sign-off is complete** (PR #89): app-active
 > Carbon hot key (`kVK_ANSI_F` + `cmdKey|shiftKey` while active), Files↔Search toggle, and
 > owned `plainsong.workspaceSearch.queryField` focus — verified on the built-in keyboard under
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
-> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4
-> (including out-of-process XCUITest for the same keys, performance probes/budgets), and the overall Definition of Done
+> actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
+> now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
+> events are not additional physical-keyboard evidence. WS4 performance probes/budgets and the overall Definition of Done
 > remain open. Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
@@ -817,8 +818,8 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   activates authority-backed match, Escape results→field and field→editor (query/results kept),
   click a result then ↑/↓ still uses the pure reducer (not silent native-table fallback).
   Evidence: `testHostedOwnerKeyboardSmokeFiveScenarios` (hosted `NSWindow`, **real `NSEvent`
-  key/click delivery** via `window.sendEvent` through `doCommandBy`/`onKeyPress`/backing table
-  rows; Debug probe is observability only, 2026-07-20).
+  key/click delivery** via `window.sendEvent` through `doCommandBy`/the concrete results key
+  responder/backing table rows; Debug probe is observability only, updated 2026-07-23).
 - [x] Add document-aware, tokenized exact-range navigation in EditorKit.
 - [x] Keep tree selection synchronized when a search result opens.
 - [x] Validate source fingerprints before applying a result.
@@ -840,9 +841,74 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 
 - [ ] Add MarkdownCore, WorkspaceKit, AppState, and EditorKit regression suites from the
   matrix below.
-- [ ] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
+- [x] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
   flow, using a deterministic Debug-only fixture inside the app container rather than
-  automating `NSOpenPanel`.
+  automating `NSOpenPanel`. Evidence: `PlainsongUITests` launches the real app with a unique,
+  app-container-owned Markdown/MDX fixture; drives ⇧⌘F, exact CJK paste, grouped results,
+  no-wrap arrows, Return, both Escape transitions, and click-then-arrow routing through
+  accessibility identifiers; and observes the activated filename plus native-verified UTF-16
+  selection. Native AX state verifies actual query-field focus; Debug support creates/removes
+  only fixture files, cleans expired `ws4a-*` fixture directories at launch, and publishes
+  accepted navigation without setting query, results, selection, or App state. Before ordinary
+  `AppState` construction, fixture launch selects a cleared test-only defaults suite, no-op
+  last-opened/recent stores, transient mutation-recovery stores, and disables restore; the real
+  app-launch factory regression proves production session/recovery metadata is never loaded.
+  Fixture opening still retains the production workspace-open, indexing, search, and activation
+  paths.
+  Result routing is proven by the subsequent keys themselves, and a Debug-only reducer-event
+  observation proves click-then-arrow events reached the custom no-wrap reducer rather than
+  merely producing the same native `List` selection. App-level ASCII input without a
+  field click proves shortcut focus before the exact CJK query replaces it. All waits are
+  predicate-based and every test fixture remains unique. Post-activation focus restoration
+  recognizes the actual `STTextView` editor through EditorKit's stable accessibility identity,
+  observes its first-responder handoff, and is cancelled by newer focus intent or sidebar
+  disappearance before it can publish results readiness. Rejected activation immediately keeps
+  results routing live and creates no delayed fallback. Success immediately invalidates the
+  pre-Return results-ready claim, then requires consecutive turns with the same intent, live
+  sidebar, and the concrete window-local results key responder before republishing readiness.
+  That responder sends Up/Down/Return/Escape through the existing reducer/authority path;
+  logical SwiftUI focus cannot publish readiness or later steal routing.
+  XCUITest requires a monotonic activation probe for this Return before accepting restoration,
+  and a separate routing probe proves its back-to-back Escapes traversed results→query→editor
+  before native editor focus is accepted. The hosted real-event gate proves that a second
+  Escape, query-field Down, or row click after the first forced query-focus confirmation cancels
+  that loop and remains outside query focus across consecutive turns.
+  The concrete results responder participates in the AppKit key-view loop: `insertTab:` and
+  `insertBacktab:` select the next/previous key view, with hosted real-`NSEvent` coverage for
+  Tab and Shift-Tab. Results→query records a synchronous handoff-pending intent, so two Escape
+  event pairs delivered without yielding still complete results→query→editor even while the
+  router remains first responder. Every XCUITest arrow assertion also requires the exact next
+  monotonic reducer receipt before accepting selection, including unchanged first+Up and
+  last+Down boundaries.
+  Tab and Shift-Tab are newer focus intents: the router notifies the sidebar before AppKit
+  traversal, canceling and invalidating any forced query-focus loop. Hosted real-event coverage
+  uses distinct forward/backward responders and proves neither traversal is reclaimed. A forced
+  handoff clears its token-matched pending state on success, cancellation, or retry exhaustion;
+  the hosted gate waits for an ineligible-window exhaustion and proves the next Escape is again
+  results→query. Hosted no-wrap boundaries require the same monotonic reducer receipts as
+  XCUITest rather than accepting an already-true selection.
+  The query-field delegate applies the same cancellation before returning `insertTab:` and
+  `insertBacktab:` to AppKit; hosted real-event coverage waits for the field's first forced-focus
+  confirmation before traversing and proves the next retry cannot reclaim it. Traversal cancels
+  either attempt kind and records the exact superseded request ID so the delayed `.task(id:)`
+  path cannot replay a repeated/programmatic focus request. That exact superseded receipt lives
+  in shared `WorkspaceSearchUIState`, distinct from the applied receipt, so Files→Search remount
+  and a second window sharing `AppState` also reject it while a newer explicit request remains
+  eligible. Controller identity deduplicates the `.onChange` and `.task(id:)` schedulers for the
+  same request and is cleared only by that installation's completion. Hosted coverage drives both
+  traversal directions after repeated `focusWorkspaceSearch()`, then separately remounts Search
+  and transfers key-window eligibility to another hosted window; each gate requires the traversal
+  destination to remain first responder, the receipt to remain unapplied, and the exact attempt
+  sequence never to change. Debug observability also binds that sequence to the exact request ID
+  so an older queued attempt cannot satisfy the predicate. Query-generation changes and empty-query
+  clearing cancel only a pending, controller-typed forced handoff and
+  clear pending before lowering results focus; an unapplied shortcut retry has distinct requested
+  ownership and cannot be canceled. The hosted gate makes the window ineligible, drives both
+  production query paths, and requires an exact cancellation receipt within 500 ms, well before
+  natural retry exhaustion. A separate race advances generation during a requested shortcut
+  retry, restores eligibility without a reschedule signal, and proves the same exact attempt and
+  request ID focus Search and apply its receipt.
+  XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [ ] Add large-workspace and large-document performance probes.
 - [ ] Record measured local performance and choose/freeze budgets from evidence.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only

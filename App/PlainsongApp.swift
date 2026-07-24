@@ -4,8 +4,15 @@ import MarkdownCore
 import SwiftUI
 
 @MainActor
-private func makePlainsongAppState() -> AppState {
-    AppState()
+func makePlainsongAppState(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) -> AppState {
+    #if DEBUG
+        if environment[DebugWorkspaceSearchFixture.environmentKey]?.isEmpty == false {
+            return DebugWorkspaceSearchFixture.makeIsolatedAppState()
+        }
+    #endif
+    return AppState()
 }
 
 /// App entry point. Scenes only — state lives in `AppState` (agent.md §4).

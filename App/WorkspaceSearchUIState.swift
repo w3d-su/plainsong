@@ -26,6 +26,9 @@ struct WorkspaceSearchUIState: Equatable {
     /// advance this; only a key-window receipt after the owned Search `NSTextField` is first
     /// responder may mark applied.
     var focusAppliedID: UInt64 = 0
+    /// Last request explicitly superseded by a newer user traversal. This is App-owned so a
+    /// remounted Search sidebar or another window sharing AppState cannot replay the receipt.
+    var focusSupersededID: UInt64 = 0
     /// When non-`nil`, a non-empty UI query was deferred because search was not ready for this
     /// workspace generation. Only that pending install may auto-resume; ordinary reloads do not
     /// re-arm this from a mere non-empty query field. Active-query refresh uses a separate,
@@ -52,8 +55,12 @@ enum WorkspaceSearchFocusArbitration {
     static func shouldApplyFocus(
         requestID: UInt64,
         appliedID: UInt64,
+        supersededID: UInt64,
         isKeyWindow: Bool
     ) -> Bool {
-        isKeyWindow && requestID > 0 && requestID > appliedID
+        isKeyWindow
+            && requestID > 0
+            && requestID > appliedID
+            && requestID > supersededID
     }
 }

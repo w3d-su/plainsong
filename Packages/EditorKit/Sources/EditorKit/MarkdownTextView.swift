@@ -109,6 +109,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isEditable = isEnabled
         textView.isSelectable = isEnabled
+        textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
 
         context.coordinator.isUpdating = true
         textView.text = text

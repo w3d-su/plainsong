@@ -193,6 +193,9 @@ private struct DocumentHeader: View {
                     Text(fileURL?.lastPathComponent ?? "Untitled")
                         .font(.headline)
                         .lineLimit(1)
+                        .accessibilityIdentifier("plainsong.editor.fileName")
+                        .accessibilityLabel("Current editor file")
+                        .accessibilityValue(fileURL?.lastPathComponent ?? "Untitled")
 
                     if isDirty {
                         Circle()
