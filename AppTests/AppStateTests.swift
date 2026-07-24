@@ -16371,8 +16371,13 @@ final class WorkspaceSearchAppStateTests: XCTestCase {
         } else {
             window.orderFront(nil)
         }
-        // Let SwiftUI install the shell; Search field is not required yet (Files mode).
-        try await Task.sleep(nanoseconds: 30_000_000)
+        if appState.workspaceSearchUI.mode == .search {
+            try await waitUntil("search sidebar mounts in workspace host") {
+                WorkspaceSearchFieldFocus.findSearchTextField(in: window.contentView) != nil
+            }
+        }
+        // Files-mode callers make their state change after this returns, then predicate-wait for
+        // the real Search field/focus receipt; no speculative shell delay is required here.
         return SearchSidebarHost(window: window, hostingView: hostingView)
     }
 
