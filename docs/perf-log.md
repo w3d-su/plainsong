@@ -127,7 +127,7 @@ Superseded values are not retained except where a finding is explicitly about ho
 |---|---|
 | Date | 2026-07-26 |
 | Branch | `phase3-search-ws4b-performance-gates`, originally branched from `main` at `fe953db`, with `main` at `58740ac` (PR #94) merged in at `9b89bce` |
-| Measured commit | `d22108617616e9084a3e46faa989af36eb5971ef` |
+| Measured commit | `a09cafb91f2194b04d1777bcb28a9259933101c1` — the commit holding the measured source. The commit stamping this row is its direct child and differs only in this line; no Swift source changed between them. |
 | macOS | Darwin 27.0.0 |
 | Machine | Apple Silicon, arm64, 16 GB RAM |
 | Probe count | 14 WS4B tests, part of 23 in the `PerformanceTests` target |
