@@ -49,8 +49,32 @@ extension WorkspaceSearchPerformanceTests {
             sensitiveResult.matches.count,
             "smart and sensitive must take observably different backends here"
         )
-        // CJK has no cased characters, so `.smart` resolves insensitive for it too.
-        XCTAssertEqual(cjkResult.matches.count, 2, "smart CJK must match both CJK occurrences")
+        // A pure CJK pattern matches its occurrences, but note this alone proves nothing about
+        // the backend: CJK is caseless, so both backends return the same thing. The two extra
+        // occurrences here are the `平明歌` in `平明歌X`, hence 3 rather than 2.
+        XCTAssertEqual(cjkResult.matches.count, 3, "smart CJK must match every CJK occurrence")
+
+        // This is the CJK case that *does* discriminate: a lower-case Latin suffix on a CJK
+        // pattern, against an upper-case occurrence.
+        let cjkCasedSmart = try await collect(request: makeRequest(
+            capture: fixture.capture,
+            rootIdentity: "ws4b-smart-case-cjk-cased-smart",
+            query: TextSearchQuery(pattern: Self.cjkCasedPattern)
+        ))
+        let cjkCasedSensitive = try await collect(request: makeRequest(
+            capture: fixture.capture,
+            rootIdentity: "ws4b-smart-case-cjk-cased-sensitive",
+            query: TextSearchQuery(pattern: Self.cjkCasedPattern, caseSensitivity: .sensitive)
+        ))
+        XCTAssertEqual(
+            try XCTUnwrap(fileResults(in: cjkCasedSmart.events).first).matches.count,
+            1,
+            "smart must match the upper-case CJK+Latin occurrence"
+        )
+        XCTAssertTrue(
+            fileResults(in: cjkCasedSensitive.events).isEmpty,
+            "sensitive must not match the upper-case CJK+Latin occurrence"
+        )
 
         for (run, label) in [
             (smartRun, "smart"), (sensitiveRun, "sensitive"), (cjkSmartRun, "cjk smart"),
@@ -101,8 +125,13 @@ extension WorkspaceSearchPerformanceTests {
         )
     }
 
-    /// A full admission-cap file of CJK text searched with a CJK pattern under `.smart`, i.e. the
-    /// insensitive backend over non-ASCII at the largest admissible size.
+    /// A full admission-cap file of CJK text searched under `.smart`, i.e. the insensitive backend
+    /// over non-ASCII at the largest admissible size.
+    ///
+    /// The pattern's trailing Latin letter is lower-case while the file's occurrence is
+    /// upper-case, so this probe is self-proving: `.smart` matches only because it resolved
+    /// insensitive, and the `.sensitive` control below must find nothing in the same file. A pure
+    /// CJK pattern would match identically under either backend and could not show which ran.
     func testAdmittedCJKFileUnderDefaultSmartCaseStaysWithinBudget() async throws {
         let fixture = try await makeAdmittedCJKFileFixture()
         defer { removeDirectory(fixture.rootURL) }
@@ -110,7 +139,26 @@ extension WorkspaceSearchPerformanceTests {
         let request = try makeRequest(
             capture: fixture.capture,
             rootIdentity: "ws4b-admitted-cjk",
-            query: TextSearchQuery(pattern: Self.cjkToken)
+            query: TextSearchQuery(pattern: Self.cjkCasedPattern)
+        )
+
+        // Unmeasured control: the same pattern under `.sensitive` must match nothing here, so the
+        // measured samples cannot be passing through the already-budgeted sensitive path.
+        let sensitiveRun = try await collect(request: makeRequest(
+            capture: fixture.capture,
+            rootIdentity: "ws4b-admitted-cjk-sensitive",
+            query: TextSearchQuery(pattern: Self.cjkCasedPattern, caseSensitivity: .sensitive)
+        ))
+        XCTAssertTrue(
+            fileResults(in: sensitiveRun.events).isEmpty,
+            "sensitive control must not match the upper-case occurrence"
+        )
+        try assertSharedStreamInvariants(
+            sensitiveRun.events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 0,
+            expectedSkippedEventCount: 0,
+            label: "cjk sensitive control"
         )
 
         let warmUp = try await collect(request: request)

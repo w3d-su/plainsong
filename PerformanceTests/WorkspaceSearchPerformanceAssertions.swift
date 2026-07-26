@@ -229,9 +229,11 @@ extension WorkspaceSearchPerformanceTests {
         XCTAssertEqual(result.matches.count, 1, label)
         XCTAssertEqual(match.range, fixture.expectedMatchRange, label)
         XCTAssertEqual(match.line, fixture.expectedLine, label)
+        // The matched source text carries the upper-case suffix even though the pattern was
+        // lower-case: that is the insensitive backend's fingerprint in the output.
         XCTAssertEqual(
             (match.preview as NSString).substring(with: match.previewMatchRange),
-            Self.cjkToken,
+            Self.cjkCasedOccurrence,
             label
         )
         XCTAssertLessThanOrEqual(

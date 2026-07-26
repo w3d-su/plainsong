@@ -86,6 +86,13 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let upperCaseToken = "PLAINSONG-NEEDLE"
     /// CJK has no cased characters, so `.smart` always resolves to insensitive matching for it.
     static let cjkToken = "平明歌"
+    /// Pure CJK text matches identically under either backend, so it cannot by itself prove which
+    /// backend `.smart` selected. These two differ only in the case of a trailing Latin letter:
+    /// the pattern is all-lowercase (so `.smart` resolves insensitive and matches the occurrence)
+    /// while `.sensitive` must find nothing. That difference is what makes the CJK probes
+    /// falsifiable rather than merely non-empty.
+    static let cjkCasedPattern = "平明歌x"
+    static let cjkCasedOccurrence = "平明歌X"
     static let bulkFileCount = 2000
     static let bulkSectionCount = 20
     static let bulkMatchingStride = 4
@@ -95,6 +102,29 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let oversizedFileByteCount = 8 * 524_288
     /// What a correctly bounded read of any oversized file contributes: `inclusiveLimit(cap)`.
     static let boundedOversizedReadByteCount = 524_289
+
+    /// `WorkspaceAnchoredFileSystem.readAllBytes` reads in 64 KiB chunks and emits one `readChunk`
+    /// event per successful `read(2)`, so chunk counts distinguish "stopped at the limit" from
+    /// "read everything, then truncated" — which byte counts derived from the returned buffer
+    /// cannot do.
+    static let readChunkByteCount = 64 * 1024
+    /// `ceil(524,289 / 65,536)` = eight full chunks plus a one-byte tail.
+    static let boundedOversizedReadChunkCount = 9
+    /// What reading the whole 4 MiB sibling would cost.
+    static let unboundedOversizedReadChunkCount = oversizedFileByteCount / readChunkByteCount
+    /// The exactly-at-cap file stops one chunk earlier: its ninth read returns EOF and emits no
+    /// event.
+    static let admittedFileReadChunkCount = 8
+
+    /// Well past the 64 KiB ignore ceiling, so a bounded read is distinguishable from a full one.
+    static let oversizedIgnoreFileByteCount = 4 * 64 * 1024
+    /// `ceil(65,537 / 65,536)` = one full chunk plus a one-byte tail.
+    static let boundedIgnoreReadChunkCount = 2
+
+    /// Candidate count for the progress-stride probe. Chosen so it is neither below the
+    /// 100-event cap nor divisible by it: `ceil(250 / 100) = 3` while `floor` would give 2, and
+    /// 250 is not a multiple of 3, so the final `N / N` event is required separately.
+    static let progressStrideFileCount = 250
 
     /// Files in the global-cap fixture. Each holds one more than the per-file ceiling, so the
     /// first 20 files emit 500 matches each and land exactly on the 10,000 global ceiling; the

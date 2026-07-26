@@ -27,6 +27,12 @@ struct SingleFileFixture {
     let expectedLine: Int
 }
 
+struct IgnoreFixture {
+    let rootURL: URL
+    let capture: WorkspaceDirectorySnapshotCapture
+    let ignoredRelativePath: String
+}
+
 struct GlobalCapFixture {
     let rootURL: URL
     let capture: WorkspaceDirectorySnapshotCapture
@@ -163,45 +169,6 @@ extension WorkspaceSearchPerformanceTests {
         )
     }
 
-    func makeSmartCaseFixture() async throws -> SingleFileFixture {
-        let root = try makeTemporaryDirectory(prefix: "WS4BSmartCase")
-        let body = Self.makeSmartCaseBody()
-        try Data(body.utf8).write(to: root.appendingPathComponent("smart-case.md"), options: .atomic)
-
-        let capture = try await WorkspaceDirectoryScanner().snapshotCapture(root: root)
-        let range = try XCTUnwrap(Self.independentTokenRanges(in: body).first)
-
-        return SingleFileFixture(
-            rootURL: root,
-            capture: capture,
-            relativePath: "smart-case.md",
-            byteCount: body.utf8.count,
-            expectedMatchRange: range,
-            expectedLine: Self.lineNumber(ofUTF16Location: range.location, in: body)
-        )
-    }
-
-    func makeAdmittedCJKFileFixture() async throws -> SingleFileFixture {
-        let root = try makeTemporaryDirectory(prefix: "WS4BAdmittedCJK")
-        let body = Self.makeExactlyAdmittedCJKBody()
-        XCTAssertEqual(body.utf8.count, Self.admittedFileByteCount)
-        try Data(body.utf8).write(to: root.appendingPathComponent("admitted-cjk.md"), options: .atomic)
-
-        let capture = try await WorkspaceDirectoryScanner().snapshotCapture(root: root)
-        let ranges = Self.independentRanges(of: Self.cjkToken, in: body)
-        XCTAssertEqual(ranges.count, 1)
-        let range = try XCTUnwrap(ranges.first)
-
-        return SingleFileFixture(
-            rootURL: root,
-            capture: capture,
-            relativePath: "admitted-cjk.md",
-            byteCount: body.utf8.count,
-            expectedMatchRange: range,
-            expectedLine: Self.lineNumber(ofUTF16Location: range.location, in: body)
-        )
-    }
-
     func makeAdmissionBoundaryFixture() async throws -> SingleFileFixture {
         let root = try makeTemporaryDirectory(prefix: "WS4BAdmissionBoundary")
         let admitted = Self.makeExactlyAdmittedBody()
@@ -291,7 +258,10 @@ extension WorkspaceSearchPerformanceTests {
     /// cased characters, so a `.smart` query over this text always resolves to the insensitive
     /// backend — the path the UI default actually takes for CJK input.
     static func makeExactlyAdmittedCJKBody() -> String {
-        let tail = "\n最後一行提到\(cjkToken)。\n"
+        // The occurrence carries an upper-case Latin suffix while the query pattern carries a
+        // lower-case one, so a `.sensitive` run over this file finds nothing and the `.smart`
+        // run's single match is proof that the insensitive backend was selected.
+        let tail = "\n最後一行提到\(cjkCasedOccurrence)。\n"
         let header = "# 中文全文搜尋容量上限\n\n"
         let unit = "這是一段用來測試工作區搜尋效能的中文內容，並不包含搜尋標記。\n"
         let unitByteCount = unit.utf8.count
@@ -318,6 +288,7 @@ extension WorkspaceSearchPerformanceTests {
 
         中文出現一次：\(cjkToken)。
         中文再出現一次：\(cjkToken)。
+        中文加上大寫拉丁字母：\(cjkCasedOccurrence)。
         """
     }
 

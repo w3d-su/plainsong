@@ -7,6 +7,53 @@ import XCTest
 // dense whole-word rejection at the admission cap.
 
 extension WorkspaceSearchPerformanceTests {
+    /// Progress coalescing on a candidate count that is neither below the 100-event cap nor
+    /// divisible by it.
+    ///
+    /// Every other fixture in this suite has `N <= 100` (stride 1) or `N` an exact multiple of
+    /// 100 (2,000 → stride 20, remainder 0). Both shapes are satisfied by a wrong rule: `floor`
+    /// instead of `ceil` gives the same stride when `N` divides evenly, and the final `N / N`
+    /// event is indistinguishable from an ordinary stride hit. At `N = 250` the two diverge —
+    /// `ceil(250/100) = 3` against `floor = 2`, and 250 is not a multiple of 3, so the final
+    /// event only appears if it is emitted separately.
+    func testProgressCoalescingUsesCeilingStrideOnNonDivisibleCandidateCounts() async throws {
+        let fixture = try await makeProgressStrideFixture()
+        defer { removeDirectory(fixture.rootURL) }
+
+        let request = try makeRequest(
+            capture: fixture.capture,
+            rootIdentity: "ws4b-progress-stride",
+            query: TextSearchQuery(pattern: Self.token, caseSensitivity: .sensitive)
+        )
+
+        let run = try await collect(request: request)
+        let progress = progressEvents(in: run.events)
+
+        // Spelled out here rather than reusing the shared helper, so this probe cannot be made to
+        // pass by a matching mistake in that helper.
+        let stride = 3
+        var expectedCompleted = Array(stride ..< Self.progressStrideFileCount)
+            .filter { $0.isMultiple(of: stride) }
+        expectedCompleted.append(Self.progressStrideFileCount)
+
+        XCTAssertEqual(stride, (Self.progressStrideFileCount + 99) / 100)
+        XCTAssertNotEqual(stride, Self.progressStrideFileCount / 100, "floor would differ here")
+        XCTAssertFalse(Self.progressStrideFileCount.isMultiple(of: stride))
+
+        XCTAssertEqual(progress.map(\.completedFileCount), expectedCompleted)
+        XCTAssertTrue(progress.allSatisfy { $0.candidateFileCount == Self.progressStrideFileCount })
+        XCTAssertLessThanOrEqual(progress.count, Self.expectedMaximumProgressEvents)
+        XCTAssertEqual(progress.last?.completedFileCount, Self.progressStrideFileCount)
+
+        try assertSharedStreamInvariants(
+            run.events,
+            candidateFileCount: Self.progressStrideFileCount,
+            expectedFileResultCount: fixture.matchingRelativePaths.count,
+            expectedSkippedEventCount: 0,
+            label: "progress stride"
+        )
+    }
+
     // MARK: - Global 10,000-match ceiling
 
     /// Drives the global per-query ceiling for real: 24 files each holding one more than the

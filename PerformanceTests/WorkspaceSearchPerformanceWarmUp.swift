@@ -23,14 +23,26 @@ import XCTest
 actor WorkspaceSearchPerformanceWarmUp {
     static let shared = WorkspaceSearchPerformanceWarmUp()
 
-    private var hasWarmed = false
+    /// The single in-flight or completed warm-up. Callers await *this task*, not a flag, so a
+    /// second caller arriving mid-warm-up blocks until the work is actually finished instead of
+    /// racing ahead and measuring against a half-warm process.
+    private var warmUpTask: Task<Void, any Error>?
 
-    /// Performs the warm-up on the first call in this process and returns immediately after that.
-    /// Actor isolation serializes concurrent callers, so the body cannot run twice.
+    /// Performs the warm-up once per process. Concurrent callers share the same task; a failed
+    /// warm-up is not recorded as done, so the failure surfaces and a later caller can retry
+    /// rather than every subsequent probe silently measuring an unwarmed process.
     func warmUpIfNeeded() async throws {
-        guard !hasWarmed else { return }
-        hasWarmed = true
-        try await Self.performWarmUp()
+        if let warmUpTask {
+            return try await warmUpTask.value
+        }
+        let task = Task { try await Self.performWarmUp() }
+        warmUpTask = task
+        do {
+            try await task.value
+        } catch {
+            warmUpTask = nil
+            throw error
+        }
     }
 
     /// Bounded warm-up over a small workspace touching each expensive path the probes rely on:
@@ -93,7 +105,69 @@ actor WorkspaceSearchPerformanceWarmUp {
                 query: query
             )
             let service = WorkspaceSearchService()
-            for await _ in service.events(for: request) {}
+
+            // The stream's outcome is checked rather than discarded. A warm-up that failed —
+            // unreadable fixture, a `.failed` terminal, a search that matched nothing — would
+            // otherwise "succeed" while leaving the very paths it exists to warm untouched, and
+            // every probe after it would quietly measure a cold process.
+            var summary: WorkspaceSearchSummary?
+            var failure: WorkspaceSearchServiceFailure?
+            var searchedFileCount = 0
+            for await event in service.events(for: request) {
+                switch event {
+                case let .completed(_, completedSummary):
+                    summary = completedSummary
+                case let .failed(_, serviceFailure):
+                    failure = serviceFailure
+                case let .fileResult(_, result):
+                    searchedFileCount += result.matches.isEmpty ? 0 : 1
+                case .skippedFile, .progress, .validationFailure:
+                    break
+                }
+            }
+
+            guard failure == nil else {
+                throw WarmUpError.streamFailed(queryIndex: index)
+            }
+            guard let summary else {
+                throw WarmUpError.noTerminalEvent(queryIndex: index)
+            }
+            guard summary.searchedFileCount == 2 else {
+                throw WarmUpError.unexpectedSearchedFileCount(
+                    queryIndex: index,
+                    actual: summary.searchedFileCount
+                )
+            }
+            // Queries 0 and 1 must match the prose file; query 2 is a whole-word rejection shape
+            // and is expected to match nothing, but it still has to have scanned both files.
+            let expectedMatchingFiles = index == 2 ? 0 : 1
+            guard searchedFileCount == expectedMatchingFiles else {
+                throw WarmUpError.unexpectedMatchingFileCount(
+                    queryIndex: index,
+                    expected: expectedMatchingFiles,
+                    actual: searchedFileCount
+                )
+            }
+        }
+    }
+
+    enum WarmUpError: Error, CustomStringConvertible {
+        case streamFailed(queryIndex: Int)
+        case noTerminalEvent(queryIndex: Int)
+        case unexpectedSearchedFileCount(queryIndex: Int, actual: Int)
+        case unexpectedMatchingFileCount(queryIndex: Int, expected: Int, actual: Int)
+
+        var description: String {
+            switch self {
+            case let .streamFailed(index):
+                "WS4B warm-up query \(index) emitted a failure terminal"
+            case let .noTerminalEvent(index):
+                "WS4B warm-up query \(index) produced no completion terminal"
+            case let .unexpectedSearchedFileCount(index, actual):
+                "WS4B warm-up query \(index) searched \(actual) files, expected 2"
+            case let .unexpectedMatchingFileCount(index, expected, actual):
+                "WS4B warm-up query \(index) matched \(actual) files, expected \(expected)"
+            }
         }
     }
 
