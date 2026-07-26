@@ -121,12 +121,13 @@ Current sweep values from `make test`:
 
 | Field | Value |
 |---|---|
-| Date | 2026-07-25 |
+| Date | 2026-07-25; re-measured 2026-07-26 after the review-hardening pass |
 | Branch | `phase3-search-ws4b-performance-gates`; originally branched from `main` at `fe953db`, then merged `main` at `58740ac` (PR #94) |
-| Commit | Release re-verification run at merge commit `9b89bce`. Only this section's prose changed afterwards; no Swift source was touched after the run. |
+| Commit | Debug and Release re-measurement at the review-hardening tip described in "2026-07-26 re-measurement" below. Only this section's prose changed after those runs; no Swift source was touched afterwards. |
 | macOS | Darwin 27.0.0 |
 | Machine | Apple Silicon, arm64, 16 GB RAM |
-| Test file | `PerformanceTests/WorkspaceSearchPerformanceTests.swift` |
+| Test files | `PerformanceTests/WorkspaceSearchPerformanceTests.swift` (probes and frozen constants), plus `…SmartCasePerformanceTests`, `…CeilingPerformanceTests`, `…CancellationPerformanceTests`, `…PerformanceFixtures`, `…PerformanceAssertions`, `…PerformanceSupport`, `…PerformanceBlockingReader`. Split from one 1,258-line file to keep each under the ~400-line guidance in agent.md §17.10. |
+| Probe count | 10 tests (5 at the original freeze, then +2 for the resource-ceiling pins and global match ceiling, then +3 for the default `.smart` case path) |
 | Local Release command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release ENABLE_TESTABILITY=YES -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
 | Local Debug command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
 | Reproducibility | Reproducible as written. Both commands above run at this branch tip with no build-setting override. Before PR #94 was merged the Release command exited 65 here, because `AppTests` referenced App probes that exist only under `#if DEBUG` and `xcodebuild` builds every test target even under `-only-testing`; merging `main` at `58740ac` removed that. Three Release runs were performed after the merge — see "Post-#94 Release re-verification" below. |
@@ -155,15 +156,30 @@ Current sweep values from `make test`:
    `assertSharedStreamInvariants` helper, so the exact event count, progress coalescing,
    read-window ceilings, skipped-detail cap, and completion ordering are checked on all of them
    rather than on the bulk probe only.
-5. The resource ceilings (`4` concurrent reads, `100` progress events, `100` reported skipped
-   files, `500` matches per file, `10,000` matches per query, `524,288`-byte admission cap) are
-   pinned as literals in the test file, not read back from `WorkspaceSearchLimits`. Reading them
-   back would make every bound self-fulfilling: widening a production default would widen the
-   assertion with it and stay green. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`
-   is the single comparison point against production, so a deliberate limit change fails there.
-6. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
+5. The resource ceilings are pinned as literals in the test file, not read back from
+   `WorkspaceSearchLimits` / `TextSearchEngine`. Reading them back would make every bound
+   self-fulfilling: widening a production default would widen the assertion with it and stay
+   green. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single comparison
+   point against production, so a deliberate limit change fails there. Pinned: `4` concurrent
+   reads, `100` progress events, `100` reported skipped files, `500` matches per file, `10,000`
+   matches per query, `524,288`-byte admission cap, `128` ignore files, `65,536` bytes per ignore
+   file, `256` UTF-16 units per query pattern, and `1,024` UTF-16 units of snippet context
+   per side.
+6. Case policy is covered on both paths. The UI default is `.smart`, which resolves to the
+   *insensitive* backend for an all-lowercase or CJK pattern — a different Foundation comparison
+   from the `.sensitive` path the original probes measured.
+   `testSmartCaseResolvesToInsensitiveMatchingForLowercaseAndCJKPatterns` is the anti-vacuity
+   gate: it proves the resolution behaviorally (the same lowercase pattern matches three case
+   spellings under `.smart` but one under `.sensitive`), so the two `.smart` budget probes cannot
+   silently degenerate into re-measuring the already-budgeted `.sensitive` path.
+7. Progress coalescing is compared as a whole sequence, not just its length, monotonicity, and
+   final value — those three hold for many wrong sequences, including a stride of 1 truncated at
+   100 events and an off-by-one stride. The expected sequence is rebuilt from the documented rule
+   (every multiple of `ceil(N / M)` in `1 ... N`, plus a final `N`) rather than read back from
+   the stream.
+8. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
    cancellation behavior, and resource ceilings stay hard everywhere, including CI.
-7. The two waits in the cancellation probe (window saturation, post-cancel drain) are bounded at
+9. The two waits in the cancellation probe (window saturation, post-cancel drain) are bounded at
    10 s each and fail the probe on expiry, so a regression cannot stall the test job until the
    CI timeout.
 
@@ -173,10 +189,12 @@ Current sweep values from `make test`:
 |---|---|
 | 2,000-file workspace | 20 directories x 100 files, `.md` and `.mdx`, 2,893,000 bytes total; 500 files contain the query token exactly twice (1,000 matches) |
 | Admitted file | exactly 524,288 bytes (the `WorkspaceSearchLimits` admission cap) with the only match in the final line |
-| Admission boundary | the same 524,288-byte file plus a 524,289-byte sibling |
+| Admission boundary | the same 524,288-byte file plus a 4,194,304-byte sibling (8x the cap). Deliberately not `cap + 1`: with a one-byte-over sibling, a reader that wrongly read the whole file would report the same byte count as one that stopped at the inclusive limit, so the probe could not distinguish them. At 8x the cap a bounded read contributes 524,289 bytes and an unbounded one would contribute 4,194,304, and the probe asserts the former. |
 | Dense whole-word (`ascii-suffix`) | 524,288 bytes of ASCII whose every literal hit is rejected by a trailing word character |
 | Dense whole-word (`unicode-periodic`) | 524,288 bytes of composed `e`+U+0301 periodic text searched with a 192-UTF-16-unit whole-word pattern; every overlapping candidate is examined and rejected |
 | Global match ceiling | 24 files each holding 501 occurrences of the token (one more than the per-file ceiling), so the first 20 files emit 500 matches each and land exactly on the 10,000 per-query ceiling while the remaining four must still be read and accounted |
+| Smart case | one small file holding the token in lowercase, title case, and upper case, plus two CJK occurrences; used to prove which matching backend `.smart` resolved to |
+| Admitted CJK file | exactly 524,288 bytes of CJK prose with the CJK token in the final line, searched with a CJK pattern under the default `.smart` policy |
 | Cancellation | the 2,000-file workspace with a controlled reader that blocks every candidate read |
 
 Two probes carry no wall-clock budget and exist purely as correctness gates:
@@ -198,13 +216,14 @@ Each cell is the median of three measured samples within one run; three runs per
 | Dense whole-word `unicode-periodic` | < 2,500 ms | 611.946, 628.251, 610.962 | 1144.527, 1068.369, 1060.272 | Pass |
 | Cancel-to-drain, saturated 4-read window | < 50 ms | 0.185, 0.157, 0.173 | 0.172, 0.161, 0.192 | Pass |
 
-Final-tree verification, run after the last source edit (medians): Release workspace search
-650.747 ms, admitted file 7.121 ms, `ascii-suffix` 5.029 ms, `unicode-periodic` 592.165 ms,
-cancel-to-drain 0.145 ms; Debug workspace search 1040.001 ms, admitted file 37.661 ms,
-`ascii-suffix` 45.089 ms, `unicode-periodic` 1146.458 ms, cancel-to-drain 0.115 ms. The three
-Release and three Debug runs tabulated above were taken while budgets were being chosen; the
-tree changed only in assertions after them, and the final-tree values fall inside the same
-ranges.
+Historical note: at the original 2026-07-25 freeze, a "final-tree" verification run after the
+last source edit reported Release workspace search 650.747 ms, admitted file 7.121 ms,
+`ascii-suffix` 5.029 ms, `unicode-periodic` 592.165 ms, cancel-to-drain 0.145 ms; Debug
+workspace search 1040.001 ms, admitted file 37.661 ms, `ascii-suffix` 45.089 ms,
+`unicode-periodic` 1146.458 ms, cancel-to-drain 0.115 ms. **Those values describe the tree as it
+was at that freeze, which had 5 probes and no `.smart`, ceiling-pin, or global-ceiling coverage.
+They are not a verification of the current tree** — the 2026-07-26 re-measurement above is. They
+are retained only to show how the budgets were originally chosen.
 
 Raw in-run samples for the first Release run: workspace search
 `[713.694, 681.521, 753.233]`; admitted file `[7.861, 7.825, 7.762]`; `ascii-suffix`
@@ -212,6 +231,43 @@ Raw in-run samples for the first Release run: workspace search
 `[0.222, 0.195, 0.138, 0.091, 0.185]`. Raw in-run samples for the first Debug run: workspace
 search `[1137.147, 1227.007, 1292.670]`; admitted file `[39.105, 38.837, 38.790]`; cancellation
 drain `[0.213, 0.168, 0.107, 0.238, 0.172]`.
+
+### 2026-07-26 re-measurement after the review-hardening pass
+
+Three Debug and three Release runs of the full 10-probe suite at the review-hardening tip, each
+run `test-without-building` against a pre-built product so build work is never inside a sample,
+and with nothing else running on the machine. All six runs reported `** TEST EXECUTE SUCCEEDED **`,
+10 tests, 0 failures.
+
+| Metric | Budget | Debug medians (3 runs) | Release medians (3 runs) |
+|---|---:|---|---|
+| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1868.097, 1386.190, 1432.885 | 884.126, 822.020, 794.526 |
+| Workspace search, 2,000 files (`.smart`) | < 4,000 ms | 1538.752, 1356.618, 1297.017 | 761.469, 802.057, 753.301 |
+| Admitted 524,288-byte file | < 150 ms | 84.485, 43.255, 54.984 | 10.025, 8.988, 9.115 |
+| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 34.729, 30.484, 28.548 | 26.973, 26.683, 28.471 |
+| Dense whole-word `ascii-suffix` | < 200 ms | 141.794, 50.747, 52.355 | 5.461, 5.956, 5.728 |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 2462.412, 1205.736, 1237.540 | 694.887, 660.877, 743.965 |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.193, 0.203, 0.212 | 0.150, 0.173, 0.207 |
+
+The two `.smart` budgets are frozen from these Debug numbers: 4,000 ms is ~2.6x the slowest
+`.smart` bulk median, and 150 ms is ~4.3x the slowest CJK median. Notably `.smart` is **not**
+slower than `.sensitive` on the bulk workspace here — in Release it is consistently a little
+faster — so the insensitive backend is not a throughput regression; it was simply unmeasured.
+
+#### Correction: the "2-4x headroom" claim does not hold cold
+
+The budget-selection text below says each budget carries about 2-4x headroom over the measured
+Debug median. That is accurate for warm runs but **false for a cold first run**. In Debug run 1,
+taken immediately after a build with cold caches, `unicode-periodic` produced samples
+`[1655.452, 2709.261, 2462.412]` — one sample above the 2,500 ms budget, and a median of
+2462.412 ms, 1.5% under it. Debug runs 2 and 3 on the same tip were ~1,205 and ~1,238 ms.
+
+That budget is therefore effectively ~1.0x headroom on a cold Debug run, not 2-4x. It did not
+fail here and no budget was changed to rescue it, because changing a frozen budget is an owner
+decision and this pass was scoped to the review findings. Recorded as a known risk: the first
+Debug run after a build is the one most likely to trip `unicode-periodic`, and `make test` runs
+Debug. Options if it does start failing: raise that budget with fresh cold-run evidence, or give
+the probe a process-level warm-up rather than the per-probe one it has now.
 
 ### Post-#94 Release re-verification
 
@@ -245,11 +301,28 @@ budgets stay informational on CI regardless.
 ### Budget selection
 
 Budgets are frozen against the **Debug** medians because `make test` runs the Debug
-configuration, and Debug is roughly 2x slower than Release on these paths. Each budget keeps
-about 2.4x-3.8x headroom over its measured Debug median. No budget was chosen to rescue a
-failing run: the first Debug run of the `unicode-periodic` shape exceeded an initial 750 ms
-guess, and the response was to measure Release, confirm the cost is the documented worst case
-behind the 512 KiB admission cap, and freeze an evidence-based budget instead.
+configuration, and Debug is roughly 2x slower than Release on these paths. No budget was chosen
+to rescue a failing run: the first Debug run of the `unicode-periodic` shape exceeded an initial
+750 ms guess, and the response was to measure Release, confirm the cost is the documented worst
+case behind the 512 KiB admission cap, and freeze an evidence-based budget instead.
+
+Headroom over the measured Debug median, from the 2026-07-26 re-measurement (slowest of the
+three medians per metric):
+
+| Metric | Budget | Slowest Debug median | Headroom |
+|---|---:|---:|---:|
+| Workspace search, 2,000 files (`.sensitive`) | 3,000 ms | 1868.097 ms | 1.6x |
+| Workspace search, 2,000 files (`.smart`) | 4,000 ms | 1538.752 ms | 2.6x |
+| Admitted 524,288-byte file | 150 ms | 84.485 ms | 1.8x |
+| Admitted 524,288-byte CJK file (`.smart`) | 150 ms | 34.729 ms | 4.3x |
+| Dense whole-word `ascii-suffix` | 200 ms | 141.794 ms | 1.4x |
+| Dense whole-word `unicode-periodic` | 2,500 ms | 2462.412 ms | 1.0x |
+| Cancel-to-drain | 50 ms | 0.212 ms | 236x |
+
+An earlier revision of this section claimed a uniform 2.4x-3.8x headroom. That was true of the
+warm runs it was written from and is not true generally: the slowest-median column above is
+dominated by cold first runs, where three of the seven metrics fall under 2x and
+`unicode-periodic` is effectively at parity with its budget. See the correction above.
 
 ### Notes
 

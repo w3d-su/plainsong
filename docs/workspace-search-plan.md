@@ -13,11 +13,15 @@
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
 > actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
 > now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
-> events are not additional physical-keyboard evidence. **WS4B has landed production-shaped
-> performance probes and evidence-frozen budgets** (2,000-file workspace, exactly-admitted
-> 512 KiB file, dense whole-word rejection, rapid cancellation of a saturated read window;
-> see `docs/perf-log.md`). The remaining WS4 regression-suite item and the overall Definition of
-> Done remain open. Workspace Search as a whole stays **IN PROGRESS**.**
+> events are not additional physical-keyboard evidence. **WS4B is proposed in PR #93, which is
+> still a Draft and is not merged**; nothing in WS4B has landed on `main` yet. That PR adds
+> production-shaped performance probes and evidence-frozen budgets (2,000-file workspace under
+> both the `.sensitive` and default `.smart` case policies, exactly-admitted 512 KiB file, a
+> 512 KiB CJK file under `.smart`, an oversized sibling proving reads stay bounded, dense
+> whole-word rejection, the global 10,000-match ceiling, pinned resource ceilings, and rapid
+> cancellation of a saturated read window; see `docs/perf-log.md`). The remaining WS4
+> regression-suite item and the overall Definition of Done remain open. Workspace Search as a
+> whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -930,12 +934,15 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 - [x] Record measured local performance and choose/freeze budgets from evidence. Evidence:
   `docs/perf-log.md` §"Phase 3 WS4B Workspace Search Performance Gates" records the
   environment, commands, fixtures, raw samples from three Release and three Debug runs, and the
-  frozen budgets (2,000-file workspace < 3,000 ms; admitted 512 KiB file < 150 ms; dense
-  whole-word `ascii-suffix` < 200 ms and `unicode-periodic` < 2,500 ms; cancel-to-drain
-  < 50 ms). Budgets are frozen against Debug medians because `make test` runs Debug, and they
-  are hard locally and informational on hosted CI under risk R15. The `unicode-periodic`
-  Release median of 612 ms at exactly 512 KiB is production-shaped confirmation of the §2.3
-  admission cap.
+  frozen budgets (2,000-file workspace < 3,000 ms under `.sensitive` and < 4,000 ms under the
+  default `.smart` policy; admitted 512 KiB file < 150 ms; admitted 512 KiB CJK file under
+  `.smart` < 150 ms; dense whole-word `ascii-suffix` < 200 ms and `unicode-periodic` < 2,500 ms;
+  cancel-to-drain < 50 ms). Budgets are frozen against Debug medians because `make test` runs
+  Debug, and they are hard locally and informational on hosted CI under risk R15. The
+  `unicode-periodic` Release median at exactly 512 KiB is production-shaped confirmation of the
+  §2.3 admission cap. Known risk recorded in the same section: on a cold first Debug run
+  `unicode-periodic` measured a 2,462 ms median against its 2,500 ms budget, so that budget is
+  effectively at parity cold rather than carrying the headroom the other budgets do.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
 
