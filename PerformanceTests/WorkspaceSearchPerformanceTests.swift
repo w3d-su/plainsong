@@ -103,6 +103,15 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let globalCapOccurrencesPerFile = expectedMaximumMatchesPerFile + 1
     static let globalCapEmittingFileCount = expectedMaximumMatchesPerQuery / expectedMaximumMatchesPerFile
 
+    // MARK: - Process warm-up
+
+    /// Runs before every test, but does real work only on the first call in the process. See
+    /// `WorkspaceSearchPerformanceWarmUp` for why the per-probe warm-up is not sufficient.
+    override func setUp() async throws {
+        try await super.setUp()
+        try await WorkspaceSearchPerformanceWarmUp.shared.warmUpIfNeeded()
+    }
+
     // MARK: - Production ceilings this gate is pinned to
 
     /// Fails when a production default moves away from the ceiling the rest of this file asserts

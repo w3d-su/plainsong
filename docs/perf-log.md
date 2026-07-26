@@ -149,6 +149,11 @@ Current sweep values from `make test`:
    warm-up is asserted with the same deterministic predicates as the measured samples, so a
    warm-up that searched nothing cannot make later samples cheap. The cancellation probe has no
    warm-up; it repeats five independent cancellations and reports their median.
+3a. A separate one-per-process warm-up (`WorkspaceSearchPerformanceWarmUp`, invoked from
+   `setUp()`) runs a bounded search over a small workspace before any probe executes. It absorbs
+   process start-up — dyld, Foundation/ICU initialization, first task-group construction, CPU
+   frequency ramp — which the per-probe warm-up cannot, because that cost is paid once per
+   process and lands entirely on whichever probe runs first. See the cold-start finding below.
 4. Every sample hard-asserts the ordered result set, per-file match ranges/lines, exact summary
    accounting, exact event counts, and read-window ceilings. Timing is only recorded after those
    assertions hold. Every run that reaches completion — measured sample, warm-up, and the
@@ -239,6 +244,10 @@ run `test-without-building` against a pre-built product so build work is never i
 and with nothing else running on the machine. All six runs reported `** TEST EXECUTE SUCCEEDED **`,
 10 tests, 0 failures.
 
+These are the numbers **before** the process-level warm-up described below was added. They are
+retained because they are the evidence that motivated it, and because the `.smart` budgets were
+frozen from them.
+
 | Metric | Budget | Debug medians (3 runs) | Release medians (3 runs) |
 |---|---:|---|---|
 | Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1868.097, 1386.190, 1432.885 | 884.126, 822.020, 794.526 |
@@ -251,23 +260,61 @@ and with nothing else running on the machine. All six runs reported `** TEST EXE
 
 The two `.smart` budgets are frozen from these Debug numbers: 4,000 ms is ~2.6x the slowest
 `.smart` bulk median, and 150 ms is ~4.3x the slowest CJK median. Notably `.smart` is **not**
-slower than `.sensitive` on the bulk workspace here — in Release it is consistently a little
-faster — so the insensitive backend is not a throughput regression; it was simply unmeasured.
+slower than `.sensitive` on the bulk workspace — in Release it is consistently a little faster —
+so the insensitive backend is not a throughput regression; it was simply unmeasured.
 
-#### Correction: the "2-4x headroom" claim does not hold cold
+#### Cold-start finding, and the process-level warm-up that resolves it
 
-The budget-selection text below says each budget carries about 2-4x headroom over the measured
-Debug median. That is accurate for warm runs but **false for a cold first run**. In Debug run 1,
-taken immediately after a build with cold caches, `unicode-periodic` produced samples
-`[1655.452, 2709.261, 2462.412]` — one sample above the 2,500 ms budget, and a median of
-2462.412 ms, 1.5% under it. Debug runs 2 and 3 on the same tip were ~1,205 and ~1,238 ms.
+Debug run 1 above was taken immediately after a build, with cold caches, and the whole suite was
+uniformly 1.3x-2.8x slower than runs 2 and 3. `unicode-periodic` produced samples
+`[1655.452, 2709.261, 2462.412]` — one sample **above** its 2,500 ms budget, median 2462.412 ms,
+1.5% under. That made the budget effectively ~1.0x headroom on a cold run, and `make test` runs
+Debug, so the first run after a build was the one most likely to trip it.
 
-That budget is therefore effectively ~1.0x headroom on a cold Debug run, not 2-4x. It did not
-fail here and no budget was changed to rescue it, because changing a frozen budget is an owner
-decision and this pass was scoped to the review findings. Recorded as a known risk: the first
-Debug run after a build is the one most likely to trip `unicode-periodic`, and `make test` runs
-Debug. Options if it does start failing: raise that budget with fresh cold-run evidence, or give
-the probe a process-level warm-up rather than the per-probe one it has now.
+The cause is cost paid **per process**, not per probe: dyld work for the first call into
+WorkspaceKit and MarkdownCore, Foundation/ICU table initialization on the first Unicode
+comparison, first construction of the task-group read pipeline, and CPU frequency ramp from idle.
+The existing per-probe warm-up cannot absorb any of it — whichever probe XCTest runs first pays
+all of it.
+
+`WorkspaceSearchPerformanceWarmUp` is a one-per-process actor invoked from `setUp()`, outside
+every timed region. It runs a bounded search over a small workspace (tens of KiB, not the 512 KiB
+cap) that touches each expensive path: candidate planning, anchored reads, UTF-8 decoding, both
+case backends, composed whole-word rejection, snippet construction, and stream delivery.
+
+This changes the harness, not the product: process start-up is not search cost, and the budgets
+describe steady-state search. The trade-off is explicit — the gate no longer sees process
+start-up regressions, which it only ever observed by accident through whichever probe ran first.
+
+Measured effect on the cold first Debug run after a build, same machine and conditions:
+
+| Metric | Budget | Cold run 1, before | Cold run 1, after |
+|---|---:|---:|---:|
+| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1868.097 | 1198.152 |
+| Admitted 524,288-byte file | < 150 ms | 84.485 | 40.826 |
+| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 34.729 | 26.524 |
+| Dense whole-word `ascii-suffix` | < 200 ms | 141.794 | 48.508 |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | **2462.412** | **1149.402** |
+| Cancel-to-drain | < 50 ms | 0.193 | 0.197 |
+
+`unicode-periodic`'s worst individual cold sample went from 2709.261 ms (over budget) to
+1177.059 ms. Run-to-run spread also collapsed: its three medians were 2462.412 / 1205.736 /
+1237.540 before and 1149.402 / 1112.387 / 1102.974 after.
+
+#### Post-warm-up measurement (current tip)
+
+Three Debug and three Release runs, `test-without-building`, quiet machine. All six reported
+`** TEST EXECUTE SUCCEEDED **`, 10 tests, 0 failures.
+
+| Metric | Budget | Debug medians (3 runs) | Release medians (3 runs) |
+|---|---:|---|---|
+| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1198.152, 1160.181, 1237.518 | 718.984, 758.269, 645.777 |
+| Workspace search, 2,000 files (`.smart`) | < 4,000 ms | 1174.411, 1161.879, 1201.410 | 874.124, 709.593, 647.714 |
+| Admitted 524,288-byte file | < 150 ms | 40.826, 42.260, 41.757 | 8.421, 7.982, 10.361 |
+| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 26.524, 32.077, 27.830 | 28.159, 25.740, 27.081 |
+| Dense whole-word `ascii-suffix` | < 200 ms | 48.508, 61.164, 49.227 | 6.351, 5.556, 5.578 |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 1149.402, 1112.387, 1102.974 | 665.317, 725.112, 648.667 |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.197, 0.195, 0.202 | 0.234, 0.170, 0.165 |
 
 ### Post-#94 Release re-verification
 
@@ -306,23 +353,24 @@ to rescue a failing run: the first Debug run of the `unicode-periodic` shape exc
 750 ms guess, and the response was to measure Release, confirm the cost is the documented worst
 case behind the 512 KiB admission cap, and freeze an evidence-based budget instead.
 
-Headroom over the measured Debug median, from the 2026-07-26 re-measurement (slowest of the
-three medians per metric):
+Headroom over the measured Debug median, from the post-warm-up runs (slowest of the three
+medians per metric, so this is the worst case across a cold first run and two warm ones):
 
 | Metric | Budget | Slowest Debug median | Headroom |
 |---|---:|---:|---:|
-| Workspace search, 2,000 files (`.sensitive`) | 3,000 ms | 1868.097 ms | 1.6x |
-| Workspace search, 2,000 files (`.smart`) | 4,000 ms | 1538.752 ms | 2.6x |
-| Admitted 524,288-byte file | 150 ms | 84.485 ms | 1.8x |
-| Admitted 524,288-byte CJK file (`.smart`) | 150 ms | 34.729 ms | 4.3x |
-| Dense whole-word `ascii-suffix` | 200 ms | 141.794 ms | 1.4x |
-| Dense whole-word `unicode-periodic` | 2,500 ms | 2462.412 ms | 1.0x |
-| Cancel-to-drain | 50 ms | 0.212 ms | 236x |
+| Workspace search, 2,000 files (`.sensitive`) | 3,000 ms | 1237.518 ms | 2.4x |
+| Workspace search, 2,000 files (`.smart`) | 4,000 ms | 1201.410 ms | 3.3x |
+| Admitted 524,288-byte file | 150 ms | 42.260 ms | 3.5x |
+| Admitted 524,288-byte CJK file (`.smart`) | 150 ms | 32.077 ms | 4.7x |
+| Dense whole-word `ascii-suffix` | 200 ms | 61.164 ms | 3.3x |
+| Dense whole-word `unicode-periodic` | 2,500 ms | 1149.402 ms | 2.2x |
+| Cancel-to-drain | 50 ms | 0.202 ms | 248x |
 
-An earlier revision of this section claimed a uniform 2.4x-3.8x headroom. That was true of the
-warm runs it was written from and is not true generally: the slowest-median column above is
-dominated by cold first runs, where three of the seven metrics fall under 2x and
-`unicode-periodic` is effectively at parity with its budget. See the correction above.
+History worth keeping: an earlier revision claimed a uniform 2.4x-3.8x headroom, which was true
+only of warm runs. Measured against cold first runs, three of the seven metrics fell under 2x and
+`unicode-periodic` sat at 1.0x — effectively at parity with its budget. The process-level warm-up
+above is what restored the claim, rather than any budget being widened; every budget in this
+table is unchanged from its original freeze.
 
 ### Notes
 

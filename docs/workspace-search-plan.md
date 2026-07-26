@@ -940,9 +940,11 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   cancel-to-drain < 50 ms). Budgets are frozen against Debug medians because `make test` runs
   Debug, and they are hard locally and informational on hosted CI under risk R15. The
   `unicode-periodic` Release median at exactly 512 KiB is production-shaped confirmation of the
-  §2.3 admission cap. Known risk recorded in the same section: on a cold first Debug run
-  `unicode-periodic` measured a 2,462 ms median against its 2,500 ms budget, so that budget is
-  effectively at parity cold rather than carrying the headroom the other budgets do.
+  §2.3 admission cap. A cold-start finding is recorded in the same section: the first Debug run
+  after a build was uniformly 1.3x-2.8x slower and put `unicode-periodic` at a 2,462 ms median
+  against its 2,500 ms budget. It is resolved by a one-per-process warm-up rather than by
+  widening any budget; after it, that probe's cold median is 1,149 ms and every metric's
+  worst-case Debug headroom is 2.2x or better.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
 
