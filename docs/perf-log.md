@@ -129,6 +129,7 @@ Current sweep values from `make test`:
 | Test file | `PerformanceTests/WorkspaceSearchPerformanceTests.swift` |
 | Local Release command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release ENABLE_TESTABILITY=YES -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
 | Local Debug command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
+| Reproducibility at this branch tip | **The Release command does not run at this tip yet** — it exits 65. This branch is based on `main` at `fe953db`, which still has `AppTests` referencing App probes that exist only under `#if DEBUG`, and `xcodebuild` builds every test target even under `-only-testing`. PR #94 fixes that. The Debug command above runs today and is what `make test` exercises. Required before this section can be called reproducible: merge #94, rebase this branch onto it, re-run the Release command, and update the commit SHA here and in the PR body with that run's result. |
 | Measurement provenance | The Release medians below were taken before PR #94 landed, when `AppTests` still forced `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG'` onto the Release test build. They were **not** re-measured after that override was removed, and the Release command above is the post-#94 command. Accepted without a re-run because the override never changed optimization level — the measured code was built `-O` either way — and `Packages/MarkdownCore` and `Packages/WorkspaceKit` contain no `#if DEBUG` code at all, so the extra compilation condition could not reach the measured search path. Owner decision on 2026-07-25. Anything that later moves a budget close to its limit should be re-measured with the command as written. |
 
 ### Procedure
@@ -149,9 +150,22 @@ Current sweep values from `make test`:
    warm-up; it repeats five independent cancellations and reports their median.
 4. Every sample hard-asserts the ordered result set, per-file match ranges/lines, exact summary
    accounting, exact event counts, and read-window ceilings. Timing is only recorded after those
-   assertions hold.
-5. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
+   assertions hold. Every run that reaches completion — measured sample, warm-up, and the
+   dense-rejection literal control alike — is put through the shared
+   `assertSharedStreamInvariants` helper, so the exact event count, progress coalescing,
+   read-window ceilings, skipped-detail cap, and completion ordering are checked on all of them
+   rather than on the bulk probe only.
+5. The resource ceilings (`4` concurrent reads, `100` progress events, `100` reported skipped
+   files, `500` matches per file, `10,000` matches per query, `524,288`-byte admission cap) are
+   pinned as literals in the test file, not read back from `WorkspaceSearchLimits`. Reading them
+   back would make every bound self-fulfilling: widening a production default would widen the
+   assertion with it and stay green. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`
+   is the single comparison point against production, so a deliberate limit change fails there.
+6. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
    cancellation behavior, and resource ceilings stay hard everywhere, including CI.
+7. The two waits in the cancellation probe (window saturation, post-cancel drain) are bounded at
+   10 s each and fail the probe on expiry, so a regression cannot stall the test job until the
+   CI timeout.
 
 ### Fixtures
 
@@ -162,7 +176,15 @@ Current sweep values from `make test`:
 | Admission boundary | the same 524,288-byte file plus a 524,289-byte sibling |
 | Dense whole-word (`ascii-suffix`) | 524,288 bytes of ASCII whose every literal hit is rejected by a trailing word character |
 | Dense whole-word (`unicode-periodic`) | 524,288 bytes of composed `e`+U+0301 periodic text searched with a 192-UTF-16-unit whole-word pattern; every overlapping candidate is examined and rejected |
+| Global match ceiling | 24 files each holding 501 occurrences of the token (one more than the per-file ceiling), so the first 20 files emit 500 matches each and land exactly on the 10,000 per-query ceiling while the remaining four must still be read and accounted |
 | Cancellation | the 2,000-file workspace with a controlled reader that blocks every candidate read |
+
+Two probes carry no wall-clock budget and exist purely as correctness gates:
+`testProductionSearchLimitsStillMatchTheFrozenGateCeilings` pins the production ceilings, and
+`testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates` drives the 10,000-match per-query
+ceiling for real — it asserts the ceiling is hit exactly (not overshot), that `isGloballyTruncated`
+is set, that only the first 20 files emit results in path order, and that all 24 candidates are
+still read and counted in the accounting-only phase that follows.
 
 ### Measurements and frozen budgets
 

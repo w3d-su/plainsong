@@ -17,6 +17,12 @@ import XCTest
 /// results, exact summary/event accounting, read-window ceilings, and cancellation behavior
 /// (every read released, no further read started, no terminal event) are hard assertions
 /// everywhere, including CI; only the cancel-to-drain latency number follows the R15 rule.
+///
+/// Every run that reaches completion — measured sample, warm-up, and the dense-rejection literal
+/// control alike — goes through `assertSharedStreamInvariants`, so the exact event count, progress
+/// coalescing, read-window ceilings, skipped-detail cap, and completion ordering are checked on
+/// all of them. The resource ceilings are pinned as literals in this file rather than read back
+/// from `WorkspaceSearchLimits`; see `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
 final class WorkspaceSearchPerformanceTests: XCTestCase {
     // MARK: - Frozen budgets
 
@@ -32,6 +38,22 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     /// Cancel-to-drain latency for a saturated four-read window. Debug and Release < 0.3 ms.
     static let cancellationDrainBudgetMilliseconds = 50.0
 
+    // MARK: - Frozen production ceilings
+
+    // The resource ceilings this gate measures against, pinned as literals instead of being read
+    // back from `WorkspaceSearchLimits`. Deriving expectations from the production defaults makes
+    // every bound below self-fulfilling: widening a default would silently widen the assertion
+    // with it. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single place
+    // that compares these literals against production, so a deliberate limit change fails there
+    // (one obvious, intentional edit) rather than passing everywhere unnoticed.
+
+    static let expectedMaximumConcurrentReads = 4
+    static let expectedMaximumProgressEvents = 100
+    static let expectedMaximumReportedSkippedFiles = 100
+    static let expectedMaximumMatchesPerFile = 500
+    static let expectedMaximumMatchesPerQuery = 10000
+    static let expectedMaximumFileSizeBytes = 524_288
+
     // MARK: - Fixture shape
 
     static let token = "plainsong-needle"
@@ -40,6 +62,111 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let bulkMatchingStride = 4
     static let matchesPerMatchingFile = 2
     static let admittedFileByteCount = 524_288
+
+    /// Files in the global-cap fixture. Each holds one more than the per-file ceiling, so the
+    /// first 20 files emit 500 matches each and land exactly on the 10,000 global ceiling; the
+    /// remaining files must be drained for accounting without emitting any further result.
+    static let globalCapFileCount = 24
+    static let globalCapOccurrencesPerFile = expectedMaximumMatchesPerFile + 1
+    static let globalCapEmittingFileCount = expectedMaximumMatchesPerQuery / expectedMaximumMatchesPerFile
+
+    // MARK: - Production ceilings this gate is pinned to
+
+    /// Fails when a production default moves away from the ceiling the rest of this file asserts
+    /// against. Without this, every bound below would be read back from the same value it claims
+    /// to be checking, and raising a limit would keep the suite green.
+    func testProductionSearchLimitsStillMatchTheFrozenGateCeilings() {
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumConcurrentReads,
+            Self.expectedMaximumConcurrentReads
+        )
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumProgressEvents,
+            Self.expectedMaximumProgressEvents
+        )
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumReportedSkippedFiles,
+            Self.expectedMaximumReportedSkippedFiles
+        )
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumMatchesPerFile,
+            Self.expectedMaximumMatchesPerFile
+        )
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumMatchesPerQuery,
+            Self.expectedMaximumMatchesPerQuery
+        )
+        XCTAssertEqual(
+            WorkspaceSearchLimits.defaultMaximumFileSizeBytes,
+            Self.expectedMaximumFileSizeBytes
+        )
+
+        // The requests in this file are built with the default limits, so the instance values
+        // must agree with the statics as well.
+        let limits = WorkspaceSearchLimits()
+        XCTAssertEqual(limits.maximumConcurrentReads, Self.expectedMaximumConcurrentReads)
+        XCTAssertEqual(limits.maximumProgressEvents, Self.expectedMaximumProgressEvents)
+        XCTAssertEqual(limits.maximumReportedSkippedFiles, Self.expectedMaximumReportedSkippedFiles)
+        XCTAssertEqual(limits.maximumMatchesPerFile, Self.expectedMaximumMatchesPerFile)
+        XCTAssertEqual(limits.maximumMatchesPerQuery, Self.expectedMaximumMatchesPerQuery)
+        XCTAssertEqual(limits.maximumFileSizeBytes, Self.expectedMaximumFileSizeBytes)
+
+        // The admission-cap fixtures are sized against the file ceiling, so they must track it.
+        XCTAssertEqual(Self.admittedFileByteCount, Self.expectedMaximumFileSizeBytes)
+    }
+
+    // MARK: - Global 10,000-match ceiling
+
+    /// Drives the global per-query ceiling for real: 24 files each holding one more than the
+    /// per-file ceiling, so the first 20 files emit exactly 10,000 matches and the remaining four
+    /// must be read and accounted without emitting a further result.
+    func testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates() async throws {
+        let fixture = try await makeGlobalCapFixture()
+        defer { removeDirectory(fixture.rootURL) }
+
+        let request = try makeRequest(
+            capture: fixture.capture,
+            rootIdentity: "ws4b-global-match-cap",
+            query: TextSearchQuery(pattern: Self.token, caseSensitivity: .sensitive)
+        )
+
+        let run = try await collect(request: request)
+        let results = fileResults(in: run.events)
+        let summary = try XCTUnwrap(completedSummaries(in: run.events).first)
+
+        // Only the files up to the ceiling emit results, in path order.
+        XCTAssertEqual(
+            results.map(\.relativePath),
+            Array(fixture.orderedRelativePaths.prefix(Self.globalCapEmittingFileCount))
+        )
+        XCTAssertTrue(results.allSatisfy { $0.matches.count == Self.expectedMaximumMatchesPerFile })
+        XCTAssertTrue(results.allSatisfy(\.isTruncated))
+
+        // The ceiling is hit exactly, not overshot.
+        XCTAssertEqual(summary.totalEmittedMatchCount, Self.expectedMaximumMatchesPerQuery)
+        XCTAssertEqual(
+            results.reduce(0) { $0 + $1.matches.count },
+            Self.expectedMaximumMatchesPerQuery
+        )
+        XCTAssertTrue(summary.isGloballyTruncated)
+        XCTAssertTrue(summary.isTruncated)
+
+        // Accounting continues past the ceiling: every candidate is still read and counted.
+        XCTAssertEqual(summary.candidateFileCount, Self.globalCapFileCount)
+        XCTAssertEqual(summary.searchedFileCount, Self.globalCapFileCount)
+        XCTAssertEqual(summary.skippedFileCount, 0)
+        XCTAssertEqual(summary.ignoredFileCount, 0)
+        XCTAssertEqual(summary.readInstrumentation.diskReadCount, Self.globalCapFileCount)
+        XCTAssertEqual(summary.readInstrumentation.diskReadByteCount, fixture.totalByteCount)
+
+        try assertSharedStreamInvariants(
+            run.events,
+            candidateFileCount: Self.globalCapFileCount,
+            expectedFileResultCount: Self.globalCapEmittingFileCount,
+            expectedSkippedEventCount: 0,
+            label: "global match ceiling"
+        )
+    }
 
     // MARK: - 2,000-file production workspace
 
@@ -150,7 +277,15 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
             summary.readInstrumentation.diskReadByteCount,
             Self.admittedFileByteCount + (Self.admittedFileByteCount + 1)
         )
-        XCTAssertEqual(terminalEventCount(in: run.events), 1)
+        XCTAssertEqual(summary.omittedSkippedFileCount, 0)
+
+        try assertSharedStreamInvariants(
+            run.events,
+            candidateFileCount: 2,
+            expectedFileResultCount: 1,
+            expectedSkippedEventCount: 1,
+            label: "admission boundary"
+        )
     }
 
     func testDenseWholeWordRejectionAtTheAdmissionCapStaysWithinBudget() async throws {
@@ -188,10 +323,17 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
         )
         XCTAssertEqual(
             literalResult.matches.count,
-            WorkspaceSearchLimits().maximumMatchesPerFile,
+            Self.expectedMaximumMatchesPerFile,
             "\(shape.rawValue) literal control"
         )
         XCTAssertTrue(literalResult.isTruncated, "\(shape.rawValue) literal control")
+        try assertSharedStreamInvariants(
+            literalRun.events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 1,
+            expectedSkippedEventCount: 0,
+            label: "\(shape.rawValue) literal control"
+        )
 
         let warmUp = try await collect(request: request)
         try assertDenseRejectionResults(warmUp.events, fixture: fixture, label: "\(shape.rawValue) warm-up")
@@ -228,7 +370,7 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
         let fixture = try await makeBulkWorkspaceFixture()
         defer { removeDirectory(fixture.rootURL) }
 
-        let readWindow = WorkspaceSearchLimits.defaultMaximumConcurrentReads
+        let readWindow = Self.expectedMaximumConcurrentReads
         var samples: [Double] = []
 
         for attempt in 1 ... 5 {
@@ -249,12 +391,30 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
             }
 
             // Every read blocks, so the producer saturates exactly the configured window.
-            await reader.waitUntilStartCount(readWindow)
+            guard await reader.waitUntilStartCount(readWindow) else {
+                let started = await reader.startCount()
+                consumer.cancel()
+                _ = await consumer.value
+                return XCTFail(
+                    """
+                    attempt \(attempt): producer never saturated the \(readWindow)-read window \
+                    (started \(started)); aborting instead of waiting out the job
+                    """
+                )
+            }
             let startedBeforeCancellation = await reader.startCount()
             let cancelledAt = DispatchTime.now().uptimeNanoseconds
             consumer.cancel()
             let events = await consumer.value
-            await reader.waitUntilNoActiveReads()
+            guard await reader.waitUntilNoActiveReads() else {
+                let stillActive = await reader.activeReadCount()
+                return XCTFail(
+                    """
+                    attempt \(attempt): \(stillActive) read(s) still active after cancellation; \
+                    aborting instead of waiting out the job
+                    """
+                )
+            }
             let drainMilliseconds = Self.milliseconds(since: cancelledAt)
 
             let activeReads = await reader.activeReadCount()
@@ -304,6 +464,13 @@ private struct SingleFileFixture {
     let byteCount: Int
     let expectedMatchRange: NSRange
     let expectedLine: Int
+}
+
+private struct GlobalCapFixture {
+    let rootURL: URL
+    let capture: WorkspaceDirectorySnapshotCapture
+    let orderedRelativePaths: [String]
+    let totalByteCount: Int
 }
 
 private struct DenseWholeWordFixture {
@@ -379,6 +546,38 @@ extension WorkspaceSearchPerformanceTests {
             matchingRelativePaths: matchingRelativePaths,
             totalByteCount: totalByteCount,
             expectedMatchRanges: expectedMatchRanges
+        )
+    }
+
+    private func makeGlobalCapFixture() async throws -> GlobalCapFixture {
+        let root = try makeTemporaryDirectory(prefix: "WS4BGlobalMatchCap")
+        var orderedRelativePaths: [String] = []
+        var totalByteCount = 0
+
+        // One occurrence more than the per-file ceiling, so every file is also per-file
+        // truncated and the global ceiling is reached exactly on a file boundary.
+        let body = (0 ..< Self.globalCapOccurrencesPerFile)
+            .map { "line \($0) \(Self.token)\n" }
+            .joined()
+
+        for index in 0 ..< Self.globalCapFileCount {
+            let name = String(format: "cap-%02d.md", index)
+            try Data(body.utf8).write(to: root.appendingPathComponent(name), options: .atomic)
+            orderedRelativePaths.append(name)
+            totalByteCount += body.utf8.count
+        }
+
+        let capture = try await WorkspaceDirectoryScanner().snapshotCapture(root: root)
+        XCTAssertEqual(
+            Self.independentTokenRanges(in: body).count,
+            Self.globalCapOccurrencesPerFile
+        )
+
+        return GlobalCapFixture(
+            rootURL: root,
+            capture: capture,
+            orderedRelativePaths: orderedRelativePaths,
+            totalByteCount: totalByteCount
         )
     }
 
@@ -578,8 +777,6 @@ extension WorkspaceSearchPerformanceTests {
     ) throws {
         let results = fileResults(in: events)
         let summary = try XCTUnwrap(completedSummaries(in: events).first, label)
-        let progress = progressEvents(in: events)
-        let limits = WorkspaceSearchLimits()
         let expectedMatchCount = fixture.matchingRelativePaths.count * Self.matchesPerMatchingFile
 
         XCTAssertEqual(results.map(\.relativePath), fixture.matchingRelativePaths, label)
@@ -612,25 +809,64 @@ extension WorkspaceSearchPerformanceTests {
 
         XCTAssertEqual(summary.readInstrumentation.diskReadCount, Self.bulkFileCount, label)
         XCTAssertEqual(summary.readInstrumentation.diskReadByteCount, fixture.totalByteCount, label)
-        XCTAssertEqual(summary.readInstrumentation.maximumConcurrentReads, limits.maximumConcurrentReads, label)
-        XCTAssertEqual(summary.readInstrumentation.maximumOutstandingReadCount, limits.maximumConcurrentReads, label)
-        // Buffering behind an earlier path is completion-order dependent; only its ceiling is
-        // contractual, so the exact peak is not asserted.
-        XCTAssertLessThanOrEqual(
-            summary.readInstrumentation.maximumBufferedReadCount,
-            limits.maximumConcurrentReads,
+        // 2,000 candidates genuinely saturate the window, so here the ceiling is reached exactly
+        // rather than merely respected. Buffering behind an earlier path is completion-order
+        // dependent, so only its ceiling is contractual (asserted in the shared invariants).
+        XCTAssertEqual(
+            summary.readInstrumentation.maximumConcurrentReads,
+            Self.expectedMaximumConcurrentReads,
+            label
+        )
+        XCTAssertEqual(
+            summary.readInstrumentation.maximumOutstandingReadCount,
+            Self.expectedMaximumConcurrentReads,
             label
         )
 
-        // Structural memory boundedness: production emits a finite, precomputable number of
-        // events with per-file, per-query, snippet, and read-window ceilings intact.
-        let expectedProgressEventCount = limits.maximumProgressEvents
+        // This fixture must stay clear of the global ceiling; the ceiling itself is driven by
+        // `testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates`.
+        XCTAssertLessThan(expectedMatchCount, Self.expectedMaximumMatchesPerQuery, label)
+        XCTAssertTrue(
+            results.allSatisfy { $0.matches.count <= Self.expectedMaximumMatchesPerFile },
+            label
+        )
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: Self.bulkFileCount,
+            expectedFileResultCount: fixture.matchingRelativePaths.count,
+            expectedSkippedEventCount: 0,
+            label: label
+        )
+    }
+
+    /// Stream-shape invariants that must hold for **every** probe in this file, not just the bulk
+    /// one: an exactly precomputable event count, monotonic progress ending at `N / N`, read-window
+    /// ceilings, the skipped-detail cap, and completion as the final event. Each probe still
+    /// asserts its own content (paths, ranges, lines, byte accounting) separately.
+    private func assertSharedStreamInvariants(
+        _ events: [WorkspaceSearchEvent],
+        candidateFileCount: Int,
+        expectedFileResultCount: Int,
+        expectedSkippedEventCount: Int,
+        label: String
+    ) throws {
+        let summary = try XCTUnwrap(completedSummaries(in: events).first, label)
+        let progress = progressEvents(in: events)
+        let expectedProgressEventCount = Self.expectedProgressEventCount(
+            candidateFileCount: candidateFileCount
+        )
+
+        XCTAssertEqual(fileResults(in: events).count, expectedFileResultCount, label)
+        XCTAssertEqual(skippedFiles(in: events).count, expectedSkippedEventCount, label)
+
         XCTAssertEqual(progress.count, expectedProgressEventCount, label)
+        XCTAssertLessThanOrEqual(progress.count, Self.expectedMaximumProgressEvents, label)
         XCTAssertEqual(
             progress.last,
             WorkspaceSearchProgress(
-                completedFileCount: Self.bulkFileCount,
-                candidateFileCount: Self.bulkFileCount
+                completedFileCount: candidateFileCount,
+                candidateFileCount: candidateFileCount
             ),
             label
         )
@@ -638,20 +874,47 @@ extension WorkspaceSearchPerformanceTests {
             zip(progress, progress.dropFirst()).allSatisfy { $0.completedFileCount < $1.completedFileCount },
             label
         )
-        XCTAssertEqual(
-            events.count,
-            results.count + expectedProgressEventCount + 1,
+
+        XCTAssertLessThanOrEqual(
+            summary.readInstrumentation.maximumConcurrentReads,
+            Self.expectedMaximumConcurrentReads,
             label
         )
-        XCTAssertLessThanOrEqual(expectedMatchCount, limits.maximumMatchesPerQuery, label)
-        XCTAssertTrue(
-            results.allSatisfy { $0.matches.count <= limits.maximumMatchesPerFile },
+        XCTAssertLessThanOrEqual(
+            summary.readInstrumentation.maximumOutstandingReadCount,
+            Self.expectedMaximumConcurrentReads,
+            label
+        )
+        XCTAssertLessThanOrEqual(
+            summary.readInstrumentation.maximumBufferedReadCount,
+            Self.expectedMaximumConcurrentReads,
+            label
+        )
+        XCTAssertLessThanOrEqual(
+            summary.skippedFiles.count,
+            Self.expectedMaximumReportedSkippedFiles,
+            label
+        )
+
+        XCTAssertEqual(
+            events.count,
+            expectedFileResultCount + expectedSkippedEventCount + expectedProgressEventCount + 1,
             label
         )
         XCTAssertEqual(terminalEventCount(in: events), 1, label)
         guard let lastEvent = events.last, case .completed = lastEvent else {
             return XCTFail("\(label): completion must be the final event")
         }
+    }
+
+    /// Mirrors the production coalescing rule: stride `ceil(N / M)` with a final value, so the
+    /// stream never exceeds `M` progress events regardless of workspace size.
+    private static func expectedProgressEventCount(candidateFileCount: Int) -> Int {
+        let candidates = max(candidateFileCount, 1)
+        let cap = expectedMaximumProgressEvents
+        let stride = max(1, (candidates + cap - 1) / cap)
+        let whole = candidates / stride
+        return candidates % stride == 0 ? whole : whole + 1
     }
 
     private func assertAdmittedFileResults(
@@ -692,7 +955,17 @@ extension WorkspaceSearchPerformanceTests {
             Self.admittedFileByteCount,
             label
         )
-        XCTAssertEqual(terminalEventCount(in: events), 1, label)
+        XCTAssertFalse(summary.isTruncated, label)
+        XCTAssertEqual(summary.ignoredFileCount, 0, label)
+        XCTAssertEqual(summary.omittedSkippedFileCount, 0, label)
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 1,
+            expectedSkippedEventCount: 0,
+            label: label
+        )
     }
 
     private func assertDenseRejectionResults(
@@ -706,10 +979,20 @@ extension WorkspaceSearchPerformanceTests {
         XCTAssertTrue(skippedFiles(in: events).isEmpty, label)
         XCTAssertEqual(summary.candidateFileCount, 1, label)
         XCTAssertEqual(summary.searchedFileCount, 1, label)
+        XCTAssertEqual(summary.skippedFileCount, 0, label)
+        XCTAssertEqual(summary.ignoredFileCount, 0, label)
         XCTAssertEqual(summary.totalEmittedMatchCount, 0, label)
+        XCTAssertFalse(summary.isTruncated, label)
         XCTAssertEqual(summary.readInstrumentation.diskReadCount, 1, label)
         XCTAssertEqual(summary.readInstrumentation.diskReadByteCount, fixture.byteCount, label)
-        XCTAssertEqual(terminalEventCount(in: events), 1, label)
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 0,
+            expectedSkippedEventCount: 0,
+            label: label
+        )
     }
 
     private static func previewUTF16Bound(for match: TextSearchMatch) -> Int {
@@ -816,11 +1099,16 @@ extension WorkspaceSearchPerformanceTests {
 /// `.ignore` resolve immediately as missing, exactly as they do in the real fixture, so the
 /// blocked reads are candidate reads only.
 private actor BlockingSearchReader: WorkspaceSearchFileReading {
+    /// Generous relative to the sub-millisecond behavior being measured, but bounded, so a
+    /// regression fails this probe in seconds instead of stalling the whole test job.
+    static let waitTimeoutNanoseconds: UInt64 = 10_000_000_000
+
     private var activeReads = 0
     private var startedReads = 0
     private var cancelledReads = 0
-    private var startWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
-    private var idleWaiters: [CheckedContinuation<Void, Never>] = []
+    private var nextWaiterID: UInt64 = 0
+    private var startWaiters: [(UInt64, Int, CheckedContinuation<Bool, Never>)] = []
+    private var idleWaiters: [(UInt64, CheckedContinuation<Bool, Never>)] = []
 
     nonisolated func physicalPreflightError(at _: URL) -> WorkspaceSearchFileReadError? {
         nil
@@ -853,18 +1141,67 @@ private actor BlockingSearchReader: WorkspaceSearchFileReading {
         return WorkspaceSearchFileReadResult(data: data, fileAuthority: nil)
     }
 
-    func waitUntilStartCount(_ count: Int) async {
-        if startedReads >= count { return }
-        await withCheckedContinuation { continuation in
-            startWaiters.append((count, continuation))
+    /// Waits for the producer to start `count` reads, returning `false` if it has not done so
+    /// within the deadline. Every read here blocks for a minute, so an unbounded wait would turn
+    /// a window regression into a job-length hang instead of a test failure; the caller asserts
+    /// on the result and stops rather than reporting a meaningless latency sample.
+    func waitUntilStartCount(
+        _ count: Int,
+        timeoutNanoseconds: UInt64 = BlockingSearchReader.waitTimeoutNanoseconds
+    ) async -> Bool {
+        if startedReads >= count { return true }
+        let id = nextWaiterID
+        nextWaiterID += 1
+        let expiry = expiryTask(for: id, timeoutNanoseconds: timeoutNanoseconds) { reader, id in
+            await reader.expireStartWaiter(id)
+        }
+        defer { expiry.cancel() }
+        return await withCheckedContinuation { continuation in
+            startWaiters.append((id, count, continuation))
         }
     }
 
-    func waitUntilNoActiveReads() async {
-        if activeReads == 0 { return }
-        await withCheckedContinuation { continuation in
-            idleWaiters.append(continuation)
+    /// Waits for every blocked read to unwind after cancellation, returning `false` on timeout
+    /// for the same reason as `waitUntilStartCount(_:timeoutNanoseconds:)`.
+    func waitUntilNoActiveReads(
+        timeoutNanoseconds: UInt64 = BlockingSearchReader.waitTimeoutNanoseconds
+    ) async -> Bool {
+        if activeReads == 0 { return true }
+        let id = nextWaiterID
+        nextWaiterID += 1
+        let expiry = expiryTask(for: id, timeoutNanoseconds: timeoutNanoseconds) { reader, id in
+            await reader.expireIdleWaiter(id)
         }
+        defer { expiry.cancel() }
+        return await withCheckedContinuation { continuation in
+            idleWaiters.append((id, continuation))
+        }
+    }
+
+    private nonisolated func expiryTask(
+        for id: UInt64,
+        timeoutNanoseconds: UInt64,
+        expire: @escaping @Sendable (BlockingSearchReader, UInt64) async -> Void
+    ) -> Task<Void, Never> {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            guard !Task.isCancelled, let self else { return }
+            await expire(self, id)
+        }
+    }
+
+    /// Removing the waiter under actor isolation is what keeps the resume exactly-once: whichever
+    /// of the satisfying path and the expiry path reaches the array first takes the continuation.
+    private func expireStartWaiter(_ id: UInt64) {
+        guard let index = startWaiters.firstIndex(where: { $0.0 == id }) else { return }
+        let waiter = startWaiters.remove(at: index)
+        waiter.2.resume(returning: false)
+    }
+
+    private func expireIdleWaiter(_ id: UInt64) {
+        guard let index = idleWaiters.firstIndex(where: { $0.0 == id }) else { return }
+        let waiter = idleWaiters.remove(at: index)
+        waiter.1.resume(returning: false)
     }
 
     func startCount() -> Int {
@@ -893,7 +1230,7 @@ private actor BlockingSearchReader: WorkspaceSearchFileReading {
                 let waiters = idleWaiters
                 idleWaiters.removeAll()
                 for waiter in waiters {
-                    waiter.resume()
+                    waiter.1.resume(returning: true)
                 }
             }
         }
@@ -908,12 +1245,12 @@ private actor BlockingSearchReader: WorkspaceSearchFileReading {
     }
 
     private func resumeStartWaiters() {
-        var remaining: [(Int, CheckedContinuation<Void, Never>)] = []
-        for (target, continuation) in startWaiters {
-            if startedReads >= target {
-                continuation.resume()
+        var remaining: [(UInt64, Int, CheckedContinuation<Bool, Never>)] = []
+        for waiter in startWaiters {
+            if startedReads >= waiter.1 {
+                waiter.2.resume(returning: true)
             } else {
-                remaining.append((target, continuation))
+                remaining.append(waiter)
             }
         }
         startWaiters = remaining
