@@ -916,21 +916,28 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   retry, restores eligibility without a reschedule signal, and proves the same exact attempt and
   request ID focus Search and apply its receipt.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
-- [x] Add large-workspace and large-document performance probes. Evidence:
-  `PerformanceTests/WorkspaceSearchPerformanceTests.swift` drives the real
-  `WorkspaceSearchService` over real on-disk workspaces. The four search probes use the
-  production `WorkspaceSearchDiskFileReader`: a 2,000-file `.md`/`.mdx` workspace, a file of
-  exactly the 524,288-byte admission cap whose only match is in the final line, its
-  524,289-byte one-byte-over sibling, and two dense whole-word rejection shapes at the cap. A
-  fifth probe measures rapid cancellation of a saturated four-read window and is the one
-  deliberate exception: it substitutes a controlled reader that blocks every candidate read,
-  because deterministic cancel-to-drain measurement needs a window that cannot finish on its
-  own. Fixture creation and `snapshotCapture` are excluded from timing; each search probe's
-  warm-up request is asserted with the same predicates as the measured samples. Each sample
-  hard-asserts ordered results, per-file UTF-16 match ranges and line numbers, exact summary
-  accounting (candidate/searched/skipped/ignored counts, emitted matches, disk read count and
-  byte total), the exact finite event count, and the concurrent/buffered/outstanding read
-  ceilings. Memory boundedness is asserted as structural limits rather than an RSS threshold.
+- [x] Add large-workspace and large-document performance probes. Evidence: 14 probes across 11
+  files under `PerformanceTests/` drive the real `WorkspaceSearchService` over real on-disk
+  workspaces. Every probe that issues a search uses the production
+  `WorkspaceSearchDiskFileReader`; the ceiling-pin probe performs no search, and the
+  cancellation probe is the one deliberate reader exception, substituting a reader that blocks
+  every candidate read because deterministic cancel-to-drain measurement needs a window that
+  cannot finish on its own. Shapes: a 2,000-file `.md`/`.mdx` workspace under both `.sensitive`
+  and the default `.smart` case policy; a file of exactly the 524,288-byte admission cap whose
+  only match is in the final line; a 524,288-byte CJK file searched under `.smart`; an
+  admission-boundary pair whose oversized sibling is 4,194,304 bytes, eight times the cap, so a
+  bounded read is distinguishable from a read-everything-then-truncate one; two dense whole-word
+  rejection shapes at the cap; a 24-file global-match-ceiling workspace; a 250-file
+  progress-coalescing workspace; and oversized/under-ceiling `.gitignore` pairs. Fixture creation
+  and `snapshotCapture` are excluded from timing; each search probe's warm-up request is asserted
+  with the same predicates as the measured samples, and a one-per-process warm-up runs before any
+  probe. Every run that reaches completion with at least one surviving candidate goes through the
+  shared stream invariants: ordered results, per-file UTF-16 match ranges and line numbers, exact
+  summary accounting, the full progress sequence, the exact finite event count, and the
+  concurrent/buffered/outstanding read ceilings. Read bounds are proven from the production
+  reader's `readChunk` events, which carry the bytes requested of and returned by each `read(2)`,
+  rather than from returned buffer sizes. Memory boundedness is asserted as structural limits
+  rather than an RSS threshold.
 - [x] Record measured local performance and choose/freeze budgets from evidence. Evidence:
   `docs/perf-log.md` §"Phase 3 WS4B Workspace Search Performance Gates" records the
   environment, commands, fixtures, raw samples from three Release and three Debug runs, and the

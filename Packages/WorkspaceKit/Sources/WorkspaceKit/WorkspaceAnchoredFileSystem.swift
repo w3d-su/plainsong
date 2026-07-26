@@ -340,7 +340,12 @@ enum WorkspaceAnchoredFileSystem {
         case displacedEntryCaptured
         case willRollback
         case didRollback
-        case readChunk(Int)
+        /// Chunk index, the byte count asked of `read(2)`, and the byte count it returned.
+        ///
+        /// The requested count is carried so an observer can prove a bounded read actually issued
+        /// bounded syscalls. Chunk indices alone cannot: a loop that asked for a full buffer every
+        /// time and truncated the result afterwards produces the same indices as a correct one.
+        case readChunk(Int, Int, Int)
         case bytesRead
         case postflight
     }

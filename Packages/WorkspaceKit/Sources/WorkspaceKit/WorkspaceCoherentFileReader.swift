@@ -198,7 +198,7 @@ extension WorkspaceCoherentFileReader {
                          .didRollback,
                          .namespaceValidated:
                         break
-                    case let .readChunk(chunk):
+                    case let .readChunk(chunk, _, _):
                         eventHandler?(.readChunk(attempt, chunk))
                     case .bytesRead:
                         eventHandler?(.bytesRead(attempt))

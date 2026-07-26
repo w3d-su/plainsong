@@ -377,7 +377,7 @@ extension WorkspaceAnchoredFileSystem {
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
             data.append(contentsOf: buffer.prefix(count))
-            hooks.emit(.readChunk(chunkIndex))
+            hooks.emit(.readChunk(chunkIndex, requested, count))
             chunkIndex += 1
         }
         try checkCancellation()

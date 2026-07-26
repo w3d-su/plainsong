@@ -30,14 +30,32 @@ final class ReaderEventRecorder: @unchecked Sendable {
         return storage
     }
 
-    /// Zero-based chunk indices observed for `relativePath`, in emission order.
-    func readChunkIndices(forPathSuffix suffix: String) -> [Int] {
+    /// One entry per observed `read(2)` on `suffix`, in emission order.
+    func reads(forPathSuffix suffix: String) -> [ObservedRead] {
         events.compactMap { event in
-            guard case let .readChunk(_, chunkIndex, path) = event, path.hasSuffix(suffix) else {
+            guard case let .readChunk(_, chunkIndex, requested, returned, path) = event,
+                  path.hasSuffix(suffix)
+            else {
                 return nil
             }
-            return chunkIndex
+            return ObservedRead(index: chunkIndex, requested: requested, returned: returned)
         }
+    }
+
+    struct ObservedRead: Equatable {
+        let index: Int
+        let requested: Int
+        let returned: Int
+    }
+}
+
+extension [ReaderEventRecorder.ObservedRead] {
+    var totalRequested: Int {
+        reduce(0) { $0 + $1.requested }
+    }
+
+    var totalReturned: Int {
+        reduce(0) { $0 + $1.returned }
     }
 }
 
@@ -69,27 +87,48 @@ extension WorkspaceSearchPerformanceTests {
         XCTAssertEqual(summary.searchedFileCount, 1)
         XCTAssertEqual(summary.skippedFileCount, 1)
 
-        let oversizedChunks = recorder.readChunkIndices(forPathSuffix: "oversized.md")
-        let admittedChunks = recorder.readChunkIndices(forPathSuffix: "admitted.md")
+        let oversized = recorder.reads(forPathSuffix: "oversized.md")
+        let admitted = recorder.reads(forPathSuffix: "admitted.md")
 
         XCTAssertEqual(
-            oversizedChunks,
+            oversized.map(\.index),
             Array(0 ..< Self.boundedOversizedReadChunkCount),
             """
             the oversized sibling must be read in exactly \(Self.boundedOversizedReadChunkCount) \
-            chunks; \(Self.unboundedOversizedReadChunkCount) would mean the whole file was read \
-            and the result merely truncated
+            chunks; \(Self.unboundedOversizedReadChunkCount) would mean the whole file was read
             """
         )
-        XCTAssertLessThan(
-            oversizedChunks.count,
-            Self.unboundedOversizedReadChunkCount,
-            "a full read of the 4 MiB sibling must not happen"
+
+        // Chunk counts alone are not enough: a loop that asked for a full 64 KiB buffer on the
+        // final read and truncated afterwards produces these same nine indices. Assert the bytes
+        // actually asked of `read(2)` and actually returned.
+        XCTAssertEqual(
+            oversized.totalRequested,
+            Self.boundedOversizedReadByteCount,
+            "the syscalls must request exactly the inclusive limit in total"
         )
+        XCTAssertEqual(oversized.totalReturned, Self.boundedOversizedReadByteCount)
+        XCTAssertEqual(
+            oversized.last?.requested,
+            1,
+            "the final read must ask for the single remaining byte, not a full buffer"
+        )
+        XCTAssertTrue(oversized.allSatisfy { $0.requested <= Self.readChunkByteCount })
+        XCTAssertLessThan(oversized.totalReturned, Self.oversizedFileByteCount)
 
         // The admitted file stops one chunk earlier: its ninth read returns EOF, which emits no
         // chunk event, so a correct bounded read of an exactly-at-cap file is eight chunks.
-        XCTAssertEqual(admittedChunks, Array(0 ..< Self.admittedFileReadChunkCount))
+        XCTAssertEqual(admitted.map(\.index), Array(0 ..< Self.admittedFileReadChunkCount))
+        XCTAssertEqual(admitted.totalRequested, Self.admittedFileByteCount)
+        XCTAssertEqual(admitted.totalReturned, Self.admittedFileByteCount)
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: 2,
+            expectedFileResultCount: 1,
+            expectedSkippedEventCount: 1,
+            label: "read bounds"
+        )
     }
 
     /// The 64 KiB ignore-file ceiling has behavior, not just a pinned constant: an oversized
@@ -122,15 +161,31 @@ extension WorkspaceSearchPerformanceTests {
             "an over-ceiling ignore file must not be applied"
         )
 
-        let ignoreChunks = recorder.readChunkIndices(forPathSuffix: ".gitignore")
+        let ignoreReads = recorder.reads(forPathSuffix: ".gitignore")
         XCTAssertEqual(
-            ignoreChunks,
+            ignoreReads.map(\.index),
             Array(0 ..< Self.boundedIgnoreReadChunkCount),
             """
             the oversized .gitignore must be read in exactly \
             \(Self.boundedIgnoreReadChunkCount) chunks, not to its full \
             \(Self.oversizedIgnoreFileByteCount) bytes
             """
+        )
+        XCTAssertEqual(
+            ignoreReads.totalRequested,
+            Self.boundedIgnoreReadByteCount,
+            "two chunks could still be 131,072 bytes; the requested total is what bounds it"
+        )
+        XCTAssertEqual(ignoreReads.totalReturned, Self.boundedIgnoreReadByteCount)
+        XCTAssertEqual(ignoreReads.last?.requested, 1)
+        XCTAssertLessThan(ignoreReads.totalReturned, Self.oversizedIgnoreFileByteCount)
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 1,
+            expectedSkippedEventCount: 0,
+            label: "oversized ignore"
         )
     }
 
@@ -156,5 +211,15 @@ extension WorkspaceSearchPerformanceTests {
         )
         XCTAssertEqual(summary.ignoredFileCount, 1)
         XCTAssertEqual(summary.searchedFileCount, 0)
+        XCTAssertEqual(summary.skippedFileCount, 0)
+
+        // No candidate survives here, so the shared invariants' progress model does not apply;
+        // terminal correctness is still asserted, so a `.failed` terminal or a missing completion
+        // cannot pass.
+        XCTAssertTrue(failures(in: run.events).isEmpty)
+        XCTAssertEqual(terminalEventCount(in: run.events), 1)
+        guard let last = run.events.last, case .completed = last else {
+            return XCTFail("completion must be the final event")
+        }
     }
 }

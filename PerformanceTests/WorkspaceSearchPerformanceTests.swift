@@ -5,58 +5,65 @@ import XCTest
 
 /// Phase 3 WS4B production-shaped workspace-search performance gates.
 ///
-/// Every probe drives the real `WorkspaceSearchService` over a real on-disk workspace. The
-/// search probes use the production `WorkspaceSearchDiskFileReader`, so the measured cost
-/// includes candidate planning, anchored no-follow reads, UTF-8 decoding, MarkdownCore
-/// matching, and stream delivery. The cancellation probe is the one deliberate exception: it
-/// substitutes a controlled reader that blocks every candidate read, because deterministic
-/// cancellation needs a saturated read window that cannot finish on its own. Fixture creation
-/// and workspace scanning are always performed before timing starts.
+/// Every probe that issues a search drives the real `WorkspaceSearchService` over a real on-disk
+/// workspace using the production `WorkspaceSearchDiskFileReader`, so the measured cost includes
+/// candidate planning, anchored no-follow reads, UTF-8 decoding, MarkdownCore matching, and
+/// stream delivery. Two probes are not of that shape:
+/// `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` performs no search at all, and the
+/// cancellation probe substitutes a controlled reader that blocks every candidate read, because
+/// deterministic cancellation needs a saturated read window that cannot finish on its own.
+/// Fixture creation and workspace scanning are always performed before timing starts.
 ///
 /// Wall-clock budgets are hard locally and informational on hosted CI (risk R15). Deterministic
 /// results, exact summary/event accounting, read-window ceilings, and cancellation behavior
 /// (every read released, no further read started, no terminal event) are hard assertions
 /// everywhere, including CI; only the cancel-to-drain latency number follows the R15 rule.
 ///
-/// Every run that reaches completion — measured sample, warm-up, and the dense-rejection literal
-/// control alike — goes through `assertSharedStreamInvariants`, so the exact event count, progress
-/// coalescing, read-window ceilings, skipped-detail cap, and completion ordering are checked on
-/// all of them. The resource ceilings are pinned as literals in this file rather than read back
-/// from `WorkspaceSearchLimits`; see `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
+/// Every run that reaches completion with at least one surviving candidate — measured sample,
+/// warm-up, and controls alike — goes through `assertSharedStreamInvariants`, so the exact event
+/// count, progress coalescing, read-window ceilings, skipped-detail cap, and completion ordering
+/// are checked on all of them. The under-ceiling ignore control is the one exception: its ignore
+/// rule removes the only candidate, so the progress model does not apply and that probe asserts
+/// terminal correctness directly. The resource ceilings are pinned as literals in this file
+/// rather than read back from `WorkspaceSearchLimits`; see
+/// `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
 ///
 /// Both case policies are covered. `.smart` is the UI default and resolves to the *insensitive*
 /// backend for lowercase and CJK patterns, so it is a different comparison path from the
 /// `.sensitive` probes here; see `WorkspaceSearchSmartCasePerformanceTests.swift`.
 ///
-/// The probes are split across several files to stay near the ~400-line guidance in agent.md
-/// §17.10: this file holds the class, the frozen constants, the ceiling pins, and the throughput
-/// probes; `…SmartCase…`, `…Ceiling…`, and `…Cancellation…` hold the remaining probes;
-/// `…Fixtures`, `…Assertions`, `…Support`, and `…BlockingReader` hold the shared machinery.
+/// The gate is split across eleven files to stay near the ~400-line guidance in agent.md §17.10:
+/// this file holds the class, the frozen constants, the ceiling pins, and the throughput probes;
+/// `…SmartCase…`, `…Ceiling…`, `…Cancellation…`, and `…ReadBounds…` hold the remaining probes;
+/// `…PerformanceFixtures`, `…PerformanceIgnoreFixtures`, `…PerformanceAssertions`,
+/// `…PerformanceSupport`, `…PerformanceWarmUp`, and `…PerformanceBlockingReader` hold the shared
+/// machinery.
 final class WorkspaceSearchPerformanceTests: XCTestCase {
     // MARK: - Frozen budgets
 
-    // Budgets are frozen from the 2026-07-25 measurements recorded in `docs/perf-log.md`.
-    // They must hold in the Debug configuration used by `make test`, which is roughly 2x
-    // slower than Release on these paths, so each budget carries about 2-4x headroom over
-    // the measured Debug median.
+    // Budgets are frozen from evidence and must hold in the Debug configuration `make test` uses,
+    // which is roughly 2x slower than Release on these paths. Headroom is not uniform; the
+    // measured per-metric figures live in `docs/perf-log.md`, which is the authority. The
+    // per-budget notes below quote the slowest of the three Debug medians from that record.
 
-    /// Full 2,000-file workspace search. Debug median 1227 ms, Release median 714 ms.
+    /// Full 2,000-file workspace search. Slowest Debug median 1239.958 ms; ~2.4x headroom.
     static let bulkWorkspaceBudgetMilliseconds = 3000.0
-    /// One admitted 512 KiB file with the only match near EOF. Debug 39 ms, Release 8 ms.
+    /// One admitted 512 KiB file with the only match near EOF.
+    /// Slowest Debug median 41.978 ms; ~3.6x headroom.
     static let admittedFileBudgetMilliseconds = 150.0
-    /// Cancel-to-drain latency for a saturated four-read window. Debug and Release < 0.3 ms.
+    /// Cancel-to-drain latency for a saturated four-read window.
+    /// Slowest Debug median 0.244 ms.
     static let cancellationDrainBudgetMilliseconds = 50.0
 
     // The UI default is `.smart`, and `.smart` over a lowercase or CJK pattern resolves to the
-    // *insensitive* backend — a different, more expensive Foundation comparison than the
-    // `.sensitive` path the probes above measure. These budgets cover that default path and are
-    // frozen from the 2026-07-26 Debug measurements recorded in `docs/perf-log.md`.
+    // *insensitive* Foundation backend — a different comparison path from the `.sensitive` probes
+    // above. These budgets cover that default path.
 
     /// Full 2,000-file workspace search under the default `.smart` case policy.
-    /// Debug medians 1538.752, 1356.618, 1297.017 ms; budget is ~2.6x the slowest.
+    /// Slowest Debug median 1242.638 ms; ~3.2x headroom.
     static let bulkWorkspaceSmartCaseBudgetMilliseconds = 4000.0
-    /// One admitted 512 KiB CJK file searched with a CJK pattern under `.smart`.
-    /// Debug medians 34.729, 30.484, 28.548 ms; budget is ~4.3x the slowest.
+    /// One admitted 512 KiB CJK file under `.smart`.
+    /// Slowest Debug median 28.455 ms; ~5.3x headroom.
     static let admittedCJKFileBudgetMilliseconds = 150.0
 
     // MARK: - Frozen production ceilings
@@ -120,6 +127,8 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let oversizedIgnoreFileByteCount = 4 * 64 * 1024
     /// `ceil(65,537 / 65,536)` = one full chunk plus a one-byte tail.
     static let boundedIgnoreReadChunkCount = 2
+    /// `inclusiveLimit(65,536)`: the exact byte total a bounded ignore-file read may request.
+    static let boundedIgnoreReadByteCount = 65537
 
     /// Candidate count for the progress-stride probe. Chosen so it is neither below the
     /// 100-event cap nor divisible by it: `ceil(250 / 100) = 3` while `floor` would give 2, and

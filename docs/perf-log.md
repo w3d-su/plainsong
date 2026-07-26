@@ -119,16 +119,15 @@ Current sweep values from `make test`:
 
 ## Phase 3 WS4B Workspace Search Performance Gates
 
-This section is the complete record for the WS4B gate. It was rewritten on 2026-07-26 after the
-second review pass rather than amended, so there is one set of current numbers rather than a
-chain of corrections. Superseded values from earlier revisions are not retained except where a
-finding is explicitly about how they changed.
+This section is the complete record for the WS4B gate. It is rewritten rather than amended on
+each revision, so it carries one set of current numbers instead of a chain of corrections.
+Superseded values are not retained except where a finding is explicitly about how they changed.
 
 | Field | Value |
 |---|---|
 | Date | 2026-07-26 |
 | Branch | `phase3-search-ws4b-performance-gates`, originally branched from `main` at `fe953db`, with `main` at `58740ac` (PR #94) merged in at `9b89bce` |
-| Measured commit | The review-hardening tip. Only this section's prose changed after the runs below; no Swift source was touched afterwards. |
+| Measured commit | `d22108617616e9084a3e46faa989af36eb5971ef` |
 | macOS | Darwin 27.0.0 |
 | Machine | Apple Silicon, arm64, 16 GB RAM |
 | Probe count | 14 WS4B tests, part of 23 in the `PerformanceTests` target |
@@ -175,8 +174,10 @@ read the built bundle under macOS TCC.
 
 ### Procedure
 
-1. Every probe drives the real `WorkspaceSearchService` over a real on-disk workspace. The search
-   probes use the production `WorkspaceSearchDiskFileReader`, so the measurement includes
+1. Every probe that issues a search drives the real `WorkspaceSearchService` over a real on-disk
+   workspace. (`testProductionSearchLimitsStillMatchTheFrozenGateCeilings` performs no search; it
+   only compares pinned constants.) Those probes use the production
+   `WorkspaceSearchDiskFileReader`, so the measurement includes
    candidate planning, ignore-policy probes, anchored no-follow reads, UTF-8 decoding,
    MarkdownCore matching, snippet construction, and stream delivery. The cancellation probe is
    the one deliberate exception: it substitutes a controlled reader that blocks every candidate
@@ -194,9 +195,12 @@ read the built bundle under macOS TCC.
    validates its own stream — one completion terminal, no failure terminal, expected searched and
    matching file counts — so a warm-up that silently failed cannot be recorded as done. A failure
    is not cached, so it surfaces instead of leaving every later probe measuring a cold process.
-5. Every run that reaches completion — measured sample, warm-up, and controls alike — goes
-   through `assertSharedStreamInvariants`: exact event count, the full progress sequence,
-   read-window ceilings, the skipped-detail cap, and completion as the final event.
+5. Every run that reaches completion with at least one surviving candidate — measured sample,
+   warm-up, and controls alike — goes through `assertSharedStreamInvariants`: exact event count,
+   the full progress sequence, read-window ceilings, the skipped-detail cap, and completion as
+   the final event. The one exception is the under-ceiling ignore control, where the ignore rule
+   removes the only candidate so the progress model does not apply; that probe asserts terminal
+   correctness directly instead (exactly one terminal, no failure, completion last).
 6. Resource ceilings are pinned as literals in the test file, not read back from
    `WorkspaceSearchLimits` / `TextSearchEngine`. Reading them back would make every bound
    self-fulfilling. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single
@@ -219,8 +223,8 @@ second review pass removed three cases where the answer was "the one it exists t
 | 2,000-file workspace (`.sensitive` and `.smart`) | ordered results, per-file ranges/lines, summary accounting, event count, or read-window ceilings regress |
 | `testSmartCaseResolvesToInsensitiveMatchingForLowercaseAndCJKPatterns` | `.smart` stopped resolving to the insensitive backend. One lowercase pattern matches three case spellings under `.smart` but one under `.sensitive`; a CJK pattern with a lowercase Latin suffix matches an upper-case occurrence under `.smart` and nothing under `.sensitive` |
 | Admitted 512 KiB file, and the CJK file under `.smart` | the match near EOF is missed, or byte accounting drifts. The CJK probe carries its own `.sensitive` control that must match nothing, so it cannot degenerate into re-measuring the sensitive path |
-| `testOversizedFileIsReadOnlyToTheInclusiveLimit` | the reader read past `inclusiveLimit(cap)`. Asserted on `readChunk` events from the production reader — 9 chunks for the 4 MiB sibling, 8 for the exactly-at-cap file — not on returned byte counts, which a read-everything-then-truncate reader would report identically |
-| `testOversizedIgnoreFileIsBoundedAndItsRulesAreRejected` plus its under-ceiling control | the 64 KiB ignore ceiling stopped rejecting over-size ignore files, or their reads stopped being bounded (2 chunks). The control proves the same rule *is* honored under the ceiling, so "nothing was suppressed" cannot pass by the rule never working |
+| `testOversizedFileIsReadOnlyToTheInclusiveLimit` | the reader read past `inclusiveLimit(cap)`. Asserted on `readChunk` events from the production reader, which carry the bytes **requested of** and **returned by** each `read(2)`: 9 chunks totalling exactly 524,289 requested bytes with a final one-byte request. Chunk counts alone would not suffice — a loop that asked for a full 64 KiB buffer on the last read and truncated afterwards produces the same nine indices |
+| `testOversizedIgnoreFileIsBoundedAndItsRulesAreRejected` plus its under-ceiling control | the 64 KiB ignore ceiling stopped rejecting over-size ignore files, or their reads stopped being bounded — asserted as 2 chunks totalling exactly 65,537 requested bytes, so two full-buffer reads (131,072 bytes) would fail. The control proves the same rule *is* honored under the ceiling, so "nothing was suppressed" cannot pass by the rule never working |
 | `testProgressCoalescingUsesCeilingStrideOnNonDivisibleCandidateCounts` | the stride became `floor` instead of `ceil`, or the final `N / N` event was dropped. Uses 250 candidates: every other fixture has `N ≤ 100` or `N` divisible by 100, where both mistakes are invisible |
 | `testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates` | the 10,000-match ceiling were overshot, `isGloballyTruncated` unset, results emitted past the ceiling, or remaining candidates not drained for accounting |
 | `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` | any pinned production ceiling moved |
@@ -251,13 +255,13 @@ The full `PerformanceTests` target was also run in Release: 23 tests, 0 failures
 
 | Metric | Budget | Debug medians (3 runs) | Release medians (3 runs) | Headroom |
 |---|---:|---|---|---:|
-| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1225.553, 1227.107, 1239.958 | 647.726, 645.724, 643.545 | 2.4x |
-| Workspace search, 2,000 files (`.smart`) | < 4,000 ms | 1213.314, 1242.638, 1209.999 | 671.865, 639.951, 655.974 | 3.2x |
-| Admitted 524,288-byte file | < 150 ms | 41.978, 40.070, 40.538 | 7.650, 7.680, 7.576 | 3.6x |
-| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 27.294, 28.153, 28.455 | 24.319, 23.956, 24.776 | 5.3x |
-| Dense whole-word `ascii-suffix` | < 200 ms | 49.825, 48.524, 47.631 | 5.054, 5.054, 5.143 | 4.0x |
-| Dense whole-word `unicode-periodic` | < 2,500 ms | 1115.369, 1123.998, 1124.372 | 600.437, 617.946, 611.281 | 2.2x |
-| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.198, 0.244, 0.199 | 0.161, 0.165, 0.202 | 205x |
+| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1075.583, 1034.997, 1060.381 | 854.278, 808.488, 868.376 | 2.8x |
+| Workspace search, 2,000 files (`.smart`) | < 4,000 ms | 1097.697, 1042.528, 1119.895 | 1118.649, 901.823, 752.182 | 3.6x |
+| Admitted 524,288-byte file | < 150 ms | 37.794, 37.784, 37.991 | 8.979, 9.168, 10.970 | 3.9x |
+| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 24.892, 24.559, 24.547 | 27.948, 30.141, 29.815 | 6.0x |
+| Dense whole-word `ascii-suffix` | < 200 ms | 45.242, 45.500, 45.635 | 5.870, 6.044, 6.061 | 4.4x |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 1027.955, 1025.876, 1021.251 | 660.601, 673.219, 702.148 | 2.4x |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.162, 0.174, 0.141 | 0.210, 0.187, 0.186 | 287x |
 
 Headroom is budget divided by the *slowest* of the three Debug medians, so it is the worst case
 across a cold first run and two warm ones.
@@ -271,9 +275,15 @@ measure Release, confirm the cost is the documented worst case behind the 512 Ki
 and freeze an evidence-based budget instead. The `.smart` budgets were frozen the same way, from
 the Debug medians measured when those probes were added.
 
-`.smart` is **not** slower than `.sensitive` on the bulk workspace — the two are within noise of
-each other, and `.smart` was slightly faster in some Release runs. The gap this pass closed was
-missing coverage of the default path, not a throughput regression.
+`.smart` is **not** meaningfully slower than `.sensitive` on the bulk workspace — the two are
+within run-to-run noise of each other in Debug, and each has been the faster of the two across
+different Release runs. The gap this pass closed was missing coverage of the default path, not a
+throughput regression.
+
+Headroom is budget divided by the *slowest* of the three Debug medians, and is not uniform: it
+ranges from 2.4x (`unicode-periodic`) to 6.0x (CJK). An earlier revision of this document claimed
+a uniform 2.4x-3.8x; that was true only of warm runs before the process warm-up existed, and is
+replaced by the per-metric column in the measurement table above.
 
 ### Cold-start finding and the process warm-up
 
