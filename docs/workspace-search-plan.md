@@ -917,21 +917,22 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   request ID focus Search and apply its receipt.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
 - [x] Add large-workspace and large-document performance probes. Evidence: 14 probes across 11
-  files under `PerformanceTests/` drive the real `WorkspaceSearchService` over real on-disk
-  workspaces. Every probe that issues a search uses the production
-  `WorkspaceSearchDiskFileReader`; the ceiling-pin probe performs no search, and the
-  cancellation probe is the one deliberate reader exception, substituting a reader that blocks
-  every candidate read because deterministic cancel-to-drain measurement needs a window that
-  cannot finish on its own. Shapes: a 2,000-file `.md`/`.mdx` workspace under both `.sensitive`
+  files under `PerformanceTests/`. Twelve of them drive the real `WorkspaceSearchService` over
+  real on-disk workspaces using the production `WorkspaceSearchDiskFileReader`. The two
+  exceptions are explicit: the ceiling-pin probe performs no search at all, comparing pinned
+  constants against production limits, and the cancellation probe substitutes a reader that
+  blocks every candidate read because deterministic cancel-to-drain measurement needs a window
+  that cannot finish on its own. Shapes: a 2,000-file `.md`/`.mdx` workspace under both `.sensitive`
   and the default `.smart` case policy; a file of exactly the 524,288-byte admission cap whose
   only match is in the final line; a 524,288-byte CJK file searched under `.smart`; an
   admission-boundary pair whose oversized sibling is 4,194,304 bytes, eight times the cap, so a
   bounded read is distinguishable from a read-everything-then-truncate one; two dense whole-word
   rejection shapes at the cap; a 24-file global-match-ceiling workspace; a 250-file
   progress-coalescing workspace; and oversized/under-ceiling `.gitignore` pairs. Fixture creation
-  and `snapshotCapture` are excluded from timing; each search probe's warm-up request is asserted
-  with the same predicates as the measured samples, and a one-per-process warm-up runs before any
-  probe. Every run that reaches completion with at least one surviving candidate goes through the
+  and `snapshotCapture` are excluded from timing. Each *timed search* probe runs one unmeasured
+  warm-up request asserted with the same predicates as its measured samples; the cancellation
+  probe has no warm-up and instead repeats five independent cancellations. A one-per-process
+  warm-up runs before any probe. Every run that reaches completion with at least one surviving candidate goes through the
   shared stream invariants: ordered results, per-file UTF-16 match ranges and line numbers, exact
   summary accounting, the full progress sequence, the exact finite event count, and the
   concurrent/buffered/outstanding read ceilings. Read bounds are proven from the production

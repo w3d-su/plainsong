@@ -216,7 +216,9 @@ read the built bundle under macOS TCC.
 ### What each probe can actually falsify
 
 Every probe below was checked against the question "what break would this still pass?" — the
-second review pass removed three cases where the answer was "the one it exists to catch".
+third and fourth review passes removed four cases where the answer was "the one it exists to
+catch": derived resource ceilings, an unreachable global match cap, a `cap + 1` oversized fixture,
+and read bounds asserted from chunk counts rather than syscall byte counts.
 
 | Probe | Would fail if… |
 |---|---|

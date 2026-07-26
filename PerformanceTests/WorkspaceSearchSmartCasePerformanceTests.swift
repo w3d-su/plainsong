@@ -76,13 +76,20 @@ extension WorkspaceSearchPerformanceTests {
             "sensitive must not match the upper-case CJK+Latin occurrence"
         )
 
-        for (run, label) in [
-            (smartRun, "smart"), (sensitiveRun, "sensitive"), (cjkSmartRun, "cjk smart"),
+        // Every run in this probe, including the two CJK-cased controls, is checked for terminal
+        // shape. Without this a control could emit its result and then `.failed`, or never
+        // complete, and the match-count assertions above would still pass.
+        for (run, label, expectedResults) in [
+            (smartRun, "smart", 1),
+            (sensitiveRun, "sensitive", 1),
+            (cjkSmartRun, "cjk smart", 1),
+            (cjkCasedSmart, "cjk cased smart", 1),
+            (cjkCasedSensitive, "cjk cased sensitive", 0),
         ] {
             try assertSharedStreamInvariants(
                 run.events,
                 candidateFileCount: 1,
-                expectedFileResultCount: 1,
+                expectedFileResultCount: expectedResults,
                 expectedSkippedEventCount: 0,
                 label: label
             )

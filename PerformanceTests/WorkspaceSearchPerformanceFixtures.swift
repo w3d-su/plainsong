@@ -56,9 +56,11 @@ enum DenseWholeWordShape: String, CaseIterable {
     case suffixRejected = "ascii-suffix"
     case composedPeriodic = "unicode-periodic"
 
-    /// Frozen from the 2026-07-25 measurements in `docs/perf-log.md`. The composed-periodic
-    /// shape is the documented worst case at the admission cap: Debug median 1145 ms and
-    /// Release median 612 ms, which is why a 1 MiB admission cap was rejected.
+    /// Frozen from evidence recorded in `docs/perf-log.md`, which is the authority. At the
+    /// measured commit the slowest Debug medians were 45.635 ms (`ascii-suffix`, ~4.4x headroom)
+    /// and 1027.955 ms (`composedPeriodic`, ~2.4x). The composed-periodic shape is the documented
+    /// worst case at the admission cap — ~660-702 ms in Release at exactly 512 KiB — which is why
+    /// a 1 MiB admission cap was rejected.
     var budgetMilliseconds: Double {
         switch self {
         case .suffixRejected:

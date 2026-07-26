@@ -46,13 +46,13 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     // measured per-metric figures live in `docs/perf-log.md`, which is the authority. The
     // per-budget notes below quote the slowest of the three Debug medians from that record.
 
-    /// Full 2,000-file workspace search. Slowest Debug median 1239.958 ms; ~2.4x headroom.
+    /// Full 2,000-file workspace search. Slowest Debug median 1075.583 ms; ~2.8x headroom.
     static let bulkWorkspaceBudgetMilliseconds = 3000.0
     /// One admitted 512 KiB file with the only match near EOF.
-    /// Slowest Debug median 41.978 ms; ~3.6x headroom.
+    /// Slowest Debug median 37.991 ms; ~3.9x headroom.
     static let admittedFileBudgetMilliseconds = 150.0
     /// Cancel-to-drain latency for a saturated four-read window.
-    /// Slowest Debug median 0.244 ms.
+    /// Slowest Debug median 0.174 ms.
     static let cancellationDrainBudgetMilliseconds = 50.0
 
     // The UI default is `.smart`, and `.smart` over a lowercase or CJK pattern resolves to the
@@ -60,10 +60,10 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     // above. These budgets cover that default path.
 
     /// Full 2,000-file workspace search under the default `.smart` case policy.
-    /// Slowest Debug median 1242.638 ms; ~3.2x headroom.
+    /// Slowest Debug median 1119.895 ms; ~3.6x headroom.
     static let bulkWorkspaceSmartCaseBudgetMilliseconds = 4000.0
     /// One admitted 512 KiB CJK file under `.smart`.
-    /// Slowest Debug median 28.455 ms; ~5.3x headroom.
+    /// Slowest Debug median 24.892 ms; ~6.0x headroom.
     static let admittedCJKFileBudgetMilliseconds = 150.0
 
     // MARK: - Frozen production ceilings
