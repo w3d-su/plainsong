@@ -122,15 +122,15 @@ Current sweep values from `make test`:
 | Field | Value |
 |---|---|
 | Date | 2026-07-25 |
-| Branch | `phase3-search-ws4b-performance-gates` (branched from `main` at `fe953db`) |
-| Commit | Working tree for the WS4B performance-gate PR |
+| Branch | `phase3-search-ws4b-performance-gates`; originally branched from `main` at `fe953db`, then merged `main` at `58740ac` (PR #94) |
+| Commit | Release re-verification run at merge commit `9b89bce`. Only this section's prose changed afterwards; no Swift source was touched after the run. |
 | macOS | Darwin 27.0.0 |
 | Machine | Apple Silicon, arm64, 16 GB RAM |
 | Test file | `PerformanceTests/WorkspaceSearchPerformanceTests.swift` |
 | Local Release command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release ENABLE_TESTABILITY=YES -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
 | Local Debug command | `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test` |
-| Reproducibility at this branch tip | **The Release command does not run at this tip yet** — it exits 65. This branch is based on `main` at `fe953db`, which still has `AppTests` referencing App probes that exist only under `#if DEBUG`, and `xcodebuild` builds every test target even under `-only-testing`. PR #94 fixes that. The Debug command above runs today and is what `make test` exercises. Required before this section can be called reproducible: merge #94, rebase this branch onto it, re-run the Release command, and update the commit SHA here and in the PR body with that run's result. |
-| Measurement provenance | The Release medians below were taken before PR #94 landed, when `AppTests` still forced `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG'` onto the Release test build. They were **not** re-measured after that override was removed, and the Release command above is the post-#94 command. Accepted without a re-run because the override never changed optimization level — the measured code was built `-O` either way — and `Packages/MarkdownCore` and `Packages/WorkspaceKit` contain no `#if DEBUG` code at all, so the extra compilation condition could not reach the measured search path. Owner decision on 2026-07-25. Anything that later moves a budget close to its limit should be re-measured with the command as written. |
+| Reproducibility | Reproducible as written. Both commands above run at this branch tip with no build-setting override. Before PR #94 was merged the Release command exited 65 here, because `AppTests` referenced App probes that exist only under `#if DEBUG` and `xcodebuild` builds every test target even under `-only-testing`; merging `main` at `58740ac` removed that. Three Release runs were performed after the merge — see "Post-#94 Release re-verification" below. |
+| Measurement provenance | The budget-selection medians tabulated below were taken **before** PR #94, when the Release test build still required `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) DEBUG'`. They are retained as the record of how the budgets were chosen. They are no longer the only Release evidence: the post-#94 re-verification below re-measured every metric with the override gone and landed inside the same ranges, which confirms empirically what was previously only argued — the override changed no optimization level (`-O` either way) and could not reach the measured path, since `Packages/MarkdownCore` and `Packages/WorkspaceKit` contain no `#if DEBUG` code. |
 
 ### Procedure
 
@@ -212,6 +212,25 @@ Raw in-run samples for the first Release run: workspace search
 `[0.222, 0.195, 0.138, 0.091, 0.185]`. Raw in-run samples for the first Debug run: workspace
 search `[1137.147, 1227.007, 1292.670]`; admitted file `[39.105, 38.837, 38.790]`; cancellation
 drain `[0.213, 0.168, 0.107, 0.238, 0.172]`.
+
+### Post-#94 Release re-verification
+
+Three Release runs at merge commit `9b89bce`, after `main` at `58740ac` (PR #94) was merged in, so
+the documented Release command runs with **no** `SWIFT_ACTIVE_COMPILATION_CONDITIONS` override. All
+three reported `** TEST SUCCEEDED **`, 7 tests, 0 failures. The first run built from a cleaned
+`plainsong-ws4b-release` DerivedData.
+
+| Metric | Budget | Post-#94 Release medians (3 runs) | Pre-#94 Release medians (3 runs) | Result |
+|---|---:|---|---|---|
+| Workspace search, 2,000 files | < 3,000 ms | 697.214, 696.860, 766.784 | 713.694, 680.838, 680.895 | Pass |
+| Admitted 524,288-byte file | < 150 ms | 8.071, 8.443, 11.466 | 7.825, 7.701, 7.630 | Pass |
+| Dense whole-word `ascii-suffix` | < 200 ms | 5.542, 5.524, 5.513 | 5.420, 5.665, 5.282 | Pass |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 629.910, 630.545, 708.431 | 611.946, 628.251, 610.962 | Pass |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.209, 0.178, 0.217 | 0.185, 0.157, 0.173 | Pass |
+
+Every metric stays in the same range as the pre-#94 runs, with the third run uniformly a little
+slower (unrelated load on the machine, visible across all five metrics at once rather than in any
+single path). No budget was changed as a result of this re-verification.
 
 ### First hosted CI observation
 
