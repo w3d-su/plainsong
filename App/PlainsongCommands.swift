@@ -52,6 +52,20 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canSave)
         }
 
+        // F0 spike: claim ⌘F via a real Edit-menu item (no separate CommandMenu("Edit") —
+        // that would duplicate the system Edit title and risk the same key-equivalent
+        // swallow documented for View). Wired like Format: sendAction → focused editor.
+        // Production find-bar UI is PR C; this action only records fire for the owner
+        // physical-keyboard gate. Do not add a Carbon hot key unless that gate fails.
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find…") {
+                EditorFindSpike.performShowFind()
+            }
+            .keyboardShortcut("f", modifiers: .command)
+            .disabled(!snapshot.hasOpenDocument)
+        }
+
         // Placed inside the system-provided View menu (sidebar/toolbar commands live there).
         // A separate `CommandMenu("View")` duplicated that menu's title, and SwiftUI's
         // key-equivalent dispatch swallowed ⇧⌘P/⇧⌘F without firing their actions while two
