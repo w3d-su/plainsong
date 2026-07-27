@@ -44,7 +44,16 @@ struct EditorFindQueryField: NSViewRepresentable {
         context.coordinator.onSubmit = onSubmit
         context.coordinator.onEscape = onEscape
 
-        if field.stringValue != text {
+        // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
+        // Composition is not yet committed into the Binding; a SwiftUI re-render that
+        // pushes the stale Binding value would wipe the composing glyphs.
+        let isComposing: Bool = {
+            if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
+                return true
+            }
+            return context.coordinator.isComposing
+        }()
+        if !isComposing, field.stringValue != text {
             field.stringValue = text
         }
         field.isEditable = isEnabled
@@ -77,6 +86,8 @@ struct EditorFindQueryField: NSViewRepresentable {
         weak var field: NSTextField?
         var lastFocusRequestID: UInt64 = 0
         var lastSelectAllRequestID: UInt64 = 0
+        /// True while the field editor reports marked text (IME composition in progress).
+        var isComposing = false
 
         init(
             text: Binding<String>,
@@ -90,10 +101,13 @@ struct EditorFindQueryField: NSViewRepresentable {
 
         func controlTextDidChange(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
-            // While marked text exists, keep committing ownership with the input context.
+            // While marked text exists, keep ownership with the input context and do not
+            // publish an intermediate Binding that would round-trip and wipe composition.
             if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
+                isComposing = true
                 return
             }
+            isComposing = false
             if text.wrappedValue != field.stringValue {
                 text.wrappedValue = field.stringValue
             }
@@ -101,6 +115,7 @@ struct EditorFindQueryField: NSViewRepresentable {
 
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
+            isComposing = false
             if text.wrappedValue != field.stringValue {
                 text.wrappedValue = field.stringValue
             }

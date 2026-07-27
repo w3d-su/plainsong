@@ -17,6 +17,8 @@ final class EditorFindUITests: XCTestCase {
             shouldRestoreLastOpenedFile: false
         )
         appState.editorFindHost.controller.debounceNanoseconds = 0
+        // Deterministic eligibility without flaky key-window first-responder setup.
+        appState.editorFindHost.commandContextOverride = true
         return appState
     }
 
@@ -32,6 +34,7 @@ final class EditorFindUITests: XCTestCase {
             ui.requestFocusAndSelectAll()
         }
         appState.setEditorFindUI(ui)
+        appState.ensureEditorFindSessionObserverInstalled()
         appState.syncEditorFindControllerDocument()
         if !query.isEmpty {
             appState.pushEditorFindQueryToController()
@@ -60,9 +63,7 @@ final class EditorFindUITests: XCTestCase {
             appState.editorFindHost.controller.session?.total == 2
         }
         // Drain any query-time navigation from first document.
-        let firstNavID = appState.editorFindHost.controller.pendingNavigationCommand?.id
         appState.editorNavigationCommand = nil
-        appState.editorFindHost.lastAppliedNavigationID = firstNavID
 
         let otherURL = URL(fileURLWithPath: "/tmp/plainsong-editor-find-other-\(UUID().uuidString).md")
         let other = DocumentSession(text: "needle only once", url: otherURL, fileKind: .markdown)
@@ -75,14 +76,11 @@ final class EditorFindUITests: XCTestCase {
             appState.editorFindHost.controller.session?.total == 1
         }
 
-        // Rebind must not emit a newer navigation (counter-only).
-        if let pending = appState.editorFindHost.controller.pendingNavigationCommand {
-            XCTAssertEqual(
-                pending.id,
-                firstNavID,
-                "F4b rebind must not emit navigation for the newly focused file"
-            )
-        }
+        // Rebind re-runs for the counter only — no new navigation emission.
+        XCTAssertNil(
+            appState.editorFindHost.controller.pendingNavigationCommand,
+            "F4b rebind must not auto-jump; user moves with ⌘G"
+        )
         XCTAssertNil(
             appState.editorNavigationCommand,
             "App must not apply a new find navigation after rebind"
@@ -100,6 +98,7 @@ final class EditorFindUITests: XCTestCase {
 
         XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
         XCTAssertNil(appState.editorFindHost.controller.session)
+        XCTAssertNil(appState.editorFindHost.controller.query)
         XCTAssertEqual(appState.editorFindHost.controller.documentBinding, .empty)
     }
 
@@ -107,12 +106,64 @@ final class EditorFindUITests: XCTestCase {
         let appState = makeAppState()
         openFindBar(appState, query: "alpha")
         XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
+        XCTAssertNotNil(appState.editorFindHost.controller.query)
 
         appState.notifyEditorFindWorkspaceDidClose()
 
         XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
         XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
         XCTAssertNil(appState.editorFindHost.controller.session)
+        XCTAssertNil(
+            appState.editorFindHost.controller.query,
+            "controller query must clear on workspace close"
+        )
+    }
+
+    func testFindCommandsNoOpWhenBarVisibleButFocusNotEditorOrFindField() {
+        let appState = makeAppState()
+        appState.editorFindHost.commandContextOverride = false
+        var ui = appState.editorFindHost.ui
+        ui.isBarVisible = true
+        ui.queryText = "alpha"
+        appState.setEditorFindUI(ui)
+        let focusBefore = appState.editorFindHost.ui.focusRequestID
+
+        // Bar visible alone is not eligibility when override says context inactive.
+        appState.showOrRefocusEditorFind()
+        XCTAssertEqual(appState.editorFindHost.ui.focusRequestID, focusBefore)
+
+        appState.editorFindNext()
+        appState.editorFindPrevious()
+        appState.useSelectionForEditorFind()
+        XCTAssertEqual(appState.editorFindHost.ui.queryText, "alpha")
+    }
+
+    func testFindNavigationUsesSharedAppNavigationChannelViaProvider() async throws {
+        let appState = makeAppState(text: "one two one")
+        // Simulate a prior workspace-search navigation at a high channel ID.
+        appState.editorNavigationGeneration = 1000
+        openFindBar(appState, query: "one")
+        try await waitUntil("session ready") {
+            appState.editorFindHost.controller.session?.total == 2
+        }
+        try await waitUntil("App publishes navigation") {
+            appState.editorNavigationCommand != nil
+        }
+        guard case let .navigate(request)? = appState.editorNavigationCommand else {
+            return XCTFail("expected navigate")
+        }
+        XCTAssertGreaterThan(
+            request.id,
+            1000,
+            "find navigation must use App editorNavigationGeneration via navigationIDProvider"
+        )
+        XCTAssertFalse(request.shouldFocusEditor)
+        // Provider is installed: controller pending shares the same ID as App publish.
+        guard case let .navigate(pending)? = appState.editorFindHost.controller.pendingNavigationCommand
+        else {
+            return XCTFail("controller still holds pending")
+        }
+        XCTAssertEqual(pending.id, request.id)
     }
 
     // MARK: - F5 source+preview
@@ -185,6 +236,10 @@ final class EditorFindUITests: XCTestCase {
             source.contains("return false"),
             "Marked-text branch must leave keys with the input context"
         )
+        XCTAssertTrue(
+            source.contains("isComposing"),
+            "updateNSView must skip Binding overwrite while composing"
+        )
     }
 
     // MARK: - F7 focus arbitration
@@ -215,23 +270,22 @@ final class EditorFindUITests: XCTestCase {
 
     func testCommandFWhileBarOpenRefocusesAndNeverCloses() {
         let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
+        appState.showOrRefocusEditorFind()
+        XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
         let focusBefore = appState.editorFindHost.ui.focusRequestID
         let selectBefore = appState.editorFindHost.ui.selectAllRequestID
-        XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
 
-        // Bar already open → contextOK without editor first responder.
+        // ⌘F while open: re-focus + select-all, never close.
         appState.showOrRefocusEditorFind()
 
         XCTAssertTrue(appState.editorFindHost.ui.isBarVisible, "⌘F must never close an open bar")
         XCTAssertEqual(appState.editorFindHost.ui.focusRequestID, focusBefore &+ 1)
         XCTAssertEqual(appState.editorFindHost.ui.selectAllRequestID, selectBefore &+ 1)
-        XCTAssertEqual(appState.editorFindHost.ui.queryText, "alpha")
     }
 
     func testCommandFAndWorkspaceSearchFocusReceiptsDoNotCrossConsume() {
         let appState = makeAppState()
-        openFindBar(appState, query: "x")
+        appState.showOrRefocusEditorFind()
         let findFocus = appState.editorFindHost.ui.focusRequestID
 
         appState.workspaceRootURL = URL(fileURLWithPath: "/tmp/plainsong-find-cross-consume")
@@ -257,48 +311,35 @@ final class EditorFindUITests: XCTestCase {
 
     func testUseSelectionForFindSetsPatternWithoutShowingBar() {
         let appState = makeAppState(text: "prefix selectedWord suffix")
-        // Simulate a non-empty editor selection known to App (⌘E path).
         let range = ("prefix selectedWord suffix" as NSString).range(of: "selectedWord")
-        appState.editorFindHost.latestKnownEditorSelection = range
-        // Force command context via open bar then close — still allow when selection is known
-        // by temporarily opening visibility for context, then testing the no-show contract.
-        // useSelection requires editor/find context; seed bar visibility without focusing.
-        var ui = appState.editorFindHost.ui
-        ui.isBarVisible = true
-        appState.setEditorFindUI(ui)
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            range: range
+        )
 
+        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
         appState.useSelectionForEditorFind()
         XCTAssertEqual(appState.editorFindHost.ui.queryText, "selectedWord")
-
-        // Now close and prove ⌘E with bar closed still sets pattern without reopening when
-        // we keep bar closed after useSelection — product: never shows.
-        appState.closeEditorFindBar()
-        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
-
-        // With bar closed, need command context. Seed selection and force context by
-        // setting latestKnown + calling when bar was open path already validated no-show
-        // doesn't open: useSelection when bar open doesn't change visibility goal.
-        // Direct contract: after useSelection, bar remains closed if it was closed —
-        // reopen then use with open, close, and assert useSelection path does not open.
-        openFindBar(appState, query: "old")
-        appState.editorFindHost.latestKnownEditorSelection = range
-        appState.useSelectionForEditorFind()
-        XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
-        XCTAssertEqual(appState.editorFindHost.ui.queryText, "selectedWord")
-        appState.closeEditorFindBar()
-        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
-        // Closed + no editor focus → useSelection no-ops (does not show bar).
-        appState.useSelectionForEditorFind()
         XCTAssertFalse(
             appState.editorFindHost.ui.isBarVisible,
             "⌘E must not show the find bar (macOS convention)"
         )
+
+        // Context inactive → no-op (does not show bar, does not change pattern).
+        appState.editorFindHost.commandContextOverride = false
+        appState.editorFindHost.ui.queryText = ""
+        appState.setEditorFindUI(appState.editorFindHost.ui)
+        appState.useSelectionForEditorFind()
+        XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
+        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
     }
 
     func testUseSelectionRejectsNewlinesAndOversizedPatterns() {
         let appState = makeAppState(text: "a\nb")
-        openFindBar(appState)
-        appState.editorFindHost.latestKnownEditorSelection = NSRange(location: 0, length: 3) // includes newline
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            range: NSRange(location: 0, length: 3) // includes newline
+        )
         appState.useSelectionForEditorFind()
         XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
 
@@ -309,8 +350,37 @@ final class EditorFindUITests: XCTestCase {
             fileKind: .markdown
         )
         appState.setCurrentDocument(longSession, synchronizingWorkspaceTree: false)
-        openFindBar(appState)
-        appState.editorFindHost.latestKnownEditorSelection = NSRange(location: 0, length: long.utf16.count)
+        appState.editorFindHost.commandContextOverride = true
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            range: NSRange(location: 0, length: long.utf16.count)
+        )
+        appState.useSelectionForEditorFind()
+        XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
+    }
+
+    func testCachedSelectionDoesNotCrossDocumentIdentity() {
+        let appState = makeAppState(text: "alpha beta")
+        let rangeA = ("alpha beta" as NSString).range(of: "alpha")
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            range: rangeA
+        )
+        let other = DocumentSession(
+            text: "gamma delta",
+            url: URL(fileURLWithPath: "/tmp/plainsong-editor-find-other-sel.md"),
+            fileKind: .markdown
+        )
+        appState.setCurrentDocument(other, synchronizingWorkspaceTree: false)
+        // Cache cleared on switch.
+        XCTAssertNil(appState.editorFindHost.latestKnownEditorSelection)
+
+        appState.editorFindHost.commandContextOverride = true
+        // Wrong-document cache must not supply ⌘E pattern.
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: EditorDocumentIdentity(rawValue: "file://other"),
+            range: rangeA
+        )
         appState.useSelectionForEditorFind()
         XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
     }

@@ -13,28 +13,39 @@ extension AppState {
 
     /// Wire controller → App presentation/navigation once. Match completion is async and
     /// debounced; a fixed sleep after `setQuery` races and leaves hits unmarked.
+    ///
+    /// Also installs `navigationIDProvider` so find shares App's workspace-search
+    /// high-water mark (F3 shared ID domain contract from PR B).
     func ensureEditorFindSessionObserverInstalled() {
         guard !editorFindHost.didInstallSessionObserver else { return }
         editorFindHost.didInstallSessionObserver = true
+        editorFindHost.controller.navigationIDProvider = { [weak self] in
+            guard let self else { return 0 }
+            return self.advanceEditorNavigationGeneration()
+        }
         editorFindHost.controller.onSessionDidChange = { [weak self] in
             guard let self else { return }
-            self.publishEditorFindSessionPresentation()
-            self.applyEditorFindNavigationIfNeeded()
+            publishEditorFindSessionPresentation()
+            applyEditorFindNavigationIfNeeded()
         }
     }
 
     /// Whether the key window's first responder is the editor, its field editor, or the find field.
     func isEditorFindCommandContextActive() -> Bool {
         guard hasOpenDocument else { return false }
+        if let override = editorFindHost.commandContextOverride {
+            return override
+        }
         return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
     }
 
     /// ⌘F — show or re-focus; never closes.
+    ///
+    /// No-op when focus is not the editor or find field (sidebar / preview), even if the
+    /// bar is already visible — bar visibility alone does not grant command eligibility.
     func showOrRefocusEditorFind() {
         guard hasOpenDocument else { return }
-        // Allow when bar already open (focus may be in find field) or editor is active.
-        let contextOK = isEditorFindCommandContextActive() || editorFindHost.ui.isBarVisible
-        guard contextOK else { return }
+        guard isEditorFindCommandContextActive() else { return }
 
         ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
@@ -60,48 +71,47 @@ extension AppState {
 
     func editorFindNext() {
         guard hasOpenDocument else { return }
-        guard editorFindHost.ui.isBarVisible || isEditorFindCommandContextActive() else { return }
+        guard isEditorFindCommandContextActive() else { return }
         ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         if !editorFindHost.ui.isBarVisible {
             syncEditorFindControllerDocument()
         }
-        if editorFindHost.controller.session == nil {
+        // Session is nil while a match is in flight (invalidated at scheduleMatch).
+        guard editorFindHost.controller.session != nil else {
             if !editorFindHost.ui.queryText.isEmpty {
                 pushEditorFindQueryToController()
             }
             return
         }
         editorFindHost.controller.findNext()
-        applyEditorFindNavigationIfNeeded()
-        publishEditorFindSessionPresentation()
+        // onSessionDidChange remaps navigation onto the shared channel.
     }
 
     func editorFindPrevious() {
         guard hasOpenDocument else { return }
-        guard editorFindHost.ui.isBarVisible || isEditorFindCommandContextActive() else { return }
+        guard isEditorFindCommandContextActive() else { return }
         ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         if !editorFindHost.ui.isBarVisible {
             syncEditorFindControllerDocument()
         }
-        if editorFindHost.controller.session == nil {
+        guard editorFindHost.controller.session != nil else {
             if !editorFindHost.ui.queryText.isEmpty {
                 pushEditorFindQueryToController()
             }
             return
         }
         editorFindHost.controller.findPrevious()
-        applyEditorFindNavigationIfNeeded()
-        publishEditorFindSessionPresentation()
     }
 
     /// ⌘E — macOS convention: set pattern from selection **without** showing/focusing the bar.
     /// Never closes an open bar. Format ▸ Inline Code no longer claims ⌘E (Decision Log).
     func useSelectionForEditorFind() {
         guard hasOpenDocument else { return }
-        guard isEditorFindCommandContextActive() || editorFindHost.ui.isBarVisible else { return }
+        guard isEditorFindCommandContextActive() else { return }
 
+        ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         let selection = currentEditorSelectionUTF16()
         let text = currentDocument.text as NSString
@@ -125,9 +135,6 @@ extension AppState {
         editorFindHost.controller.setCaretAnchor(selection.location)
         syncEditorFindControllerDocument()
         pushEditorFindQueryToController()
-        if editorFindHost.ui.isBarVisible {
-            publishEditorFindSessionPresentation()
-        }
     }
 
     func handleEditorFindQueryTextChange(_ text: String) {
@@ -136,8 +143,10 @@ extension AppState {
         ui.queryText = text
         setEditorFindUI(ui)
         syncEditorFindControllerDocument()
-        if let selection = editorFindHost.latestKnownEditorSelection {
-            editorFindHost.controller.setCaretAnchor(selection.location)
+        if let known = editorFindHost.latestKnownEditorSelection,
+           known.documentIdentity == activeEditorDocumentIdentity
+        {
+            editorFindHost.controller.setCaretAnchor(known.range.location)
         }
         pushEditorFindQueryToController()
     }
@@ -182,6 +191,10 @@ extension AppState {
     }
 
     func notifyEditorFindDocumentDidSwitch() {
+        // Drop selection cache — ranges are document-scoped.
+        editorFindHost.latestKnownEditorSelection = nil
+        editorFindHost.lastPublishedFindNavigationID = nil
+
         if !hasOpenDocument {
             editorFindHost.controller.clearForNoDocument()
             var ui = editorFindHost.ui
@@ -210,7 +223,11 @@ extension AppState {
     }
 
     func notifyEditorFindWorkspaceDidClose() {
+        // clearForNoDocument clears controller query + session so the next open does not
+        // re-run a background find against a new document.
         editorFindHost.controller.clearForNoDocument()
+        editorFindHost.latestKnownEditorSelection = nil
+        editorFindHost.lastPublishedFindNavigationID = nil
         var ui = editorFindHost.ui
         ui.closeBar()
         ui.queryText = ""
@@ -255,7 +272,6 @@ extension AppState {
         }
         editorFindHost.controller.setQuery(query)
         // Counter + selection apply via onSessionDidChange when the debounced match lands.
-        // Do not sleep-then-apply: that races match completion and leaves hits unmarked.
     }
 
     private func publishEditorFindSessionPresentation() {
@@ -264,35 +280,48 @@ extension AppState {
         setEditorFindUI(ui)
     }
 
+    /// Publish the controller's pending navigation on the shared App channel.
+    /// IDs are already from `navigationIDProvider` → `advanceEditorNavigationGeneration`
+    /// (do **not** allocate a second ID here).
     private func applyEditorFindNavigationIfNeeded() {
         guard let command = editorFindHost.controller.pendingNavigationCommand else { return }
         let id = command.id
-        if let last = editorFindHost.lastAppliedNavigationID, id <= last {
+        if let last = editorFindHost.lastPublishedFindNavigationID, id <= last {
             return
         }
-        editorFindHost.lastAppliedNavigationID = id
-        // Bump by reassigning so SwiftUI/EditorKit always observe a new command value
-        // even if a prior equal enum associated value was somehow sticky.
+        editorFindHost.lastPublishedFindNavigationID = id
+        // Reassign so SwiftUI/EditorKit observes a new command value.
         editorNavigationCommand = nil
         editorNavigationCommand = command
     }
 
     private func refreshEditorFindCaretFromResponderIfPossible() {
         if let range = EditorSelectionProbe.keyWindowEditorSelection() {
-            editorFindHost.latestKnownEditorSelection = range
+            let cached = EditorFindCachedSelection(
+                documentIdentity: activeEditorDocumentIdentity,
+                range: range
+            )
+            editorFindHost.latestKnownEditorSelection = cached
             editorFindHost.controller.setCaretAnchor(range.location)
-        } else if let known = editorFindHost.latestKnownEditorSelection {
-            editorFindHost.controller.setCaretAnchor(known.location)
+        } else if let known = editorFindHost.latestKnownEditorSelection,
+                  known.documentIdentity == activeEditorDocumentIdentity
+        {
+            editorFindHost.controller.setCaretAnchor(known.range.location)
         }
     }
 
     private func currentEditorSelectionUTF16() -> NSRange {
         if let live = EditorSelectionProbe.keyWindowEditorSelection() {
-            editorFindHost.latestKnownEditorSelection = live
+            editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+                documentIdentity: activeEditorDocumentIdentity,
+                range: live
+            )
             return live
         }
-        if let known = editorFindHost.latestKnownEditorSelection {
-            return known
+        if let known = editorFindHost.latestKnownEditorSelection,
+           known.documentIdentity == activeEditorDocumentIdentity
+        {
+            return known.range
         }
         return NSRange(location: 0, length: 0)
     }

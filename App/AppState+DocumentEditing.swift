@@ -530,18 +530,21 @@ extension AppState {
         EditorDocumentIdentity(rawValue: url.absoluteString)
     }
 
-    private func issueEditorNavigation(
+    func issueEditorNavigation(
         documentIdentity: EditorDocumentIdentity,
-        selection: NSRange
+        selection: NSRange,
+        shouldFocusEditor: Bool = true
     ) {
         editorNavigationCommand = .navigate(EditorNavigationRequest(
             id: advanceEditorNavigationGeneration(),
             documentIdentity: documentIdentity,
-            selection: selection
+            selection: selection,
+            shouldFocusEditor: shouldFocusEditor
         ))
     }
 
-    private func advanceEditorNavigationGeneration() -> UInt64 {
+    @discardableResult
+    func advanceEditorNavigationGeneration() -> UInt64 {
         precondition(editorNavigationGeneration < .max, "Editor navigation generation exhausted")
         editorNavigationGeneration += 1
         return editorNavigationGeneration
