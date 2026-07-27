@@ -210,13 +210,19 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             "Focus on a bar control in the key window must keep ⌘G / ⌘E live"
         )
 
-        // An untagged report cannot be checked against the key window, so it is not stored.
+        // An untagged report cannot be checked against the key window and cannot be scoped to
+        // an owner, so it is ignored outright rather than stored or used to clear.
         appState.setEditorFindChromeFocus(.wholeWord, inWindowNumber: nil)
-        XCTAssertNil(appState.editorFindHost.chromeFocus)
-        XCTAssertFalse(appState.isEditorFindCommandContextActive())
+        XCTAssertEqual(appState.editorFindHost.chromeFocus?.focus, .matchCase)
+        appState.setEditorFindChromeFocus(nil, inWindowNumber: nil)
+        XCTAssertEqual(
+            appState.editorFindHost.chromeFocus?.windowNumber,
+            key,
+            "An untagged clear must not drop an owned report"
+        )
+        XCTAssertTrue(appState.isEditorFindCommandContextActive())
 
         // Focus left the bar: fall back to the AppKit editor / query-field check.
-        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: key)
         appState.clearEditorFindChromeFocus()
         XCTAssertEqual(
             appState.isEditorFindCommandContextActive(),
@@ -255,6 +261,49 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         )
     }
 
+    func testBackgroundWindowCannotClearTheKeyWindowsChromeFocusReport() {
+        let appState = makeAppState()
+        openFindBar(appState, query: "alpha")
+        appState.editorFindHost.commandContextOverride = nil
+        let key = 202
+        let background = 101
+        appState.editorFindHost.keyWindowNumberOverride = key
+
+        // Full Keyboard Access has focus on the key window's Aa toggle.
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: key)
+        XCTAssertTrue(appState.isEditorFindCommandContextActive())
+
+        // A background window's bar loses focus, or unmounts, and reports nil for itself.
+        appState.setEditorFindChromeFocus(nil, inWindowNumber: background)
+        XCTAssertEqual(
+            appState.editorFindHost.chromeFocus?.windowNumber,
+            key,
+            "A background window must not clear a report it does not own"
+        )
+        XCTAssertTrue(
+            appState.isEditorFindCommandContextActive(),
+            "⌘G / ⌘E must survive an unrelated window closing or losing focus"
+        )
+
+        // The owning window clears its own report normally.
+        appState.setEditorFindChromeFocus(nil, inWindowNumber: key)
+        XCTAssertNil(appState.editorFindHost.chromeFocus)
+    }
+
+    func testBackgroundWindowCannotOverwriteTheKeyWindowsChromeFocusReport() {
+        let appState = makeAppState()
+        openFindBar(appState, query: "alpha")
+        appState.editorFindHost.commandContextOverride = nil
+        appState.editorFindHost.keyWindowNumberOverride = 202
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: 202)
+
+        // A background window reporting its own focus replaces the stored report, but it is
+        // then tagged with *that* window and so grants nothing.
+        appState.setEditorFindChromeFocus(.next, inWindowNumber: 101)
+        XCTAssertEqual(appState.editorFindHost.chromeFocus?.windowNumber, 101)
+        XCTAssertFalse(appState.isEditorFindCommandContextActive())
+    }
+
     func testEveryBarCloseRouteClearsReportedChromeFocus() {
         for close in [
             ("Escape / Done", { (state: AppState) in state.closeEditorFindBar() }),
@@ -276,6 +325,42 @@ final class EditorFindFocusReceiptTests: XCTestCase {
                 "\(close.0): a closed bar must not leave focus state that keeps commands eligible"
             )
         }
+    }
+
+    // MARK: - Window bridge
+
+    func testWindowBridgeDefersPublicationToTheNextMainActorTurn() async throws {
+        let bridge = EditorFindBarWindowBridge()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil) }
+
+        // `EditorFindBarWindowReader.updateNSView` calls this from inside a SwiftUI view
+        // update. Publishing synchronously there is undefined and trips "Modifying state
+        // during view update", which is why the bar no longer writes `@State` directly.
+        bridge.attach(to: window)
+        XCTAssertNil(
+            bridge.windowNumber,
+            "The window must not be published synchronously during a view update"
+        )
+
+        try await waitUntil("bridge publishes on a later turn") {
+            bridge.windowNumber == window.windowNumber
+        }
+
+        // Repeat attachment for the same window is a no-op.
+        bridge.attach(to: window)
+        XCTAssertEqual(bridge.windowNumber, window.windowNumber)
+
+        // Detaching publishes nil, also deferred.
+        bridge.attach(to: nil)
+        XCTAssertEqual(bridge.windowNumber, window.windowNumber)
+        try await waitUntil("bridge publishes detachment") { bridge.windowNumber == nil }
     }
 
     func testEditorAndQueryFieldResponderEligibilityIsUnchanged() throws {

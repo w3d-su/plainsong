@@ -13,9 +13,9 @@ import SwiftUI
 struct EditorFindBar: View {
     @EnvironmentObject private var appState: AppState
     @FocusState private var chromeFocus: EditorFindChromeFocus?
-    /// Window hosting *this* bar, learned from the owned query field. Focus reports are
-    /// tagged with it so a background window's focus cannot grant eligibility in the key one.
-    @State private var hostWindowNumber: Int?
+    /// Window hosting *this* bar. Focus reports are tagged with it so a background window can
+    /// neither grant eligibility in the key one nor clear the key one's live report.
+    @StateObject private var windowBridge = EditorFindBarWindowBridge()
 
     var body: some View {
         let ui = appState.editorFindHost.ui
@@ -35,10 +35,6 @@ struct EditorFindBar: View {
                 readFocusSnapshot: { appState.editorFindHost.ui.focusSnapshot },
                 markFocusApplied: { appState.markEditorFindFocusApplied($0) },
                 markSelectAllApplied: { appState.markEditorFindSelectAllApplied($0) },
-                reportHostWindowNumber: { number in
-                    guard hostWindowNumber != number else { return }
-                    hostWindowNumber = number
-                },
                 onSubmit: {
                     // Bar chrome acts directly: the responder-context guard exists to keep
                     // *menu* commands from firing when focus is elsewhere in the window.
@@ -139,15 +135,20 @@ struct EditorFindBar: View {
         .onExitCommand {
             appState.closeEditorFindBarFromExitCommand()
         }
+        .background(EditorFindBarWindowReader(bridge: windowBridge))
         .onChange(of: chromeFocus) { _, focus in
-            appState.setEditorFindChromeFocus(focus, inWindowNumber: hostWindowNumber)
+            appState.setEditorFindChromeFocus(focus, inWindowNumber: windowBridge.windowNumber)
         }
-        .onChange(of: hostWindowNumber) { _, number in
+        .onChange(of: windowBridge.windowNumber) { previous, number in
+            // The window is published a turn late, so focus may already have been reported
+            // against no window (dropped) or against the previous one. Re-home it.
             guard chromeFocus != nil else { return }
+            appState.setEditorFindChromeFocus(nil, inWindowNumber: previous)
             appState.setEditorFindChromeFocus(chromeFocus, inWindowNumber: number)
         }
         .onDisappear {
-            appState.clearEditorFindChromeFocus()
+            // Scoped: this bar unmounting must not wipe another window's live report.
+            appState.setEditorFindChromeFocus(nil, inWindowNumber: windowBridge.windowNumber)
         }
     }
 }

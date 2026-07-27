@@ -17,9 +17,6 @@ struct EditorFindQueryField: NSViewRepresentable {
     var markFocusApplied: (UInt64) -> Void
     /// Advances the shared select-all receipt. Only called after this field performed it.
     var markSelectAllApplied: (UInt64) -> Void
-    /// Reports the `NSWindow` hosting this bar. The bar itself is SwiftUI and cannot answer
-    /// it; this owned field can, and chrome-focus reports need it to stay window-scoped.
-    var reportHostWindowNumber: (Int?) -> Void
     var onSubmit: () -> Void
     var onEscape: () -> Void
 
@@ -74,7 +71,6 @@ struct EditorFindQueryField: NSViewRepresentable {
         }
         field.isEditable = isEnabled
         field.setAccessibilityIdentifier(EditorFindAccessibility.queryField)
-        reportHostWindowNumber(field.window?.windowNumber)
 
         let snapshot = readFocusSnapshot()
         if EditorFindFocusArbitration.shouldKeepRetrying(

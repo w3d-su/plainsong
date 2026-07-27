@@ -58,41 +58,6 @@ extension AppState {
         return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
     }
 
-    /// Whether the **key** window is the one reporting find-bar chrome focus.
-    ///
-    /// Every window's bar reports its own SwiftUI focus into shared `AppState`, so the report
-    /// is only meaningful next to the window it came from: focus stranded in a background
-    /// window must not make ⌘G / ⌘E eligible in the window the user is actually typing in.
-    func hasKeyWindowFindChromeFocus() -> Bool {
-        guard let report = editorFindHost.chromeFocus,
-              let keyWindowNumber = editorFindHost.keyWindowNumberOverride
-              ?? NSApp.keyWindow?.windowNumber
-        else {
-            return false
-        }
-        return report.windowNumber == keyWindowNumber
-    }
-
-    /// Records which find-bar control SwiftUI reports as focused, and from which window.
-    ///
-    /// Clearing is unconditional: it only ever removes eligibility, so a window clearing
-    /// another's stale report is safe. Setting requires a window, because an untagged report
-    /// cannot be checked against the key window.
-    func setEditorFindChromeFocus(_ focus: EditorFindChromeFocus?, inWindowNumber windowNumber: Int?) {
-        let report: EditorFindChromeFocusReport? = {
-            guard let focus, let windowNumber else { return nil }
-            return EditorFindChromeFocusReport(windowNumber: windowNumber, focus: focus)
-        }()
-        guard editorFindHost.chromeFocus != report else { return }
-        editorFindHost.chromeFocus = report
-        objectWillChange.send()
-    }
-
-    /// Clears any reported chrome focus (bar close, document switch, workspace close).
-    func clearEditorFindChromeFocus() {
-        setEditorFindChromeFocus(nil, inWindowNumber: nil)
-    }
-
     /// ⌘F — show or re-focus; never closes.
     ///
     /// No-op when focus is not the editor or find field (sidebar / preview), even if the
