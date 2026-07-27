@@ -9,6 +9,41 @@ final class EditorNavigationIntegrationTests: XCTestCase {
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
     private let documentB = EditorDocumentIdentity(rawValue: "document-b")
 
+    func testFindNavigationSelectsAndScrollsWithoutStealingFirstResponder() throws {
+        let source = (0 ... 300)
+            .map { $0 == 280 ? "line \($0) exact 🧪 needle" : "line \($0) filler" }
+            .joined(separator: "\n")
+        let target = (source as NSString).range(of: "exact 🧪 needle")
+        let model = NavigationModel(text: source, selection: NSRange(location: 0, length: 0))
+        let fixture = try makeWindowedFixture(model: model, source: source, height: 100)
+        fixture.textView.textSelection = NSRange(location: 0, length: 0)
+        // Give the editor focus first so a stolen-focus regression is observable, then
+        // hand focus to a decoy find field for the navigation under test.
+        XCTAssertTrue(fixture.window.makeFirstResponder(fixture.textView))
+        let decoy = NSTextField(string: "find-query")
+        decoy.frame = NSRect(x: 0, y: 0, width: 120, height: 24)
+        fixture.window.contentView?.addSubview(decoy)
+        fixture.window.makeKeyAndOrderFront(nil)
+        guard fixture.window.makeFirstResponder(decoy) else {
+            throw XCTSkip("makeFirstResponder(decoy) unavailable in this runner")
+        }
+
+        let request = EditorNavigationRequest(
+            id: 11,
+            documentIdentity: documentA,
+            selection: target,
+            shouldFocusEditor: false
+        )
+        fixture.coordinator.observeNavigationCommand(.navigate(request))
+        fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
+
+        XCTAssertEqual(fixture.textView.selectedRange(), target)
+        XCTAssertFalse(
+            fixture.window.firstResponder === fixture.textView,
+            "Find-style navigation must not claim editor first responder"
+        )
+    }
+
     func testSameDocumentSelectsScrollsAndFocusesInWindowWithoutUndoOrTextMutation() throws {
         let source = (0 ... 300)
             .map { $0 == 280 ? "line \($0) exact 🧪 needle" : "line \($0) filler" }

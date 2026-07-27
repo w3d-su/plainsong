@@ -13,4 +13,6 @@ final class EditorFindHost {
     var presentationTask: Task<Void, Never>?
     var lastAppliedNavigationID: UInt64?
     var latestKnownEditorSelection: NSRange?
+    /// Ensures `onSessionDidChange` is wired once to AppState.
+    var didInstallSessionObserver = false
 }

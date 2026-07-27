@@ -53,21 +53,24 @@ struct EditorFindBar: View {
             .accessibilityIdentifier(EditorFindAccessibility.wholeWord)
             .accessibilityLabel("Whole word")
 
-            if ui.hasActiveQuery {
-                Text(ui.matchCounterText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier(EditorFindAccessibility.matchCounter)
-                    .accessibilityLabel("Find match counter")
-                    .accessibilityValue(ui.matchCounterText)
+            // Always reserve counter chrome so first-match appearance does not reflow
+            // the HStack and remount the AppKit query field (which would drop focus).
+            Text(ui.hasActiveQuery ? ui.matchCounterText : " ")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 72, alignment: .trailing)
+                .opacity(ui.hasActiveQuery ? 1 : 0)
+                .accessibilityIdentifier(EditorFindAccessibility.matchCounter)
+                .accessibilityLabel("Find match counter")
+                .accessibilityValue(ui.hasActiveQuery ? ui.matchCounterText : "")
+                .accessibilityHidden(!ui.hasActiveQuery)
 
-                if ui.isTruncated {
-                    Label("Truncated", systemImage: "exclamationmark.triangle")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .accessibilityIdentifier(EditorFindAccessibility.truncatedIndicator)
-                        .accessibilityLabel("Results truncated at match ceiling")
-                }
+            if ui.hasActiveQuery, ui.isTruncated {
+                Label("Truncated", systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier(EditorFindAccessibility.truncatedIndicator)
+                    .accessibilityLabel("Results truncated at match ceiling")
             }
 
             Button {

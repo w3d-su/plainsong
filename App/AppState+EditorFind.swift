@@ -11,6 +11,18 @@ extension AppState {
         objectWillChange.send()
     }
 
+    /// Wire controller → App presentation/navigation once. Match completion is async and
+    /// debounced; a fixed sleep after `setQuery` races and leaves hits unmarked.
+    func ensureEditorFindSessionObserverInstalled() {
+        guard !editorFindHost.didInstallSessionObserver else { return }
+        editorFindHost.didInstallSessionObserver = true
+        editorFindHost.controller.onSessionDidChange = { [weak self] in
+            guard let self else { return }
+            self.publishEditorFindSessionPresentation()
+            self.applyEditorFindNavigationIfNeeded()
+        }
+    }
+
     /// Whether the key window's first responder is the editor, its field editor, or the find field.
     func isEditorFindCommandContextActive() -> Bool {
         guard hasOpenDocument else { return false }
@@ -24,6 +36,7 @@ extension AppState {
         let contextOK = isEditorFindCommandContextActive() || editorFindHost.ui.isBarVisible
         guard contextOK else { return }
 
+        ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         let wasVisible = editorFindHost.ui.isBarVisible
         var ui = editorFindHost.ui
@@ -48,6 +61,7 @@ extension AppState {
     func editorFindNext() {
         guard hasOpenDocument else { return }
         guard editorFindHost.ui.isBarVisible || isEditorFindCommandContextActive() else { return }
+        ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         if !editorFindHost.ui.isBarVisible {
             syncEditorFindControllerDocument()
@@ -66,6 +80,7 @@ extension AppState {
     func editorFindPrevious() {
         guard hasOpenDocument else { return }
         guard editorFindHost.ui.isBarVisible || isEditorFindCommandContextActive() else { return }
+        ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         if !editorFindHost.ui.isBarVisible {
             syncEditorFindControllerDocument()
@@ -116,6 +131,7 @@ extension AppState {
     }
 
     func handleEditorFindQueryTextChange(_ text: String) {
+        ensureEditorFindSessionObserverInstalled()
         var ui = editorFindHost.ui
         ui.queryText = text
         setEditorFindUI(ui)
@@ -127,6 +143,7 @@ extension AppState {
     }
 
     func handleEditorFindOptionsChange() {
+        ensureEditorFindSessionObserverInstalled()
         syncEditorFindControllerDocument()
         pushEditorFindQueryToController()
     }
@@ -149,6 +166,7 @@ extension AppState {
 
     func notifyEditorFindDocumentDidChange() {
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else { return }
+        ensureEditorFindSessionObserverInstalled()
         let session = currentDocument
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
@@ -160,7 +178,7 @@ extension AppState {
         } else {
             editorFindHost.controller.documentTextDidChange(text: binding.text, revision: binding.revision)
         }
-        scheduleEditorFindPresentationRefresh()
+        // Counter refresh arrives via onSessionDidChange when the recompute finishes.
     }
 
     func notifyEditorFindDocumentDidSwitch() {
@@ -172,6 +190,7 @@ extension AppState {
             setEditorFindUI(ui)
             return
         }
+        ensureEditorFindSessionObserverInstalled()
         let binding = EditorFindDocumentBinding(
             identity: activeEditorDocumentIdentity,
             text: currentDocument.text,
@@ -185,7 +204,6 @@ extension AppState {
             // Do **not** call `setQuery` / `pushEditorFindQueryToController` here — that
             // would schedule `.query` and auto-jump into the newly focused file (F4b).
             editorFindHost.controller.rebindDocument(binding)
-            scheduleEditorFindPresentationRefresh()
         } else if editorFindHost.controller.query != nil {
             editorFindHost.controller.rebindDocument(binding)
         }
@@ -227,30 +245,23 @@ extension AppState {
     }
 
     func pushEditorFindQueryToController() {
+        ensureEditorFindSessionObserverInstalled()
         let query = editorFindHost.ui.makeSearchQuery()
         if query.pattern.isEmpty {
             editorFindHost.controller.setQuery(nil)
+            // onSessionDidChange refreshes chrome; still publish immediately for empty.
             publishEditorFindSessionPresentation()
             return
         }
         editorFindHost.controller.setQuery(query)
-        scheduleEditorFindPresentationRefresh()
+        // Counter + selection apply via onSessionDidChange when the debounced match lands.
+        // Do not sleep-then-apply: that races match completion and leaves hits unmarked.
     }
 
     private func publishEditorFindSessionPresentation() {
         var ui = editorFindHost.ui
         ui.applySessionPresentation(editorFindHost.controller.session)
         setEditorFindUI(ui)
-    }
-
-    private func scheduleEditorFindPresentationRefresh() {
-        editorFindHost.presentationTask?.cancel()
-        editorFindHost.presentationTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 200_000_000)
-            guard !Task.isCancelled, let self else { return }
-            publishEditorFindSessionPresentation()
-            applyEditorFindNavigationIfNeeded()
-        }
     }
 
     private func applyEditorFindNavigationIfNeeded() {
@@ -260,6 +271,9 @@ extension AppState {
             return
         }
         editorFindHost.lastAppliedNavigationID = id
+        // Bump by reassigning so SwiftUI/EditorKit always observe a new command value
+        // even if a prior equal enum associated value was somehow sticky.
+        editorNavigationCommand = nil
         editorNavigationCommand = command
     }
 
