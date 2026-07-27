@@ -11,13 +11,33 @@ import SwiftUI
 @MainActor
 final class EditorFindBarWindowBridge: ObservableObject {
     @Published private(set) var windowNumber: Int?
+    /// Last window actually published. Survives detach so bar teardown can still address the
+    /// report it made for that window after the probe has already reported `nil`.
+    private(set) var lastAttachedWindowNumber: Int?
+
+    /// What the latest `attach` asked for. Compared against **this**, never against the
+    /// published value: publication is a turn late, so `attach(A)` then `attach(nil)` would
+    /// otherwise see `windowNumber == nil`, skip scheduling, and let A's in-flight task
+    /// publish a window that is no longer attached.
+    private var desiredWindowNumber: Int?
+    private var generation: UInt64 = 0
+    private var publishTask: Task<Void, Never>?
 
     func attach(to window: NSWindow?) {
         let number = window?.windowNumber
-        guard windowNumber != number else { return }
-        Task { @MainActor [weak self] in
-            guard let self, windowNumber != number else { return }
+        guard desiredWindowNumber != number else { return }
+        desiredWindowNumber = number
+        generation &+= 1
+        let scheduled = generation
+        publishTask?.cancel()
+        publishTask = Task { @MainActor [weak self] in
+            guard let self, !Task.isCancelled, scheduled == generation else { return }
+            publishTask = nil
+            guard windowNumber != number else { return }
             windowNumber = number
+            if let number {
+                lastAttachedWindowNumber = number
+            }
         }
     }
 }
@@ -36,6 +56,11 @@ struct EditorFindBarWindowReader: NSViewRepresentable {
         nsView.bridge = bridge
         // Safe from inside a view update only because `attach` defers the publish.
         bridge.attach(to: nsView.window)
+    }
+
+    static func dismantleNSView(_ nsView: EditorFindBarWindowProbeView, coordinator _: ()) {
+        nsView.bridge?.attach(to: nil)
+        nsView.bridge = nil
     }
 }
 

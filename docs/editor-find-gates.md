@@ -27,7 +27,11 @@
 > already had. A fourth round scoped report *clearing* to the owning window (tagging alone
 > still let a background window wipe the key window's live report), moved the window lookup
 > onto a deferred `EditorFindBarWindowBridge` instead of writing `@State` from
-> `updateNSView`, and restacked the branch onto `main` after #96 merged.
+> `updateNSView`, and restacked the branch onto `main` after #96 merged. A fifth round
+> replaced the single tagged report with **one report per window**, because a non-`nil` report
+> from any window still replaced the only slot — so returning to a window whose bar still held
+> focus republished nothing and left its ⌘G / ⌘E dead — and gave the bridge generation
+> fencing, because it compared against its own turn-stale published value.
 >
 > Known un-automated: **F6** — removing the Done key equivalent is verifiable by inspection
 > but not by an in-process test, because reproducing the bypass needs a real IME. It stays
@@ -597,12 +601,18 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `...testEveryBarCloseRouteClearsReportedChromeFocus`, and `EditorFindReviewFixTests`
   `...testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext`. Only *which
   window is key* is stubbed; the report-versus-key comparison runs for real.
-  Report *clearing* is window-scoped too — a background window closing or losing focus must
-  not wipe the key window's live report
+  Storage is **one entry per window** (`chromeFocusByWindow`), so neither clearing nor
+  overwriting can cross windows and returning to a window whose bar still holds focus restores
+  eligibility with no republication
   (`...testBackgroundWindowCannotClearTheKeyWindowsChromeFocusReport`,
-  `...testBackgroundWindowCannotOverwriteTheKeyWindowsChromeFocusReport`), and the window
+  `...testBackgroundWindowCannotOverwriteTheKeyWindowsChromeFocusReport`,
+  `...testSwitchingBackToAWindowThatAlreadyReportedFocusRestoresEligibility`). The window
   itself is published a turn late by `EditorFindBarWindowBridge` rather than written into
-  `@State` from `updateNSView` (`...testWindowBridgeDefersPublicationToTheNextMainActorTurn`).
+  `@State` from `updateNSView`, with generation fencing so a superseded attachment cannot
+  publish (`...testWindowBridgeDefersPublicationToTheNextMainActorTurn`,
+  `...testWindowBridgeAttachThenImmediateDetachNeverPublishesTheStaleWindow`,
+  `...testWindowBridgePublishesOnlyTheLatestOfARapidSequence`,
+  `...testWindowBridgeDismantleDetachesTheProbe`).
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
   SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all, nor that
   the bridge receives a window in the shipped view tree.

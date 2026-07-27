@@ -153,7 +153,7 @@ final class EditorFindReviewFixTests: XCTestCase {
             appState.editorFindHost.ui.isBarVisible,
             "Escape on Aa / whole-word / Next / Previous / Done must close the bar"
         )
-        XCTAssertNil(appState.editorFindHost.chromeFocus)
+        XCTAssertTrue(appState.editorFindHost.chromeFocusByWindow.isEmpty)
 
         // Idempotent when there is nothing to close.
         appState.closeEditorFindBarFromExitCommand()

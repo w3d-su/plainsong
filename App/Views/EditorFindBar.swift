@@ -148,7 +148,12 @@ struct EditorFindBar: View {
         }
         .onDisappear {
             // Scoped: this bar unmounting must not wipe another window's live report.
-            appState.setEditorFindChromeFocus(nil, inWindowNumber: windowBridge.windowNumber)
+            // Falls back to the last attached window because the probe may already have
+            // detached (publishing `nil`) before SwiftUI runs this.
+            appState.setEditorFindChromeFocus(
+                nil,
+                inWindowNumber: windowBridge.windowNumber ?? windowBridge.lastAttachedWindowNumber
+            )
         }
     }
 }

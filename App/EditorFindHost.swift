@@ -18,16 +18,6 @@ struct EditorFindCachedSelection: Equatable {
     let range: NSRange
 }
 
-/// A find-bar chrome focus report, tagged with the window that produced it.
-///
-/// `AppState` is shared across the `WindowGroup`, and every window's `EditorFindBar` reports
-/// its own SwiftUI `FocusState`. Without the window tag, focus left behind in a background
-/// window would make ⌘G / ⌘E eligible in whichever window is key.
-struct EditorFindChromeFocusReport: Equatable {
-    let windowNumber: Int
-    let focus: EditorFindChromeFocus
-}
-
 @MainActor
 final class EditorFindHost {
     let controller = EditorFindController()
@@ -39,9 +29,13 @@ final class EditorFindHost {
     var latestKnownEditorSelection: EditorFindCachedSelection?
     /// Ensures `onSessionDidChange` is wired once to AppState.
     var didInstallSessionObserver = false
-    /// Which find-bar control holds SwiftUI focus, and in which window.
-    /// Cleared whenever the bar closes or the document/workspace changes.
-    var chromeFocus: EditorFindChromeFocusReport?
+    /// Reported SwiftUI find-bar focus, **keyed by window number**.
+    ///
+    /// One entry per window: `AppState` is shared across the `WindowGroup` and each window's
+    /// bar keeps its own `FocusState`, so a single slot would let whichever window wrote last
+    /// silently own eligibility. Cleared entirely when the bar closes or the
+    /// document/workspace changes.
+    var chromeFocusByWindow: [Int: EditorFindChromeFocus] = [:]
     /// Test seam: when non-`nil`, replaces key-window first-responder eligibility checks.
     var commandContextOverride: Bool?
     /// Test seam: when non-`nil`, stands in for `NSApp.keyWindow?.windowNumber`.
