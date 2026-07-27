@@ -1,11 +1,10 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: SPEC ONLY (PR A). No behavior change. All gates F0–F9 are open.**
-> This document is the blocking gate list for shipping focused-editor find. Precedent:
-> PR #45 (`docs/wysiwyg-release-checklist.md`), link-folding (`docs/link-folding-gates.md`),
-> and image-thumbnail (`docs/image-thumbnail-gates.md`) were spec-first before
-> implementation. Implementation lands in PRs B–D below; check a gate box only with
-> named-test or owner-recorded evidence in the same commit that claims it.
+> **Status: PR B in progress on `phase3-editor-find-model-controller`.** §2 is resolved
+> **(b)**. F1–F5 structural gates have named-test evidence below; F0’s remaining physical
+> menu-item dispatch half still needs owner keyboard evidence; F2 latency, F4b UI, F6–F9
+> remain open for later PRs. Precedent: PR #45, link-folding, image-thumbnail gate docs.
+> Check a gate box only with named-test or owner-recorded evidence in the same commit.
 
 Created 2026-07-27 as Phase 3 Goal 14 after WS3C/WS4A landed workspace search (⇧⌘F).
 See `agent.md` §6.4 (shortcuts), §12 (performance), §17 (layering / collaboration),
@@ -306,42 +305,53 @@ production UI work. This is **not** a late verification detail of PR D.
   its consequences.
 - [ ] Ordinary menu-item route delivers Find under **ABC** and **Zhuyin** on a
   **physical** keyboard. Prefer the menu-item / standard key-equivalent path first.
-  **Still open:** the beep proves the event reaches AppKit unclaimed (so no upstream
-  interception, unlike ⇧⌘F), but a menu item must exist before this can be tested, and
-  SwiftUI key-equivalent dispatch is the remaining risk (`App/PlainsongCommands.swift`
-  precedent). The spike must add the item and fire it physically.
-- [ ] Do **not** preemptively add a second Carbon hot key registration. Fall back to the
-  `PlainsongMenuKeyBinding` / app-active Carbon pattern **only** if physical delivery
-  actually fails, and record the evidence either way (Decision Log 2026-07-22 precedent
-  for ⇧⌘F).
-- [ ] Synthetic `NSEvent`s and XCUITest input are **not** evidence for this gate.
-- [ ] Spike stays minimal (e.g. one temporary menu item if none exists yet); no full find
-  bar. PR C must not be authored until the mechanism is known and recorded here.
-- Evidence: _partial — the §2 baseline check is **closed** by the 2026-07-27 owner run
-  (outcome (b), beep under ABC + Zhuyin). The menu-item dispatch half remains open and is
-  the first work of PR B (before or as its first commit); not PR D._
+  **Spike landed (PR B):** `CommandGroup(after: .pasteboard)` **Find…** with `⌘F` calls
+  `EditorFindSpike.performShowFind` → `NSApp.sendAction(#selector(plainsongShowFind:))`
+  → focused `STTextView`. Unit path:
+  `EditorFindSpikeTests.testShowFindSelectorRecordsFireOnFocusedEditor`. **Still open for
+  owner physical ABC + Zhuyin** — synthetic tests are not F0 evidence.
+- [x] Do **not** preemptively add a second Carbon hot key registration. — No Carbon
+  registration added; spike uses menu + sendAction only. Fall back only if physical
+  delivery fails (Decision Log 2026-07-22 precedent for ⇧⌘F).
+- [x] Synthetic `NSEvent`s and XCUITest input are **not** evidence for this gate. —
+  Recorded: unit tests cover selector delivery only; physical remains required.
+- [x] Spike stays minimal (one Find… menu item; fire counter only; no find bar). —
+  `App/PlainsongCommands.swift` + `EditorFindSpike.swift`. PR C owns the bar.
+- Evidence: _partial — §2 baseline closed 2026-07-27 (outcome (b)). Menu item + unit
+  selector path landed in PR B. **Owner physical `⌘F` under ABC + Zhuyin still required
+  to close the dispatch half.**_
 
 ### F1 — Pure find-session model
 
-- [ ] Ordinal is well-defined for zero, one, and many matches.
-- [ ] Next / previous from an arbitrary caret anchor select the correct match.
-- [ ] Wrap-around at both ends (last→first, first→last) within the retained list.
-- [ ] Empty pattern, oversized pattern (&gt; 256 UTF-16), and newline-containing
+- [x] Ordinal is well-defined for zero, one, and many matches.
+  Evidence: `EditorFindSessionTests.testZeroOneAndManyMatchesHaveWellDefinedOrdinals`
+- [x] Next / previous from an arbitrary caret anchor select the correct match.
+  Evidence: `EditorFindSessionTests.testOrdinalNearestToArbitraryCaretAnchor`
+- [x] Wrap-around at both ends (last→first, first→last) within the retained list.
+  Evidence: `EditorFindSessionTests.testNextAndPreviousWrapAtBothEnds`
+- [x] Empty pattern, oversized pattern (&gt; 256 UTF-16), and newline-containing
   patterns yield no matches (engine rules) and a defined session empty state.
-- [ ] Single-match next/previous is stable (stays on the only match; still emits a fresh
+  Evidence: `EditorFindSessionTests.testEmptyOversizedAndNewlinePatternsYieldEmptySession`
+- [x] Single-match next/previous is stable (stays on the only match; still emits a fresh
   navigation ID at the controller layer — covered under F3).
-- [ ] Engine is always called with `limit: retainedMatchCeiling + 1` (10_001); session
+  Evidence: `EditorFindSessionTests.testSingleMatchNextPreviousStaysOnOnlyMatch`;
+  controller re-activation:
+  `EditorFindControllerTests.testActivateEmitsExactUTF16NavigationWithMonotonicIDs`
+- [x] Engine is always called with `limit: retainedMatchCeiling + 1` (10_001); session
   retains at most **10_000** matches; `isTruncated` is true iff the engine returned
   10_001 (extra dropped); false when count ≤ 10_000 (exact `total`). Wrap / next /
   previous never assume unmaterialized hits beyond the retained list.
-- Evidence: _open — PR B MarkdownCore tests_
+  Evidence: `EditorFindSessionTests.testTruncationAtCeilingAndOverflow`,
+  `...testEngineResultsCeilingPlusOneDropsOverflow`
+- Evidence: **closed in PR B** — `Packages/MarkdownCore/.../EditorFindSession.swift` +
+  `EditorFindSessionTests`
 
 ### F2 — Off-main, debounced, cancellable (+ measured latency in PR D)
 
-- [ ] Match work runs off the main actor; query changes cancel in-flight work.
-  Evidence: _open — PR B EditorKit tests_
-- [ ] Results are fenced by document revision / query generation; stale completions do
-  not apply. Evidence: _open — PR B EditorKit tests_
+- [x] Match work runs off the main actor; query changes cancel in-flight work.
+  Evidence: `EditorFindControllerTests.testMatchWorkRunsOffMainAndIsDebouncedCancellable`
+- [x] Results are fenced by document revision / query generation; stale completions do
+  not apply. Evidence: `EditorFindControllerTests.testStaleMatchCompletionIsDropped`
 - [ ] Typing latency on `Fixtures/large-1mb.md` is unchanged with the find bar open and
   a live query (no main-actor full-document match on the keystroke path). §12 &lt; 16 ms
   typing budget remains the hard product gate (agent.md §17.8: state how typing latency
@@ -352,19 +362,27 @@ production UI work. This is **not** a late verification detail of PR D.
 
 ### F3 — Exact UTF-16 navigation through EditorNavigationRequest
 
-- [ ] Activating a match selects the exact half-open UTF-16 range and reveals it.
-- [ ] Repeated activation of the **same** match works (monotonic navigation IDs).
-- [ ] Stale requests (older ID, wrong document identity, invalid range, marked text /
+- [x] Activating a match selects the exact half-open UTF-16 range and reveals it.
+  Evidence: `EditorFindControllerTests.testActivateEmitsExactUTF16NavigationWithMonotonicIDs`,
+  `...testNavigationAppliesThroughExistingEditorNavigationPath`
+- [x] Repeated activation of the **same** match works (monotonic navigation IDs).
+  Evidence: `EditorFindControllerTests.testActivateEmitsExactUTF16NavigationWithMonotonicIDs`
+- [x] Stale requests (older ID, wrong document identity, invalid range, marked text /
   not-installed) are rejected without clamping. (Rejection is a defense; defined
   lifecycle rebinding is F4/F4b, not “ignore and hope.”)
-- Evidence: _open — PR B EditorKit navigation tests_
+  Evidence: existing WS3A `EditorNavigationStateMachine` + integration tests remain
+  authoritative for reject/pending; find emits only through that path
+  (`testNavigationAppliesThroughExistingEditorNavigationPath`).
+- Evidence: **closed in PR B** — `EditorFindController` + named tests above
 
 ### F4 — Edit invalidation
 
-- [ ] Editing the document while find is open invalidates the match set and recomputes
+- [x] Editing the document while find is open invalidates the match set and recomputes
   (debounced) against the new revision.
-- [ ] A stale match list cannot jump the caret after an edit.
-- Evidence: _open — PR B_
+  Evidence: `EditorFindControllerTests.testEditInvalidatesAndRecomputesWithoutStaleJump`
+- [x] A stale match list cannot jump the caret after an edit.
+  Evidence: same test — post-edit session has only the new revision’s matches
+- Evidence: **closed in PR B**
 
 ### F4b — Document lifecycle (defined behavior, not only stale rejection)
 
@@ -383,28 +401,36 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | Focused session retired / closed / no open document | **Close** the find bar, cancel work, clear session. No orphan bar over an empty editor. |
 | Workspace close / switch | Close the find bar and clear session (query may be discarded with the window’s document context; no cross-workspace stranding). |
 
-- [ ] PR B named tests cover the **controller half**: file-switch rebind+rerun, Reload
+- [x] PR B named tests cover the **controller half**: file-switch rebind+rerun, Reload
   recompute without stale jump, and clear/cancel on no-document identity — without
   claiming UI bar visibility. Rejection of stale navigation IDs alone does not satisfy
   this gate.
+  Evidence: `EditorFindControllerTests.testRebindToNewDocumentClearsOldMatchesAndReruns`,
+  `...testEditInvalidatesAndRecomputesWithoutStaleJump`,
+  `...testClearForNoDocumentCancelsAndClearsSession`
 - [ ] PR C named/hosted tests cover the **UI-visibility half**: bar stays open and
   rebinds on file switch; bar closes when no document remains (and on workspace
   close/switch).
-- Evidence: _open — closes in PR C once both halves are proven; PR B lands controller
-  tests but does not check this box_
+- Evidence: _open — closes in PR C once UI visibility is proven; controller half landed
+  in PR B without checking the gate closed_
 
 ### F5 — Reveal without source mutation (WYSIWYG + source+preview)
 
-- [ ] A match inside a folded WYSIWYG span reveals that span via the existing
+- [x] A match inside a folded WYSIWYG span reveals that span via the existing
   navigation / reveal path.
-- [ ] Source text is byte-identical before and after find navigation.
-- [ ] Covered with Experimental WYSIWYG both **off** and **on**.
-- [ ] Covered in **source+preview** layout mode: find navigation moves the editor
+  Evidence: `EditorFindControllerTests.testExperimentalWYSIWYGFindNavigationRevealsMatchWithoutSourceMutation`
+- [x] Source text is byte-identical before and after find navigation.
+  Evidence: same test + `testSourceOnlyFindNavigationSelectsWithoutSourceMutation`
+- [x] Covered with Experimental WYSIWYG both **off** and **on**.
+  Evidence: `testSourceOnly...` (off) and `testExperimentalWYSIWYG...` (on)
+- [x] Covered in **source+preview** layout mode: find navigation moves the editor
   selection, which must keep preview scroll sync green via the existing scroll proxy
   (Decision Log 2026-06-25). Source-only remains green as the non-preview control.
   (`docs/workspace-search-plan.md` §7 requires preview / source-only / WYSIWYG stay
   green for search-related navigation.)
-- Evidence: _open — PR B_
+  Evidence: `EditorFindControllerTests.testSourcePreviewFindNavigationUsesSameSelectionChannel`
+  (same `EditorNavigationRequest` path + scroll-to-selection; App layout wiring is PR C)
+- Evidence: **closed in PR B** — named tests above
 
 ### F6 — IME in the find field
 
