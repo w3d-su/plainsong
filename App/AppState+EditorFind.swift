@@ -21,7 +21,7 @@ extension AppState {
         editorFindHost.didInstallSessionObserver = true
         editorFindHost.controller.navigationIDProvider = { [weak self] in
             guard let self else { return 0 }
-            return self.advanceEditorNavigationGeneration()
+            return advanceEditorNavigationGeneration()
         }
         editorFindHost.controller.onSessionDidChange = { [weak self] in
             guard let self else { return }
