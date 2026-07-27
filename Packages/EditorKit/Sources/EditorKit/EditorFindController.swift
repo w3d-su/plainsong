@@ -143,6 +143,13 @@ public final class EditorFindController {
 
     private struct PendingStepIntent: Equatable {
         let generation: UInt64
+        /// Direction of the **first** press (`+1` next, `-1` previous).
+        ///
+        /// A counter-only generation spends its first press activating the current ordinal,
+        /// so only the presses after it move. The net count alone cannot express that:
+        /// next-then-previous nets zero but must still end one match back, and
+        /// previous-then-next nets zero but must end one match forward.
+        let firstDirection: Int
         /// Net signed steps: positive = next, negative = previous.
         var netSteps: Int
     }
@@ -252,6 +259,31 @@ public final class EditorFindController {
         notifySessionDidChange()
     }
 
+    /// Stops navigating **without discarding a resolved session**.
+    ///
+    /// For when the find UI closes but the query stays usable: any generation still in flight
+    /// is fenced (`cancelInFlightWork` advances the generation, so a detached worker's result
+    /// is dropped at apply time), and unpublished navigation plus pending steps are cleared —
+    /// but `session`, and therefore `currentOrdinal`, is retained so the next ⌘G continues
+    /// from the match the user was actually on rather than restarting at the caret anchor.
+    ///
+    /// When no session exists yet the query is still inside its debounce window; fencing that
+    /// generation would leave the retained query permanently unusable, so it is re-run
+    /// counter-only instead.
+    public func suspendNavigation() {
+        pendingNavigationCommand = nil
+        pendingStepIntent = nil
+        shouldActivateCurrentOnNextStep = false
+        guard session != nil else {
+            scheduleMatch(reason: .patternOnly)
+            return
+        }
+        cancelInFlightWork()
+        // The retained session already resolved an ordinal, so the next step moves from it.
+        shouldActivateCurrentOnNextStep = false
+        notifySessionDidChange()
+    }
+
     public func cancelInFlightWork() {
         // Count supersession of either the debounce admission or a running match worker.
         // Debounce cancel is the common rapid-typing path (matchTask often still nil).
@@ -283,7 +315,11 @@ public final class EditorFindController {
             intent.netSteps = min(ceiling, max(-ceiling, intent.netSteps &+ delta))
             pendingStepIntent = intent
         } else {
-            pendingStepIntent = PendingStepIntent(generation: queryGeneration, netSteps: delta)
+            pendingStepIntent = PendingStepIntent(
+                generation: queryGeneration,
+                firstDirection: delta,
+                netSteps: delta
+            )
         }
     }
 
@@ -444,18 +480,15 @@ public final class EditorFindController {
         on newSession: EditorFindSession,
         queryWouldNavigate: Bool
     ) {
-        guard intent.netSteps != 0 else {
-            session = newSession
-            emitNavigation(for: newSession.currentMatch)
-            return
-        }
         // A navigating query already resolves to the anchor match, so every recorded press
         // is a step past it. A counter-only generation (edit / rebind / ⌘E) has not moved
-        // the selection yet, so the first press activates the current ordinal and only the
-        // presses after it step.
+        // the selection yet, so the *first* press activates the current ordinal and only the
+        // presses after it step — which is why the first press's direction is retained
+        // separately from the net: next-then-previous nets zero but must still end one match
+        // back, and previous-then-next must end one match forward.
         let steps = queryWouldNavigate
             ? intent.netSteps
-            : intent.netSteps - (intent.netSteps > 0 ? 1 : -1)
+            : intent.netSteps - intent.firstDirection
         let session = steps == 0 ? newSession : newSession.stepped(by: steps)
         self.session = session
         emitNavigation(for: session.currentMatch)

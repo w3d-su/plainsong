@@ -119,8 +119,70 @@ final class EditorFindControllerStepIntentTests: XCTestCase {
         guard case let .navigate(nav)? = controller.pendingNavigationCommand else {
             return XCTFail("expected navigation")
         }
+        // A navigating query already resolved to the anchor match, so +1 then -1 returns there.
         XCTAssertEqual(nav.selection, firstTwo)
         XCTAssertEqual(controller.session?.currentOrdinal, 1)
+    }
+
+    /// A counter-only generation spends its **first** press activating the current ordinal,
+    /// so opposing presses do not cancel out: next-then-previous must end one match back.
+    /// A net-only intent cannot express this.
+    func testOpposingStepsAfterCounterOnlyRecomputeStepBackFromCurrent() async throws {
+        let text = "a hit b hit c hit d"
+        let hits = occurrences(of: "hit", in: text)
+        XCTAssertEqual(hits.count, 3)
+        let controller = makeController(text: text)
+        // Anchor on the second hit so a step back is observable and does not wrap.
+        controller.setCaretAnchor(hits[1].location)
+        let hold = EditorFindMatchHold()
+        controller.testMatchHold = hold
+        controller.setQuery(TextSearchQuery(pattern: "hit"), emitsNavigation: false)
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { hold.waiterCount >= 1 }
+
+        controller.findNext()
+        controller.findPrevious()
+        hold.release()
+
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
+            controller.session?.total == 3 && controller.pendingNavigationCommand != nil
+        }
+        guard case let .navigate(nav)? = controller.pendingNavigationCommand else {
+            return XCTFail("expected navigation")
+        }
+        XCTAssertEqual(
+            nav.selection,
+            hits[0],
+            "Next activates the current match; the following Previous must still step back"
+        )
+        XCTAssertEqual(controller.session?.currentOrdinal, 1)
+    }
+
+    func testOpposingStepsStartingWithPreviousStepForwardFromCurrent() async throws {
+        let text = "a hit b hit c hit d"
+        let hits = occurrences(of: "hit", in: text)
+        let controller = makeController(text: text)
+        controller.setCaretAnchor(hits[1].location)
+        let hold = EditorFindMatchHold()
+        controller.testMatchHold = hold
+        controller.setQuery(TextSearchQuery(pattern: "hit"), emitsNavigation: false)
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { hold.waiterCount >= 1 }
+
+        controller.findPrevious()
+        controller.findNext()
+        hold.release()
+
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
+            controller.session?.total == 3 && controller.pendingNavigationCommand != nil
+        }
+        guard case let .navigate(nav)? = controller.pendingNavigationCommand else {
+            return XCTFail("expected navigation")
+        }
+        XCTAssertEqual(
+            nav.selection,
+            hits[2],
+            "Previous activates the current match; the following Next must still step forward"
+        )
+        XCTAssertEqual(controller.session?.currentOrdinal, 3)
     }
 
     func testRepeatedStepsAfterCounterOnlyRecomputeActivateThenStep() async throws {
