@@ -13,8 +13,14 @@
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
 > actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
 > now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
-> events are not additional physical-keyboard evidence. WS4 performance probes/budgets and the overall Definition of Done
-> remain open. Workspace Search as a whole stays **IN PROGRESS**.**
+> events are not additional physical-keyboard evidence. **WS4B performance gates are implemented
+> by PR #93** with production-shaped probes and evidence-frozen budgets (2,000-file workspace under
+> both the `.sensitive` and default `.smart` case policies, exactly-admitted 512 KiB file, a
+> 512 KiB CJK file under `.smart`, an oversized sibling proving reads stay bounded, dense
+> whole-word rejection, the global 10,000-match ceiling, pinned resource ceilings, and rapid
+> cancellation of a saturated read window; see `docs/perf-log.md`). The remaining WS4
+> regression-suite item and the overall Definition of Done remain open. Workspace Search as a
+> whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -909,8 +915,53 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   retry, restores eligibility without a reschedule signal, and proves the same exact attempt and
   request ID focus Search and apply its receipt.
   XCUITest input remains synthetic and does not extend the physical-keyboard evidence from PR #89.
-- [ ] Add large-workspace and large-document performance probes.
-- [ ] Record measured local performance and choose/freeze budgets from evidence.
+- [x] Add large-workspace and large-document performance probes. Evidence: 14 probes across 11
+  files under `PerformanceTests/`. Twelve of them drive the real `WorkspaceSearchService` over
+  real on-disk workspaces using the production `WorkspaceSearchDiskFileReader`. The two
+  exceptions are explicit: the ceiling-pin probe performs no search at all, comparing pinned
+  constants against production limits, and the cancellation probe substitutes a reader that
+  blocks every candidate read because deterministic cancel-to-drain measurement needs a window
+  that cannot finish on its own. Shapes: a 2,000-file `.md`/`.mdx` workspace under both `.sensitive`
+  and the default `.smart` case policy; a file of exactly the 524,288-byte admission cap whose
+  only match is in the final line; a 524,288-byte CJK file searched under `.smart`; an
+  admission-boundary pair whose oversized sibling is 4,194,304 bytes, eight times the cap, so a
+  bounded read is distinguishable from a read-everything-then-truncate one; two dense whole-word
+  rejection shapes at the cap; a 24-file global-match-ceiling workspace; a 250-file
+  progress-coalescing workspace; and oversized/under-ceiling `.gitignore` pairs. Fixture creation
+  and `snapshotCapture` are excluded from timing. Each *timed search* probe runs one unmeasured
+  warm-up request asserted with the same predicates as its measured samples; the cancellation
+  probe has no warm-up and instead repeats five independent cancellations. A one-per-process
+  warm-up runs before any probe. Every run that reaches completion goes through the shared stream
+  invariants, which cover the exact finite event count, the full progress sequence, the
+  concurrent/buffered/outstanding read ceilings, and completion as the final event. Two
+  components are checked differently: the process warm-up throws typed errors of its own, because
+  it runs before XCTest assertions are meaningful, and the cancellation probe asserts
+  consumer-observed silence. The helper's skipped-detail bound is a shape check, not evidence —
+  no fixture here exceeds one skipped file, and cap enforcement is proven separately in
+  WorkspaceKit's resource-contract tests. Content correctness — ordered result
+  paths, per-file UTF-16 match ranges and line numbers, and summary accounting — is asserted by
+  the probes it applies to against their own fixtures, not by that shared helper and not
+  uniformly: a rejection probe has no result paths to order, and the ceiling pin has no fixture
+  at all. Read bounds are proven from the production
+  reader's `readChunk` events, which carry the bytes requested of and returned by each `read(2)`,
+  rather than from returned buffer sizes. Memory boundedness is asserted as structural limits
+  rather than an RSS threshold.
+- [x] Record measured local performance and choose/freeze budgets from evidence. Evidence:
+  `docs/perf-log.md` §"Phase 3 WS4B Workspace Search Performance Gates" records the
+  environment, commands, fixtures, raw samples from three Release and three Debug runs, and the
+  frozen budgets (2,000-file workspace < 3,000 ms under `.sensitive` and < 4,000 ms under the
+  default `.smart` policy; admitted 512 KiB file < 150 ms; admitted 512 KiB CJK file under
+  `.smart` < 150 ms; dense whole-word `ascii-suffix` < 200 ms and `unicode-periodic` < 2,500 ms;
+  cancel-to-drain < 50 ms). Budgets are frozen against Debug medians because `make test` runs
+  Debug, and they are hard locally and informational on hosted CI under risk R15. The
+  `unicode-periodic` Release median at exactly 512 KiB is production-shaped confirmation of the
+  §2.3 admission cap. Worst-case Debug headroom is 2.2x or better on every metric, after a
+  cold-start finding was resolved by a one-per-process warm-up rather than by widening any
+  budget. The 14 probes are individually falsifiable: read bounds are asserted on the production
+  reader's `readChunk` events rather than on returned byte counts, the 64 KiB ignore ceiling has
+  an oversized-`.gitignore` probe plus an under-ceiling control, progress coalescing is exercised
+  at a candidate count that is neither below nor divisible by the 100-event cap, and the `.smart`
+  probes carry `.sensitive` controls that must find nothing.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
 
@@ -923,7 +974,7 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 | EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
 | PlainsongTests | Debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; edited-document-only pending-navigation cancellation; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after a distinct newest snapshot and its freshly captured root authority/generation install, with the latest overlay edited while scan is pending; failed/stale/cancelled reload plus direct late-token/context event rejection; real UI replacement/options and empty-query plus genuinely pending close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility; keyboard: field ↓ selects first result, ↑/↓ move without wrap, Return activates, Escape results→field and field→editor without clearing query/results; click a result then ↑/↓ still routes through search selection (not only native table) |
-| PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness |
+| PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness. WS4B satisfies the workspace-search half of this row through `WorkspaceSearchPerformanceTests`, where memory boundedness means hard structural limits (four-read window, finite event bound, per-file/per-query match caps, bounded snippets, exact admitted bytes) rather than a resident-memory threshold |
 
 New tests placed in existing SwiftPM, AppTests, and PerformanceTests directories are
 already picked up by `make test`. Adding the XCUITest target requires editing `project.yml`

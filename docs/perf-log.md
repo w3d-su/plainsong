@@ -117,6 +117,248 @@ Current sweep values from `make test`:
 | Result | Pass |
 | Notes | `WYSIWYGImageThumbnailI8PerformanceGateTests.testI8VisibleRangeRecomputeWithImageFoldingStaysUnderFiftyMilliseconds` measures post-edit visible-range parse/fold (incl. image regions), highlight attribute apply (preserving image markers), image-marker presentation apply, and display. Decode isolation asserted by `testI8LoaderDecodePathRunsOffMainThread`. Production fix: image presentation source identity no longer walks full UTF-16 of multi-MB documents on every apply. |
 
+## Phase 3 WS4B Workspace Search Performance Gates
+
+This section is the complete record for the WS4B gate. It is rewritten rather than amended on
+each revision, so it carries one set of current numbers instead of a chain of corrections.
+Superseded values are not retained except where a finding is explicitly about how they changed.
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-26 |
+| Branch | `phase3-search-ws4b-performance-gates`, originally branched from `main` at `fe953db`, with `main` at `58740ac` (PR #94) merged in at `9b89bce` |
+| Measured commit | `a09cafb91f2194b04d1777bcb28a9259933101c1` — the commit holding the measured source. The commit stamping this row is its direct child and differs only in this line; no Swift source changed between them. |
+| macOS | Darwin 27.0.0 |
+| Machine | Apple Silicon, arm64, 16 GB RAM |
+| Probe count | 14 WS4B tests, part of 23 in the `PerformanceTests` target |
+| Source files | 11: `WorkspaceSearchPerformanceTests` (class, frozen constants, ceiling pins, throughput probes), `…SmartCase…`, `…Ceiling…`, `…Cancellation…`, `…ReadBounds…` (probes), `…PerformanceFixtures`, `…PerformanceIgnoreFixtures`, `…PerformanceAssertions`, `…PerformanceSupport`, `…PerformanceWarmUp`, `…PerformanceBlockingReader`. Split from one 1,258-line file to stay near the ~400-line guidance in agent.md §17.10 |
+
+### Reproduction
+
+Build once, then run. Timing runs use `test-without-building` so no build work can land inside a
+sample; the `build-for-testing` step is separate and unmeasured. `ENABLE_TESTABILITY=YES` is
+required in Release because `WorkspaceSearchReadBoundsPerformanceTests` uses
+`@testable import WorkspaceKit` to install the reader's `readChunk` observation hook.
+
+Debug (what `make test` exercises):
+
+```
+rm -rf ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug \
+  -only-testing:PerformanceTests build-for-testing
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-debug \
+  -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test-without-building
+```
+
+Release:
+
+```
+rm -rf ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release \
+  ENABLE_TESTABILITY=YES -only-testing:PerformanceTests build-for-testing
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
+  -derivedDataPath ~/Library/Developer/Xcode/DerivedData/plainsong-ws4b-release \
+  ENABLE_TESTABILITY=YES \
+  -only-testing:PerformanceTests/WorkspaceSearchPerformanceTests test-without-building
+```
+
+Both run at this branch tip with no build-setting override beyond `ENABLE_TESTABILITY`. Before
+PR #94 was merged the Release command exited 65 here, because `AppTests` referenced App probes
+that exist only under `#if DEBUG` and `xcodebuild` builds every test target even under
+`-only-testing`; merging `main` at `58740ac` removed that. Keep test DerivedData under
+`~/Library/Developer` — pointing it inside `~/Documents` makes the spawned xctest agent unable to
+read the built bundle under macOS TCC.
+
+### Procedure
+
+1. Every probe that issues a search drives the real `WorkspaceSearchService` over a real on-disk
+   workspace. (`testProductionSearchLimitsStillMatchTheFrozenGateCeilings` performs no search; it
+   only compares pinned constants.) Those probes use the production
+   `WorkspaceSearchDiskFileReader`, so the measurement includes
+   candidate planning, ignore-policy probes, anchored no-follow reads, UTF-8 decoding,
+   MarkdownCore matching, snippet construction, and stream delivery. The cancellation probe is
+   the one deliberate exception: it substitutes a controlled reader that blocks every candidate
+   read, because a deterministic cancel-to-drain measurement needs a saturated read window that
+   cannot finish on its own.
+2. Fixture creation and `WorkspaceDirectoryScanner.snapshotCapture` run before timing starts and
+   are never inside a measured region.
+3. Each timed search probe runs one unmeasured warm-up request, then three measured requests. The
+   warm-up is asserted with the same deterministic predicates as the measured samples, so a
+   warm-up that searched nothing cannot make later samples cheap. The cancellation probe has no
+   warm-up; it repeats five independent cancellations and reports their median.
+4. A separate one-per-process warm-up (`WorkspaceSearchPerformanceWarmUp`, invoked from
+   `setUp()`) runs a bounded search before any probe executes. Callers await a shared task rather
+   than a flag, so a second caller cannot race ahead of an in-flight warm-up, and the warm-up
+   validates its own stream — one completion terminal, no failure terminal, expected searched and
+   matching file counts — so a warm-up that silently failed cannot be recorded as done. A failure
+   is not cached, so it surfaces instead of leaving every later probe measuring a cold process.
+5. Every run that reaches completion goes through `assertSharedStreamInvariants`: exact event
+   count, the full progress sequence, read-window ceilings, and completion as the final event.
+   That includes the under-ceiling ignore control — an ignored entry is still a plan item and
+   still counts toward `candidateFileCount`, so production emits its `1 / 1` progress event and
+   the helper applies. The only component with a separate validator is the process warm-up, which
+   runs before XCTest assertions are meaningful and throws typed errors instead: exactly one
+   terminal event, no failure terminal, no validation failure, and nothing emitted after the
+   terminal. The cancellation probe is checked differently again, by consumer-observed silence.
+
+   The helper also carries a `skippedFiles.count <= 100` bound, but that is a shape check rather
+   than evidence: no fixture here produces more than one skipped file, so the bound is never
+   approached. Cap enforcement is proven in WorkspaceKit by
+   `WorkspaceSearchResourceContractTests.testSlowConsumerReceivesBoundedLosslessResultsDetailsProgressAndTerminal`
+   (600 skips against a detail limit of 7, asserting both the retained prefix and
+   `omittedSkippedFileCount`). WS4B's contribution is pinning that production's default is 100.
+6. Resource ceilings are pinned as literals in the test file, not read back from
+   `WorkspaceSearchLimits` / `TextSearchEngine`. Reading them back would make every bound
+   self-fulfilling. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single
+   comparison point against production. Pinned: `4` concurrent reads, `100` progress events,
+   `100` reported skipped files, `500` matches per file, `10,000` matches per query,
+   `524,288`-byte admission cap, `128` ignore files, `65,536` bytes per ignore file, `256` UTF-16
+   units per query pattern, `1,024` UTF-16 units of snippet context per side.
+7. Budgets are hard locally and informational on hosted CI (risk R15). Deterministic counts,
+   cancellation behavior, and resource ceilings stay hard everywhere, including CI.
+8. The cancellation probe's two waits are bounded at 10 s each and fail the probe on expiry, so a
+   regression cannot stall the test job to the CI timeout.
+
+### What each probe can actually falsify
+
+Every probe below was checked against the question "what break would this still pass?" — the
+eight review passes removed cases where the answer was "the one it exists to catch": resource
+ceilings read back from the production limits they checked and a global match cap asserted only by
+an unreachable inequality (first pass); a `cap + 1` oversized fixture that could not distinguish a
+bounded read from a truncating one (second); read bounds asserted from `Data.count`, an ignore
+ceiling with no behavior attached, and progress coalescing exercised only where `floor` and `ceil`
+agree (third); chunk counts that still could not catch a final full-buffer read (fourth);
+CJK-cased controls that still bypassed the shared invariants, stale source budget comments, and
+incomplete or numerically false Decision Log records (`a777dc4`, fifth); zero-result controls that
+could not tell "searched and found nothing" from "never looked" (sixth); a cancellation probe
+checking only some event kinds, a warm-up accepting validation failures, and an ignore control
+that skipped the progress invariant outright (seventh); and a cancellation assertion whose scope
+was overstated, plus a vacuous skipped-detail bound (eighth).
+
+| Probe | Would fail if… |
+|---|---|
+| 2,000-file workspace (`.sensitive` and `.smart`) | ordered results, per-file ranges/lines, summary accounting, event count, or read-window ceilings regress |
+| `testSmartCaseResolvesToInsensitiveMatchingForLowercaseAndCJKPatterns` | `.smart` stopped resolving to the insensitive backend. One lowercase pattern matches three case spellings under `.smart` but one under `.sensitive`; a CJK pattern with a lowercase Latin suffix matches an upper-case occurrence under `.smart` and nothing under `.sensitive` |
+| Admitted 512 KiB file, and the CJK file under `.smart` | the match near EOF is missed, or byte accounting drifts. The CJK probe carries its own `.sensitive` control that must match nothing, so it cannot degenerate into re-measuring the sensitive path |
+| `testOversizedFileIsReadOnlyToTheInclusiveLimit` | the reader read past `inclusiveLimit(cap)`. Asserted on `readChunk` events from the production reader, which carry the bytes **requested of** and **returned by** each `read(2)`: 9 chunks totalling exactly 524,289 requested bytes with a final one-byte request. Chunk counts alone would not suffice — a loop that asked for a full 64 KiB buffer on the last read and truncated afterwards produces the same nine indices |
+| `testOversizedIgnoreFileIsBoundedAndItsRulesAreRejected` plus its under-ceiling control | the 64 KiB ignore ceiling stopped rejecting over-size ignore files, or their reads stopped being bounded — asserted as 2 chunks totalling exactly 65,537 requested bytes, so two full-buffer reads (131,072 bytes) would fail. The control proves the same rule *is* honored under the ceiling, so "nothing was suppressed" cannot pass by the rule never working |
+| `testProgressCoalescingUsesCeilingStrideOnNonDivisibleCandidateCounts` | the stride became `floor` instead of `ceil`, or the final `N / N` event was dropped. Uses 250 candidates: every other fixture has `N ≤ 100` or `N` divisible by 100, where both mistakes are invisible |
+| `testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates` | the 10,000-match ceiling were overshot, `isGloballyTruncated` unset, results emitted past the ceiling, or remaining candidates not drained for accounting |
+| `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` | any pinned production ceiling moved |
+| Cancellation | any blocked read was left running, another read started, or the consumer observed any event |
+
+### Fixtures
+
+| Fixture | Shape |
+|---|---|
+| 2,000-file workspace | 20 directories x 100 files, `.md` and `.mdx`, 2,893,000 bytes total; 500 files contain the query token exactly twice (1,000 matches) |
+| Admitted file | exactly 524,288 bytes (the admission cap) with the only match in the final line |
+| Admission boundary | the same 524,288-byte file plus a 4,194,304-byte sibling, 8x the cap. Deliberately not `cap + 1`: at one byte over, a bounded read and a read-everything-then-truncate reader report identical byte counts |
+| Admitted CJK file | exactly 524,288 bytes of CJK prose whose final line holds `平明歌X`, searched with the lowercase pattern `平明歌x` |
+| Smart case | one file holding the token in lowercase, title case and upper case, two CJK occurrences, and one CJK+upper-case-Latin occurrence |
+| Oversized ignore | one matching file plus a 262,144-byte `.gitignore` naming it, with the rule on the first line |
+| Under-ceiling ignore | the same file and rule in a `.gitignore` of a few dozen bytes |
+| Progress stride | 250 files, above the 100-event cap and not divisible by it |
+| Global match ceiling | 24 files of 501 occurrences each, so the first 20 emit 500 matches apiece and land exactly on the 10,000 ceiling |
+| Dense whole-word (`ascii-suffix`) | 524,288 bytes of ASCII whose every literal hit is rejected by a trailing word character |
+| Dense whole-word (`unicode-periodic`) | 524,288 bytes of composed `e`+U+0301 periodic text searched with a 192-UTF-16-unit whole-word pattern |
+| Cancellation | the 2,000-file workspace with a controlled reader that blocks every candidate read |
+
+### Measurements
+
+Three Debug and three Release runs at the measured commit, quiet machine, each `test-without-building`
+against the pre-built product. All six reported `** TEST EXECUTE SUCCEEDED **`, 14 tests, 0 failures.
+The full `PerformanceTests` target was also run in Release: 23 tests, 0 failures.
+
+| Metric | Budget | Debug medians (3 runs) | Release medians (3 runs) | Headroom |
+|---|---:|---|---|---:|
+| Workspace search, 2,000 files (`.sensitive`) | < 3,000 ms | 1075.583, 1034.997, 1060.381 | 854.278, 808.488, 868.376 | 2.8x |
+| Workspace search, 2,000 files (`.smart`) | < 4,000 ms | 1097.697, 1042.528, 1119.895 | 1118.649, 901.823, 752.182 | 3.6x |
+| Admitted 524,288-byte file | < 150 ms | 37.794, 37.784, 37.991 | 8.979, 9.168, 10.970 | 3.9x |
+| Admitted 524,288-byte CJK file (`.smart`) | < 150 ms | 24.892, 24.559, 24.547 | 27.948, 30.141, 29.815 | 6.0x |
+| Dense whole-word `ascii-suffix` | < 200 ms | 45.242, 45.500, 45.635 | 5.870, 6.044, 6.061 | 4.4x |
+| Dense whole-word `unicode-periodic` | < 2,500 ms | 1027.955, 1025.876, 1021.251 | 660.601, 673.219, 702.148 | 2.4x |
+| Cancel-to-drain, saturated 4-read window | < 50 ms | 0.162, 0.174, 0.141 | 0.210, 0.187, 0.186 | 287x |
+
+Headroom is budget divided by the *slowest* of the three Debug medians, so it is the worst case
+across a cold first run and two warm ones.
+
+### Budget selection
+
+Budgets are frozen against Debug medians because `make test` runs Debug, which is roughly 2x
+slower than Release on these paths. No budget was chosen to rescue a failing run: the first Debug
+run of the `unicode-periodic` shape exceeded an initial 750 ms guess, and the response was to
+measure Release, confirm the cost is the documented worst case behind the 512 KiB admission cap,
+and freeze an evidence-based budget instead. The `.smart` budgets were frozen the same way, from
+the Debug medians measured when those probes were added.
+
+`.smart` is **not** meaningfully slower than `.sensitive` on the bulk workspace — the two are
+within run-to-run noise of each other in Debug, and each has been the faster of the two across
+different Release runs. The gap this pass closed was missing coverage of the default path, not a
+throughput regression.
+
+Headroom is budget divided by the *slowest* of the three Debug medians, and is not uniform: it
+ranges from 2.4x (`unicode-periodic`) to 6.0x (CJK). An earlier revision of this document claimed
+a uniform 2.4x-3.8x; that was true only of warm runs before the process warm-up existed, and is
+replaced by the per-metric column in the measurement table above.
+
+### Cold-start finding and the process warm-up
+
+Before the process-level warm-up existed, the first Debug run after a build was uniformly
+1.3x-2.8x slower than the runs after it, and `unicode-periodic` produced samples
+`[1655.452, 2709.261, 2462.412]` — one sample **above** its 2,500 ms budget, median 2462.412 ms,
+1.5% under. That made the budget effectively ~1.0x headroom cold, and `make test` runs Debug.
+
+The cause is cost paid per *process*, not per probe: dyld work for the first call into
+WorkspaceKit and MarkdownCore, Foundation/ICU table initialization on the first Unicode
+comparison, first construction of the task-group read pipeline, and CPU frequency ramp from idle.
+The per-probe warm-up cannot absorb any of it — whichever probe XCTest runs first pays all of it.
+
+`WorkspaceSearchPerformanceWarmUp` runs one bounded search over a small workspace (tens of KiB)
+before any probe, touching each expensive path. Cold first Debug run after a build, same machine:
+`unicode-periodic` 2462.412 → 1149.402 ms, worst sample 2709.261 → 1177.059 ms; bulk workspace
+1868.097 → 1198.152 ms; `ascii-suffix` 141.794 → 48.508 ms; admitted file 84.485 → 40.826 ms.
+
+This moves the harness, not the product: process start-up is not search cost, and the budgets
+describe steady-state search. The explicit trade-off is that the gate no longer observes process
+start-up regressions, which it only ever caught by accident through whichever probe ran first.
+**No budget was changed** — every number in the budget table is its original frozen value.
+
+### First hosted CI observation
+
+GitHub Actions `build-and-test` on `macos-15` for PR #93 commit
+`d47404392cc64bcc0480e828aa79e509b6fe7f2c` produced these medians: workspace search
+1239.690 ms (samples `[1126.512, 1239.690, 1386.824]`), admitted file 43.802 ms,
+`ascii-suffix` 46.440 ms, `unicode-periodic` 985.311 ms, cancel-to-drain 0.137 ms. Every value
+was under budget, so no R15 informational line was printed on that run. This predates the
+`.smart`, ceiling, read-bounds, and progress-stride probes and the process warm-up; it is
+recorded as a hosted datapoint only. Per R15 the local values above remain the acceptance
+evidence, and these budgets stay informational on CI regardless.
+
+### Notes
+
+- The `unicode-periodic` result is production-shaped confirmation of the
+  `docs/workspace-search-plan.md` §2.3 admission cap: 660.601-702.148 ms in Release at exactly
+  512 KiB across the three authoritative runs. A
+  1 MiB cap would put a single adversarial file over one second in Release, which is why the cap
+  was not raised.
+- Memory boundedness is asserted structurally rather than with a resident-memory threshold: the
+  four-read window (concurrent, buffered, and outstanding), the finite event bound, the
+  per-file/per-query match caps, the bounded snippet size, and the exact admitted byte count are
+  all hard assertions. No RSS assertion was added, because RSS on this path is dominated by
+  allocator and page-cache behavior that is not stable enough for a gate.
+- The cancellation probe proves that after cancelling the consuming Task, all four blocked reads
+  are released, no further read starts, and the consumer observes no events at all. Scope: that
+  last part is what the *consumer* saw. Cancelling the consuming Task also terminates the
+  `AsyncStream` continuation, so a terminal the producer wrongly yielded afterwards would be
+  discarded before reaching the collected events. Proving the producer never attempts a
+  post-cancellation terminal would need a yield-observation seam or a direct pipeline test, and
+  this gate does not claim it.
+
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`

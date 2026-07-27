@@ -223,7 +223,8 @@ extension WorkspaceSearchDiskFileReader {
         case componentOpened(Int, String, String)
         case parentAnchored(Int, String)
         case fileOpened(Int, String)
-        case readChunk(Int, Int, String)
+        /// Attempt, chunk index, bytes requested of `read(2)`, bytes returned, relative path.
+        case readChunk(Int, Int, Int, Int, String)
         case postflight(Int, String)
         case retry(Int, String)
     }
@@ -251,8 +252,8 @@ extension WorkspaceSearchDiskFileReader {
              .didRollback,
              .namespaceValidated:
             break
-        case let .readChunk(chunk):
-            eventHandler?(.readChunk(attempt, chunk, locationPath))
+        case let .readChunk(chunk, requested, returned):
+            eventHandler?(.readChunk(attempt, chunk, requested, returned, locationPath))
         case .bytesRead:
             break
         case .postflight:
