@@ -20,6 +20,12 @@
 > first-responder and UI-visibility evidence is still what F4b UI, F5 source+preview, F6, and
 > F7 are waiting on.
 >
+> A third round then tagged chrome-focus reports with the reporting window (an App-global
+> value let a background window's focus grant eligibility in the key one), restored Escape as
+> a close path from the editor and from bar chrome — which removing the Done key equivalent
+> had broken — and gave the selection cache the same revision provenance the live probe
+> already had.
+>
 > Known un-automated: **F6** — removing the Done key equivalent is verifiable by inspection
 > but not by an in-process test, because reproducing the bypass needs a real IME. It stays
 > covered by the owner IME smoke item that already blocks F6.
@@ -539,6 +545,18 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   equivalent is resolved before the field editor sees the event, so Escape closed the bar
   mid-composition instead of cancelling it. **Not automated** — reproducing the bypass
   needs a real IME, so this rides the owner IME smoke below.
+- [ ] Escape still closes the bar from **every** find context, which removing that key
+  equivalent initially broke (it left the query field's delegate as the only handler).
+  Restored through two responder-chain routes, neither a key equivalent:
+  `MarkdownSTTextView.cancelOperation` → `EditorFindActionHooks.cancelFind` for editor
+  focus, and SwiftUI `.onExitCommand` for bar chrome. The editor route defers to marked
+  text and to an open completion list first, and falls through to `super` when no bar is
+  open so STTextView's own Escape behaviour is unchanged; the chrome route re-checks live
+  query-field composition at dispatch, because a field editor that declines
+  `cancelOperation:` lets the event bubble past it.
+  Evidence: `EditorFindReviewFixTests.testEscapeFromTheEditorClosesTheBarAndReportsItConsumedTheKey`,
+  `...testEscapeFromBarChromeClosesTheBar`. Still open: the ordering guarantees against a
+  real IME and a real completion list are owner-smoke items.
 - Evidence: _open — delegate-level reservation covered; owner physical IME still required
   for commit-into-document and the Escape-during-composition path_
 
@@ -567,13 +585,17 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   equivalent), which is what actually closes this gate.
 - [ ] Find commands stay eligible while Full Keyboard Access focuses a bar control (Aa,
   whole-word, Next, Previous, Done). The bar's own controls act unconditionally; menu
-  eligibility comes from SwiftUI-reported `EditorFindChromeFocus` gated on
-  `keyWindowHostsFindBar()`. Partial: `EditorFindReviewFixTests`
+  eligibility comes from SwiftUI-reported `EditorFindChromeFocus`, **tagged with the
+  reporting window** and accepted only when that window is key — `AppState` is shared
+  across the `WindowGroup`, so an untagged report let focus stranded in a background window
+  grant eligibility in the key one. Partial: `EditorFindFocusReceiptTests`
   `testFindBarChromeFocusKeepsMenuCommandsEligibleOnlyForTheHostingKeyWindow`,
-  `...testClosingTheBarClearsReportedChromeFocus`,
-  `...testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext`.
+  `...testKeyWindowChangeAloneFlipsChromeFocusEligibility`,
+  `...testEveryBarCloseRouteClearsReportedChromeFocus`, and `EditorFindReviewFixTests`
+  `...testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext`. Only *which
+  window is key* is stubbed; the report-versus-key comparison runs for real.
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
-  SwiftUI focus transition.
+  SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all.
 - [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.

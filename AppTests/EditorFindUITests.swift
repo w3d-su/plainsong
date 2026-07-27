@@ -373,6 +373,7 @@ final class EditorFindUITests: XCTestCase {
         let range = ("prefix selectedWord suffix" as NSString).range(of: "selectedWord")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: appState.currentDocument.version,
             range: range
         )
 
@@ -397,6 +398,7 @@ final class EditorFindUITests: XCTestCase {
         let appState = makeAppState(text: "a\nb")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: appState.currentDocument.version,
             range: NSRange(location: 0, length: 3) // includes newline
         )
         appState.useSelectionForEditorFind()
@@ -412,6 +414,7 @@ final class EditorFindUITests: XCTestCase {
         appState.editorFindHost.commandContextOverride = true
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: appState.currentDocument.version,
             range: NSRange(location: 0, length: long.utf16.count)
         )
         appState.useSelectionForEditorFind()
@@ -423,6 +426,7 @@ final class EditorFindUITests: XCTestCase {
         let rangeA = ("alpha beta" as NSString).range(of: "alpha")
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: appState.currentDocument.version,
             range: rangeA
         )
         let other = DocumentSession(
@@ -438,10 +442,45 @@ final class EditorFindUITests: XCTestCase {
         // Wrong-document cache must not supply ⌘E pattern.
         appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
             documentIdentity: EditorDocumentIdentity(rawValue: "file://other"),
+            sourceRevision: appState.currentDocument.version,
             range: rangeA
         )
         appState.useSelectionForEditorFind()
         XCTAssertEqual(appState.editorFindHost.ui.queryText, "")
+    }
+
+    func testCachedSelectionDoesNotCrossSourceRevision() {
+        let text = "alpha beta"
+        let appState = makeAppState(text: text)
+        let range = (text as NSString).range(of: "alpha")
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: appState.currentDocument.version,
+            range: range
+        )
+        appState.useSelectionForEditorFind()
+        XCTAssertEqual(appState.editorFindHost.ui.queryText, "alpha")
+
+        // Same URL, new content — exactly what an external Reload produces. The identity is
+        // unchanged, so an identity-only cache would index the old range into the new text.
+        var ui = appState.editorFindHost.ui
+        ui.queryText = ""
+        appState.setEditorFindUI(ui)
+        let staleRevision = appState.currentDocument.version
+        appState.applyDocumentText("zzzzz beta", to: appState.currentDocument)
+        XCTAssertNotEqual(appState.currentDocument.version, staleRevision)
+        appState.editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: appState.activeEditorDocumentIdentity,
+            sourceRevision: staleRevision,
+            range: range
+        )
+
+        appState.useSelectionForEditorFind()
+        XCTAssertEqual(
+            appState.editorFindHost.ui.queryText,
+            "",
+            "A range from a superseded revision must not be read out of the new text"
+        )
     }
 
     // MARK: - Accessibility IDs (F9 chrome half; XCUITest remains PR D)

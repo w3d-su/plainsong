@@ -13,6 +13,9 @@ import SwiftUI
 struct EditorFindBar: View {
     @EnvironmentObject private var appState: AppState
     @FocusState private var chromeFocus: EditorFindChromeFocus?
+    /// Window hosting *this* bar, learned from the owned query field. Focus reports are
+    /// tagged with it so a background window's focus cannot grant eligibility in the key one.
+    @State private var hostWindowNumber: Int?
 
     var body: some View {
         let ui = appState.editorFindHost.ui
@@ -32,6 +35,10 @@ struct EditorFindBar: View {
                 readFocusSnapshot: { appState.editorFindHost.ui.focusSnapshot },
                 markFocusApplied: { appState.markEditorFindFocusApplied($0) },
                 markSelectAllApplied: { appState.markEditorFindSelectAllApplied($0) },
+                reportHostWindowNumber: { number in
+                    guard hostWindowNumber != number else { return }
+                    hostWindowNumber = number
+                },
                 onSubmit: {
                     // Bar chrome acts directly: the responder-context guard exists to keep
                     // *menu* commands from firing when focus is elsewhere in the window.
@@ -125,11 +132,22 @@ struct EditorFindBar: View {
         .background(.bar)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(EditorFindAccessibility.bar)
+        // Responder-chain Escape, not a key equivalent: a key equivalent outranks the field
+        // editor and would close the bar mid-IME-composition (see the Done button above).
+        // This covers focus sitting on any bar control; editor focus is covered by
+        // `MarkdownSTTextView.cancelOperation` through `EditorFindActionHooks.cancelFind`.
+        .onExitCommand {
+            appState.closeEditorFindBarFromExitCommand()
+        }
         .onChange(of: chromeFocus) { _, focus in
-            appState.setEditorFindChromeFocus(focus)
+            appState.setEditorFindChromeFocus(focus, inWindowNumber: hostWindowNumber)
+        }
+        .onChange(of: hostWindowNumber) { _, number in
+            guard chromeFocus != nil else { return }
+            appState.setEditorFindChromeFocus(chromeFocus, inWindowNumber: number)
         }
         .onDisappear {
-            appState.setEditorFindChromeFocus(nil)
+            appState.clearEditorFindChromeFocus()
         }
     }
 }

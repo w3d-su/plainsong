@@ -63,16 +63,24 @@ enum EditorFindResponderSupport {
         return matchesEditorOrFindFieldResponder(first)
     }
 
-    /// Whether the key window is the one currently showing the find bar.
+    /// Whether the key window's owned find query field currently has IME marked text.
     ///
-    /// Gates the SwiftUI-reported chrome focus: `AppState` is shared across the
-    /// `WindowGroup`, so a background window's stale focus must never grant eligibility.
-    /// The owned query field is a real `NSView` with a stable identifier, which makes this
-    /// answerable in AppKit even though the surrounding chrome is not.
+    /// Escape reaching find-bar chrome through the responder chain must not close the bar
+    /// mid-composition. A field editor that declines `cancelOperation:` lets the event bubble
+    /// past it, so the guard has to be re-checked where the bar handles it, against live
+    /// AppKit state rather than a cached flag.
     @MainActor
-    static func keyWindowHostsFindBar() -> Bool {
-        guard let root = NSApp.keyWindow?.contentView else { return false }
-        return descendant(of: root, identifiedBy: EditorFindAccessibility.queryField) != nil
+    static func keyWindowQueryFieldIsComposing() -> Bool {
+        guard let root = NSApp.keyWindow?.contentView,
+              let field = descendant(
+                  of: root,
+                  identifiedBy: EditorFindAccessibility.queryField
+              ) as? NSTextField,
+              let editor = field.currentEditor() as? NSTextView
+        else {
+            return false
+        }
+        return editor.hasMarkedText()
     }
 
     @MainActor

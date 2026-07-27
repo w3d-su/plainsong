@@ -186,27 +186,38 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             appState.editorFindHost.controller.session?.total == 3
         }
 
-        // Eligibility must come from the reported SwiftUI chrome focus, and only while the
-        // key window is the one showing the bar. Both sides of that gate are driven
-        // explicitly — reading ambient `NSApp.keyWindow` would make this order-dependent on
-        // any other test that leaves a window key (CI caught exactly that).
+        // Eligibility comes from the reported SwiftUI chrome focus, and the report is only
+        // meaningful next to the window that produced it. Only *which window is key* is
+        // stubbed; the report-versus-key comparison under test still runs. Reading ambient
+        // `NSApp.keyWindow` instead would make this order-dependent on any other test that
+        // leaves a window key — CI caught exactly that.
         appState.editorFindHost.commandContextOverride = nil
+        let background = 101
+        let key = 202
+        appState.editorFindHost.keyWindowNumberOverride = key
 
-        appState.editorFindHost.keyWindowHostsFindBarOverride = false
-        appState.setEditorFindChromeFocus(.matchCase)
+        // Window A (background) reports focus on its own bar.
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: background)
         XCTAssertFalse(
             appState.isEditorFindCommandContextActive(),
-            "A background window's chrome focus must not consume find commands"
+            "Focus stranded in a background window must not make ⌘G / ⌘E eligible in the key one"
         )
 
-        appState.editorFindHost.keyWindowHostsFindBarOverride = true
+        // Window B (key) reports focus on its own bar.
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: key)
         XCTAssertTrue(
             appState.isEditorFindCommandContextActive(),
-            "Focus on a bar control in the hosting key window must keep ⌘G / ⌘E live"
+            "Focus on a bar control in the key window must keep ⌘G / ⌘E live"
         )
 
+        // An untagged report cannot be checked against the key window, so it is not stored.
+        appState.setEditorFindChromeFocus(.wholeWord, inWindowNumber: nil)
+        XCTAssertNil(appState.editorFindHost.chromeFocus)
+        XCTAssertFalse(appState.isEditorFindCommandContextActive())
+
         // Focus left the bar: fall back to the AppKit editor / query-field check.
-        appState.setEditorFindChromeFocus(nil)
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: key)
+        appState.clearEditorFindChromeFocus()
         XCTAssertEqual(
             appState.isEditorFindCommandContextActive(),
             EditorFindResponderSupport.keyWindowHasEditorOrFindField(),
@@ -214,11 +225,34 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         )
 
         // A hidden bar is never eligible, whatever focus was last reported.
-        appState.setEditorFindChromeFocus(.matchCase)
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: key)
         var ui = appState.editorFindHost.ui
         ui.isBarVisible = false
         appState.setEditorFindUI(ui)
         XCTAssertFalse(appState.isEditorFindCommandContextActive())
+    }
+
+    func testKeyWindowChangeAloneFlipsChromeFocusEligibility() {
+        let appState = makeAppState()
+        openFindBar(appState, query: "alpha")
+        appState.editorFindHost.commandContextOverride = nil
+
+        // One report, unchanged. Only which window is key moves — as when the user switches
+        // windows without touching the bar.
+        appState.setEditorFindChromeFocus(.next, inWindowNumber: 7)
+        appState.editorFindHost.keyWindowNumberOverride = 7
+        XCTAssertTrue(appState.isEditorFindCommandContextActive())
+
+        appState.editorFindHost.keyWindowNumberOverride = 9
+        XCTAssertFalse(
+            appState.isEditorFindCommandContextActive(),
+            "The same report must stop granting eligibility once its window is no longer key"
+        )
+        XCTAssertEqual(
+            appState.editorFindHost.chromeFocus?.windowNumber,
+            7,
+            "The report itself is retained — only its relevance changed"
+        )
     }
 
     func testEveryBarCloseRouteClearsReportedChromeFocus() {
@@ -232,8 +266,8 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         ] {
             let appState = makeAppState()
             openFindBar(appState, query: "alpha")
-            appState.setEditorFindChromeFocus(.next)
-            XCTAssertEqual(appState.editorFindHost.chromeFocus, .next, close.0)
+            appState.setEditorFindChromeFocus(.next, inWindowNumber: 31)
+            XCTAssertEqual(appState.editorFindHost.chromeFocus?.focus, .next, close.0)
 
             close.1(appState)
             XCTAssertFalse(appState.editorFindHost.ui.isBarVisible, close.0)

@@ -60,6 +60,24 @@ final class MarkdownSTTextView: STTextView {
         super.keyDown(with: event)
     }
 
+    /// Escape closes the find bar when nothing more local owns it.
+    ///
+    /// Order matters and is deliberately conservative. An active IME composition and an open
+    /// completion list are both *more* local than the find bar, so they keep `super`'s
+    /// behaviour. Only when neither applies does the find hook get a chance, and when the hook
+    /// declines (no bar open) `super` still runs — STTextView opens the completion list on
+    /// Escape, and that must not regress.
+    override func cancelOperation(_ sender: Any?) {
+        guard !hasMarkedText(), !isCompletionActive else {
+            super.cancelOperation(sender)
+            return
+        }
+        if EditorFindActionHooks.cancelFind?() == true {
+            return
+        }
+        super.cancelOperation(sender)
+    }
+
     override func mouseDown(with event: NSEvent) {
         focusForMouseInteractionIfNeeded()
 

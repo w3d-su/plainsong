@@ -22,6 +22,9 @@ enum EditorFindCommandDelivery {
         EditorFindActionHooks.useSelectionForFind = {
             PlainsongAppServices.appState?.useSelectionForEditorFind()
         }
+        EditorFindActionHooks.cancelFind = {
+            PlainsongAppServices.appState?.closeEditorFindBarFromEditorEscape() ?? false
+        }
     }
 
     @discardableResult

@@ -100,7 +100,7 @@ extension AppState {
             ui.closeBar()
             ui.applySessionPresentation(nil)
             setEditorFindUI(ui)
-            setEditorFindChromeFocus(nil)
+            clearEditorFindChromeFocus()
             return
         }
         ensureEditorFindSessionObserverInstalled()
@@ -131,6 +131,6 @@ extension AppState {
         ui.queryText = ""
         ui.applySessionPresentation(nil)
         setEditorFindUI(ui)
-        setEditorFindChromeFocus(nil)
+        clearEditorFindChromeFocus()
     }
 }

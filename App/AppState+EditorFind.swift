@@ -52,29 +52,45 @@ extension AppState {
         if let override = editorFindHost.commandContextOverride {
             return override
         }
-        if editorFindHost.ui.isBarVisible,
-           editorFindHost.chromeFocus != nil,
-           keyWindowHostsEditorFindBar()
-        {
+        if editorFindHost.ui.isBarVisible, hasKeyWindowFindChromeFocus() {
             return true
         }
         return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
     }
 
-    /// Whether the key window is the one showing the find bar. Tests may override so the
-    /// rule is exercised in both directions instead of depending on ambient `NSApp` state.
-    func keyWindowHostsEditorFindBar() -> Bool {
-        if let override = editorFindHost.keyWindowHostsFindBarOverride {
-            return override
+    /// Whether the **key** window is the one reporting find-bar chrome focus.
+    ///
+    /// Every window's bar reports its own SwiftUI focus into shared `AppState`, so the report
+    /// is only meaningful next to the window it came from: focus stranded in a background
+    /// window must not make ⌘G / ⌘E eligible in the window the user is actually typing in.
+    func hasKeyWindowFindChromeFocus() -> Bool {
+        guard let report = editorFindHost.chromeFocus,
+              let keyWindowNumber = editorFindHost.keyWindowNumberOverride
+              ?? NSApp.keyWindow?.windowNumber
+        else {
+            return false
         }
-        return EditorFindResponderSupport.keyWindowHostsFindBar()
+        return report.windowNumber == keyWindowNumber
     }
 
-    /// Records which find-bar control SwiftUI reports as focused (`nil` when focus left).
-    func setEditorFindChromeFocus(_ focus: EditorFindChromeFocus?) {
-        guard editorFindHost.chromeFocus != focus else { return }
-        editorFindHost.chromeFocus = focus
+    /// Records which find-bar control SwiftUI reports as focused, and from which window.
+    ///
+    /// Clearing is unconditional: it only ever removes eligibility, so a window clearing
+    /// another's stale report is safe. Setting requires a window, because an untagged report
+    /// cannot be checked against the key window.
+    func setEditorFindChromeFocus(_ focus: EditorFindChromeFocus?, inWindowNumber windowNumber: Int?) {
+        let report: EditorFindChromeFocusReport? = {
+            guard let focus, let windowNumber else { return nil }
+            return EditorFindChromeFocusReport(windowNumber: windowNumber, focus: focus)
+        }()
+        guard editorFindHost.chromeFocus != report else { return }
+        editorFindHost.chromeFocus = report
         objectWillChange.send()
+    }
+
+    /// Clears any reported chrome focus (bar close, document switch, workspace close).
+    func clearEditorFindChromeFocus() {
+        setEditorFindChromeFocus(nil, inWindowNumber: nil)
     }
 
     /// ⌘F — show or re-focus; never closes.
@@ -109,10 +125,37 @@ extension AppState {
         var ui = editorFindHost.ui
         ui.closeBar() // also supersedes pending focus
         setEditorFindUI(ui)
-        setEditorFindChromeFocus(nil)
+        clearEditorFindChromeFocus()
         cancelPublishedFindNavigationOnSharedChannel()
         editorFindHost.controller.suspendNavigation()
         requestEditorFocus()
+    }
+
+    /// Escape delivered to the **editor** (`MarkdownSTTextView.cancelOperation`).
+    ///
+    /// Returns `false` when there is no bar to close, so the editor keeps its own Escape
+    /// behaviour. EditorKit has already ruled out marked text and an open completion list.
+    @discardableResult
+    func closeEditorFindBarFromEditorEscape() -> Bool {
+        guard editorFindHost.ui.isBarVisible else { return false }
+        closeEditorFindBar()
+        return true
+    }
+
+    /// Escape delivered to find-bar chrome (SwiftUI `onExitCommand`).
+    ///
+    /// This is a responder-chain action, **not** a key equivalent: a key equivalent is
+    /// resolved before the field editor sees the event, which is exactly how the Done button's
+    /// old `.cancelAction` closed the bar mid-IME-composition. The composition guard is still
+    /// re-checked here, because a field editor that declines `cancelOperation:` lets the event
+    /// bubble up to this handler.
+    func closeEditorFindBarFromExitCommand() {
+        guard editorFindHost.ui.isBarVisible,
+              !EditorFindResponderSupport.keyWindowQueryFieldIsComposing()
+        else {
+            return
+        }
+        closeEditorFindBar()
     }
 
     /// Abandon any unapplied Find focus request (⇧⌘F, external focus owners).
@@ -244,10 +287,8 @@ extension AppState {
         ui.queryText = text
         setEditorFindUI(ui)
         syncEditorFindControllerDocument()
-        if let known = editorFindHost.latestKnownEditorSelection,
-           known.documentIdentity == activeEditorDocumentIdentity
-        {
-            editorFindHost.controller.setCaretAnchor(known.range.location)
+        if let known = usableCachedEditorSelection() {
+            editorFindHost.controller.setCaretAnchor(known.location)
         }
         cancelPublishedFindNavigationOnSharedChannel()
         pushEditorFindQueryToController()
@@ -345,56 +386,5 @@ extension AppState {
         let id = advanceEditorNavigationGeneration()
         editorFindHost.lastPublishedFindNavigationID = id
         editorNavigationCommand = .cancel(id: id)
-    }
-
-    private func refreshEditorFindCaretFromResponderIfPossible() {
-        if let range = appliedEditorSelectionUTF16() {
-            editorFindHost.controller.setCaretAnchor(range.location)
-        } else if let known = editorFindHost.latestKnownEditorSelection,
-                  known.documentIdentity == activeEditorDocumentIdentity
-        {
-            editorFindHost.controller.setCaretAnchor(known.range.location)
-        }
-    }
-
-    /// The editor's real selection, caching it for the window-less fallback.
-    ///
-    /// Reads the editor view itself rather than the last *published* navigation: a published
-    /// request can still be pending or rejected inside EditorKit, so trusting it would let
-    /// ⌘E copy a range the editor never applied.
-    ///
-    /// The range is accepted only with matching **provenance**. A native selection is an
-    /// offset into whatever source the editor currently holds; during a document switch or a
-    /// same-URL Reload that is still the previous content, so stamping it with App's current
-    /// identity would let ⌘E index new text with an old range. Identity, installed state, and
-    /// the App-owned source revision must all agree before the range is usable.
-    private func appliedEditorSelectionUTF16() -> NSRange? {
-        guard let applied = EditorSelectionProbe.keyWindowAppliedEditorSelection(),
-              EditorFindAppliedSelectionPolicy.accepts(
-                  applied,
-                  identity: activeEditorDocumentIdentity,
-                  revision: currentDocument.version,
-                  textUTF16Length: (currentDocument.text as NSString).length
-              )
-        else {
-            return nil
-        }
-        editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
-            documentIdentity: applied.documentIdentity,
-            range: applied.range
-        )
-        return applied.range
-    }
-
-    private func currentEditorSelectionUTF16() -> NSRange {
-        if let applied = appliedEditorSelectionUTF16() {
-            return applied
-        }
-        if let known = editorFindHost.latestKnownEditorSelection,
-           known.documentIdentity == activeEditorDocumentIdentity
-        {
-            return known.range
-        }
-        return NSRange(location: 0, length: 0)
     }
 }

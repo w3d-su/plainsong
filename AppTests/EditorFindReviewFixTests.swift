@@ -117,6 +117,49 @@ final class EditorFindReviewFixTests: XCTestCase {
         XCTAssertEqual(step.selection, hits[1])
     }
 
+    // MARK: - Escape routes
+
+    func testEscapeFromTheEditorClosesTheBarAndReportsItConsumedTheKey() {
+        let appState = makeAppState()
+        openFindBar(appState, query: "alpha")
+        XCTAssertTrue(appState.editorFindHost.ui.isBarVisible)
+
+        // `MarkdownSTTextView.cancelOperation` reaches this through
+        // `EditorFindActionHooks.cancelFind` once it has ruled out marked text and an open
+        // completion list.
+        XCTAssertTrue(
+            appState.closeEditorFindBarFromEditorEscape(),
+            "Escape in the editor must close the find bar"
+        )
+        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
+
+        // No bar left: the editor must keep its own Escape behaviour (STTextView opens the
+        // completion list), so the hook has to decline rather than swallow the key.
+        XCTAssertFalse(
+            appState.closeEditorFindBarFromEditorEscape(),
+            "With no bar open, Escape must fall through to the editor"
+        )
+    }
+
+    func testEscapeFromBarChromeClosesTheBar() {
+        let appState = makeAppState()
+        openFindBar(appState, query: "alpha")
+        appState.setEditorFindChromeFocus(.matchCase, inWindowNumber: 5)
+
+        // SwiftUI `onExitCommand` from a focused bar control. No query field is mounted in
+        // this headless state, so the composition guard reports not-composing.
+        appState.closeEditorFindBarFromExitCommand()
+        XCTAssertFalse(
+            appState.editorFindHost.ui.isBarVisible,
+            "Escape on Aa / whole-word / Next / Previous / Done must close the bar"
+        )
+        XCTAssertNil(appState.editorFindHost.chromeFocus)
+
+        // Idempotent when there is nothing to close.
+        appState.closeEditorFindBarFromExitCommand()
+        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
+    }
+
     // MARK: - Close-bar fencing
 
     func testClosingTheBarFencesAQueryStillInsideTheDebounceWindow() async throws {

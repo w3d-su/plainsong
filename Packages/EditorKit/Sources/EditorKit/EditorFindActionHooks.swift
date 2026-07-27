@@ -8,4 +8,7 @@ public enum EditorFindActionHooks {
     public static var findNext: (() -> Void)?
     public static var findPrevious: (() -> Void)?
     public static var useSelectionForFind: (() -> Void)?
+    /// Escape delivered to the editor. Returns `true` when the find bar consumed it, so the
+    /// editor can fall through to its own `cancelOperation:` behaviour when it did not.
+    public static var cancelFind: (() -> Bool)?
 }
