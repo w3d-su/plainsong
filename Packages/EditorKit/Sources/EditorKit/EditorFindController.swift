@@ -85,6 +85,11 @@ enum EditorFindScheduleReason: Equatable {
 /// `Task.detached` does not inherit cancellation and `TextSearchEngine` has no cancel
 /// points, so "cancel" means the in-flight result is **dropped** at apply time (fence),
 /// not that the engine call is interrupted. Find never mutates source text.
+///
+/// **Navigation IDs:** when `navigationIDProvider` is installed (production App), IDs come
+/// from the shared `editorNavigationGeneration` domain used by workspace search. When nil
+/// (unit tests), a controller-local sequence is used — safe only while nothing else shares
+/// the `editorNavigationCommand` channel.
 @MainActor
 public final class EditorFindController {
     public private(set) var session: EditorFindSession?
@@ -102,6 +107,14 @@ public final class EditorFindController {
     /// Debounce before match admission. Tests may set to 0.
     public var debounceNanoseconds: UInt64 = 150_000_000
 
+    /// Optional shared-domain ID source (App installs `advanceEditorNavigationGeneration`).
+    /// When nil, falls back to a controller-local sequence for isolated unit tests.
+    public var navigationIDProvider: (() -> UInt64)?
+
+    /// Invoked on the main actor after a generation’s session (and optional navigation)
+    /// is applied, or after a query is cleared / session invalidated.
+    public var onSessionDidChange: (() -> Void)?
+
     /// Test seam: when true, match work runs on the main actor (off-main negative control).
     /// Internal only — must never be reachable from App or other production clients
     /// (would put the synchronous engine on the main actor and break §12).
@@ -114,6 +127,9 @@ public final class EditorFindController {
     private var navigationSequence: UInt64 = 0
     private var matchTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
+    /// After non-navigating recompute (edit/rebind), first next/previous activates the
+    /// current ordinal instead of stepping past it.
+    private var shouldActivateCurrentOnNextStep = false
 
     public init(documentBinding: EditorFindDocumentBinding = .empty) {
         self.documentBinding = documentBinding
@@ -149,12 +165,16 @@ public final class EditorFindController {
         scheduleMatch(reason: .edit)
     }
 
-    /// No document remains: cancel and clear session (F4b controller half).
+    /// No document remains: cancel and clear session **and** query (F4b controller half).
+    /// Leaving `query` set would re-run a background match on the next document bind.
     public func clearForNoDocument() {
         cancelInFlightWork()
         documentBinding = .empty
+        query = nil
         session = nil
         pendingNavigationCommand = nil
+        shouldActivateCurrentOnNextStep = false
+        notifySessionDidChange()
     }
 
     // MARK: - Query / navigation
@@ -170,22 +190,41 @@ public final class EditorFindController {
     }
 
     public func findNext() {
+        // No navigation from a stale or in-flight session (cleared at scheduleMatch).
         guard var session else { return }
+        if shouldActivateCurrentOnNextStep {
+            shouldActivateCurrentOnNextStep = false
+            self.session = session
+            emitNavigation(for: session.currentMatch)
+            notifySessionDidChange()
+            return
+        }
         session = session.next()
         self.session = session
         emitNavigation(for: session.currentMatch)
+        notifySessionDidChange()
     }
 
     public func findPrevious() {
         guard var session else { return }
+        if shouldActivateCurrentOnNextStep {
+            shouldActivateCurrentOnNextStep = false
+            self.session = session
+            emitNavigation(for: session.currentMatch)
+            notifySessionDidChange()
+            return
+        }
         session = session.previous()
         self.session = session
         emitNavigation(for: session.currentMatch)
+        notifySessionDidChange()
     }
 
     /// Re-activates the current match with a fresh navigation ID (F3).
     public func activateCurrentMatch() {
+        shouldActivateCurrentOnNextStep = false
         emitNavigation(for: session?.currentMatch)
+        notifySessionDidChange()
     }
 
     public func cancelInFlightWork() {
@@ -198,6 +237,10 @@ public final class EditorFindController {
         debounceTask = nil
         matchTask?.cancel()
         matchTask = nil
+        // Advance the fence so a detached worker that still finishes cannot apply.
+        // scheduleMatch will increment again when it starts a new generation — double
+        // advance is fine and keeps cancel-only callers safe.
+        queryGeneration &+= 1
     }
 
     // MARK: - Private
@@ -205,6 +248,7 @@ public final class EditorFindController {
     private func clearSessionKeepingQuery() {
         session = nil
         pendingNavigationCommand = nil
+        shouldActivateCurrentOnNextStep = false
     }
 
     private func scheduleMatch(reason: EditorFindScheduleReason) {
@@ -215,15 +259,23 @@ public final class EditorFindController {
         let query = query
         let anchor = caretAnchorUTF16
         let debounce = debounceNanoseconds
-        // Edit preserves ordinal when the match still exists; query/rebind resolve from anchor.
+        // Capture ordinal before invalidating session (edit preserves it when still valid).
         let preferredOrdinal: Int? = reason == .edit ? session?.currentOrdinal : nil
         let shouldNavigate = reason.emitsNavigationOnCompletion
+
+        // Drop the previous session immediately so next/previous/activate during debounce
+        // cannot navigate ranges from a superseded query or document revision.
+        session = nil
+        pendingNavigationCommand = nil
+        shouldActivateCurrentOnNextStep = false
+        notifySessionDidChange()
 
         guard let query, !query.pattern.isEmpty else {
             session = query.map { EditorFindSession.empty(query: $0, caretAnchorUTF16: anchor) }
             if shouldNavigate {
                 pendingNavigationCommand = nil
             }
+            notifySessionDidChange()
             return
         }
 
@@ -326,8 +378,14 @@ public final class EditorFindController {
         completedMatchCount &+= 1
         session = newSession
         if shouldNavigate {
+            shouldActivateCurrentOnNextStep = false
             emitNavigation(for: newSession.currentMatch)
+        } else {
+            // Counter-only recompute: first explicit next/previous activates current match
+            // instead of stepping past the anchor-resolved ordinal.
+            shouldActivateCurrentOnNextStep = newSession.currentMatch != nil
         }
+        notifySessionDidChange()
     }
 
     private func emitNavigation(for match: TextSearchMatch?) {
@@ -336,13 +394,23 @@ public final class EditorFindController {
         else {
             return
         }
-        navigationSequence &+= 1
+        let id: UInt64
+        if let navigationIDProvider {
+            id = navigationIDProvider()
+        } else {
+            navigationSequence &+= 1
+            id = navigationSequence
+        }
         let request = EditorNavigationRequest(
-            id: navigationSequence,
+            id: id,
             documentIdentity: identity,
             selection: match.range
         )
         pendingNavigationCommand = .navigate(request)
+    }
+
+    private func notifySessionDidChange() {
+        onSessionDidChange?()
     }
 
     /// Synchronous, nonisolated probe: true when the calling thread is not the main thread.
