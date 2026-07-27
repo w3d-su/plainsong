@@ -195,12 +195,15 @@ read the built bundle under macOS TCC.
    validates its own stream — one completion terminal, no failure terminal, expected searched and
    matching file counts — so a warm-up that silently failed cannot be recorded as done. A failure
    is not cached, so it surfaces instead of leaving every later probe measuring a cold process.
-5. Every run that reaches completion with at least one surviving candidate — measured sample,
-   warm-up, and controls alike — goes through `assertSharedStreamInvariants`: exact event count,
-   the full progress sequence, read-window ceilings, the skipped-detail cap, and completion as
-   the final event. The one exception is the under-ceiling ignore control, where the ignore rule
-   removes the only candidate so the progress model does not apply; that probe asserts terminal
-   correctness directly instead (exactly one terminal, no failure, completion last).
+5. Every run that reaches completion goes through `assertSharedStreamInvariants`: exact event
+   count, the full progress sequence, read-window ceilings, the skipped-detail cap, and
+   completion as the final event. That includes the under-ceiling ignore control — an ignored
+   entry is still a plan item and still counts toward `candidateFileCount`, so production emits
+   its `1 / 1` progress event and the helper applies. The only component with a separate
+   validator is the process warm-up, which runs before XCTest assertions are meaningful and
+   throws typed errors instead: exactly one terminal event, no failure terminal, no validation
+   failure, and nothing emitted after the terminal. The cancellation probe is checked differently
+   again, by asserting its stream is entirely silent.
 6. Resource ceilings are pinned as literals in the test file, not read back from
    `WorkspaceSearchLimits` / `TextSearchEngine`. Reading them back would make every bound
    self-fulfilling. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single
@@ -216,13 +219,15 @@ read the built bundle under macOS TCC.
 ### What each probe can actually falsify
 
 Every probe below was checked against the question "what break would this still pass?" — the
-five review passes removed cases where the answer was "the one it exists to catch": resource
+six review passes removed cases where the answer was "the one it exists to catch": resource
 ceilings read back from the production limits they checked and a global match cap asserted only by
 an unreachable inequality (first pass); a `cap + 1` oversized fixture that could not distinguish a
 bounded read from a truncating one (second); read bounds asserted from `Data.count`, an ignore
 ceiling with no behavior attached, and progress coalescing exercised only where `floor` and `ceil`
-agree (third); chunk counts that still could not catch a final full-buffer read (fourth); and
-zero-result controls that could not tell "searched and found nothing" from "never looked" (fifth).
+agree (third); chunk counts that still could not catch a final full-buffer read (fourth);
+zero-result controls that could not tell "searched and found nothing" from "never looked" (fifth);
+and a cancellation probe checking only some event kinds, a warm-up accepting validation failures,
+and an ignore control that skipped the progress invariant outright (sixth).
 
 | Probe | Would fail if… |
 |---|---|

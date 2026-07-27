@@ -936,8 +936,10 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   candidate goes through the shared stream invariants, which cover the exact finite event count,
   the full progress sequence, the concurrent/buffered/outstanding read ceilings, the
   skipped-detail cap, and completion as the final event. Content correctness — ordered result
-  paths, per-file UTF-16 match ranges and line numbers, and full summary accounting — is asserted
-  by each probe against its own fixture rather than by that shared helper. Read bounds are proven from the production
+  paths, per-file UTF-16 match ranges and line numbers, and summary accounting — is asserted by
+  the probes it applies to against their own fixtures, not by that shared helper and not
+  uniformly: a rejection probe has no result paths to order, and the ceiling pin has no fixture
+  at all. Read bounds are proven from the production
   reader's `readChunk` events, which carry the bytes requested of and returned by each `read(2)`,
   rather than from returned buffer sizes. Memory boundedness is asserted as structural limits
   rather than an RSS threshold.

@@ -213,13 +213,17 @@ extension WorkspaceSearchPerformanceTests {
         XCTAssertEqual(summary.searchedFileCount, 0)
         XCTAssertEqual(summary.skippedFileCount, 0)
 
-        // No candidate survives here, so the shared invariants' progress model does not apply;
-        // terminal correctness is still asserted, so a `.failed` terminal or a missing completion
-        // cannot pass.
-        XCTAssertTrue(failures(in: run.events).isEmpty)
-        XCTAssertEqual(terminalEventCount(in: run.events), 1)
-        guard let last = run.events.last, case .completed = last else {
-            return XCTFail("completion must be the final event")
-        }
+        // An ignored entry is still a plan item, so it counts toward `candidateFileCount` and
+        // production still emits a `1 / 1` progress event. The shared invariants therefore do
+        // apply here; asserting terminal shape alone would let a missing or wrong progress event,
+        // or an extra event, through.
+        XCTAssertEqual(summary.candidateFileCount, 1)
+        try assertSharedStreamInvariants(
+            run.events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 0,
+            expectedSkippedEventCount: 0,
+            label: "under-ceiling ignore"
+        )
     }
 }

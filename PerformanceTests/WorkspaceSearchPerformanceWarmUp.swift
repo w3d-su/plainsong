@@ -117,6 +117,7 @@ actor WorkspaceSearchPerformanceWarmUp {
             var summary: WorkspaceSearchSummary?
             var terminalCount = 0
             var sawFailure = false
+            var sawValidationFailure = false
             var eventsAfterTerminal = 0
             var matchingFileCount = 0
             for await event in service.events(for: request) {
@@ -130,13 +131,21 @@ actor WorkspaceSearchPerformanceWarmUp {
                     sawFailure = true
                 case let .fileResult(_, result):
                     matchingFileCount += result.matches.isEmpty ? 0 : 1
-                case .skippedFile, .progress, .validationFailure:
+                case .validationFailure:
+                    // Not a terminal event, so the terminal checks below would not see it: a
+                    // stream that emitted a validation failure and then completed would have
+                    // passed while the warm-up had in fact validated nothing.
+                    sawValidationFailure = true
+                case .skippedFile, .progress:
                     break
                 }
             }
 
             guard !sawFailure else {
                 throw WarmUpError.streamFailed(queryIndex: index)
+            }
+            guard !sawValidationFailure else {
+                throw WarmUpError.validationFailed(queryIndex: index)
             }
             guard terminalCount == 1 else {
                 throw WarmUpError.unexpectedTerminalCount(queryIndex: index, actual: terminalCount)
@@ -171,6 +180,7 @@ actor WorkspaceSearchPerformanceWarmUp {
 
     enum WarmUpError: Error, CustomStringConvertible {
         case streamFailed(queryIndex: Int)
+        case validationFailed(queryIndex: Int)
         case noTerminalEvent(queryIndex: Int)
         case unexpectedTerminalCount(queryIndex: Int, actual: Int)
         case eventsAfterTerminal(queryIndex: Int, actual: Int)
@@ -181,6 +191,8 @@ actor WorkspaceSearchPerformanceWarmUp {
             switch self {
             case let .streamFailed(index):
                 "WS4B warm-up query \(index) emitted a failure terminal"
+            case let .validationFailed(index):
+                "WS4B warm-up query \(index) emitted a validation failure"
             case let .noTerminalEvent(index):
                 "WS4B warm-up query \(index) produced no completion terminal"
             case let .unexpectedTerminalCount(index, actual):

@@ -67,6 +67,14 @@ extension WorkspaceSearchPerformanceTests {
             XCTAssertEqual(startCount, readWindow, "attempt \(attempt)")
             XCTAssertEqual(activeReads, 0, "attempt \(attempt)")
             XCTAssertEqual(cancelledReads, readWindow, "attempt \(attempt)")
+            // Every read in this fixture blocks and none completes, so no plan item finishes:
+            // there is no legitimate event of *any* kind, before or after the cancellation.
+            // Asserting the stream is entirely silent covers progress, skipped files, and
+            // validation failures too, which per-kind checks alone would let through.
+            XCTAssertTrue(
+                events.isEmpty,
+                "attempt \(attempt): expected a silent stream, got \(events.count) event(s)"
+            )
             XCTAssertTrue(completedSummaries(in: events).isEmpty, "attempt \(attempt)")
             XCTAssertTrue(failures(in: events).isEmpty, "attempt \(attempt)")
             XCTAssertEqual(terminalEventCount(in: events), 0, "attempt \(attempt)")
