@@ -153,6 +153,10 @@ extension AppState {
             try workspaceSearchPostActivationHook?()
             cancelPendingEditorNavigationIfNeeded(force: true)
             commitWorkspaceSearchActivation(activation)
+            // Fence in-document find before the search navigation claims an ID. A same-document
+            // activation never reaches `setCurrentDocument`, so this is the only place a find
+            // match still in flight is stopped from overriding the search selection later.
+            notifyEditorFindWorkspaceSearchWillNavigate(to: match.range)
             issueEditorNavigation(
                 documentIdentity: activation.documentIdentity,
                 selection: match.range

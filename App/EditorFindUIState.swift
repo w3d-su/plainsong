@@ -15,6 +15,13 @@ struct EditorFindUIState: Equatable {
     var wholeWord = false
     /// Monotonic focus request for the owned AppKit query field.
     var focusRequestID: UInt64 = 0
+    /// Last focus request actually consumed by a **key** window's owned query field.
+    ///
+    /// App-owned, exactly like `WorkspaceSearchUIState.focusAppliedID`: `AppState` is shared
+    /// across the `WindowGroup`, so a per-coordinator receipt lets a second window (or a
+    /// remounted bar) replay a token the first window already spent. Only a key window whose
+    /// owned `NSTextField` is the real first responder may advance this.
+    var focusAppliedID: UInt64 = 0
     /// Bumped whenever the field should select-all (⌘F show/re-focus).
     var selectAllRequestID: UInt64 = 0
     /// Highest request ID that was abandoned without becoming first responder
@@ -41,6 +48,26 @@ struct EditorFindUIState: Equatable {
         if focusRequestID > focusSupersededID {
             focusSupersededID = focusRequestID
         }
+    }
+
+    /// Live arbitration inputs for one focus attempt. Read fresh on every retry iteration —
+    /// never captured across an `await`, because key-window and token state both move.
+    struct FocusSnapshot: Equatable {
+        var requestID: UInt64
+        var appliedID: UInt64
+        var supersededID: UInt64
+        var selectAllRequestID: UInt64
+        var isBarVisible: Bool
+    }
+
+    var focusSnapshot: FocusSnapshot {
+        FocusSnapshot(
+            requestID: focusRequestID,
+            appliedID: focusAppliedID,
+            supersededID: focusSupersededID,
+            selectAllRequestID: selectAllRequestID,
+            isBarVisible: isBarVisible
+        )
     }
 
     mutating func applySessionPresentation(_ session: EditorFindSession?) {
@@ -86,5 +113,37 @@ struct EditorFindUIState: Equatable {
             caseSensitivity: matchCase ? .sensitive : .smart,
             wholeWord: wholeWord
         )
+    }
+}
+
+/// Pure focus arbitration for the owned find query field.
+///
+/// Mirrors `WorkspaceSearchFocusArbitration`: only a key window may apply a request, and
+/// only when it is newer than both App-owned receipts. Background windows sharing the same
+/// `AppState` must never consume a token.
+enum EditorFindFocusArbitration {
+    static func shouldApplyFocus(
+        requestID: UInt64,
+        appliedID: UInt64,
+        supersededID: UInt64,
+        isKeyWindow: Bool
+    ) -> Bool {
+        isKeyWindow
+            && requestID > 0
+            && requestID > appliedID
+            && requestID > supersededID
+    }
+
+    /// Whether an attempt is still worth retrying: the request is current and neither
+    /// consumed nor abandoned. Key-window state is deliberately excluded — a bar that has
+    /// not mounted yet, or a window that is not key *yet*, must keep waiting.
+    static func shouldKeepRetrying(
+        requestID: UInt64,
+        snapshot: EditorFindUIState.FocusSnapshot
+    ) -> Bool {
+        snapshot.isBarVisible
+            && snapshot.requestID == requestID
+            && requestID > snapshot.appliedID
+            && requestID > snapshot.supersededID
     }
 }

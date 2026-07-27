@@ -20,12 +20,13 @@ struct EditorFindBar: View {
                     set: { appState.handleEditorFindQueryTextChange($0) }
                 ),
                 focusRequestID: ui.focusRequestID,
-                selectAllRequestID: ui.selectAllRequestID,
-                focusSupersededID: ui.focusSupersededID,
-                isBarVisible: ui.isBarVisible,
                 isEnabled: true,
+                readFocusSnapshot: { appState.editorFindHost.ui.focusSnapshot },
+                markFocusApplied: { appState.markEditorFindFocusApplied($0) },
                 onSubmit: {
-                    appState.editorFindNext()
+                    // Bar chrome acts directly: the responder-context guard exists to keep
+                    // *menu* commands from firing when focus is elsewhere in the window.
+                    appState.stepEditorFindFromBarControl(.next)
                 },
                 onEscape: {
                     appState.closeEditorFindBar()
@@ -76,7 +77,7 @@ struct EditorFindBar: View {
             }
 
             Button {
-                appState.editorFindPrevious()
+                appState.stepEditorFindFromBarControl(.previous)
             } label: {
                 Image(systemName: "chevron.up")
             }
@@ -86,7 +87,7 @@ struct EditorFindBar: View {
             .disabled(!ui.hasActiveQuery)
 
             Button {
-                appState.editorFindNext()
+                appState.stepEditorFindFromBarControl(.next)
             } label: {
                 Image(systemName: "chevron.down")
             }

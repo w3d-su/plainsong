@@ -297,9 +297,6 @@ private extension AppState {
         )
         _ = advanceSessionLifecycle(for: completed.session)
         completed.session.markSaved(text: completed.text, url: destination)
-        if completed.session === currentDocument {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
         _ = clearWorkspaceMutationTextRecovery(for: completed.session)
         sessionCache[destination] = completed.session
         adoptAnchoredFileBinding(
@@ -311,6 +308,12 @@ private extension AppState {
         lastKnownDiskHashes[destination] = Self.contentHash(completed.text)
         lastKnownDiskModificationDates[destination] = nil
         handleSessionAccess(url: destination, isDirty: false)
+        // Rekey Find only once the retained binding names the destination: identity comes
+        // from `sessionStateURL`, so notifying before `adoptAnchoredFileBinding` would
+        // rebind Find to the *old* URL and never correct itself.
+        if completed.session === currentDocument {
+            notifyEditorFindDocumentIdentityDidRekey()
+        }
         rememberRecentItem(destination)
         restoreRecoveryPrompt(for: completed.session)
         finishRetiredEditorDocumentSessionIfPossible(for: completed.session)
@@ -596,9 +599,6 @@ private extension AppState {
             fallbackURL: oldURL,
             removesEditorBindingRegistration: false
         )
-        if session === currentDocument {
-            notifyEditorFindDocumentIdentityDidRekey()
-        }
         rehomeRetirement(
             retirement,
             session: session,
@@ -616,6 +616,13 @@ private extension AppState {
             isDirty: true
         )
         handleSessionAccess(url: context.location.fileURL, isDirty: true)
+        // Identity resolves through the retained indeterminate context, which is installed
+        // above. Rekeying before that left Find bound to the pre-quarantine URL with no
+        // second rebind, so every later find command targeted a document that no longer
+        // owned this session's state.
+        if session === currentDocument {
+            notifyEditorFindDocumentIdentityDidRekey()
+        }
         cancelAutosave(for: session)
         refreshIndeterminateFileWriteReconciliation(for: session)
     }

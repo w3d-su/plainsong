@@ -7,6 +7,12 @@
 > navigation ID domain is wired via App `navigationIDProvider`. F2 latency, F8, F9 XCUITest
 > remain open for PR D. Precedent: PR #45, link-folding, image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
+>
+> The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
+> PR B so #96 compiles standalone, and PR C added production-path lifecycle coverage plus a
+> shared focus receipt, find-bar chrome eligibility, and workspace-search / close-bar
+> fencing. **No gate box was checked by that work**: hosted first-responder and UI-visibility
+> evidence is still what F4b UI, F5 source+preview, F6, and F7 are waiting on.
 
 Created 2026-07-27 as Phase 3 Goal 14 after WS3C/WS4A landed workspace search (⇧⌘F).
 See `agent.md` §6.4 (shortcuts), §12 (performance), §17 (layering / collaboration),
@@ -465,7 +471,25 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Partial unit evidence: `EditorFindUITests.testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump`,
   `...testFindBarClosesWhenNoDocumentRemains`,
   `...testFindBarClosesOnWorkspaceClose`
-- Evidence: **partial** — PR B controller half closed; PR C UI unit smoke only (reopened)
+  Production-path lifecycle evidence (2026-07-27 review):
+  `EditorFindLifecycleCombinationTests.testCleanExternalReloadRecountsFindWithoutAutoJumping`,
+  `...testKeepMineAfterExternalChangeLeavesFindOnTheLocalSource`,
+  `...testRenameRekeysFindIdentityToTheNewURL`,
+  `...testDetachedSaveCopyRekeysFindToTheDestination`,
+  `...testIndeterminateSaveCopyQuarantineRekeysFindToTheQuarantinedLocation`
+  These drive `openExternalFile` / `refreshWorkspaceAfterFileSystemChange` /
+  `keepMineForExternallyChangedFile` / `renameWorkspaceItem` / `saveDetachedCurrentDocument`
+  rather than the `notifyEditorFind*` hooks, so a hook wired at the wrong point in a
+  transaction fails them (the quarantine ordering bug did). They assert controller identity,
+  recount, and absence of navigation — **not** hosted bar visibility, which is why the box
+  stays unchecked.
+- Also covered: a workspace-search activation on the **already-current** document fences an
+  in-flight find generation before the search navigation takes an ID
+  (`EditorFindReviewFixTests.testWorkspaceSearchHandOffStopsAnInFlightFindFromNavigatingAfterwards`),
+  and Escape / Done fences a query still inside the debounce window
+  (`...testClosingTheBarFencesAQueryStillInsideTheDebounceWindow`).
+- Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
+  fencing covered in-process; hosted UI-visibility half still open
 
 ### F5 — Reveal without source mutation (WYSIWYG; source+preview in PR C)
 
@@ -505,6 +529,16 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   necessary but not sufficient — first-responder proof required).
 - [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
   Partial: `EditorFindUITests` token integer tests.
+- [ ] A focus request consumed by one `WindowGroup` window is not replayable by another
+  window or by a remounted bar. Partial (2026-07-27 review): `EditorFindUIState` now carries
+  an App-owned `focusAppliedID` alongside `focusSupersededID`, arbitration is pure
+  (`EditorFindFocusArbitration`), and the owned field's attempt is a bounded key-window retry
+  instead of one `DispatchQueue.main.async` hop that lost the first-⌘F mount race.
+  Evidence: `EditorFindReviewFixTests.testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest`,
+  `...testBackgroundWindowAndSupersededRequestsNeverAdvanceTheReceipt`,
+  `...testRetryContinuesWhileTheBarIsVisibleAndTheRequestIsUnresolved`.
+  Still open: hosted dual-window first-responder proof (the WS3C `WindowKeyStateTracker`
+  equivalent), which is what actually closes this gate.
 - [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.

@@ -37,6 +37,23 @@ public enum EditorSelectionProbe {
         return nil
     }
 
+    /// Selected UTF-16 range of the key window's Plainsong editor **regardless of which view
+    /// is first responder**.
+    ///
+    /// `keyWindowEditorSelection()` answers "is the editor focused, and what is selected".
+    /// This answers "what has the editor actually applied", which is what ⌘E needs while the
+    /// find field owns focus: a navigation that was published but rejected or superseded
+    /// before the editor installed it must not be reported as the selection.
+    public static func keyWindowAppliedEditorSelection() -> NSRange? {
+        guard let window = NSApp.keyWindow,
+              let root = window.contentView,
+              let editor = editorTextView(in: root) as? STTextView
+        else {
+            return nil
+        }
+        return editor.selectedRange()
+    }
+
     /// Whether the key window's first responder is the Plainsong editor text view.
     public static func keyWindowHasEditorFocus() -> Bool {
         keyWindowEditorSelection() != nil
@@ -77,6 +94,18 @@ public enum EditorSelectionProbe {
             return view
         }
 
+        return nil
+    }
+
+    private static func editorTextView(in view: NSView) -> NSView? {
+        if view.accessibilityIdentifier() == EditorAccessibility.textViewIdentifier {
+            return view
+        }
+        for subview in view.subviews {
+            if let match = editorTextView(in: subview) {
+                return match
+            }
+        }
         return nil
     }
 }

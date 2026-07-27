@@ -69,11 +69,16 @@ extension AppState {
     }
 
     /// Escape / Done — close bar and return focus to editor.
+    ///
+    /// Fences the controller first: a query typed moments earlier may still be inside the
+    /// debounce window, and its match would otherwise land after the bar is gone and move
+    /// the editor selection. The retained query stays usable for a later ⌘G.
     func closeEditorFindBar() {
         guard editorFindHost.ui.isBarVisible else { return }
         var ui = editorFindHost.ui
         ui.closeBar() // also supersedes pending focus
         setEditorFindUI(ui)
+        yieldEditorFindNavigation(caretAnchorUTF16: nil)
         requestEditorFocus()
     }
 
@@ -87,27 +92,63 @@ extension AppState {
         setEditorFindUI(ui)
     }
 
-    func editorFindNext() {
-        guard hasOpenDocument else { return }
-        guard isEditorFindCommandContextActive() else { return }
-        ensureEditorFindSessionObserverInstalled()
-        refreshEditorFindCaretFromResponderIfPossible()
-        if !editorFindHost.ui.isBarVisible {
-            syncEditorFindControllerDocument()
+    /// Consumes a focus request after the **key** window's owned query field is the real
+    /// first responder. Shared across the `WindowGroup` so a background window or a
+    /// remounted bar cannot replay a spent token. Idempotent for older/applied tokens.
+    func markEditorFindFocusApplied(_ requestID: UInt64) {
+        guard requestID == editorFindHost.ui.focusRequestID,
+              EditorFindFocusArbitration.shouldApplyFocus(
+                  requestID: requestID,
+                  appliedID: editorFindHost.ui.focusAppliedID,
+                  supersededID: editorFindHost.ui.focusSupersededID,
+                  isKeyWindow: true
+              )
+        else {
+            return
         }
-        // While session is nil (debounce), records pending next intent — does not re-push query.
-        editorFindHost.controller.findNext()
+        var ui = editorFindHost.ui
+        ui.focusAppliedID = requestID
+        setEditorFindUI(ui)
+    }
+
+    enum EditorFindStepDirection {
+        case next
+        case previous
+    }
+
+    func editorFindNext() {
+        guard isEditorFindCommandContextActive() else { return }
+        stepEditorFind(.next)
     }
 
     func editorFindPrevious() {
-        guard hasOpenDocument else { return }
         guard isEditorFindCommandContextActive() else { return }
+        stepEditorFind(.previous)
+    }
+
+    /// Next/previous triggered by the find bar's own chrome (buttons, Return in the field).
+    ///
+    /// Deliberately skips `isEditorFindCommandContextActive()`. That guard keeps *menu*
+    /// commands from firing when window focus is somewhere unrelated; a click or Return on
+    /// the bar is already unambiguous, and with Full Keyboard Access the focused control
+    /// may be a bar toggle or button that the responder check does not recognize.
+    func stepEditorFindFromBarControl(_ direction: EditorFindStepDirection) {
+        stepEditorFind(direction)
+    }
+
+    private func stepEditorFind(_ direction: EditorFindStepDirection) {
+        guard hasOpenDocument else { return }
         ensureEditorFindSessionObserverInstalled()
         refreshEditorFindCaretFromResponderIfPossible()
         if !editorFindHost.ui.isBarVisible {
             syncEditorFindControllerDocument()
         }
-        editorFindHost.controller.findPrevious()
+        // While session is nil (debounce), records a pending step intent bound to the
+        // in-flight query generation — does not re-push the query.
+        switch direction {
+        case .next: editorFindHost.controller.findNext()
+        case .previous: editorFindHost.controller.findPrevious()
+        }
     }
 
     /// ⌘E — macOS convention: set pattern from selection **without** showing/focusing the bar
@@ -186,93 +227,6 @@ extension AppState {
         handleEditorFindOptionsChange()
     }
 
-    func notifyEditorFindDocumentDidChange() {
-        guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else { return }
-        ensureEditorFindSessionObserverInstalled()
-        cancelPublishedFindNavigationOnSharedChannel()
-        let session = currentDocument
-        let binding = EditorFindDocumentBinding(
-            identity: activeEditorDocumentIdentity,
-            text: session.text,
-            revision: UInt64(max(0, session.version))
-        )
-        if editorFindHost.controller.documentBinding.identity != binding.identity {
-            editorFindHost.controller.rebindDocument(binding)
-        } else {
-            editorFindHost.controller.documentTextDidChange(text: binding.text, revision: binding.revision)
-        }
-        // Counter refresh arrives via onSessionDidChange when the recompute finishes.
-    }
-
-    /// Text/revision changed for the same session identity without going through
-    /// `applyDocumentText` (External Reload, Keep Mine, clean auto-adoption).
-    func notifyEditorFindExternalContentDidReplace() {
-        notifyEditorFindDocumentDidChange()
-    }
-
-    /// URL / retained identity rekey (rename, move, Save Copy adoption) without a full
-    /// document switch — rebind so Find identity tracks the new URL.
-    func notifyEditorFindDocumentIdentityDidRekey() {
-        guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else {
-            // Still drop any published nav under the old identity.
-            cancelPublishedFindNavigationOnSharedChannel()
-            editorFindHost.latestKnownEditorSelection = nil
-            return
-        }
-        ensureEditorFindSessionObserverInstalled()
-        cancelPublishedFindNavigationOnSharedChannel()
-        editorFindHost.latestKnownEditorSelection = nil
-        let binding = EditorFindDocumentBinding(
-            identity: activeEditorDocumentIdentity,
-            text: currentDocument.text,
-            revision: UInt64(max(0, currentDocument.version))
-        )
-        editorFindHost.controller.rebindDocument(binding)
-    }
-
-    func notifyEditorFindDocumentDidSwitch() {
-        // Drop selection cache — ranges are document-scoped.
-        editorFindHost.latestKnownEditorSelection = nil
-        cancelPublishedFindNavigationOnSharedChannel()
-
-        if !hasOpenDocument {
-            editorFindHost.controller.clearForNoDocument()
-            var ui = editorFindHost.ui
-            ui.closeBar()
-            ui.applySessionPresentation(nil)
-            setEditorFindUI(ui)
-            return
-        }
-        ensureEditorFindSessionObserverInstalled()
-        let binding = EditorFindDocumentBinding(
-            identity: activeEditorDocumentIdentity,
-            text: currentDocument.text,
-            revision: UInt64(max(0, currentDocument.version))
-        )
-        if editorFindHost.ui.isBarVisible {
-            var ui = editorFindHost.ui
-            ui.resetChromeKeepingQuery()
-            setEditorFindUI(ui)
-            // Rebind re-runs the retained controller query with `.rebind` (counter only).
-            editorFindHost.controller.rebindDocument(binding)
-        } else if editorFindHost.controller.query != nil {
-            editorFindHost.controller.rebindDocument(binding)
-        }
-    }
-
-    func notifyEditorFindWorkspaceDidClose() {
-        // clearForNoDocument clears controller query + session so the next open does not
-        // re-run a background find against a new document.
-        cancelPublishedFindNavigationOnSharedChannel()
-        editorFindHost.controller.clearForNoDocument()
-        editorFindHost.latestKnownEditorSelection = nil
-        var ui = editorFindHost.ui
-        ui.closeBar()
-        ui.queryText = ""
-        ui.applySessionPresentation(nil)
-        setEditorFindUI(ui)
-    }
-
     // MARK: - Internals
 
     func syncEditorFindControllerDocument() {
@@ -328,13 +282,10 @@ extension AppState {
             return
         }
         editorFindHost.lastPublishedFindNavigationID = id
-        // Keep selection cache in sync so ⌘E after ⌘G uses the navigated range, not a stale one.
-        if case let .navigate(request) = command {
-            editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
-                documentIdentity: request.documentIdentity,
-                range: request.selection
-            )
-        }
+        // Deliberately no selection-cache write here. Publishing is not applying: EditorKit
+        // may leave the request pending (marked text, document not installed) or reject it
+        // outright, so ⌘E reads the editor's *applied* selection instead
+        // (`currentEditorSelectionUTF16`).
         // Reassign so SwiftUI/EditorKit observes a new command value.
         editorNavigationCommand = nil
         editorNavigationCommand = command
@@ -348,12 +299,7 @@ extension AppState {
     }
 
     private func refreshEditorFindCaretFromResponderIfPossible() {
-        if let range = EditorSelectionProbe.keyWindowEditorSelection() {
-            let cached = EditorFindCachedSelection(
-                documentIdentity: activeEditorDocumentIdentity,
-                range: range
-            )
-            editorFindHost.latestKnownEditorSelection = cached
+        if let range = appliedEditorSelectionUTF16() {
             editorFindHost.controller.setCaretAnchor(range.location)
         } else if let known = editorFindHost.latestKnownEditorSelection,
                   known.documentIdentity == activeEditorDocumentIdentity
@@ -362,15 +308,25 @@ extension AppState {
         }
     }
 
+    /// The editor's real selection, caching it for the window-less fallback.
+    ///
+    /// Reads the editor view itself rather than the last *published* navigation: a published
+    /// request can still be pending or rejected inside EditorKit, so trusting it would let
+    /// ⌘E copy a range the editor never applied.
+    private func appliedEditorSelectionUTF16() -> NSRange? {
+        let range = EditorSelectionProbe.keyWindowEditorSelection()
+            ?? EditorSelectionProbe.keyWindowAppliedEditorSelection()
+        guard let range else { return nil }
+        editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
+            documentIdentity: activeEditorDocumentIdentity,
+            range: range
+        )
+        return range
+    }
+
     private func currentEditorSelectionUTF16() -> NSRange {
-        // Prefer live editor selection; never use cache when the find field owns focus
-        // unless the cache was updated by the last applied find navigation.
-        if let live = EditorSelectionProbe.keyWindowEditorSelection() {
-            editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
-                documentIdentity: activeEditorDocumentIdentity,
-                range: live
-            )
-            return live
+        if let applied = appliedEditorSelectionUTF16() {
+            return applied
         }
         if let known = editorFindHost.latestKnownEditorSelection,
            known.documentIdentity == activeEditorDocumentIdentity
@@ -378,67 +334,5 @@ extension AppState {
             return known.range
         }
         return NSRange(location: 0, length: 0)
-    }
-}
-
-// MARK: - First-responder helpers
-
-enum EditorFindResponderSupport {
-    @MainActor
-    static func keyWindowHasEditorOrFindField() -> Bool {
-        if EditorSelectionProbe.keyWindowHasEditorFocus() {
-            return true
-        }
-        guard let window = NSApp.keyWindow,
-              let first = window.firstResponder
-        else {
-            return false
-        }
-        return matchesEditorOrFindFieldResponder(first)
-    }
-
-    @MainActor
-    private static func matchesEditorOrFindFieldResponder(_ first: NSResponder) -> Bool {
-        if let view = first as? NSView, matchesEditorOrFindField(view) {
-            return true
-        }
-        // Field editor (NSTextView) for the find field or editor.
-        if let textView = first as? NSTextView {
-            if textView.enclosingScrollView?.documentView?.accessibilityIdentifier()
-                == EditorAccessibility.textViewIdentifier
-            {
-                return true
-            }
-            if let document = textView.enclosingScrollView?.documentView as? NSView,
-               matchesEditorOrFindField(document)
-            {
-                return true
-            }
-            var view: NSView? = textView.superview
-            while let current = view {
-                if matchesEditorOrFindField(current) { return true }
-                view = current.superview
-            }
-            // Field editor owned by the find NSTextField.
-            if let field = textView.delegate as? NSTextField,
-               field.accessibilityIdentifier() == EditorFindAccessibility.queryField
-            {
-                return true
-            }
-        }
-        return false
-    }
-
-    @MainActor
-    private static func matchesEditorOrFindField(_ view: NSView) -> Bool {
-        let id = view.accessibilityIdentifier() ?? ""
-        if id == EditorAccessibility.textViewIdentifier { return true }
-        if id == EditorFindAccessibility.queryField { return true }
-        if let field = view as? NSTextField,
-           field.accessibilityIdentifier() == EditorFindAccessibility.queryField
-        {
-            return true
-        }
-        return false
     }
 }

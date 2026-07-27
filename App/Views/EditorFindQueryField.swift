@@ -3,25 +3,26 @@ import SwiftUI
 
 /// Owned AppKit query field for in-document find (not SwiftUI `FocusState`).
 ///
-/// Focus apply is **key-window only** and **request-token ordered**: the async focus
-/// closure re-reads the latest request IDs and does not consume a token until the field
-/// actually becomes first responder. Older closures cannot steal focus after a newer
-/// ⌘F / ⇧⌘F / Escape intent.
+/// Focus apply is **key-window only** and settled against the App-owned receipt in
+/// `EditorFindUIState`. The retry loop re-reads that receipt plus live key-window state on
+/// every iteration and consumes a token only after this field is the real first responder,
+/// so a second `WindowGroup` window or a remounted bar can never replay a spent request.
 struct EditorFindQueryField: NSViewRepresentable {
     @Binding var text: String
     var focusRequestID: UInt64
-    var selectAllRequestID: UInt64
-    /// Highest abandoned request; async focus must no-op for `requestID <=` this value.
-    var focusSupersededID: UInt64
-    /// When false, focus requests are ignored (bar closed / unmounted).
-    var isBarVisible: Bool
     var isEnabled: Bool
+    /// Live arbitration inputs; read fresh inside the retry loop, never captured.
+    var readFocusSnapshot: () -> EditorFindUIState.FocusSnapshot
+    /// Advances the shared applied receipt. Only called after key-window first-responder proof.
+    var markFocusApplied: (UInt64) -> Void
     var onSubmit: () -> Void
     var onEscape: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $text,
+            readFocusSnapshot: readFocusSnapshot,
+            markFocusApplied: markFocusApplied,
             onSubmit: onSubmit,
             onEscape: onEscape
         )
@@ -42,27 +43,24 @@ struct EditorFindQueryField: NSViewRepresentable {
         field.isEditable = isEnabled
         field.isSelectable = true
         context.coordinator.field = field
-        context.coordinator.lastAppliedFocusRequestID = 0
-        context.coordinator.lastAppliedSelectAllRequestID = 0
         return field
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
-        context.coordinator.text = $text
-        context.coordinator.field = field
-        context.coordinator.onSubmit = onSubmit
-        context.coordinator.onEscape = onEscape
-        context.coordinator.isBarVisible = isBarVisible
-        context.coordinator.latestFocusRequestID = focusRequestID
-        context.coordinator.latestSelectAllRequestID = selectAllRequestID
-        context.coordinator.focusSupersededID = focusSupersededID
+        let coordinator = context.coordinator
+        coordinator.text = $text
+        coordinator.field = field
+        coordinator.onSubmit = onSubmit
+        coordinator.onEscape = onEscape
+        coordinator.readFocusSnapshot = readFocusSnapshot
+        coordinator.markFocusApplied = markFocusApplied
 
         // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
         let isComposing: Bool = {
             if let editor = field.currentEditor() as? NSTextView, editor.hasMarkedText() {
                 return true
             }
-            return context.coordinator.isComposing
+            return coordinator.isComposing
         }()
         if !isComposing, field.stringValue != text {
             field.stringValue = text
@@ -70,84 +68,157 @@ struct EditorFindQueryField: NSViewRepresentable {
         field.isEditable = isEnabled
         field.setAccessibilityIdentifier(EditorFindAccessibility.queryField)
 
-        let needsFocus = isBarVisible
-            && focusRequestID != 0
-            && focusRequestID > focusSupersededID
-            && focusRequestID != context.coordinator.lastAppliedFocusRequestID
-        if needsFocus {
-            let requestID = focusRequestID
-            let selectID = selectAllRequestID
-            DispatchQueue.main.async {
-                context.coordinator.applyFocusIfEligible(
-                    field: field,
-                    requestID: requestID,
-                    selectAllRequestID: selectID
-                )
-            }
-        } else if isBarVisible,
-                  selectAllRequestID != context.coordinator.lastAppliedSelectAllRequestID,
-                  focusRequestID == context.coordinator.lastAppliedFocusRequestID,
-                  focusRequestID > focusSupersededID
-        {
-            // Select-all only while already focused on this request.
-            if field.window?.isKeyWindow == true,
-               field.window?.firstResponder === field.currentEditor()
-               || field.window?.firstResponder === field
-            {
-                context.coordinator.lastAppliedSelectAllRequestID = selectAllRequestID
-                field.currentEditor()?.selectAll(nil)
-            }
+        let snapshot = readFocusSnapshot()
+        if EditorFindFocusArbitration.shouldKeepRetrying(
+            requestID: focusRequestID,
+            snapshot: snapshot
+        ) {
+            // The field may not be in a key window yet (first ⌘F mounts the bar in the same
+            // turn), so this schedules a bounded retry instead of one async attempt.
+            coordinator.scheduleFocusAttempt(requestID: focusRequestID)
+        } else {
+            coordinator.cancelFocusAttempt()
+            coordinator.applySelectAllIfAlreadyFocused(snapshot: snapshot)
         }
     }
 
+    static func dismantleNSView(_: NSTextField, coordinator: Coordinator) {
+        coordinator.cancelFocusAttempt()
+    }
+
     final class Coordinator: NSObject, NSTextFieldDelegate {
+        /// 180 × 16 ms ≈ 3 s, matching the workspace-search focus loop's mount-race budget.
+        private static let maximumAttempts = 180
+        private static let retryIntervalNanoseconds: UInt64 = 16_000_000
+
         var text: Binding<String>
+        var readFocusSnapshot: () -> EditorFindUIState.FocusSnapshot
+        var markFocusApplied: (UInt64) -> Void
         var onSubmit: () -> Void
         var onEscape: () -> Void
         weak var field: NSTextField?
-        var lastAppliedFocusRequestID: UInt64 = 0
-        var lastAppliedSelectAllRequestID: UInt64 = 0
-        var latestFocusRequestID: UInt64 = 0
-        var latestSelectAllRequestID: UInt64 = 0
-        var focusSupersededID: UInt64 = 0
-        var isBarVisible = false
         var isComposing = false
+
+        private var focusTask: Task<Void, Never>?
+        private var focusTaskRequestID: UInt64?
+        /// Select-all is per-field chrome, so it stays coordinator-local even though the
+        /// focus receipt is App-owned.
+        private var lastAppliedSelectAllRequestID: UInt64 = 0
 
         init(
             text: Binding<String>,
+            readFocusSnapshot: @escaping () -> EditorFindUIState.FocusSnapshot,
+            markFocusApplied: @escaping (UInt64) -> Void,
             onSubmit: @escaping () -> Void,
             onEscape: @escaping () -> Void
         ) {
             self.text = text
+            self.readFocusSnapshot = readFocusSnapshot
+            self.markFocusApplied = markFocusApplied
             self.onSubmit = onSubmit
             self.onEscape = onEscape
         }
 
-        func applyFocusIfEligible(
-            field: NSTextField,
-            requestID: UInt64,
-            selectAllRequestID: UInt64
-        ) {
-            // Superseded by a newer focus intent (⌘F again) or abandoned (⇧⌘F / Escape).
-            guard requestID == latestFocusRequestID else { return }
-            guard requestID > focusSupersededID else { return }
-            guard isBarVisible else { return }
-            guard let window = field.window, window.isKeyWindow else { return }
-            guard requestID != lastAppliedFocusRequestID else { return }
+        deinit {
+            focusTask?.cancel()
+        }
 
-            guard window.makeFirstResponder(field) else { return }
-            // Confirm we actually hold focus before consuming the token.
-            let focused = window.firstResponder === field
-                || window.firstResponder === field.currentEditor()
-            guard focused else { return }
+        func cancelFocusAttempt() {
+            focusTask?.cancel()
+            focusTask = nil
+            focusTaskRequestID = nil
+        }
 
-            lastAppliedFocusRequestID = requestID
-            if selectAllRequestID == latestSelectAllRequestID,
-               selectAllRequestID != lastAppliedSelectAllRequestID
-            {
-                lastAppliedSelectAllRequestID = selectAllRequestID
-                field.currentEditor()?.selectAll(nil)
+        func scheduleFocusAttempt(requestID: UInt64) {
+            guard focusTaskRequestID != requestID || focusTask == nil else { return }
+            focusTask?.cancel()
+            focusTaskRequestID = requestID
+            focusTask = Task { @MainActor [weak self] in
+                await self?.runFocusAttempt(requestID: requestID)
+                if let self, focusTaskRequestID == requestID {
+                    focusTask = nil
+                    focusTaskRequestID = nil
+                }
             }
+        }
+
+        private func runFocusAttempt(requestID: UInt64) async {
+            for _ in 0 ..< Self.maximumAttempts {
+                guard !Task.isCancelled else { return }
+                let snapshot = readFocusSnapshot()
+                guard EditorFindFocusArbitration.shouldKeepRetrying(
+                    requestID: requestID,
+                    snapshot: snapshot
+                ) else {
+                    return
+                }
+                if applyFocusIfEligible(requestID: requestID, snapshot: snapshot) {
+                    return
+                }
+                do {
+                    try await Task.sleep(nanoseconds: Self.retryIntervalNanoseconds)
+                } catch {
+                    return
+                }
+            }
+        }
+
+        /// Returns `true` once the shared receipt was advanced for `requestID`.
+        @discardableResult
+        func applyFocusIfEligible(
+            requestID: UInt64,
+            snapshot: EditorFindUIState.FocusSnapshot
+        ) -> Bool {
+            guard let field, let window = field.window else { return false }
+            guard EditorFindFocusArbitration.shouldApplyFocus(
+                requestID: requestID,
+                appliedID: snapshot.appliedID,
+                supersededID: snapshot.supersededID,
+                isKeyWindow: window.isKeyWindow
+            ) else {
+                return false
+            }
+            guard window.makeFirstResponder(field), isFirstResponder(field, in: window) else {
+                return false
+            }
+            // Re-read after `makeFirstResponder`: another window may have applied meanwhile.
+            let settled = readFocusSnapshot()
+            guard EditorFindFocusArbitration.shouldApplyFocus(
+                requestID: requestID,
+                appliedID: settled.appliedID,
+                supersededID: settled.supersededID,
+                isKeyWindow: window.isKeyWindow
+            ) else {
+                return false
+            }
+            markFocusApplied(requestID)
+            applySelectAll(requestID: settled.selectAllRequestID, field: field)
+            return true
+        }
+
+        /// ⌘F on an already-focused field only needs the select-all half.
+        func applySelectAllIfAlreadyFocused(snapshot: EditorFindUIState.FocusSnapshot) {
+            guard snapshot.isBarVisible,
+                  snapshot.requestID == snapshot.appliedID,
+                  snapshot.selectAllRequestID != lastAppliedSelectAllRequestID,
+                  let field,
+                  let window = field.window,
+                  window.isKeyWindow,
+                  isFirstResponder(field, in: window)
+            else {
+                return
+            }
+            applySelectAll(requestID: snapshot.selectAllRequestID, field: field)
+        }
+
+        private func applySelectAll(requestID: UInt64, field: NSTextField) {
+            guard requestID != lastAppliedSelectAllRequestID else { return }
+            lastAppliedSelectAllRequestID = requestID
+            field.currentEditor()?.selectAll(nil)
+        }
+
+        private func isFirstResponder(_ field: NSTextField, in window: NSWindow) -> Bool {
+            window.firstResponder === field || window.firstResponder === field.currentEditor()
         }
 
         func controlTextDidChange(_ obj: Notification) {
