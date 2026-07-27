@@ -13,9 +13,8 @@
 > ABC and Zhuyin. Ordinary-edit/FSEvent **active-search refresh is complete**: only a query that
 > actually ran is refreshed, with post-debounce dirty overlays and root-bound reload intent. WS4A
 > now has an out-of-process XCUITest acceptance gate for the same search workflow; these synthetic
-> events are not additional physical-keyboard evidence. **WS4B is proposed in PR #93, which is
-> still a Draft and is not merged**; nothing in WS4B has landed on `main` yet. That PR adds
-> production-shaped performance probes and evidence-frozen budgets (2,000-file workspace under
+> events are not additional physical-keyboard evidence. **WS4B performance gates are implemented
+> by PR #93** with production-shaped probes and evidence-frozen budgets (2,000-file workspace under
 > both the `.sensitive` and default `.smart` case policies, exactly-admitted 512 KiB file, a
 > 512 KiB CJK file under `.smart`, an oversized sibling proving reads stay bounded, dense
 > whole-word rejection, the global 10,000-match ceiling, pinned resource ceilings, and rapid
