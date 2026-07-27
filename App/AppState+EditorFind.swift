@@ -54,11 +54,20 @@ extension AppState {
         }
         if editorFindHost.ui.isBarVisible,
            editorFindHost.chromeFocus != nil,
-           EditorFindResponderSupport.keyWindowHostsFindBar()
+           keyWindowHostsEditorFindBar()
         {
             return true
         }
         return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
+    }
+
+    /// Whether the key window is the one showing the find bar. Tests may override so the
+    /// rule is exercised in both directions instead of depending on ambient `NSApp` state.
+    func keyWindowHostsEditorFindBar() -> Bool {
+        if let override = editorFindHost.keyWindowHostsFindBarOverride {
+            return override
+        }
+        return EditorFindResponderSupport.keyWindowHostsFindBar()
     }
 
     /// Records which find-bar control SwiftUI reports as focused (`nil` when focus left).

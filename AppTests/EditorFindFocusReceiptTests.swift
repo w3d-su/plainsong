@@ -186,18 +186,38 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             appState.editorFindHost.controller.session?.total == 3
         }
 
-        // No AppKit override: eligibility must come from the reported SwiftUI chrome focus.
-        // No window in this headless state hosts the owned query field, so chrome focus alone
-        // must not grant it — otherwise a background window could consume find commands.
+        // Eligibility must come from the reported SwiftUI chrome focus, and only while the
+        // key window is the one showing the bar. Both sides of that gate are driven
+        // explicitly — reading ambient `NSApp.keyWindow` would make this order-dependent on
+        // any other test that leaves a window key (CI caught exactly that).
         appState.editorFindHost.commandContextOverride = nil
+
+        appState.editorFindHost.keyWindowHostsFindBarOverride = false
         appState.setEditorFindChromeFocus(.matchCase)
         XCTAssertFalse(
             appState.isEditorFindCommandContextActive(),
-            "Chrome focus is only trusted while the key window is the one showing the bar"
+            "A background window's chrome focus must not consume find commands"
         )
-        XCTAssertFalse(EditorFindResponderSupport.keyWindowHostsFindBar())
 
+        appState.editorFindHost.keyWindowHostsFindBarOverride = true
+        XCTAssertTrue(
+            appState.isEditorFindCommandContextActive(),
+            "Focus on a bar control in the hosting key window must keep ⌘G / ⌘E live"
+        )
+
+        // Focus left the bar: fall back to the AppKit editor / query-field check.
         appState.setEditorFindChromeFocus(nil)
+        XCTAssertEqual(
+            appState.isEditorFindCommandContextActive(),
+            EditorFindResponderSupport.keyWindowHasEditorOrFindField(),
+            "Without chrome focus, eligibility is exactly the AppKit responder answer"
+        )
+
+        // A hidden bar is never eligible, whatever focus was last reported.
+        appState.setEditorFindChromeFocus(.matchCase)
+        var ui = appState.editorFindHost.ui
+        ui.isBarVisible = false
+        appState.setEditorFindUI(ui)
         XCTAssertFalse(appState.isEditorFindCommandContextActive())
     }
 
@@ -231,6 +251,15 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
+        // This window carries the owned query-field identifier, so leaving it key would make
+        // `keyWindowHostsFindBar()` true for every later test in the process. CI failed on
+        // exactly that ordering before this teardown existed.
+        //
+        // `orderOut`, not `close`: a programmatic `NSWindow` defaults to
+        // `isReleasedWhenClosed = true`, so closing it over-releases the local reference and
+        // takes the test host down with it.
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil) }
         let root = NSView(frame: window.contentLayoutRect)
         window.contentView = root
         let queryField = NSTextField(string: "")

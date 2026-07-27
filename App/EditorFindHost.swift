@@ -28,4 +28,7 @@ final class EditorFindHost {
     var chromeFocus: EditorFindChromeFocus?
     /// Test seam: when non-`nil`, replaces key-window first-responder eligibility checks.
     var commandContextOverride: Bool?
+    /// Test seam: when non-`nil`, replaces `EditorFindResponderSupport.keyWindowHostsFindBar()`.
+    /// Production leaves this `nil` so live AppKit key state is used.
+    var keyWindowHostsFindBarOverride: Bool?
 }
