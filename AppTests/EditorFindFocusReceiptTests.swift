@@ -201,17 +201,27 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         XCTAssertFalse(appState.isEditorFindCommandContextActive())
     }
 
-    func testClosingTheBarClearsReportedChromeFocus() {
-        let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
-        appState.setEditorFindChromeFocus(.next)
-        XCTAssertEqual(appState.editorFindHost.chromeFocus, .next)
+    func testEveryBarCloseRouteClearsReportedChromeFocus() {
+        for close in [
+            ("Escape / Done", { (state: AppState) in state.closeEditorFindBar() }),
+            ("workspace close", { (state: AppState) in state.notifyEditorFindWorkspaceDidClose() }),
+            ("no document remains", { (state: AppState) in
+                state.currentDocument = DocumentSession()
+                state.notifyEditorFindDocumentDidSwitch()
+            }),
+        ] {
+            let appState = makeAppState()
+            openFindBar(appState, query: "alpha")
+            appState.setEditorFindChromeFocus(.next)
+            XCTAssertEqual(appState.editorFindHost.chromeFocus, .next, close.0)
 
-        appState.closeEditorFindBar()
-        XCTAssertNil(
-            appState.editorFindHost.chromeFocus,
-            "A closed bar must not leave focus state that could keep commands eligible"
-        )
+            close.1(appState)
+            XCTAssertFalse(appState.editorFindHost.ui.isBarVisible, close.0)
+            XCTAssertNil(
+                appState.editorFindHost.chromeFocus,
+                "\(close.0): a closed bar must not leave focus state that keeps commands eligible"
+            )
+        }
     }
 
     func testEditorAndQueryFieldResponderEligibilityIsUnchanged() throws {
