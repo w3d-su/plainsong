@@ -52,17 +52,35 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canSave)
         }
 
-        // F0 spike: claim ⌘F via a real Edit-menu item (no separate CommandMenu("Edit") —
-        // that would duplicate the system Edit title and risk the same key-equivalent
-        // swallow documented for View). Wired like Format: sendAction → focused editor.
-        // Production find-bar UI is PR C; this action only records fire for the owner
-        // physical-keyboard gate. Do not add a Carbon hot key unless that gate fails.
+        // In-document find (PR C). Claimed in the system Edit menu — not a separate
+        // CommandMenu("Edit") — so key-equivalent dispatch is not swallowed by a
+        // duplicated title (same rule as View / ⇧⌘P). Delivery is AppState-owned
+        // (find bar chrome); F0 proved the ordinary menu-item path under ABC+Zhuyin.
+        // No Carbon hot key (Decision Log 2026-07-22 / F0).
         CommandGroup(after: .pasteboard) {
             Divider()
             Button("Find…") {
-                EditorFindSpike.performShowFind()
+                appState.showOrRefocusEditorFind()
             }
             .keyboardShortcut("f", modifiers: .command)
+            .disabled(!snapshot.hasOpenDocument)
+
+            Button("Find Next") {
+                appState.editorFindNext()
+            }
+            .keyboardShortcut("g", modifiers: .command)
+            .disabled(!snapshot.hasOpenDocument)
+
+            Button("Find Previous") {
+                appState.editorFindPrevious()
+            }
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            .disabled(!snapshot.hasOpenDocument)
+
+            Button("Use Selection for Find") {
+                appState.useSelectionForEditorFind()
+            }
+            .keyboardShortcut("e", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
         }
 
@@ -95,7 +113,9 @@ struct PlainsongCommands: Commands {
                 key: "x",
                 modifiers: [.control, .command]
             )
-            formatButton("Inline Code", .format(.inlineCode), key: "e", modifiers: .command)
+            // Inline Code keeps the Format menu entry but no longer claims ⌘E —
+            // Use Selection for Find adopts the macOS ⌘E convention (Decision Log).
+            formatButtonWithoutShortcut("Inline Code", .format(.inlineCode))
             formatButton("Link", .format(.link), key: "k", modifiers: .command)
 
             Divider()
@@ -127,6 +147,16 @@ struct PlainsongCommands: Commands {
             EditorCommandDispatcher.perform(command)
         }
         .keyboardShortcut(key, modifiers: modifiers)
+        .disabled(!snapshot.hasOpenDocument)
+    }
+
+    private func formatButtonWithoutShortcut(
+        _ title: String,
+        _ command: MarkdownEditCommand
+    ) -> some View {
+        Button(title) {
+            EditorCommandDispatcher.perform(command)
+        }
         .disabled(!snapshot.hasOpenDocument)
     }
 }

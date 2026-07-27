@@ -57,6 +57,7 @@ extension AppState {
         clearSessionState(for: closingSession, fallbackURL: key)
         currentDocument = DocumentSession()
         observeCurrentDocument()
+        notifyEditorFindDocumentDidSwitch()
         promoteNextWorkspaceMutationRecoverySessionIfNeeded()
     }
 

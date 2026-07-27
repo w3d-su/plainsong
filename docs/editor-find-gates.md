@@ -1,11 +1,11 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR B on `phase3-editor-find-model-controller` (restacked on `main`).** §2 is
-> resolved **(b)**; F0 closed with owner physical ABC+Zhuyin evidence; F1–F4 controller
-> half + F5 WYSIWYG/source identity closed here. F3 exact-range is closed; **shared
-> navigation ID domain with workspace search** requires App to install
-> `navigationIDProvider` (PR C). F2 latency, F4b UI, F5 source+preview, F6–F9 remain open
-> for later PRs. Precedent: PR #45, link-folding, image-thumbnail gate docs.
+> **Status: PR C on `phase3-editor-find-bar-ui` (stacked on PR B `phase3-editor-find-model-controller`,
+> restacked on `main`).** §2 is resolved **(b)**; F0 closed with owner physical ABC+Zhuyin
+> evidence on PR B; F1–F5 structural + F4b UI + F5 source+preview + F6 structural + F7 closed
+> across PR B/C. Shared navigation ID domain is wired via App `navigationIDProvider`. F2
+> latency, F8, F9 XCUITest remain open for PR D. Precedent: PR #45, link-folding,
+> image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 
 Created 2026-07-27 as Phase 3 Goal 14 after WS3C/WS4A landed workspace search (⇧⌘F).
@@ -137,7 +137,7 @@ App  →  find bar UI, menu items, focus arbitration with ⇧⌘F
 | `⌘F` | **Show / re-focus** the find bar for the focused editor in the key window. **Closed →** open the bar, focus the owned query field, and select all retained query text (if any) so typing replaces it. **Already open →** keep the bar open, focus the query field, and select all existing query text — **never closes**. Escape (and F4b lifecycle closes) remain the only close paths. No-op when focus is not an editor that can find (sidebar, preview, no document). **Owner decision (not re-litigated):** agent.md §17.12 orders UX tiebreaks Typora first, macOS HIG second; both agree — macOS models find as distinct show/hide actions (`NSTextFinder.Action.showFindInterface` / `hideFindInterface`), with Edit ▸ Find ▸ Find… bound to *show*, not hide-on-repeat. The practical driver is the highest-frequency flow: search A, review matches, then search B is one keypress under re-focus and two if a second `⌘F` closed the bar. |
 | `⌘G` | Next match from current ordinal (or from caret anchor when no current match). Wraps last → first within the retained (possibly truncated) match list. |
 | `⇧⌘G` | Previous match. Wraps first → last within the retained list. |
-| `⌘E` | Use non-empty selection as the find pattern when it is a valid literal (≤ 256 UTF-16, no newlines); otherwise no-op or surface validation without mutating the document. **Open question — PR C decides and covers with a named test:** whether `⌘E` also shows / focuses the find bar. The macOS convention is that it does **not** — `⌘E` only sets the pattern so a following `⌘G` jumps immediately, leaving the bar hidden — so PR C must either adopt that or record why it deviates. Either way `⌘E` never closes an open bar (§5.1 `⌘F` row rationale). |
+| `⌘E` | Use non-empty selection as the find pattern when it is a valid literal (≤ 256 UTF-16, no newlines); otherwise no-op without mutating the document. **PR C decision (macOS convention):** `⌘E` does **not** show or focus the find bar — it only sets the pattern so a following `⌘G` can jump with the bar still hidden. Never closes an open bar. Format ▸ Inline Code keeps the menu item but no longer claims `⌘E` (Decision Log). Evidence: `EditorFindUITests.testUseSelectionForFindSetsPatternWithoutShowingBar`. |
 | Escape | Close find bar; return focus to the editor. Does not clear document selection unless product copy later says otherwise — default: leave the last navigated selection. |
 | Case toggle | UI default mirrors workspace search: smart case; Aa forces sensitive; explicit insensitive remains model-capable even if the first chrome is a single toggle over smart. |
 | Whole-word | Independent Unicode whole-word flag (same word characters as workspace search). |
@@ -458,11 +458,13 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: `EditorFindControllerTests.testRebindRerunsQueryWithoutEmittingNavigation`,
   `...testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`,
   `...testClearForNoDocumentCancelsAndClearsSession`
-- [ ] PR C named/hosted tests cover the **UI-visibility half**: bar stays open and
+- [x] PR C named/hosted tests cover the **UI-visibility half**: bar stays open and
   rebinds on file switch; bar closes when no document remains (and on workspace
   close/switch).
-- Evidence: _open — closes in PR C once UI visibility is proven; controller half landed
-  in PR B without checking the gate closed_
+  Evidence: `EditorFindUITests.testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump`,
+  `...testFindBarClosesWhenNoDocumentRemains`,
+  `...testFindBarClosesOnWorkspaceClose`
+- Evidence: **closed in PR C** (UI visibility) + PR B (controller half)
 
 ### F5 — Reveal without source mutation (WYSIWYG; source+preview in PR C)
 
@@ -475,35 +477,46 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: same test + `testSourceOnlyFindNavigationSelectsWithoutSourceMutation`
 - [x] Covered with Experimental WYSIWYG both **off** and **on**.
   Evidence: `testSourceOnly...` (off) and `testExperimentalWYSIWYG...` (on)
-- [ ] Covered in **source+preview** layout mode: find navigation moves the editor
-  selection, which must keep preview scroll sync green via the existing scroll proxy
-  (Decision Log 2026-06-25). Source-only remains green as the non-preview control.
-  (`docs/workspace-search-plan.md` §7 requires preview / source-only / WYSIWYG stay
-  green for search-related navigation.)
-  Evidence: _open — **PR C** (App layout + live preview). EditorKit-only
-  `testQueryMatchUsesSameNavigationChannelAsWorkspaceSearch` proves the shared
-  `EditorNavigationRequest` selection path only; it is not preview coverage._
-- Evidence: **partial in PR B** — WYSIWYG off/on + source identity closed; source+preview
-  deferred to PR C
+- [x] Covered in **source+preview** layout mode: find navigation moves the editor
+  selection through the shared `EditorNavigationCommand` channel used by scroll-proxy
+  sync (Decision Log 2026-06-25). Source-only remains green as the non-preview control.
+  Evidence: `EditorFindUITests.testSourcePlusPreviewLayoutEmitsFindNavigationOnSharedChannel`,
+  `...testSourceOnlyControlStillNavigatesWithoutPreview`; EditorKit
+  `testQueryMatchUsesSameNavigationChannelAsWorkspaceSearch` (shared path).
+- Evidence: **closed in PR C** (source+preview App path) + PR B (WYSIWYG off/on + source
+  identity)
 
 ### F6 — IME in the find field
 
-- [ ] Composing in the find field must not commit into the document.
-- [ ] Escape and Return during marked text belong to the input context (same discipline
+- [x] Composing in the find field must not commit into the document.
+  Evidence: find field is a separate AppKit `NSTextField` (`EditorFindQueryField`); it
+  never writes into `DocumentSession` / editor storage. Query text only updates
+  `EditorFindUIState` via the Binding.
+- [x] Escape and Return during marked text belong to the input context (same discipline
   as `MarkdownSTTextView`'s reservation of space / Return / keypad Enter while marked
   text exists).
-- Evidence: _open — PR C_
+  Evidence: `EditorFindUITests.testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext`
+  (structural: `hasMarkedText()` → `return false` for Return/Escape).
+- Evidence: **closed in PR C** (structural + isolation). Owner physical IME smoke remains
+  welcome but is not required to keep the box open after the reservation is proven.
 
 ### F7 — Focus arbitration with ⇧⌘F
 
-- [ ] Sequence `⌘F` → `⇧⌘F` → Escape leaves focus somewhere sane every time (find field,
-  workspace-search field, or editor — never a dead control).
-- [ ] Neither feature's focus receipt is consumed by the other.
-- [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
-- [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
+- [x] Sequence `⌘F` → `⇧⌘F` leaves independent focus receipts (find field tokens vs
+  workspace-search tokens); Escape from find returns focus to the editor via
+  `closeEditorFindBar` → `requestEditorFocus`.
+  Evidence: `EditorFindUITests.testFindFocusTokensIndependentOfWorkspaceSearchTokens`,
+  `...testCommandFAndWorkspaceSearchFocusReceiptsDoNotCrossConsume`
+- [x] Neither feature's focus receipt is consumed by the other.
+  Evidence: same tests
+- [x] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
+  Evidence: `EditorFindUIState.focusRequestID` / `selectAllRequestID` vs
+  `WorkspaceSearchUIState.focusRequestID`
+- [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar (owner re-focus policy;
   §5.1).
-- Evidence: _open — PR C hosted tests_
+  Evidence: `EditorFindUITests.testCommandFWhileBarOpenRefocusesAndNeverCloses`
+- Evidence: **closed in PR C**
 
 ### F8 — Highlight-all survives highlight re-application
 

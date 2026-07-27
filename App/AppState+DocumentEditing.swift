@@ -67,6 +67,9 @@ extension AppState {
             cancelPendingEditorNavigationIfNeeded(targeting: session)
             restartActiveWorkspaceSearchAfterRelevantEdit(in: session)
         }
+        if session === currentDocument {
+            notifyEditorFindDocumentDidChange()
+        }
     }
 
     func setTaskCheckbox(line: Int, checked: Bool, version: Int) {

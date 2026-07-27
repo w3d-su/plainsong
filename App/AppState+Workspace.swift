@@ -473,6 +473,7 @@ extension AppState {
         }
         observeCurrentDocument()
         scheduleCompletionWorkspaceRefresh()
+        notifyEditorFindDocumentDidSwitch()
     }
 
     func handleSessionAccess(url: URL, isDirty: Bool) {
