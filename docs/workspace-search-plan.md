@@ -932,10 +932,12 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   and `snapshotCapture` are excluded from timing. Each *timed search* probe runs one unmeasured
   warm-up request asserted with the same predicates as its measured samples; the cancellation
   probe has no warm-up and instead repeats five independent cancellations. A one-per-process
-  warm-up runs before any probe. Every run that reaches completion with at least one surviving candidate goes through the
-  shared stream invariants: ordered results, per-file UTF-16 match ranges and line numbers, exact
-  summary accounting, the full progress sequence, the exact finite event count, and the
-  concurrent/buffered/outstanding read ceilings. Read bounds are proven from the production
+  warm-up runs before any probe. Every run that reaches completion with at least one surviving
+  candidate goes through the shared stream invariants, which cover the exact finite event count,
+  the full progress sequence, the concurrent/buffered/outstanding read ceilings, the
+  skipped-detail cap, and completion as the final event. Content correctness — ordered result
+  paths, per-file UTF-16 match ranges and line numbers, and full summary accounting — is asserted
+  by each probe against its own fixture rather than by that shared helper. Read bounds are proven from the production
   reader's `readChunk` events, which carry the bytes requested of and returned by each `read(2)`,
   rather than from returned buffer sizes. Memory boundedness is asserted as structural limits
   rather than an RSS threshold.

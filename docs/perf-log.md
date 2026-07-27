@@ -216,9 +216,13 @@ read the built bundle under macOS TCC.
 ### What each probe can actually falsify
 
 Every probe below was checked against the question "what break would this still pass?" — the
-third and fourth review passes removed four cases where the answer was "the one it exists to
-catch": derived resource ceilings, an unreachable global match cap, a `cap + 1` oversized fixture,
-and read bounds asserted from chunk counts rather than syscall byte counts.
+five review passes removed cases where the answer was "the one it exists to catch": resource
+ceilings read back from the production limits they checked and a global match cap asserted only by
+an unreachable inequality (first pass); a `cap + 1` oversized fixture that could not distinguish a
+bounded read from a truncating one (second); read bounds asserted from `Data.count`, an ignore
+ceiling with no behavior attached, and progress coalescing exercised only where `floor` and `ceil`
+agree (third); chunk counts that still could not catch a final full-buffer read (fourth); and
+zero-result controls that could not tell "searched and found nothing" from "never looked" (fifth).
 
 | Probe | Would fail if… |
 |---|---|
@@ -323,7 +327,8 @@ evidence, and these budgets stay informational on CI regardless.
 ### Notes
 
 - The `unicode-periodic` result is production-shaped confirmation of the
-  `docs/workspace-search-plan.md` §2.3 admission cap: ~611 ms in Release at exactly 512 KiB. A
+  `docs/workspace-search-plan.md` §2.3 admission cap: 660.601-702.148 ms in Release at exactly
+  512 KiB across the three authoritative runs. A
   1 MiB cap would put a single adversarial file over one second in Release, which is why the cap
   was not raised.
 - Memory boundedness is asserted structurally rather than with a resident-memory threshold: the

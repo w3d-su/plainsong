@@ -106,28 +106,46 @@ actor WorkspaceSearchPerformanceWarmUp {
             )
             let service = WorkspaceSearchService()
 
-            // The stream's outcome is checked rather than discarded. A warm-up that failed —
-            // unreadable fixture, a `.failed` terminal, a search that matched nothing — would
-            // otherwise "succeed" while leaving the very paths it exists to warm untouched, and
-            // every probe after it would quietly measure a cold process.
+            // The stream's outcome is checked rather than discarded: a warm-up that failed, or
+            // searched nothing, would otherwise "succeed" while leaving the very paths it exists
+            // to warm untouched, and every probe after it would quietly measure a cold process.
+            //
+            // The full terminal contract is checked, not just the last value seen — exactly one
+            // terminal event, no failure terminal, nothing emitted after it. Retaining only the
+            // most recent summary would accept a duplicate `.completed`, or progress arriving
+            // after completion, as a healthy warm-up.
             var summary: WorkspaceSearchSummary?
-            var failure: WorkspaceSearchServiceFailure?
-            var searchedFileCount = 0
+            var terminalCount = 0
+            var sawFailure = false
+            var eventsAfterTerminal = 0
+            var matchingFileCount = 0
             for await event in service.events(for: request) {
+                if terminalCount > 0 { eventsAfterTerminal += 1 }
                 switch event {
                 case let .completed(_, completedSummary):
-                    summary = completedSummary
-                case let .failed(_, serviceFailure):
-                    failure = serviceFailure
+                    terminalCount += 1
+                    summary = summary ?? completedSummary
+                case .failed:
+                    terminalCount += 1
+                    sawFailure = true
                 case let .fileResult(_, result):
-                    searchedFileCount += result.matches.isEmpty ? 0 : 1
+                    matchingFileCount += result.matches.isEmpty ? 0 : 1
                 case .skippedFile, .progress, .validationFailure:
                     break
                 }
             }
 
-            guard failure == nil else {
+            guard !sawFailure else {
                 throw WarmUpError.streamFailed(queryIndex: index)
+            }
+            guard terminalCount == 1 else {
+                throw WarmUpError.unexpectedTerminalCount(queryIndex: index, actual: terminalCount)
+            }
+            guard eventsAfterTerminal == 0 else {
+                throw WarmUpError.eventsAfterTerminal(
+                    queryIndex: index,
+                    actual: eventsAfterTerminal
+                )
             }
             guard let summary else {
                 throw WarmUpError.noTerminalEvent(queryIndex: index)
@@ -141,11 +159,11 @@ actor WorkspaceSearchPerformanceWarmUp {
             // Queries 0 and 1 must match the prose file; query 2 is a whole-word rejection shape
             // and is expected to match nothing, but it still has to have scanned both files.
             let expectedMatchingFiles = index == 2 ? 0 : 1
-            guard searchedFileCount == expectedMatchingFiles else {
+            guard matchingFileCount == expectedMatchingFiles else {
                 throw WarmUpError.unexpectedMatchingFileCount(
                     queryIndex: index,
                     expected: expectedMatchingFiles,
-                    actual: searchedFileCount
+                    actual: matchingFileCount
                 )
             }
         }
@@ -154,6 +172,8 @@ actor WorkspaceSearchPerformanceWarmUp {
     enum WarmUpError: Error, CustomStringConvertible {
         case streamFailed(queryIndex: Int)
         case noTerminalEvent(queryIndex: Int)
+        case unexpectedTerminalCount(queryIndex: Int, actual: Int)
+        case eventsAfterTerminal(queryIndex: Int, actual: Int)
         case unexpectedSearchedFileCount(queryIndex: Int, actual: Int)
         case unexpectedMatchingFileCount(queryIndex: Int, expected: Int, actual: Int)
 
@@ -163,6 +183,10 @@ actor WorkspaceSearchPerformanceWarmUp {
                 "WS4B warm-up query \(index) emitted a failure terminal"
             case let .noTerminalEvent(index):
                 "WS4B warm-up query \(index) produced no completion terminal"
+            case let .unexpectedTerminalCount(index, actual):
+                "WS4B warm-up query \(index) emitted \(actual) terminal events, expected 1"
+            case let .eventsAfterTerminal(index, actual):
+                "WS4B warm-up query \(index) emitted \(actual) events after its terminal"
             case let .unexpectedSearchedFileCount(index, actual):
                 "WS4B warm-up query \(index) searched \(actual) files, expected 2"
             case let .unexpectedMatchingFileCount(index, expected, actual):

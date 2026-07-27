@@ -111,9 +111,12 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     static let boundedOversizedReadByteCount = 524_289
 
     /// `WorkspaceAnchoredFileSystem.readAllBytes` reads in 64 KiB chunks and emits one `readChunk`
-    /// event per successful `read(2)`, so chunk counts distinguish "stopped at the limit" from
-    /// "read everything, then truncated" — which byte counts derived from the returned buffer
-    /// cannot do.
+    /// event per successful `read(2)`, carrying the bytes requested and returned.
+    ///
+    /// The chunk *count* is a useful shape check but is not the proof: a loop that asked for a
+    /// full buffer on its final read and truncated afterwards produces the same count. What rules
+    /// out read-all-then-truncate is the requested/returned byte totals the probes assert
+    /// alongside these counts.
     static let readChunkByteCount = 64 * 1024
     /// `ceil(524,289 / 65,536)` = eight full chunks plus a one-byte tail.
     static let boundedOversizedReadChunkCount = 9

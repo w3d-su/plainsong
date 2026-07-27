@@ -76,24 +76,31 @@ extension WorkspaceSearchPerformanceTests {
             "sensitive must not match the upper-case CJK+Latin occurrence"
         )
 
-        // Every run in this probe, including the two CJK-cased controls, is checked for terminal
-        // shape. Without this a control could emit its result and then `.failed`, or never
-        // complete, and the match-count assertions above would still pass.
-        for (run, label, expectedResults) in [
-            (smartRun, "smart", 1),
-            (sensitiveRun, "sensitive", 1),
-            (cjkSmartRun, "cjk smart", 1),
-            (cjkCasedSmart, "cjk cased smart", 1),
-            (cjkCasedSensitive, "cjk cased sensitive", 0),
+        // Every matching run in this probe is checked for terminal shape. Without this a run could
+        // emit its result and then `.failed`, or never complete, and the match-count assertions
+        // above would still pass.
+        for (run, label) in [
+            (smartRun, "smart"),
+            (sensitiveRun, "sensitive"),
+            (cjkSmartRun, "cjk smart"),
+            (cjkCasedSmart, "cjk cased smart"),
         ] {
             try assertSharedStreamInvariants(
                 run.events,
                 candidateFileCount: 1,
-                expectedFileResultCount: expectedResults,
+                expectedFileResultCount: 1,
                 expectedSkippedEventCount: 0,
                 label: label
             )
         }
+
+        // The zero-result control needs more than stream shape: "no results, clean completion" is
+        // also what an ignored or skipped file produces. Prove the candidate was really read.
+        try assertSearchedWithoutMatching(
+            cjkCasedSensitive.events,
+            expectedDiskReadByteCount: fixture.byteCount,
+            label: "cjk cased sensitive"
+        )
     }
 
     /// The 2,000-file workspace under the case policy the UI actually ships with.
@@ -160,11 +167,11 @@ extension WorkspaceSearchPerformanceTests {
             fileResults(in: sensitiveRun.events).isEmpty,
             "sensitive control must not match the upper-case occurrence"
         )
-        try assertSharedStreamInvariants(
+        // Proves the 512 KiB candidate was genuinely read and searched, so the empty result is a
+        // real case-sensitivity miss rather than the file never having been examined.
+        try assertSearchedWithoutMatching(
             sensitiveRun.events,
-            candidateFileCount: 1,
-            expectedFileResultCount: 0,
-            expectedSkippedEventCount: 0,
+            expectedDiskReadByteCount: Self.admittedFileByteCount,
             label: "cjk sensitive control"
         )
 

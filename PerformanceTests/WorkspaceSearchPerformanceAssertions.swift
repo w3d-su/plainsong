@@ -216,6 +216,42 @@ extension WorkspaceSearchPerformanceTests {
         )
     }
 
+    /// For a control that is expected to match nothing: proves the candidate was actually read and
+    /// searched, rather than ignored, skipped, or never planned.
+    ///
+    /// "No results plus a clean completion" is satisfied just as well by a file the ignore policy
+    /// removed, so a zero-result control that only checks stream shape cannot tell "searched and
+    /// found nothing" from "never looked".
+    func assertSearchedWithoutMatching(
+        _ events: [WorkspaceSearchEvent],
+        expectedDiskReadByteCount: Int,
+        label: String
+    ) throws {
+        let summary = try XCTUnwrap(completedSummaries(in: events).first, label)
+
+        XCTAssertTrue(fileResults(in: events).isEmpty, label)
+        XCTAssertEqual(summary.totalEmittedMatchCount, 0, label)
+
+        XCTAssertEqual(summary.candidateFileCount, 1, label)
+        XCTAssertEqual(summary.searchedFileCount, 1, "\(label): the candidate must be searched")
+        XCTAssertEqual(summary.ignoredFileCount, 0, "\(label): the candidate must not be ignored")
+        XCTAssertEqual(summary.skippedFileCount, 0, "\(label): the candidate must not be skipped")
+        XCTAssertEqual(summary.readInstrumentation.diskReadCount, 1, label)
+        XCTAssertEqual(
+            summary.readInstrumentation.diskReadByteCount,
+            expectedDiskReadByteCount,
+            "\(label): the whole candidate must have been read"
+        )
+
+        try assertSharedStreamInvariants(
+            events,
+            candidateFileCount: 1,
+            expectedFileResultCount: 0,
+            expectedSkippedEventCount: 0,
+            label: label
+        )
+    }
+
     func assertSingleCJKMatch(
         _ events: [WorkspaceSearchEvent],
         fixture: SingleFileFixture,
