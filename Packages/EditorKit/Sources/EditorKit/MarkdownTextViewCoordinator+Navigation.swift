@@ -136,11 +136,28 @@ extension MarkdownTextViewCoordinator {
             isApplyingNavigation = false
         }
 
-        guard navigationEffects(for: textView, window: window).perform(selection: request.selection) else {
+        // Capture the focus *owner* before selection changes: STTextView may claim
+        // first-responder when `textSelection` is set. Find navigation must restore the
+        // find field so typing is not interrupted.
+        let previousFocusOwner = Self.focusOwner(of: window.firstResponder)
+
+        guard navigationEffects(for: textView, window: window).perform(
+            selection: request.selection,
+            shouldFocusEditor: request.shouldFocusEditor
+        ) else {
             return false
+        }
+        if !request.shouldFocusEditor {
+            restoreFocusOwner(previousFocusOwner, in: window, editor: textView)
         }
 
         selection = request.selection
+        publishNavigationDebugProbe(request)
+        didComplete = true
+        return true
+    }
+
+    private func publishNavigationDebugProbe(_ request: EditorNavigationRequest) {
         #if DEBUG
             Task { @MainActor in
                 EditorNavigationDebugProbe.shared.publish(
@@ -149,15 +166,71 @@ extension MarkdownTextViewCoordinator {
                 )
             }
         #endif
-        didComplete = true
-        return true
+    }
+
+    /// The control that owns focus, not the transient object holding it.
+    ///
+    /// A focused `NSTextField` is *not* the window's first responder — its **field editor**
+    /// is, and AppKit unmounts that shared editor from the control the moment the control
+    /// resigns. Restoring the field editor object itself would therefore aim at a detached
+    /// editor and leave focus on the window, so capture the owning control and let AppKit
+    /// re-install its editor on the way back.
+    /// Internal for `@testable` coverage: the end-to-end navigation test cannot force this
+    /// path, because STTextView does not claim first responder on every layout.
+    static func focusOwner(of responder: NSResponder?) -> NSResponder? {
+        guard let textView = responder as? NSTextView, textView.isFieldEditor else {
+            return responder
+        }
+        // AppKit points a field editor's delegate at the control currently using it.
+        if let owner = textView.delegate as? NSResponder {
+            return owner
+        }
+        return textView.superview ?? responder
+    }
+
+    /// Puts focus back where it was before a non-focusing navigation.
+    ///
+    /// Setting `textSelection` can make STTextView first responder on its own, which would
+    /// steal typing from the find field mid-query. Restores only when the previous owner was
+    /// something other than the editor and it no longer holds focus.
+    func restoreFocusOwner(
+        _ owner: NSResponder?,
+        in window: NSWindow,
+        editor textView: STTextView
+    ) {
+        guard let owner,
+              owner !== textView,
+              !Self.holdsFocus(owner, in: window)
+        else {
+            return
+        }
+        _ = window.makeFirstResponder(owner)
+    }
+
+    /// True when `owner` is focused either directly or through its field editor.
+    private static func holdsFocus(_ owner: NSResponder, in window: NSWindow) -> Bool {
+        if window.firstResponder === owner {
+            return true
+        }
+        guard let control = owner as? NSControl,
+              let editor = control.currentEditor()
+        else {
+            return false
+        }
+        return window.firstResponder === editor
     }
 
     private func navigationEffects(for textView: STTextView, window: NSWindow) -> EditorNavigationEffects {
         EditorNavigationEffects(
             applySelection: { selection in
                 textView.textSelection = selection
-                return textView.selectedRange() == selection
+                let applied = textView.selectedRange()
+                // Force selection-highlight overlay rebuild; when the editor is not first
+                // responder (find field owns focus), STTextView still draws unemphasized
+                // selection but may need an explicit display pass after textSelections change.
+                textView.needsDisplay = true
+                textView.needsLayout = true
+                return applied == selection
             },
             scrollRangeToVisible: { selection in
                 textView.scrollRangeToVisible(selection)
