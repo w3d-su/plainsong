@@ -20,17 +20,17 @@ import XCTest
 /// hard assertions
 /// everywhere, including CI; only the cancel-to-drain latency number follows the R15 rule.
 ///
-/// Every run that reaches completion with at least one surviving candidate — measured sample,
-/// warm-up, and controls alike — goes through `assertSharedStreamInvariants`, so the exact event
-/// count, progress coalescing, read-window ceilings, skipped-detail shape, and completion ordering
-/// are checked on all of them, including the under-ceiling ignore control — an ignored entry is
-/// still a plan item, so it counts toward `candidateFileCount` and production still emits its
-/// `1 / 1` progress event. The skipped-detail assertion stays below the production-default pin;
-/// the WorkspaceKit resource-contract test, not these fixture shapes, proves cap enforcement. The
-/// two components checked differently are the process warm-up, which runs before XCTest assertions
-/// are meaningful and throws typed errors instead, and the cancellation probe, which asserts
-/// consumer-observed silence. The resource ceilings are pinned as literals in this file rather
-/// than read back from `WorkspaceSearchLimits`; see
+/// Every normally completing service probe — including measured samples, their per-probe warm-ups,
+/// and controls — goes through `assertSharedStreamInvariants`, so the exact event count, progress
+/// coalescing, read-window ceilings, skipped-detail shape, and completion ordering are checked on
+/// all of them, including the under-ceiling ignore control — an ignored entry is still a plan item,
+/// so it counts toward `candidateFileCount` and production still emits its `1 / 1` progress event.
+/// The skipped-detail assertion stays below the production-default pin; the WorkspaceKit
+/// resource-contract test, not these fixture shapes, proves cap enforcement. The two components
+/// checked differently are the process warm-up, which runs before XCTest assertions are meaningful
+/// and throws typed errors instead, and the cancellation probe, which asserts consumer-observed
+/// silence. The resource ceilings are pinned as literals in this file rather than read back from
+/// `WorkspaceSearchLimits`; see
 /// `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
 ///
 /// Both case policies are covered. `.smart` is the UI default and resolves to the *insensitive*

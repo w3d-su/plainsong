@@ -76,12 +76,13 @@ extension WorkspaceSearchPerformanceTests {
         )
     }
 
-    /// Stream-shape invariants that must hold for **every** probe in this file, not just the bulk
+    /// Stream-shape invariants shared by every normally completing service probe, not just the bulk
     /// one: an exactly precomputable event count, monotonic progress ending at `N / N`, read-window
-    /// ceilings, skipped-detail shape, and completion as the final event. This helper checks the
-    /// number of skipped details each fixture is expected to produce and that it stays below the
-    /// production-default pin; the WorkspaceKit resource-contract test proves cap enforcement.
-    /// Each probe still asserts its own content (paths, ranges, lines, byte accounting) separately.
+    /// ceilings, skipped-detail shape, and completion as the final event. The cancellation probe
+    /// and process warm-up use separate checks. This helper checks the number of skipped details
+    /// each fixture is expected to produce and that it stays below the production-default pin; the
+    /// WorkspaceKit resource-contract test proves cap enforcement. Each probe still asserts its
+    /// own content (paths, ranges, lines, byte accounting) separately.
     func assertSharedStreamInvariants(
         _ events: [WorkspaceSearchEvent],
         candidateFileCount: Int,
