@@ -67,18 +67,22 @@ extension WorkspaceSearchPerformanceTests {
             XCTAssertEqual(startCount, readWindow, "attempt \(attempt)")
             XCTAssertEqual(activeReads, 0, "attempt \(attempt)")
             XCTAssertEqual(cancelledReads, readWindow, "attempt \(attempt)")
-            // Every read in this fixture blocks and none completes, so no plan item finishes:
-            // there is no legitimate event of *any* kind, before or after the cancellation.
-            // Asserting the stream is entirely silent covers progress, skipped files, and
-            // validation failures too, which per-kind checks alone would let through.
+            // Every read in this fixture blocks and none completes, so no plan item finishes and
+            // the consumer should observe nothing at all — before the cancellation as well as
+            // after it. This covers progress, skipped files, and validation failures, which
+            // per-kind checks alone would let through.
+            //
+            // Scope of this assertion: it proves what the *consumer* observed. Cancelling the
+            // consuming Task also terminates the `AsyncStream` continuation, so a terminal the
+            // producer wrongly yielded afterwards would be discarded before reaching `events` and
+            // is not observable here. Proving the producer never attempts a post-cancellation
+            // terminal needs a yield-observation seam or a direct pipeline test; this probe does
+            // not claim it. What it does establish is: the consumer received no events, all four
+            // blocked reads were released, and no further read started.
             XCTAssertTrue(
                 events.isEmpty,
                 "attempt \(attempt): expected a silent stream, got \(events.count) event(s)"
             )
-            XCTAssertTrue(completedSummaries(in: events).isEmpty, "attempt \(attempt)")
-            XCTAssertTrue(failures(in: events).isEmpty, "attempt \(attempt)")
-            XCTAssertEqual(terminalEventCount(in: events), 0, "attempt \(attempt)")
-            XCTAssertTrue(fileResults(in: events).isEmpty, "attempt \(attempt)")
             samples.append(drainMilliseconds)
         }
 

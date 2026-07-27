@@ -16,16 +16,19 @@ import XCTest
 ///
 /// Wall-clock budgets are hard locally and informational on hosted CI (risk R15). Deterministic
 /// results, exact summary/event accounting, read-window ceilings, and cancellation behavior
-/// (every read released, no further read started, no terminal event) are hard assertions
+/// (every read released, no further read started, and no event observed by the consumer) are
+/// hard assertions
 /// everywhere, including CI; only the cancel-to-drain latency number follows the R15 rule.
 ///
 /// Every run that reaches completion with at least one surviving candidate — measured sample,
 /// warm-up, and controls alike — goes through `assertSharedStreamInvariants`, so the exact event
 /// count, progress coalescing, read-window ceilings, skipped-detail cap, and completion ordering
-/// are checked on all of them. The under-ceiling ignore control is the one exception: its ignore
-/// rule removes the only candidate, so the progress model does not apply and that probe asserts
-/// terminal correctness directly. The resource ceilings are pinned as literals in this file
-/// rather than read back from `WorkspaceSearchLimits`; see
+/// are checked on all of them, including the under-ceiling ignore control — an ignored entry is
+/// still a plan item, so it counts toward `candidateFileCount` and production still emits its
+/// `1 / 1` progress event. The two components checked differently are the process warm-up, which
+/// runs before XCTest assertions are meaningful and throws typed errors instead, and the
+/// cancellation probe, which asserts consumer-observed silence. The resource ceilings are pinned
+/// as literals in this file rather than read back from `WorkspaceSearchLimits`; see
 /// `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
 ///
 /// Both case policies are covered. `.smart` is the UI default and resolves to the *insensitive*
@@ -113,10 +116,11 @@ final class WorkspaceSearchPerformanceTests: XCTestCase {
     /// `WorkspaceAnchoredFileSystem.readAllBytes` reads in 64 KiB chunks and emits one `readChunk`
     /// event per successful `read(2)`, carrying the bytes requested and returned.
     ///
-    /// The chunk *count* is a useful shape check but is not the proof: a loop that asked for a
-    /// full buffer on its final read and truncated afterwards produces the same count. What rules
-    /// out read-all-then-truncate is the requested/returned byte totals the probes assert
-    /// alongside these counts.
+    /// The chunk *count* is a useful shape check but is not the proof, and neither is the
+    /// returned byte total: a loop that asked for a full buffer on its final read and truncated
+    /// afterwards produces the same count and the same returned total. What rules out
+    /// read-all-then-truncate is the **requested** byte total — what was actually asked of
+    /// `read(2)` — which the probes assert alongside the returned total and the count.
     static let readChunkByteCount = 64 * 1024
     /// `ceil(524,289 / 65,536)` = eight full chunks plus a one-byte tail.
     static let boundedOversizedReadChunkCount = 9

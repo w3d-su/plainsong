@@ -196,14 +196,20 @@ read the built bundle under macOS TCC.
    matching file counts — so a warm-up that silently failed cannot be recorded as done. A failure
    is not cached, so it surfaces instead of leaving every later probe measuring a cold process.
 5. Every run that reaches completion goes through `assertSharedStreamInvariants`: exact event
-   count, the full progress sequence, read-window ceilings, the skipped-detail cap, and
-   completion as the final event. That includes the under-ceiling ignore control — an ignored
-   entry is still a plan item and still counts toward `candidateFileCount`, so production emits
-   its `1 / 1` progress event and the helper applies. The only component with a separate
-   validator is the process warm-up, which runs before XCTest assertions are meaningful and
-   throws typed errors instead: exactly one terminal event, no failure terminal, no validation
-   failure, and nothing emitted after the terminal. The cancellation probe is checked differently
-   again, by asserting its stream is entirely silent.
+   count, the full progress sequence, read-window ceilings, and completion as the final event.
+   That includes the under-ceiling ignore control — an ignored entry is still a plan item and
+   still counts toward `candidateFileCount`, so production emits its `1 / 1` progress event and
+   the helper applies. The only component with a separate validator is the process warm-up, which
+   runs before XCTest assertions are meaningful and throws typed errors instead: exactly one
+   terminal event, no failure terminal, no validation failure, and nothing emitted after the
+   terminal. The cancellation probe is checked differently again, by consumer-observed silence.
+
+   The helper also carries a `skippedFiles.count <= 100` bound, but that is a shape check rather
+   than evidence: no fixture here produces more than one skipped file, so the bound is never
+   approached. Cap enforcement is proven in WorkspaceKit by
+   `WorkspaceSearchResourceContractTests.testSlowConsumerReceivesBoundedLosslessResultsDetailsProgressAndTerminal`
+   (600 skips against a detail limit of 7, asserting both the retained prefix and
+   `omittedSkippedFileCount`). WS4B's contribution is pinning that production's default is 100.
 6. Resource ceilings are pinned as literals in the test file, not read back from
    `WorkspaceSearchLimits` / `TextSearchEngine`. Reading them back would make every bound
    self-fulfilling. `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` is the single
@@ -219,7 +225,7 @@ read the built bundle under macOS TCC.
 ### What each probe can actually falsify
 
 Every probe below was checked against the question "what break would this still pass?" — the
-six review passes removed cases where the answer was "the one it exists to catch": resource
+seven review passes removed cases where the answer was "the one it exists to catch": resource
 ceilings read back from the production limits they checked and a global match cap asserted only by
 an unreachable inequality (first pass); a `cap + 1` oversized fixture that could not distinguish a
 bounded read from a truncating one (second); read bounds asserted from `Data.count`, an ignore
@@ -227,7 +233,8 @@ ceiling with no behavior attached, and progress coalescing exercised only where 
 agree (third); chunk counts that still could not catch a final full-buffer read (fourth);
 zero-result controls that could not tell "searched and found nothing" from "never looked" (fifth);
 and a cancellation probe checking only some event kinds, a warm-up accepting validation failures,
-and an ignore control that skipped the progress invariant outright (sixth).
+an ignore control that skipped the progress invariant outright (sixth); and a cancellation
+assertion whose scope was overstated, plus a vacuous skipped-detail bound (seventh).
 
 | Probe | Would fail if… |
 |---|---|
@@ -342,7 +349,12 @@ evidence, and these budgets stay informational on CI regardless.
   all hard assertions. No RSS assertion was added, because RSS on this path is dominated by
   allocator and page-cache behavior that is not stable enough for a gate.
 - The cancellation probe proves that after cancelling the consuming Task, all four blocked reads
-  are released, no further read starts, and no `completed` or `failed` terminal event is emitted.
+  are released, no further read starts, and the consumer observes no events at all. Scope: that
+  last part is what the *consumer* saw. Cancelling the consuming Task also terminates the
+  `AsyncStream` continuation, so a terminal the producer wrongly yielded afterwards would be
+  discarded before reaching the collected events. Proving the producer never attempts a
+  post-cancellation terminal would need a yield-observation seam or a direct pipeline test, and
+  this gate does not claim it.
 
 
 ## Typing Latency

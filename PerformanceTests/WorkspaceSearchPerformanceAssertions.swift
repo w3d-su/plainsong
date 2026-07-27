@@ -122,6 +122,13 @@ extension WorkspaceSearchPerformanceTests {
             Self.expectedMaximumConcurrentReads,
             label
         )
+        // Shape check only, not evidence that the cap is enforced: no fixture here produces more
+        // than one skipped file, so this bound is never approached. Enforcement is proven in
+        // WorkspaceKit by
+        // `WorkspaceSearchResourceContractTests.testSlowConsumerReceivesBoundedLosslessResultsDetailsProgressAndTerminal`,
+        // which drives 600 skips against a detail limit of 7 and asserts both the retained prefix
+        // and `omittedSkippedFileCount`. What WS4B contributes is the pin that production's
+        // default is 100 — see `testProductionSearchLimitsStillMatchTheFrozenGateCeilings`.
         XCTAssertLessThanOrEqual(
             summary.skippedFiles.count,
             Self.expectedMaximumReportedSkippedFiles,
