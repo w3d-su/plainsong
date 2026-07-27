@@ -16,14 +16,14 @@ navigation), and the Decision Log entry that freezes the engine choice.
 
 Ship Typora-class in-document find for the focused editor pane:
 
-- `⌘F` toggles a find bar owned by the focused editor in the key window
-  (open when closed; close when open — see §5.1).
+- `⌘F` shows or re-focuses a find bar owned by the focused editor in the key window
+  (never closes the bar — see §5.1).
 - `⌘G` / `⇧⌘G` move to next / previous match with wrap-around at both ends
   (Typora behavior; agent.md §17.12).
 - `⌘E` uses the current selection as the find pattern (when non-empty and valid).
 - Escape closes the find bar and returns focus to the editor.
 - Match counter shows current ordinal / total, with a distinct truncated state when
-  the fixed match limit is hit (§5.1).
+  the retained match ceiling is hit (§5.1).
 - Case-sensitivity and whole-word toggles match the workspace-search model
   (smart/sensitive/insensitive + Unicode whole-word).
 - Navigation selects and reveals exact UTF-16 ranges through the existing
@@ -105,35 +105,45 @@ App  →  find bar UI, menu items, focus arbitration with ⇧⌘F
 
 | Command / control | Behavior |
 |---|---|
-| `⌘F` | **Toggle** the find bar for the focused editor in the key window: closed → open (and focus the owned query field); open → close (and return focus to the editor). No-op when focus is not an editor that can find (sidebar, preview, no document). |
+| `⌘F` | **Show / re-focus** the find bar for the focused editor in the key window. **Closed →** open the bar, focus the owned query field, and select all retained query text (if any) so typing replaces it. **Already open →** keep the bar open, focus the query field, and select all existing query text — **never closes**. Escape (and F4b lifecycle closes) remain the only close paths. No-op when focus is not an editor that can find (sidebar, preview, no document). **Owner decision (not re-litigated):** agent.md §17.12 orders UX tiebreaks Typora first, macOS HIG second; both agree — macOS models find as distinct show/hide actions (`NSTextFinder.Action.showFindInterface` / `hideFindInterface`), with Edit ▸ Find ▸ Find… bound to *show*, not hide-on-repeat. The practical driver is the highest-frequency flow: search A, review matches, then search B is one keypress under re-focus and two if a second `⌘F` closed the bar. |
 | `⌘G` | Next match from current ordinal (or from caret anchor when no current match). Wraps last → first within the retained (possibly truncated) match list. |
 | `⇧⌘G` | Previous match. Wraps first → last within the retained list. |
 | `⌘E` | Use non-empty selection as the find pattern when it is a valid literal (≤ 256 UTF-16, no newlines); otherwise no-op or surface validation without mutating the document. |
 | Escape | Close find bar; return focus to the editor. Does not clear document selection unless product copy later says otherwise — default: leave the last navigated selection. |
 | Case toggle | UI default mirrors workspace search: smart case; Aa forces sensitive; explicit insensitive remains model-capable even if the first chrome is a single toggle over smart. |
 | Whole-word | Independent Unicode whole-word flag (same word characters as workspace search). |
-| Match counter | Exact set: `current / total` when `total > 0`. Empty query and zero-match states are distinct. **Truncated set** (limit hit): present distinctly from an exact total — e.g. `current / 10000+` plus a non-color-only truncated indicator — so the UI never implies the document has exactly `limit` matches when more exist. |
+| Match counter | Exact set: `current / total` when `total > 0` and `isTruncated == false`. Empty query and zero-match states are distinct. **Truncated set** (`isTruncated == true`): present distinctly from an exact total — e.g. `current / 10000+` plus a non-color-only truncated indicator — so the UI never implies the document has exactly `retainedMatchCeiling` matches when more exist. |
 
 #### Match limit (fixed for v1; not implementer discretion)
 
-`TextSearchEngine.matches` requires a `limit:`. v1 always passes:
+`TextSearchEngine.matches` requires a `limit:`. v1 uses a **retained ceiling** plus a
+one-shot overflow probe in a single engine call — no implementer choice of strategy:
 
-| Constant | Value | Rationale |
+| Constant | Value | Role |
 |---|---|---|
-| `EditorFindLimits.maximumMatchesPerQuery` | **10_000** | Same ceiling as workspace search’s `WorkspaceSearchLimits.defaultMaximumMatchesPerQuery` (10_000). Keeps one document’s retained match list bounded for ordinal navigation, highlight-all, and counter presentation. WS4B (`docs/perf-log.md`) already budgets production-shaped matching at the 512 KiB admission cap under both case backends and dense whole-word rejection; in-document find is one synchronous call over at most the open buffer (including `Fixtures/large-1mb.md`), so the same order of match work must stay off the main actor (§12 typing &lt; 16 ms). Searching a common letter in a megabyte file is an ordinary case, not a pathological edge — the limit is a product bound, not a rare overflow. |
+| `EditorFindLimits.retainedMatchCeiling` | **10_000** | Maximum matches the session keeps; maximum value the counter’s `total` can show for an exact set. |
+| Engine `limit:` argument | **`retainedMatchCeiling + 1` (10_001)** | Always. Detects truncation in one call. |
 
-Session semantics when the engine returns a full `limit` hits:
+| Rationale for the ceiling | |
+|---|---|
+| Parity | Same number as workspace search’s `WorkspaceSearchLimits.defaultMaximumMatchesPerQuery` (10_000 at `WorkspaceSearchModels.swift`). |
+| Product bound | Keeps one document’s retained match list bounded for ordinal navigation, highlight-all, and counter presentation. Searching a common letter in a megabyte file is an ordinary case, not a pathological edge. |
+| Performance | WS4B (`docs/perf-log.md`) already budgets production-shaped matching at the 512 KiB admission cap under both case backends and dense whole-word rejection; in-document find is one synchronous call over at most the open buffer (including `Fixtures/large-1mb.md`), so that work must stay off the main actor (§12 typing &lt; 16 ms). |
 
-- Treat the result as **truncated** (`isTruncated == true`) unless a follow-up probe
-  (e.g. `limit + 1` or an explicit “at least one more” check) proves no further match
-  exists. The implementer must pick one deterministic probe strategy and test it; the
-  product rule is that a capped list is never presented as an exact total.
-- `total` in the counter is the retained count (≤ 10_000). Truncation is a separate
-  flag/UI state, not a silent lie about completeness.
-- Next/previous/wrap operate only on the retained list (not on unmaterialized later hits).
-- Revising the number requires measured evidence (Debug/Release, recorded in
-  `docs/perf-log.md`) — the same discipline as WS4B. Do not widen the limit to rescue a
-  failing run.
+**Session algorithm (fixed):**
+
+1. Call `TextSearchEngine.matches(..., limit: retainedMatchCeiling + 1)`.
+2. If the engine returns **`retainedMatchCeiling + 1`** results: drop the extra match,
+   retain the first **10_000**, set `isTruncated = true`. Counter `total` is 10_000 and
+   the truncated UI state is shown (e.g. `current / 10000+`).
+3. If the engine returns **`≤ retainedMatchCeiling`** results: retain all of them,
+   set `isTruncated = false`. Counter `total` is exact.
+4. Next / previous / wrap operate **only** on the retained list (never on unmaterialized
+   later hits).
+
+Revising `retainedMatchCeiling` requires measured evidence (Debug/Release, recorded in
+`docs/perf-log.md`) — the same discipline as WS4B. Do not widen the ceiling to rescue a
+failing run.
 
 ### 5.2 Deferred (each needs its own gate later)
 
@@ -183,9 +193,10 @@ Session semantics when the engine returns a full `limit` hits:
 
 Pure value types over `TextSearchEngine` results, for example:
 
-- query + options + fixed `limit` (10_000) → matches + `isTruncated`
-- session state: matches, current ordinal (1-based UI), last caret anchor UTF-16,
-  truncation flag
+- query + options + engine results from `limit: retainedMatchCeiling + 1` →
+  retained matches (≤ 10_000) + `isTruncated` (true iff the engine returned 10_001)
+- session state: retained matches, current ordinal (1-based UI), last caret anchor
+  UTF-16, truncation flag
 - pure functions: `next(from:)`, `previous(from:)`, `ordinal(nearestTo:preferring:)`,
   wrap-around at both ends, empty / oversized / newline / zero-match / truncated
   handling
@@ -197,13 +208,16 @@ No I/O, no actors, no AppKit.
 - Observe document text / revision (existing session publication, not
   `objectWillChange` on every keystroke).
 - Debounce query changes; cancel in-flight match Tasks; run
-  `TextSearchEngine.matches` off the main actor with the fixed limit.
+  `TextSearchEngine.matches(..., limit: retainedMatchCeiling + 1)` off the main actor;
+  drop the overflow hit and set `isTruncated` per §5.1.
 - Fence completions by `(documentIdentity, sourceRevision, queryGeneration)`.
 - Emit `EditorNavigationCommand.navigate` with a new monotonic ID for every
   next/previous/activate — including re-activating the same match — so the WS3A
   state machine never treats a legitimate re-selection as a stale ID.
 - Rebind or clear the session on document-lifecycle transitions defined in F4/F4b
   (identity change is not only a stale-request reject; it is a defined session action).
+  PR B lands the **controller half** of F4b (cancel, clear, rebind, re-run); it does
+  **not** close F4b — UI visibility (bar stays open / bar closes) is proven in PR C.
 - Optional highlight-all attribute application with the same preservation contract as
   image markers (F8 may land in PR D).
 
@@ -236,10 +250,10 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 
 | PR | Scope | Gates closed |
 |---|---|---|
-| **A** (this PR) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 open) |
-| **B** | **F0 blocking spike first** (I0-shaped: minimal menu item if needed, owner physical `⌘F` under ABC + Zhuyin, record menu route vs Carbon fallback — before or as the first commit). Then MarkdownCore find-session model + EditorKit search controller (off-main, debounced, cancellable, revision-fenced, fixed 10_000 limit + truncation) navigating through existing navigation API. **No App find-bar UI.** Must **not** remove any existing `⌘F` entry point (invariant §5.3 #6). | F0 (owner evidence), F1–F5 (named tests). F2’s product latency bullet remains open until PR D measures it. |
-| **C** | App find bar UI + menu items + focus arbitration with ⇧⌘F. F6 IME in find field; F7 focus arbitration. If §2 (a): disable built-in finder **in this PR** with the replacement. **Do not start PR C until F0 has fixed the delivery mechanism.** | F6, F7 |
-| **D** | XCUITest (F9, including truncated counter state), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
+| **A** (this PR) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
+| **B** | **F0 blocking spike first** (I0-shaped: minimal menu item if needed, owner physical `⌘F` under ABC + Zhuyin, record menu route vs Carbon fallback — before or as the first commit). Then MarkdownCore find-session model + EditorKit search controller (off-main, debounced, cancellable, revision-fenced; engine `limit: retainedMatchCeiling + 1` with retain/drop truncation) navigating through existing navigation API. Lands the **controller half of F4b** (cancel / clear / rebind / re-run) without closing F4b. **No App find-bar UI.** Must **not** remove any existing `⌘F` entry point (invariant §5.3 #6). | **Closes:** F0 (owner evidence), F1, F2 (structural off-main / cancel / fence only), F3, F4, F5. **Does not close:** F2 latency bullet (PR D); F4b (PR C, after UI visibility). |
+| **C** | App find bar UI + menu items + focus arbitration with ⇧⌘F. F6 IME in find field; F7 focus arbitration (including `⌘F` re-focus while open). Proves F4b UI visibility (bar stays open and rebinds on file switch; bar closes when no document remains) on top of the PR B controller half. If §2 (a): disable built-in finder **in this PR** with the replacement. **Do not start PR C until F0 has fixed the delivery mechanism.** | F4b, F6, F7 |
+| **D** | XCUITest (F9, including truncated counter state and `⌘F` re-focus), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
 and `git diff --check`. PR body must list which F-gates it closes and which remain
@@ -277,8 +291,10 @@ production UI work. This is **not** a late verification detail of PR D.
   patterns yield no matches (engine rules) and a defined session empty state.
 - [ ] Single-match next/previous is stable (stays on the only match; still emits a fresh
   navigation ID at the controller layer — covered under F3).
-- [ ] Fixed limit **10_000** is applied; session can express **truncated** vs exact;
-  wrap/next/previous never assume unmaterialized hits exist beyond the retained list.
+- [ ] Engine is always called with `limit: retainedMatchCeiling + 1` (10_001); session
+  retains at most **10_000** matches; `isTruncated` is true iff the engine returned
+  10_001 (extra dropped); false when count ≤ 10_000 (exact `total`). Wrap / next /
+  previous never assume unmaterialized hits beyond the retained list.
 - Evidence: _open — PR B MarkdownCore tests_
 
 ### F2 — Off-main, debounced, cancellable (+ measured latency in PR D)
@@ -328,10 +344,15 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | Focused session retired / closed / no open document | **Close** the find bar, cancel work, clear session. No orphan bar over an empty editor. |
 | Workspace close / switch | Close the find bar and clear session (query may be discarded with the window’s document context; no cross-workspace stranding). |
 
-- [ ] Named tests cover at least: file switch rebind+rerun, Reload recompute without
-  stale jump, and close-on-no-document. Rejection of stale navigation IDs alone does not
-  close this gate.
-- Evidence: _open — PR B (controller) + PR C where UI visibility is required_
+- [ ] PR B named tests cover the **controller half**: file-switch rebind+rerun, Reload
+  recompute without stale jump, and clear/cancel on no-document identity — without
+  claiming UI bar visibility. Rejection of stale navigation IDs alone does not satisfy
+  this gate.
+- [ ] PR C named/hosted tests cover the **UI-visibility half**: bar stays open and
+  rebinds on file switch; bar closes when no document remains (and on workspace
+  close/switch).
+- Evidence: _open — closes in PR C once both halves are proven; PR B lands controller
+  tests but does not check this box_
 
 ### F5 — Reveal without source mutation (WYSIWYG + source+preview)
 
@@ -360,6 +381,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   workspace-search field, or editor — never a dead control).
 - [ ] Neither feature's focus receipt is consumed by the other.
 - [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
+- [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
+  selects all existing query text, and **never closes** the bar (owner re-focus policy;
+  §5.1).
 - Evidence: _open — PR C hosted tests_
 
 ### F8 — Highlight-all survives highlight re-application
@@ -377,9 +401,13 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 
 - [ ] Stable accessibility identifiers under `plainsong.editorFind.*` for the bar,
   query field, case/whole-word controls, match counter, next/previous controls, and
-  **truncated-state** indicator (when the 10_000 limit is hit).
+  **truncated-state** indicator (when `isTruncated` is set after a
+  `retainedMatchCeiling + 1` overflow).
 - [ ] Match counter’s truncated presentation is distinct from an exact total (not
   color alone).
+- [ ] `PlainsongUITests` asserts that `⌘F` while the bar is already open re-focuses the
+  query field, selects its text, and leaves the bar open (never closes) — out of
+  process, following the WS4A fixture pattern.
 - [ ] `PlainsongUITests` coverage following the WS4A fixture pattern: app-container
   fixture, predicate waits, no `NSOpenPanel` automation, synthetic events only (not F0
   evidence).
