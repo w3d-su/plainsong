@@ -68,13 +68,15 @@ private struct EditorFindMatchFence: Equatable {
 /// - `.edit` / `.rebind` → recompute session/counter only; do **not** move selection
 enum EditorFindScheduleReason: Equatable {
     case query
+    /// ⌘E / pattern-only: recompute counter, no auto-navigate.
+    case patternOnly
     case edit
     case rebind
 
     var emitsNavigationOnCompletion: Bool {
         switch self {
         case .query: true
-        case .edit, .rebind: false
+        case .patternOnly, .edit, .rebind: false
         }
     }
 }
@@ -130,6 +132,15 @@ public final class EditorFindController {
     /// After non-navigating recompute (edit/rebind), first next/previous activates the
     /// current ordinal instead of stepping past it.
     private var shouldActivateCurrentOnNextStep = false
+    /// Next/previous pressed while `session == nil` (debounce / in-flight). Applied once
+    /// when the generation completes — does **not** re-push the query (avoids restarting
+    /// debounce and losing reverse intent).
+    private var pendingStepIntent: PendingStepIntent?
+
+    private enum PendingStepIntent: Equatable {
+        case next
+        case previous
+    }
 
     public init(documentBinding: EditorFindDocumentBinding = .empty) {
         self.documentBinding = documentBinding
@@ -174,15 +185,17 @@ public final class EditorFindController {
         session = nil
         pendingNavigationCommand = nil
         shouldActivateCurrentOnNextStep = false
+        pendingStepIntent = nil
         notifySessionDidChange()
     }
 
     // MARK: - Query / navigation
 
-    public func setQuery(_ query: TextSearchQuery?) {
+    public func setQuery(_ query: TextSearchQuery?, emitsNavigation: Bool = true) {
         self.query = query
         caretAnchorUTF16 = max(0, caretAnchorUTF16)
-        scheduleMatch(reason: .query)
+        // ⌘E / pattern-only updates recompute the counter without auto-jumping.
+        scheduleMatch(reason: emitsNavigation ? .query : .patternOnly)
     }
 
     public func setCaretAnchor(_ utf16: Int) {
@@ -190,8 +203,14 @@ public final class EditorFindController {
     }
 
     public func findNext() {
-        // No navigation from a stale or in-flight session (cleared at scheduleMatch).
-        guard var session else { return }
+        // While a match is in flight, record intent — do not re-schedule the query
+        // (that would restart debounce and drop reverse/forward intent).
+        guard var session else {
+            if query != nil {
+                pendingStepIntent = .next
+            }
+            return
+        }
         if shouldActivateCurrentOnNextStep {
             shouldActivateCurrentOnNextStep = false
             self.session = session
@@ -206,7 +225,12 @@ public final class EditorFindController {
     }
 
     public func findPrevious() {
-        guard var session else { return }
+        guard var session else {
+            if query != nil {
+                pendingStepIntent = .previous
+            }
+            return
+        }
         if shouldActivateCurrentOnNextStep {
             shouldActivateCurrentOnNextStep = false
             self.session = session
@@ -249,6 +273,7 @@ public final class EditorFindController {
         session = nil
         pendingNavigationCommand = nil
         shouldActivateCurrentOnNextStep = false
+        pendingStepIntent = nil
     }
 
     private func scheduleMatch(reason: EditorFindScheduleReason) {
@@ -265,6 +290,7 @@ public final class EditorFindController {
 
         // Drop the previous session immediately so next/previous/activate during debounce
         // cannot navigate ranges from a superseded query or document revision.
+        // Preserve `pendingStepIntent` so ⌘G / ⇧⌘G pressed mid-debounce still apply once.
         session = nil
         pendingNavigationCommand = nil
         shouldActivateCurrentOnNextStep = false
@@ -272,9 +298,8 @@ public final class EditorFindController {
 
         guard let query, !query.pattern.isEmpty else {
             session = query.map { EditorFindSession.empty(query: $0, caretAnchorUTF16: anchor) }
-            if shouldNavigate {
-                pendingNavigationCommand = nil
-            }
+            pendingNavigationCommand = nil
+            pendingStepIntent = nil
             notifySessionDidChange()
             return
         }
@@ -377,7 +402,11 @@ public final class EditorFindController {
         }
         completedMatchCount &+= 1
         session = newSession
-        if shouldNavigate {
+        if let intent = pendingStepIntent {
+            pendingStepIntent = nil
+            shouldActivateCurrentOnNextStep = false
+            applyPendingStepIntent(intent, on: newSession, queryWouldNavigate: shouldNavigate)
+        } else if shouldNavigate {
             shouldActivateCurrentOnNextStep = false
             emitNavigation(for: newSession.currentMatch)
         } else {
@@ -386,6 +415,28 @@ public final class EditorFindController {
             shouldActivateCurrentOnNextStep = newSession.currentMatch != nil
         }
         notifySessionDidChange()
+    }
+
+    private func applyPendingStepIntent(
+        _ intent: PendingStepIntent,
+        on newSession: EditorFindSession,
+        queryWouldNavigate: Bool
+    ) {
+        var session = newSession
+        switch intent {
+        case .next:
+            if queryWouldNavigate {
+                // Query already resolves to the anchor match; user pressed next while waiting.
+                session = session.next()
+            }
+        // else: edit/rebind/patternOnly — activate current (no step past).
+        case .previous:
+            if queryWouldNavigate {
+                session = session.previous()
+            }
+        }
+        self.session = session
+        emitNavigation(for: session.currentMatch)
     }
 
     private func emitNavigation(for match: TextSearchMatch?) {
@@ -404,7 +455,8 @@ public final class EditorFindController {
         let request = EditorNavigationRequest(
             id: id,
             documentIdentity: identity,
-            selection: match.range
+            selection: match.range,
+            shouldFocusEditor: false
         )
         pendingNavigationCommand = .navigate(request)
     }
