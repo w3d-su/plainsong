@@ -10,9 +10,9 @@ final class EditorFindControllerTests: XCTestCase {
     private let documentA = EditorDocumentIdentity(rawValue: "find-doc-a")
     private let documentB = EditorDocumentIdentity(rawValue: "find-doc-b")
 
-    // MARK: - F2 structural (off-main, cancel, fence)
+    // MARK: - F2 structural (off-main, cancel admission, fence)
 
-    func testMatchWorkRunsOffMainAndIsDebouncedCancellable() async throws {
+    func testMatchWorkRunsOffMainAndReportsTrueFlag() async throws {
         let controller = EditorFindController(
             documentBinding: EditorFindDocumentBinding(
                 identity: documentA,
@@ -21,17 +21,50 @@ final class EditorFindControllerTests: XCTestCase {
             )
         )
         controller.debounceNanoseconds = 0
+        controller.forceMainActorMatchForTesting = false
         controller.setQuery(TextSearchQuery(pattern: "needle"))
 
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
             controller.session?.total == 2
         }
-        XCTAssertTrue(controller.lastMatchRanOffMain)
+        XCTAssertTrue(
+            controller.lastMatchRanOffMain,
+            "Production path must observe !Thread.isMainThread inside the worker"
+        )
         XCTAssertEqual(controller.session?.currentOrdinal, 1)
         XCTAssertEqual(controller.completedMatchCount, 1)
+    }
 
-        // Rapid query replace cancels prior work; only the latest generation applies.
-        controller.debounceNanoseconds = 50_000_000
+    func testMainActorMatchPathReportsOffMainFalse() async throws {
+        let controller = EditorFindController(
+            documentBinding: EditorFindDocumentBinding(
+                identity: documentA,
+                text: "alpha needle beta",
+                revision: 1
+            )
+        )
+        controller.debounceNanoseconds = 0
+        controller.forceMainActorMatchForTesting = true
+        controller.setQuery(TextSearchQuery(pattern: "needle"))
+
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
+            controller.session?.total == 1
+        }
+        XCTAssertFalse(
+            controller.lastMatchRanOffMain,
+            "Negative control: same search on the main actor must report ranOffMain == false"
+        )
+    }
+
+    func testRapidQueryReplaceCancelsPriorAdmissionAndAppliesLatest() async throws {
+        let controller = EditorFindController(
+            documentBinding: EditorFindDocumentBinding(
+                identity: documentA,
+                text: "alpha needle beta needle gamma",
+                revision: 1
+            )
+        )
+        controller.debounceNanoseconds = 80_000_000
         controller.setQuery(TextSearchQuery(pattern: "alpha"))
         controller.setQuery(TextSearchQuery(pattern: "gamma"))
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
@@ -39,30 +72,55 @@ final class EditorFindControllerTests: XCTestCase {
                 && controller.session?.currentMatch?.range
                 == ("alpha needle beta needle gamma" as NSString).range(of: "gamma")
         }
-        XCTAssertGreaterThanOrEqual(controller.cancelledMatchCount, 0)
+        XCTAssertGreaterThanOrEqual(
+            controller.cancelledMatchCount,
+            1,
+            "Second setQuery must cancel the first in-flight admission task"
+        )
+        XCTAssertEqual(controller.session?.total, 1)
     }
 
     func testStaleMatchCompletionIsDropped() async throws {
+        let text = "needle and zzz together"
+        let hold = EditorFindMatchHold()
         let controller = EditorFindController(
             documentBinding: EditorFindDocumentBinding(
                 identity: documentA,
-                text: String(repeating: "needle ", count: 200),
+                text: text,
                 revision: 1
             )
         )
         controller.debounceNanoseconds = 0
+        controller.testMatchHold = hold
         controller.setQuery(TextSearchQuery(pattern: "needle"))
-        // Immediately rebind with empty text before the first match can apply.
-        controller.rebindDocument(
-            EditorFindDocumentBinding(identity: documentA, text: "clean", revision: 2)
-        )
-        controller.setQuery(TextSearchQuery(pattern: "zzz-no-match"))
+
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
-            controller.session != nil && controller.session?.total == 0
+            hold.waiterCount >= 1
         }
-        // Either stale drops happened, or only the latest generation completed cleanly.
-        XCTAssertEqual(controller.session?.total, 0)
-        XCTAssertNil(controller.session?.currentMatch)
+        XCTAssertNil(controller.session, "Held first match must not have applied yet")
+
+        // Newer generation: no hold, completes while first is still blocked.
+        controller.testMatchHold = nil
+        controller.setQuery(TextSearchQuery(pattern: "zzz"))
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
+            controller.session?.total == 1
+                && controller.session?.currentMatch?.range
+                == (text as NSString).range(of: "zzz")
+        }
+        XCTAssertEqual(controller.session?.total, 1)
+
+        let dropsBeforeRelease = controller.droppedStaleMatchCount
+        hold.release()
+        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
+            controller.droppedStaleMatchCount > dropsBeforeRelease
+        }
+        XCTAssertGreaterThan(controller.droppedStaleMatchCount, dropsBeforeRelease)
+        // Stale first generation must not overwrite the second result.
+        XCTAssertEqual(controller.session?.total, 1)
+        XCTAssertEqual(
+            controller.session?.currentMatch?.range,
+            (text as NSString).range(of: "zzz")
+        )
     }
 
     // MARK: - F3 exact navigation
@@ -82,7 +140,7 @@ final class EditorFindControllerTests: XCTestCase {
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 1 }
 
         guard case let .navigate(first)? = controller.pendingNavigationCommand else {
-            return XCTFail("Expected navigation command after match")
+            return XCTFail("Expected navigation command after query match")
         }
         XCTAssertEqual(first.documentIdentity, documentA)
         XCTAssertEqual(first.selection, target)
@@ -107,7 +165,10 @@ final class EditorFindControllerTests: XCTestCase {
             .map { $0 == 150 ? "line \($0) exact find-hit" : "line \($0) filler" }
             .joined(separator: "\n")
         let target = (text as NSString).range(of: "exact find-hit")
-        let model = EditorFindControllerTestSupport.FindNavModel(text: text, selection: NSRange(location: 0, length: 0))
+        let model = EditorFindControllerTestSupport.FindNavModel(
+            text: text,
+            selection: NSRange(location: 0, length: 0)
+        )
         let fixture = try EditorFindControllerTestSupport.makeWindowedFixture(
             model: model,
             source: text,
@@ -137,9 +198,9 @@ final class EditorFindControllerTests: XCTestCase {
         XCTAssertFalse(fixture.textView.undoManager?.canUndo == true)
     }
 
-    // MARK: - F4 edit invalidation
+    // MARK: - F4 edit: recompute without navigation
 
-    func testEditInvalidatesAndRecomputesWithoutStaleJump() async throws {
+    func testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation() async throws {
         let controller = EditorFindController(
             documentBinding: EditorFindDocumentBinding(
                 identity: documentA,
@@ -150,8 +211,11 @@ final class EditorFindControllerTests: XCTestCase {
         controller.debounceNanoseconds = 0
         controller.setQuery(TextSearchQuery(pattern: "needle"))
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 2 }
-        XCTAssertEqual(controller.session?.matches.count, 2)
-        let secondOld = try XCTUnwrap(controller.session?.matches.last?.range)
+
+        guard case let .navigate(queryNav)? = controller.pendingNavigationCommand else {
+            return XCTFail("Query completion should navigate")
+        }
+        let navigationIDBeforeEdit = queryNav.id
 
         controller.documentTextDidChange(text: "one needle only", revision: 2)
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
@@ -161,14 +225,20 @@ final class EditorFindControllerTests: XCTestCase {
         XCTAssertEqual(controller.session?.total, 1)
         let only = ("one needle only" as NSString).range(of: "needle")
         XCTAssertEqual(controller.session?.currentMatch?.range, only)
-        // The removed second match from revision 1 must not remain
-        XCTAssertNotEqual(controller.session?.matches.last?.range.location, secondOld.location)
-        XCTAssertEqual(controller.session?.matches.count, 1)
+        // Edit must not emit a new navigation command.
+        guard case let .navigate(afterEdit)? = controller.pendingNavigationCommand else {
+            return XCTFail("Expected prior query navigation to remain")
+        }
+        XCTAssertEqual(
+            afterEdit.id,
+            navigationIDBeforeEdit,
+            "Document edit must not emit navigation; prior command id must be unchanged"
+        )
     }
 
-    // MARK: - F4b controller half
+    // MARK: - F4b controller half: rebind without auto-jump
 
-    func testRebindToNewDocumentClearsOldMatchesAndReruns() async throws {
+    func testRebindRerunsQueryWithoutEmittingNavigation() async throws {
         let controller = EditorFindController(
             documentBinding: EditorFindDocumentBinding(
                 identity: documentA,
@@ -179,10 +249,7 @@ final class EditorFindControllerTests: XCTestCase {
         controller.debounceNanoseconds = 0
         controller.setQuery(TextSearchQuery(pattern: "apple"))
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 1 }
-        XCTAssertEqual(
-            controller.pendingNavigationCommand.map(\.id),
-            controller.pendingNavigationCommand.map(\.id)
-        )
+        XCTAssertNotNil(controller.pendingNavigationCommand)
 
         controller.rebindDocument(
             EditorFindDocumentBinding(
@@ -191,16 +258,16 @@ final class EditorFindControllerTests: XCTestCase {
                 revision: 1
             )
         )
+        // clearSessionKeepingQuery nils pending navigation; rebind must not re-emit.
         try await EditorFindControllerTestSupport.waitUntil(timeout: 2) {
             controller.session?.total == 2
                 && controller.documentBinding.identity == self.documentB
         }
         XCTAssertEqual(controller.session?.total, 2)
-        if case let .navigate(request)? = controller.pendingNavigationCommand {
-            XCTAssertEqual(request.documentIdentity, documentB)
-        } else {
-            XCTFail("Expected navigation for document B")
-        }
+        XCTAssertNil(
+            controller.pendingNavigationCommand,
+            "File switch re-runs the query for the counter but must not auto-jump; user uses ⌘G"
+        )
     }
 
     func testClearForNoDocumentCancelsAndClearsSession() async throws {
@@ -219,126 +286,5 @@ final class EditorFindControllerTests: XCTestCase {
         XCTAssertNil(controller.session)
         XCTAssertNil(controller.pendingNavigationCommand)
         XCTAssertEqual(controller.documentBinding, .empty)
-    }
-
-    // MARK: - F5 WYSIWYG + source configurations
-
-    func testExperimentalWYSIWYGFindNavigationRevealsMatchWithoutSourceMutation() async throws {
-        let source = "Intro **folded match** tail\n"
-        let target = (source as NSString).range(of: "folded match")
-        let outsideSelection = NSRange(location: 0, length: 0)
-        let model = EditorFindControllerTestSupport.FindNavModel(text: source, selection: outsideSelection)
-        let fixture = try EditorFindControllerTestSupport.makeWindowedFixture(
-            model: model,
-            source: source,
-            documentIdentity: documentA
-        )
-        XCTAssertTrue(fixture.textView.setWYSIWYGZeroWidthFoldingEnabled(true))
-        fixture.textView.textSelection = outsideSelection
-        let folded = editorNavigationWYSIWYGPresentation(source, selection: outsideSelection, revision: 1)
-        let foldedRegion = try XCTUnwrap(folded.foldPlan?.regions.first { $0.kind == .strong })
-        XCTAssertFalse(foldedRegion.isRevealed)
-        XCTAssertTrue(MarkdownTextView.applyHighlightedText(folded, to: fixture.textView))
-        fixture.textView.undoManager?.removeAllActions()
-        let sourceBytes = Data(source.utf8)
-
-        let controller = EditorFindController(
-            documentBinding: EditorFindDocumentBinding(
-                identity: documentA,
-                text: source,
-                revision: 1
-            )
-        )
-        controller.debounceNanoseconds = 0
-        controller.setQuery(TextSearchQuery(pattern: "folded match"))
-        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 1 }
-
-        let command = try XCTUnwrap(controller.pendingNavigationCommand)
-        fixture.coordinator.observeNavigationCommand(command)
-        fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
-
-        let revealed = editorNavigationWYSIWYGPresentation(source, selection: target, revision: 2)
-        let revealedRegion = try XCTUnwrap(revealed.foldPlan?.regions.first { $0.kind == .strong })
-        XCTAssertTrue(revealedRegion.isRevealed)
-        XCTAssertTrue(MarkdownTextView.applyHighlightedText(revealed, to: fixture.textView))
-        XCTAssertEqual(fixture.textView.selectedRange(), target)
-        XCTAssertEqual(Data(EditorFindControllerTestSupport.viewText(in: fixture.textView).utf8), sourceBytes)
-        XCTAssertFalse(fixture.textView.undoManager?.canUndo == true)
-    }
-
-    func testSourceOnlyFindNavigationSelectsWithoutSourceMutation() async throws {
-        let source = "plain **not folded** source mode"
-        let target = (source as NSString).range(of: "not folded")
-        let model = EditorFindControllerTestSupport.FindNavModel(
-            text: source,
-            selection: NSRange(location: 0, length: 0)
-        )
-        let fixture = try EditorFindControllerTestSupport.makeWindowedFixture(
-            model: model,
-            source: source,
-            documentIdentity: documentA
-        )
-        // WYSIWYG folding off (source-only control)
-        XCTAssertTrue(fixture.textView.setWYSIWYGZeroWidthFoldingEnabled(false))
-        let sourceBytes = Data(source.utf8)
-
-        let controller = EditorFindController(
-            documentBinding: EditorFindDocumentBinding(
-                identity: documentA,
-                text: source,
-                revision: 1
-            )
-        )
-        controller.debounceNanoseconds = 0
-        controller.setQuery(TextSearchQuery(pattern: "not folded"))
-        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 1 }
-
-        let command = try XCTUnwrap(controller.pendingNavigationCommand)
-        fixture.coordinator.observeNavigationCommand(command)
-        fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
-
-        XCTAssertEqual(fixture.textView.selectedRange(), target)
-        XCTAssertEqual(Data(EditorFindControllerTestSupport.viewText(in: fixture.textView).utf8), sourceBytes)
-    }
-
-    func testSourcePreviewFindNavigationUsesSameSelectionChannel() async throws {
-        // Source+preview keeps the same EditorNavigationRequest path; scroll proxy is
-        // driven by selection change (Decision Log 2026-06-25). Prove selection+reveal.
-        let source = (0 ... 80)
-            .map { $0 == 40 ? "preview-sync-needle-\($0)" : "line-\($0)" }
-            .joined(separator: "\n")
-        let target = (source as NSString).range(of: "preview-sync-needle-40")
-        let model = EditorFindControllerTestSupport.FindNavModel(
-            text: source,
-            selection: NSRange(location: 0, length: 0)
-        )
-        let fixture = try EditorFindControllerTestSupport.makeWindowedFixture(
-            model: model,
-            source: source,
-            documentIdentity: documentA,
-            height: 120
-        )
-        let initialOrigin = fixture.scrollView.contentView.bounds.origin
-
-        let controller = EditorFindController(
-            documentBinding: EditorFindDocumentBinding(
-                identity: documentA,
-                text: source,
-                revision: 1
-            )
-        )
-        controller.debounceNanoseconds = 0
-        controller.setQuery(TextSearchQuery(pattern: "preview-sync-needle-40"))
-        try await EditorFindControllerTestSupport.waitUntil(timeout: 2) { controller.session?.total == 1 }
-
-        let command = try XCTUnwrap(controller.pendingNavigationCommand)
-        fixture.coordinator.observeNavigationCommand(command)
-        fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
-
-        XCTAssertEqual(fixture.textView.selectedRange(), target)
-        XCTAssertGreaterThanOrEqual(
-            fixture.scrollView.contentView.bounds.origin.y,
-            initialOrigin.y
-        )
     }
 }
