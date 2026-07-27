@@ -67,6 +67,34 @@ Then branch explicitly:
 | **(a)** A reachable built-in path exists | This work **replaces** it. The PR that ships the Plainsong replacement UI (**PR C**) must disable the built-in finder in the **same** PR so two find UIs cannot coexist. PR B must **not** remove the existing entry point (see §5.3 #6 and §7). |
 | **(b)** No reachable path exists | There is nothing to replace. “Disable the built-in finder” is a no-op. No PR body may claim a replacement. |
 
+**RESOLVED 2026-07-27 (owner run, Debug app at `main` `dfba18a`): outcome (b).**
+
+| Step | Observation |
+|---|---|
+| Edit menu inspection | **No Find submenu and no Find… item.** The menu is fully constructed and merely validated — Undo, Redo, Cut, Copy and Delete are all present but disabled — so an item synthesized by SwiftUI would have appeared disabled rather than absent. It is absent. |
+| Physical `⌘F`, ABC and Zhuyin | **System beep in both**, no find bar. |
+
+Consequences, applied throughout this document:
+
+- There is **nothing to replace**. “Disable the built-in finder” is a no-op, and no PR
+  body may claim a replacement (§5.3 #6, §6.3, §7 PR B/PR C).
+- STTextView's `NSTextFinder` stack exists but is **unreachable**: nothing sends
+  `performTextFinderAction:` without a menu item, and NSTextView-family views carry no
+  built-in `⌘F` key binding of their own. `⌘G` and `⌘E` are likewise inert today.
+- The invariant “no commit on `main` may leave `⌘F` with no working behavior” is
+  **trivially satisfied** — `⌘F` has no behavior to lose. It stays in the document
+  because it still governs the window between PR C's UI landing and any later change.
+
+**What the beep proves, and what it does not.** The beep means the event reached the app,
+completed key-equivalent resolution, and was claimed by no responder. That is the opposite
+of the ⇧⌘F failure mode, where the physical event was consumed *before* AppKit and the app
+observed nothing at all (Decision Log 2026-07-22) — so **⌘F is not intercepted upstream and
+a Carbon fallback is not expected to be needed.** It does **not** prove that SwiftUI will
+dispatch a newly added menu item's key equivalent: `App/PlainsongCommands.swift` records
+that SwiftUI swallowed ⇧⌘P/⇧⌘F key equivalents without firing their actions while two
+top-level menus shared a title, even though mouse clicks worked. **F0 therefore stays open**
+until the minimal spike adds a Find menu item and an owner physical `⌘F` fires it.
+
 F0 is a **blocking spike** (I0-shaped; see §7 / §8 F0): it decides the delivery
 mechanism before PR C is authored. Synthetic `NSEvent`s and XCUITest input are
 **not** F0 evidence (Decision Log 2026-07-22).
@@ -172,10 +200,12 @@ failing run.
 5. **Menu commands route through the responder chain** like Format
    (`EditorCommandDispatcher.perform` → `NSApp.sendAction`), so find applies to the
    focused editor in the key window and no-ops in sidebar/preview.
-6. **Built-in finder disable is conditional and co-ships with replacement UI.**
-   - If §2 outcome **(a)** holds: disable STTextView’s `NSTextFinder` bar in **PR C**
-     (the same PR that ships the Plainsong find bar and menu items), never earlier.
-   - If outcome **(b)** holds: disable is a no-op; do not claim a replacement.
+6. **Built-in finder disable — resolved to no-op by §2 outcome (b).**
+   - §2 is **resolved (b)** (2026-07-27 owner run): no reachable built-in path exists, so
+     there is nothing to disable and no PR may claim a replacement.
+   - The conditional (a) branch is retained in §2 for provenance only. If a future change
+     ever makes STTextView's finder reachable, disabling it co-ships with the Plainsong
+     bar in the same PR — never earlier.
    - **Invariant:** no commit on `main` may leave `⌘F` with no working behavior.
      PR B may take exclusive *controller* ownership for navigation/match work without
      removing any existing user-visible entry point.
@@ -228,7 +258,7 @@ No I/O, no actors, no AppKit.
 - Menu items: Find, Find Next, Find Previous, Use Selection for Find — responder-chain
   routed.
 - Focus intents independent of `WorkspaceSearchUIState` tokens.
-- If §2 outcome (a): disable built-in `NSTextFinder` **here**, with the replacement UI.
+- No built-in `NSTextFinder` disabling: §2 resolved **(b)**, nothing is reachable.
 - Must not be authored until F0 has recorded the delivery mechanism (§8 F0).
 
 ### 6.4 Performance probe (PR D)
@@ -251,8 +281,8 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | PR | Scope | Gates closed |
 |---|---|---|
 | **A** (this PR) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
-| **B** | **F0 blocking spike first** (I0-shaped: minimal menu item if needed, owner physical `⌘F` under ABC + Zhuyin, record menu route vs Carbon fallback — before or as the first commit). Then MarkdownCore find-session model + EditorKit search controller (off-main, debounced, cancellable, revision-fenced; engine `limit: retainedMatchCeiling + 1` with retain/drop truncation) navigating through existing navigation API. Lands the **controller half of F4b** (cancel / clear / rebind / re-run) without closing F4b. **No App find-bar UI.** Must **not** remove any existing `⌘F` entry point (invariant §5.3 #6). | **Closes:** F0 (owner evidence), F1, F2 (structural off-main / cancel / fence only), F3, F4, F5. **Does not close:** F2 latency bullet (PR D); F4b (PR C, after UI visibility). |
-| **C** | App find bar UI + menu items + focus arbitration with ⇧⌘F. F6 IME in find field; F7 focus arbitration (including `⌘F` re-focus while open). Proves F4b UI visibility (bar stays open and rebinds on file switch; bar closes when no document remains) on top of the PR B controller half. If §2 (a): disable built-in finder **in this PR** with the replacement. Decides and tests the open `⌘E` question from §5.1 (does `⌘E` show / focus the bar). **Do not start PR C until F0 has fixed the delivery mechanism.** | F4b, F6, F7 |
+| **B** | **F0 blocking spike first** (I0-shaped: §2 is already resolved **(b)**, so the spike adds the Find menu item that does not exist yet and proves an owner physical `⌘F` fires it under ABC + Zhuyin; record menu route vs Carbon fallback — before or as the first commit). Then MarkdownCore find-session model + EditorKit search controller (off-main, debounced, cancellable, revision-fenced; engine `limit: retainedMatchCeiling + 1` with retain/drop truncation) navigating through existing navigation API. Lands the **controller half of F4b** (cancel / clear / rebind / re-run) without closing F4b. **No App find-bar UI.** Must **not** remove any existing `⌘F` entry point (invariant §5.3 #6 — trivially satisfied under (b), since none exists). | **Closes:** F0 (owner evidence), F1, F2 (structural off-main / cancel / fence only), F3, F4, F5. **Does not close:** F2 latency bullet (PR D); F4b (PR C, after UI visibility). |
+| **C** | App find bar UI + menu items + focus arbitration with ⇧⌘F. F6 IME in find field; F7 focus arbitration (including `⌘F` re-focus while open). Proves F4b UI visibility (bar stays open and rebinds on file switch; bar closes when no document remains) on top of the PR B controller half. No built-in-finder disabling (§2 resolved (b)). Decides and tests the open `⌘E` question from §5.1 (does `⌘E` show / focus the bar). **Do not start PR C until F0 has fixed the delivery mechanism.** | F4b, F6, F7 |
 | **D** | XCUITest (F9, including truncated counter state and `⌘F` re-focus), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
@@ -268,10 +298,18 @@ Checkboxes start unchecked. Evidence lines are filled when the gate closes.
 Shape matches image-thumbnail **I0**: a minimal spike that decides the mechanism before
 production UI work. This is **not** a late verification detail of PR D.
 
-- [ ] **PR B precondition:** run the §2 runtime Edit-menu / `⌘F` check and record
-  outcome **(a)** or **(b)**.
+- [x] **PR B precondition:** run the §2 runtime Edit-menu / `⌘F` check and record
+  outcome **(a)** or **(b)**. — **Done 2026-07-27 (owner, Debug app at `main` `dfba18a`):
+  outcome (b).** No Find submenu or Find… item in the Edit menu (menu fully constructed;
+  Undo/Redo/Cut/Copy/Delete present but disabled). Physical `⌘F` under **ABC** and
+  **Zhuyin** both produced a system beep and no find bar. See §2 for the resolution and
+  its consequences.
 - [ ] Ordinary menu-item route delivers Find under **ABC** and **Zhuyin** on a
   **physical** keyboard. Prefer the menu-item / standard key-equivalent path first.
+  **Still open:** the beep proves the event reaches AppKit unclaimed (so no upstream
+  interception, unlike ⇧⌘F), but a menu item must exist before this can be tested, and
+  SwiftUI key-equivalent dispatch is the remaining risk (`App/PlainsongCommands.swift`
+  precedent). The spike must add the item and fire it physically.
 - [ ] Do **not** preemptively add a second Carbon hot key registration. Fall back to the
   `PlainsongMenuKeyBinding` / app-active Carbon pattern **only** if physical delivery
   actually fails, and record the evidence either way (Decision Log 2026-07-22 precedent
@@ -279,8 +317,9 @@ production UI work. This is **not** a late verification detail of PR D.
 - [ ] Synthetic `NSEvent`s and XCUITest input are **not** evidence for this gate.
 - [ ] Spike stays minimal (e.g. one temporary menu item if none exists yet); no full find
   bar. PR C must not be authored until the mechanism is known and recorded here.
-- Evidence: _open — owner physical run as first work of PR B (before or as first commit);
-  not PR D_
+- Evidence: _partial — the §2 baseline check is **closed** by the 2026-07-27 owner run
+  (outcome (b), beep under ABC + Zhuyin). The menu-item dispatch half remains open and is
+  the first work of PR B (before or as its first commit); not PR D._
 
 ### F1 — Pure find-session model
 
