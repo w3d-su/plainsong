@@ -6,6 +6,36 @@ import Foundation
 ///
 /// Kept out of `AppState+EditorFind.swift` so neither file grows past the §17.10 length
 /// guidance; the rules themselves are documented on each member.
+/// Whether a selection the editor has applied may be interpreted against App's current text.
+///
+/// A native selection is an offset into whatever source the editor currently holds. During a
+/// document switch, or a same-URL Reload, that is still the *previous* content while App has
+/// already moved on — so a range copied out of it would index new text with old offsets.
+/// Identity, installed state, revision, and bounds must all agree.
+enum EditorFindAppliedSelectionPolicy {
+    static func accepts(
+        _ applied: EditorAppliedSelection,
+        identity: EditorDocumentIdentity?,
+        revision: Int,
+        textUTF16Length: Int
+    ) -> Bool {
+        guard applied.isDocumentInstalled,
+              let appliedIdentity = applied.documentIdentity,
+              let currentIdentity = identity,
+              appliedIdentity == currentIdentity,
+              applied.sourceRevision == revision,
+              applied.range.location != NSNotFound,
+              applied.range.location >= 0,
+              applied.range.length >= 0,
+              applied.range.length <= Int.max - applied.range.location,
+              NSMaxRange(applied.range) <= textUTF16Length
+        else {
+            return false
+        }
+        return true
+    }
+}
+
 enum EditorFindResponderSupport {
     @MainActor
     static func keyWindowHasEditorOrFindField() -> Bool {
@@ -13,67 +43,36 @@ enum EditorFindResponderSupport {
         return windowHasEditorOrFindChrome(window)
     }
 
-    /// Whether `window`'s first responder is the editor, the find query field, or any other
-    /// control inside the find bar.
+    /// Whether `window`'s first responder is the editor or the owned find query field.
     ///
-    /// Exposed for tests so the rule can be exercised on a synthetic hierarchy without
-    /// depending on which window `NSApp` considers key.
+    /// This covers only what AppKit can actually answer. The bar's other controls (Aa,
+    /// whole-word, Next, Previous, Done) are plain SwiftUI: macOS flattens them and the
+    /// editor into a single hosting view, so there is no find-bar-specific ancestor to walk
+    /// and no reliable per-control `NSView` to identify. Focus on those is reported by
+    /// SwiftUI instead — see `AppState.isEditorFindCommandContextActive()`, which combines
+    /// this check with `editorFindHost.chromeFocus` gated on `keyWindowHostsFindBar()`.
+    ///
+    /// Exposed for tests so the rule can be exercised without depending on which window
+    /// `NSApp` considers key.
     @MainActor
     static func windowHasEditorOrFindChrome(_ window: NSWindow) -> Bool {
         if EditorSelectionProbe.keyWindowHasEditorFocus() {
             return true
         }
         guard let first = window.firstResponder else { return false }
-        if matchesEditorOrFindFieldResponder(first) {
-            return true
-        }
-        return responderIsInsideFindBarChrome(first, in: window)
+        return matchesEditorOrFindFieldResponder(first)
     }
 
-    /// True when the responder sits inside the find bar's own view subtree.
+    /// Whether the key window is the one currently showing the find bar.
     ///
-    /// Anchored on the owned query `NSTextField` rather than on SwiftUI accessibility (which
-    /// does not materialize without an assistive client): walk up from the responder to the
-    /// nearest ancestor that contains the query field, and accept only if that ancestor does
-    /// not also contain the editor. The bar's host view contains the query field and its
-    /// sibling controls but never the editor, while any shared ancestor — sidebar, preview,
-    /// window content — contains both. This is what keeps ⌘G live after Full Keyboard Access
-    /// tabs to Aa / whole-word / Next / Previous.
+    /// Gates the SwiftUI-reported chrome focus: `AppState` is shared across the
+    /// `WindowGroup`, so a background window's stale focus must never grant eligibility.
+    /// The owned query field is a real `NSView` with a stable identifier, which makes this
+    /// answerable in AppKit even though the surrounding chrome is not.
     @MainActor
-    private static func responderIsInsideFindBarChrome(
-        _ first: NSResponder,
-        in window: NSWindow
-    ) -> Bool {
-        guard let root = window.contentView,
-              let responderView = responderView(for: first),
-              let queryField = descendant(of: root, identifiedBy: EditorFindAccessibility.queryField)
-        else {
-            return false
-        }
-        let editor = descendant(of: root, identifiedBy: EditorAccessibility.textViewIdentifier)
-        var ancestor: NSView? = responderView
-        while let current = ancestor {
-            if queryField.isDescendant(of: current) {
-                if let editor, editor.isDescendant(of: current) {
-                    return false
-                }
-                return true
-            }
-            ancestor = current.superview
-        }
-        return false
-    }
-
-    @MainActor
-    private static func responderView(for first: NSResponder) -> NSView? {
-        if let textView = first as? NSTextView {
-            // Field editors are not in the chrome hierarchy; their delegate/owner is.
-            if let owner = textView.delegate as? NSView {
-                return owner
-            }
-            return textView.superview ?? textView
-        }
-        return first as? NSView
+    static func keyWindowHostsFindBar() -> Bool {
+        guard let root = NSApp.keyWindow?.contentView else { return false }
+        return descendant(of: root, identifiedBy: EditorFindAccessibility.queryField) != nil
     }
 
     @MainActor

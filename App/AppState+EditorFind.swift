@@ -39,12 +39,33 @@ extension AppState {
     }
 
     /// Whether the key window's first responder is the editor, its field editor, or the find field.
+    ///
+    /// The bar's toggles and buttons cannot be resolved in AppKit — SwiftUI flattens them and
+    /// the editor into one hosting view — so focus on those arrives from SwiftUI as
+    /// `chromeFocus` and is trusted only while the **key** window is the one showing the bar.
+    /// Residual: if SwiftUI ever failed to clear its own focus when focus left the bar, a find
+    /// command could fire while focus sits elsewhere in that same window. That is bounded to
+    /// one window and one document, and is strictly less harmful than the alternative — the
+    /// commands and the bar's own buttons going dead under Full Keyboard Access.
     func isEditorFindCommandContextActive() -> Bool {
         guard hasOpenDocument else { return false }
         if let override = editorFindHost.commandContextOverride {
             return override
         }
+        if editorFindHost.ui.isBarVisible,
+           editorFindHost.chromeFocus != nil,
+           EditorFindResponderSupport.keyWindowHostsFindBar()
+        {
+            return true
+        }
         return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
+    }
+
+    /// Records which find-bar control SwiftUI reports as focused (`nil` when focus left).
+    func setEditorFindChromeFocus(_ focus: EditorFindChromeFocus?) {
+        guard editorFindHost.chromeFocus != focus else { return }
+        editorFindHost.chromeFocus = focus
+        objectWillChange.send()
     }
 
     /// ⌘F — show or re-focus; never closes.
@@ -70,15 +91,18 @@ extension AppState {
 
     /// Escape / Done — close bar and return focus to editor.
     ///
-    /// Fences the controller first: a query typed moments earlier may still be inside the
-    /// debounce window, and its match would otherwise land after the bar is gone and move
-    /// the editor selection. The retained query stays usable for a later ⌘G.
+    /// Suspends rather than re-runs: a query still inside the debounce window must not land
+    /// afterwards and move the editor selection, but a **resolved** session keeps its ordinal
+    /// so a later ⌘G continues from the match the user was on instead of restarting at the
+    /// caret anchor.
     func closeEditorFindBar() {
         guard editorFindHost.ui.isBarVisible else { return }
         var ui = editorFindHost.ui
         ui.closeBar() // also supersedes pending focus
         setEditorFindUI(ui)
-        yieldEditorFindNavigation(caretAnchorUTF16: nil)
+        setEditorFindChromeFocus(nil)
+        cancelPublishedFindNavigationOnSharedChannel()
+        editorFindHost.controller.suspendNavigation()
         requestEditorFocus()
     }
 
@@ -108,6 +132,22 @@ extension AppState {
         }
         var ui = editorFindHost.ui
         ui.focusAppliedID = requestID
+        setEditorFindUI(ui)
+    }
+
+    /// Consumes a select-all request after the **key** window's owned query field performed
+    /// it. Shared for the same reason as the focus receipt: a fresh coordinator in a second
+    /// window starts at zero and would otherwise replay a spent select-all, so the user's
+    /// next keystroke would replace the whole query.
+    func markEditorFindSelectAllApplied(_ requestID: UInt64) {
+        guard requestID == editorFindHost.ui.selectAllRequestID,
+              requestID > 0,
+              requestID > editorFindHost.ui.selectAllAppliedID
+        else {
+            return
+        }
+        var ui = editorFindHost.ui
+        ui.selectAllAppliedID = requestID
         setEditorFindUI(ui)
     }
 
@@ -313,15 +353,28 @@ extension AppState {
     /// Reads the editor view itself rather than the last *published* navigation: a published
     /// request can still be pending or rejected inside EditorKit, so trusting it would let
     /// ⌘E copy a range the editor never applied.
+    ///
+    /// The range is accepted only with matching **provenance**. A native selection is an
+    /// offset into whatever source the editor currently holds; during a document switch or a
+    /// same-URL Reload that is still the previous content, so stamping it with App's current
+    /// identity would let ⌘E index new text with an old range. Identity, installed state, and
+    /// the App-owned source revision must all agree before the range is usable.
     private func appliedEditorSelectionUTF16() -> NSRange? {
-        let range = EditorSelectionProbe.keyWindowEditorSelection()
-            ?? EditorSelectionProbe.keyWindowAppliedEditorSelection()
-        guard let range else { return nil }
+        guard let applied = EditorSelectionProbe.keyWindowAppliedEditorSelection(),
+              EditorFindAppliedSelectionPolicy.accepts(
+                  applied,
+                  identity: activeEditorDocumentIdentity,
+                  revision: currentDocument.version,
+                  textUTF16Length: (currentDocument.text as NSString).length
+              )
+        else {
+            return nil
+        }
         editorFindHost.latestKnownEditorSelection = EditorFindCachedSelection(
-            documentIdentity: activeEditorDocumentIdentity,
-            range: range
+            documentIdentity: applied.documentIdentity,
+            range: applied.range
         )
-        return range
+        return applied.range
     }
 
     private func currentEditorSelectionUTF16() -> NSRange {

@@ -5,8 +5,10 @@ import MarkdownCore
 @testable import Plainsong
 import XCTest
 
-/// PR #97 review fixes: shared focus receipt across the `WindowGroup`, find-bar chrome
-/// eligibility, workspace-search fencing, close-bar fencing, and applied-selection reads.
+/// PR #97 review fixes: workspace-search fencing, close-bar fencing, and the provenance
+/// rules for a selection the editor has actually applied.
+///
+/// Focus receipts and find-bar chrome eligibility live in `EditorFindFocusReceiptTests`.
 @MainActor
 final class EditorFindReviewFixTests: XCTestCase {
     private func makeAppState(text: String = "alpha beta alpha gamma") -> AppState {
@@ -42,197 +44,6 @@ final class EditorFindReviewFixTests: XCTestCase {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
-    }
-
-    // MARK: - Shared focus receipt (multi-window replay)
-
-    func testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest() {
-        let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
-        let requestID = appState.editorFindHost.ui.focusRequestID
-        XCTAssertGreaterThan(requestID, 0)
-
-        // Window A's key-window field consumed the token.
-        appState.markEditorFindFocusApplied(requestID)
-        XCTAssertEqual(appState.editorFindHost.ui.focusAppliedID, requestID)
-
-        // Window B (fresh coordinator, its own local receipt) re-reads shared state.
-        XCTAssertFalse(
-            EditorFindFocusArbitration.shouldApplyFocus(
-                requestID: requestID,
-                appliedID: appState.editorFindHost.ui.focusAppliedID,
-                supersededID: appState.editorFindHost.ui.focusSupersededID,
-                isKeyWindow: true
-            ),
-            "A spent request must not be applicable in another window"
-        )
-        XCTAssertFalse(
-            EditorFindFocusArbitration.shouldKeepRetrying(
-                requestID: requestID,
-                snapshot: appState.editorFindHost.ui.focusSnapshot
-            ),
-            "A remounted bar must not keep retrying a consumed request"
-        )
-    }
-
-    func testNewerFocusRequestIsApplicableAgainAfterAnEarlierOneWasConsumed() {
-        let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
-        let first = appState.editorFindHost.ui.focusRequestID
-        appState.markEditorFindFocusApplied(first)
-
-        appState.showOrRefocusEditorFind()
-        let second = appState.editorFindHost.ui.focusRequestID
-        XCTAssertGreaterThan(second, first)
-        XCTAssertTrue(
-            EditorFindFocusArbitration.shouldApplyFocus(
-                requestID: second,
-                appliedID: appState.editorFindHost.ui.focusAppliedID,
-                supersededID: appState.editorFindHost.ui.focusSupersededID,
-                isKeyWindow: true
-            )
-        )
-    }
-
-    func testBackgroundWindowAndSupersededRequestsNeverAdvanceTheReceipt() {
-        let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
-        let requestID = appState.editorFindHost.ui.focusRequestID
-
-        XCTAssertFalse(
-            EditorFindFocusArbitration.shouldApplyFocus(
-                requestID: requestID,
-                appliedID: 0,
-                supersededID: 0,
-                isKeyWindow: false
-            ),
-            "Only the key window may apply"
-        )
-
-        // ⇧⌘F / Escape abandons the request without advancing focusRequestID (F7).
-        appState.supersedePendingEditorFindFocus()
-        XCTAssertEqual(appState.editorFindHost.ui.focusRequestID, requestID)
-        appState.markEditorFindFocusApplied(requestID)
-        XCTAssertEqual(
-            appState.editorFindHost.ui.focusAppliedID,
-            0,
-            "A superseded request must not be recorded as applied"
-        )
-        XCTAssertFalse(
-            EditorFindFocusArbitration.shouldKeepRetrying(
-                requestID: requestID,
-                snapshot: appState.editorFindHost.ui.focusSnapshot
-            )
-        )
-    }
-
-    func testRetryContinuesWhileTheBarIsVisibleAndTheRequestIsUnresolved() {
-        let appState = makeAppState()
-        openFindBar(appState, query: "alpha")
-        let requestID = appState.editorFindHost.ui.focusRequestID
-        // The field may not be mounted in a key window yet on the first ⌘F: the loop must
-        // stay armed rather than give up after one async turn.
-        XCTAssertTrue(
-            EditorFindFocusArbitration.shouldKeepRetrying(
-                requestID: requestID,
-                snapshot: appState.editorFindHost.ui.focusSnapshot
-            )
-        )
-
-        appState.closeEditorFindBar()
-        XCTAssertFalse(
-            EditorFindFocusArbitration.shouldKeepRetrying(
-                requestID: requestID,
-                snapshot: appState.editorFindHost.ui.focusSnapshot
-            ),
-            "Closing the bar ends the retry"
-        )
-    }
-
-    // MARK: - Find bar chrome eligibility
-
-    func testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext() async throws {
-        let appState = makeAppState(text: "one two one two one")
-        openFindBar(appState, query: "one")
-        try await waitUntil("session ready") {
-            appState.editorFindHost.controller.session?.total == 3
-        }
-        XCTAssertEqual(appState.editorFindHost.controller.session?.currentOrdinal, 1)
-
-        // Full Keyboard Access moved focus to a bar control the responder check cannot name.
-        appState.editorFindHost.commandContextOverride = false
-        appState.editorFindNext()
-        XCTAssertEqual(
-            appState.editorFindHost.controller.session?.currentOrdinal,
-            1,
-            "Menu ⌘G still respects the context guard"
-        )
-
-        appState.stepEditorFindFromBarControl(.next)
-        XCTAssertEqual(
-            appState.editorFindHost.controller.session?.currentOrdinal,
-            2,
-            "The bar's own Next button must never no-op"
-        )
-        appState.stepEditorFindFromBarControl(.previous)
-        XCTAssertEqual(appState.editorFindHost.controller.session?.currentOrdinal, 1)
-    }
-
-    func testResponderEligibilityAcceptsFindBarChromeButNotUnrelatedFocus() throws {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
-            styleMask: [.titled],
-            backing: .buffered,
-            defer: false
-        )
-        let root = NSView(frame: window.contentLayoutRect)
-        window.contentView = root
-
-        // Find bar host: query field plus a sibling control (Aa / Next / Previous stand-in).
-        let barHost = NSView(frame: NSRect(x: 0, y: 360, width: 600, height: 40))
-        let queryField = NSTextField(string: "")
-        queryField.setAccessibilityIdentifier(EditorFindAccessibility.queryField)
-        queryField.frame = NSRect(x: 0, y: 0, width: 200, height: 24)
-        let barButton = NSButton(title: "Aa", target: nil, action: nil)
-        barButton.frame = NSRect(x: 210, y: 0, width: 40, height: 24)
-        barHost.addSubview(queryField)
-        barHost.addSubview(barButton)
-
-        // Editor pane, sibling of the bar host.
-        let editorHost = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 360))
-        let editor = NSTextView(frame: editorHost.bounds)
-        editor.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
-        editorHost.addSubview(editor)
-
-        // Unrelated chrome (sidebar), also a sibling.
-        let sidebarButton = NSButton(title: "Files", target: nil, action: nil)
-        sidebarButton.frame = NSRect(x: 500, y: 100, width: 80, height: 24)
-
-        root.addSubview(barHost)
-        root.addSubview(editorHost)
-        root.addSubview(sidebarButton)
-        window.makeKeyAndOrderFront(nil)
-
-        guard window.makeFirstResponder(barButton) else {
-            throw XCTSkip("makeFirstResponder(barButton) unavailable in this runner")
-        }
-        XCTAssertTrue(
-            EditorFindResponderSupport.windowHasEditorOrFindChrome(window),
-            "A control inside the find bar must keep ⌘F / ⌘G / ⌘E live"
-        )
-
-        guard window.makeFirstResponder(sidebarButton) else {
-            throw XCTSkip("makeFirstResponder(sidebarButton) unavailable in this runner")
-        }
-        XCTAssertFalse(
-            EditorFindResponderSupport.windowHasEditorOrFindChrome(window),
-            "Focus outside the bar and editor stays ineligible"
-        )
-
-        guard window.makeFirstResponder(queryField) else {
-            throw XCTSkip("makeFirstResponder(queryField) unavailable in this runner")
-        }
-        XCTAssertTrue(EditorFindResponderSupport.windowHasEditorOrFindChrome(window))
     }
 
     // MARK: - Workspace search fencing
@@ -328,23 +139,43 @@ final class EditorFindReviewFixTests: XCTestCase {
         }
     }
 
-    func testClosingTheBarKeepsTheQueryUsableForALaterStep() async throws {
-        let text = "keep me keep me"
+    func testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances() async throws {
+        let text = "a hit b hit c hit d"
         let appState = makeAppState(text: text)
-        openFindBar(appState, query: "keep")
+        let hits = TextSearchEngine.matches(
+            in: text,
+            query: TextSearchQuery(pattern: "hit"),
+            limit: EditorFindLimits.engineMatchLimit
+        ).map(\.range)
+        XCTAssertEqual(hits.count, 3)
+
+        openFindBar(appState, query: "hit")
         try await waitUntil("session ready") {
-            appState.editorFindHost.controller.session?.total == 2
+            appState.editorFindHost.controller.session?.total == 3
         }
+        // Walk to hit 2 the way a user would.
+        appState.editorFindNext()
+        XCTAssertEqual(appState.editorFindHost.controller.session?.currentOrdinal, 2)
+
         appState.closeEditorFindBar()
-        try await waitUntil("counter-only recompute lands after close") {
-            appState.editorFindHost.controller.session?.total == 2
-        }
+        XCTAssertFalse(appState.editorFindHost.ui.isBarVisible)
+        XCTAssertEqual(
+            appState.editorFindHost.controller.session?.currentOrdinal,
+            2,
+            "Closing the bar must not reset a resolved ordinal"
+        )
         XCTAssertNotNil(appState.editorFindHost.controller.query)
 
         appState.editorFindNext()
-        XCTAssertNotNil(
-            appState.editorFindHost.controller.pendingNavigationCommand,
-            "⌘G with the bar closed still steps the retained query"
+        guard case let .navigate(nav)? =
+            appState.editorFindHost.controller.pendingNavigationCommand
+        else {
+            return XCTFail("⌘G with the bar closed still steps the retained query")
+        }
+        XCTAssertEqual(
+            nav.selection,
+            hits[2],
+            "⌘G after Escape must advance to hit 3, not restart at hit 1"
         )
     }
 
@@ -364,6 +195,103 @@ final class EditorFindReviewFixTests: XCTestCase {
         XCTAssertNil(
             appState.editorFindHost.latestKnownEditorSelection,
             "Publishing is not applying: ⌘E must not adopt an unapplied range"
+        )
+    }
+
+    // MARK: - Applied-selection provenance
+
+    func testAppliedSelectionIsRejectedWithoutMatchingDocumentAndRevisionProvenance() {
+        let identity = EditorDocumentIdentity(rawValue: "file:///tmp/current.md")
+        let other = EditorDocumentIdentity(rawValue: "file:///tmp/other.md")
+        let range = NSRange(location: 2, length: 3)
+        let length = 20
+        let revision = 7
+
+        func applied(
+            identity: EditorDocumentIdentity?,
+            revision: Int?,
+            installed: Bool = true,
+            range: NSRange = range
+        ) -> EditorAppliedSelection {
+            EditorAppliedSelection(
+                documentIdentity: identity,
+                sourceRevision: revision,
+                isDocumentInstalled: installed,
+                range: range
+            )
+        }
+
+        XCTAssertTrue(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(identity: identity, revision: revision),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            )
+        )
+        // Document switch: the native view still holds the previous source.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(identity: other, revision: revision),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            ),
+            "A range from another document must never be indexed into the current text"
+        )
+        // Same-URL Reload: identity matches but the content behind it changed.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(identity: identity, revision: revision - 1),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            ),
+            "A range from a superseded revision must be rejected, not reinterpreted"
+        )
+        // Transition not finished installing.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(identity: identity, revision: revision, installed: false),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            )
+        )
+        // No provenance at all.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(identity: nil, revision: nil),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            )
+        )
+        // Out of bounds for the current text.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(
+                    identity: identity,
+                    revision: revision,
+                    range: NSRange(location: 18, length: 5)
+                ),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            )
+        )
+        // Malformed range cannot overflow the bounds arithmetic.
+        XCTAssertFalse(
+            EditorFindAppliedSelectionPolicy.accepts(
+                applied(
+                    identity: identity,
+                    revision: revision,
+                    range: NSRange(location: NSNotFound, length: 0)
+                ),
+                identity: identity,
+                revision: revision,
+                textUTF16Length: length
+            )
         )
     }
 }

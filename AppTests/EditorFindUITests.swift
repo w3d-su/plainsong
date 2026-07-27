@@ -220,31 +220,66 @@ final class EditorFindUITests: XCTestCase {
 
     // MARK: - F6 IME structural
 
-    func testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext() throws {
-        // Structural gate: Coordinator must not swallow Return/Escape while marked text exists.
-        // Hosted IME streams remain owner-run; this proves the reservation is present.
-        let sourceURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("App/Views/EditorFindQueryField.swift")
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-        XCTAssertTrue(
-            source.contains("hasMarkedText()"),
-            "Find field must consult marked-text state"
+    func testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext() {
+        // Behavioural gate: the Coordinator must not swallow Return/Escape while marked text
+        // exists, so the input context can commit or cancel the composition. Hosted IME
+        // streams remain owner-run (F6); this drives the real delegate callback.
+        //
+        // Previously this scraped `EditorFindQueryField.swift` for substrings, which proved
+        // nothing about behaviour and deadlocked the sandboxed test host in `open()` when the
+        // file's cached sandbox grant went stale.
+        var submitCount = 0
+        var escapeCount = 0
+        let coordinator = EditorFindQueryField.Coordinator(
+            text: .constant(""),
+            readFocusSnapshot: { EditorFindUIState().focusSnapshot },
+            markFocusApplied: { _ in },
+            markSelectAllApplied: { _ in },
+            onSubmit: { submitCount += 1 },
+            onEscape: { escapeCount += 1 }
         )
-        XCTAssertTrue(
-            source.contains("cancelOperation"),
-            "Find field must handle Escape"
+        let field = NSTextField(string: "")
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
+
+        // No composition: the field owns Return and Escape.
+        XCTAssertTrue(coordinator.control(
+            field,
+            textView: textView,
+            doCommandBy: #selector(NSResponder.insertNewline(_:))
+        ))
+        XCTAssertEqual(submitCount, 1)
+        XCTAssertTrue(coordinator.control(
+            field,
+            textView: textView,
+            doCommandBy: #selector(NSResponder.cancelOperation(_:))
+        ))
+        XCTAssertEqual(escapeCount, 1)
+
+        // Composing: both keys belong to the input context, and neither action fires.
+        textView.setMarkedText(
+            "ㄅ",
+            selectedRange: NSRange(location: 0, length: 1),
+            replacementRange: NSRange(location: 0, length: 0)
         )
-        // While marked: return false so the input context keeps the key.
-        XCTAssertTrue(
-            source.contains("return false"),
-            "Marked-text branch must leave keys with the input context"
+        XCTAssertTrue(textView.hasMarkedText(), "precondition: marked text is active")
+        XCTAssertFalse(
+            coordinator.control(
+                field,
+                textView: textView,
+                doCommandBy: #selector(NSResponder.insertNewline(_:))
+            ),
+            "Return must commit the composition, not submit the find query"
         )
-        XCTAssertTrue(
-            source.contains("isComposing"),
-            "updateNSView must skip Binding overwrite while composing"
+        XCTAssertFalse(
+            coordinator.control(
+                field,
+                textView: textView,
+                doCommandBy: #selector(NSResponder.cancelOperation(_:))
+            ),
+            "Escape must cancel the composition, not close the find bar"
         )
+        XCTAssertEqual(submitCount, 1)
+        XCTAssertEqual(escapeCount, 1)
     }
 
     // MARK: - F7 focus arbitration

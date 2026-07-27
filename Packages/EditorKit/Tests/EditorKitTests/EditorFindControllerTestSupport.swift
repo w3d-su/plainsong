@@ -36,6 +36,9 @@ enum EditorFindControllerTestSupport {
         textView.isSelectable = true
         textView.showsLineNumbers = false
         textView.font = MarkdownSyntaxHighlighter.defaultFont
+        // `MarkdownTextView.makeNSView` stamps this in production; the fixture builds the
+        // scroll view directly, and the selection probes locate the editor by this identifier.
+        textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
         textView.text = source
         textView.textSelection = NSRange(location: 0, length: 0)
 

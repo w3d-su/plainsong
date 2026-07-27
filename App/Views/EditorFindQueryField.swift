@@ -15,6 +15,8 @@ struct EditorFindQueryField: NSViewRepresentable {
     var readFocusSnapshot: () -> EditorFindUIState.FocusSnapshot
     /// Advances the shared applied receipt. Only called after key-window first-responder proof.
     var markFocusApplied: (UInt64) -> Void
+    /// Advances the shared select-all receipt. Only called after this field performed it.
+    var markSelectAllApplied: (UInt64) -> Void
     var onSubmit: () -> Void
     var onEscape: () -> Void
 
@@ -23,6 +25,7 @@ struct EditorFindQueryField: NSViewRepresentable {
             text: $text,
             readFocusSnapshot: readFocusSnapshot,
             markFocusApplied: markFocusApplied,
+            markSelectAllApplied: markSelectAllApplied,
             onSubmit: onSubmit,
             onEscape: onEscape
         )
@@ -54,6 +57,7 @@ struct EditorFindQueryField: NSViewRepresentable {
         coordinator.onEscape = onEscape
         coordinator.readFocusSnapshot = readFocusSnapshot
         coordinator.markFocusApplied = markFocusApplied
+        coordinator.markSelectAllApplied = markSelectAllApplied
 
         // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
         let isComposing: Bool = {
@@ -94,6 +98,7 @@ struct EditorFindQueryField: NSViewRepresentable {
         var text: Binding<String>
         var readFocusSnapshot: () -> EditorFindUIState.FocusSnapshot
         var markFocusApplied: (UInt64) -> Void
+        var markSelectAllApplied: (UInt64) -> Void
         var onSubmit: () -> Void
         var onEscape: () -> Void
         weak var field: NSTextField?
@@ -101,20 +106,19 @@ struct EditorFindQueryField: NSViewRepresentable {
 
         private var focusTask: Task<Void, Never>?
         private var focusTaskRequestID: UInt64?
-        /// Select-all is per-field chrome, so it stays coordinator-local even though the
-        /// focus receipt is App-owned.
-        private var lastAppliedSelectAllRequestID: UInt64 = 0
 
         init(
             text: Binding<String>,
             readFocusSnapshot: @escaping () -> EditorFindUIState.FocusSnapshot,
             markFocusApplied: @escaping (UInt64) -> Void,
+            markSelectAllApplied: @escaping (UInt64) -> Void,
             onSubmit: @escaping () -> Void,
             onEscape: @escaping () -> Void
         ) {
             self.text = text
             self.readFocusSnapshot = readFocusSnapshot
             self.markFocusApplied = markFocusApplied
+            self.markSelectAllApplied = markSelectAllApplied
             self.onSubmit = onSubmit
             self.onEscape = onEscape
         }
@@ -192,7 +196,7 @@ struct EditorFindQueryField: NSViewRepresentable {
                 return false
             }
             markFocusApplied(requestID)
-            applySelectAll(requestID: settled.selectAllRequestID, field: field)
+            applySelectAll(snapshot: settled, field: field)
             return true
         }
 
@@ -200,7 +204,6 @@ struct EditorFindQueryField: NSViewRepresentable {
         func applySelectAllIfAlreadyFocused(snapshot: EditorFindUIState.FocusSnapshot) {
             guard snapshot.isBarVisible,
                   snapshot.requestID == snapshot.appliedID,
-                  snapshot.selectAllRequestID != lastAppliedSelectAllRequestID,
                   let field,
                   let window = field.window,
                   window.isKeyWindow,
@@ -208,12 +211,20 @@ struct EditorFindQueryField: NSViewRepresentable {
             else {
                 return
             }
-            applySelectAll(requestID: snapshot.selectAllRequestID, field: field)
+            applySelectAll(snapshot: snapshot, field: field)
         }
 
-        private func applySelectAll(requestID: UInt64, field: NSTextField) {
-            guard requestID != lastAppliedSelectAllRequestID else { return }
-            lastAppliedSelectAllRequestID = requestID
+        /// Select-all is gated on the **App-owned** receipt, not a coordinator-local one:
+        /// a second window's coordinator starts at zero, so a local receipt would replay a
+        /// spent select-all on its first binding update and the next keystroke would replace
+        /// the whole query.
+        private func applySelectAll(
+            snapshot: EditorFindUIState.FocusSnapshot,
+            field: NSTextField
+        ) {
+            let requestID = snapshot.selectAllRequestID
+            guard requestID > 0, requestID > snapshot.selectAllAppliedID else { return }
+            markSelectAllApplied(requestID)
             field.currentEditor()?.selectAll(nil)
         }
 

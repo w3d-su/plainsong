@@ -24,6 +24,12 @@ struct EditorFindUIState: Equatable {
     var focusAppliedID: UInt64 = 0
     /// Bumped whenever the field should select-all (⌘F show/re-focus).
     var selectAllRequestID: UInt64 = 0
+    /// Last select-all request actually performed by a **key** window's owned query field.
+    ///
+    /// App-owned for the same reason as `focusAppliedID`: a coordinator-local receipt starts
+    /// at zero in every new window, so a second window's first binding update would replay a
+    /// spent select-all and the next keystroke would replace the whole query.
+    var selectAllAppliedID: UInt64 = 0
     /// Highest request ID that was abandoned without becoming first responder
     /// (e.g. ⇧⌘F took focus, Escape closed the bar). Pending async closures for
     /// `requestID <= focusSupersededID` must no-op. Independent of workspace-search tokens.
@@ -57,6 +63,7 @@ struct EditorFindUIState: Equatable {
         var appliedID: UInt64
         var supersededID: UInt64
         var selectAllRequestID: UInt64
+        var selectAllAppliedID: UInt64
         var isBarVisible: Bool
     }
 
@@ -66,6 +73,7 @@ struct EditorFindUIState: Equatable {
             appliedID: focusAppliedID,
             supersededID: focusSupersededID,
             selectAllRequestID: selectAllRequestID,
+            selectAllAppliedID: selectAllAppliedID,
             isBarVisible: isBarVisible
         )
     }
@@ -114,6 +122,22 @@ struct EditorFindUIState: Equatable {
             wholeWord: wholeWord
         )
     }
+}
+
+/// Which find-bar control currently holds SwiftUI keyboard focus.
+///
+/// The bar's toggles and buttons are plain SwiftUI, so under Full Keyboard Access there is no
+/// dedicated AppKit view to detect: macOS SwiftUI flattens the bar and the editor into one
+/// hosting view, which is why an AppKit ancestor walk cannot tell "focus is on Aa" from
+/// "focus is in the sidebar". Observing SwiftUI's own focus is the only reliable signal.
+/// This is **observation only** — focus for the query field is still driven through the owned
+/// AppKit `NSTextField`, per the WS3C precedent against `FocusState`-driven focus.
+enum EditorFindChromeFocus: Hashable {
+    case matchCase
+    case wholeWord
+    case previous
+    case next
+    case done
 }
 
 /// Pure focus arbitration for the owned find query field.

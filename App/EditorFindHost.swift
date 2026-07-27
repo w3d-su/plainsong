@@ -23,6 +23,9 @@ final class EditorFindHost {
     var latestKnownEditorSelection: EditorFindCachedSelection?
     /// Ensures `onSessionDidChange` is wired once to AppState.
     var didInstallSessionObserver = false
+    /// Which find-bar control holds SwiftUI focus, or `nil` when focus is elsewhere.
+    /// Cleared whenever the bar closes or the document/workspace changes.
+    var chromeFocus: EditorFindChromeFocus?
     /// Test seam: when non-`nil`, replaces key-window first-responder eligibility checks.
     var commandContextOverride: Bool?
 }

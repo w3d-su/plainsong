@@ -11,8 +11,18 @@
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
 > PR B so #96 compiles standalone, and PR C added production-path lifecycle coverage plus a
 > shared focus receipt, find-bar chrome eligibility, and workspace-search / close-bar
-> fencing. **No gate box was checked by that work**: hosted first-responder and UI-visibility
-> evidence is still what F4b UI, F5 source+preview, F6, and F7 are waiting on.
+> fencing. A second review round then replaced the AppKit find-bar ancestor walk with
+> SwiftUI-reported chrome focus (macOS flattens the bar and the editor into one hosting view,
+> so that walk could not fire in production), removed Escape as a Done key equivalent so it
+> can no longer bypass the query field's IME reservation, made close preserve the resolved
+> ordinal, shared the select-all receipt, and gave the applied-selection probe
+> document/revision provenance. **No gate box was checked by either round**: hosted
+> first-responder and UI-visibility evidence is still what F4b UI, F5 source+preview, F6, and
+> F7 are waiting on.
+>
+> Known un-automated: **F6** — removing the Done key equivalent is verifiable by inspection
+> but not by an in-process test, because reproducing the bypass needs a real IME. It stays
+> covered by the owner IME smoke item that already blocks F6.
 
 Created 2026-07-27 as Phase 3 Goal 14 after WS3C/WS4A landed workspace search (⇧⌘F).
 See `agent.md` §6.4 (shortcuts), §12 (performance), §17 (layering / collaboration),
@@ -487,7 +497,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   in-flight find generation before the search navigation takes an ID
   (`EditorFindReviewFixTests.testWorkspaceSearchHandOffStopsAnInFlightFindFromNavigatingAfterwards`),
   and Escape / Done fences a query still inside the debounce window
-  (`...testClosingTheBarFencesAQueryStillInsideTheDebounceWindow`).
+  (`...testClosingTheBarFencesAQueryStillInsideTheDebounceWindow`) **without** resetting a
+  resolved ordinal (`...testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances`,
+  `EditorFindControllerSuspendTests`).
 - Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
   fencing covered in-process; hosted UI-visibility half still open
 
@@ -516,9 +528,19 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - [ ] Escape and Return during marked text belong to the input context (same discipline
   as `MarkdownSTTextView`'s reservation of space / Return / keypad Enter while marked
   text exists). Source-string scans are **not** behavioral evidence.
-  Partial structural code: `EditorFindQueryField` marked-text branches + Binding overwrite
-  skip while composing.
-- Evidence: _open — needs field-editor + marked-text behavioral test or owner physical IME_
+  Partial behavioural evidence (2026-07-27, second review):
+  `EditorFindUITests.testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext`
+  now drives the real `control(_:textView:doCommandBy:)` callback against an `NSTextView`
+  with live marked text and asserts neither submit nor close fires. It replaced a
+  source-substring scan, which proved nothing and additionally deadlocked the sandboxed
+  test host in `open()` once the file's cached sandbox grant went stale.
+- [ ] Escape must not reach the bar through any path that outranks the field editor. The
+  Done button therefore declares **no** `.keyboardShortcut(.cancelAction)`: a key
+  equivalent is resolved before the field editor sees the event, so Escape closed the bar
+  mid-composition instead of cancelling it. **Not automated** — reproducing the bypass
+  needs a real IME, so this rides the owner IME smoke below.
+- Evidence: _open — delegate-level reservation covered; owner physical IME still required
+  for commit-into-document and the Escape-during-composition path_
 
 ### F7 — Focus arbitration with ⇧⌘F
 
@@ -537,8 +559,21 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: `EditorFindReviewFixTests.testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest`,
   `...testBackgroundWindowAndSupersededRequestsNeverAdvanceTheReceipt`,
   `...testRetryContinuesWhileTheBarIsVisibleAndTheRequestIsUnresolved`.
+  The **select-all** receipt is App-owned for the same reason
+  (`...testSelectAllReceiptIsSharedSoASecondWindowCannotReplayIt`): a coordinator-local one
+  starts at zero in a new window, so a spent select-all would replay and the next keystroke
+  would replace the whole query.
   Still open: hosted dual-window first-responder proof (the WS3C `WindowKeyStateTracker`
   equivalent), which is what actually closes this gate.
+- [ ] Find commands stay eligible while Full Keyboard Access focuses a bar control (Aa,
+  whole-word, Next, Previous, Done). The bar's own controls act unconditionally; menu
+  eligibility comes from SwiftUI-reported `EditorFindChromeFocus` gated on
+  `keyWindowHostsFindBar()`. Partial: `EditorFindReviewFixTests`
+  `testFindBarChromeFocusKeepsMenuCommandsEligibleOnlyForTheHostingKeyWindow`,
+  `...testClosingTheBarClearsReportedChromeFocus`,
+  `...testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext`.
+  Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
+  SwiftUI focus transition.
 - [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.

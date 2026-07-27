@@ -3,8 +3,16 @@ import MarkdownCore
 import SwiftUI
 
 /// Find bar chrome in the editor pane (fixed HStack shell; not NavigationSplitView).
+///
+/// The toggles and buttons are plain SwiftUI, so AppKit cannot tell which of them holds
+/// keyboard focus — macOS flattens the bar and the editor into one hosting view. Their focus
+/// is therefore reported to `AppState` through SwiftUI's own `FocusState`, purely as an
+/// **observation** that keeps ⌘F / ⌘G / ⇧⌘G / ⌘E eligible while Full Keyboard Access is on
+/// one of them. Focus for the query field is still *driven* by the owned AppKit
+/// `NSTextField`, per the WS3C precedent against `FocusState`-driven focus.
 struct EditorFindBar: View {
     @EnvironmentObject private var appState: AppState
+    @FocusState private var chromeFocus: EditorFindChromeFocus?
 
     var body: some View {
         let ui = appState.editorFindHost.ui
@@ -23,6 +31,7 @@ struct EditorFindBar: View {
                 isEnabled: true,
                 readFocusSnapshot: { appState.editorFindHost.ui.focusSnapshot },
                 markFocusApplied: { appState.markEditorFindFocusApplied($0) },
+                markSelectAllApplied: { appState.markEditorFindSelectAllApplied($0) },
                 onSubmit: {
                     // Bar chrome acts directly: the responder-context guard exists to keep
                     // *menu* commands from firing when focus is elsewhere in the window.
@@ -43,6 +52,7 @@ struct EditorFindBar: View {
                     .font(.caption.weight(.semibold))
             }
             .toggleStyle(.button)
+            .focused($chromeFocus, equals: .matchCase)
             .accessibilityIdentifier(EditorFindAccessibility.matchCase)
             .accessibilityLabel("Match case")
 
@@ -53,6 +63,7 @@ struct EditorFindBar: View {
                 Image(systemName: "text.word.spacing")
             }
             .toggleStyle(.button)
+            .focused($chromeFocus, equals: .wholeWord)
             .accessibilityIdentifier(EditorFindAccessibility.wholeWord)
             .accessibilityLabel("Whole word")
 
@@ -82,6 +93,7 @@ struct EditorFindBar: View {
                 Image(systemName: "chevron.up")
             }
             .buttonStyle(.borderless)
+            .focused($chromeFocus, equals: .previous)
             .accessibilityIdentifier(EditorFindAccessibility.previousButton)
             .accessibilityLabel("Find previous")
             .disabled(!ui.hasActiveQuery)
@@ -92,14 +104,20 @@ struct EditorFindBar: View {
                 Image(systemName: "chevron.down")
             }
             .buttonStyle(.borderless)
+            .focused($chromeFocus, equals: .next)
             .accessibilityIdentifier(EditorFindAccessibility.nextButton)
             .accessibilityLabel("Find next")
             .disabled(!ui.hasActiveQuery)
 
+            // Deliberately no `.keyboardShortcut(.cancelAction)`. A key equivalent is resolved
+            // before the field editor sees the event, so Escape would bypass the query field's
+            // marked-text reservation and close the bar mid-IME composition instead of
+            // cancelling that composition. Escape closes through the query field's
+            // `doCommandBy`, which is also what `NSTextFinder`'s own bar does.
             Button("Done") {
                 appState.closeEditorFindBar()
             }
-            .keyboardShortcut(.cancelAction)
+            .focused($chromeFocus, equals: .done)
             .accessibilityIdentifier(EditorFindAccessibility.doneButton)
         }
         .padding(.horizontal, 12)
@@ -107,5 +125,11 @@ struct EditorFindBar: View {
         .background(.bar)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(EditorFindAccessibility.bar)
+        .onChange(of: chromeFocus) { _, focus in
+            appState.setEditorFindChromeFocus(focus)
+        }
+        .onDisappear {
+            appState.setEditorFindChromeFocus(nil)
+        }
     }
 }
