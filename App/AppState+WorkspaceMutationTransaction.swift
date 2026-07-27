@@ -356,6 +356,9 @@ extension AppState {
             RetainedEditorImageAssetDocumentAuthority.init
         )
         session.relocate(to: record.newURL)
+        if session === currentDocument {
+            notifyEditorFindDocumentIdentityDidRekey()
+        }
         relocateWorkspaceMutationTextRecovery(for: session, to: record.newURL)
         restoreWorkspaceRelocationResolution(record)
     }

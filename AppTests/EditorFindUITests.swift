@@ -76,15 +76,20 @@ final class EditorFindUITests: XCTestCase {
             appState.editorFindHost.controller.session?.total == 1
         }
 
-        // Rebind re-runs for the counter only — no new navigation emission.
+        // Rebind re-runs for the counter only — no auto-jump.
         XCTAssertNil(
             appState.editorFindHost.controller.pendingNavigationCommand,
             "F4b rebind must not auto-jump; user moves with ⌘G"
         )
-        XCTAssertNil(
-            appState.editorNavigationCommand,
-            "App must not apply a new find navigation after rebind"
-        )
+        // Shared channel may carry a superseding cancel (so an older navigate cannot apply),
+        // but must never publish a fresh navigate for the rebind.
+        if let command = appState.editorNavigationCommand {
+            if case .navigate = command {
+                XCTFail("App must not apply a new find navigation after rebind; got \(command)")
+            } else if case .cancel = command {
+                // Expected: cancelPublishedFindNavigationOnSharedChannel on document switch.
+            }
+        }
     }
 
     func testFindBarClosesWhenNoDocumentRemains() {
@@ -303,8 +308,27 @@ final class EditorFindUITests: XCTestCase {
         XCTAssertEqual(
             appState.editorFindHost.ui.focusRequestID,
             findAfter,
-            "⇧⌘F must not consume find focus receipts"
+            "⇧⌘F must not advance find focusRequestID (token independence)"
         )
+        XCTAssertEqual(
+            appState.editorFindHost.ui.focusSupersededID,
+            findAfter,
+            "⇧⌘F must supersede pending Find focus so older async closures cannot steal"
+        )
+    }
+
+    func testSupersededFindFocusIsNotEligibleForApply() {
+        var ui = EditorFindUIState()
+        ui.isBarVisible = true
+        ui.requestFocusAndSelectAll()
+        XCTAssertEqual(ui.focusRequestID, 1)
+        XCTAssertEqual(ui.focusSupersededID, 0)
+        ui.supersedePendingFocus()
+        XCTAssertEqual(ui.focusSupersededID, 1)
+        // A later ⌘F is still eligible (new request above superseded).
+        ui.requestFocusAndSelectAll()
+        XCTAssertEqual(ui.focusRequestID, 2)
+        XCTAssertGreaterThan(ui.focusRequestID, ui.focusSupersededID)
     }
 
     // MARK: - ⌘E Use Selection (macOS convention: no show/focus)

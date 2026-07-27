@@ -54,31 +54,31 @@ struct PlainsongCommands: Commands {
 
         // In-document find (PR C). Claimed in the system Edit menu — not a separate
         // CommandMenu("Edit") — so key-equivalent dispatch is not swallowed by a
-        // duplicated title (same rule as View / ⇧⌘P). Delivery is AppState-owned
-        // (find bar chrome); F0 proved the ordinary menu-item path under ABC+Zhuyin.
-        // No Carbon hot key (Decision Log 2026-07-22 / F0).
+        // duplicated title (same rule as View / ⇧⌘P). Delivery is **responder-chain**
+        // (`sendAction` → focused editor), matching Format and the F0 proof path.
+        // Find-field focus falls back via `EditorFindCommandDelivery`. No Carbon.
         CommandGroup(after: .pasteboard) {
             Divider()
             Button("Find…") {
-                appState.showOrRefocusEditorFind()
+                EditorFindCommandDelivery.performShowFind()
             }
             .keyboardShortcut("f", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
 
             Button("Find Next") {
-                appState.editorFindNext()
+                EditorFindCommandDelivery.performFindNext()
             }
             .keyboardShortcut("g", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
 
             Button("Find Previous") {
-                appState.editorFindPrevious()
+                EditorFindCommandDelivery.performFindPrevious()
             }
             .keyboardShortcut("g", modifiers: [.command, .shift])
             .disabled(!snapshot.hasOpenDocument)
 
             Button("Use Selection for Find") {
-                appState.useSelectionForEditorFind()
+                EditorFindCommandDelivery.performUseSelectionForFind()
             }
             .keyboardShortcut("e", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)

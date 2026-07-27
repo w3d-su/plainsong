@@ -32,6 +32,8 @@ struct PlainsongApp: App {
         _menuBarState = StateObject(wrappedValue: MenuBarState(appState: state))
         // Publish state before the app-active Carbon ⇧⌘F handler can receive an event.
         PlainsongAppServices.appState = state
+        // Find menu actions → STTextView responder chain (gate §6.3 / F0 path).
+        EditorFindCommandDelivery.installHooks()
     }
 
     var body: some Scene {

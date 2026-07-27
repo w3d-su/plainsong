@@ -21,6 +21,8 @@ struct EditorFindBar: View {
                 ),
                 focusRequestID: ui.focusRequestID,
                 selectAllRequestID: ui.selectAllRequestID,
+                focusSupersededID: ui.focusSupersededID,
+                isBarVisible: ui.isBarVisible,
                 isEnabled: true,
                 onSubmit: {
                     appState.editorFindNext()

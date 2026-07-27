@@ -297,6 +297,9 @@ private extension AppState {
         )
         _ = advanceSessionLifecycle(for: completed.session)
         completed.session.markSaved(text: completed.text, url: destination)
+        if completed.session === currentDocument {
+            notifyEditorFindDocumentIdentityDidRekey()
+        }
         _ = clearWorkspaceMutationTextRecovery(for: completed.session)
         sessionCache[destination] = completed.session
         adoptAnchoredFileBinding(
@@ -593,6 +596,9 @@ private extension AppState {
             fallbackURL: oldURL,
             removesEditorBindingRegistration: false
         )
+        if session === currentDocument {
+            notifyEditorFindDocumentIdentityDidRekey()
+        }
         rehomeRetirement(
             retirement,
             session: session,

@@ -1,11 +1,11 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR C on `phase3-editor-find-bar-ui` (stacked on PR B `phase3-editor-find-model-controller`,
-> restacked on `main`).** §2 is resolved **(b)**; F0 closed with owner physical ABC+Zhuyin
-> evidence on PR B; F1–F5 structural + F4b UI + F5 source+preview + F6 structural + F7 closed
-> across PR B/C. Shared navigation ID domain is wired via App `navigationIDProvider`. F2
-> latency, F8, F9 XCUITest remain open for PR D. Precedent: PR #45, link-folding,
-> image-thumbnail gate docs.
+> **Status: PR C on `phase3-editor-find-bar-ui` (stacked on PR B).** §2 is resolved **(b)**;
+> F0 closed with owner physical ABC+Zhuyin on PR B. F1–F4 controller half + F5 WYSIWYG/source
+> identity closed on PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
+> production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
+> navigation ID domain is wired via App `navigationIDProvider`. F2 latency, F8, F9 XCUITest
+> remain open for PR D. Precedent: PR #45, link-folding, image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 
 Created 2026-07-27 as Phase 3 Goal 14 after WS3C/WS4A landed workspace search (⇧⌘F).
@@ -297,7 +297,7 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 |---|---|---|
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
 | **B** (this PR, #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
-| **C** | App find bar UI + menu items + focus arbitration with ⇧⌘F. Installs `navigationIDProvider` onto the shared App navigation generation. F6 IME; F7 focus (including `⌘F` re-focus). F4b UI visibility. **F5 source+preview** scroll-proxy coverage with a live preview. No built-in-finder disabling (§2 (b)). Decides open `⌘E` question. | F4b, F5 source+preview, F6, F7; shared navigation ID domain in production |
+| **C** | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
 | **D** | XCUITest (F9, including truncated counter state and `⌘F` re-focus), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
@@ -455,16 +455,17 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - [x] PR B named tests cover the **controller half**: file-switch rebind+rerun **without
   navigation emission**, edit recompute without navigation, and clear on no-document —
   without claiming UI bar visibility.
-  Evidence: `EditorFindControllerTests.testRebindRerunsQueryWithoutEmittingNavigation`,
+  Evidence: `EditorFindControllerLifecycleTests.testRebindRerunsQueryWithoutEmittingNavigation`,
   `...testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`,
   `...testClearForNoDocumentCancelsAndClearsSession`
-- [x] PR C named/hosted tests cover the **UI-visibility half**: bar stays open and
-  rebinds on file switch; bar closes when no document remains (and on workspace
-  close/switch).
-  Evidence: `EditorFindUITests.testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump`,
+- [ ] PR C **production-path** tests cover the **UI-visibility half** with real
+  Reload / Keep Mine / rename / Save Copy rekey / missing-file close, and cancel on the
+  shared navigation channel — App-state unit smoke for bar open/close alone is **not**
+  sufficient (see review: External Reload and identity rekey paths must invalidate Find).
+  Partial unit evidence: `EditorFindUITests.testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump`,
   `...testFindBarClosesWhenNoDocumentRemains`,
   `...testFindBarClosesOnWorkspaceClose`
-- Evidence: **closed in PR C** (UI visibility) + PR B (controller half)
+- Evidence: **partial** — PR B controller half closed; PR C UI unit smoke only (reopened)
 
 ### F5 — Reveal without source mutation (WYSIWYG; source+preview in PR C)
 
@@ -477,46 +478,38 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: same test + `testSourceOnlyFindNavigationSelectsWithoutSourceMutation`
 - [x] Covered with Experimental WYSIWYG both **off** and **on**.
   Evidence: `testSourceOnly...` (off) and `testExperimentalWYSIWYG...` (on)
-- [x] Covered in **source+preview** layout mode: find navigation moves the editor
-  selection through the shared `EditorNavigationCommand` channel used by scroll-proxy
-  sync (Decision Log 2026-06-25). Source-only remains green as the non-preview control.
-  Evidence: `EditorFindUITests.testSourcePlusPreviewLayoutEmitsFindNavigationOnSharedChannel`,
-  `...testSourceOnlyControlStillNavigatesWithoutPreview`; EditorKit
-  `testQueryMatchUsesSameNavigationChannelAsWorkspaceSearch` (shared path).
-- Evidence: **closed in PR C** (source+preview App path) + PR B (WYSIWYG off/on + source
-  identity)
+- [ ] Covered in **source+preview** layout mode with a **live** preview: find navigation
+  must move editor selection **and** keep preview scroll sync green via the existing
+  scroll proxy (Decision Log 2026-06-25). App-state-only checks that set
+  `layoutMode` and assert `EditorNavigationCommand` are **not** sufficient.
+  Evidence: _open — needs hosted WorkspaceWindow + PreviewController + scroll coordinator_
+- Evidence: **partial in PR B** — WYSIWYG off/on + source identity closed; source+preview
+  live path open
 
 ### F6 — IME in the find field
 
-- [x] Composing in the find field must not commit into the document.
-  Evidence: find field is a separate AppKit `NSTextField` (`EditorFindQueryField`); it
-  never writes into `DocumentSession` / editor storage. Query text only updates
-  `EditorFindUIState` via the Binding.
-- [x] Escape and Return during marked text belong to the input context (same discipline
+- [ ] Composing in the find field must not commit into the document.
+- [ ] Escape and Return during marked text belong to the input context (same discipline
   as `MarkdownSTTextView`'s reservation of space / Return / keypad Enter while marked
-  text exists).
-  Evidence: `EditorFindUITests.testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext`
-  (structural: `hasMarkedText()` → `return false` for Return/Escape).
-- Evidence: **closed in PR C** (structural + isolation). Owner physical IME smoke remains
-  welcome but is not required to keep the box open after the reservation is proven.
+  text exists). Source-string scans are **not** behavioral evidence.
+  Partial structural code: `EditorFindQueryField` marked-text branches + Binding overwrite
+  skip while composing.
+- Evidence: _open — needs field-editor + marked-text behavioral test or owner physical IME_
 
 ### F7 — Focus arbitration with ⇧⌘F
 
-- [x] Sequence `⌘F` → `⇧⌘F` leaves independent focus receipts (find field tokens vs
-  workspace-search tokens); Escape from find returns focus to the editor via
-  `closeEditorFindBar` → `requestEditorFocus`.
-  Evidence: `EditorFindUITests.testFindFocusTokensIndependentOfWorkspaceSearchTokens`,
-  `...testCommandFAndWorkspaceSearchFocusReceiptsDoNotCrossConsume`
-- [x] Neither feature's focus receipt is consumed by the other.
-  Evidence: same tests
-- [x] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
-  Evidence: `EditorFindUIState.focusRequestID` / `selectAllRequestID` vs
-  `WorkspaceSearchUIState.focusRequestID`
-- [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
-  selects all existing query text, and **never closes** the bar (owner re-focus policy;
-  §5.1).
-  Evidence: `EditorFindUITests.testCommandFWhileBarOpenRefocusesAndNeverCloses`
-- Evidence: **closed in PR C**
+- [ ] Sequence `⌘F` → `⇧⌘F` leaves focus somewhere sane every time (find field,
+  workspace-search field, or editor — never a dead control); older Find focus closures
+  must not steal after a newer intent (key-window only, request-token ordered).
+- [ ] Neither feature's focus receipt is consumed by the other (token independence is
+  necessary but not sufficient — first-responder proof required).
+- [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
+  Partial: `EditorFindUITests` token integer tests.
+- [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
+  selects all existing query text, and **never closes** the bar — proven on a real
+  first responder, not only focusRequestID counters.
+- Evidence: _open — production focus path fixed for key-window/token ordering; hosted
+  first-responder matrix still required_
 
 ### F8 — Highlight-all survives highlight re-application
 

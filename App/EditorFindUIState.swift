@@ -17,6 +17,10 @@ struct EditorFindUIState: Equatable {
     var focusRequestID: UInt64 = 0
     /// Bumped whenever the field should select-all (⌘F show/re-focus).
     var selectAllRequestID: UInt64 = 0
+    /// Highest request ID that was abandoned without becoming first responder
+    /// (e.g. ⇧⌘F took focus, Escape closed the bar). Pending async closures for
+    /// `requestID <= focusSupersededID` must no-op. Independent of workspace-search tokens.
+    var focusSupersededID: UInt64 = 0
     /// Presentation of session counter (updated from controller).
     var matchCounterText = ""
     var isTruncated = false
@@ -29,6 +33,14 @@ struct EditorFindUIState: Equatable {
 
     mutating func requestFocusOnly() {
         focusRequestID &+= 1
+    }
+
+    /// Abandon any unapplied focus request without advancing `focusRequestID`
+    /// (so workspace-search / other owners keep token independence).
+    mutating func supersedePendingFocus() {
+        if focusRequestID > focusSupersededID {
+            focusSupersededID = focusRequestID
+        }
     }
 
     mutating func applySessionPresentation(_ session: EditorFindSession?) {
@@ -65,6 +77,7 @@ struct EditorFindUIState: Equatable {
 
     mutating func closeBar() {
         isBarVisible = false
+        supersedePendingFocus()
     }
 
     func makeSearchQuery() -> TextSearchQuery {
