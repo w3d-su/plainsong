@@ -133,13 +133,18 @@ public final class EditorFindController {
     /// current ordinal instead of stepping past it.
     private var shouldActivateCurrentOnNextStep = false
     /// Next/previous pressed while `session == nil` (debounce / in-flight). Applied once
-    /// when the generation completes — does **not** re-push the query (avoids restarting
-    /// debounce and losing reverse intent).
+    /// when *that same* generation completes — does **not** re-push the query (avoids
+    /// restarting debounce and losing reverse intent).
+    ///
+    /// Bound to `queryGeneration` so a later query/edit/rebind can never consume a step
+    /// recorded against superseded results, and carries a net signed count so repeated
+    /// presses during one debounce are not compressed into a single step.
     private var pendingStepIntent: PendingStepIntent?
 
-    private enum PendingStepIntent: Equatable {
-        case next
-        case previous
+    private struct PendingStepIntent: Equatable {
+        let generation: UInt64
+        /// Net signed steps: positive = next, negative = previous.
+        var netSteps: Int
     }
 
     public init(documentBinding: EditorFindDocumentBinding = .empty) {
@@ -206,9 +211,7 @@ public final class EditorFindController {
         // While a match is in flight, record intent — do not re-schedule the query
         // (that would restart debounce and drop reverse/forward intent).
         guard var session else {
-            if query != nil {
-                pendingStepIntent = .next
-            }
+            recordPendingStep(1)
             return
         }
         if shouldActivateCurrentOnNextStep {
@@ -226,9 +229,7 @@ public final class EditorFindController {
 
     public func findPrevious() {
         guard var session else {
-            if query != nil {
-                pendingStepIntent = .previous
-            }
+            recordPendingStep(-1)
             return
         }
         if shouldActivateCurrentOnNextStep {
@@ -269,6 +270,23 @@ public final class EditorFindController {
 
     // MARK: - Private
 
+    /// Accumulates a step pressed while the current generation is still computing.
+    ///
+    /// Bound to the in-flight `queryGeneration`; a step recorded here is discarded if a
+    /// newer query/edit/rebind supersedes that generation. The net count is clamped so a
+    /// pathological press rate cannot overflow — any magnitude past one full cycle wraps
+    /// to the same ordinal anyway.
+    private func recordPendingStep(_ delta: Int) {
+        guard query != nil else { return }
+        let ceiling = EditorFindLimits.retainedMatchCeiling
+        if var intent = pendingStepIntent, intent.generation == queryGeneration {
+            intent.netSteps = min(ceiling, max(-ceiling, intent.netSteps &+ delta))
+            pendingStepIntent = intent
+        } else {
+            pendingStepIntent = PendingStepIntent(generation: queryGeneration, netSteps: delta)
+        }
+    }
+
     private func clearSessionKeepingQuery() {
         session = nil
         pendingNavigationCommand = nil
@@ -289,11 +307,13 @@ public final class EditorFindController {
         let shouldNavigate = reason.emitsNavigationOnCompletion
 
         // Drop the previous session immediately so next/previous/activate during debounce
-        // cannot navigate ranges from a superseded query or document revision.
-        // Preserve `pendingStepIntent` so ⌘G / ⇧⌘G pressed mid-debounce still apply once.
+        // cannot navigate ranges from a superseded query or document revision. Steps
+        // recorded against the superseded generation are dropped with it; ⌘G / ⇧⌘G pressed
+        // from here on records against `generation` and applies when *it* completes.
         session = nil
         pendingNavigationCommand = nil
         shouldActivateCurrentOnNextStep = false
+        pendingStepIntent = nil
         notifySessionDidChange()
 
         guard let query, !query.pattern.isEmpty else {
@@ -402,7 +422,9 @@ public final class EditorFindController {
         }
         completedMatchCount &+= 1
         session = newSession
-        if let intent = pendingStepIntent {
+        // Only a step recorded against *this* generation may be consumed; anything older
+        // belonged to superseded results and was already dropped by `scheduleMatch`.
+        if let intent = pendingStepIntent, intent.generation == fence.queryGeneration {
             pendingStepIntent = nil
             shouldActivateCurrentOnNextStep = false
             applyPendingStepIntent(intent, on: newSession, queryWouldNavigate: shouldNavigate)
@@ -422,19 +444,19 @@ public final class EditorFindController {
         on newSession: EditorFindSession,
         queryWouldNavigate: Bool
     ) {
-        var session = newSession
-        switch intent {
-        case .next:
-            if queryWouldNavigate {
-                // Query already resolves to the anchor match; user pressed next while waiting.
-                session = session.next()
-            }
-        // else: edit/rebind/patternOnly — activate current (no step past).
-        case .previous:
-            if queryWouldNavigate {
-                session = session.previous()
-            }
+        guard intent.netSteps != 0 else {
+            session = newSession
+            emitNavigation(for: newSession.currentMatch)
+            return
         }
+        // A navigating query already resolves to the anchor match, so every recorded press
+        // is a step past it. A counter-only generation (edit / rebind / ⌘E) has not moved
+        // the selection yet, so the first press activates the current ordinal and only the
+        // presses after it step.
+        let steps = queryWouldNavigate
+            ? intent.netSteps
+            : intent.netSteps - (intent.netSteps > 0 ? 1 : -1)
+        let session = steps == 0 ? newSession : newSession.stepped(by: steps)
         self.session = session
         emitNavigation(for: session.currentMatch)
     }

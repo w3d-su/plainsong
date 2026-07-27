@@ -57,6 +57,17 @@ final class EditorNavigationStateMachineTests: XCTestCase {
         XCTAssertEqual(effectsInOrder, ["selection", "scroll", "focus"])
         XCTAssertEqual(state.lastHandledRequestID, 1)
         XCTAssertNil(state.pendingRequest)
+
+        effectsInOrder.removeAll()
+        appliedSelection = nil
+        scrolledRange = nil
+        XCTAssertTrue(
+            effects.perform(selection: range, shouldFocusEditor: false),
+            "Selection+scroll must succeed without requiring focus"
+        )
+        XCTAssertEqual(appliedSelection, range)
+        XCTAssertEqual(scrolledRange, range)
+        XCTAssertEqual(effectsInOrder, ["selection", "scroll"])
     }
 
     func testWrongDocumentIdentityLeavesRequestPendingWithoutEffects() {

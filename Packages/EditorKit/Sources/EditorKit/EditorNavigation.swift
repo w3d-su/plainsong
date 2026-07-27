@@ -14,15 +14,21 @@ public struct EditorNavigationRequest: Identifiable, Equatable, Sendable {
     public let id: UInt64
     public let documentIdentity: EditorDocumentIdentity
     public let selection: NSRange
+    /// When `true` (default), navigation makes the editor first responder after selecting.
+    /// In-document find sets this `false` so typing in the find field is not stolen when
+    /// match completion updates the editor selection/scroll.
+    public let shouldFocusEditor: Bool
 
     public init(
         id: UInt64,
         documentIdentity: EditorDocumentIdentity,
-        selection: NSRange
+        selection: NSRange,
+        shouldFocusEditor: Bool = true
     ) {
         self.id = id
         self.documentIdentity = documentIdentity
         self.selection = selection
+        self.shouldFocusEditor = shouldFocusEditor
     }
 }
 
@@ -167,9 +173,12 @@ struct EditorNavigationEffects {
     let scrollRangeToVisible: (NSRange) -> Void
     let focusEditor: () -> Bool
 
-    func perform(selection: NSRange) -> Bool {
+    func perform(selection: NSRange, shouldFocusEditor: Bool = true) -> Bool {
         guard applySelection(selection) else { return false }
         scrollRangeToVisible(selection)
-        return focusEditor()
+        if shouldFocusEditor {
+            return focusEditor()
+        }
+        return true
     }
 }

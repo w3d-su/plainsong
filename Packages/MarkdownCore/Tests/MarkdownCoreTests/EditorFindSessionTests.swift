@@ -188,6 +188,70 @@ final class EditorFindSessionTests: XCTestCase {
         XCTAssertEqual(under.total, 50)
     }
 
+    func testSteppedMatchesRepeatedNextAndPreviousIncludingWrap() {
+        let text = "0aa1aa2aa3aa4"
+        let session = EditorFindSession.search(
+            in: text,
+            query: TextSearchQuery(pattern: "aa"),
+            caretAnchorUTF16: 0
+        )
+        XCTAssertEqual(session.total, 4)
+        XCTAssertEqual(session.currentOrdinal, 1)
+
+        for steps in -9 ... 9 {
+            var expected = session
+            for _ in 0 ..< abs(steps) {
+                expected = steps > 0 ? expected.next() : expected.previous()
+            }
+            XCTAssertEqual(
+                session.stepped(by: steps).currentOrdinal,
+                expected.currentOrdinal,
+                "stepped(by: \(steps)) must equal \(abs(steps)) repeated calls"
+            )
+        }
+    }
+
+    func testSteppedAgreesWithNextAndPreviousFromEveryCaretAnchor() {
+        let text = "aa bb aa bb aa"
+        for anchor in 0 ... text.utf16.count {
+            let session = EditorFindSession.search(
+                in: text,
+                query: TextSearchQuery(pattern: "aa"),
+                caretAnchorUTF16: anchor
+            )
+            XCTAssertEqual(
+                session.stepped(by: 1).currentOrdinal,
+                session.next().currentOrdinal,
+                "anchor \(anchor)"
+            )
+            XCTAssertEqual(
+                session.stepped(by: -1).currentOrdinal,
+                session.previous().currentOrdinal,
+                "anchor \(anchor)"
+            )
+        }
+    }
+
+    func testSteppedIsSafeForExtremeStepCountsAndEmptyMatches() {
+        let text = "aa bb aa"
+        let session = EditorFindSession.search(
+            in: text,
+            query: TextSearchQuery(pattern: "aa")
+        )
+        XCTAssertEqual(session.total, 2)
+        // `Int.min` cannot be negated; the implementation must reduce before offsetting.
+        XCTAssertNotNil(session.stepped(by: Int.min).currentOrdinal)
+        XCTAssertNotNil(session.stepped(by: Int.max).currentOrdinal)
+        XCTAssertEqual(session.stepped(by: 0).currentOrdinal, session.currentOrdinal)
+
+        let empty = EditorFindSession.search(
+            in: text,
+            query: TextSearchQuery(pattern: "zzz")
+        )
+        XCTAssertNil(empty.stepped(by: 3).currentOrdinal)
+        XCTAssertEqual(empty.stepped(by: 3).total, 0)
+    }
+
     func testWithCaretAnchorReResolvesOrdinalWithoutRematching() {
         let text = "aa bb aa bb aa"
         let session = EditorFindSession.search(

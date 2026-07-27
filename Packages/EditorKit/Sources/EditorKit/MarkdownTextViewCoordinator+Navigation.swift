@@ -136,11 +136,28 @@ extension MarkdownTextViewCoordinator {
             isApplyingNavigation = false
         }
 
-        guard navigationEffects(for: textView, window: window).perform(selection: request.selection) else {
+        // Capture first responder before selection changes: STTextView may claim
+        // first-responder when `textSelection` is set. Find navigation must restore
+        // the find field so typing is not interrupted.
+        let previousFirstResponder = window.firstResponder
+
+        guard navigationEffects(for: textView, window: window).perform(
+            selection: request.selection,
+            shouldFocusEditor: request.shouldFocusEditor
+        ) else {
             return false
+        }
+        if !request.shouldFocusEditor {
+            restoreFirstResponder(previousFirstResponder, in: window, editor: textView)
         }
 
         selection = request.selection
+        publishNavigationDebugProbe(request)
+        didComplete = true
+        return true
+    }
+
+    private func publishNavigationDebugProbe(_ request: EditorNavigationRequest) {
         #if DEBUG
             Task { @MainActor in
                 EditorNavigationDebugProbe.shared.publish(
@@ -149,15 +166,38 @@ extension MarkdownTextViewCoordinator {
                 )
             }
         #endif
-        didComplete = true
-        return true
+    }
+
+    /// Puts focus back where it was before a non-focusing navigation.
+    ///
+    /// Setting `textSelection` can make STTextView first responder on its own, which would
+    /// steal typing from the find field mid-query. Restores only when the previous responder
+    /// was something other than the editor and it actually lost first responder.
+    private func restoreFirstResponder(
+        _ previous: NSResponder?,
+        in window: NSWindow,
+        editor textView: STTextView
+    ) {
+        guard let previous,
+              previous !== textView,
+              window.firstResponder !== previous
+        else {
+            return
+        }
+        _ = window.makeFirstResponder(previous)
     }
 
     private func navigationEffects(for textView: STTextView, window: NSWindow) -> EditorNavigationEffects {
         EditorNavigationEffects(
             applySelection: { selection in
                 textView.textSelection = selection
-                return textView.selectedRange() == selection
+                let applied = textView.selectedRange()
+                // Force selection-highlight overlay rebuild; when the editor is not first
+                // responder (find field owns focus), STTextView still draws unemphasized
+                // selection but may need an explicit display pass after textSelections change.
+                textView.needsDisplay = true
+                textView.needsLayout = true
+                return applied == selection
             },
             scrollRangeToVisible: { selection in
                 textView.scrollRangeToVisible(selection)

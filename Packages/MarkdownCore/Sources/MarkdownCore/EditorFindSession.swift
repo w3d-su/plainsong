@@ -152,6 +152,48 @@ public struct EditorFindSession: Equatable, Sendable {
         )
     }
 
+    /// Applies `steps` wrapped next/previous steps in one operation.
+    ///
+    /// Positive steps behave like repeated `next()`, negative like repeated `previous()`,
+    /// including the first-step caret-anchor resolution when `currentOrdinal` is `nil`.
+    /// Repeated ⌘G / ⇧⌘G pressed while a generation is still computing must not be
+    /// compressed into a single step, so the controller accumulates a net count and
+    /// applies it here without an O(steps) loop.
+    public func stepped(by steps: Int) -> EditorFindSession {
+        guard !matches.isEmpty, steps != 0 else { return self }
+        let total = matches.count
+        // Reduce before any offset arithmetic so every `Int` magnitude (including
+        // `Int.min`, which cannot be negated) stays in range.
+        let wrapped = steps % total
+        let startIndex: Int
+        let offset: Int
+        if let currentOrdinal {
+            startIndex = currentOrdinal - 1
+            offset = wrapped
+        } else {
+            let preference: EditorFindAnchorPreference = steps > 0 ? .next : .previous
+            let resolved = Self.ordinal(
+                nearestTo: caretAnchorUTF16,
+                preferring: preference,
+                in: matches
+            ) ?? (steps > 0 ? 1 : total)
+            // The anchor resolution *is* the first step, so only the rest are offsets.
+            startIndex = resolved - 1
+            offset = wrapped - (steps > 0 ? 1 : -1)
+        }
+        var index = (startIndex + offset) % total
+        if index < 0 {
+            index += total
+        }
+        return EditorFindSession(
+            retainedMatches: matches,
+            isTruncated: isTruncated,
+            query: query,
+            caretAnchorUTF16: caretAnchorUTF16,
+            preferredOrdinal: index + 1
+        )
+    }
+
     /// 1-based ordinal nearest the caret for the given preference, or `nil` if empty.
     public static func ordinal(
         nearestTo anchor: Int,
