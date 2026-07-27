@@ -17,21 +17,19 @@ public struct EditorFindDocumentBinding: Equatable, Sendable {
 }
 
 /// Test seam: holds off-main match work until `release()` so stale-completion races
-/// can be made deterministic. Not used in production.
-public final class EditorFindMatchHold: @unchecked Sendable {
+/// can be made deterministic. Internal only (`@testable import`); not shipping API.
+final class EditorFindMatchHold: @unchecked Sendable {
     private let lock = NSLock()
     private var isHeld = true
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    public init() {}
-
-    public var waiterCount: Int {
+    var waiterCount: Int {
         lock.lock()
         defer { lock.unlock() }
         return waiters.count
     }
 
-    public func waitIfHeld() async {
+    func waitIfHeld() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             lock.lock()
             if isHeld {
@@ -44,7 +42,7 @@ public final class EditorFindMatchHold: @unchecked Sendable {
         }
     }
 
-    public func release() {
+    func release() {
         lock.lock()
         isHeld = false
         let pending = waiters
@@ -104,11 +102,14 @@ public final class EditorFindController {
     /// Debounce before match admission. Tests may set to 0.
     public var debounceNanoseconds: UInt64 = 150_000_000
 
-    /// Test seam: when true, match work runs on the main actor (for the off-main negative control).
-    public var forceMainActorMatchForTesting = false
+    /// Test seam: when true, match work runs on the main actor (off-main negative control).
+    /// Internal only — must never be reachable from App or other production clients
+    /// (would put the synchronous engine on the main actor and break §12).
+    var forceMainActorMatchForTesting = false
 
     /// Test seam: when set, the match worker awaits `waitIfHeld()` before searching.
-    public var testMatchHold: EditorFindMatchHold?
+    /// Internal only (`@testable import`).
+    var testMatchHold: EditorFindMatchHold?
 
     private var navigationSequence: UInt64 = 0
     private var matchTask: Task<Void, Never>?

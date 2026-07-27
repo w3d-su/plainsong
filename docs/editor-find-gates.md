@@ -333,7 +333,10 @@ production UI work. This is **not** a late verification detail of PR D.
   `App/PlainsongCommands.swift` + `EditorFindSpike.swift`. PR C owns the bar.
 - Evidence: _partial — §2 baseline closed 2026-07-27 (outcome (b)). Menu item + unit
   selector path landed in PR B. **Owner physical `⌘F` under ABC + Zhuyin still required
-  to close the dispatch half.**_
+  to close the dispatch half.** Owner signal: Console.app → filter subsystem
+  `app.plainsong.editor` or message `F0 spike`; each successful fire logs
+  `F0 spike: plainsongShowFind fired (count=N)`. A disabled Find… key equivalent still
+  beeps and produces **no** log line._
 
 ### F1 — Pure find-session model
 
