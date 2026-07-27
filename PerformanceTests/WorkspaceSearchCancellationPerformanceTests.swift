@@ -8,7 +8,7 @@ import XCTest
 extension WorkspaceSearchPerformanceTests {
     // MARK: - Rapid cancellation of a saturated read window
 
-    func testRapidCancellationOfASaturatedReadWindowDrainsWithoutTerminalEvent() async throws {
+    func testRapidCancellationOfASaturatedReadWindowDrainsAndConsumerObservesNoEvents() async throws {
         let fixture = try await makeBulkWorkspaceFixture()
         defer { removeDirectory(fixture.rootURL) }
 

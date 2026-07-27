@@ -225,16 +225,18 @@ read the built bundle under macOS TCC.
 ### What each probe can actually falsify
 
 Every probe below was checked against the question "what break would this still pass?" — the
-seven review passes removed cases where the answer was "the one it exists to catch": resource
+eight review passes removed cases where the answer was "the one it exists to catch": resource
 ceilings read back from the production limits they checked and a global match cap asserted only by
 an unreachable inequality (first pass); a `cap + 1` oversized fixture that could not distinguish a
 bounded read from a truncating one (second); read bounds asserted from `Data.count`, an ignore
 ceiling with no behavior attached, and progress coalescing exercised only where `floor` and `ceil`
 agree (third); chunk counts that still could not catch a final full-buffer read (fourth);
-zero-result controls that could not tell "searched and found nothing" from "never looked" (fifth);
-and a cancellation probe checking only some event kinds, a warm-up accepting validation failures,
-an ignore control that skipped the progress invariant outright (sixth); and a cancellation
-assertion whose scope was overstated, plus a vacuous skipped-detail bound (seventh).
+CJK-cased controls that still bypassed the shared invariants, stale source budget comments, and
+incomplete or numerically false Decision Log records (`a777dc4`, fifth); zero-result controls that
+could not tell "searched and found nothing" from "never looked" (sixth); a cancellation probe
+checking only some event kinds, a warm-up accepting validation failures, and an ignore control
+that skipped the progress invariant outright (seventh); and a cancellation assertion whose scope
+was overstated, plus a vacuous skipped-detail bound (eighth).
 
 | Probe | Would fail if… |
 |---|---|
@@ -246,7 +248,7 @@ assertion whose scope was overstated, plus a vacuous skipped-detail bound (seven
 | `testProgressCoalescingUsesCeilingStrideOnNonDivisibleCandidateCounts` | the stride became `floor` instead of `ceil`, or the final `N / N` event was dropped. Uses 250 candidates: every other fixture has `N ≤ 100` or `N` divisible by 100, where both mistakes are invisible |
 | `testGlobalMatchCeilingTruncatesAndDrainsRemainingCandidates` | the 10,000-match ceiling were overshot, `isGloballyTruncated` unset, results emitted past the ceiling, or remaining candidates not drained for accounting |
 | `testProductionSearchLimitsStillMatchTheFrozenGateCeilings` | any pinned production ceiling moved |
-| Cancellation | a read were left running, another started, or a terminal event emitted after cancel |
+| Cancellation | any blocked read was left running, another read started, or the consumer observed any event |
 
 ### Fixtures
 
