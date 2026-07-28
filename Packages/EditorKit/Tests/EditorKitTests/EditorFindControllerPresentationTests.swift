@@ -6,6 +6,11 @@ import XCTest
 
 @MainActor
 final class EditorFindControllerPresentationTests: XCTestCase {
+    override func tearDown() {
+        EditorFindControllerTestSupport.tearDownWindows()
+        super.tearDown()
+    }
+
     private let documentA = EditorDocumentIdentity(rawValue: "find-doc-a")
 
     // MARK: - F5 WYSIWYG off/on (source+preview deferred to PR C)

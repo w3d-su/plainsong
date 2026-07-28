@@ -67,6 +67,9 @@ extension AppState {
             cancelPendingEditorNavigationIfNeeded(targeting: session)
             restartActiveWorkspaceSearchAfterRelevantEdit(in: session)
         }
+        if session === currentDocument {
+            notifyEditorFindDocumentDidChange()
+        }
     }
 
     func setTaskCheckbox(line: Int, checked: Bool, version: Int) {
@@ -150,6 +153,10 @@ extension AppState {
             try workspaceSearchPostActivationHook?()
             cancelPendingEditorNavigationIfNeeded(force: true)
             commitWorkspaceSearchActivation(activation)
+            // Fence in-document find before the search navigation claims an ID. A same-document
+            // activation never reaches `setCurrentDocument`, so this is the only place a find
+            // match still in flight is stopped from overriding the search selection later.
+            notifyEditorFindWorkspaceSearchWillNavigate(to: match.range)
             issueEditorNavigation(
                 documentIdentity: activation.documentIdentity,
                 selection: match.range
@@ -527,18 +534,21 @@ extension AppState {
         EditorDocumentIdentity(rawValue: url.absoluteString)
     }
 
-    private func issueEditorNavigation(
+    func issueEditorNavigation(
         documentIdentity: EditorDocumentIdentity,
-        selection: NSRange
+        selection: NSRange,
+        shouldFocusEditor: Bool = true
     ) {
         editorNavigationCommand = .navigate(EditorNavigationRequest(
             id: advanceEditorNavigationGeneration(),
             documentIdentity: documentIdentity,
-            selection: selection
+            selection: selection,
+            shouldFocusEditor: shouldFocusEditor
         ))
     }
 
-    private func advanceEditorNavigationGeneration() -> UInt64 {
+    @discardableResult
+    func advanceEditorNavigationGeneration() -> UInt64 {
         precondition(editorNavigationGeneration < .max, "Editor navigation generation exhausted")
         editorNavigationGeneration += 1
         return editorNavigationGeneration

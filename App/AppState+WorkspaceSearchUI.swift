@@ -44,6 +44,9 @@ extension AppState {
         ui.mode = .search
         ui.focusRequestID &+= 1
         workspaceSearchUI = ui
+        // Abandon pending Find-field focus so an older ⌘F async closure cannot steal
+        // after ⇧⌘F (F7). Does not advance Find focusRequestID (token independence).
+        supersedePendingEditorFindFocus()
     }
 
     /// `Command-Shift-F`: toggle Search/Files, focusing the query whenever Search is opened.

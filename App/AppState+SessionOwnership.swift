@@ -296,6 +296,7 @@ extension AppState {
             detachedSessionURLs.remove(canonicalURL)
             if session === currentDocument {
                 missingFilePrompt = nil
+                notifyEditorFindExternalContentDidReplace()
             }
         }
         recordKnownSessionDiskText(

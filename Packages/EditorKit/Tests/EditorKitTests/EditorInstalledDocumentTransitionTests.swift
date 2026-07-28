@@ -6,6 +6,11 @@ import XCTest
 
 @MainActor
 final class EditorInstalledDocumentTransitionTests: XCTestCase {
+    override func tearDown() {
+        EditorFindControllerTestSupport.tearDownWindows()
+        super.tearDown()
+    }
+
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
     private let documentB = EditorDocumentIdentity(rawValue: "document-b")
 
@@ -599,11 +604,13 @@ private extension EditorInstalledDocumentTransitionTests {
         textView.textSelection = NSRange(location: 0, length: 0)
         let coordinator = representable.makeCoordinator()
         textView.textDelegate = coordinator
-        let window = NSWindow(
-            contentRect: frame,
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
+        let window = EditorFindControllerTestSupport.registerWindowForTeardown(
+            NSWindow(
+                contentRect: frame,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
         )
         window.contentView = scrollView
         window.makeKeyAndOrderFront(nil)

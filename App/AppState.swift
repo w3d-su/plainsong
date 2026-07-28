@@ -164,9 +164,9 @@ final class AppState: ObservableObject {
     /// Test seam / multi-window key routing refresh. Bumped when key eligibility may have changed
     /// without a new `focusRequestID` (window activation, or a test override flip).
     @Published var workspaceSearchFocusKeyEpoch: UInt64 = 0
-    /// When non-`nil`, replaces `NSWindow.isKeyWindow` for workspace-search focus eligibility.
-    /// Production leaves this `nil` so live AppKit key state is used after every suspension.
+    /// When non-`nil`, replaces `NSWindow.isKeyWindow` for search focus eligibility (tests).
     var workspaceSearchFocusKeyWindowCheck: ((NSWindow) -> Bool)?
+    let editorFindHost = EditorFindHost()
     @Published var editorNavigationCommand: EditorNavigationCommand?
     @Published var showAllFiles = false
     @Published var completionWorkspace: CompletionWorkspace = .empty

@@ -62,9 +62,23 @@ public enum EditorFindSpike {
 }
 
 @MainActor
-extension STTextView {
-    /// F0 spike selector. Production PR C will open / re-focus the find bar here.
+public extension STTextView {
+    /// Find commands delivered through the AppKit responder chain (same shape as Format).
+    /// Production App installs `EditorFindActionHooks` from `PlainsongApp` init.
     @objc func plainsongShowFind(_: Any?) {
         EditorFindSpike.recordFire()
+        EditorFindActionHooks.showFind?()
+    }
+
+    @objc func plainsongFindNext(_: Any?) {
+        EditorFindActionHooks.findNext?()
+    }
+
+    @objc func plainsongFindPrevious(_: Any?) {
+        EditorFindActionHooks.findPrevious?()
+    }
+
+    @objc func plainsongUseSelectionForFind(_: Any?) {
+        EditorFindActionHooks.useSelectionForFind?()
     }
 }

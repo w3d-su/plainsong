@@ -6,6 +6,11 @@ import XCTest
 
 @MainActor
 final class EditorNavigationIntegrationTests: XCTestCase {
+    override func tearDown() {
+        EditorFindControllerTestSupport.tearDownWindows()
+        super.tearDown()
+    }
+
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
     private let documentB = EditorDocumentIdentity(rawValue: "document-b")
 
@@ -231,12 +236,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         )
         XCTAssertEqual(fixture.textView.selectedRange(), NSRange(location: 0, length: 0))
 
-        let window = NSWindow(
-            contentRect: fixture.scrollView.frame,
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
+        let window = makeRegisteredWindow(frame: fixture.scrollView.frame)
         window.makeKeyAndOrderFront(nil)
         window.contentView = fixture.scrollView
         RunLoop.current.run(until: Date().addingTimeInterval(0.02))
@@ -311,12 +311,7 @@ private extension EditorNavigationIntegrationTests {
         height: CGFloat = 240
     ) throws -> WindowedFixture {
         let detached = try makeDetachedFixture(model: model, source: source, height: height)
-        let window = NSWindow(
-            contentRect: detached.scrollView.frame,
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
+        let window = makeRegisteredWindow(frame: detached.scrollView.frame)
         window.contentView = detached.scrollView
         window.makeKeyAndOrderFront(nil)
         detached.textView.layoutSubtreeIfNeeded()
@@ -328,6 +323,18 @@ private extension EditorNavigationIntegrationTests {
             coordinator: detached.coordinator,
             textBinding: detached.textBinding,
             selectionBinding: detached.selectionBinding
+        )
+    }
+
+    /// Registered so `tearDownWindows()` in this class's `tearDown()` actually covers it.
+    func makeRegisteredWindow(frame: NSRect) -> NSWindow {
+        EditorFindControllerTestSupport.registerWindowForTeardown(
+            NSWindow(
+                contentRect: frame,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
         )
     }
 

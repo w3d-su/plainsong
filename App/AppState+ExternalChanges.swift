@@ -599,6 +599,9 @@ private extension AppState {
             abortExternalResolutionAfterUnexpectedSourceChange(for: session)
             return
         }
+        if session === currentDocument {
+            notifyEditorFindExternalContentDidReplace()
+        }
         let acceptedSourceSnapshot = EditorDocumentSourceSnapshot(
             source: payload.snapshot.text,
             revision: session.version
@@ -912,6 +915,9 @@ private extension AppState {
             return
         }
 
+        if session === currentDocument {
+            notifyEditorFindExternalContentDidReplace()
+        }
         clearExternalChangeConflict(at: canonicalURL)
         detachedSessionURLs.remove(canonicalURL)
         recordKnownSessionDiskText(

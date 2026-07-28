@@ -125,6 +125,10 @@ private struct EditorWorkspace: View {
                 WYSIWYGFallbackBanner(message: fallbackMessage)
             }
 
+            if appState.editorFindHost.ui.isBarVisible {
+                EditorFindBar()
+            }
+
             Divider()
 
             HStack(spacing: 0) {

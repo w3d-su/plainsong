@@ -219,6 +219,7 @@ private extension AppState {
         completionWorkspace = .empty
         // Close/switch clears query chrome and mode; Files/Search mode flip does not.
         resetWorkspaceSearchUIState()
+        notifyEditorFindWorkspaceDidClose()
 
         let retainedSessionIdentities = Set(retiredEditorDocumentSessions.values.map {
             ObjectIdentifier($0.session)
