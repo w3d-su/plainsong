@@ -36,7 +36,7 @@ public enum EditorSelectionProbe {
     /// Selected UTF-16 range when the key window's first responder is the Plainsong editor
     /// (or its field editor). Returns `nil` when focus is elsewhere (find field, sidebar, preview).
     public static func keyWindowEditorSelection() -> NSRange? {
-        guard let window = NSApp.keyWindow else { return nil }
+        guard let window = currentKeyWindow else { return nil }
         return editorSelection(in: window)
     }
 
@@ -78,7 +78,7 @@ public enum EditorSelectionProbe {
     /// previous source, so a caller must check the identity and revision it came from before
     /// interpreting the offsets against its own current text.
     public static func keyWindowAppliedEditorSelection() -> EditorAppliedSelection? {
-        guard let window = NSApp.keyWindow else { return nil }
+        guard let window = currentKeyWindow else { return nil }
         return appliedEditorSelection(in: window)
     }
 
@@ -99,9 +99,21 @@ public enum EditorSelectionProbe {
         )
     }
 
+    /// Test seam: stands in for `NSApp.keyWindow` in every `keyWindow…` entry point.
+    ///
+    /// A test process cannot make a programmatic window key (`NSApp.keyWindow` stays nil when
+    /// the host app is not active), so without this there is no way to tell a window-scoped
+    /// implementation from one that consults the global key window — both answer identically.
+    /// Production leaves this `nil`. Mirrors `AppState.workspaceSearchFocusKeyWindowCheck`.
+    public static var keyWindowOverrideForTesting: (() -> NSWindow?)?
+
+    private static var currentKeyWindow: NSWindow? {
+        keyWindowOverrideForTesting?() ?? NSApp.keyWindow
+    }
+
     /// Whether the key window's first responder is the Plainsong editor text view.
     public static func keyWindowHasEditorFocus() -> Bool {
-        guard let window = NSApp.keyWindow else { return false }
+        guard let window = currentKeyWindow else { return false }
         return hasEditorFocus(in: window)
     }
 
@@ -116,7 +128,7 @@ public enum EditorSelectionProbe {
     }
 
     public static func keyWindowEditorTextView() -> NSView? {
-        guard let window = NSApp.keyWindow else { return nil }
+        guard let window = currentKeyWindow else { return nil }
         return editorTextView(focusedIn: window)
     }
 

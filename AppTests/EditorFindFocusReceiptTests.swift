@@ -481,12 +481,19 @@ final class EditorFindFocusReceiptTests: XCTestCase {
     }
 
     func testResponderEligibilityIsScopedToTheWindowItIsAskedAbout() throws {
-        // Window A holds editor focus; window B holds nothing relevant. Asking about B must
-        // answer for B. This previously consulted `NSApp.keyWindow` first, so A's editor
-        // focus made B report eligible.
+        // Window A holds editor focus **and is the key window**; window B holds nothing
+        // relevant. Asking about B must answer for B.
+        //
+        // The key window is driven through `EditorSelectionProbe.keyWindowOverrideForTesting`
+        // because a test process cannot make a programmatic window key — `NSApp.keyWindow`
+        // stays nil while the host app is inactive, and without the override a global
+        // key-window implementation and a window-scoped one answer identically, so the test
+        // could not tell them apart. With the override installed, reverting
+        // `windowHasEditorOrFindChrome` to `keyWindowHasEditorFocus()` fails this test.
         let windowA = makeProbeWindow()
         let windowB = makeProbeWindow()
         defer {
+            EditorSelectionProbe.keyWindowOverrideForTesting = nil
             windowA.orderOut(nil)
             windowB.orderOut(nil)
         }
@@ -498,20 +505,17 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         unrelated.frame = NSRect(x: 0, y: 0, width: 80, height: 24)
         windowB.contentView?.addSubview(unrelated)
 
-        windowA.makeKeyAndOrderFront(nil)
         guard windowA.makeFirstResponder(editor) else {
             throw XCTSkip("makeFirstResponder(editor) unavailable in this runner")
         }
         guard windowB.makeFirstResponder(unrelated) else {
             throw XCTSkip("makeFirstResponder(unrelated) unavailable in this runner")
         }
-
-        // The deterministic half: the probe the eligibility check now uses is window-scoped.
-        // This is what fails if anyone routes it back through `NSApp.keyWindow` — in this
-        // test host that global is `nil`, so a keyWindow-based implementation reports `false`
-        // for A even though A holds editor focus.
-        XCTAssertTrue(EditorSelectionProbe.hasEditorFocus(in: windowA))
-        XCTAssertFalse(EditorSelectionProbe.hasEditorFocus(in: windowB))
+        EditorSelectionProbe.keyWindowOverrideForTesting = { windowA }
+        XCTAssertTrue(
+            EditorSelectionProbe.keyWindowHasEditorFocus(),
+            "precondition: the *key* window holds editor focus, which is what would leak"
+        )
 
         XCTAssertTrue(
             EditorFindResponderSupport.windowHasEditorOrFindChrome(windowA),
@@ -519,12 +523,12 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         )
         XCTAssertFalse(
             EditorFindResponderSupport.windowHasEditorOrFindChrome(windowB),
-            "Another window's editor focus must not make this window eligible"
+            "The key window's editor focus must not make a different window eligible"
         )
-        // Honest limit: `NSApp.keyWindow` is nil in this test host (verified — the host app is
-        // not active), so these last two assertions cannot reproduce the ambient-key failure
-        // by themselves. They document the contract; the probe assertions above are what
-        // catch a regression, and `EditorSelectionProbeTests` covers the same rule in EditorKit.
+
+        // And the probe the check relies on is itself window-scoped.
+        XCTAssertTrue(EditorSelectionProbe.hasEditorFocus(in: windowA))
+        XCTAssertFalse(EditorSelectionProbe.hasEditorFocus(in: windowB))
     }
 
     func testEditorAndQueryFieldResponderEligibilityIsUnchanged() throws {

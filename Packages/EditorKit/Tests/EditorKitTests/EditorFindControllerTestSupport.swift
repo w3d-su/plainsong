@@ -23,6 +23,44 @@ enum EditorFindControllerTestSupport {
         let coordinator: MarkdownTextViewCoordinator
     }
 
+    /// Windows handed out by `makeWindowedFixture`, so they can be ordered out again.
+    ///
+    /// A shown key window carrying an editor first responder stays in
+    /// `NSApplication.shared.windows` after the local variable goes away, where it can still
+    /// answer responder-chain questions for later tests.
+    private static var fixtureWindows: [NSWindow] = []
+
+    /// Creates the fixture's window and registers it for teardown.
+    ///
+    /// Orders out any earlier fixture window first, so two shown windows can never both keep
+    /// an editor reachable on the responder chain.
+    private static func makeRegisteredWindow(hosting scrollView: NSScrollView) -> NSWindow {
+        tearDownWindows()
+        let window = NSWindow(
+            contentRect: scrollView.frame,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        // `orderOut`, not `close`: a programmatic NSWindow defaults to release-on-close.
+        window.isReleasedWhenClosed = false
+        window.contentView = scrollView
+        fixtureWindows.append(window)
+        return window
+    }
+
+    /// Orders out every fixture window created so far. Call from `tearDown()`.
+    static func tearDownWindows() {
+        for window in fixtureWindows {
+            window.orderOut(nil)
+        }
+        fixtureWindows.removeAll()
+    }
+
+    /// Builds a windowed editor fixture.
+    ///
+    /// The window is registered for teardown: earlier fixture windows are ordered out here,
+    /// and the test class's `tearDown()` must call `tearDownWindows()` for the last one.
     static func makeWindowedFixture(
         model: FindNavModel,
         source: String,
@@ -65,13 +103,7 @@ enum EditorFindControllerTestSupport {
         )
         coordinator.finishDocumentTransition(candidate, in: textView)
 
-        let window = NSWindow(
-            contentRect: scrollView.frame,
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = scrollView
+        let window = makeRegisteredWindow(hosting: scrollView)
         window.makeKeyAndOrderFront(nil)
         textView.layoutSubtreeIfNeeded()
         textView.textLayoutManager.ensureLayout(for: textView.textLayoutManager.documentRange)

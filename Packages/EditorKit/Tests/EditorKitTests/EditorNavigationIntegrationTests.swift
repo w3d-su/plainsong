@@ -6,6 +6,11 @@ import XCTest
 
 @MainActor
 final class EditorNavigationIntegrationTests: XCTestCase {
+    override func tearDown() {
+        EditorFindControllerTestSupport.tearDownWindows()
+        super.tearDown()
+    }
+
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
     private let documentB = EditorDocumentIdentity(rawValue: "document-b")
 

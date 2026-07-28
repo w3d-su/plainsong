@@ -7,6 +7,11 @@ import XCTest
 /// still holds the previous content.
 @MainActor
 final class EditorSelectionProbeTests: XCTestCase {
+    override func tearDown() {
+        EditorFindControllerTestSupport.tearDownWindows()
+        super.tearDown()
+    }
+
     private let documentA = EditorDocumentIdentity(rawValue: "document-a")
 
     func testAppliedSelectionReportsInstalledDocumentIdentityAndRevision() throws {
