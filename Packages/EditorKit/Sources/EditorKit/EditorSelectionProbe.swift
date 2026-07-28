@@ -104,8 +104,9 @@ public enum EditorSelectionProbe {
     /// A test process cannot make a programmatic window key (`NSApp.keyWindow` stays nil when
     /// the host app is not active), so without this there is no way to tell a window-scoped
     /// implementation from one that consults the global key window — both answer identically.
-    /// Production leaves this `nil`. Mirrors `AppState.workspaceSearchFocusKeyWindowCheck`.
-    public static var keyWindowOverrideForTesting: (() -> NSWindow?)?
+    /// Production leaves this `nil`. Deliberately **internal**: reachable through
+    /// `@testable import EditorKit`, so no production client can mutate global probe state.
+    static var keyWindowOverrideForTesting: (() -> NSWindow?)?
 
     private static var currentKeyWindow: NSWindow? {
         keyWindowOverrideForTesting?() ?? NSApp.keyWindow

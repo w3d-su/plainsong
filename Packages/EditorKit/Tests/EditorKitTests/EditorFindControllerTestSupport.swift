@@ -31,25 +31,38 @@ enum EditorFindControllerTestSupport {
     private static var fixtureWindows: [NSWindow] = []
 
     /// Creates the fixture's window and registers it for teardown.
-    ///
-    /// Orders out any earlier fixture window first, so two shown windows can never both keep
-    /// an editor reachable on the responder chain.
     private static func makeRegisteredWindow(hosting scrollView: NSScrollView) -> NSWindow {
-        tearDownWindows()
         let window = NSWindow(
             contentRect: scrollView.frame,
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        // `orderOut`, not `close`: a programmatic NSWindow defaults to release-on-close.
-        window.isReleasedWhenClosed = false
         window.contentView = scrollView
+        registerWindowForTeardown(window)
+        return window
+    }
+
+    /// Registers a test window so `tearDownWindows()` will hide it and drop this reference.
+    ///
+    /// **Every** test window that is ordered in must go through here, including ones built by
+    /// a test class's own fixture factory — a class calling `tearDownWindows()` while its
+    /// factory never registers is a no-op that reads like cleanup.
+    @discardableResult
+    static func registerWindowForTeardown(_ window: NSWindow) -> NSWindow {
+        // `orderOut`, not `close`: a programmatic NSWindow defaults to release-on-close, and
+        // closing it would over-release a window the test still holds.
+        window.isReleasedWhenClosed = false
         fixtureWindows.append(window)
         return window
     }
 
-    /// Orders out every fixture window created so far. Call from `tearDown()`.
+    /// Hides every registered window and drops the registry's references. Call from `tearDown()`.
+    ///
+    /// `orderOut` alone leaves the window in `NSApplication.shared.windows` (verified) — it
+    /// stops being visible and stops being key, which is what removes it from responder-chain
+    /// reach. It leaves that list only once the last reference goes away, which is why the
+    /// registry releases rather than merely hiding.
     static func tearDownWindows() {
         for window in fixtureWindows {
             window.orderOut(nil)

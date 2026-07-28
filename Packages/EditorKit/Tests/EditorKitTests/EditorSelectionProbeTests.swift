@@ -110,4 +110,35 @@ final class EditorSelectionProbeTests: XCTestCase {
         XCTAssertNotNil(EditorSelectionProbe.editorTextView(focusedIn: withEditor.window))
         XCTAssertNil(EditorSelectionProbe.editorTextView(focusedIn: other))
     }
+
+    func testTearDownReleasesRegisteredFixtureWindows() throws {
+        // `orderOut` hides a window and drops its key status — enough to take it out of
+        // responder-chain reach — but it stays in `NSApplication.shared.windows` until the
+        // last reference goes away. The registry therefore releases as well as hides.
+        weak var released: NSWindow?
+        try autoreleasepool {
+            let model = EditorFindControllerTestSupport.FindNavModel(
+                text: "teardown",
+                selection: NSRange(location: 0, length: 0)
+            )
+            let fixture = try EditorFindControllerTestSupport.makeWindowedFixture(
+                model: model,
+                source: "teardown",
+                documentIdentity: documentA
+            )
+            released = fixture.window
+            XCTAssertTrue(
+                NSApplication.shared.windows.contains { $0 === fixture.window },
+                "precondition: a shown fixture window is registered with the application"
+            )
+        }
+
+        autoreleasepool {
+            EditorFindControllerTestSupport.tearDownWindows()
+        }
+        XCTAssertNil(
+            released,
+            "teardown must release the window so it leaves NSApplication.shared.windows"
+        )
+    }
 }
