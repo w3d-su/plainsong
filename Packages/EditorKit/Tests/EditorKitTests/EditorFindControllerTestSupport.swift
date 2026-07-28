@@ -23,7 +23,8 @@ enum EditorFindControllerTestSupport {
         let coordinator: MarkdownTextViewCoordinator
     }
 
-    /// Windows handed out by `makeWindowedFixture`, so they can be ordered out again.
+    /// Every window registered through `registerWindowForTeardown(_:)` — this file's fixture
+    /// plus the test classes' own factories — held until `tearDownWindows()` runs.
     ///
     /// A shown key window carrying an editor first responder stays in
     /// `NSApplication.shared.windows` after the local variable goes away, where it can still
@@ -72,8 +73,9 @@ enum EditorFindControllerTestSupport {
 
     /// Builds a windowed editor fixture.
     ///
-    /// The window is registered for teardown: earlier fixture windows are ordered out here,
-    /// and the test class's `tearDown()` must call `tearDownWindows()` for the last one.
+    /// The window is registered for teardown. Registration only records it — nothing is
+    /// hidden until the test class's `tearDown()` calls `tearDownWindows()`, so a single test
+    /// may hold several fixture windows at once.
     static func makeWindowedFixture(
         model: FindNavModel,
         source: String,
