@@ -33,8 +33,9 @@ final class EditorFindHost {
     ///
     /// One entry per window: `AppState` is shared across the `WindowGroup` and each window's
     /// bar keeps its own `FocusState`, so a single slot would let whichever window wrote last
-    /// silently own eligibility. Cleared entirely when the bar closes or the
-    /// document/workspace changes.
+    /// silently own eligibility. A window clears only its own entry; every entry is dropped
+    /// only where the bar itself goes away (Escape / Done, last document closed, workspace
+    /// closed) — **not** on an ordinary document switch, which keeps the bar open per F4b.
     var chromeFocusByWindow: [Int: EditorFindChromeFocus] = [:]
     /// Test seam: when non-`nil`, replaces key-window first-responder eligibility checks.
     var commandContextOverride: Bool?

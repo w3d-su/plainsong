@@ -41,8 +41,11 @@ extension AppState {
     /// Whether the key window's first responder is the editor, its field editor, or the find field.
     ///
     /// The bar's toggles and buttons cannot be resolved in AppKit — SwiftUI flattens them and
-    /// the editor into one hosting view — so focus on those arrives from SwiftUI as
-    /// `chromeFocus` and is trusted only while the **key** window is the one showing the bar.
+    /// the editor into one hosting view — so focus on those arrives from SwiftUI as a
+    /// per-window entry in `chromeFocusByWindow`, and only the **key** window's own entry
+    /// counts. Anything else — bar hidden, or no entry for the key window — falls through to
+    /// the AppKit responder check.
+    ///
     /// Residual: if SwiftUI ever failed to clear its own focus when focus left the bar, a find
     /// command could fire while focus sits elsewhere in that same window. That is bounded to
     /// one window and one document, and is strictly less harmful than the alternative — the

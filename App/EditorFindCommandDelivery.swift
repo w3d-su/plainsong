@@ -1,12 +1,13 @@
 import AppKit
 import EditorKit
-import STTextView
 
 /// Delivers in-document find commands via the AppKit responder chain (gate §6.3),
 /// matching Format commands and the F0 `sendAction` proof path.
 ///
-/// Falls back to shared `AppState` only when the key window's first responder is the
-/// find field (or its field editor), which is not an `STTextView` target.
+/// The selectors and the concrete editor type live behind `EditorFindCommandDispatcher` in
+/// EditorKit (agent.md §6.1); App only consumes the delivered/not-delivered result.
+/// Falls back to shared `AppState` only when the key window's first responder is the find
+/// field (or its field editor), which is not on the editor's responder path.
 @MainActor
 enum EditorFindCommandDelivery {
     static func installHooks() {
@@ -29,10 +30,10 @@ enum EditorFindCommandDelivery {
 
     @discardableResult
     static func performShowFind() -> Bool {
-        if NSApp.sendAction(#selector(STTextView.plainsongShowFind(_:)), to: nil, from: nil) {
+        if EditorFindCommandDispatcher.send(.show) {
             return true
         }
-        // Find field owns focus: not on the STTextView responder path.
+        // Find field owns focus: not on the editor responder path.
         guard let appState = PlainsongAppServices.appState,
               appState.isEditorFindCommandContextActive()
         else {
@@ -44,7 +45,7 @@ enum EditorFindCommandDelivery {
 
     @discardableResult
     static func performFindNext() -> Bool {
-        if NSApp.sendAction(#selector(STTextView.plainsongFindNext(_:)), to: nil, from: nil) {
+        if EditorFindCommandDispatcher.send(.next) {
             return true
         }
         guard let appState = PlainsongAppServices.appState,
@@ -58,7 +59,7 @@ enum EditorFindCommandDelivery {
 
     @discardableResult
     static func performFindPrevious() -> Bool {
-        if NSApp.sendAction(#selector(STTextView.plainsongFindPrevious(_:)), to: nil, from: nil) {
+        if EditorFindCommandDispatcher.send(.previous) {
             return true
         }
         guard let appState = PlainsongAppServices.appState,
@@ -72,11 +73,7 @@ enum EditorFindCommandDelivery {
 
     @discardableResult
     static func performUseSelectionForFind() -> Bool {
-        if NSApp.sendAction(
-            #selector(STTextView.plainsongUseSelectionForFind(_:)),
-            to: nil,
-            from: nil
-        ) {
+        if EditorFindCommandDispatcher.send(.useSelection) {
             return true
         }
         guard let appState = PlainsongAppServices.appState,

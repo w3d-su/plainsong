@@ -53,4 +53,43 @@ final class EditorFindSpikeTests: XCTestCase {
         _ = NSApp.sendAction(#selector(STTextView.plainsongShowFind(_:)), to: nil, from: nil)
         XCTAssertEqual(EditorFindSpike.fireCount, 0)
     }
+
+    func testDispatcherRoutesEachCommandToItsEditorSelector() throws {
+        // App must not name `STTextView` (agent.md §6.1), so it sends these through
+        // `EditorFindCommandDispatcher`. Prove each case reaches the matching hook.
+        let frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
+        let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
+        textView.text = "dispatch"
+
+        var fired: [String] = []
+        EditorFindActionHooks.showFind = { fired.append("show") }
+        EditorFindActionHooks.findNext = { fired.append("next") }
+        EditorFindActionHooks.findPrevious = { fired.append("previous") }
+        EditorFindActionHooks.useSelectionForFind = { fired.append("useSelection") }
+        defer {
+            EditorFindActionHooks.showFind = nil
+            EditorFindActionHooks.findNext = nil
+            EditorFindActionHooks.findPrevious = nil
+            EditorFindActionHooks.useSelectionForFind = nil
+        }
+
+        for command in [EditorFindCommand.show, .next, .previous, .useSelection] {
+            XCTAssertTrue(
+                EditorFindCommandDispatcher.send(command, to: textView),
+                "\(command) must be deliverable to the editor"
+            )
+        }
+        XCTAssertEqual(fired, ["show", "next", "previous", "useSelection"])
+    }
+
+    func testDispatcherReportsNotDeliveredWithoutAnEditorResponder() {
+        // This is the signal App's find-field fallback depends on.
+        for command in [EditorFindCommand.show, .next, .previous, .useSelection] {
+            XCTAssertFalse(
+                EditorFindCommandDispatcher.send(command, to: nil),
+                "\(command) must report not-delivered when no editor is on the responder path"
+            )
+        }
+    }
 }

@@ -1,8 +1,9 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR C on `phase3-editor-find-bar-ui` (stacked on PR B).** §2 is resolved **(b)**;
-> F0 closed with owner physical ABC+Zhuyin on PR B. F1–F4 controller half + F5 WYSIWYG/source
-> identity closed on PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
+> **Status: PR C on `phase3-editor-find-bar-ui`, targeting `main` directly — PR B (#96)
+> merged as `8cab153`, so this branch is no longer stacked.** §2 is resolved **(b)**;
+> F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
+> identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
 > production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
 > navigation ID domain is wired via App `navigationIDProvider`. F2 latency, F8, F9 XCUITest
 > remain open for PR D. Precedent: PR #45, link-folding, image-thumbnail gate docs.
@@ -325,8 +326,8 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | PR | Scope | Gates closed |
 |---|---|---|
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
-| **B** (this PR, #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
-| **C** | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
+| **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
+| **C** (this PR, #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
 | **D** | XCUITest (F9, including truncated counter state and `⌘F` re-focus), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
@@ -516,7 +517,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
   fencing covered in-process; hosted UI-visibility half still open
 
-### F5 — Reveal without source mutation (WYSIWYG; source+preview in PR C)
+### F5 — Reveal without source mutation (WYSIWYG closed in PR B; source+preview still open)
 
 - [x] A match inside a folded WYSIWYG span: navigation selects the match; the fold plan
   recomputed from the **post-navigation** selection marks the region revealed; applying

@@ -40,9 +40,11 @@ extension AppState {
 
     /// Drops every window's reported chrome focus.
     ///
-    /// Unlike a per-window report this is an **App-scoped** intent: the bar itself is gone
-    /// (closed, document switched, workspace closed) in every window, because `isBarVisible`
-    /// is shared, so no window's report can still be describing focus inside it.
+    /// Unlike a per-window report this is an **App-scoped** intent, used only where the bar
+    /// is actually gone in every window — Escape / Done, the last document closing, and
+    /// workspace close — because `isBarVisible` is shared. Switching between documents is
+    /// deliberately **not** one of them: F4b keeps the bar open across a file switch, so the
+    /// focus reports still describe live chrome.
     func clearEditorFindChromeFocus() {
         guard !editorFindHost.chromeFocusByWindow.isEmpty else { return }
         editorFindHost.chromeFocusByWindow.removeAll()

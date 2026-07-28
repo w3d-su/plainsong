@@ -49,9 +49,9 @@ enum EditorFindResponderSupport {
     /// whole-word, Next, Previous, Done) are plain SwiftUI: macOS flattens them and the
     /// editor into a single hosting view, so there is no find-bar-specific ancestor to walk
     /// and no reliable per-control `NSView` to identify. Focus on those is reported by
-    /// SwiftUI instead — see `AppState.isEditorFindCommandContextActive()`, which falls back
-    /// to this check when `hasKeyWindowFindChromeFocus()` finds no entry for the key window
-    /// in `editorFindHost.chromeFocusByWindow`.
+    /// SwiftUI instead — see `AppState.isEditorFindCommandContextActive()`, which consults
+    /// `chromeFocusByWindow` first and falls back to this check whenever that path does not
+    /// apply: the bar is hidden, **or** the key window has no entry of its own.
     ///
     /// Exposed for tests so the rule can be exercised without depending on which window
     /// `NSApp` considers key.
