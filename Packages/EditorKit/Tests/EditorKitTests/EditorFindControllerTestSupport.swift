@@ -24,7 +24,7 @@ enum EditorFindControllerTestSupport {
     }
 
     /// Every window registered through `registerWindowForTeardown(_:)` — this file's fixture
-    /// plus the test classes' own factories — held until `tearDownWindows()` runs.
+    /// plus the test classes' own factories — is held until `tearDownWindows()` runs.
     ///
     /// A shown key window carrying an editor first responder stays in
     /// `NSApplication.shared.windows` after the local variable goes away, where it can still
@@ -46,9 +46,9 @@ enum EditorFindControllerTestSupport {
 
     /// Registers a test window so `tearDownWindows()` will hide it and drop this reference.
     ///
-    /// **Every** test window that is ordered in must go through here, including ones built by
-    /// a test class's own fixture factory — a class calling `tearDownWindows()` while its
-    /// factory never registers is a no-op that reads like cleanup.
+    /// An ordered-in window owned by a find-fixture test class must go through here when that
+    /// class relies on `tearDownWindows()`. This includes windows built by the class's own
+    /// fixture factory; otherwise its shared teardown is a no-op that only reads like cleanup.
     @discardableResult
     static func registerWindowForTeardown(_ window: NSWindow) -> NSWindow {
         // `orderOut`, not `close`: a programmatic NSWindow defaults to release-on-close, and
