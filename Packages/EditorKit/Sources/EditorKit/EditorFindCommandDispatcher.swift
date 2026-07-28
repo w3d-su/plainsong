@@ -15,9 +15,11 @@ public enum EditorFindCommand: Equatable, Sendable {
 /// stay behind EditorKit, so App never names `STTextView` (agent.md §6.1 — "App/ and
 /// MarkdownCore/ must never import STTextView types").
 ///
-/// Unlike the Format dispatcher this reports delivery, because App owns a real fallback: when
-/// the find field rather than the editor holds focus there is no `STTextView` on the responder
-/// path, and the command has to be applied against shared `AppState` instead.
+/// Unlike the Format dispatcher this reports delivery, because App owns a real fallback. The
+/// find bar has focusable surfaces the responder chain cannot reach an editor through: the
+/// owned query field and its field editor, and the bar's SwiftUI chrome (Aa, whole-word,
+/// Previous, Next, Done). In all of those there is no `STTextView` on the responder path, so
+/// App applies the command against shared `AppState` instead.
 @MainActor
 public enum EditorFindCommandDispatcher {
     /// Returns `true` when a responder accepted the command.
@@ -35,7 +37,9 @@ public enum EditorFindCommandDispatcher {
         NSApplication.shared.sendAction(selector(for: command), to: target, from: nil)
     }
 
-    private static func selector(for command: EditorFindCommand) -> Selector {
+    /// Internal so a test can ask `NSApplication.target(forAction:)` whether an editor is
+    /// reachable, instead of inferring it from ambient responder state.
+    static func selector(for command: EditorFindCommand) -> Selector {
         switch command {
         case .show: #selector(STTextView.plainsongShowFind(_:))
         case .next: #selector(STTextView.plainsongFindNext(_:))

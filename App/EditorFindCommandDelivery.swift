@@ -6,8 +6,12 @@ import EditorKit
 ///
 /// The selectors and the concrete editor type live behind `EditorFindCommandDispatcher` in
 /// EditorKit (agent.md §6.1); App only consumes the delivered/not-delivered result.
-/// Falls back to shared `AppState` only when the key window's first responder is the find
-/// field (or its field editor), which is not on the editor's responder path.
+///
+/// Falls back to shared `AppState` whenever the editor is not on the responder path but the
+/// command is still eligible — the owned query field or its field editor holds focus, **or**
+/// SwiftUI focus sits on the bar's own chrome (Aa, whole-word, Previous, Next, Done), which
+/// AppKit cannot route to. `isEditorFindCommandContextActive()` is what decides eligibility
+/// in both cases.
 @MainActor
 enum EditorFindCommandDelivery {
     static func installHooks() {
@@ -33,7 +37,7 @@ enum EditorFindCommandDelivery {
         if EditorFindCommandDispatcher.send(.show) {
             return true
         }
-        // Find field owns focus: not on the editor responder path.
+        // Find chrome owns focus (query field or a bar control): no editor on the responder path.
         guard let appState = PlainsongAppServices.appState,
               appState.isEditorFindCommandContextActive()
         else {

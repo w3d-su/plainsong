@@ -42,16 +42,28 @@ final class EditorFindSpikeTests: XCTestCase {
         // sendAction with explicit target (menu path uses to: nil in production;
         // unit tests without a full NSApp activation may not walk the key window).
         XCTAssertTrue(
-            NSApp.sendAction(#selector(STTextView.plainsongShowFind(_:)), to: textView, from: nil)
+            NSApplication.shared.sendAction(
+                #selector(STTextView.plainsongShowFind(_:)),
+                to: textView,
+                from: nil
+            )
         )
         XCTAssertEqual(EditorFindSpike.fireCount, 2)
     }
 
-    func testShowFindNoOpsWithoutFocusedEditorResponder() {
-        XCTAssertEqual(EditorFindSpike.fireCount, 0)
-        // No first-responder editor: sendAction(to: nil) finds no target; count stays 0.
-        _ = NSApp.sendAction(#selector(STTextView.plainsongShowFind(_:)), to: nil, from: nil)
-        XCTAssertEqual(EditorFindSpike.fireCount, 0)
+    func testShowFindNoOpsWithoutFocusedEditorResponder() throws {
+        // `NSApplication.shared`, not `NSApp`: the latter is nil until something instantiates
+        // the application, so this crashed when run on its own and only passed because an
+        // earlier test in the suite had already created it.
+        try withNonEditorKeyWindow { _ in
+            XCTAssertEqual(EditorFindSpike.fireCount, 0)
+            _ = NSApplication.shared.sendAction(
+                #selector(STTextView.plainsongShowFind(_:)),
+                to: nil,
+                from: nil
+            )
+            XCTAssertEqual(EditorFindSpike.fireCount, 0)
+        }
     }
 
     func testDispatcherRoutesEachCommandToItsEditorSelector() throws {
@@ -83,13 +95,65 @@ final class EditorFindSpikeTests: XCTestCase {
         XCTAssertEqual(fired, ["show", "next", "previous", "useSelection"])
     }
 
-    func testDispatcherReportsNotDeliveredWithoutAnEditorResponder() {
-        // This is the signal App's find-field fallback depends on.
-        for command in [EditorFindCommand.show, .next, .previous, .useSelection] {
-            XCTAssertFalse(
-                EditorFindCommandDispatcher.send(command, to: nil),
-                "\(command) must report not-delivered when no editor is on the responder path"
-            )
+    func testDispatcherReportsNotDeliveredWithoutAnEditorResponder() throws {
+        // This is the signal App's chrome fallback depends on, so the test has to establish
+        // that no editor is reachable rather than inherit whatever an earlier test focused.
+        var fired: [String] = []
+        EditorFindActionHooks.showFind = { fired.append("show") }
+        EditorFindActionHooks.findNext = { fired.append("next") }
+        EditorFindActionHooks.findPrevious = { fired.append("previous") }
+        EditorFindActionHooks.useSelectionForFind = { fired.append("useSelection") }
+        defer {
+            EditorFindActionHooks.showFind = nil
+            EditorFindActionHooks.findNext = nil
+            EditorFindActionHooks.findPrevious = nil
+            EditorFindActionHooks.useSelectionForFind = nil
         }
+
+        try withNonEditorKeyWindow { _ in
+            for command in [EditorFindCommand.show, .next, .previous, .useSelection] {
+                XCTAssertNil(
+                    NSApplication.shared.target(
+                        forAction: EditorFindCommandDispatcher.selector(for: command)
+                    ),
+                    "precondition: no editor may be reachable on the responder chain"
+                )
+                XCTAssertFalse(
+                    EditorFindCommandDispatcher.send(command, to: nil),
+                    "\(command) must report not-delivered when no editor is on the responder path"
+                )
+            }
+            XCTAssertEqual(fired, [], "nothing may fire when delivery reports false")
+        }
+    }
+
+    /// Runs `body` with a key window whose first responder is deliberately **not** an editor,
+    /// so responder-chain outcomes cannot depend on what another test left focused.
+    ///
+    /// Skips rather than asserts when the runner refuses key/first-responder changes: a
+    /// dirty ambient chain would make the result meaningless either way.
+    private func withNonEditorKeyWindow(_ body: (NSWindow) throws -> Void) throws {
+        let frame = NSRect(x: 0, y: 0, width: 200, height: 100)
+        let window = NSWindow(
+            contentRect: frame,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil) }
+        let decoy = NSTextField(string: "not-an-editor")
+        decoy.frame = NSRect(x: 0, y: 0, width: 120, height: 24)
+        window.contentView?.addSubview(decoy)
+        window.makeKeyAndOrderFront(nil)
+        guard window.makeFirstResponder(decoy) else {
+            throw XCTSkip("makeFirstResponder(decoy) unavailable in this runner")
+        }
+        guard NSApplication.shared.target(
+            forAction: EditorFindCommandDispatcher.selector(for: .show)
+        ) == nil else {
+            throw XCTSkip("An editor is still reachable on the ambient responder chain")
+        }
+        try body(window)
     }
 }
