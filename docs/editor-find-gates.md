@@ -417,11 +417,11 @@ interruption of in-flight engine work.
   increment `droppedStaleMatchCount` and do not apply.
   Evidence: `EditorFindControllerTests.testStaleMatchCompletionIsDropped` (deterministic
   hold seam: first generation held, second applied, first released and dropped);
-  `...testCancelInFlightWorkAdvancesFenceSoDetachedWorkerCannotApply`
+  `EditorFindControllerLifecycleTests.testCancelInFlightWorkAdvancesFenceSoDetachedWorkerCannotApply`
 - [x] Scheduling a new match (query / edit / rebind) **immediately** clears `session` and
   `pendingNavigationCommand` so next/previous/activate during debounce cannot emit a
   superseded range under a new revision.
-  Evidence: `EditorFindControllerTests.testScheduleMatchInvalidatesSessionSoNextDoesNotUseStaleRanges`
+  Evidence: `EditorFindControllerLifecycleTests.testScheduleMatchInvalidatesSessionSoNextDoesNotUseStaleRanges`
 - [ ] Typing latency on `Fixtures/large-1mb.md` is unchanged with the find bar open and
   a live query (no main-actor full-document match on the keystroke path). §12 &lt; 16 ms
   typing budget remains the hard product gate (agent.md §17.8: state how typing latency
@@ -434,7 +434,7 @@ interruption of in-flight engine work.
 
 - [x] Activating a match selects the exact half-open UTF-16 range and reveals it.
   Evidence: `EditorFindControllerTests.testActivateEmitsExactUTF16NavigationWithMonotonicIDs`,
-  `...testNavigationAppliesThroughExistingEditorNavigationPath`
+  `EditorFindControllerTests.testNavigationAppliesThroughExistingEditorNavigationPath`
 - [x] Repeated activation of the **same** match works (monotonic navigation IDs).
   Evidence: `EditorFindControllerTests.testActivateEmitsExactUTF16NavigationWithMonotonicIDs`
 - [x] Stale requests (older ID, wrong document identity, invalid range, marked text /
@@ -442,12 +442,12 @@ interruption of in-flight engine work.
   lifecycle rebinding is F4/F4b, not “ignore and hope.”)
   Evidence: existing WS3A `EditorNavigationStateMachine` + integration tests remain
   authoritative for reject/pending; find emits only through that path
-  (`testNavigationAppliesThroughExistingEditorNavigationPath`).
+  (`EditorFindControllerTests.testNavigationAppliesThroughExistingEditorNavigationPath`).
 - [x] **Shared navigation ID domain (contract):** production App **must** install
   `EditorFindController.navigationIDProvider` from the same high-water mark as workspace
   search (`AppState.editorNavigationGeneration`). When the provider is nil (unit tests),
   the controller uses a local sequence — safe only while nothing else shares the channel.
-  Evidence: `EditorFindControllerTests.testNavigationIDProviderUsesSharedDomain`
+  Evidence: `EditorFindControllerLifecycleTests.testNavigationIDProviderUsesSharedDomain`
 - Evidence: **closed in PR B for exact-range + provider contract.** Production wiring of
   the provider lands in PR C (App find bar).
 
@@ -455,13 +455,13 @@ interruption of in-flight engine work.
 
 - [x] Editing the document while find is open invalidates the match set and recomputes
   (debounced) against the new revision **without emitting navigation**.
-  Evidence: `EditorFindControllerTests.testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`
+  Evidence: `EditorFindControllerLifecycleTests.testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`
 - [x] A stale match list cannot jump the caret after an edit (session + pending cleared at
   schedule; recompute leaves no navigation command).
   Evidence: same test + `testScheduleMatchInvalidatesSessionSoNextDoesNotUseStaleRanges`
 - [x] After edit/rebind (non-navigating recompute), the first next/previous **activates**
   the current ordinal instead of stepping past it.
-  Evidence: `EditorFindControllerTests.testFirstFindNextAfterRebindActivatesCurrentMatchNotNext`
+  Evidence: `EditorFindControllerLifecycleTests.testFirstFindNextAfterRebindActivatesCurrentMatchNotNext`
 - Evidence: **closed in PR B**
 
 ### F4b — Document lifecycle (defined behavior, not only stale rejection)
@@ -522,7 +522,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   recomputed from the **post-navigation** selection marks the region revealed; applying
   that presentation clears folded-delimiter attributes on the delimiter runs; source
   bytes unchanged.
-  Evidence: `EditorFindControllerTests.testExperimentalWYSIWYGFindNavigationSelectsMatchAndRevealsFoldRegion`
+  Evidence: `EditorFindControllerPresentationTests.testExperimentalWYSIWYGFindNavigationSelectsMatchAndRevealsFoldRegion`
 - [x] Source text is byte-identical before and after find navigation.
   Evidence: same test + `testSourceOnlyFindNavigationSelectsWithoutSourceMutation`
 - [x] Covered with Experimental WYSIWYG both **off** and **on**.
@@ -581,7 +581,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   an App-owned `focusAppliedID` alongside `focusSupersededID`, arbitration is pure
   (`EditorFindFocusArbitration`), and the owned field's attempt is a bounded key-window retry
   instead of one `DispatchQueue.main.async` hop that lost the first-⌘F mount race.
-  Evidence: `EditorFindReviewFixTests.testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest`,
+  Evidence: `EditorFindFocusReceiptTests.testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest`,
   `...testBackgroundWindowAndSupersededRequestsNeverAdvanceTheReceipt`,
   `...testRetryContinuesWhileTheBarIsVisibleAndTheRequestIsUnresolved`.
   The **select-all** receipt is App-owned for the same reason
@@ -598,7 +598,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   grant eligibility in the key one. Partial: `EditorFindFocusReceiptTests`
   `testFindBarChromeFocusKeepsMenuCommandsEligibleOnlyForTheHostingKeyWindow`,
   `...testKeyWindowChangeAloneFlipsChromeFocusEligibility`,
-  `...testEveryBarCloseRouteClearsReportedChromeFocus`, and `EditorFindReviewFixTests`
+  `...testEveryBarCloseRouteClearsReportedChromeFocus`,
   `...testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext`. Only *which
   window is key* is stubbed; the report-versus-key comparison runs for real.
   Storage is **one entry per window** (`chromeFocusByWindow`), so neither clearing nor

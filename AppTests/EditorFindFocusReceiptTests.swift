@@ -487,9 +487,9 @@ final class EditorFindFocusReceiptTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
-        // This window carries the owned query-field identifier, so leaving it key would make
-        // `keyWindowHostsFindBar()` true for every later test in the process. CI failed on
-        // exactly that ordering before this teardown existed.
+        // This window carries the owned query-field identifier and is made key below, so
+        // leaving it key would change what `NSApp.keyWindow` answers for every later test in
+        // the process. CI failed on exactly that ordering before this teardown existed.
         //
         // `orderOut`, not `close`: a programmatic `NSWindow` defaults to
         // `isReleasedWhenClosed = true`, so closing it over-releases the local reference and
