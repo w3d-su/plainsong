@@ -28,6 +28,11 @@ final class EditorFindSpikeTests: XCTestCase {
             backing: .buffered,
             defer: false
         )
+        // This window makes an *editor* first responder and key. Left ordered in, AppKit can
+        // keep it reachable and pollute the responder chain for every later test.
+        // `orderOut`, not `close`: a programmatic NSWindow defaults to release-on-close.
+        window.isReleasedWhenClosed = false
+        defer { window.orderOut(nil) }
         window.contentView = scrollView
         window.makeKeyAndOrderFront(nil)
         XCTAssertTrue(window.makeFirstResponder(textView))
@@ -73,6 +78,8 @@ final class EditorFindSpikeTests: XCTestCase {
         let scrollView = MarkdownSTTextView.scrollableTextView(frame: frame)
         let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
         textView.text = "dispatch"
+        // Delivery here is to an explicit target, so this editor is never made key — but keep
+        // it out of any window so it cannot join an ambient responder chain either.
 
         var fired: [String] = []
         EditorFindActionHooks.showFind = { fired.append("show") }

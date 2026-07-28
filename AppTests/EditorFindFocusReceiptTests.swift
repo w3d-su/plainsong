@@ -480,6 +480,53 @@ final class EditorFindFocusReceiptTests: XCTestCase {
         return window
     }
 
+    func testResponderEligibilityIsScopedToTheWindowItIsAskedAbout() throws {
+        // Window A holds editor focus; window B holds nothing relevant. Asking about B must
+        // answer for B. This previously consulted `NSApp.keyWindow` first, so A's editor
+        // focus made B report eligible.
+        let windowA = makeProbeWindow()
+        let windowB = makeProbeWindow()
+        defer {
+            windowA.orderOut(nil)
+            windowB.orderOut(nil)
+        }
+
+        let editor = NSTextView(frame: NSRect(x: 0, y: 0, width: 180, height: 80))
+        editor.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
+        windowA.contentView?.addSubview(editor)
+        let unrelated = NSButton(title: "Files", target: nil, action: nil)
+        unrelated.frame = NSRect(x: 0, y: 0, width: 80, height: 24)
+        windowB.contentView?.addSubview(unrelated)
+
+        windowA.makeKeyAndOrderFront(nil)
+        guard windowA.makeFirstResponder(editor) else {
+            throw XCTSkip("makeFirstResponder(editor) unavailable in this runner")
+        }
+        guard windowB.makeFirstResponder(unrelated) else {
+            throw XCTSkip("makeFirstResponder(unrelated) unavailable in this runner")
+        }
+
+        // The deterministic half: the probe the eligibility check now uses is window-scoped.
+        // This is what fails if anyone routes it back through `NSApp.keyWindow` — in this
+        // test host that global is `nil`, so a keyWindow-based implementation reports `false`
+        // for A even though A holds editor focus.
+        XCTAssertTrue(EditorSelectionProbe.hasEditorFocus(in: windowA))
+        XCTAssertFalse(EditorSelectionProbe.hasEditorFocus(in: windowB))
+
+        XCTAssertTrue(
+            EditorFindResponderSupport.windowHasEditorOrFindChrome(windowA),
+            "The window that actually holds editor focus is eligible"
+        )
+        XCTAssertFalse(
+            EditorFindResponderSupport.windowHasEditorOrFindChrome(windowB),
+            "Another window's editor focus must not make this window eligible"
+        )
+        // Honest limit: `NSApp.keyWindow` is nil in this test host (verified — the host app is
+        // not active), so these last two assertions cannot reproduce the ambient-key failure
+        // by themselves. They document the contract; the probe assertions above are what
+        // catch a regression, and `EditorSelectionProbeTests` covers the same rule in EditorKit.
+    }
+
     func testEditorAndQueryFieldResponderEligibilityIsUnchanged() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),

@@ -101,14 +101,28 @@ public enum EditorSelectionProbe {
 
     /// Whether the key window's first responder is the Plainsong editor text view.
     public static func keyWindowHasEditorFocus() -> Bool {
-        keyWindowEditorSelection() != nil
-            || keyWindowEditorTextView() != nil
+        guard let window = NSApp.keyWindow else { return false }
+        return hasEditorFocus(in: window)
+    }
+
+    /// Whether **this** window's first responder is the Plainsong editor text view.
+    ///
+    /// Window-scoped on purpose: `keyWindowHasEditorFocus()` answers about `NSApp.keyWindow`,
+    /// which is the wrong question — and a wrong answer — for a caller asking about a
+    /// specific window while a different one holds editor focus.
+    public static func hasEditorFocus(in window: NSWindow) -> Bool {
+        editorSelection(in: window) != nil
+            || editorTextView(focusedIn: window) != nil
     }
 
     public static func keyWindowEditorTextView() -> NSView? {
-        guard let window = NSApp.keyWindow,
-              let first = window.firstResponder
-        else {
+        guard let window = NSApp.keyWindow else { return nil }
+        return editorTextView(focusedIn: window)
+    }
+
+    /// Window-scoped counterpart of `keyWindowEditorTextView()`.
+    public static func editorTextView(focusedIn window: NSWindow) -> NSView? {
+        guard let first = window.firstResponder else {
             return nil
         }
 

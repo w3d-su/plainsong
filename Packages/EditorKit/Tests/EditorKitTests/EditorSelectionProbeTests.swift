@@ -62,4 +62,47 @@ final class EditorSelectionProbeTests: XCTestCase {
         XCTAssertEqual(applied.range, target)
         XCTAssertEqual(applied.documentIdentity, documentA)
     }
+
+    func testEditorFocusIsScopedToTheWindowAsked() throws {
+        // `keyWindowHasEditorFocus()` answers about `NSApp.keyWindow`, which is the wrong
+        // question for a caller asking about a specific window — and gave the wrong answer
+        // when a different window held editor focus.
+        let source = "alpha needle omega"
+        let model = EditorFindControllerTestSupport.FindNavModel(
+            text: source,
+            selection: NSRange(location: 0, length: 0)
+        )
+        let withEditor = try EditorFindControllerTestSupport.makeWindowedFixture(
+            model: model,
+            source: source,
+            documentIdentity: documentA
+        )
+        XCTAssertTrue(
+            withEditor.window.firstResponder === withEditor.textView,
+            "precondition: this window's editor holds first responder"
+        )
+
+        let other = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        other.isReleasedWhenClosed = false
+        defer { other.orderOut(nil) }
+        let decoy = NSTextField(string: "not-an-editor")
+        decoy.frame = NSRect(x: 0, y: 0, width: 120, height: 24)
+        other.contentView?.addSubview(decoy)
+        guard other.makeFirstResponder(decoy) else {
+            throw XCTSkip("makeFirstResponder(decoy) unavailable in this runner")
+        }
+
+        XCTAssertTrue(EditorSelectionProbe.hasEditorFocus(in: withEditor.window))
+        XCTAssertFalse(
+            EditorSelectionProbe.hasEditorFocus(in: other),
+            "A window without editor focus must answer false even while another window has it"
+        )
+        XCTAssertNotNil(EditorSelectionProbe.editorTextView(focusedIn: withEditor.window))
+        XCTAssertNil(EditorSelectionProbe.editorTextView(focusedIn: other))
+    }
 }

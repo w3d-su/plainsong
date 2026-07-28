@@ -53,11 +53,13 @@ enum EditorFindResponderSupport {
     /// `chromeFocusByWindow` first and falls back to this check whenever that path does not
     /// apply: the bar is hidden, **or** the key window has no entry of its own.
     ///
-    /// Exposed for tests so the rule can be exercised without depending on which window
-    /// `NSApp` considers key.
+    /// Every check is scoped to `window`. It previously asked
+    /// `EditorSelectionProbe.keyWindowHasEditorFocus()` first, which answers about
+    /// `NSApp.keyWindow` — so asking about window B returned `true` whenever window A held
+    /// editor focus. Exposed for tests, which rely on that scoping.
     @MainActor
     static func windowHasEditorOrFindChrome(_ window: NSWindow) -> Bool {
-        if EditorSelectionProbe.keyWindowHasEditorFocus() {
+        if EditorSelectionProbe.hasEditorFocus(in: window) {
             return true
         }
         guard let first = window.firstResponder else { return false }
