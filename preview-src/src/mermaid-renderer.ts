@@ -187,38 +187,8 @@ export class MermaidRenderCoordinator {
   }
 }
 
-interface MermaidDataset {
-  mermaidGeneration?: string;
-  mermaidOrdinal?: string;
-  mermaidSource?: string;
-}
-
-interface ClassListReader {
-  contains(token: string): boolean;
-}
-
-interface ClassListWriter extends ClassListReader {
-  add(...tokens: string[]): void;
-  remove(...tokens: string[]): void;
-}
-
-export interface MermaidWrapperLike {
-  classList: ClassListWriter;
-  dataset: MermaidDataset;
-  innerHTML: string;
-  textContent: string | null;
-}
-
-export interface PreviewPatchElementLike {
-  classList: ClassListReader;
-  className: string;
-  dataset: MermaidDataset;
-  matches(selector: string): boolean;
-  textContent: string | null;
-}
-
 export function markMermaidWrapperPending(
-  wrapper: MermaidWrapperLike,
+  wrapper: HTMLElement,
   descriptor: MermaidBlockDescriptor,
 ): void {
   wrapper.classList.add("mermaid-rendered", "mermaid-pending");
@@ -228,7 +198,7 @@ export function markMermaidWrapperPending(
 }
 
 export function applyMermaidBlockOutcome(
-  wrapper: MermaidWrapperLike,
+  wrapper: HTMLElement,
   descriptor: MermaidBlockDescriptor,
   outcome: MermaidBlockOutcome,
 ): boolean {
@@ -251,9 +221,15 @@ export function applyMermaidBlockOutcome(
 }
 
 export function shouldUpdatePreviewElement(
-  fromElement: PreviewPatchElementLike,
-  toElement: PreviewPatchElementLike,
+  fromElement: Element,
+  toElement: Element,
 ): boolean {
+  if (
+    !(fromElement instanceof HTMLElement) ||
+    !(toElement instanceof HTMLElement)
+  ) {
+    return true;
+  }
   if (shouldPreserveMermaidWrapper(fromElement, toElement)) {
     return false;
   }
@@ -266,8 +242,32 @@ export function shouldUpdatePreviewElement(
   );
 }
 
+export function shouldUpdatePreviewChildren(
+  fromElement: Element,
+  toElement: Element,
+): boolean {
+  if (
+    !(fromElement instanceof HTMLElement) ||
+    !(toElement instanceof HTMLElement)
+  ) {
+    return true;
+  }
+  if (
+    !toElement.classList.contains("mermaid-rendered") ||
+    !toElement.classList.contains("mermaid-pending")
+  ) {
+    return true;
+  }
+
+  const existingSVG = fromElement.firstElementChild;
+  return !(
+    existingSVG?.localName === "svg" &&
+    existingSVG.namespaceURI === "http://www.w3.org/2000/svg"
+  );
+}
+
 function mermaidWrapperMatchesDescriptor(
-  wrapper: Pick<MermaidWrapperLike, "dataset">,
+  wrapper: HTMLElement,
   descriptor: MermaidBlockDescriptor,
 ): boolean {
   return (
@@ -278,8 +278,8 @@ function mermaidWrapperMatchesDescriptor(
 }
 
 function shouldPreserveMermaidWrapper(
-  fromElement: PreviewPatchElementLike,
-  toElement: PreviewPatchElementLike,
+  fromElement: HTMLElement,
+  toElement: HTMLElement,
 ): boolean {
   if (
     !fromElement.classList.contains("mermaid-rendered") ||
@@ -300,14 +300,12 @@ function shouldPreserveMermaidWrapper(
   );
 }
 
-function codeLanguageClass(element: PreviewPatchElementLike): string {
+function codeLanguageClass(element: HTMLElement): string {
   return (
-    element.className
-      .split(/\s+/u)
-      .find(
-        (className) =>
-          className.startsWith("language-") || className.startsWith("lang-"),
-      ) ?? ""
+    Array.from(element.classList).find(
+      (className) =>
+        className.startsWith("language-") || className.startsWith("lang-"),
+    ) ?? ""
   );
 }
 

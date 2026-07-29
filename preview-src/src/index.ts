@@ -12,7 +12,6 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import mermaid from "mermaid";
-import morphdom from "morphdom";
 import {
   type BridgeMessage,
   PROTOCOL_VERSION,
@@ -20,15 +19,10 @@ import {
 } from "./bridge";
 import { rewriteImageSources } from "./image-rewrite";
 import {
-  collectPendingMermaidWrapper,
-  prepareMermaidBlocks,
-  renderPendingMermaidBlocks,
+  patchPreviewRoot,
   rerenderVisibleMermaidBlocks,
 } from "./mermaid-dom";
-import {
-  MermaidRenderCoordinator,
-  shouldUpdatePreviewElement,
-} from "./mermaid-renderer";
+import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
@@ -176,27 +170,11 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
   rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages);
-  const preparedMermaidBlocks = prepareMermaidBlocks(nextRoot, mermaidRenderer);
-  const pendingMermaidWrappers = new Set<HTMLElement>();
 
   clearMdxErrorBanner();
-  morphdom(previewRoot, nextRoot, {
-    childrenOnly: true,
-    onBeforeElUpdated: shouldUpdatePreviewElement,
-    onElUpdated(element) {
-      collectPendingMermaidWrapper(element, pendingMermaidWrappers);
-    },
-    onNodeAdded(node) {
-      collectPendingMermaidWrapper(node, pendingMermaidWrappers);
-    },
-  });
+  const mermaidPatch = patchPreviewRoot(previewRoot, nextRoot, mermaidRenderer);
   highlightCodeBlocks();
-  await renderPendingMermaidBlocks(
-    previewRoot,
-    pendingMermaidWrappers,
-    preparedMermaidBlocks,
-    mermaidRenderer,
-  );
+  await mermaidPatch;
   if (payload.renderID < latestRenderID) return;
   currentRenderedVersion = payload.version;
 

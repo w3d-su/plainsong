@@ -1,13 +1,44 @@
+import morphdom from "morphdom";
 import {
   applyMermaidBlockOutcome,
   type MermaidBlockDescriptor,
   MermaidRenderCoordinator,
   markMermaidWrapperPending,
+  shouldUpdatePreviewChildren,
+  shouldUpdatePreviewElement,
 } from "./mermaid-renderer";
 
 export type PreparedMermaidBlocks = ReadonlyArray<
   MermaidBlockDescriptor | undefined
 >;
+
+export function patchPreviewRoot(
+  liveRoot: HTMLElement,
+  nextRoot: HTMLElement,
+  coordinator: MermaidRenderCoordinator,
+): Promise<void> {
+  const descriptors = prepareMermaidBlocks(nextRoot, coordinator);
+  const pendingWrappers = new Set<HTMLElement>();
+
+  morphdom(liveRoot, nextRoot, {
+    childrenOnly: true,
+    onBeforeElUpdated: shouldUpdatePreviewElement,
+    onBeforeElChildrenUpdated: shouldUpdatePreviewChildren,
+    onElUpdated(element) {
+      collectPendingMermaidWrapper(element, pendingWrappers);
+    },
+    onNodeAdded(node) {
+      collectPendingMermaidWrapper(node, pendingWrappers);
+    },
+  });
+
+  return renderPendingMermaidBlocks(
+    liveRoot,
+    pendingWrappers,
+    descriptors,
+    coordinator,
+  );
+}
 
 export function prepareMermaidBlocks(
   root: ParentNode,

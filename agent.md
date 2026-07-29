@@ -312,17 +312,25 @@ Two unified pipelines selected by `fileKind`:
 Post-render in browser: `highlight.js` handles non-Mermaid code fences. Before the live
 DOM patch, Mermaid fences become `div.mermaid-rendered` placeholders carrying the exact
 fence source, its Mermaid-fence ordinal, and the current Mermaid-theme generation.
-`morphdom` keeps a matching successful live wrapper; remaining placeholders use a
-64-entry success-only LRU with the same exact source + ordinal key, and misses call
-`mermaid.render`. Concurrent identical misses coalesce in a separate in-flight table
-with the same 64-entry bound. Failed renders remain `.mermaid-error`, are not cached,
-and retry on the next render. A preview-theme change reinitializes Mermaid, clears both
-tables, and re-renders every visible diagram because the theme is baked into its SVG.
-Checkbox inputs remain enabled and clickable.
+`morphdom` keeps a matching successful live wrapper. A changed wrapper receives the new
+descriptor and `.mermaid-pending` state while retaining its previous SVG children only
+as a stale visual until rendering settles; pending wrappers are never authoritative,
+and success or `.mermaid-error` replaces those children. Remaining placeholders use a
+64-entry success-only LRU keyed by the exact JavaScript source string + ordinal tuple,
+and misses call `mermaid.render`. Exact-string comparison, not the removed 32-bit djb2
+hash, authorizes reuse. The ordinal is part of the key because Mermaid output embeds its
+render ID in SVG IDs and references; reusing one SVG string for identical fences at two
+positions would duplicate IDs. Inserting or removing a fence therefore deliberately
+invalidates every shifted following ordinal. Concurrent identical misses coalesce in a
+separate in-flight table with the same 64-entry bound. Failed renders remain
+`.mermaid-error`, are not cached, and retry on the next render. A preview-theme change
+reinitializes Mermaid, clears both tables, and re-renders every visible diagram because
+the theme is baked into its SVG. Checkbox inputs remain enabled and clickable.
 
 DOM update: render to HTML string → prepare Mermaid placeholders → `morphdom` patch
-against live DOM → resolve pending Mermaid wrappers. This preserves unchanged Mermaid
-SVG DOM, unchanged highlighted-code DOM, scroll position, and image loads.
+against live DOM (retaining a changed diagram's prior SVG while pending) → resolve
+pending Mermaid wrappers. This preserves unchanged Mermaid SVG DOM, unchanged
+highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
 the Frontmatter panel, §10). Optional toggle to show it as a styled block.
@@ -439,8 +447,12 @@ attempt without a Decision Log entry.
 Techniques: tree-sitter incremental edits (`InputEdit`), Neon visible-range-first
 highlighting, morphdom patching, render-version dropping, LRU sessions, and bounded
 success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal within a
-theme generation. **Any PR that regresses typing latency is rejected regardless of
-features.** Add a `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
+theme generation. The ordinal prevents duplicate Mermaid-generated SVG IDs when equal
+source appears more than once; inserting or removing a fence intentionally invalidates
+shifted following ordinals. While a changed diagram renders, morphdom keeps its prior
+SVG children only as non-authoritative pending content, avoiding a temporary collapse.
+**Any PR that regresses typing latency is rejected regardless of features.** Add a
+`PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
 
 M5 planning note: the highlight budget is accepted only from visible-range-first
 highlighting instrumentation, not from the historical 250 KB full-document inline
@@ -772,7 +784,7 @@ make format           # swiftformat . && swiftlint --fix
 
 | 2026-07-29 | PR #97 ninth review: the fixture teardown claim was false; every test window now registers, and the key-window seam is internal | **This entry corrects the preceding row.** That row said all six fixture-using classes call `tearDownWindows()` and are therefore cleaned up. Two of them — `EditorNavigationIntegrationTests` and `EditorInstalledDocumentTransitionTests` — build their windows in their **own** factories, which never registered with the shared registry, so the `tearDown()` added for them was a no-op that read like cleanup: eight navigation fixtures plus a window built inline for the attach test could still be left ordered in with an editor first responder. Registration is now a named `registerWindowForTeardown(_:)` and every such site routes through it. `EditorSelectionProbeTests.testTearDownReleasesRegisteredFixtureWindows` asserts the window is actually gone afterwards through a weak reference — measured first, because `orderOut` hides a window and drops key status but leaves it in `NSApplication.shared.windows`, and `close()` does not remove it either; only releasing the last reference does, so the registry releases as well as hides. Scope boundary stated rather than implied: other EditorKit suites (WYSIWYG gates, document-binding lifecycle, programmatic writer activation) also build windows directly and are deliberately untouched by this find-bar PR. Separately, `keyWindowOverrideForTesting` is **internal**, not public: AppTests reaches it through `@testable import EditorKit` (verified building and running), so a test-only seam does not become mutable global state on a public production API. Alt: leaving the two local factories to per-test `defer` was rejected because a shared `tearDown()` that silently covers nothing is worse than no teardown; expanding into the other window-building suites was rejected as unrelated scope for this PR rather than because those windows are safe. |
 
-| 2026-07-29 | Preview Mermaid memo is exact, theme-scoped, success-only, and bounded | The preview only wrote a 32-bit `data-mermaid-hash`: each fresh tree still held `pre/code`, so `morphdom` replaced the live `div.mermaid-rendered` and every debounce called `mermaid.render` again. Fresh trees now carry same-tag pending wrappers. A successful live wrapper is authoritative when its exact JavaScript source string, absolute Mermaid-fence ordinal, and Mermaid-theme generation all match; remaining wrappers use a 64-entry success-only LRU keyed by the same exact source + ordinal tuple. Cache hits re-check the stored exact source and ordinal, djb2 is removed, and Mermaid renderer IDs are monotonic, so no hash collision can authorize SVG reuse. Concurrent identical misses coalesce in an in-flight table with the same 64-entry bound. A preview-theme change reinitializes Mermaid, clears both tables, and re-renders visible diagrams; failures remain `.mermaid-error`, are not cached, and retry. Both bounds prevent growth across document switches, while current live DOM preservation remains independent of eviction. No measured performance improvement is claimed; measurement is the next PR. Alt: hash-only reuse, caching failures, an unbounded cache, or retaining SVGs across themes was rejected for correctness, recovery, memory, and theme fidelity. |
+| 2026-07-29 | Preview Mermaid memo is exact, ordinal-scoped, theme-invalidated, success-only, bounded, and real-DOM tested | The documented memo did not exist: the preview only wrote a 32-bit `data-mermaid-hash`, every fresh tree still held `pre/code`, and `morphdom` replaced each live `div.mermaid-rendered`, so every debounce called `mermaid.render`. Fresh trees now carry same-tag pending wrappers and the render path calls one exported prepare → morphdom/collect → resolve seam. A successful live wrapper is authoritative only when its exact JavaScript source string, absolute Mermaid-fence ordinal, and Mermaid-theme generation all match; remaining wrappers use a 64-entry success-only LRU whose JSON tuple key and stored fields compare the exact source + ordinal, so djb2 collisions cannot authorize reuse. An installed Mermaid 11.15 probe produced 18 IDs, including the renderer ID on the root SVG and in a `url(#…)` reference; inserting that SVG string twice duplicated all 18 IDs. The ordinal therefore isolates equal-source instances, with the deliberate consequence that inserting or removing a fence re-renders every shifted following diagram. Changed wrappers receive the new descriptor and `.mermaid-pending` state but keep the exact prior SVG children as stale visual content until success or error replaces them; pending content is never accepted as authoritative. Concurrent identical misses coalesce in a separately bounded 64-entry in-flight table. A theme change reinitializes Mermaid, advances the generation, clears both tables, and re-renders every visible diagram because theme styling is baked into SVG; failures remain `.mermaid-error`, are not cached, and retry. Both bounds prevent growth across document switches. Vitest now uses the `jsdom` dev dependency to exercise actual HTML/SVG nodes and morphdom callback order; fake node doubles were rejected because they let the broken production wiring pass, while a hosted WKWebView/performance harness is deferred to the measurement follow-up. No measured performance improvement is claimed. Alt: hash-only or source-only reuse, caching failures, an unbounded cache, blanking changed wrappers, retaining SVGs across themes, or continuing fake-DOM-only tests was rejected for collision safety, SVG ID uniqueness, recovery, memory, visual stability, theme fidelity, and falsifiability. |
 
 ---
 
