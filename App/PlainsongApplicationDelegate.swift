@@ -167,7 +167,9 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
         ) {
             guard let fixture = debugEditorFindFixture,
                   let cleanupToken = debugEditorFindCleanupToken,
-                  let request = NSPasteboard.general.string(
+                  let request = debugEditorFindCleanupPasteboard(
+                      token: cleanupToken
+                  ).string(
                       forType: NSPasteboard.PasteboardType(
                           DebugEditorFindFixture.cleanupRequestPasteboardType
                       )
@@ -180,7 +182,6 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             else {
                 return
             }
-            stopPollingForDebugEditorFindCleanupRequests()
             NSApplication.shared.terminate(nil)
         }
 
@@ -197,7 +198,7 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             }
 
             if let token = debugEditorFindCleanupToken, !token.isEmpty {
-                let pasteboard = NSPasteboard.general
+                let pasteboard = debugEditorFindCleanupPasteboard(token: token)
                 pasteboard.clearContents()
                 let receipt = DebugEditorFindFixture.cleanupReceipt(
                     identifier: fixture.identifier,
@@ -208,7 +209,13 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
                     forType: NSPasteboard.PasteboardType(
                         DebugEditorFindFixture.cleanupReceiptPasteboardType
                     )
-                ) else {
+                ),
+                    pasteboard.string(
+                        forType: NSPasteboard.PasteboardType(
+                            DebugEditorFindFixture.cleanupReceiptPasteboardType
+                        )
+                    ) == receipt
+                else {
                     return false
                 }
             }
@@ -217,6 +224,16 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             debugEditorFindCleanupToken = nil
             stopPollingForDebugEditorFindCleanupRequests()
             return true
+        }
+
+        private func debugEditorFindCleanupPasteboard(
+            token: String
+        ) -> NSPasteboard {
+            NSPasteboard(
+                name: NSPasteboard.Name(
+                    DebugEditorFindFixture.cleanupPasteboardName(token: token)
+                )
+            )
         }
     #endif
 }

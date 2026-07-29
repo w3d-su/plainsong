@@ -6,51 +6,96 @@ private struct EditorFindCleanupOutcome {
     var didRequestCleanupHandshake = false
     var didReceiveCleanupReceipt = false
     var didExitGracefully = false
+    var didReachNotRunning = false
     var completionPath = "none"
+}
+
+private struct EditorFindRestorationReport {
+    var inputSourceEvents: [String] = []
+    var pasteboardEvents: [String] = []
 }
 
 extension EditorFindAcceptanceTests {
     func terminateApplication() {
-        let keyboardRestoreFailure = restoreLaunchInputSource()
+        var restoration = EditorFindRestorationReport()
+        attemptInputSourceRestoration(
+            phase: "before app termination",
+            report: &restoration
+        )
+        attemptPasteboardRestoration(
+            phase: "before app termination",
+            report: &restoration
+        )
+
         let outcome = completeAppCleanupAndQuit()
         let selectedSourceSummary = selectedASCIISourceIdentifiers
             .sorted()
             .joined(separator: ", ")
         app = nil
         workspaceWindow = nil
-        restoreGeneralPasteboard()
+
+        if shortcutInputSource.hasPendingRestoration {
+            attemptInputSourceRestoration(
+                phase: "after app termination retry",
+                report: &restoration
+            )
+        }
+        if ownedPasteboard.hasPendingRestoration {
+            attemptPasteboardRestoration(
+                phase: "after app termination retry",
+                report: &restoration
+            )
+        }
+
+        if outcome.didReachNotRunning {
+            let cleanupChannel = cleanupPasteboard()
+            cleanupChannel.clearContents()
+            cleanupChannel.releaseGlobally()
+        }
         reportCleanup(
             outcome,
             selectedSourceSummary: selectedSourceSummary,
-            keyboardRestoreFailure: keyboardRestoreFailure
+            restoration: restoration
         )
     }
 
-    private func restoreLaunchInputSource() -> String? {
-        defer { savedKeyboardInputSource = nil }
-        guard let savedKeyboardInputSource else {
-            return nil
-        }
+    private func attemptInputSourceRestoration(
+        phase: String,
+        report: inout EditorFindRestorationReport
+    ) {
         do {
-            try EditorFindSyntheticShortcutInputSource.restoreExactInputSource(
-                savedKeyboardInputSource
-            )
-            return nil
+            let outcome = try shortcutInputSource
+                .restorePendingSelectionIfOwned()
+            report.inputSourceEvents.append("\(phase): \(outcome)")
         } catch {
-            return String(describing: error)
+            report.inputSourceEvents.append("\(phase) failed: \(error)")
+        }
+    }
+
+    private func attemptPasteboardRestoration(
+        phase: String,
+        report: inout EditorFindRestorationReport
+    ) {
+        do {
+            let outcome = try ownedPasteboard.restoreIfStillOwned()
+            report.pasteboardEvents.append("\(phase): \(outcome)")
+        } catch {
+            report.pasteboardEvents.append("\(phase) failed: \(error)")
         }
     }
 
     private func completeAppCleanupAndQuit() -> EditorFindCleanupOutcome {
         let expectedReceipt = "removed:\(fixtureIdentifier):\(cleanupToken)"
         var outcome = EditorFindCleanupOutcome(
-            didExitGracefully: app.state == .notRunning
+            didExitGracefully: app.state == .notRunning,
+            didReachNotRunning: app.state == .notRunning
         )
         if !outcome.didExitGracefully {
             outcome.didRequestCleanupHandshake = requestAppSideCleanupAndQuit()
             if outcome.didRequestCleanupHandshake {
                 outcome.didReceiveCleanupReceipt = waitForCleanupReceipt(expectedReceipt)
                 outcome.didExitGracefully = app.wait(for: .notRunning, timeout: 10)
+                outcome.didReachNotRunning = outcome.didExitGracefully
                 if outcome.didReceiveCleanupReceipt, outcome.didExitGracefully {
                     outcome.completionPath = "app-side handshake"
                 }
@@ -61,6 +106,7 @@ extension EditorFindAcceptanceTests {
             if outcome.didRequestGracefulQuit {
                 outcome.didReceiveCleanupReceipt = waitForCleanupReceipt(expectedReceipt)
                 outcome.didExitGracefully = app.wait(for: .notRunning, timeout: 10)
+                outcome.didReachNotRunning = outcome.didExitGracefully
                 if outcome.didReceiveCleanupReceipt, outcome.didExitGracefully {
                     outcome.completionPath = "Quit menu"
                 }
@@ -68,7 +114,7 @@ extension EditorFindAcceptanceTests {
         }
         if !outcome.didExitGracefully {
             app.terminate()
-            _ = app.wait(for: .notRunning, timeout: 5)
+            outcome.didReachNotRunning = app.wait(for: .notRunning, timeout: 5)
         }
         return outcome
     }
@@ -76,7 +122,7 @@ extension EditorFindAcceptanceTests {
     private func reportCleanup(
         _ outcome: EditorFindCleanupOutcome,
         selectedSourceSummary: String,
-        keyboardRestoreFailure: String?
+        restoration: EditorFindRestorationReport
     ) {
         print(
             "F9 cleanup receipt \(outcome.didReceiveCleanupReceipt ? "verified" : "missing"): "
@@ -84,13 +130,23 @@ extension EditorFindAcceptanceTests {
         )
         print("F9 cleanup completion: \(outcome.completionPath)")
         print("F9 synthetic ASCII input source(s): \(selectedSourceSummary)")
+        print(
+            "F9 input-source restoration: "
+                + restoration.inputSourceEvents.joined(separator: "; ")
+        )
+        print(
+            "F9 pasteboard restoration: "
+                + restoration.pasteboardEvents.joined(separator: "; ")
+        )
 
-        if let keyboardRestoreFailure {
-            XCTFail(
-                "Could not restore and read back the launch-time input source: "
-                    + keyboardRestoreFailure
-            )
-        }
+        XCTAssertFalse(
+            shortcutInputSource.hasPendingRestoration,
+            "Input-source restoration still failed after the post-termination retry"
+        )
+        XCTAssertFalse(
+            ownedPasteboard.hasPendingRestoration,
+            "General-pasteboard restoration still failed after the post-termination retry"
+        )
         XCTAssertTrue(
             outcome.didRequestGracefulQuit || outcome.didRequestCleanupHandshake,
             "Could not request the app's normal Quit or cleanup handshake path"
@@ -103,14 +159,6 @@ extension EditorFindAcceptanceTests {
             outcome.didExitGracefully,
             "The app did not exit through its graceful termination path"
         )
-    }
-
-    func snapshotGeneralPasteboard() -> [[NSPasteboard.PasteboardType: Data]] {
-        NSPasteboard.general.pasteboardItems?.map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            })
-        } ?? []
     }
 
     private func requestGracefulQuit() -> Bool {
@@ -133,12 +181,13 @@ extension EditorFindAcceptanceTests {
         guard app.state != .notRunning else {
             return false
         }
-        let pasteboard = NSPasteboard.general
+        let pasteboard = cleanupPasteboard()
         pasteboard.clearContents()
+        let request = "quit:\(fixtureIdentifier):\(cleanupToken)"
         return pasteboard.setString(
-            "quit:\(fixtureIdentifier):\(cleanupToken)",
+            request,
             forType: Self.cleanupRequestType
-        )
+        ) && pasteboard.string(forType: Self.cleanupRequestType) == request
     }
 
     private func waitForCleanupReceipt(
@@ -146,8 +195,9 @@ extension EditorFindAcceptanceTests {
         timeout: TimeInterval = 10
     ) -> Bool {
         let predicate = NSPredicate { _, _ in
-            NSPasteboard.general.string(forType: Self.cleanupReceiptType)
-                == expectedReceipt
+            self.cleanupPasteboard().string(
+                forType: Self.cleanupReceiptType
+            ) == expectedReceipt
         }
         return predicateCompletes(
             predicate,
@@ -156,19 +206,12 @@ extension EditorFindAcceptanceTests {
         )
     }
 
-    private func restoreGeneralPasteboard() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let items = savedPasteboardItems.map { values in
-            let item = NSPasteboardItem()
-            for (type, data) in values {
-                item.setData(data, forType: type)
-            }
-            return item
-        }
-        if !items.isEmpty {
-            pasteboard.writeObjects(items)
-        }
+    private func cleanupPasteboard() -> NSPasteboard {
+        NSPasteboard(
+            name: .init(
+                "app.plainsong.editor.debug.editor-find-cleanup.\(cleanupToken)"
+            )
+        )
     }
 
     private func predicateCompletes(

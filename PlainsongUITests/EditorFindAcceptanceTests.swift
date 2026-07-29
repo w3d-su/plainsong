@@ -1,5 +1,4 @@
 import AppKit
-import Carbon
 import XCTest
 
 @MainActor
@@ -13,8 +12,8 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
 
     var app: XCUIApplication!
     var workspaceWindow: XCUIElement!
-    var savedPasteboardItems: [[NSPasteboard.PasteboardType: Data]] = []
-    var savedKeyboardInputSource: TISInputSource?
+    var ownedPasteboard = EditorFindOwnedPasteboard()
+    var shortcutInputSource = EditorFindSyntheticShortcutInputSource()
     var fixtureIdentifier = ""
     var cleanupToken = ""
     var selectedASCIISourceIdentifiers = Set<String>()
@@ -35,6 +34,16 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         waitForKeyboardFocus(editor)
         waitForKeyboardBlur(queryField)
 
+        let findBar = findElement("plainsong.editorFind.bar")
+        XCTAssertTrue(
+            findBar.exists,
+            "The find bar must already be open immediately before repeated Command-F"
+        )
+        waitForValue(
+            "needle",
+            of: queryField,
+            description: "retained query immediately before repeated Command-F"
+        )
         try pressCommandF()
         waitForKeyboardFocus(queryField)
         try paste("q")
@@ -80,11 +89,10 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
 }
 
 extension EditorFindAcceptanceTests {
-    private func launchApplication() {
+    func launchApplication() {
         continueAfterFailure = false
-        savedPasteboardItems = snapshotGeneralPasteboard()
-        savedKeyboardInputSource =
-            TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        ownedPasteboard = EditorFindOwnedPasteboard()
+        shortcutInputSource = EditorFindSyntheticShortcutInputSource()
         fixtureIdentifier = "f9-\(UUID().uuidString)"
         cleanupToken = UUID().uuidString
         app = XCUIApplication()
@@ -132,7 +140,7 @@ extension EditorFindAcceptanceTests {
         waitForKeyboardFocus(editor)
     }
 
-    private func openFindWithShortcut() throws -> XCUIElement {
+    func openFindWithShortcut() throws -> XCUIElement {
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         waitForKeyboardFocus(editor)
         let findBar = findElement("plainsong.editorFind.bar")
@@ -164,7 +172,7 @@ extension EditorFindAcceptanceTests {
         try typeCommandKey("f", on: editor)
     }
 
-    private func typeCommandKey(
+    func typeCommandKey(
         _ key: String,
         on element: XCUIElement
     ) throws {
@@ -172,13 +180,12 @@ extension EditorFindAcceptanceTests {
         // Scope it to any enabled, selectable ASCII-capable source only while testmanagerd
         // synthesizes this shortcut, then restore and read back the exact prior source.
         do {
-            let identifier = try EditorFindSyntheticShortcutInputSource
-                .withASCIICapableInputSource {
-                    element.typeKey(
-                        XCUIKeyboardKey(rawValue: key),
-                        modifierFlags: .command
-                    )
-                }
+            let identifier = try shortcutInputSource.withASCIICapableInputSource {
+                element.typeKey(
+                    XCUIKeyboardKey(rawValue: key),
+                    modifierFlags: .command
+                )
+            }
             selectedASCIISourceIdentifiers.insert(identifier)
         } catch let error as EditorFindSyntheticShortcutInputSource.InputSourceError {
             switch error {
@@ -190,6 +197,12 @@ extension EditorFindAcceptanceTests {
                 throw XCTSkip(
                     "This runner could not select/read back an eligible ASCII input source: "
                         + failures.joined(separator: "; ")
+                )
+            case let .currentSourceChangedBeforeSelection(identifier),
+                 let .currentSourceChangedDuringShortcut(identifier):
+                throw XCTSkip(
+                    "The runner's input source changed externally during shortcut injection: "
+                        + identifier
                 )
             default:
                 throw error
@@ -214,18 +227,16 @@ extension EditorFindAcceptanceTests {
         }
     }
 
-    private func findElement(_ identifier: String) -> XCUIElement {
+    func findElement(_ identifier: String) -> XCUIElement {
         workspaceWindow.descendants(matching: .any)[identifier]
     }
 
-    private func paste(_ value: String) throws {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        XCTAssertTrue(pasteboard.setString(value, forType: .string))
+    func paste(_ value: String) throws {
+        try ownedPasteboard.writeString(value)
         try typeCommandKey("v", on: workspaceWindow)
     }
 
-    private func waitForKeyboardFocus(
+    func waitForKeyboardFocus(
         _ element: XCUIElement,
         timeout: TimeInterval = 5
     ) {
@@ -249,7 +260,7 @@ extension EditorFindAcceptanceTests {
         )
     }
 
-    private func waitForValue(
+    func waitForValue(
         _ expectedValue: String,
         of element: XCUIElement,
         description: String,
@@ -279,7 +290,7 @@ extension EditorFindAcceptanceTests {
         )
     }
 
-    private func wait(
+    func wait(
         for predicate: NSPredicate,
         on element: XCUIElement,
         timeout: TimeInterval,

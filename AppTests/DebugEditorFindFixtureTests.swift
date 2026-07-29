@@ -2,6 +2,29 @@
     @testable import Plainsong
     import XCTest
 
+    private final class FixtureCreationResults: @unchecked Sendable {
+        private let lock = NSLock()
+        private var values: [
+            Result<DebugEditorFindFixture.CreatedFixture, Error>
+        ] = []
+
+        func append(
+            _ value: Result<DebugEditorFindFixture.CreatedFixture, Error>
+        ) {
+            lock.lock()
+            values.append(value)
+            lock.unlock()
+        }
+
+        func snapshot() -> [
+            Result<DebugEditorFindFixture.CreatedFixture, Error>
+        ] {
+            lock.lock()
+            defer { lock.unlock() }
+            return values
+        }
+    }
+
     final class DebugEditorFindFixtureTests: XCTestCase {
         @MainActor
         func testAppLaunchFactoryUsesIsolatedPersistenceForEditorFindFixture() throws {
@@ -36,6 +59,9 @@
             )
             XCTAssertEqual(source.components(separatedBy: "needle").count - 1, 3)
             XCTAssertEqual(source.components(separatedBy: "x").count - 1, 10001)
+            XCTAssertEqual(source.components(separatedBy: "caseprobe").count - 1, 1)
+            XCTAssertEqual(source.components(separatedBy: "CASEPROBE").count - 1, 1)
+            XCTAssertEqual(source.components(separatedBy: "wordprobe").count - 1, 3)
         }
 
         func testFixtureCreationRejectsOccupiedIdentifierWithoutDeletingIt() throws {
@@ -65,6 +91,42 @@
             )
         }
 
+        func testConcurrentSameIdentifierCreationCannotDeleteWinner() throws {
+            let identifier = "f9-concurrent-\(UUID().uuidString)"
+            let results = FixtureCreationResults()
+
+            DispatchQueue.concurrentPerform(iterations: 2) { _ in
+                results.append(
+                    Result {
+                        try DebugEditorFindFixture.create(
+                            identifier: identifier
+                        )
+                    }
+                )
+            }
+
+            let snapshot = results.snapshot()
+            let created = snapshot.compactMap { try? $0.get() }
+            let fixture = try XCTUnwrap(created.first)
+            defer { try? fixture.remove() }
+            XCTAssertEqual(created.count, 1)
+            XCTAssertTrue(
+                FileManager.default.fileExists(
+                    atPath: fixture.workspaceURL.path
+                )
+            )
+
+            for result in snapshot where (try? result.get()) == nil {
+                XCTAssertThrowsError(try result.get()) { error in
+                    guard case DebugEditorFindFixture.FixtureError
+                        .fixtureAlreadyExists = error
+                    else {
+                        return XCTFail("Unexpected error: \(error)")
+                    }
+                }
+            }
+        }
+
         func testCreatedFixtureCleanupRemovesOnlyItsExactDirectoryAndIsIdempotent() throws {
             let fileManager = FileManager.default
             let fixture = try DebugEditorFindFixture.create(
@@ -89,6 +151,14 @@
             try fixture.remove(fileManager: fileManager)
 
             XCTAssertFalse(fileManager.fileExists(atPath: fixture.workspaceURL.path))
+            XCTAssertFalse(
+                fileManager.fileExists(
+                    atPath: DebugEditorFindFixture.ownershipLeaseURL(
+                        for: fixture.identifier,
+                        in: root
+                    ).path
+                )
+            )
             XCTAssertTrue(fileManager.fileExists(atPath: sibling.path))
             XCTAssertTrue(fileManager.fileExists(atPath: unrelated.path))
         }
@@ -106,13 +176,25 @@
             try fileManager.createDirectory(at: external, withIntermediateDirectories: true)
             let sentinel = external.appendingPathComponent("sentinel")
             try Data("preserve".utf8).write(to: sentinel)
-            try fileManager.removeItem(at: fixture.workspaceURL)
+            let heldOriginal = fixture.workspaceURL.deletingLastPathComponent()
+                .appendingPathComponent(
+                    "held-original-\(UUID().uuidString)",
+                    isDirectory: true
+                )
+            try fileManager.moveItem(at: fixture.workspaceURL, to: heldOriginal)
             try fileManager.createSymbolicLink(
                 at: fixture.workspaceURL,
                 withDestinationURL: external
             )
             defer {
                 try? fileManager.removeItem(at: fixture.workspaceURL)
+                if fileManager.fileExists(atPath: heldOriginal.path) {
+                    try? fileManager.moveItem(
+                        at: heldOriginal,
+                        to: fixture.workspaceURL
+                    )
+                }
+                try? fixture.remove(fileManager: fileManager)
                 try? fileManager.removeItem(at: external)
             }
 
@@ -123,6 +205,10 @@
             }
             XCTAssertTrue(fileManager.fileExists(atPath: fixture.workspaceURL.path))
             XCTAssertEqual(try String(contentsOf: sentinel, encoding: .utf8), "preserve")
+
+            try fileManager.removeItem(at: fixture.workspaceURL)
+            try fileManager.moveItem(at: heldOriginal, to: fixture.workspaceURL)
+            try fixture.remove(fileManager: fileManager)
         }
 
         func testCreatedFixtureCleanupRejectsReplacementRegularFile() throws {
@@ -131,9 +217,23 @@
                 identifier: "f9-file-replacement-\(UUID().uuidString)",
                 fileManager: fileManager
             )
-            try fileManager.removeItem(at: fixture.workspaceURL)
+            let heldOriginal = fixture.workspaceURL.deletingLastPathComponent()
+                .appendingPathComponent(
+                    "held-original-\(UUID().uuidString)",
+                    isDirectory: true
+                )
+            try fileManager.moveItem(at: fixture.workspaceURL, to: heldOriginal)
             try Data("preserve".utf8).write(to: fixture.workspaceURL)
-            defer { try? fileManager.removeItem(at: fixture.workspaceURL) }
+            defer {
+                try? fileManager.removeItem(at: fixture.workspaceURL)
+                if fileManager.fileExists(atPath: heldOriginal.path) {
+                    try? fileManager.moveItem(
+                        at: heldOriginal,
+                        to: fixture.workspaceURL
+                    )
+                }
+                try? fixture.remove(fileManager: fileManager)
+            }
 
             XCTAssertThrowsError(try fixture.remove(fileManager: fileManager)) { error in
                 guard case DebugEditorFindFixture.FixtureError.unsafeCreatedFixture = error else {
@@ -144,6 +244,10 @@
                 try String(contentsOf: fixture.workspaceURL, encoding: .utf8),
                 "preserve"
             )
+
+            try fileManager.removeItem(at: fixture.workspaceURL)
+            try fileManager.moveItem(at: heldOriginal, to: fixture.workspaceURL)
+            try fixture.remove(fileManager: fileManager)
         }
     }
 
@@ -162,7 +266,13 @@
             try fileManager.moveItem(at: fixture.workspaceURL, to: heldOriginal)
             defer {
                 try? fileManager.removeItem(at: fixture.workspaceURL)
-                try? fileManager.removeItem(at: heldOriginal)
+                if fileManager.fileExists(atPath: heldOriginal.path) {
+                    try? fileManager.moveItem(
+                        at: heldOriginal,
+                        to: fixture.workspaceURL
+                    )
+                }
+                try? fixture.remove(fileManager: fileManager)
             }
             try fileManager.createDirectory(
                 at: fixture.workspaceURL,
@@ -180,6 +290,10 @@
                 try String(contentsOf: sentinel, encoding: .utf8),
                 "preserve"
             )
+
+            try fileManager.removeItem(at: fixture.workspaceURL)
+            try fileManager.moveItem(at: heldOriginal, to: fixture.workspaceURL)
+            try fixture.remove(fileManager: fileManager)
         }
 
         func testCreatedFixtureCleanupUnlinksNestedSymlinkWithoutTouchingTarget() throws {
@@ -302,7 +416,7 @@
             )
         }
 
-        func testRemoveStaleFixturesPreservesCurrentRecentUnrelatedAndSymlink() throws {
+        func testRemoveStaleFixturesPreservesUnleasedCurrentRecentUnrelatedAndSymlink() throws {
             let fileManager = FileManager.default
             let root = fileManager.temporaryDirectory
                 .appendingPathComponent(
@@ -340,7 +454,10 @@
             )
 
             XCTAssertTrue(fileManager.fileExists(atPath: current.path))
-            XCTAssertFalse(fileManager.fileExists(atPath: stale.path))
+            XCTAssertTrue(
+                fileManager.fileExists(atPath: stale.path),
+                "A legacy directory without a lease has no provable ownership"
+            )
             XCTAssertTrue(fileManager.fileExists(atPath: recent.path))
             XCTAssertTrue(fileManager.fileExists(atPath: unrelated.path))
             XCTAssertTrue(fileManager.fileExists(atPath: symlink.path))

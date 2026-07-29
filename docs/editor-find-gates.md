@@ -1,13 +1,16 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR C on `phase3-editor-find-bar-ui`, targeting `main` directly — PR B (#96)
-> merged as `8cab153`, so this branch is no longer stacked.** §2 is resolved **(b)**;
-> F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
-> identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
-> production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
-> navigation ID domain is wired via App `navigationIDProvider`. F2 latency and F8 remain
-> open for PR D; F9 XCUITest closed with launched-app evidence on 2026-07-29. Precedent:
-> PR #45, link-folding, image-thumbnail gate docs.
+> **Status: PR A (#95), PR B (#96), and PR C (#97) are merged.** §2 is resolved
+> **(b)**; F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half +
+> F5 WYSIWYG/source identity closed in PR B, and PR C supplies the production App UI and
+> navigation-ID wiring. **F4b hosted UI, F5 source+preview, F6, and most of F7 remain
+> open** until their named hosted/owner evidence lands. A separate F2 measurement tip
+> records query-completion and hosted native-edit admission/root-update **proxies only**;
+> full physical-input → child-layout → compositor keystroke-to-screen latency remains
+> open. This dedicated `phase3-editor-find-f9-ui-acceptance` follow-up closes F9 and the
+> repeated-⌘F sub-gate of F7. F8 remains a separate pending follow-up; no F2/F8/F9
+> combined-tip evidence is claimed. Precedent: PR #45, link-folding, image-thumbnail gate
+> docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
@@ -66,7 +69,7 @@ Ship Typora-class in-document find for the focused editor pane:
 Workspace search (`⇧⌘F`) remains independent. Neither feature's focus receipt may
 consume the other's token.
 
-## 2. Baseline: what ⌘F does today (code-verified table; runtime path open)
+## 2. Historical baseline: what ⌘F did before merged PR #97
 
 Empirical code inspection on the PR A tip (not a physical-keyboard run, and not a
 live Edit-menu run):
@@ -124,12 +127,12 @@ observed nothing at all (Decision Log 2026-07-22) — so **⌘F is not intercept
 a Carbon fallback is not expected to be needed.** It does **not** prove that SwiftUI will
 dispatch a newly added menu item's key equivalent: `App/PlainsongCommands.swift` records
 that SwiftUI swallowed ⇧⌘P/⇧⌘F key equivalents without firing their actions while two
-top-level menus shared a title, even though mouse clicks worked. **F0 therefore stays open**
-until the minimal spike adds a Find menu item and an owner physical `⌘F` fires it.
+top-level menus shared a title, even though mouse clicks worked. **F0 therefore stayed open**
+until the minimal spike added a Find menu item and an owner physical `⌘F` fired it.
 
-F0 is a **blocking spike** (I0-shaped; see §7 / §8 F0): it decides the delivery
-mechanism before PR C is authored. Synthetic `NSEvent`s and XCUITest input are
-**not** F0 evidence (Decision Log 2026-07-22).
+F0 was a **blocking spike** (I0-shaped; see §7 / §8 F0): it fixed the delivery
+mechanism before merged PR #97 shipped the bar. Synthetic `NSEvent`s and XCUITest
+input are **not** F0 evidence (Decision Log 2026-07-22).
 
 ## 3. Engine decision (fixed)
 
@@ -293,11 +296,12 @@ No I/O, no actors, no AppKit.
 - Emit navigation on **query** completion and on explicit next/previous/activate only —
   **not** on edit or rebind (§5.1 table).
 - Rebind or clear the session on document-lifecycle transitions defined in F4/F4b
-  without auto-jump. PR B lands the controller half; PR C owns UI visibility.
+  without auto-jump. PR B landed the controller half; merged PR #97 owns the App UI,
+  while hosted UI-visibility evidence remains separately open.
 - Optional highlight-all attribute application with the same preservation contract as
-  image markers (F8 may land in PR D).
+  image markers (separate pending F8 follow-up).
 
-### 6.3 App — find bar + menus (PR C)
+### 6.3 App — find bar + menus (merged PR #97)
 
 - Find bar chrome above or below the focused editor pane (implementation detail;
   prefer not fighting the STTextView gutter / scroll geometry).
@@ -307,7 +311,7 @@ No I/O, no actors, no AppKit.
 - No built-in `NSTextFinder` disabling: §2 resolved **(b)**, nothing is reachable.
 - Must not be authored until F0 has recorded the delivery mechanism (§8 F0).
 
-### 6.4 Performance probe (PR D)
+### 6.4 Performance probes (separate F2 follow-up)
 
 Add a `PerformanceTests` probe over `Fixtures/large-1mb.md`:
 
@@ -316,8 +320,10 @@ Add a `PerformanceTests` probe over `Fixtures/large-1mb.md`:
 3. Freeze the budget from measured Debug medians (same discipline as WS4B).
 4. Do not invent a budget; do not widen a budget to rescue a failing run.
 5. Wall-clock budgets are hard locally and informational on hosted CI under R15.
-6. Include a live-query / find-open typing-latency sample that closes F2’s product
-   latency bullet (agent.md §17.8) — structural off-main tests in PR B are not enough.
+6. Include a production-hosted live-query / find-open typing-latency sample. Close only
+   the named interval it measures; a native `insertText` admission or root-update receipt
+   does not prove physical delivery, child-layout completion, compositor presentation, or
+   the full agent.md §12 keystroke-to-screen criterion.
 
 ## 7. PR split
 
@@ -327,9 +333,11 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | PR | Scope | Gates closed |
 |---|---|---|
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
-| **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
-| **C** (this PR, #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
-| **D** | XCUITest (F9, including truncated counter state and `⌘F` re-focus), performance probe with frozen budgets (closes F2 latency), highlight-all + F8. | F2 (latency bullet), F8, F9 + perf |
+| **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** full F2 keystroke-to-screen latency; F4b hosted UI; F5 source+preview; F6–F9. |
+| **C** (merged as #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b hosted UI / F5 live preview / F6 / F7 until named hosted evidence |
+| **F2 proxy follow-up** (separate tip) | Measures exact 1 MiB query completion plus production-hosted native `insertText` admission and root App/SwiftUI update receipt. | Closes only the named proxy budgets. Full physical-input, child-layout, compositor, and cold O(n) scroll-index work remain outside the proof. |
+| **F9 follow-up** (`phase3-editor-find-f9-ui-acceptance`) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | Closes F9 and only the repeated-⌘F sub-gate of F7. Does not claim physical-keyboard/IME evidence. |
+| **F8 follow-up** (separate, pending) | Highlight-all implementation, if retained, plus preservation across highlight re-application. | F8 remains open; no highlight-all work or evidence is part of F9. |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
 and `git diff --check`. PR body must list which F-gates it closes and which remain
@@ -342,7 +350,7 @@ Checkboxes start unchecked. Evidence lines are filled when the gate closes.
 ### F0 — ⌘F key delivery (blocking mechanism spike; owner physical keyboard)
 
 Shape matches image-thumbnail **I0**: a minimal spike that decides the mechanism before
-production UI work. This is **not** a late verification detail of PR D.
+production UI work. This is **not** a late verification detail of a performance follow-up.
 
 - [x] **PR B precondition:** run the §2 runtime Edit-menu / `⌘F` check and record
   outcome **(a)** or **(b)**. — **Done 2026-07-27 (owner, Debug app at `main` `dfba18a`):
@@ -366,7 +374,7 @@ production UI work. This is **not** a late verification detail of PR D.
 - [x] Synthetic `NSEvent`s and XCUITest input are **not** evidence for this gate. —
   Recorded: unit tests cover selector delivery only; physical remains required.
 - [x] Spike stays minimal (one Find… menu item; fire counter only; no find bar). —
-  `App/PlainsongCommands.swift` + `EditorFindSpike.swift`. PR C owns the bar.
+  `App/PlainsongCommands.swift` + `EditorFindSpike.swift`; merged PR #97 owns the bar.
 - Evidence: **closed 2026-07-27.** §2 outcome (b); menu route spike in PR B; owner
   physical `⌘F` under **ABC** and **Zhuyin** confirmed via Console `F0 spike` logs
   (`delivered=true` + `fired`). Mechanism = ordinary menu item + `sendAction` (no Carbon).
@@ -396,7 +404,7 @@ production UI work. This is **not** a late verification detail of PR D.
 - Evidence: **closed in PR B** — `Packages/MarkdownCore/.../EditorFindSession.swift` +
   `EditorFindSessionTests`
 
-### F2 — Off-main, debounced, result-dropping (+ measured latency in PR D)
+### F2 — Off-main, debounced, result-dropping (+ named latency proxies)
 
 Match admission is debounced. Production match work runs in `Task.detached` and records
 whether the worker observed `!Thread.isMainThread` (not a hardcoded flag). Rapid query
@@ -424,13 +432,26 @@ interruption of in-flight engine work.
   `pendingNavigationCommand` so next/previous/activate during debounce cannot emit a
   superseded range under a new revision.
   Evidence: `EditorFindControllerLifecycleTests.testScheduleMatchInvalidatesSessionSoNextDoesNotUseStaleRanges`
-- [ ] Typing latency on `Fixtures/large-1mb.md` is unchanged with the find bar open and
-  a live query (no main-actor full-document match on the keystroke path). §12 &lt; 16 ms
-  typing budget remains the hard product gate (agent.md §17.8: state how typing latency
-  was verified when the edit path is touched). **A written assertion or structural
-  off-main test alone does not close this bullet** — it closes only with measured
-  evidence from the PR D performance probe (`docs/perf-log.md`).
-  Evidence: _open — PR D perf probe + recorded numbers_
+- [x] The separate measured source `9de4157f71a1e9fb12cdde696d7e3214b8feff4f`
+  records deterministic zero, sparse, and dense-truncated completion through App query
+  publication, the production debounce, detached matching/fencing, and App presentation.
+  Evidence:
+  `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`.
+- [x] That same separate tip records a production-hosted **proxy** beginning at native
+  programmatic `insertText` admission and ending at a root App/SwiftUI state-update
+  receipt, with the old find session invalidated synchronously and the exact eventual
+  dense result recomputed off-main.
+  Evidence:
+  `EditorFindPerformanceTests.testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets`.
+  This is consumer-observation evidence for those named intervals, not proof of physical
+  input, child-layout completion, compositor presentation, or equality with find-closed.
+- [ ] Full agent.md §12 &lt;16 ms **keystroke-to-screen** latency with find open is
+  proven end-to-end. The named proxies begin after physical input and stop before child
+  layout/compositor completion. Their retained samples also expose a one-off synchronous
+  O(n) preview-scroll line-index rebuild outside find matching. Resolve or explicitly
+  cover those gaps before checking this box.
+- Evidence: **partial on a separate F2 tip only.** The proxy evidence above was not run
+  on, combined with, or recharacterized as evidence for this F9 tip.
 
 ### F3 — Exact UTF-16 navigation through EditorNavigationRequest
 
@@ -451,7 +472,7 @@ interruption of in-flight engine work.
   the controller uses a local sequence — safe only while nothing else shares the channel.
   Evidence: `EditorFindControllerLifecycleTests.testNavigationIDProviderUsesSharedDomain`
 - Evidence: **closed in PR B for exact-range + provider contract.** Production wiring of
-  the provider lands in PR C (App find bar).
+  the provider shipped in merged PR #97 with the App find bar.
 
 ### F4 — Edit invalidation
 
@@ -475,13 +496,13 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 
 | Transition | Intended behavior |
 |---|---|
-| Sidebar switches to another Markdown/MDX file | Bar **stays open** (UI: PR C). Controller: cancel in-flight work for the old identity; clear matches/ordinal; rebind to the new identity + revision; **re-run the query for the counter only — do not emit navigation / auto-jump**. User moves with `⌘G`. |
+| Sidebar switches to another Markdown/MDX file | Bar **stays open** (merged #97 UI contract). Controller: cancel in-flight work for the old identity; clear matches/ordinal; rebind to the new identity + revision; **re-run the query for the counter only — do not emit navigation / auto-jump**. User moves with `⌘G`. |
 | `⇧⌘F` result activates a different document | Same as sidebar switch at the controller: rebind + re-run without auto-jump. Focus arbitration remains F7. |
 | External disk change → Reload | Same document identity, new bytes/revision: recompute like F4 edit (**no navigation**); do not apply pre-Reload ranges. |
 | External disk change → Keep Mine | Local source remains authority: recompute only if revision/text actually changed; no navigation. |
 | Warm session LRU eviction / retirement of a **non-focused** session | No find-session effect while that session is not the focused editor document. |
-| Focused session retired / closed / no open document | **Close** the find bar (UI: PR C), cancel work, clear session. |
-| Workspace close / switch | Close the find bar and clear session (UI: PR C). |
+| Focused session retired / closed / no open document | **Close** the find bar (merged #97 UI contract), cancel work, clear session. |
+| Workspace close / switch | Close the find bar and clear session (merged #97 UI contract). |
 
 - [x] PR B named tests cover the **controller half**: file-switch rebind+rerun **without
   navigation emission**, edit recompute without navigation, and clear on no-document —
@@ -489,10 +510,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: `EditorFindControllerLifecycleTests.testRebindRerunsQueryWithoutEmittingNavigation`,
   `...testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`,
   `...testClearForNoDocumentCancelsAndClearsSession`
-- [ ] PR C **production-path** tests cover the **UI-visibility half** with real
-  Reload / Keep Mine / rename / Save Copy rekey / missing-file close, and cancel on the
-  shared navigation channel — App-state unit smoke for bar open/close alone is **not**
-  sufficient (see review: External Reload and identity rekey paths must invalidate Find).
+- [ ] Hosted **production-path** tests cover the remaining **UI-visibility half** with
+  real Reload / Keep Mine / rename / Save Copy rekey / missing-file close, and cancel on
+  the shared navigation channel. Merged #97's App-state and production-lifecycle tests are
+  not hosted bar-visibility evidence (see review: External Reload and identity rekey paths
+  must invalidate Find).
   Partial unit evidence: `EditorFindUITests.testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump`,
   `...testFindBarClosesWhenNoDocumentRemains`,
   `...testFindBarClosesOnWorkspaceClose`
@@ -515,8 +537,8 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   (`...testClosingTheBarFencesAQueryStillInsideTheDebounceWindow`) **without** resetting a
   resolved ordinal (`...testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances`,
   `EditorFindControllerSuspendTests`).
-- Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
-  fencing covered in-process; hosted UI-visibility half still open
+- Evidence: **partial** — PR B controller half closed; merged #97 covers production-path
+  lifecycle + fencing in-process; hosted UI-visibility half still open
 
 ### F5 — Reveal without source mutation (WYSIWYG closed in PR B; source+preview still open)
 
@@ -624,6 +646,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence (2026-07-29):
   `EditorFindAcceptanceTests.testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen`
   launches the app, opens Find with `⌘F`, moves native keyboard focus back to the editor,
+  immediately reasserts that the bar is still present and its query is still `needle`,
   then sends a second `⌘F`. Predicate waits observe the query field regain native
   `hasKeyboardFocus`; pasting `q` without a test-side select-all replaces the whole existing
   `needle` query, and the launched app still exposes `plainsong.editorFind.bar`.
@@ -637,9 +660,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   markers do.
 - [ ] Named test applies highlighting **between** search attribute application and the
   assertion (proves preservation, not just initial paint).
-- [ ] If highlight-all is deferred out of v1, this gate stays open and PR D must say so
-  explicitly rather than checking the box.
-- Evidence: _open — PR D (or explicit deferral)_
+- [ ] If highlight-all is deferred out of v1, this gate stays open and the separate F8
+  follow-up must say so explicitly rather than checking the box.
+- Evidence: _open — separate pending F8 follow-up (or explicit deferral)_
 
 ### F9 — Accessibility + XCUITest
 
@@ -701,7 +724,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   existing WorkspaceSearch acceptance tests, so no assertion or runner failure remains in
   the final gate.
 
-## 9. Performance gate (PR D)
+## 9. Performance gate (separate F2 follow-up)
 
 | Step | Rule |
 |---|---|
@@ -723,5 +746,5 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | Role | Responsibility |
 |---|---|
 | Implementer | Named tests for F1–F9 as listed; no checkbox without evidence. |
-| Owner | **F0 physical-keyboard spike at the start of PR B** under ABC + Zhuyin (menu route first; Carbon only if that fails); merge authority. F0 is not deferred to PR D. |
+| Owner | **F0 physical-keyboard spike at the start of PR B** under ABC + Zhuyin (menu route first; Carbon only if that fails); merge authority. F0 is not deferred to a later performance follow-up. |
 | Maintainer | Squash-merge after review + green CI; never author self-merge. |

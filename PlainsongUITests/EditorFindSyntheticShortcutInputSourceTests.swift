@@ -51,10 +51,49 @@ final class EditorFindInputSourceTests: XCTestCase {
         )
     }
 
+    func testRestorationDecisionRestoresOnlyTheSessionSelectedSource() {
+        XCTAssertEqual(
+            EditorFindSyntheticShortcutInputSource.restorationDecision(
+                originalIdentifier: "original",
+                selectedIdentifier: "selected",
+                currentIdentifier: nil
+            ),
+            .readbackUnavailable
+        )
+        XCTAssertEqual(
+            EditorFindSyntheticShortcutInputSource.restorationDecision(
+                originalIdentifier: "original",
+                selectedIdentifier: "selected",
+                currentIdentifier: "selected"
+            ),
+            .restoreOriginal
+        )
+        XCTAssertEqual(
+            EditorFindSyntheticShortcutInputSource.restorationDecision(
+                originalIdentifier: "original",
+                selectedIdentifier: "selected",
+                currentIdentifier: "original"
+            ),
+            .alreadyOriginal
+        )
+        XCTAssertEqual(
+            EditorFindSyntheticShortcutInputSource.restorationDecision(
+                originalIdentifier: "original",
+                selectedIdentifier: "selected",
+                currentIdentifier: "external"
+            ),
+            .preserveExternalChange
+        )
+    }
+
     func testRuntimeDiscoveryUsesCapabilitiesAndRestoresExactCurrentSource() throws {
-        let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        let originalIdentifier = try XCTUnwrap(
+            EditorFindSyntheticShortcutInputSource
+                .currentInputSourceIdentifier()
+        )
+        let inputSource = EditorFindSyntheticShortcutInputSource()
         defer {
-            try? EditorFindSyntheticShortcutInputSource.restoreExactInputSource(original)
+            _ = try? inputSource.restorePendingSelectionIfOwned()
         }
         let eligible = EditorFindSyntheticShortcutInputSource
             .eligibleCapabilities(
@@ -65,14 +104,125 @@ final class EditorFindInputSourceTests: XCTestCase {
         }
 
         var didRunBody = false
-        let selectedIdentifier = try EditorFindSyntheticShortcutInputSource
-            .withASCIICapableInputSource {
-                didRunBody = true
-            }
+        let selectedIdentifier = try inputSource.withASCIICapableInputSource {
+            didRunBody = true
+        }
 
         XCTAssertTrue(didRunBody)
         XCTAssertTrue(eligible.map(\.identifier).contains(selectedIdentifier))
-        try EditorFindSyntheticShortcutInputSource.restoreExactInputSource(original)
+        XCTAssertFalse(inputSource.hasPendingRestoration)
+        XCTAssertEqual(
+            EditorFindSyntheticShortcutInputSource
+                .currentInputSourceIdentifier(),
+            originalIdentifier
+        )
+    }
+
+    func testUnreadableCurrentSourceRetainsLeaseForRetry() throws {
+        var readbacks: [String?] = [
+            nil,
+            "selected",
+            "selected",
+            "original",
+        ]
+        let inputSource = EditorFindSyntheticShortcutInputSource(
+            currentIdentifierReader: {
+                readbacks.removeFirst()
+            },
+            selector: { _ in noErr }
+        )
+        inputSource.installPendingSelectionLeaseForTesting(
+            originalIdentifier: "original",
+            selectedIdentifier: "selected"
+        )
+
+        XCTAssertThrowsError(
+            try inputSource.restorePendingSelectionIfOwned()
+        ) { error in
+            guard case EditorFindSyntheticShortcutInputSource.InputSourceError
+                .currentInputSourceIdentifierUnavailable = error
+            else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
+        XCTAssertTrue(inputSource.hasPendingRestoration)
+
+        XCTAssertEqual(
+            try inputSource.restorePendingSelectionIfOwned(),
+            .restored
+        )
+        XCTAssertFalse(inputSource.hasPendingRestoration)
+        XCTAssertTrue(readbacks.isEmpty)
+    }
+
+    func testFailedRestoreRetainsLeaseUntilVerifiedRetry() throws {
+        var readbacks: [String?] = [
+            "selected",
+            "selected",
+            "selected",
+            "selected",
+            "original",
+        ]
+        var selectionStatuses: [OSStatus] = [OSStatus(paramErr), noErr]
+        let inputSource = EditorFindSyntheticShortcutInputSource(
+            currentIdentifierReader: {
+                readbacks.removeFirst()
+            },
+            selector: { _ in
+                selectionStatuses.removeFirst()
+            }
+        )
+        inputSource.installPendingSelectionLeaseForTesting(
+            originalIdentifier: "original",
+            selectedIdentifier: "selected"
+        )
+
+        XCTAssertThrowsError(
+            try inputSource.restorePendingSelectionIfOwned()
+        ) { error in
+            guard case let EditorFindSyntheticShortcutInputSource.InputSourceError
+                .couldNotRestoreInputSource(identifier, status) = error
+            else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(identifier, "original")
+            XCTAssertEqual(status, OSStatus(paramErr))
+        }
+        XCTAssertTrue(inputSource.hasPendingRestoration)
+
+        XCTAssertEqual(
+            try inputSource.restorePendingSelectionIfOwned(),
+            .restored
+        )
+        XCTAssertFalse(inputSource.hasPendingRestoration)
+        XCTAssertTrue(readbacks.isEmpty)
+        XCTAssertTrue(selectionStatuses.isEmpty)
+    }
+
+    func testExternalChangeAtRestoreBoundaryIsPreservedWithoutSelection() throws {
+        var readbacks: [String?] = ["selected", "external"]
+        var selectionCount = 0
+        let inputSource = EditorFindSyntheticShortcutInputSource(
+            currentIdentifierReader: {
+                readbacks.removeFirst()
+            },
+            selector: { _ in
+                selectionCount += 1
+                return noErr
+            }
+        )
+        inputSource.installPendingSelectionLeaseForTesting(
+            originalIdentifier: "original",
+            selectedIdentifier: "selected"
+        )
+
+        XCTAssertEqual(
+            try inputSource.restorePendingSelectionIfOwned(),
+            .externalChangePreserved("external")
+        )
+        XCTAssertFalse(inputSource.hasPendingRestoration)
+        XCTAssertEqual(selectionCount, 0)
+        XCTAssertTrue(readbacks.isEmpty)
     }
 
     private func capabilities(
