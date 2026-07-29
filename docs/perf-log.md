@@ -361,21 +361,45 @@ evidence, and these budgets stay informational on CI regardless.
 
 ## Phase 3 F2 In-Document Find Performance Gate
 
-This is the complete baseline record for the F2 production-shaped find probe. The measured source
-was committed first; this documentation is a source-identical child with no Swift changes.
+This is the complete authoritative baseline for the F2 query-completion and production-hosted
+state-update receipt probes. All six retained runs measured the exact source at
+`9de4157f71a1e9fb12cdde696d7e3214b8feff4f`; the follow-up evidence correction changes only
+documentation and one assertion-contract comment, with no executable Swift behavior change.
 
 | Field | Value |
 |---|---|
 | Date | 2026-07-29 (Asia/Taipei) |
 | Branch | `codex/editor-find-f2-performance-probe`, based directly on `main` at `384786e5e98edd397a9e842d499eab252317db3b` |
-| Measured source commit | `e7be9b04616b67d54d8d40437521ffd0f02fc84b` |
+| Measured source commit | `9de4157f71a1e9fb12cdde696d7e3214b8feff4f` |
 | macOS | macOS 27.0 (26A5388g) |
 | Xcode | Xcode 27.0 (27A5194q) |
 | Machine | MacBook Pro (MacBookPro18,3), Apple M1 Pro (8 cores), arm64, 16 GB RAM |
 | Fixture | `Fixtures/large-1mb.md`: 1,048,962 bytes; SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
-| Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testHostedLargeFixtureLiveQueryTypingStaysWithinFrameBudgetAndSearchesOffMain` |
-| Raw artifacts | `/private/tmp/plainsong-f2-{debug,release}-run{1,2,3}-e7be9b0.xcresult`; the complete numeric samples from all six artifacts are retained below. |
+| Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets` |
+| Raw artifacts | Six `.xcresult` bundles and their paired `.log` files, listed below. |
 | Result | Pass — three Debug and three Release runs, two tests per run, zero failures. |
+
+Authoritative raw artifacts:
+
+```text
+/private/tmp/plainsong-f2-debug-run1-9de4157.xcresult
+/private/tmp/plainsong-f2-debug-run1-9de4157.log
+/private/tmp/plainsong-f2-debug-run2-9de4157.xcresult
+/private/tmp/plainsong-f2-debug-run2-9de4157.log
+/private/tmp/plainsong-f2-debug-run3-9de4157.xcresult
+/private/tmp/plainsong-f2-debug-run3-9de4157.log
+/private/tmp/plainsong-f2-release-run1-9de4157.xcresult
+/private/tmp/plainsong-f2-release-run1-9de4157.log
+/private/tmp/plainsong-f2-release-run2-9de4157.xcresult
+/private/tmp/plainsong-f2-release-run2-9de4157.log
+/private/tmp/plainsong-f2-release-run3-9de4157.xcresult
+/private/tmp/plainsong-f2-release-run3-9de4157.log
+```
+
+The `.log` files are retained console captures of the six `test-without-building` invocations
+below. The two preceding `build-for-testing` commands are recorded for reproduction but are not
+captured in those run logs. The shell capture wrapper was not part of the measured contract and
+is not reconstructed here.
 
 ### Reproduction
 
@@ -386,7 +410,7 @@ Debug build:
 
 ```sh
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
-  -derivedDataPath /private/tmp/plainsong-f2-debug \
+  -derivedDataPath /private/tmp/plainsong-f2-9de4157-debug \
   -only-testing:PerformanceTests/EditorFindPerformanceTests build-for-testing
 ```
 
@@ -395,8 +419,8 @@ Debug run (`RUN` was set to `1`, `2`, then `3` in separate invocations):
 ```sh
 RUN=1
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
-  -derivedDataPath /private/tmp/plainsong-f2-debug \
-  -resultBundlePath "/private/tmp/plainsong-f2-debug-run${RUN}-e7be9b0.xcresult" \
+  -derivedDataPath /private/tmp/plainsong-f2-9de4157-debug \
+  -resultBundlePath "/private/tmp/plainsong-f2-debug-run${RUN}-9de4157.xcresult" \
   -only-testing:PerformanceTests/EditorFindPerformanceTests test-without-building
 ```
 
@@ -404,7 +428,7 @@ Release build:
 
 ```sh
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
-  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-release \
+  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-9de4157-release \
   -only-testing:PerformanceTests/EditorFindPerformanceTests build-for-testing
 ```
 
@@ -413,8 +437,8 @@ Release run (`RUN` was set to `1`, `2`, then `3` in separate invocations):
 ```sh
 RUN=1
 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
-  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-release \
-  -resultBundlePath "/private/tmp/plainsong-f2-release-run${RUN}-e7be9b0.xcresult" \
+  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-9de4157-release \
+  -resultBundlePath "/private/tmp/plainsong-f2-release-run${RUN}-9de4157.xcresult" \
   -only-testing:PerformanceTests/EditorFindPerformanceTests test-without-building
 ```
 
@@ -426,37 +450,46 @@ EditorKit transition state. It does not enable `DEBUG` compilation or change the
 The query probe starts its clock immediately before
 `AppState.handleEditorFindQueryTextChange`. It includes App query publication, the production
 150 ms debounce, detached `TextSearchEngine` matching, revision/query fencing, main-actor session
-application, and the wrapped App presentation callback. Every scenario gets one unmeasured warm-up
-and three measured samples. Every sample hard-asserts the exact retained count/truncation shape and
-that the matcher observed itself off the main thread.
+application, and App presentation. Every scenario gets one unmeasured warm-up and three measured
+samples. Every sample hard-asserts the exact retained count/truncation shape, first and last retained
+match endpoints, and that the matcher observed itself off the main thread.
 
-| Shape | Deterministic pattern | Fixture occurrences | Expected applied result |
-|---|---|---:|---|
-| Zero | `plainsong-f2-zero-hit` | 0 | 0 retained; not truncated |
-| Sparse | `generated sections: 1274` | 1, at the fixture tail | 1 retained; not truncated |
-| Dense | `section` (default smart case) | 11,467 | 10,000 retained; truncated after the 10,001 overflow match, reached after scanning about 87% of the fixture |
+| Shape | Deterministic pattern | Expected result | Exact retained endpoints |
+|---|---|---|---|
+| Zero | `plainsong-f2-zero-hit` | 0 retained; not truncated | first `nil`; last `nil` |
+| Sparse | `generated sections: 1274` | 1 retained; not truncated | first = last: `NSRange(location: 1_048_904, length: 24)`, line 33,140 |
+| Dense | `section` (default smart case) | 10,000 retained; truncated by the 10,001st overflow match | first: `NSRange(location: 399, length: 7)`, line 15; last retained: `NSRange(location: 914_752, length: 7)`, line 28,901 |
 
-The typing probe mounts the public `MarkdownEditorView`, focuses its real `MarkdownSTTextView`, opens
-find state, and primes the dense live query. Each deterministic insertion is in the mounted visible
-range and travels through native `insertText`, the production writer/source contract, App
-publication, find invalidation, and the scheduled SwiftUI representable update.
+The production-hosted probe mounts the shipped `WorkspaceWindow` in a 1,100 × 720
+`NSHostingController`/`NSWindow`, injects the real `AppState`, and waits for both the production
+`MarkdownSTTextView` and shipped `EditorFindBar` query `NSTextField`. It opens find through
+`showOrRefocusEditorFind()`, drives the dense query through
+`handleEditorFindQueryTextChange`, and confirms the visible `1 / 10000+` truncated presentation.
+Mount, find-bar creation, and dense-query priming all occur before measured editing starts.
 
-The hosted surface does not mount `WorkspaceWindow` or render the find-bar chrome. It opens the
-production App bar-visibility state through `showOrRefocusEditorFind()`, so the live query,
-invalidation, debounce, and result-presentation machinery are active; the measured typing surface
-is the public editor rather than chrome layout or rendering.
+Each of five measured edits focuses the real editor and calls its native
+`insertText("x", replacementRange: .notFound)` at the mounted visible-range start. **Admission**
+starts immediately before that call and stops when it returns. **Root state-update receipt** stops
+at the timestamp captured synchronously when the root's test-only
+`NSViewRepresentable.updateNSView` enters with the new document revision, bar/query still present,
+and the old find presentation invalidated. The receipt is stored with a monotonic generation and
+bounded history so a later update cannot overwrite the awaited snapshot.
 
-Two clocks are recorded: **admission** stops when `insertText` returns; **presented update** stops
-after the scheduled representable update has run and its transition generation advanced. The latter
-is a hosted editor-update proxy, not physical-keyboard, compositor, or keystroke-to-pixels evidence.
-Before the first suspension, hard assertions require the completed-match count to be unchanged,
-`session == nil`, and no pending navigation — proving the 1 MiB match did not run synchronously.
-The eventual recompute is awaited outside the frame measurement and must again produce the exact
-dense/truncated result off-main. There are five measured insertions per run.
+Before the first suspension, hard assertions require the completed-match count to remain unchanged,
+`session == nil`, and no pending navigation. This proves that the old presentation was invalidated
+and no new match completion or navigation was applied synchronously; it does not prove that no
+matcher work began synchronously. The polling loop calls `layoutSubtreeIfNeeded()` to drive pending
+SwiftUI/AppKit work, so incidental layout may occur before the timestamped root receipt. The
+endpoint does not require or prove that child layout completed. After finding the receipt, the test
+forces any remaining layout and proves the production editor representable updated. The eventual
+recompute is outside the two measured intervals and must run off-main, retain/truncate the same
+10,000 matches, and shift both endpoint locations by exactly the insertion count while preserving
+their line numbers.
 
-The probe has no find-closed control distribution. “Unchanged with find open” therefore means the
-existing product `<16 ms` frame budget still passes with App's bar-visibility state open and a dense
-live query; it does not claim statistical equality with find closed or a hosted full-window bar.
+The receipt proves entry into the root SwiftUI/AppKit update transaction. It excludes compositor
+presentation and physical keyboard delivery, and does not require or prove child-layout completion;
+therefore it does not close the separate `<16 ms` keystroke-to-screen criterion or claim equality
+with a find-closed distribution.
 
 ### Raw query-completion results
 
@@ -464,54 +497,117 @@ All values are milliseconds. Bold values are the median of the three samples in 
 
 | Configuration / run | Zero samples; median | Sparse samples; median | Dense samples; median |
 |---|---|---|---|
-| Debug 1 | `[226.170, 231.926, 236.716]`; **231.926** | `[242.481, 240.377, 245.166]`; **242.481** | `[637.159, 625.486, 640.878]`; **637.159** |
-| Debug 2 | `[233.944, 242.868, 245.209]`; **242.868** | `[248.324, 246.484, 245.352]`; **246.484** | `[669.029, 629.208, 677.657]`; **669.029** |
-| Debug 3 | `[241.551, 240.493, 235.315]`; **240.493** | `[253.076, 275.147, 248.885]`; **253.076** | `[756.801, 804.366, 669.309]`; **756.801** |
-| Release 1 | `[167.492, 166.953, 161.329]`; **166.953** | `[171.865, 172.589, 179.928]`; **172.589** | `[277.624, 228.064, 233.738]`; **233.738** |
-| Release 2 | `[163.794, 167.847, 160.691]`; **163.794** | `[171.000, 174.991, 204.173]`; **174.991** | `[232.474, 235.168, 245.231]`; **235.168** |
-| Release 3 | `[178.020, 174.073, 169.418]`; **174.073** | `[173.937, 174.255, 195.714]`; **174.255** | `[236.118, 241.957, 242.075]`; **241.957** |
+| Debug 1 | `[230.054, 230.569, 235.345]`; **230.569** | `[255.113, 258.474, 244.393]`; **255.113** | `[671.057, 668.833, 771.242]`; **671.057** |
+| Debug 2 | `[241.984, 234.174, 241.267]`; **241.267** | `[238.228, 239.795, 241.874]`; **239.795** | `[631.900, 609.142, 612.755]`; **612.755** |
+| Debug 3 | `[228.480, 249.670, 238.126]`; **238.126** | `[236.585, 240.397, 244.040]`; **240.397** | `[721.962, 644.999, 628.471]`; **644.999** |
+| Release 1 | `[177.844, 170.335, 165.132]`; **170.335** | `[188.213, 174.679, 195.105]`; **188.213** | `[238.496, 222.093, 239.837]`; **238.496** |
+| Release 2 | `[167.056, 165.207, 180.933]`; **167.056** | `[188.362, 191.799, 179.804]`; **188.362** | `[232.030, 235.690, 234.209]`; **234.209** |
+| Release 3 | `[164.257, 168.169, 178.137]`; **168.169** | `[182.731, 185.654, 190.301]`; **185.654** | `[236.848, 243.054, 240.336]`; **240.336** |
 
-### Raw hosted live-query typing results
+### Raw production-hosted edit results
 
-All values are milliseconds. Bold values are the five-sample median; the final value in the
-presented-update cell is that run's maximum.
+All values are milliseconds. Bold values are the five-sample median; the last value in the receipt
+cell is the diagnostic maximum. Budgets apply to each run's median, not its maximum.
 
-| Configuration / run | Admission samples; median | Presented-update samples; median; maximum |
+| Configuration / run | Admission samples; median | Root state-update receipt samples; median; maximum |
 |---|---|---|
-| Debug 1 | `[1.245, 1.162, 1.169, 2.837, 1.210]`; **1.210** | `[8.024, 5.637, 5.016, 7.178, 5.843]`; **5.843**; max **8.024** |
-| Debug 2 | `[1.283, 1.115, 1.061, 1.028, 1.016]`; **1.061** | `[9.506, 5.992, 5.812, 5.377, 5.751]`; **5.812**; max **9.506** |
-| Debug 3 | `[1.385, 1.218, 1.106, 0.964, 1.064]`; **1.106** | `[8.176, 4.282, 5.656, 5.334, 5.425]`; **5.425**; max **8.176** |
-| Release 1 | `[2.044, 1.071, 0.879, 0.977, 1.041]`; **1.041** | `[5.905, 6.284, 4.432, 5.019, 4.807]`; **5.019**; max **6.284** |
-| Release 2 | `[2.487, 1.007, 1.063, 1.593, 1.031]`; **1.063** | `[10.845, 3.831, 4.365, 5.158, 3.578]`; **4.365**; max **10.845** |
-| Release 3 | `[1.866, 1.230, 1.084, 0.933, 1.024]`; **1.084** | `[5.422, 4.999, 5.421, 5.091, 4.824]`; **5.091**; max **5.422** |
+| Debug 1 | `[1.372, 1.211, 20.462, 1.198, 2.129]`; **1.372** | `[5.235, 4.555, 23.936, 4.064, 5.613]`; **5.235**; max **23.936** |
+| Debug 2 | `[1.840, 1.134, 16.322, 1.125, 1.136]`; **1.136** | `[6.075, 4.428, 19.726, 3.949, 4.176]`; **4.428**; max **19.726** |
+| Debug 3 | `[1.553, 1.142, 16.434, 1.206, 1.122]`; **1.206** | `[5.706, 3.951, 20.326, 4.127, 4.881]`; **4.881**; max **20.326** |
+| Release 1 | `[1.259, 1.178, 14.392, 0.989, 0.978]`; **1.178** | `[4.967, 4.525, 17.851, 3.692, 3.691]`; **4.525**; max **17.851** |
+| Release 2 | `[1.769, 1.123, 14.909, 1.076, 0.942]`; **1.123** | `[6.484, 4.825, 17.831, 3.836, 4.852]`; **4.852**; max **17.831** |
+| Release 3 | `[1.146, 1.242, 14.259, 1.044, 0.998]`; **1.146** | `[6.521, 5.908, 17.779, 4.395, 4.449]`; **5.908**; max **17.779** |
 
 ### Budgets and enforcement
 
-The measured source entered the six-run sequence with provisional round ceilings. The final freeze
-uses the retained authoritative Debug artifacts above: `<400`, `<400`, and `<1,100 ms` leave
-1.65x, 1.58x, and 1.45x headroom over the slowest of the three Debug run medians. All provisional
-ceilings passed, so no threshold was widened or otherwise changed after an authoritative run.
-Release values were not used to justify a budget. The six retained `.xcresult` bundles and the raw
-samples above are therefore the complete evidence for both the baseline and final initial budgets.
+The five round ceilings were already present in measured commit `9de4157` before the authoritative
+sequence. They were derived from Debug medians with conservative room for normal variance; none was
+widened after a retained run. Release is confirmation only and did not justify a threshold.
 
-| Metric | Budget | Authoritative Debug medians | Release medians | Budget / slowest Debug median |
-|---|---:|---|---|---:|
-| Zero query completion | < 400 ms | 231.926, 242.868, 240.493 | 166.953, 163.794, 174.073 | 1.65x |
-| Sparse query completion | < 400 ms | 242.481, 246.484, 253.076 | 172.589, 174.991, 174.255 | 1.58x |
-| Dense-truncated query completion | < 1,100 ms | 637.159, 669.029, 756.801 | 233.738, 235.168, 241.957 | 1.45x |
-| Hosted live-query presented-update maximum | < 16 ms | 8.024, 9.506, 8.176 | 6.284, 10.845, 5.422 | Existing product budget; not re-derived |
+| Metric | Debug run medians | Debug median of run medians | Release run medians | Release median of run medians | Budget | Budget / slowest Debug run median |
+|---|---|---:|---|---:|---:|---:|
+| Zero query completion | 230.569, 241.267, 238.126 | **238.126** | 170.335, 167.056, 168.169 | **168.169** | < 400 ms | 1.66x |
+| Sparse query completion | 255.113, 239.795, 240.397 | **240.397** | 188.213, 188.362, 185.654 | **188.213** | < 400 ms | 1.57x |
+| Dense-truncated query completion | 671.057, 612.755, 644.999 | **644.999** | 238.496, 234.209, 240.336 | **238.496** | < 1,100 ms | 1.64x |
+| Native edit admission | 1.372, 1.136, 1.206 | **1.206** | 1.178, 1.123, 1.146 | **1.146** | < 5 ms | 3.64x |
+| Root state-update receipt | 5.235, 4.428, 4.881 | **4.881** | 4.525, 4.852, 5.908 | **4.852** | < 15 ms | 2.87x |
 
-Query gates enforce the per-run median; the typing gate enforces the five-sample maximum. Admission
-is retained as a diagnostic and has no separate budget because the presented-update clock contains
-it. All deterministic fixture/count/truncation/session/off-main assertions are hard everywhere.
-Wall-clock thresholds are hard locally and print informational failures on CI under R15.
+Query gates enforce each run's three-sample median. The production-hosted gates enforce each run's
+five-sample admission and receipt medians. Deterministic fixture identity, endpoints,
+count/truncation, session invalidation, transition generation, and off-main assertions remain hard
+everywhere. Wall-clock thresholds are hard locally and print informational failures on hosted CI
+under R15.
+
+### Deterministic third-edit outlier
+
+Every retained run has one large synchronous sample at exactly the third insertion: Debug admission
+is 16.322–20.462 ms and Release admission is 14.259–14.909 ms; the corresponding receipt sample is
+19.726–23.936 ms in Debug and 17.779–17.851 ms in Release. It is not discarded, and the complete
+arrays above retain it.
+
+Repeated sampling attributed that spike to the editor/preview scroll-sync bridge's
+`EditorScrollLineIndex.init(text:)`: after the text-change observer invalidates its cache, the next
+visible-line request synchronously rebuilds line starts by walking the full 1 MiB string's UTF-16
+units. This O(n) main-actor work extends `insertText` admission. It is not find matching: before
+every await the probe proves no new match result or navigation was applied and the old
+session/navigation are gone, while the later exact dense recompute again reports that it ran
+off-main.
+
+The supporting diagnostic artifacts are
+`/private/tmp/plainsong-f2-outlier-profile5.xcresult` and
+`/private/tmp/plainsong-f2-outlier-correct.sample.txt`. They are non-authoritative diagnosis, not
+part of the six-run baseline. The repeatable spike is real production performance debt; the
+median-based F2 proxies pass, but this evidence is one reason the full `<16 ms`
+keystroke-to-screen criterion remains open.
+
+### Narrow pre-measure warning exception
+
+Each of the six authoritative logs contains exactly three
+`Modifying state during view update, this will cause undefined behavior.` warnings, all before
+measured editing begins: two while the production editor representable mounts and one while the
+dense prime applies its initial navigation. The six paired `.xcresult` bundles each coalesce those
+three console emissions into one Runtime Warning issue. No warning occurs during the five measured
+edits.
+
+The `.xcresult` issue is coalesced and its generic source attribution differs by configuration
+(`PerformanceTests/EditorFindProductionHostSupport.swift` in Debug,
+`Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift` in Release), so it proves warning
+presence but not the origin of each console emission. Break-at-warning diagnosis localized the
+mount pair to
+`Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift`: `makeNSView` installs the coordinator
+as `textDelegate` at line 92 and assigns `textSelection` at line 96 before `isUpdating` becomes true
+at line 114. That setup ordering predates F2 (`d7de15a5`). The resulting
+`textViewDidChangeSelection` callback reaches the SwiftUI selection binding at
+`Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator.swift:833`; that binding write
+also predates F2 (`e62e378f`). Running the pre-existing hosted
+`AppBackedEditorPerformanceTests.testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget`
+without the F2 root receipt produces the same coalesced Runtime Warning family in
+`/private/tmp/f2-warning-appbacked.xcresult`, confirming that the family is not introduced by the
+receipt. That bundle does not retain a per-emission console log and is not used to prove the
+authoritative two-emission mount count; that count comes from each of the six retained F2 logs.
+
+The dense-prime warning localizes to
+`Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Navigation.swift:154`, where the
+applied navigation writes `selection = request.selection`; that statement predates F2
+(`a33ad47b`). In the probe,
+`primeProductionWorkspaceFind` returns before `measureProductionWorkspaceEdits` is called
+(`PerformanceTests/EditorFindProductionHostPerformanceProbe.swift:38-39`), so this navigation
+warning is pre-measure by construction. With all three retained emissions localized to mount or
+prime, none remains in the measured-edit interval. The test-only root receipt is plain storage and
+publishes no SwiftUI state; it is not the warning source.
+
+This baseline is accepted only under that exact three-warning, pre-measure exception and is not
+warning-free UI evidence. Any additional signature/count, any warning after measured editing
+starts, or a relevant editor/F8/toolchain/OS change requires fresh investigation and measurement.
+If the production path is fixed, fewer or zero warnings are accepted and this exception should be
+removed.
 
 ### F8 boundary
 
-F8 remains open. The measured `main` baseline has no production highlight-all apply/clear surface,
-so this work records no highlight preservation, apply-latency, or clear-latency claim. The shared
-fixture, hosted editor harness, and zero/sparse/dense scenarios are intentionally reusable when that
-production surface lands; no unmerged behavior was manufactured for this baseline.
+F8 remains deferred. Commit `9de4157` has no production highlight-all apply/clear implementation,
+so this work records no highlight preservation, apply-latency, or clear-latency claim. The exact
+fixture, scenarios, full `WorkspaceWindow` host, and generation-stamped receipt are reusable after
+that production surface lands; no unmerged F8 behavior was optimized or manufactured here.
 
 ## Typing Latency
 

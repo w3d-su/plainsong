@@ -1,12 +1,15 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR C merged as #97 at `384786e`; the F2 performance portion is now measured
-> independently at source commit `e7be9b0`.** §2 is resolved **(b)**;
+> **Status: PR C merged as #97 at `384786e`; the F2 query-completion and production-hosted
+> state-receipt proxies are measured independently at source commit `9de4157`.** §2 is
+> resolved **(b)**;
 > F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
 > identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
 > production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
-> navigation ID domain is wired via App `navigationIDProvider`. **F2 latency is closed; F8 and
-> F9 remain open follow-ups.** Precedent: PR #45, link-folding, image-thumbnail gate docs.
+> navigation ID domain is wired via App `navigationIDProvider`. **F2 structural work and the
+> named proxy budgets are closed, but the full §12 keystroke-to-screen criterion remains
+> open; F8 and F9 also remain open follow-ups.** Precedent: PR #45, link-folding,
+> image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
@@ -315,8 +318,9 @@ Add a `PerformanceTests` probe over `Fixtures/large-1mb.md`:
 3. Freeze the budget from measured Debug medians (same discipline as WS4B).
 4. Do not invent a budget; do not widen a budget to rescue a failing run.
 5. Wall-clock budgets are hard locally and informational on hosted CI under R15.
-6. Include a live-query / find-open typing-latency sample that closes F2’s product
-   latency bullet (agent.md §17.8) — structural off-main tests in PR B are not enough.
+6. Include a production-hosted live-query / find-open typing-latency sample. Close only
+   the contract it actually measures; keep the full agent.md §12 keystroke-to-screen
+   criterion open without physical-input, child-layout, and compositor evidence.
 
 ## 7. PR split
 
@@ -328,7 +332,7 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
 | **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
 | **C** (merged as #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
-| **D** (split follow-ups) | F2 performance probe with frozen budgets is complete independently. Remaining scope is XCUITest (F9, including truncated counter state and `⌘F` re-focus) plus any later highlight-all implementation and F8 evidence. | **Closes F2 latency only. F8 and F9 remain open.** |
+| **D** (split follow-ups) | F2 query-completion and production-hosted state-receipt proxies have frozen budgets. Remaining scope includes the full keystroke-to-screen criterion, XCUITest (F9, including truncated counter state and `⌘F` re-focus), and any later highlight-all implementation/F8 evidence. | **Closes the named F2 proxy budgets only. Full screen latency, F8, and F9 remain open.** |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
 and `git diff --check`. PR body must list which F-gates it closes and which remain
@@ -423,23 +427,41 @@ interruption of in-flight engine work.
   `pendingNavigationCommand` so next/previous/activate during debounce cannot emit a
   superseded range under a new revision.
   Evidence: `EditorFindControllerLifecycleTests.testScheduleMatchInvalidatesSessionSoNextDoesNotUseStaleRanges`
-- [x] Typing latency on `Fixtures/large-1mb.md` is unchanged with the find bar open and
-  a live query (no main-actor full-document match on the keystroke path). §12 &lt; 16 ms
-  typing budget remains the hard product gate (agent.md §17.8: state how typing latency
-  was verified when the edit path is touched). **A written assertion or structural
-  off-main test alone does not close this bullet** — it closes only with measured
-  evidence from the F2 performance probe (`docs/perf-log.md`).
-  Evidence: `EditorFindPerformanceTests.testHostedLargeFixtureLiveQueryTypingStaysWithinFrameBudgetAndSearchesOffMain`
-  mounts the public editor with App's bar-visibility state set open and a dense live query;
-  three Debug runs measured presented-update maxima of 8.024, 9.506, and 8.176 ms. Before every await,
-  the test proves the old session was invalidated and the completed-match count did not
-  advance; each eventual recompute must finish off-main with 10,000 retained matches and
-  truncation. `...testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases` separately
-  measures the production 150 ms debounce through applied App presentation. This closes the
-  existing &lt;16 ms product budget under active find state; it does not claim physical-keyboard
-  timing, statistical equality with a find-closed distribution, or rendering of the
-  `WorkspaceWindow` find-bar chrome. Raw Debug/Release samples and scope are in `docs/perf-log.md`
-  under “Phase 3 F2 In-Document Find Performance Gate.”
+- [x] Deterministic zero, sparse, and dense-truncated queries over the exact frozen
+  `Fixtures/large-1mb.md` content complete through App query handling, the production
+  150 ms debounce, detached matching, fencing, and App presentation within their measured
+  per-run three-sample-median budgets.
+  Evidence:
+  `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`;
+  exact content SHA, match endpoints, six raw runs, and budgets are in `docs/perf-log.md`.
+- [x] With a dense live query open, the shipped `WorkspaceWindow`, real `AppState`, public
+  editor, and shipped `EditorFindBar` path admit five deterministic native edits with a
+  per-run median &lt;5 ms and deliver the invalidated AppState snapshot into the root
+  SwiftUI/AppKit update transaction with a per-run median &lt;15 ms. Before the first
+  suspension, the old session is nil and no completed match/navigation advances; every
+  eventual recompute returns the exact shifted 10,000-retained/truncated result off-main.
+  Evidence:
+  `EditorFindPerformanceTests.testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets`.
+  This receipt does not require or prove child-layout completion, though layout used to
+  drive the SwiftUI update can occur before it; it excludes compositor presentation and
+  physical keyboard delivery.
+- [ ] Full agent.md §12 &lt;16 ms **keystroke-to-screen** latency with find open is proven
+  end-to-end. The current harness begins at programmatic `insertText` and stops at root
+  update-transaction entry, so it cannot close this criterion. The retained raw samples
+  also expose a real one-off synchronous O(n) preview-scroll line-index rebuild
+  (Debug admission up to 20.462 ms; Release up to 14.909 ms), which is separate production
+  performance debt rather than find matching. Physical-input, child-layout/compositor, and
+  that cold rebuild must be resolved or explicitly covered before checking this box.
+
+**Narrow hosted-warning policy for this baseline:** every retained hosted run emits exactly
+two pre-measure mount warnings and one pre-measure dense-prime warning with the existing
+SwiftUI text-selection signature; none occurs after measured editing starts. The mount pair
+comes from the pre-F2 representable selection-binding path, and the prime warning from the
+pre-F2 navigation selection binding. This baseline is accepted only under that explicit
+exception and is **not warning-free UI evidence**. Any additional signature/count, any
+warning during the measured interval, or a relevant editor/F8/toolchain/OS change invalidates
+the exception and requires a fresh run. If the production warning is fixed, accept fewer/zero
+warnings and remove this exception.
 
 ### F3 — Exact UTF-16 navigation through EditorNavigationRequest
 
@@ -642,10 +664,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   assertion (proves preservation, not just initial paint).
 - [ ] If highlight-all is deferred out of v1, this gate stays open and PR D must say so
   explicitly rather than checking the box.
-- Evidence: **open / explicitly deferred.** The measured `main` baseline has no production
-  highlight-all apply/clear surface. The F2 fixture, hosted harness, and zero/sparse/dense
-  scenarios are reusable for a later F8 probe, but this evidence neither measures nor claims
-  highlight preservation, apply latency, or clear latency.
+- Evidence: **open / explicitly deferred.** The measured `9de4157` source (branch base
+  `384786e`) has no production highlight-all apply/clear surface. The F2 fixture, hosted
+  harness, and zero/sparse/dense scenarios are reusable for a later F8 probe, but this
+  branch-only evidence neither measures nor claims highlight preservation, apply latency,
+  or clear latency on any combined tip.
 
 ### F9 — Accessibility + XCUITest
 
@@ -673,11 +696,14 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | Discipline | No invented budgets; no widening to rescue a run — fix harness or code. |
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
 
-**F2 result:** source commit `e7be9b04616b67d54d8d40437521ffd0f02fc84b` passed three
+**F2 result:** source commit `9de4157f71a1e9fb12cdde696d7e3214b8feff4f` passed three
 Debug and three Release runs. Frozen query-completion budgets are &lt;400 ms zero,
-&lt;400 ms sparse, and &lt;1,100 ms dense-truncated; the existing hosted typing budget
-remains &lt;16 ms. The complete command/environment record and all raw samples are in
-`docs/perf-log.md`. This result closes only F2 latency; it does not close any F8 or F9 item.
+&lt;400 ms sparse, and &lt;1,100 ms dense-truncated. The production-hosted five-edit median
+budgets are &lt;5 ms for synchronous admission and &lt;15 ms for root state-update receipt.
+The complete command/environment record, exact fixture identity/endpoints, raw samples,
+outlier diagnosis, and narrow warning exception are in `docs/perf-log.md`. These results
+close only the named F2 proxy contracts; the full &lt;16 ms keystroke-to-screen criterion,
+F8, and F9 remain open.
 
 ## 10. Non-goals for this gate set
 

@@ -274,7 +274,8 @@ extension EditorFindPerformanceTests {
         expectedVersion: Int,
         expectedSourcePrefix: String
     ) {
-        // Runs before any await: the old session is invalidated without a synchronous scan.
+        // Runs before any await: the old session is invalidated, and no new match
+        // completion or navigation has been applied synchronously.
         XCTAssertEqual(controller.completedMatchCount, baselineCompletedCount)
         XCTAssertNil(controller.session)
         XCTAssertNil(controller.pendingNavigationCommand)
