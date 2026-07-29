@@ -359,6 +359,140 @@ evidence, and these budgets stay informational on CI regardless.
   this gate does not claim it.
 
 
+## MarkdownCore Whole-Word Boundary Cost
+
+Investigation of an intermittent local failure in
+`TextSearchResourceBoundTests.testOneMegabyteContinuousUnicodeWordSkipsRejectedCandidatesLinearly`,
+whose 3.0 s budget sat at roughly 1.2x headroom on a quiet machine and was exceeded outright once
+the machine was busy. Per risk R15 that budget is hard locally, so it failed for every contributor
+rather than only on CI.
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-29 |
+| Branch | `phase3-text-search-word-boundary-cost`, branched from `main` at `dbc341c` |
+| Measured commit | `4b1c836` — the commit holding the measured source. The commit stamping this section is its direct child and changes only documentation; no Swift source differs between them. |
+| macOS | 27.0 (build 26A5388g), Darwin 27.0.0 |
+| Machine | Apple M1 Pro, arm64, 16 GB RAM |
+| Toolchain | Apple Swift 6.4 (swiftlang-6.4.0.20.104) |
+| Budget | Unchanged at 3.0 s. No budget in this repository was widened by this work. |
+
+### Reproduction
+
+The budget is gated against Debug because `make test` runs `swift test` in Debug. Run from
+`Packages/MarkdownCore`; build once so no compile lands inside a sample:
+
+```bash
+swift build --build-tests && swift test --filter TextSearchResourceBoundTests
+```
+
+Three scenarios were measured separately, because the failure was scenario-dependent: the test
+alone (`--filter …/testOneMegabyte…`), its class (`--filter TextSearchResourceBoundTests`, where it
+runs eighth of nine), and the whole package (`swift test`). Durations are the value the test
+itself measures with `ContinuousClock` around `TextSearchEngine.matches`, which excludes fixture
+construction. They were read by temporarily making `assertTextSearchDurationUnderLocally` print
+on every call; that print is not part of the committed change.
+
+### Measurements
+
+Debug, seconds, against the unchanged 3.0 s budget:
+
+| Scenario | Before (`dbc341c`) | After | Worst-case headroom after |
+|---|---|---|---|
+| Test alone | 2.246, 2.280, 2.255, 2.284 | 0.929, 0.916, 0.932, 0.920, 0.913 | 3.2x |
+| Its class | 2.250, 2.230, 2.247, 2.278 | 0.904, 0.905, 0.909, 0.908 | 3.3x |
+| Whole package | 2.530, 2.524, 2.547, 2.507 | 0.905, 0.908, 0.905, 0.917, 0.903 | 3.3x |
+
+Release, class scenario, seconds: before 0.948, 0.973, 0.953; after 0.645, 0.638, 0.637.
+
+The before/after pairs above were taken back to back in one session, stashing only the production
+file, so they share machine state. Earlier in the same session, with the machine busier, the same
+`dbc341c` source measured 7.050, 4.995, 4.854, 3.154, 2.924, 2.780, 2.864, 3.009 alone and 5.731,
+7.143, 8.409, 5.329 in its class — four of those twelve are over budget, and the class scenario was
+consistently the worst. That spread across identical source is the finding: the budget had no room
+for ordinary machine-state variance. After the change the same scenarios sit in a 0.903-0.932 band,
+about 3%, and the class scenario is no longer the worst case.
+
+The whole MarkdownCore package suite also dropped from 12.6 s to 5.3 s, because five other tests in
+the file exercise the same path.
+
+### Where the time went
+
+Profiled at 1 MiB of U+00E9 with a whole-word, case-sensitive `é` query. Whole-word rejection walks
+every composed character once, so each row below is about one million operations. Standalone
+microbenchmarks, Debug:
+
+| Component | Cost |
+|---|---|
+| `rangeOfComposedCharacterSequence` | 0.55 s |
+| `substring(with:)` + `generalCategory` | 0.84 s |
+| — `generalCategory` alone | 0.15 s |
+| `character(at:)` | 0.22 s |
+| Whole engine call | 3.00 s |
+
+Two costs were avoidable and neither is inherent to the fixture:
+
+1. `isWordCharacter(in:storage:)` allocated a `String` per composed character purely to ask whether
+   it is a word character — about 0.69 s of the 0.84 s row above.
+2. The composed-sequence cache ran `append` + `removeFirst` on an eight-element `Array` on every
+   miss, and in a marching scan every character is a miss. Stubbing the retention bookkeeping out
+   entirely as a throwaway measurement took the engine call from 1.79 s to 0.80 s, which located
+   roughly a second of overhead in cache maintenance rather than in the search itself.
+
+### What changed
+
+Three semantics-preserving changes in `TextSearchComposedSequences.swift`, all verified by
+mutation testing (see below):
+
+1. `isWordCharacter(in:storage:)` decodes UTF-16 out of the storage directly instead of
+   materializing a substring, decoding surrogate pairs by hand. A range that splits a pair yields
+   U+FFFD from `substring(with:)`, which is not a word scalar, so skipping the unpaired unit
+   reaches the same answer.
+2. `isWordScalar` answers ASCII without an ICU general-category lookup. This does not help the
+   non-ASCII fixture above; it helps ordinary Markdown.
+3. The composed-range cache became a fixed-capacity ring that overwrites its oldest slot, plus a
+   retained most-recent range that serves marching scans in one bounds check. Composed sequences
+   partition the storage, so at most one retained range can contain a location and retention order
+   affects hit rate only, never the answer.
+
+### Falsifiability
+
+The new `TextSearchWordBoundaryScalarTests` were mutation-tested against the production file:
+
+| Mutation | Result |
+|---|---|
+| Surrogate decode shift 10 → 9 | 6 failures |
+| ASCII digit range off by one (admits `:`) | 1 failure |
+| ASCII lowercase range off by one (drops `a`) | 1 failure |
+| Ring never advances its eviction slot | 1 failure |
+| Most-recent range returned without its containment check | Non-terminating; killed at 10 minutes |
+| Ring lookup scans unused slots | No failure — see below |
+
+The last one is a genuine no-op rather than a coverage gap: unused slots hold
+`NSRange(location: NSNotFound, length: 0)`, whose zero length means the containment test can never
+succeed, so scanning them is wasted work and nothing more.
+
+One coverage gap was found this way and closed. The first ASCII test compared the new decoding
+against the substring-based `isWordCharacter(in: String)` overload, but both call the same
+`isWordScalar`, so the shared ASCII shortcut inside it was invisible to that comparison — the
+off-by-one mutation passed. `testEveryASCIIScalarAgreesWithTheGeneralCategoryRule` restates the
+general-category rule as an independent oracle over all 128 ASCII scalars, and catches it.
+
+### Notes
+
+- The three options weighed in the brief resolved as follows. A one-per-process warm-up in the
+  shape of `WorkspaceSearchPerformanceWarmUp` was measured and rejected: this test runs eighth of
+  nine in its class and last-but-one in the package, so it already had ample warm-up, and the
+  class scenario was reliably *slower* than running it alone — the opposite of a cold-start
+  signature. Avoidable work was the actual cause. Re-freezing the budget number was never reached.
+- The fixture shape was left alone. Its 1 MiB continuous-word text is what makes the linear-skip
+  assertion meaningful, and its instrumentation bounds
+  (`literalCandidatesExamined == 1`, `uncachedComposedUTF16UnitsVisited <= length + 2`) are
+  unchanged and still pass, so the test still gates the same property it always did.
+- Same-session before/after pairs are what the comparison rests on. Absolute numbers from
+  different sessions are not comparable here: identical `dbc341c` source measured 2.25 s and 8.41 s
+  in the same scenario a few hours apart.
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`
