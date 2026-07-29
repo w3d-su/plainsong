@@ -226,14 +226,30 @@ aggregate-size, CSP, and URL-sink decisions apply to the offscreen DOM before ei
 runs, so PDF/Print cannot include a remote or rejected image. Neither may use the visible
 preview.
 
-**PDF page model:** v1 Export as PDF is one continuous full-document page. After the
+**PDF page model:** v1 Export as PDF targets one continuous full-document page. After the
 offscreen WebView receives a nonzero export viewport and completes layout,
 `WKPDFConfiguration.rect` covers the exact full scrollable content bounds from the first
 through last sentinel. Print remains paper-paginated by `NSPrintInfo` and the standard
 panel. The two paths must have equivalent content/theme/assets, not identical page
-breaks. If E0 shows that `createPDF` cannot capture this full rect without clipping or an
-unusable platform limit, stop and amend D4; do not silently switch silent export to
-`printOperation`.
+breaks.
+
+A continuous page is **not assumed reachable for every document**. PDF's default user
+space caps one page at **14,400 units (200 inches) per side**. A long-form post — the
+primary Plainsong use case — reaches that laid-out height well before
+`Fixtures/perf-100kb.md` does, so this is a mainline case, not an edge case. E0 must
+measure a fixture whose laid-out content height **exceeds 14,400 pt** and record what
+WebKit actually does at and beyond that bound: clip, scale, fail, or emit an invalid page
+box.
+
+**Conditional fallback, fixed here so an E0 NO-GO does not block PR G on a fresh
+decision:** if the continuous page proves unreachable or unusable past that bound, Export
+as PDF paginates at a fixed page height at or below the platform maximum, with no content
+duplicated or dropped across breaks. Every other D4 term is unchanged: it still uses
+`createPDF`, still shows no print panel, and still captures the same barrier-completed
+offscreen render, so the signed-off two-surface product contract is preserved. Do not
+silently switch silent export to `printOperation`, and do not quietly narrow the export to
+whatever happens to fit. If neither the continuous page nor fixed-height pagination is
+achievable, stop and amend D4 before implementation.
 
 **Rationale:** `createPDF` is the deterministic byte-producing API for an app-owned PDF
 artifact; `printOperation(with:)` is the native user-controlled printing workflow. One
@@ -328,9 +344,11 @@ the repository's strongest filesystem-authority policy.
 App
   File commands, exact document snapshot, NSSavePanel / NSPrintOperation orchestration,
   one-shot write result and user-visible errors
-    PreviewKit
-      offscreen PreviewController lifecycle, render/result fencing, asset:// policy,
-      WKWebView PDF and print APIs
+    PreviewKit                          WorkspaceKit
+      offscreen PreviewController         one-shot non-retained artifact writer reusing
+      lifecycle, render/result fencing,   the existing anchored no-follow descriptor and
+      asset:// policy, WKWebView          RENAME_EXCL / RENAME_SWAP publication
+      PDF and print APIs                  primitives
         preview-src
           completed render, protocol-v6 static HTML serializer, asset/style finalization
 ```
@@ -338,6 +356,15 @@ App
 - App composes the operation; it does not construct HTML or read live DOM.
 - PreviewKit owns WebKit and the custom asset scheme. It does not import App or
   WorkspaceKit.
+- PR E's one-shot artifact writer lives in **WorkspaceKit**, beside — not inside — the
+  retained mutation path. It exposes a one-shot API that consumes the panel-granted URL
+  for exactly one operation, holds no bookmark, journal, session, or recovery authority,
+  and returns a typed committed / not-committed / indeterminate outcome. App calls it
+  directly; PreviewKit never does, and this adds no PreviewKit → WorkspaceKit edge.
+- **Rejected:** implementing D5's publication primitives in App or PreviewKit.
+  WorkspaceKit already owns the only audited `openat(O_NOFOLLOW)` and `renameatx_np`
+  implementations, and a second copy is exactly the drift that forced
+  `WorkspaceRootContainment` to be extracted in the first place.
 - `preview-src` owns static DOM serialization and never gains filesystem authority.
 - MarkdownCore remains canonical source/model only. Export v1 needs no new parser.
 - The one-shot write is not a WorkspaceKit Save/Save Copy operation and does not weaken
@@ -421,9 +448,10 @@ barrier.
 
 ### 6.4 PDF / Print and destination commit
 
-PreviewKit supplies either a continuous full-content PDF from
-`createPDF`/`pdf(configuration:)` with an explicit full-content rect, or a paper-paginated
-`NSPrintOperation` from `printOperation(with:)`. App writes HTML/PDF only after the
+PreviewKit supplies either PDF bytes from `createPDF`/`pdf(configuration:)` with an
+explicit rect — one continuous full-content page, or D4's fixed-height pagination if E0
+records that the continuous page is unreachable — or a paper-paginated `NSPrintOperation`
+from `printOperation(with:)`. App writes HTML/PDF only after the
 appropriate save panel returns an exact URL and D5 validation succeeds. Cancellation
 destroys the offscreen controller and writes nothing.
 
@@ -461,6 +489,15 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [ ] A multi-viewport fixture produces nonempty PDF data with a valid `%PDF-` header;
   parsed/extracted output contains distinct first- and last-block sentinels in order, so
   a blank or first-viewport-only PDF cannot pass.
+- [ ] A fixture whose laid-out content height **exceeds 14,400 pt** (PDF's default
+  single-page maximum, per D4) is measured separately, and the observed behavior at and
+  beyond that bound is recorded: continuous capture, clipping, scaling, an API failure,
+  or an invalid page box. A few-viewport fixture sits far below this bound and cannot
+  stand in for it — without this bullet E0 can pass while the continuous-page model is
+  already broken for ordinary long-form posts.
+- [ ] If the continuous page is unreachable past that bound, D4's fixed-height pagination
+  fallback is exercised on the same fixture and proves no content is duplicated or
+  dropped across page breaks. Record GO for continuous, GO for paginated, or NO-GO.
 - [ ] The same spike begins while a visible preview is scrolled away from the top and
   proves its scroll position, theme, DOM/render ID, and first responder are unchanged.
 - [ ] Source-only and Experimental WYSIWYG both succeed without mounting a visible
@@ -538,8 +575,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 ### E5 — Separate PDF and Print mechanisms
 
 - [ ] Export as PDF… uses `createPDF` / the async `pdf(configuration:)` overlay and
-  an explicit full-content rect, writes nonempty valid PDF bytes without opening the
-  print panel, and preserves first/last sentinels on one continuous page.
+  an explicit rect, writes nonempty valid PDF bytes without opening the print panel, and
+  preserves first/last sentinels in order. The page model asserted here is whichever one
+  E0 recorded — one continuous full-content page, or D4's fixed-height pagination with no
+  content duplicated or dropped across breaks. It is not asserted as continuous
+  independently of E0's result.
 - [ ] Print… uses `printOperation(with:)` and presents the standard macOS print panel;
   it does not show `NSSavePanel` first.
 - [ ] Both use the same completed offscreen snapshot and include finalized images,
@@ -597,8 +637,8 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   Mermaid, task checkboxes, allowlisted/ineligible images, and MDX placeholders.
 - [ ] Source-only, source+preview, and Experimental WYSIWYG produce content-equivalent
   static HTML for the same deterministic snapshot/resources and content/theme-equivalent
-  PDF/Print output; continuous-PDF versus paper-Print pagination is intentionally
-  different.
+  PDF/Print output; the E0-recorded PDF page model versus paper-Print pagination is
+  intentionally different.
 - [ ] Light, dark, and resolved-system themes match the current preview theme without
   mutating the visible preview.
 - [ ] A current-render error and an MDX stale-last-good state fail rather than exporting
