@@ -84,7 +84,7 @@ manifest_source_archive_sha256=""
 manifest_source_tree_sha256=""
 manifest_build_input_sha256=""
 manifest_package_input_path=""
-manifest_package_input_sha256=""
+manifest_resolved_package_input_sha256=""
 manifest_xcodegen_path=""
 manifest_xcodegen_sha256=""
 manifest_destination=""
@@ -104,7 +104,9 @@ while IFS="=" read -r key value; do
         source_tree_sha256) manifest_source_tree_sha256="$value" ;;
         build_input_sha256) manifest_build_input_sha256="$value" ;;
         package_input_path) manifest_package_input_path="$value" ;;
-        package_input_sha256) manifest_package_input_sha256="$value" ;;
+        resolved_package_input_sha256)
+            manifest_resolved_package_input_sha256="$value"
+            ;;
         xcodegen_path) manifest_xcodegen_path="$value" ;;
         xcodegen_sha256) manifest_xcodegen_sha256="$value" ;;
         destination) manifest_destination="$value" ;;
@@ -119,7 +121,7 @@ while IFS="=" read -r key value; do
     esac
 done < "$manifest_path"
 
-if [[ "$manifest_format" != "4" ]]; then
+if [[ "$manifest_format" != "5" ]]; then
     echo "unsupported F2 build manifest format: $manifest_format" >&2
     exit 2
 fi
@@ -231,32 +233,39 @@ verify_build_source_snapshot() {
 }
 
 verify_package_input() {
-    local package_input_sha256
+    local resolved_package_input_sha256
     local writable_entry
 
-    if [[ ! -d "$manifest_package_input_path/checkouts" ]]; then
+    if [[ ! -d "$manifest_package_input_path/checkouts" ||
+        ! -d "$manifest_package_input_path/artifacts" ||
+        ! -f "$manifest_package_input_path/workspace-state.json" ]]; then
         echo "F2 resolved SwiftPM package input is incomplete" >&2
         return 1
     fi
     if ! writable_entry="$(
-        /usr/bin/find "$manifest_package_input_path" \
-            -perm +0222 -print -quit
+        /usr/bin/find "$manifest_package_input_path/checkouts" \
+            -name .git -prune -o -perm +0222 -print -quit &&
+            /usr/bin/find "$manifest_package_input_path/artifacts" \
+                -perm +0222 -print -quit &&
+            /usr/bin/find "$manifest_package_input_path/workspace-state.json" \
+                -perm +0222 -print -quit
     )"; then
-        echo "could not verify F2 package-input permissions" >&2
+        echo "could not verify F2 resolved-package-input permissions" >&2
         return 1
     fi
     if [[ -n "$writable_entry" ]]; then
-        echo "F2 package input is not read-only: $writable_entry" >&2
+        echo "F2 resolved package input is not read-only: $writable_entry" >&2
         return 1
     fi
-    if ! package_input_sha256="$(
-        /usr/bin/python3 "$artifact_hasher" "$manifest_package_input_path"
+    if ! resolved_package_input_sha256="$(
+        /usr/bin/python3 "$artifact_hasher" \
+            --resolved-package-input "$manifest_package_input_path"
     )"; then
-        echo "could not hash the F2 package input" >&2
+        echo "could not hash the F2 resolved package input" >&2
         return 1
     fi
-    if [[ "$package_input_sha256" != "$manifest_package_input_sha256" ]]; then
-        echo "F2 package input differs from the build manifest" >&2
+    if [[ "$resolved_package_input_sha256" != "$manifest_resolved_package_input_sha256" ]]; then
+        echo "F2 resolved package input differs from the build manifest" >&2
         return 1
     fi
 }
@@ -634,7 +643,7 @@ if ! verify_run_evidence_inputs ||
     exit 1
 fi
 
-source_check_line="F2 SOURCE CHECK PASS commit=$source_commit configuration=$configuration budget-mode=$manifest_budget_mode build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true build-input-sha256=$manifest_build_input_sha256 package-input-readonly=true package-input-sha256=$manifest_package_input_sha256 snapshot-readonly=true frozen-products=$snapshot_root host-bundle-sha256=$manifest_host_bundle_sha256 xctestrun-sha256=$manifest_xctestrun_sha256 raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-input-sha256=$inspection_input_sha256"
+source_check_line="F2 SOURCE CHECK PASS commit=$source_commit configuration=$configuration budget-mode=$manifest_budget_mode build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true build-input-sha256=$manifest_build_input_sha256 resolved-package-input-readonly=true resolved-package-input-sha256=$manifest_resolved_package_input_sha256 snapshot-readonly=true frozen-products=$snapshot_root host-bundle-sha256=$manifest_host_bundle_sha256 xctestrun-sha256=$manifest_xctestrun_sha256 raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-input-sha256=$inspection_input_sha256"
 
 set +e
 {
@@ -784,4 +793,4 @@ if ! verify_complete_evidence || ! verify_evidence_manifest; then
     exit 1
 fi
 
-echo "F2 FINAL INTEGRITY PASS commit=$source_commit configuration=$configuration build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true package-input-readonly=true snapshot-readonly=true raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-readonly=true xcresult-inspection-input-sha256=$inspection_input_sha256 xcresult-inspection-result-sha256=$inspection_result_sha256 warning-check-readonly=true warning-check-sha256=$warning_check_sha256 evidence-manifest-readonly=true evidence-manifest-sha256=$evidence_manifest_sha256"
+echo "F2 FINAL INTEGRITY PASS commit=$source_commit configuration=$configuration build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true resolved-package-input-readonly=true resolved-package-input-sha256=$manifest_resolved_package_input_sha256 snapshot-readonly=true raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-readonly=true xcresult-inspection-input-sha256=$inspection_input_sha256 xcresult-inspection-result-sha256=$inspection_result_sha256 warning-check-readonly=true warning-check-sha256=$warning_check_sha256 evidence-manifest-readonly=true evidence-manifest-sha256=$evidence_manifest_sha256"
