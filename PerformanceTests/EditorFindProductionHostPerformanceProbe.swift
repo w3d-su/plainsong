@@ -112,6 +112,19 @@ extension EditorFindPerformanceTests {
         harness.textView.textSelection = NSRange(location: 0, length: 0)
         let baselineVersion = harness.app.appState.currentDocument.version
         var samples = WorkspaceEditSamples()
+        let warningPhaseID = UUID().uuidString.lowercased()
+        logMeasuredEditWarningPhase(
+            "BEGIN",
+            id: warningPhaseID,
+            editCount: EditorFindPerformanceSupport.measuredLiveEditCount
+        )
+        defer {
+            logMeasuredEditWarningPhase(
+                "END",
+                id: warningPhaseID,
+                editCount: EditorFindPerformanceSupport.measuredLiveEditCount
+            )
+        }
         for iteration in 1 ... EditorFindPerformanceSupport.measuredLiveEditCount {
             let result = try await measureProductionWorkspaceEdit(
                 iteration: iteration,
@@ -124,6 +137,21 @@ extension EditorFindPerformanceTests {
             harness.app.cancelScheduledAppWork()
         }
         return samples
+    }
+
+    /// Synchronous, timestamped console markers let the authoritative runner classify
+    /// SwiftUI diagnostics by phase without relying on `.xcresult` issue coalescing.
+    func logMeasuredEditWarningPhase(
+        _ event: String,
+        id: String,
+        editCount: Int
+    ) {
+        NSLog(
+            "F2_WARNING_PHASE_%@ id=%@ edits=%d",
+            event,
+            id,
+            editCount
+        )
     }
 
     func measureProductionWorkspaceEdit(

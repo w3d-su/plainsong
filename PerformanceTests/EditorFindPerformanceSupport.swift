@@ -178,6 +178,11 @@ enum EditorFindPerformanceSupport {
         return environment["CI"] == "true" || environment["GITHUB_ACTIONS"] == "true"
     }
 
+    static func logBudgetMode() {
+        let mode = isContinuousIntegration ? "ci-informational" : "local-hard"
+        print("F2 PERF budget mode \(mode)")
+    }
+
     static func median(_ values: [Double]) -> Double {
         let sorted = values.sorted()
         return sorted[sorted.count / 2]

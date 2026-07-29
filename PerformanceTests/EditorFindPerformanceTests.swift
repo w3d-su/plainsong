@@ -13,6 +13,7 @@ import XCTest
 @MainActor
 final class EditorFindPerformanceTests: XCTestCase {
     func testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases() async throws {
+        EditorFindPerformanceSupport.logBudgetMode()
         let fixture = try EditorFindPerformanceSupport.fixtureText(
             testBundle: Bundle(for: Self.self)
         )
@@ -63,6 +64,7 @@ final class EditorFindPerformanceTests: XCTestCase {
     func testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets()
         async throws
     {
+        EditorFindPerformanceSupport.logBudgetMode()
         let fixture = try EditorFindPerformanceSupport.fixtureText(
             testBundle: Bundle(for: Self.self)
         )
