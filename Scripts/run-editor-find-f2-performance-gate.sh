@@ -16,6 +16,7 @@ log_digest_path="${log_path}.sha256"
 warning_check_digest_path="${warning_check_path}.sha256"
 evidence_manifest_path="${log_path%.log}.evidence-manifest.txt"
 snapshot_root="${result_bundle_path%.xcresult}.products"
+inspection_result_bundle_path="${result_bundle_path%.xcresult}.inspection.xcresult"
 
 if [[ "$configuration" != "Debug" && "$configuration" != "Release" ]]; then
     echo "configuration must be Debug or Release, got: $configuration" >&2
@@ -30,7 +31,7 @@ fi
 if [[ -e "$result_bundle_path" || -e "$log_path" ||
     -e "$log_digest_path" || -e "$warning_check_path" ||
     -e "$warning_check_digest_path" || -e "$evidence_manifest_path" ||
-    -e "$snapshot_root" ]]; then
+    -e "$snapshot_root" || -e "$inspection_result_bundle_path" ]]; then
     echo "refusing to mix or overwrite existing F2 evidence artifacts" >&2
     echo "result: $result_bundle_path" >&2
     echo "log: $log_path" >&2
@@ -39,6 +40,7 @@ if [[ -e "$result_bundle_path" || -e "$log_path" ||
     echo "check digest: $warning_check_digest_path" >&2
     echo "evidence manifest: $evidence_manifest_path" >&2
     echo "snapshot: $snapshot_root" >&2
+    echo "xcresult inspection copy: $inspection_result_bundle_path" >&2
     exit 2
 fi
 
@@ -566,6 +568,16 @@ fi
 result_bundle_sha256="$(
     /usr/bin/python3 "$artifact_hasher" "$result_bundle_path"
 )"
+/usr/bin/ditto --noextattr --noqtn --noacl \
+    "$result_bundle_path" "$inspection_result_bundle_path"
+/bin/chmod -R u+w "$inspection_result_bundle_path"
+inspection_input_sha256="$(
+    /usr/bin/python3 "$artifact_hasher" "$inspection_result_bundle_path"
+)"
+if [[ "$inspection_input_sha256" != "$result_bundle_sha256" ]]; then
+    echo "F2 xcresult inspection copy differs from the sealed raw result" >&2
+    exit 1
+fi
 
 verify_run_evidence_inputs() {
     local current_result_sha256
@@ -596,18 +608,40 @@ verify_run_evidence_inputs() {
     fi
 }
 
-if ! verify_run_evidence_inputs || ! verify_static_integrity; then
+verify_inspection_input() {
+    local current_sha256
+
+    if [[ ! -d "$inspection_result_bundle_path" ]]; then
+        echo "F2 xcresult inspection input is missing" >&2
+        return 1
+    fi
+    if ! current_sha256="$(
+        /usr/bin/python3 "$artifact_hasher" "$inspection_result_bundle_path"
+    )"; then
+        echo "could not hash the F2 xcresult inspection input" >&2
+        return 1
+    fi
+    if [[ "$current_sha256" != "$result_bundle_sha256" ]]; then
+        echo "F2 xcresult inspection input changed before validation" >&2
+        return 1
+    fi
+}
+
+if ! verify_run_evidence_inputs ||
+    ! verify_inspection_input ||
+    ! verify_static_integrity; then
     echo "F2 authoritative run failed: post-run inputs failed integrity checks" >&2
     exit 1
 fi
 
-source_check_line="F2 SOURCE CHECK PASS commit=$source_commit configuration=$configuration budget-mode=$manifest_budget_mode build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true build-input-sha256=$manifest_build_input_sha256 package-input-readonly=true package-input-sha256=$manifest_package_input_sha256 snapshot-readonly=true frozen-products=$snapshot_root host-bundle-sha256=$manifest_host_bundle_sha256 xctestrun-sha256=$manifest_xctestrun_sha256 raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256"
+source_check_line="F2 SOURCE CHECK PASS commit=$source_commit configuration=$configuration budget-mode=$manifest_budget_mode build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true build-input-sha256=$manifest_build_input_sha256 package-input-readonly=true package-input-sha256=$manifest_package_input_sha256 snapshot-readonly=true frozen-products=$snapshot_root host-bundle-sha256=$manifest_host_bundle_sha256 xctestrun-sha256=$manifest_xctestrun_sha256 raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-input-sha256=$inspection_input_sha256"
 
 set +e
 {
     echo "$source_check_line"
     /usr/bin/python3 "$checker" \
-        "$log_path" "$result_bundle_path" "$captured_log_sha256"
+        "$log_path" "$inspection_result_bundle_path" \
+        "$captured_log_sha256" "$result_bundle_sha256"
 } 2>&1 |
     /usr/bin/python3 "$stream_capturer" \
         "$warning_check_path" "$warning_check_digest_path"
@@ -615,6 +649,19 @@ checker_pipeline_statuses=("${PIPESTATUS[@]}")
 set -e
 checker_status="${checker_pipeline_statuses[0]}"
 check_capture_status="${checker_pipeline_statuses[1]}"
+
+/bin/chmod -R a-w "$inspection_result_bundle_path"
+inspection_writable_entry="$(
+    /usr/bin/find "$inspection_result_bundle_path" \
+        -perm +0222 -print -quit
+)"
+if [[ -n "$inspection_writable_entry" ]]; then
+    echo "F2 xcresult inspection result is not read-only: $inspection_writable_entry" >&2
+    exit 1
+fi
+inspection_result_sha256="$(
+    /usr/bin/python3 "$artifact_hasher" "$inspection_result_bundle_path"
+)"
 
 if [[ "$check_capture_status" -ne 0 ]]; then
     echo "F2 authoritative run failed: check-output capture exited $check_capture_status" >&2
@@ -635,9 +682,41 @@ if ! verify_stream_capture \
     exit 1
 fi
 
+verify_inspection_result() {
+    local current_sha256
+    local writable_entry
+
+    if [[ ! -d "$inspection_result_bundle_path" ]]; then
+        echo "F2 xcresult inspection result is missing" >&2
+        return 1
+    fi
+    if ! writable_entry="$(
+        /usr/bin/find "$inspection_result_bundle_path" \
+            -perm +0222 -print -quit
+    )"; then
+        echo "could not verify F2 xcresult inspection-result permissions" >&2
+        return 1
+    fi
+    if [[ -n "$writable_entry" ]]; then
+        echo "F2 xcresult inspection result is not read-only: $writable_entry" >&2
+        return 1
+    fi
+    if ! current_sha256="$(
+        /usr/bin/python3 "$artifact_hasher" "$inspection_result_bundle_path"
+    )"; then
+        echo "could not hash the F2 xcresult inspection result" >&2
+        return 1
+    fi
+    if [[ "$current_sha256" != "$inspection_result_sha256" ]]; then
+        echo "F2 xcresult inspection result changed after validation" >&2
+        return 1
+    fi
+}
+
 verify_complete_evidence() {
     verify_static_integrity || return 1
     verify_run_evidence_inputs || return 1
+    verify_inspection_result || return 1
     verify_stream_capture \
         "$warning_check_path" "$warning_check_digest_path" \
         "$warning_check_sha256" "$warning_check_bytes" || return 1
@@ -659,6 +738,9 @@ fi
     printf 'raw_log_bytes=%s\n' "$captured_log_bytes"
     printf 'xcresult_path=%s\n' "$result_bundle_path"
     printf 'xcresult_sha256=%s\n' "$result_bundle_sha256"
+    printf 'xcresult_inspection_path=%s\n' "$inspection_result_bundle_path"
+    printf 'xcresult_inspection_input_sha256=%s\n' "$inspection_input_sha256"
+    printf 'xcresult_inspection_result_sha256=%s\n' "$inspection_result_sha256"
     printf 'warning_check_path=%s\n' "$warning_check_path"
     printf 'warning_check_sha256=%s\n' "$warning_check_sha256"
     printf 'warning_check_bytes=%s\n' "$warning_check_bytes"
@@ -702,4 +784,4 @@ if ! verify_complete_evidence || ! verify_evidence_manifest; then
     exit 1
 fi
 
-echo "F2 FINAL INTEGRITY PASS commit=$source_commit configuration=$configuration build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true package-input-readonly=true snapshot-readonly=true raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 warning-check-readonly=true warning-check-sha256=$warning_check_sha256 evidence-manifest-readonly=true evidence-manifest-sha256=$evidence_manifest_sha256"
+echo "F2 FINAL INTEGRITY PASS commit=$source_commit configuration=$configuration build-manifest-readonly=true build-manifest-sha256=$manifest_sha256 exact-source-readonly=true package-input-readonly=true snapshot-readonly=true raw-log-readonly=true raw-log-sha256=$captured_log_sha256 xcresult-readonly=true xcresult-sha256=$result_bundle_sha256 xcresult-inspection-readonly=true xcresult-inspection-input-sha256=$inspection_input_sha256 xcresult-inspection-result-sha256=$inspection_result_sha256 warning-check-readonly=true warning-check-sha256=$warning_check_sha256 evidence-manifest-readonly=true evidence-manifest-sha256=$evidence_manifest_sha256"

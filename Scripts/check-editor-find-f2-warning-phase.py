@@ -61,6 +61,30 @@ def load_xcresult_summary(result_path: Path) -> dict:
         fail(f"xcresulttool returned invalid JSON: {error}")
 
 
+def validate_artifact_digest(result_path: Path, expected_sha256: str) -> None:
+    if SHA256_PATTERN.fullmatch(expected_sha256) is None:
+        fail(f"invalid expected xcresult SHA-256: {expected_sha256!r}")
+
+    hasher = Path(__file__).with_name("hash-editor-find-f2-artifact.py")
+    completed = subprocess.run(
+        ["/usr/bin/python3", str(hasher), str(result_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        fail(
+            "could not hash xcresult inspection input: "
+            f"{completed.stderr.strip()}"
+        )
+    actual_sha256 = completed.stdout.strip()
+    if actual_sha256 != expected_sha256:
+        fail(
+            "xcresult inspection input differs from the sealed raw result: "
+            f"{actual_sha256} != {expected_sha256}"
+        )
+
+
 def validate_xcresult(summary: dict) -> int:
     if summary.get("result") != "Passed":
         fail(f"xcresult result is {summary.get('result')!r}, not 'Passed'")
@@ -141,7 +165,7 @@ def validate_log(log_path: Path) -> tuple[str, int, int, int]:
     swiftui_lines = [
         (line_number, line, SWIFTUI_MESSAGE_PATTERN.search(line))
         for line_number, line in enumerate(lines, start=1)
-        if "[SwiftUI]" in line
+        if "[SwiftUI]" in line or WARNING_MESSAGE in line
     ]
     unknown_lines = [
         (line_number, line)
@@ -210,21 +234,24 @@ def validate_log(log_path: Path) -> tuple[str, int, int, int]:
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         fail(
             "usage: check-editor-find-f2-warning-phase.py "
-            "LOG XCRESULT EXPECTED_LOG_SHA256"
+            "LOG XCRESULT_INSPECTION_COPY EXPECTED_LOG_SHA256 "
+            "EXPECTED_XCRESULT_SHA256"
         )
 
     log_path = Path(sys.argv[1])
     result_path = Path(sys.argv[2])
     expected_log_sha256 = sys.argv[3]
+    expected_result_sha256 = sys.argv[4]
     if not log_path.is_file():
         fail(f"log file does not exist: {log_path}")
     if not result_path.is_dir():
         fail(f"xcresult bundle does not exist: {result_path}")
 
     validate_log_digest(log_path, expected_log_sha256)
+    validate_artifact_digest(result_path, expected_result_sha256)
     phase_id, premeasure, measured, postmeasure = validate_log(log_path)
     coalesced_issue_count = validate_xcresult(load_xcresult_summary(result_path))
     print(
@@ -234,6 +261,7 @@ def main() -> None:
         f"raw-known-post={postmeasure} unknown-swiftui=0 "
         f"raw-log-sha256={expected_log_sha256} "
         "budget-mode=local-hard budget-mode-markers=2 "
+        f"xcresult-input-sha256={expected_result_sha256} "
         f"xcresult-coalesced-known={coalesced_issue_count}"
     )
 
