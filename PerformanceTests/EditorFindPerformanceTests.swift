@@ -6,9 +6,10 @@ import XCTest
 /// F2 production-shaped performance probes over the committed 1 MiB editor fixture.
 ///
 /// Query timing retains the production 150 ms debounce and drives App's real query-change
-/// entry point through `EditorFindController` to the applied App presentation. Typing timing
-/// drives a hosted `MarkdownEditorView` input through the production writer and App binding,
-/// then awaits the real off-main recompute outside the wall-clock measurement.
+/// entry point through `EditorFindController` to the applied App presentation. Edit timing
+/// hosts the shipped `WorkspaceWindow`, editor, and find-bar view tree, then records when
+/// that root accepts the invalidated AppState snapshot. The timed receipt does not imply
+/// child layout completion, compositor presentation, or physical-keystroke evidence.
 @MainActor
 final class EditorFindPerformanceTests: XCTestCase {
     func testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases() async throws {
@@ -59,69 +60,26 @@ final class EditorFindPerformanceTests: XCTestCase {
         }
     }
 
-    func testHostedLargeFixtureLiveQueryTypingStaysWithinFrameBudgetAndSearchesOffMain()
+    func testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets()
         async throws
     {
         let fixture = try EditorFindPerformanceSupport.fixtureText(
             testBundle: Bundle(for: Self.self)
         )
-        let harness = try await EditorFindPerformanceSupport.makeHostedEditorHarness(
+        let harness = try await EditorFindPerformanceSupport.makeHostedWorkspaceHarness(
             fixtureText: fixture
         )
-        defer { harness.cleanUp() }
-        let appState = harness.app.appState
-        let scenario = try XCTUnwrap(
-            EditorFindPerformanceSupport.scenarios.first { $0.label == "dense-truncated" }
-        )
-
-        XCTAssertTrue(harness.window.makeFirstResponder(harness.textView))
-        try await Task.sleep(nanoseconds: 100_000_000)
-        await EditorFindPerformanceSupport.settleScheduledSwiftUIUpdate(in: harness)
-
-        let initial = try await measureQueryCompletion(
-            scenario,
-            in: appState,
-            label: "live-query prime"
-        )
-        assertSession(initial, matches: scenario, label: "live-query prime")
-
-        let samples = try await measureHostedLiveQueryTyping(
-            harness: harness,
-            scenario: scenario
-        )
-        let admissionMedian = EditorFindPerformanceSupport.median(samples.admission)
-        let updateMedian = EditorFindPerformanceSupport.median(samples.presentedUpdate)
-        let updateMaximum = try XCTUnwrap(samples.presentedUpdate.max())
-        print(String(
-            format: "F2 PERF hosted live-query typing 1MB admission median %.3f ms samples %@; "
-                + "presented update median %.3f ms max %.3f ms samples %@",
-            admissionMedian,
-            EditorFindPerformanceSupport.formatSamples(samples.admission),
-            updateMedian,
-            updateMaximum,
-            EditorFindPerformanceSupport.formatSamples(samples.presentedUpdate)
-        ))
-
-        // This is the existing product frame budget (agent.md §12), not a new measured budget.
-        assertWallClockBudget(
-            updateMaximum,
-            lessThan: 16.0,
-            metric: "hosted live-query typing presented-update max"
-        )
+        do {
+            try await runProductionWorkspaceEditProbe(in: harness)
+            await harness.cleanUp()
+        } catch {
+            await harness.cleanUp()
+            throw error
+        }
     }
 }
 
-private extension EditorFindPerformanceTests {
-    struct TimedHostedEdit {
-        let admissionMilliseconds: Double
-        let presentedUpdateMilliseconds: Double
-    }
-
-    struct HostedTypingSamples {
-        var admission: [Double] = []
-        var presentedUpdate: [Double] = []
-    }
-
+extension EditorFindPerformanceTests {
     final class CompletionObservation {
         let expectation: XCTestExpectation
         let previousObserver: (() -> Void)?
@@ -143,127 +101,9 @@ private extension EditorFindPerformanceTests {
             timedSession
         }
     }
-
-    func measureHostedLiveQueryEdit(
-        iteration: Int,
-        baselineVersion: Int,
-        expectedSourcePrefix: String,
-        harness: EditorFindPerformanceSupport.HostedEditorHarness,
-        scenario: EditorFindPerformanceSupport.Scenario
-    ) async throws -> TimedHostedEdit {
-        let appState = harness.app.appState
-        let controller = appState.editorFindHost.controller
-        let baselineCompletedCount = controller.completedMatchCount
-        let completion = installCompletionObservation(
-            on: appState,
-            after: baselineCompletedCount,
-            pattern: scenario.pattern,
-            label: "hosted live-query edit \(iteration)"
-        )
-        defer { controller.onSessionDidChange = completion.previousObserver }
-        let generationBefore = try XCTUnwrap(
-            harness.coordinator.preparedDocumentTransitionGeneration,
-            "hosted editor did not expose a prepared transition before edit \(iteration)"
-        )
-
-        let start = DispatchTime.now().uptimeNanoseconds
-        completion.startTime = start
-        harness.textView.insertText("x", replacementRange: .notFound)
-        let admitted = DispatchTime.now().uptimeNanoseconds
-
-        assertSynchronousEditAdmission(
-            controller: controller,
-            baselineCompletedCount: baselineCompletedCount,
-            appState: appState,
-            expectedVersion: baselineVersion + iteration,
-            expectedSourcePrefix: expectedSourcePrefix
-        )
-
-        await EditorFindPerformanceSupport.settleScheduledSwiftUIUpdate(in: harness)
-        let presented = DispatchTime.now().uptimeNanoseconds
-        try assertPresentedEditorUpdate(
-            harness: harness,
-            generationBefore: generationBefore,
-            iteration: iteration
-        )
-
-        await fulfillment(of: [completion.expectation], timeout: 10)
-        let resolved = try XCTUnwrap(
-            completion.result(),
-            "hosted live-query edit \(iteration) did not record the completed session"
-        )
-        assertSession(resolved, matches: scenario, label: "hosted live-query edit \(iteration)")
-        return TimedHostedEdit(
-            admissionMilliseconds: EditorFindPerformanceSupport.milliseconds(
-                from: start,
-                to: admitted
-            ),
-            presentedUpdateMilliseconds: EditorFindPerformanceSupport.milliseconds(
-                from: start,
-                to: presented
-            )
-        )
-    }
-
-    func measureHostedLiveQueryTyping(
-        harness: EditorFindPerformanceSupport.HostedEditorHarness,
-        scenario: EditorFindPerformanceSupport.Scenario
-    ) async throws -> HostedTypingSamples {
-        harness.app.cancelScheduledAppWork()
-        // Keep the deterministic edit in the mounted visible range. Moving the caret to the
-        // 1 MiB tail would benchmark a cold full-document scroll/layout, not typing admission.
-        harness.textView.textSelection = NSRange(location: 0, length: 0)
-        let baselineVersion = harness.app.appState.currentDocument.version
-        var samples = HostedTypingSamples()
-        for iteration in 1 ... EditorFindPerformanceSupport.measuredLiveEditCount {
-            let result = try await measureHostedLiveQueryEdit(
-                iteration: iteration,
-                baselineVersion: baselineVersion,
-                expectedSourcePrefix: String(repeating: "x", count: iteration),
-                harness: harness,
-                scenario: scenario
-            )
-            samples.admission.append(result.admissionMilliseconds)
-            samples.presentedUpdate.append(result.presentedUpdateMilliseconds)
-            harness.app.cancelScheduledAppWork()
-        }
-        return samples
-    }
-
-    func assertSynchronousEditAdmission(
-        controller: EditorFindController,
-        baselineCompletedCount: Int,
-        appState: AppState,
-        expectedVersion: Int,
-        expectedSourcePrefix: String
-    ) {
-        // Runs before any await: the old session is invalidated without a synchronous scan.
-        XCTAssertEqual(controller.completedMatchCount, baselineCompletedCount)
-        XCTAssertNil(controller.session)
-        XCTAssertNil(controller.pendingNavigationCommand)
-        XCTAssertEqual(appState.currentDocument.version, expectedVersion)
-        XCTAssertTrue(appState.currentDocument.text.hasPrefix(expectedSourcePrefix))
-    }
-
-    func assertPresentedEditorUpdate(
-        harness: EditorFindPerformanceSupport.HostedEditorHarness,
-        generationBefore: UInt64,
-        iteration: Int
-    ) throws {
-        let generationAfter = try XCTUnwrap(
-            harness.coordinator.preparedDocumentTransitionGeneration,
-            "hosted editor lost its prepared transition after edit \(iteration)"
-        )
-        XCTAssertGreaterThan(
-            generationAfter,
-            generationBefore,
-            "hosted SwiftUI representable update did not run for edit \(iteration)"
-        )
-        XCTAssertEqual(harness.textView.text, harness.app.appState.currentDocument.text)
-    }
 }
 
-private extension EditorFindPerformanceTests {
+extension EditorFindPerformanceTests {
     func measureQueryCompletion(
         _ scenario: EditorFindPerformanceSupport.Scenario,
         in appState: AppState,
@@ -320,7 +160,19 @@ private extension EditorFindPerformanceTests {
                 ),
                 retainedMatchCount: session?.total ?? 0,
                 isTruncated: session?.isTruncated ?? false,
-                ranOffMain: controller.lastMatchRanOffMain
+                ranOffMain: controller.lastMatchRanOffMain,
+                firstMatch: session?.matches.first.map {
+                    EditorFindPerformanceSupport.ExpectedMatchEndpoint(
+                        range: $0.range,
+                        line: $0.line
+                    )
+                },
+                lastRetainedMatch: session?.matches.last.map {
+                    EditorFindPerformanceSupport.ExpectedMatchEndpoint(
+                        range: $0.range,
+                        line: $0.line
+                    )
+                }
             ))
         }
         return observation
@@ -329,10 +181,21 @@ private extension EditorFindPerformanceTests {
     func assertSession(
         _ result: EditorFindPerformanceSupport.TimedSession,
         matches scenario: EditorFindPerformanceSupport.Scenario,
-        label: String
+        label: String,
+        sourceOffsetUTF16: Int = 0
     ) {
         XCTAssertEqual(result.retainedMatchCount, scenario.expectedRetainedMatchCount, label)
         XCTAssertEqual(result.isTruncated, scenario.expectedTruncation, label)
+        XCTAssertEqual(
+            result.firstMatch,
+            scenario.expectedFirstMatch?.shifted(byUTF16: sourceOffsetUTF16),
+            "\(label): first retained match moved"
+        )
+        XCTAssertEqual(
+            result.lastRetainedMatch,
+            scenario.expectedLastRetainedMatch?.shifted(byUTF16: sourceOffsetUTF16),
+            "\(label): last retained match moved"
+        )
         XCTAssertTrue(result.ranOffMain, "\(label): production matcher must run off main")
     }
 
