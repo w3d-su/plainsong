@@ -1,7 +1,7 @@
 # In-Document Find (⌘F) — Gate Specification
 
 > **Status: PR C merged as #97 at `384786e`; the F2 query-completion and production-hosted
-> state-receipt proxies are measured independently at source commit `9de4157`.** §2 is
+> state-receipt proxies are measured independently at source commit `c871ddf`.** §2 is
 > resolved **(b)**;
 > F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
 > identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
@@ -449,19 +449,21 @@ interruption of in-flight engine work.
   end-to-end. The current harness begins at programmatic `insertText` and stops at root
   update-transaction entry, so it cannot close this criterion. The retained raw samples
   also expose a real one-off synchronous O(n) preview-scroll line-index rebuild
-  (Debug admission up to 20.462 ms; Release up to 14.909 ms), which is separate production
+  (Debug admission up to 25.264 ms; Release up to 14.444 ms), which is separate production
   performance debt rather than find matching. Physical-input, child-layout/compositor, and
   that cold rebuild must be resolved or explicitly covered before checking this box.
 
 **Narrow hosted-warning policy for this baseline:** every retained hosted run emits exactly
 two pre-measure mount warnings and one pre-measure dense-prime warning with the existing
-SwiftUI text-selection signature; none occurs after measured editing starts. The mount pair
-comes from the pre-F2 representable selection-binding path, and the prime warning from the
-pre-F2 navigation selection binding. This baseline is accepted only under that explicit
-exception and is **not warning-free UI evidence**. Any additional signature/count, any
-warning during the measured interval, or a relevant editor/F8/toolchain/OS change invalidates
-the exception and requires a fresh run. If the production warning is fixed, accept fewer/zero
-warnings and remove this exception.
+SwiftUI text-selection signature. The test emits a same-UUID `BEGIN`/`END` pair around exactly
+five measured edits, and the authoritative wrapper verifies the sealed raw log has exactly
+three known warnings before `BEGIN`, zero between the markers, zero after `END`, and no other
+SwiftUI diagnostic; it separately requires one matching coalesced `.xcresult` issue. A negative
+control that moves a warning fails even though that issue remains coalesced. The mount pair comes
+from the pre-F2 representable selection-binding path, and the prime warning from the pre-F2
+navigation selection binding. This exception is **not warning-free UI evidence**. The current
+checker rejects any signature/count change, including fewer warnings, and any warning at or
+after `BEGIN`; a production fix requires deliberately replacing it with a zero-warning contract.
 
 ### F3 — Exact UTF-16 navigation through EditorNavigationRequest
 
@@ -664,11 +666,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   assertion (proves preservation, not just initial paint).
 - [ ] If highlight-all is deferred out of v1, this gate stays open and PR D must say so
   explicitly rather than checking the box.
-- Evidence: **open / explicitly deferred.** The measured `9de4157` source (branch base
-  `384786e`) has no production highlight-all apply/clear surface. The F2 fixture, hosted
-  harness, and zero/sparse/dense scenarios are reusable for a later F8 probe, but this
-  branch-only evidence neither measures nor claims highlight preservation, apply latency,
-  or clear latency on any combined tip.
+- Evidence: **open / explicitly deferred.** The measured `c871ddf` source includes
+  `origin/main` at `250e91e` and has no production highlight-all apply/clear surface. The F2
+  fixture, hosted harness, and zero/sparse/dense scenarios are reusable for a later F8 probe,
+  but this branch-only evidence neither measures nor claims highlight preservation, apply
+  latency, or clear latency on any combined tip.
 
 ### F9 — Accessibility + XCUITest
 
@@ -696,12 +698,13 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | Discipline | No invented budgets; no widening to rescue a run — fix harness or code. |
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
 
-**F2 result:** source commit `9de4157f71a1e9fb12cdde696d7e3214b8feff4f` passed three
+**F2 result:** source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979` passed three
 Debug and three Release runs. Frozen query-completion budgets are &lt;400 ms zero,
 &lt;400 ms sparse, and &lt;1,100 ms dense-truncated. The production-hosted five-edit median
 budgets are &lt;5 ms for synchronous admission and &lt;15 ms for root state-update receipt.
 The complete command/environment record, exact fixture identity/endpoints, raw samples,
-outlier diagnosis, and narrow warning exception are in `docs/perf-log.md`. These results
+sealed source/package/artifact hashes, warning-phase negative control, outlier diagnosis, and
+narrow warning exception are in `docs/perf-log.md`. These results
 close only the named F2 proxy contracts; the full &lt;16 ms keystroke-to-screen criterion,
 F8, and F9 remain open.
 
