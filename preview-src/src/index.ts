@@ -19,6 +19,16 @@ import {
   postBridgeMessage,
 } from "./bridge";
 import { rewriteImageSources } from "./image-rewrite";
+import {
+  collectPendingMermaidWrapper,
+  prepareMermaidBlocks,
+  renderPendingMermaidBlocks,
+  rerenderVisibleMermaidBlocks,
+} from "./mermaid-dom";
+import {
+  MermaidRenderCoordinator,
+  shouldUpdatePreviewElement,
+} from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
@@ -39,6 +49,11 @@ let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
+
+const mermaidRenderer = new MermaidRenderCoordinator(
+  (id, source) => mermaid.render(id, source),
+  (configuration) => mermaid.initialize(configuration),
+);
 
 registerHighlightLanguages();
 initializeMermaid("system");
@@ -107,10 +122,17 @@ async function receive(message: BridgeMessage): Promise<void> {
     case "scrollToLine":
       scrollToLine(message.payload.line, message.payload.animated);
       break;
-    case "setTheme":
-      applyPreviewSettings(message.payload.theme, message.payload.allowRemoteImages);
+    case "setTheme": {
+      const themeChanged = applyPreviewSettings(
+        message.payload.theme,
+        message.payload.allowRemoteImages,
+      );
       rewriteImageSources(previewRoot, currentBaseDir, currentAllowRemoteImages);
+      if (themeChanged) {
+        await rerenderVisibleMermaidBlocks(previewRoot, mermaidRenderer);
+      }
       break;
+    }
     case "ready":
     case "renderComplete":
     case "previewScrolled":
@@ -154,14 +176,27 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
   rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages);
+  const preparedMermaidBlocks = prepareMermaidBlocks(nextRoot, mermaidRenderer);
+  const pendingMermaidWrappers = new Set<HTMLElement>();
 
   clearMdxErrorBanner();
   morphdom(previewRoot, nextRoot, {
     childrenOnly: true,
-    onBeforeElUpdated: preserveUnchangedHighlightedCode,
+    onBeforeElUpdated: shouldUpdatePreviewElement,
+    onElUpdated(element) {
+      collectPendingMermaidWrapper(element, pendingMermaidWrappers);
+    },
+    onNodeAdded(node) {
+      collectPendingMermaidWrapper(node, pendingMermaidWrappers);
+    },
   });
   highlightCodeBlocks();
-  await renderMermaidBlocks();
+  await renderPendingMermaidBlocks(
+    previewRoot,
+    pendingMermaidWrappers,
+    preparedMermaidBlocks,
+    mermaidRenderer,
+  );
   if (payload.renderID < latestRenderID) return;
   currentRenderedVersion = payload.version;
 
@@ -291,10 +326,10 @@ function sourceLineForElement(element: Element): number | undefined {
   return Number.isFinite(line) ? line : undefined;
 }
 
-function applyPreviewSettings(theme: string, allowRemoteImages: boolean): void {
+function applyPreviewSettings(theme: string, allowRemoteImages: boolean): boolean {
   document.documentElement.dataset.theme = theme;
   currentAllowRemoteImages = allowRemoteImages;
-  initializeMermaid(theme);
+  return initializeMermaid(theme);
 }
 
 function highlightCodeBlocks(): void {
@@ -304,61 +339,6 @@ function highlightCodeBlocks(): void {
 
     hljs.highlightElement(code);
   }
-}
-
-function preserveUnchangedHighlightedCode(fromElement: Element, toElement: Element): boolean {
-  if (!(fromElement instanceof HTMLElement) || !(toElement instanceof HTMLElement)) {
-    return true;
-  }
-  if (!fromElement.matches("pre code") || !toElement.matches("pre code")) {
-    return true;
-  }
-  return (
-    fromElement.textContent !== toElement.textContent ||
-    codeLanguageClass(fromElement) !== codeLanguageClass(toElement)
-  );
-}
-
-function codeLanguageClass(element: HTMLElement): string {
-  return (
-    Array.from(element.classList).find(
-      (className) => className.startsWith("language-") || className.startsWith("lang-"),
-    ) ?? ""
-  );
-}
-
-async function renderMermaidBlocks(): Promise<void> {
-  const blocks = Array.from(
-    previewRoot.querySelectorAll<HTMLElement>(
-      "pre > code.language-mermaid, pre > code.lang-mermaid",
-    ),
-  );
-
-  for (const [index, code] of blocks.entries()) {
-    const source = code.textContent ?? "";
-    const hash = hashString(source);
-    const wrapper = document.createElement("div");
-    wrapper.className = "mermaid-rendered";
-    wrapper.dataset.mermaidHash = hash;
-
-    try {
-      const rendered = await mermaid.render(`mermaid-${hash}-${index}`, source);
-      wrapper.innerHTML = rendered.svg;
-      code.closest("pre")?.replaceWith(wrapper);
-    } catch (error) {
-      wrapper.classList.add("mermaid-error");
-      wrapper.textContent = error instanceof Error ? error.message : String(error);
-      code.closest("pre")?.replaceWith(wrapper);
-    }
-  }
-}
-
-function hashString(value: string): string {
-  let hash = 5381;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(index);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 function registerHighlightLanguages(): void {
@@ -393,10 +373,6 @@ function requirePreviewRoot(): HTMLElement {
   return root;
 }
 
-function initializeMermaid(theme: string): void {
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: theme === "dark" ? "dark" : "default",
-  });
+function initializeMermaid(theme: string): boolean {
+  return mermaidRenderer.initializeTheme(theme);
 }

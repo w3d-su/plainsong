@@ -309,12 +309,20 @@ Two unified pipelines selected by `fileKind`:
 - `mdx`: same + `remark-mdx`; a custom remark plugin transforms `mdxJsxFlowElement` /
   `mdxJsxTextElement` / `mdxjsEsm` nodes into placeholder HTML (§9) instead of compiling.
 
-Post-render in browser: `highlight.js` on code fences (langs registered explicitly,
-~20 common ones); `mermaid.render` for `mermaid` fences (init once, theme follows app);
-checkbox inputs enabled and clickable.
+Post-render in browser: `highlight.js` handles non-Mermaid code fences. Before the live
+DOM patch, Mermaid fences become `div.mermaid-rendered` placeholders carrying the exact
+fence source, its Mermaid-fence ordinal, and the current Mermaid-theme generation.
+`morphdom` keeps a matching successful live wrapper; remaining placeholders use a
+64-entry success-only LRU with the same exact source + ordinal key, and misses call
+`mermaid.render`. Concurrent identical misses coalesce in a separate in-flight table
+with the same 64-entry bound. Failed renders remain `.mermaid-error`, are not cached,
+and retry on the next render. A preview-theme change reinitializes Mermaid, clears both
+tables, and re-renders every visible diagram because the theme is baked into its SVG.
+Checkbox inputs remain enabled and clickable.
 
-DOM update: render to HTML string → `morphdom` patch against live DOM. This preserves
-scroll position, mermaid SVGs (keyed by content hash to skip re-render), and image loads.
+DOM update: render to HTML string → prepare Mermaid placeholders → `morphdom` patch
+against live DOM → resolve pending Mermaid wrappers. This preserves unchanged Mermaid
+SVG DOM, unchanged highlighted-code DOM, scroll position, and image loads.
 
 Frontmatter is **not** rendered as a table in the preview body; it is stripped (shown in
 the Frontmatter panel, §10). Optional toggle to show it as a styled block.
@@ -429,8 +437,9 @@ attempt without a Decision Log entry.
 | Memory (app host RSS) | < 400 MB in the Plainsong host process with 8 warm sessions + 2 settled live WKWebViews |
 
 Techniques: tree-sitter incremental edits (`InputEdit`), Neon visible-range-first
-highlighting, morphdom patching, render-version dropping, LRU sessions, mermaid memoization
-by fence content hash. **Any PR that regresses typing latency is rejected regardless of
+highlighting, morphdom patching, render-version dropping, LRU sessions, and bounded
+success-only Mermaid memoization by exact fence source + Mermaid-fence ordinal within a
+theme generation. **Any PR that regresses typing latency is rejected regardless of
 features.** Add a `PerformanceTests` target with a large fixture (`Fixtures/large-1mb.md`).
 
 M5 planning note: the highlight budget is accepted only from visible-range-first
@@ -763,6 +772,7 @@ make format           # swiftformat . && swiftlint --fix
 
 | 2026-07-29 | PR #97 ninth review: the fixture teardown claim was false; every test window now registers, and the key-window seam is internal | **This entry corrects the preceding row.** That row said all six fixture-using classes call `tearDownWindows()` and are therefore cleaned up. Two of them — `EditorNavigationIntegrationTests` and `EditorInstalledDocumentTransitionTests` — build their windows in their **own** factories, which never registered with the shared registry, so the `tearDown()` added for them was a no-op that read like cleanup: eight navigation fixtures plus a window built inline for the attach test could still be left ordered in with an editor first responder. Registration is now a named `registerWindowForTeardown(_:)` and every such site routes through it. `EditorSelectionProbeTests.testTearDownReleasesRegisteredFixtureWindows` asserts the window is actually gone afterwards through a weak reference — measured first, because `orderOut` hides a window and drops key status but leaves it in `NSApplication.shared.windows`, and `close()` does not remove it either; only releasing the last reference does, so the registry releases as well as hides. Scope boundary stated rather than implied: other EditorKit suites (WYSIWYG gates, document-binding lifecycle, programmatic writer activation) also build windows directly and are deliberately untouched by this find-bar PR. Separately, `keyWindowOverrideForTesting` is **internal**, not public: AppTests reaches it through `@testable import EditorKit` (verified building and running), so a test-only seam does not become mutable global state on a public production API. Alt: leaving the two local factories to per-test `defer` was rejected because a shared `tearDown()` that silently covers nothing is worse than no teardown; expanding into the other window-building suites was rejected as unrelated scope for this PR rather than because those windows are safe. |
 
+| 2026-07-29 | Preview Mermaid memo is exact, theme-scoped, success-only, and bounded | The preview only wrote a 32-bit `data-mermaid-hash`: each fresh tree still held `pre/code`, so `morphdom` replaced the live `div.mermaid-rendered` and every debounce called `mermaid.render` again. Fresh trees now carry same-tag pending wrappers. A successful live wrapper is authoritative when its exact JavaScript source string, absolute Mermaid-fence ordinal, and Mermaid-theme generation all match; remaining wrappers use a 64-entry success-only LRU keyed by the same exact source + ordinal tuple. Cache hits re-check the stored exact source and ordinal, djb2 is removed, and Mermaid renderer IDs are monotonic, so no hash collision can authorize SVG reuse. Concurrent identical misses coalesce in an in-flight table with the same 64-entry bound. A preview-theme change reinitializes Mermaid, clears both tables, and re-renders visible diagrams; failures remain `.mermaid-error`, are not cached, and retry. Both bounds prevent growth across document switches, while current live DOM preservation remains independent of eviction. No measured performance improvement is claimed; measurement is the next PR. Alt: hash-only reuse, caching failures, an unbounded cache, or retaining SVGs across themes was rejected for correctness, recovery, memory, and theme fidelity. |
 
 ---
 
