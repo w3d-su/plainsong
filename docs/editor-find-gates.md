@@ -5,8 +5,9 @@
 > F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
 > identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
 > production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
-> navigation ID domain is wired via App `navigationIDProvider`. F2 latency, F8, F9 XCUITest
-> remain open for PR D. Precedent: PR #45, link-folding, image-thumbnail gate docs.
+> navigation ID domain is wired via App `navigationIDProvider`. F2 latency and F8 remain
+> open for PR D; F9 XCUITest closed with launched-app evidence on 2026-07-29. Precedent:
+> PR #45, link-folding, image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
@@ -617,11 +618,17 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
   SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all, nor that
   the bridge receives a window in the shipped view tree.
-- [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
+- [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.
-- Evidence: _open — production focus path fixed for key-window/token ordering; hosted
-  first-responder matrix still required_
+  Evidence (2026-07-29):
+  `EditorFindAcceptanceTests.testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen`
+  launches the app, opens Find with `⌘F`, moves native keyboard focus back to the editor,
+  then sends a second `⌘F`. Predicate waits observe the query field regain native
+  `hasKeyboardFocus`; pasting `q` without a test-side select-all replaces the whole existing
+  `needle` query, and the launched app still exposes `plainsong.editorFind.bar`.
+- Evidence: _partially closed — repeated-⌘F has launched-app first-responder proof; the
+  cross-feature, dual-window, and Full Keyboard Access hosted matrix remains open_
 
 ### F8 — Highlight-all survives highlight re-application
 
@@ -636,19 +643,35 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 
 ### F9 — Accessibility + XCUITest
 
-- [ ] Stable accessibility identifiers under `plainsong.editorFind.*` for the bar,
+- [x] Stable accessibility identifiers under `plainsong.editorFind.*` for the bar,
   query field, case/whole-word controls, match counter, next/previous controls, and
   **truncated-state** indicator (when `isTruncated` is set after a
   `retainedMatchCeiling + 1` overflow).
-- [ ] Match counter’s truncated presentation is distinct from an exact total (not
+- [x] Match counter’s truncated presentation is distinct from an exact total (not
   color alone).
-- [ ] `PlainsongUITests` asserts that `⌘F` while the bar is already open re-focuses the
+- [x] `PlainsongUITests` asserts that `⌘F` while the bar is already open re-focuses the
   query field, selects its text, and leaves the bar open (never closes) — out of
   process, following the WS4A fixture pattern.
-- [ ] `PlainsongUITests` coverage following the WS4A fixture pattern: app-container
+- [x] `PlainsongUITests` coverage following the WS4A fixture pattern: app-container
   fixture, predicate waits, no `NSOpenPanel` automation, synthetic events only (not F0
   evidence).
-- Evidence: _open — PR D_
+- Evidence (2026-07-29): `EditorFindAcceptanceTests` launches the real Debug app against a
+  unique app-container-owned `editor-find.md` fixture and enters the production workspace-open
+  path. `testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen` proves first-`⌘F` open/focus
+  plus the F7 repeated-shortcut contract while exercising the bar, query, case, whole-word,
+  previous, next, Done, and match-counter identifiers.
+  `testExactAndTruncatedCountersAreObservablyDistinct` observes exact `1 / 3` with no
+  truncated element, then the `retainedMatchCeiling + 1` fixture query as `… / 10000+` plus
+  the stable truncated identifier and its non-color-only accessibility value. The final
+  command
+  `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -destination 'platform=macOS'
+  -derivedDataPath /private/tmp/plainsong-f9-derived
+  -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3 test`
+  executed 6 tests with 0 failures. All state waits are predicate-based and no
+  `NSOpenPanel` is involved. Shortcut injection uses XCUI's public synthetic `typeKey`
+  surface with a scoped enabled Latin input source that is restored immediately and again
+  during teardown; this is UI-acceptance evidence only and adds no physical-keyboard F0
+  evidence.
 
 ## 9. Performance gate (PR D)
 

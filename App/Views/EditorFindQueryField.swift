@@ -90,6 +90,7 @@ struct EditorFindQueryField: NSViewRepresentable {
         coordinator.cancelFocusAttempt()
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextFieldDelegate {
         /// 180 × 16 ms ≈ 3 s, matching the workspace-search focus loop's mount-race budget.
         private static let maximumAttempts = 180
