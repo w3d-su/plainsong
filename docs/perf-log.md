@@ -359,6 +359,160 @@ evidence, and these budgets stay informational on CI regardless.
   this gate does not claim it.
 
 
+## Phase 3 F2 In-Document Find Performance Gate
+
+This is the complete baseline record for the F2 production-shaped find probe. The measured source
+was committed first; this documentation is a source-identical child with no Swift changes.
+
+| Field | Value |
+|---|---|
+| Date | 2026-07-29 (Asia/Taipei) |
+| Branch | `codex/editor-find-f2-performance-probe`, based directly on `main` at `384786e5e98edd397a9e842d499eab252317db3b` |
+| Measured source commit | `e7be9b04616b67d54d8d40437521ffd0f02fc84b` |
+| macOS | macOS 27.0 (26A5388g) |
+| Xcode | Xcode 27.0 (27A5194q) |
+| Machine | MacBook Pro (MacBookPro18,3), Apple M1 Pro (8 cores), arm64, 16 GB RAM |
+| Fixture | `Fixtures/large-1mb.md`: 1,048,962 bytes; SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
+| Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testHostedLargeFixtureLiveQueryTypingStaysWithinFrameBudgetAndSearchesOffMain` |
+| Raw artifacts | `/private/tmp/plainsong-f2-{debug,release}-run{1,2,3}-e7be9b0.xcresult`; the complete numeric samples from all six artifacts are retained below. |
+| Result | Pass — three Debug and three Release runs, two tests per run, zero failures. |
+
+### Reproduction
+
+Build once per configuration, then run the pre-built bundle three times. Build time is outside every
+sample. Xcode auto-selected the arm64 `My Mac` destination.
+
+Debug build:
+
+```sh
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -derivedDataPath /private/tmp/plainsong-f2-debug \
+  -only-testing:PerformanceTests/EditorFindPerformanceTests build-for-testing
+```
+
+Debug run (`RUN` was set to `1`, `2`, then `3` in separate invocations):
+
+```sh
+RUN=1
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -derivedDataPath /private/tmp/plainsong-f2-debug \
+  -resultBundlePath "/private/tmp/plainsong-f2-debug-run${RUN}-e7be9b0.xcresult" \
+  -only-testing:PerformanceTests/EditorFindPerformanceTests test-without-building
+```
+
+Release build:
+
+```sh
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
+  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-release \
+  -only-testing:PerformanceTests/EditorFindPerformanceTests build-for-testing
+```
+
+Release run (`RUN` was set to `1`, `2`, then `3` in separate invocations):
+
+```sh
+RUN=1
+xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Release \
+  ENABLE_TESTABILITY=YES -derivedDataPath /private/tmp/plainsong-f2-release \
+  -resultBundlePath "/private/tmp/plainsong-f2-release-run${RUN}-e7be9b0.xcresult" \
+  -only-testing:PerformanceTests/EditorFindPerformanceTests test-without-building
+```
+
+`ENABLE_TESTABILITY=YES` is required in Release because the reusable harness observes internal
+EditorKit transition state. It does not enable `DEBUG` compilation or change the production debounce.
+
+### Procedure and scope
+
+The query probe starts its clock immediately before
+`AppState.handleEditorFindQueryTextChange`. It includes App query publication, the production
+150 ms debounce, detached `TextSearchEngine` matching, revision/query fencing, main-actor session
+application, and the wrapped App presentation callback. Every scenario gets one unmeasured warm-up
+and three measured samples. Every sample hard-asserts the exact retained count/truncation shape and
+that the matcher observed itself off the main thread.
+
+| Shape | Deterministic pattern | Fixture occurrences | Expected applied result |
+|---|---|---:|---|
+| Zero | `plainsong-f2-zero-hit` | 0 | 0 retained; not truncated |
+| Sparse | `generated sections: 1274` | 1, at the fixture tail | 1 retained; not truncated |
+| Dense | `section` (default smart case) | 11,467 | 10,000 retained; truncated after the 10,001 overflow match, reached after scanning about 87% of the fixture |
+
+The typing probe mounts the public `MarkdownEditorView`, focuses its real `MarkdownSTTextView`, opens
+find state, and primes the dense live query. Each deterministic insertion is in the mounted visible
+range and travels through native `insertText`, the production writer/source contract, App
+publication, find invalidation, and the scheduled SwiftUI representable update.
+
+The hosted surface does not mount `WorkspaceWindow` or render the find-bar chrome. It opens the
+production App bar-visibility state through `showOrRefocusEditorFind()`, so the live query,
+invalidation, debounce, and result-presentation machinery are active; the measured typing surface
+is the public editor rather than chrome layout or rendering.
+
+Two clocks are recorded: **admission** stops when `insertText` returns; **presented update** stops
+after the scheduled representable update has run and its transition generation advanced. The latter
+is a hosted editor-update proxy, not physical-keyboard, compositor, or keystroke-to-pixels evidence.
+Before the first suspension, hard assertions require the completed-match count to be unchanged,
+`session == nil`, and no pending navigation — proving the 1 MiB match did not run synchronously.
+The eventual recompute is awaited outside the frame measurement and must again produce the exact
+dense/truncated result off-main. There are five measured insertions per run.
+
+The probe has no find-closed control distribution. “Unchanged with find open” therefore means the
+existing product `<16 ms` frame budget still passes with App's bar-visibility state open and a dense
+live query; it does not claim statistical equality with find closed or a hosted full-window bar.
+
+### Raw query-completion results
+
+All values are milliseconds. Bold values are the median of the three samples in that cell.
+
+| Configuration / run | Zero samples; median | Sparse samples; median | Dense samples; median |
+|---|---|---|---|
+| Debug 1 | `[226.170, 231.926, 236.716]`; **231.926** | `[242.481, 240.377, 245.166]`; **242.481** | `[637.159, 625.486, 640.878]`; **637.159** |
+| Debug 2 | `[233.944, 242.868, 245.209]`; **242.868** | `[248.324, 246.484, 245.352]`; **246.484** | `[669.029, 629.208, 677.657]`; **669.029** |
+| Debug 3 | `[241.551, 240.493, 235.315]`; **240.493** | `[253.076, 275.147, 248.885]`; **253.076** | `[756.801, 804.366, 669.309]`; **756.801** |
+| Release 1 | `[167.492, 166.953, 161.329]`; **166.953** | `[171.865, 172.589, 179.928]`; **172.589** | `[277.624, 228.064, 233.738]`; **233.738** |
+| Release 2 | `[163.794, 167.847, 160.691]`; **163.794** | `[171.000, 174.991, 204.173]`; **174.991** | `[232.474, 235.168, 245.231]`; **235.168** |
+| Release 3 | `[178.020, 174.073, 169.418]`; **174.073** | `[173.937, 174.255, 195.714]`; **174.255** | `[236.118, 241.957, 242.075]`; **241.957** |
+
+### Raw hosted live-query typing results
+
+All values are milliseconds. Bold values are the five-sample median; the final value in the
+presented-update cell is that run's maximum.
+
+| Configuration / run | Admission samples; median | Presented-update samples; median; maximum |
+|---|---|---|
+| Debug 1 | `[1.245, 1.162, 1.169, 2.837, 1.210]`; **1.210** | `[8.024, 5.637, 5.016, 7.178, 5.843]`; **5.843**; max **8.024** |
+| Debug 2 | `[1.283, 1.115, 1.061, 1.028, 1.016]`; **1.061** | `[9.506, 5.992, 5.812, 5.377, 5.751]`; **5.812**; max **9.506** |
+| Debug 3 | `[1.385, 1.218, 1.106, 0.964, 1.064]`; **1.106** | `[8.176, 4.282, 5.656, 5.334, 5.425]`; **5.425**; max **8.176** |
+| Release 1 | `[2.044, 1.071, 0.879, 0.977, 1.041]`; **1.041** | `[5.905, 6.284, 4.432, 5.019, 4.807]`; **5.019**; max **6.284** |
+| Release 2 | `[2.487, 1.007, 1.063, 1.593, 1.031]`; **1.063** | `[10.845, 3.831, 4.365, 5.158, 3.578]`; **4.365**; max **10.845** |
+| Release 3 | `[1.866, 1.230, 1.084, 0.933, 1.024]`; **1.084** | `[5.422, 4.999, 5.421, 5.091, 4.824]`; **5.091**; max **5.422** |
+
+### Budgets and enforcement
+
+The measured source entered the six-run sequence with provisional round ceilings. The final freeze
+uses the retained authoritative Debug artifacts above: `<400`, `<400`, and `<1,100 ms` leave
+1.65x, 1.58x, and 1.45x headroom over the slowest of the three Debug run medians. All provisional
+ceilings passed, so no threshold was widened or otherwise changed after an authoritative run.
+Release values were not used to justify a budget. The six retained `.xcresult` bundles and the raw
+samples above are therefore the complete evidence for both the baseline and final initial budgets.
+
+| Metric | Budget | Authoritative Debug medians | Release medians | Budget / slowest Debug median |
+|---|---:|---|---|---:|
+| Zero query completion | < 400 ms | 231.926, 242.868, 240.493 | 166.953, 163.794, 174.073 | 1.65x |
+| Sparse query completion | < 400 ms | 242.481, 246.484, 253.076 | 172.589, 174.991, 174.255 | 1.58x |
+| Dense-truncated query completion | < 1,100 ms | 637.159, 669.029, 756.801 | 233.738, 235.168, 241.957 | 1.45x |
+| Hosted live-query presented-update maximum | < 16 ms | 8.024, 9.506, 8.176 | 6.284, 10.845, 5.422 | Existing product budget; not re-derived |
+
+Query gates enforce the per-run median; the typing gate enforces the five-sample maximum. Admission
+is retained as a diagnostic and has no separate budget because the presented-update clock contains
+it. All deterministic fixture/count/truncation/session/off-main assertions are hard everywhere.
+Wall-clock thresholds are hard locally and print informational failures on CI under R15.
+
+### F8 boundary
+
+F8 remains open. The measured `main` baseline has no production highlight-all apply/clear surface,
+so this work records no highlight preservation, apply-latency, or clear-latency claim. The shared
+fixture, hosted editor harness, and zero/sparse/dense scenarios are intentionally reusable when that
+production surface lands; no unmerged behavior was manufactured for this baseline.
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`
