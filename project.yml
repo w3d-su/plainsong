@@ -113,8 +113,13 @@ targets:
     platform: macOS
     sources:
       - path: AppTests
+      - path: Fixtures/export-e0-markdown.md
+        buildPhase: resources
+      - path: Fixtures/export-e0-mdx.mdx
+        buildPhase: resources
     dependencies:
       - target: Plainsong
+      - sdk: PDFKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.tests

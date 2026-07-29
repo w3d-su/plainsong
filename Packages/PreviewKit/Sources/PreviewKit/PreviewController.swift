@@ -77,6 +77,15 @@ public final class PreviewController: NSObject, ObservableObject {
     }
 
     public func render(_ change: DocumentTextChange) {
+        _ = submitRender(change)
+    }
+
+    @discardableResult
+    func renderForTesting(_ change: DocumentTextChange) -> Int {
+        submitRender(change)
+    }
+
+    private func submitRender(_ change: DocumentTextChange) -> Int {
         let assetContext = Self.assetContext(
             fileURL: change.fileURL,
             workspaceRootURL: workspaceAssetRootURL
@@ -96,10 +105,11 @@ public final class PreviewController: NSObject, ObservableObject {
 
         guard isReady else {
             queuedRender = payload
-            return
+            return renderID
         }
 
         send(.render(payload))
+        return renderID
     }
 
     public func scrollToLine(_ line: Int, animated: Bool) {

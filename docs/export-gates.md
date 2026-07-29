@@ -1,11 +1,9 @@
 # Phase 3 Export (HTML / PDF / Print) — Gate Specification
 
-> **Status: spec only on `phase3-export-gates-spec`, targeting `main`.** Precedent:
-> PR #45 and PR #95. This PR changes no behavior, adds no dependency, and closes no
-> export gate. Every E0–E9 checkbox starts unchecked and may be checked only with named
-> test evidence or an owner-recorded result in the same commit. E0 is a blocking
-> mechanism spike. Decisions D3–D5 require explicit owner sign-off before any
-> implementation PR starts.
+> **Status: E0 mechanism gate closed as GO (paginated); E1–E9 remain open.** Precedent:
+> PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
+> or an owner-recorded result in the same commit. Decisions D3–D5 require explicit owner
+> sign-off before any implementation PR starts.
 
 Created 2026-07-29 as a Phase 3 export candidate from `agent.md` §14. See `agent.md`
 §7 (preview and bridge), §11 (themes), §17.5 (bridge mirroring), the PR #24/#27
@@ -481,31 +479,43 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 ### E0 — Offscreen render + PDF bytes (blocking mechanism spike)
 
-- [ ] A dedicated offscreen `PreviewController` becomes ready, renders a named
+- [x] A dedicated offscreen `PreviewController` becomes ready, renders a named
   Markdown/MDX fixture, and receives `renderComplete` for the exact submitted
   `renderID`.
-- [ ] The controller receives a nonzero export viewport, and its explicit
+- [x] The controller receives a nonzero export viewport, and its explicit
   `WKPDFConfiguration.rect` equals the measured full scrollable content bounds.
-- [ ] A multi-viewport fixture produces nonempty PDF data with a valid `%PDF-` header;
+- [x] A multi-viewport fixture produces nonempty PDF data with a valid `%PDF-` header;
   parsed/extracted output contains distinct first- and last-block sentinels in order, so
   a blank or first-viewport-only PDF cannot pass.
-- [ ] A fixture whose laid-out content height **exceeds 14,400 pt** (PDF's default
+- [x] A fixture whose laid-out content height **exceeds 14,400 pt** (PDF's default
   single-page maximum, per D4) is measured separately, and the observed behavior at and
   beyond that bound is recorded: continuous capture, clipping, scaling, an API failure,
   or an invalid page box. A few-viewport fixture sits far below this bound and cannot
   stand in for it — without this bullet E0 can pass while the continuous-page model is
   already broken for ordinary long-form posts.
-- [ ] If the continuous page is unreachable past that bound, D4's fixed-height pagination
+- [x] If the continuous page is unreachable past that bound, D4's fixed-height pagination
   fallback is exercised on the same fixture and proves no content is duplicated or
   dropped across page breaks. Record GO for continuous, GO for paginated, or NO-GO.
-- [ ] The same spike begins while a visible preview is scrolled away from the top and
+- [x] The same spike begins while a visible preview is scrolled away from the top and
   proves its scroll position, theme, DOM/render ID, and first responder are unchanged.
-- [ ] Source-only and Experimental WYSIWYG both succeed without mounting a visible
+- [x] Source-only and Experimental WYSIWYG both succeed without mounting a visible
   preview.
-- [ ] Failure/timeout/cancellation produces no visible-WebView fallback and no output.
-- [ ] The PDF-byte call remains diagnostic-only: it has no App/product entry point,
+- [x] Failure/timeout/cancellation produces no visible-WebView fallback and no output.
+- [x] The PDF-byte call remains diagnostic-only: it has no App/product entry point,
   destination write, or claim that resource readiness is solved before protocol v6.
-- Evidence: _open — blocking PR B hosted mechanism spike_
+- Evidence: **GO (paginated)** —
+  `testDedicatedOffscreenControllerRendersNamedMarkdownAndMDXAtExactSubmittedRenderIDs`,
+  `testExplicitFullContentRectAndNegativeViewportControlProveMultiViewportPDF`,
+  `testTallCaptureEnumeratesBoundOutcomeAndPaginatesWithoutDuplicateOrDroppedSentinels`,
+  `testVisiblePreviewStateAndFirstResponderRemainUnchangedDuringOffscreenCapture`,
+  `testSourceOnlyAndExperimentalWYSIWYGExportWithoutMountingVisiblePreview`,
+  `testRenderCompleteAloneIsInsufficientAndFailureTimeoutCancellationReleaseResources`,
+  and `testDiagnosticPDFCallStaysTestOnlyInMemoryWithProtocolV5AndNoDestinationWrite`.
+  The hosted tall fixture measured **28,816 pt**. Full-rect capture clipped into page
+  boxes of **14,400 + 14,400 + 16 pt**; a block-boundary-aware fixed-height plan at
+  **14,400 pt** produced three pages with all **420** sentinels exactly once and in
+  order. The multi-viewport negative control measured **11,533 pt** against a **600 pt**
+  viewport and omitted the last sentinel as required.
 
 ### E1 — Immutable snapshot and lifecycle fencing
 
