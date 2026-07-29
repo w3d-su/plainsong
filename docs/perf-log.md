@@ -478,6 +478,48 @@ against the substring-based `isWordCharacter(in: String)` overload, but both cal
 off-by-one mutation passed. `testEveryASCIIScalarAgreesWithTheGeneralCategoryRule` restates the
 general-category rule as an independent oracle over all 128 ASCII scalars, and catches it.
 
+### WS4B cross-check
+
+The changed code is the whole-word path the frozen WS4B probes exercise, so those were measured
+head to head rather than assumed unaffected. Debug medians, source reverted to `dbc341c` and
+restored in place between runs, both through the full `xcodebuild ... test` stage so the runs share
+load:
+
+| WS4B probe | Baseline | After | Budget |
+|---|---|---|---|
+| dense whole-word rejection, `unicode-periodic` | 1154.951 ms | 669.050 ms | 2500 ms |
+| workspace search, 2,000 files, smart case | 1101.226 ms | 1042.827 ms | 3000 ms |
+| workspace search, 2,000 files | 1075.330 ms | 1067.072 ms | 3000 ms |
+| dense whole-word rejection, `ascii-suffix` | 45.298 ms | 45.685 ms | 200 ms |
+| admitted 512 KiB file | 37.532 ms | 39.307 ms | 150 ms |
+| admitted 512 KiB CJK file, smart case | 24.735 ms | 25.211 ms | 150 ms |
+| cancel-to-drain | 0.170 ms | 0.147 ms | 50 ms |
+
+All 14 WS4B probes pass in both configurations. `unicode-periodic` improves 42%; everything else is
+within run-to-run noise and nothing regressed. That probe is the one the 2026-07-26 Decision Log row
+recorded as effectively at parity with its budget on a cold first Debug run, so the extra room is
+worth having. **No WS4B budget is changed by this work** — those numbers stay frozen where PR #94
+and its follow-ups set them, and re-freezing them against these faster medians would be a separate
+decision with its own evidence.
+
+### Full `make test` status
+
+`make test` fails at this branch tip, and fails identically at `dbc341c`, on two tests:
+`PlainsongUITests.WorkspaceSearchAcceptanceTests.testClickThenArrowKeysUseSearchSelection` and
+`…testShortcutKeyboardActivationAndEscapeTransitions`, both with
+`Failed to activate application 'app.plainsong.editor' (current state: Running Background)`. These
+are XCUITests that require the app to become frontmost, which a non-interactive session cannot
+grant. This was verified by running the same `xcodebuild ... test` stage with only
+`TextSearchComposedSequences.swift` reverted to `dbc341c`, not inferred from the failure text.
+
+One earlier full-`make test` run at this tip did report three WS4B budget failures. That run
+overlapped with `make lint`/`make format` on the same machine and is a contention artifact, not a
+result: in it the unrelated `admitted 512 KiB` probe read 569.012 ms against the 39.307 ms it
+measures when the run has the machine to itself, a 14x slowdown no code change explains. It is
+recorded here because it is the same measurement hazard this whole section is about — WS4B budgets
+are only meaningful from the dedicated `-only-testing` commands documented above, not from a
+loaded `make test`.
+
 ### Notes
 
 - The three options weighed in the brief resolved as follows. A one-per-process warm-up in the
