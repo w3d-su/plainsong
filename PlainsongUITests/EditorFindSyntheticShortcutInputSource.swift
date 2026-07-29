@@ -132,8 +132,9 @@ final class EditorFindSyntheticShortcutInputSource {
 
     /// Restores only while the selected source is still the one this helper installed.
     ///
-    /// Selection or readback failure keeps the lease for teardown retry. If another actor
-    /// selected an identified third source, its change wins and the lease is retired.
+    /// Selection or readback failure keeps the lease for teardown retry. If either checked
+    /// boundary observes an identified third source, its change wins and the lease is retired.
+    /// TIS exposes no compare-and-swap, so a later read-to-select race and same-ID ABA remain.
     func restorePendingSelectionIfOwned() throws -> RestorationOutcome {
         guard let lease = pendingSelectionLease else {
             return .notNeeded
@@ -166,6 +167,29 @@ final class EditorFindSyntheticShortcutInputSource {
             originalIdentifier: originalIdentifier,
             selectedIdentifier: selectedIdentifier
         )
+    }
+
+    static func requireStableSelectedCandidateRestoration(
+        _ restoration: RestorationOutcome,
+        originalIdentifier: String,
+        selectedIdentifier: String
+    ) throws {
+        switch restoration {
+        case .restored:
+            return
+        case .alreadyOriginal:
+            throw InputSourceError.currentSourceChangedDuringShortcut(
+                originalIdentifier
+            )
+        case let .externalChangePreserved(identifier):
+            throw InputSourceError.currentSourceChangedDuringShortcut(
+                identifier
+            )
+        case .notNeeded:
+            throw InputSourceError.currentSourceChangedDuringShortcut(
+                selectedIdentifier
+            )
+        }
     }
 }
 
@@ -297,11 +321,11 @@ private extension EditorFindSyntheticShortcutInputSource {
 
         body()
         let restoration = try restorePendingSelectionIfOwned()
-        if case let .externalChangePreserved(identifier) = restoration {
-            throw InputSourceError.currentSourceChangedDuringShortcut(
-                identifier
-            )
-        }
+        try Self.requireStableSelectedCandidateRestoration(
+            restoration,
+            originalIdentifier: originalIdentifier,
+            selectedIdentifier: selectedIdentifier
+        )
         return .used(selectedIdentifier)
     }
 

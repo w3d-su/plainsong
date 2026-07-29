@@ -14,53 +14,12 @@ struct EditorFindPasteboardObservation {
 ///
 /// The original contents are captured lazily immediately before the first paste. Restoration
 /// proceeds only if both the change count and exact item bytes still match the last test-owned
-/// write. External changes always win. An in-flight mutation retains retry authority only while
-/// exact readback still proves that the pasteboard contains this test's nonce-marked contents.
+/// write. A distinct external generation observed at an ownership boundary wins. AppKit has no
+/// atomic compare-and-swap, so a final check-to-clear race remains. An in-flight mutation retains
+/// retry authority only while exact readback proves its nonce-marked contents, its prior authorized
+/// state, or the exact empty generation produced by its own clear.
 @MainActor
 final class EditorFindOwnedPasteboard {
-    enum RestorationOutcome: Equatable {
-        case notNeeded
-        case restored
-        case externalChangePreserved
-    }
-
-    enum PasteboardError: Error, CustomStringConvertible {
-        case changedDuringRead
-        case externalChangeBeforeWrite
-        case couldNotCaptureExactContents
-        case couldNotWriteOwnedContents
-        case ownedContentsReadbackMismatch
-        case couldNotRestoreOriginalContents
-        case originalContentsReadbackMismatch
-
-        var description: String {
-            switch self {
-            case .changedDuringRead:
-                "The pasteboard changed while its ownership state was being read"
-            case .externalChangeBeforeWrite:
-                "The pasteboard changed externally before the next test-owned write"
-            case .couldNotCaptureExactContents:
-                "The pasteboard contained a type whose exact bytes could not be captured"
-            case .couldNotWriteOwnedContents:
-                "The pasteboard rejected the test-owned contents"
-            case .ownedContentsReadbackMismatch:
-                "The test-owned pasteboard contents failed exact readback"
-            case .couldNotRestoreOriginalContents:
-                "The pasteboard rejected its original contents"
-            case .originalContentsReadbackMismatch:
-                "The restored pasteboard contents failed exact readback"
-            }
-        }
-    }
-
-    typealias Writer = (
-        NSPasteboard,
-        [NSPasteboardWriting],
-        Int
-    ) -> Bool
-    typealias Observer = (NSPasteboard) throws
-        -> EditorFindPasteboardObservation
-
     fileprivate struct ObservedState: Equatable {
         let changeCount: Int
         let snapshot: EditorFindPasteboardSnapshot
@@ -70,11 +29,14 @@ final class EditorFindOwnedPasteboard {
         case installingOwned(
             original: EditorFindPasteboardSnapshot,
             previous: ObservedState,
-            expected: EditorFindPasteboardSnapshot
+            previousWasOwned: Bool,
+            expected: EditorFindPasteboardSnapshot,
+            writeResult: WriteResult?
         )
         case restoringOriginal(
             original: EditorFindPasteboardSnapshot,
-            owned: ObservedState
+            owned: ObservedState,
+            writeResult: WriteResult?
         )
     }
 
@@ -111,7 +73,8 @@ final class EditorFindOwnedPasteboard {
         observer: @escaping Observer = { pasteboard in
             let before = pasteboard.changeCount
             let snapshot = try EditorFindOwnedPasteboard.exactSnapshot(
-                of: pasteboard.pasteboardItems ?? []
+                of: pasteboard.pasteboardItems,
+                advertisedTypes: pasteboard.types
             )
             return EditorFindPasteboardObservation(
                 beforeChangeCount: before,
@@ -141,29 +104,45 @@ final class EditorFindOwnedPasteboard {
             return
         }
 
-        let (original, previous) = try stateBeforeOwnedWrite()
+        let (original, previous, previousWasOwned) =
+            try stateBeforeOwnedWrite()
         let item = NSPasteboardItem()
-        item.setString(value, forType: .string)
-        item.setData(ownerToken, forType: Self.ownerType)
+        guard item.setString(value, forType: .string),
+              item.setData(ownerToken, forType: Self.ownerType)
+        else {
+            throw PasteboardError.couldNotWriteOwnedContents
+        }
         let expected = Self.snapshot(of: [item])
         state = .mutationInFlight(
             .installingOwned(
                 original: original,
                 previous: previous,
-                expected: expected
+                previousWasOwned: previousWasOwned,
+                expected: expected,
+                writeResult: nil
             )
         )
 
-        let didWrite = writer(
+        let writeResult = writer(
             pasteboard,
             [item],
             previous.changeCount
         )
+        state = .mutationInFlight(
+            .installingOwned(
+                original: original,
+                previous: previous,
+                previousWasOwned: previousWasOwned,
+                expected: expected,
+                writeResult: writeResult
+            )
+        )
         try finishOwnedWrite(
             original: original,
             previous: previous,
+            previousWasOwned: previousWasOwned,
             expected: expected,
-            didWrite: didWrite
+            writeResult: writeResult
         )
     }
 
@@ -183,81 +162,50 @@ final class EditorFindOwnedPasteboard {
                 return .externalChangePreserved
             }
             state = .mutationInFlight(
-                .restoringOriginal(original: original, owned: current)
+                .restoringOriginal(
+                    original: original,
+                    owned: current,
+                    writeResult: nil
+                )
             )
-            let items = Self.items(from: original)
-            let didWrite = writer(
+            let items = try Self.items(from: original)
+            let writeResult = writer(
                 pasteboard,
                 items,
                 current.changeCount
             )
+            state = .mutationInFlight(
+                .restoringOriginal(
+                    original: original,
+                    owned: current,
+                    writeResult: writeResult
+                )
+            )
             return try finishOriginalRestoration(
                 original: original,
                 owned: current,
-                didWrite: didWrite
+                writeResult: writeResult
             )
         case .mutationInFlight:
             throw PasteboardError.changedDuringRead
-        }
-    }
-
-    static func snapshot(
-        of items: [NSPasteboardItem]
-    ) -> EditorFindPasteboardSnapshot {
-        items.map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            })
-        }
-    }
-
-    /// Rechecks ownership at the last public NSPasteboard boundary before mutation.
-    ///
-    /// AppKit does not expose an atomic compare-and-swap pasteboard API, so an external
-    /// process can still race between this read and `clearContents()`. Exact post-write
-    /// readback prevents this helper from retaining ownership of such an external result.
-    static func writeObjects(
-        _ objects: [NSPasteboardWriting],
-        to pasteboard: NSPasteboard,
-        ifChangeCountIs expectedChangeCount: Int
-    ) -> Bool {
-        guard pasteboard.changeCount == expectedChangeCount else {
-            return false
-        }
-        pasteboard.clearContents()
-        return pasteboard.writeObjects(objects)
-    }
-
-    private static func exactSnapshot(
-        of items: [NSPasteboardItem]
-    ) throws -> EditorFindPasteboardSnapshot {
-        try items.map { item in
-            var values: [NSPasteboard.PasteboardType: Data] = [:]
-            for type in item.types {
-                guard let data = item.data(forType: type) else {
-                    throw PasteboardError.couldNotCaptureExactContents
-                }
-                values[type] = data
-            }
-            return values
         }
     }
 }
 
 private extension EditorFindOwnedPasteboard {
     func stateBeforeOwnedWrite() throws
-        -> (EditorFindPasteboardSnapshot, ObservedState)
+        -> (EditorFindPasteboardSnapshot, ObservedState, Bool)
     {
         switch state {
         case .untouched, .restored:
             let observed = try observeStableState()
-            return (observed.snapshot, observed)
+            return (observed.snapshot, observed, false)
         case let .owned(original, current):
             guard try observeStableState() == current else {
                 state = .externalChangePreserved
                 throw PasteboardError.externalChangeBeforeWrite
             }
-            return (original, current)
+            return (original, current, true)
         case .externalChangePreserved:
             throw PasteboardError.externalChangeBeforeWrite
         case .mutationInFlight:
@@ -268,13 +216,18 @@ private extension EditorFindOwnedPasteboard {
     func finishOwnedWrite(
         original: EditorFindPasteboardSnapshot,
         previous: ObservedState,
+        previousWasOwned: Bool,
         expected: EditorFindPasteboardSnapshot,
-        didWrite: Bool
+        writeResult: WriteResult
     ) throws {
         let observed = try observeStableState()
-        if observed.snapshot == expected {
+        if writeResultOwns(
+            observed,
+            expectedSnapshot: expected,
+            writeResult: writeResult
+        ) {
             state = .owned(original: original, current: observed)
-            guard didWrite else {
+            guard writeResult.didWrite else {
                 throw PasteboardError.couldNotWriteOwnedContents
             }
             return
@@ -283,9 +236,11 @@ private extension EditorFindOwnedPasteboard {
         retainOnlyProvenOwnership(
             original: original,
             previous: previous,
-            observed: observed
+            previousWasOwned: previousWasOwned,
+            observed: observed,
+            writeResult: writeResult
         )
-        if !didWrite {
+        if !writeResult.didWrite {
             throw PasteboardError.couldNotWriteOwnedContents
         }
         throw PasteboardError.ownedContentsReadbackMismatch
@@ -294,22 +249,29 @@ private extension EditorFindOwnedPasteboard {
     func finishOriginalRestoration(
         original: EditorFindPasteboardSnapshot,
         owned: ObservedState,
-        didWrite: Bool
+        writeResult: WriteResult
     ) throws -> RestorationOutcome {
         let observed = try observeStableState()
-        if observed.snapshot == original {
+        if writeResultOwns(
+            observed,
+            expectedSnapshot: original,
+            writeResult: writeResult
+        ) {
             state = .restored
             return .restored
         }
 
-        if observed == owned,
-           isOwnedSnapshot(observed.snapshot)
-        {
+        if observed == owned {
+            state = .owned(original: original, current: observed)
+        } else if isOwnedFailedClear(
+            observed,
+            from: writeResult
+        ) {
             state = .owned(original: original, current: observed)
         } else {
             state = .externalChangePreserved
         }
-        if !didWrite {
+        if !writeResult.didWrite {
             throw PasteboardError.couldNotRestoreOriginalContents
         }
         throw PasteboardError.originalContentsReadbackMismatch
@@ -321,21 +283,43 @@ private extension EditorFindOwnedPasteboard {
         }
         let observed = try observeStableState()
         switch mutation {
-        case let .installingOwned(original, previous, expected):
-            if observed.snapshot == expected {
+        case let .installingOwned(
+            original,
+            previous,
+            previousWasOwned,
+            expected,
+            writeResult
+        ):
+            if let writeResult,
+               writeResultOwns(
+                   observed,
+                   expectedSnapshot: expected,
+                   writeResult: writeResult
+               )
+            {
                 state = .owned(original: original, current: observed)
             } else {
                 retainOnlyProvenOwnership(
                     original: original,
                     previous: previous,
-                    observed: observed
+                    previousWasOwned: previousWasOwned,
+                    observed: observed,
+                    writeResult: writeResult
                 )
             }
-        case let .restoringOriginal(original, owned):
-            if observed.snapshot == original {
+        case let .restoringOriginal(original, owned, writeResult):
+            if let writeResult,
+               writeResultOwns(
+                   observed,
+                   expectedSnapshot: original,
+                   writeResult: writeResult
+               )
+            {
                 state = .restored
-            } else if observed == owned,
-                      isOwnedSnapshot(observed.snapshot)
+            } else if observed == owned {
+                state = .owned(original: original, current: observed)
+            } else if let writeResult,
+                      isOwnedFailedClear(observed, from: writeResult)
             {
                 state = .owned(original: original, current: observed)
             } else {
@@ -347,25 +331,44 @@ private extension EditorFindOwnedPasteboard {
     func retainOnlyProvenOwnership(
         original: EditorFindPasteboardSnapshot,
         previous: ObservedState,
-        observed: ObservedState
+        previousWasOwned: Bool,
+        observed: ObservedState,
+        writeResult: WriteResult?
     ) {
-        if observed == previous,
-           isOwnedSnapshot(observed.snapshot)
-        {
-            state = .owned(original: original, current: observed)
+        if observed == previous, previousWasOwned {
+            state = .owned(original: original, current: previous)
         } else if observed == previous {
             state = .restored
+        } else if let writeResult,
+                  isOwnedFailedClear(observed, from: writeResult)
+        {
+            state = .owned(original: original, current: observed)
         } else {
             state = .externalChangePreserved
         }
     }
 
-    func isOwnedSnapshot(
-        _ snapshot: EditorFindPasteboardSnapshot
+    func isOwnedFailedClear(
+        _ observed: ObservedState,
+        from writeResult: WriteResult
     ) -> Bool {
-        snapshot.contains { item in
-            item[Self.ownerType] == ownerToken
+        guard case let .attempted(_, ownedChangeCount) = writeResult else {
+            return false
         }
+        return observed.changeCount == ownedChangeCount
+            && observed.snapshot.isEmpty
+    }
+
+    func writeResultOwns(
+        _ observed: ObservedState,
+        expectedSnapshot: EditorFindPasteboardSnapshot,
+        writeResult: WriteResult
+    ) -> Bool {
+        guard case let .attempted(_, ownedChangeCount) = writeResult else {
+            return false
+        }
+        return observed.changeCount == ownedChangeCount
+            && observed.snapshot == expectedSnapshot
     }
 
     func observeStableState() throws -> ObservedState {
@@ -381,11 +384,13 @@ private extension EditorFindOwnedPasteboard {
 
     static func items(
         from snapshot: EditorFindPasteboardSnapshot
-    ) -> [NSPasteboardWriting] {
-        snapshot.map { values in
+    ) throws -> [NSPasteboardWriting] {
+        try snapshot.map { values in
             let item = NSPasteboardItem()
             for (type, data) in values {
-                item.setData(data, forType: type)
+                guard item.setData(data, forType: type) else {
+                    throw PasteboardError.couldNotRestoreOriginalContents
+                }
             }
             return item
         }

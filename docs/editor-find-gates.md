@@ -678,51 +678,104 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - [x] `PlainsongUITests` coverage following the WS4A fixture pattern: app-container
   fixture, predicate waits, no `NSOpenPanel` automation, synthetic events only (not F0
   evidence).
-- Evidence (2026-07-29): `EditorFindAcceptanceTests` launches the real Debug app against a
-  unique app-container-owned `editor-find.md` fixture and enters the production workspace-open
-  path. Before the first shortcut it predicate-waits for the find bar to be absent;
-  `testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen` then proves first-`⌘F` open/focus
-  plus the F7 repeated-shortcut contract while exercising the bar, query, case, whole-word,
-  previous, next, Done, and match-counter identifiers.
-  `testExactAndTruncatedCountersAreObservablyDistinct` observes exact `1 / 3` with no
-  truncated element, then the `retainedMatchCeiling + 1` fixture query as `… / 10000+` plus
-  the stable truncated identifier and its non-color-only accessibility value. The final
-  command
-  `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -destination 'platform=macOS'
-  -derivedDataPath /private/tmp/plainsong-f9-review-derived
-  -resultBundlePath /private/tmp/plainsong-f9-review-final5.xcresult
-  -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3 test`
-  executed 6 tests with 0 failures. Every iteration obtained its exact nonce-bound cleanup
-  receipt and observed the app reach `notRunning`: the Debug app accepted only the current
-  fixture's identifier/token request, entered normal termination, removed its identity-bound
-  app-created directory, verified no-follow absence, and only then published the receipt.
-  The UI runner never receives a fixture path or deletion authority. A one-hour stale sweep
-  remains for crash/interruption recovery. The focused cleanup/input-source command passed
-  13 fixture tests and 4 TIS tests, including fail-closed replacement of the captured fixture
-  root. No-follow-aware host inspection after the final run found each of its six exact
-  fixture UUIDs absent and the fixture root empty; two directories left by an earlier
-  automation-launch failure had already been separately removed by the developer.
-  All state waits are predicate-based and no `NSOpenPanel` is involved. Shortcut injection
-  uses XCUI's public synthetic `typeKey` surface with the first enabled, select-capable,
-  ASCII-capable keyboard source from current → recent ASCII → enabled ASCII-list discovery,
-  with exact source-ID readback and restoration immediately after every shortcut plus a
-  teardown fallback. Capability-policy tests admit British, Dvorak, and Colemak without an
-  identifier allowlist; the repeated launched-app run itself used the host's ABC layout.
-  This is synthetic UI-acceptance evidence only: no alternate-layout launched-app matrix,
-  physical-keyboard, or IME evidence is claimed, and a hard runner-process death can still
-  bypass input-source teardown. The retained result is warning-bearing: six SwiftUI
-  state-during-view-update runtime warnings and six QoS-inversion runtime warnings, with no
-  file/line attribution; build warnings were zero, and the artifact does not support
-  attributing those runtime warnings to `WorkspaceWindow`. An earlier full `make test`
-  attempt was not green: after all four package suites passed, both F9 and both pre-existing
-  WorkspaceSearch acceptance tests hit the same runner activation failure before product
-  assertions because the runner could not promote the app from `Running Background`; both
-  failed F9 launches still completed nonce-bound cleanup. The final-code rerun then passed
-  end-to-end: MarkdownCore 164/164; EditorKit 296 executed with 7 skips and 0 failures;
-  PreviewKit 20/20; WorkspaceKit 283/283; the Xcode scheme 614 passed, 1 skipped, 0 failed;
-  and preview `vitest` 27/27. The passing Xcode run includes F9 2/2, TIS 4/4, and the two
-  existing WorkspaceSearch acceptance tests, so no assertion or runner failure remains in
-  the final gate.
+- Evidence (2026-07-30): `EditorFindAcceptanceTests` launches the Debug app against a unique
+  app-container-owned `editor-find.md` fixture and enters the production workspace-open path.
+  Three separate methods cover the gate. The repeated-`⌘F` test predicate-waits for the bar
+  to be absent, proves the first shortcut opens and focuses it, enters `needle`, blurs the
+  query field, and — at the immediate pre-injection boundary of the second shortcut — asserts
+  that the same bar still exists and still contains `needle`. It then proves production
+  refocus/select-all by typing a replacement without issuing a test-side select-all, and
+  verifies that the bar remains open. The counter test distinguishes exact `1 / 3` with no
+  truncated element from `… / 10000+` plus the stable truncated identifier and its
+  non-color-only accessibility value. The chrome test verifies the query/toggle/button AX
+  roles, empty-query enabled states, case and whole-word value/count transitions,
+  Previous/Next ordinal changes, and Done closing the bar with editor focus restored.
+  The final three-iteration command
+  `xcodebuild -quiet -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug
+  -destination 'platform=macOS' -derivedDataPath
+  /private/tmp/plainsong-f9-currentmain-derived -resultBundlePath
+  /private/tmp/plainsong-f9-final-ui-3x-20260730j.xcresult
+  -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3
+  test-without-building` passed all 9 launched-app test runs with no failure or skip.
+  A preceding latest-code attempt produced 1 pass and 8 runner-activation failures at
+  `Running Background`; no product assertion failed, and every failed launch still completed
+  its exact app-side cleanup handshake.
+
+  Fixture creation acquires and locks a root-anchored, exclusive, no-follow per-run lease
+  before publishing the workspace name. The retained app-side handle holds the workspace
+  directory descriptor plus a random ownership-marker descriptor/inode created inside that
+  workspace, then persists that workspace and marker device/inode binding in the locked lease.
+  Cleanup fails closed if the captured root/workspace is missing, renamed, or swapped; it
+  verifies the marker unlink reached the captured workspace, checks the retained directory
+  path with `F_GETPATH`, requires no-follow absence at that exact name, and removes the exact
+  lease link before publishing a receipt. The UI runner receives neither a path nor deletion
+  authority. The one-hour crash/interruption sweep reclaims only an expired fixture whose
+  released lease it can lock **and** whose persisted workspace/marker binding still matches;
+  a lexical same-name replacement is preserved. Released pre-workspace leases remain
+  reclaimable only while unbound. Another live or paused run keeps its lock and is preserved,
+  while bound missing-name/corrupt leases and unleased legacy entries fail closed.
+  Focused fixture/lease coverage passed 25/25 in
+  `/private/tmp/plainsong-f9-final-fixture-20260730f.xcresult`, including root/workspace
+  rename-away, path replacement during deletion, marker-unlink/path-rename failure, live-lease
+  preservation, released orphan recovery, preservation of a pre-existing unleased directory
+  after failed creation, and rejection of a released lease's same-name replacement. The nine
+  launched-app runs each verified their exact nonce-bound app-side receipt and `notRunning`;
+  read-only no-follow host inspection found all nine current-run workspace names and lease
+  names absent, with zero entries left in the fixture root.
+
+  Cleanup traffic uses a per-run named pasteboard. General-pasteboard shortcut text captures
+  the item-ordered type/data byte mappings observable through AppKit before mutation and retains
+  ownership only when readback has both those exact bytes and the helper-owned generation. A
+  distinct external generation observed at a checked boundary is preserved. A failed restore
+  remains retryable after app termination; exact owned bytes at the helper's generation retain
+  restoration authority even when AppKit reports write failure, while an owned clear retains
+  only its exact empty generation. Originally empty pasteboards restore through that clear
+  generation. AppKit exposes no getter for active pasteboard contents options, so the evidence
+  does not claim restoration of an unobservable option such as `currentHostOnly`. Focused
+  restoration coverage passed 23/23 in
+  `/private/tmp/plainsong-f9-final-restoration-20260730g.xcresult` (9 TIS + 14 pasteboard),
+  including identical-byte/new-generation ABA rejection. AppKit offers no atomic pasteboard
+  compare-and-swap, leaving a documented final check-to-clear micro-race; `nil` items with
+  advertised types fail closed, while `nil`/`nil` is accepted as an observably empty
+  pasteboard and cannot distinguish total retrieval failure.
+
+  Synthetic textual shortcuts discover current → recent ASCII → enabled ASCII-list sources
+  and require keyboard category, enabled, select-capable, and ASCII-capable properties.
+  Selection and exact-source restoration are read back; a distinct external source observed at
+  a checked boundary is preserved, while a failed helper-owned restore remains retryable
+  immediately and after app termination. TIS offers no compare-and-swap, so a change in the
+  final read-to-select window and same-ID ABA are not observable ownership guarantees.
+  Capability-policy tests admit British, Dvorak, and Colemak without an identifier allowlist;
+  the launched-app run itself used ABC, so no alternate-layout launch matrix is claimed. A hard
+  runner-process death can still bypass TIS/general-pasteboard teardown. The retained F9
+  artifact contains nine QoS-inversion and nine SwiftUI state-during-view-update runtime
+  warnings with no file/line root-cause attribution; it does not support assigning existing
+  `WorkspaceWindow` warnings to this branch.
+
+  The final full `make test` gate is not green. All four Swift package suites passed
+  (MarkdownCore 164/164; EditorKit 296 executed / 7 skipped / 0 failed; PreviewKit 20/20;
+  WorkspaceKit 283/283), then Xcode passed F9 3/3, TIS 9/9, pasteboard 14/14,
+  `PlainsongTests` 603 executed / 1 skipped / 0 failed, and `PerformanceTests` 23/23.
+  Both existing `WorkspaceSearchAcceptanceTests` then made real assertions at line 162:
+  after synthetic Command-Shift-F, the `plainsong.workspaceSearch.queryField` did not appear
+  within five seconds. These were not runner-activation failures, and there is no root-cause
+  evidence assigning them to the F9 files. Xcode exited 65 before Make reached preview;
+  a separate final preview `vitest` run passed 41/41. An immediately preceding full attempt
+  stopped on MarkdownCore's existing 3-second resource-bound assertion at 3.095 s; its exact
+  isolated rerun passed at 2.485 s. All F9 state waits are predicate-based; no
+  `NSOpenPanel` is used. Synthetic XCUI `typeKey` evidence is not physical-keyboard or IME
+  evidence. On macOS
+  there is no descriptor-bound conditional `rmdir`; the marker + descriptor-path checks cover
+  the app-owned/cooperative and tested rename/swap cases but are not an identity-atomic
+  guarantee against a hostile same-container actor racing marker unlink and final path checks.
+  A crash in the small mkdir/marker-to-lease-binding window, or a stale recursive removal that
+  deletes the marker before failing, can conservatively strand an unbound/unverifiable fixture;
+  those cases leak Debug fixture bytes rather than broadening deletion authority or publishing
+  a false receipt.
+  `project.yml` is unchanged; XcodeGen only refreshed source inventory for the folder-backed
+  test/app targets, and the generated project was not hand-edited. F9 and only the repeated-
+  `⌘F` sub-gate of F7 close here; F2 retains only its separately named proxies, F8 stays
+  separate and pending, and no combined-tip evidence is claimed.
 
 ## 9. Performance gate (separate F2 follow-up)
 

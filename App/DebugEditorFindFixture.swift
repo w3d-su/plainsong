@@ -4,8 +4,9 @@
 
     /// Deterministic, app-container-owned fixture for out-of-process editor-find UI tests.
     ///
-    /// The fixture only creates source files. Opening, matching, navigation, focus, and
-    /// accessibility all continue through the launched app's production paths.
+    /// The fixture creates isolated source plus private ownership metadata only. Opening,
+    /// matching, navigation, focus, and accessibility continue through the launched app's
+    /// production paths.
     enum DebugEditorFindFixture {
         static let environmentKey = "PLAINSONG_DEBUG_EDITOR_FIND_FIXTURE"
         static let cleanupTokenEnvironmentKey =
@@ -17,6 +18,8 @@
         static let identifierPrefix = "f9-"
         static let staleFixtureAge: TimeInterval = 60 * 60
         static let leaseFilePrefix = ".plainsong-editor-find-fixture-lease-"
+        static let ownershipMarkerFilePrefix =
+            ".plainsong-editor-find-fixture-owner-"
 
         final class CreatedFixture {
             let identifier: String
@@ -24,7 +27,9 @@
             fileprivate let fixturesRoot: URL
             fileprivate let fixturesRootIdentity: EntryIdentity
             fileprivate let workspaceIdentity: EntryIdentity
+            fileprivate let workspaceHandle: DebugEditorFindFixtureWorkspaceHandle
             fileprivate let lease: DebugEditorFindFixtureLease
+            fileprivate var workspaceRemovalAttemptStarted = false
             fileprivate var workspaceWasVerifiedRemoved = false
             fileprivate var isVerifiedRemoved = false
 
@@ -34,6 +39,7 @@
                 fixturesRoot: URL,
                 fixturesRootIdentity: EntryIdentity,
                 workspaceIdentity: EntryIdentity,
+                workspaceHandle: DebugEditorFindFixtureWorkspaceHandle,
                 lease: DebugEditorFindFixtureLease
             ) {
                 self.identifier = identifier
@@ -41,6 +47,7 @@
                 self.fixturesRoot = fixturesRoot
                 self.fixturesRootIdentity = fixturesRootIdentity
                 self.workspaceIdentity = workspaceIdentity
+                self.workspaceHandle = workspaceHandle
                 self.lease = lease
             }
 
@@ -49,10 +56,14 @@
             /// The UI test never supplies a path to this operation. Revalidating the root,
             /// direct-child relationship, and entry type keeps a compromised or stale handle
             /// from widening deletion authority.
-            func remove(fileManager: FileManager = .default) throws {
+            func remove(
+                fileManager: FileManager = .default,
+                workspaceRemover: ((URL) throws -> Void)? = nil
+            ) throws {
                 try DebugEditorFindFixture.removeCreatedFixture(
                     self,
-                    fileManager: fileManager
+                    fileManager: fileManager,
+                    workspaceRemover: workspaceRemover
                 )
             }
         }
@@ -63,7 +74,8 @@
             identifier: String,
             fileManager: FileManager = .default,
             now: Date = Date(),
-            fixturesRootOverride: URL? = nil
+            fixturesRootOverride: URL? = nil,
+            sourceWriter: ((Data, URL) throws -> Void)? = nil
         ) throws -> CreatedFixture {
             let currentIdentifier = try validatedIdentifier(identifier)
             let fixturesRoot = fixturesRootOverride?.standardizedFileURL
@@ -92,43 +104,61 @@
                 fixturesRoot: fixturesRoot,
                 workspaceURL: workspaceURL
             )
+            var didCreateWorkspaceDirectory = false
             var createdWorkspaceIdentity: EntryIdentity?
+            var workspaceHandle: DebugEditorFindFixtureWorkspaceHandle?
             do {
                 try createWorkspaceDirectoryExclusively(workspaceURL)
+                didCreateWorkspaceDirectory = true
                 guard let createdWorkspaceStatus = try entryStatus(
                     at: workspaceURL
                 ), fileType(of: createdWorkspaceStatus) == mode_t(S_IFDIR) else {
                     throw FixtureError.unsafeCreatedFixture
                 }
-                createdWorkspaceIdentity = identity(of: createdWorkspaceStatus)
-                let exactMatches = """
-                needle one
-                needle two
-                needle three
-                caseprobe
-                CASEPROBE
-                wordprobe
-                wordprobeTail
-                headwordprobe
-                """
-                let overflowingMatches = String(repeating: "x ", count: 10001)
-                try Data((exactMatches + "\n" + overflowingMatches).utf8).write(
-                    to: workspaceURL.appendingPathComponent("editor-find.md"),
-                    options: .atomic
+                let workspaceIdentity = identity(of: createdWorkspaceStatus)
+                createdWorkspaceIdentity = workspaceIdentity
+                let openedWorkspaceHandle =
+                    try DebugEditorFindFixtureWorkspaceHandle.open(
+                        at: workspaceURL,
+                        expectedIdentity: workspaceIdentity
+                    )
+                workspaceHandle = openedWorkspaceHandle
+                try lease.bindWorkspace(
+                    openedWorkspaceHandle.workspaceBinding()
+                )
+                try writeFixtureSource(
+                    in: workspaceURL,
+                    sourceWriter: sourceWriter
                 )
             } catch {
+                var workspaceRemovalWasVerified = false
                 if let createdWorkspaceIdentity {
-                    removeFailedCreationIfStillOwned(
+                    workspaceRemovalWasVerified = removeFailedCreationIfStillOwned(
                         at: workspaceURL,
                         identity: createdWorkspaceIdentity,
                         fileManager: fileManager
                     )
+                    if workspaceRemovalWasVerified,
+                       let workspaceHandle
+                    {
+                        workspaceRemovalWasVerified =
+                            (try? workspaceHandle.verifyRemoved()) != nil
+                    }
                 }
-                try? lease.unlinkPathIfStillOwned()
+                if workspaceRemovalWasVerified {
+                    try? lease.unlinkPathIfStillOwned()
+                } else if !didCreateWorkspaceDirectory {
+                    // The conflicting workspace predates this attempt. Remove only the
+                    // exact lease this attempt created so a later stale sweep cannot
+                    // misclassify that unleased directory as app-owned.
+                    try? lease.unlinkPathIfStillOwned()
+                }
                 throw error
             }
 
-            guard let createdWorkspaceIdentity else {
+            guard let createdWorkspaceIdentity,
+                  let workspaceHandle
+            else {
                 throw FixtureError.unsafeCreatedFixture
             }
             guard let fixturesRootStatus = try entryStatus(at: fixturesRoot),
@@ -147,8 +177,37 @@
                 fixturesRoot: fixturesRoot,
                 fixturesRootIdentity: identity(of: fixturesRootStatus),
                 workspaceIdentity: createdWorkspaceIdentity,
+                workspaceHandle: workspaceHandle,
                 lease: lease
             )
+        }
+
+        private static func writeFixtureSource(
+            in workspaceURL: URL,
+            sourceWriter: ((Data, URL) throws -> Void)?
+        ) throws {
+            let exactMatches = """
+            needle one
+            needle two
+            needle three
+            caseprobe
+            CASEPROBE
+            wordprobe
+            wordprobeTail
+            headwordprobe
+            """
+            let overflowingMatches = String(repeating: "x ", count: 10001)
+            let source = Data(
+                (exactMatches + "\n" + overflowingMatches).utf8
+            )
+            let sourceURL = workspaceURL.appendingPathComponent(
+                "editor-find.md"
+            )
+            if let sourceWriter {
+                try sourceWriter(source, sourceURL)
+            } else {
+                try source.write(to: sourceURL, options: .atomic)
+            }
         }
 
         private static func createOwnershipLease(
@@ -171,6 +230,12 @@
                 else {
                     throw FixtureError.fixtureAlreadyExists
                 }
+                guard try releasedLease.workspaceBinding() == nil else {
+                    // A bound lease can represent a captured workspace that was
+                    // renamed away. Its missing published name is not proof that
+                    // the captured fixture was removed.
+                    throw FixtureError.fixtureAlreadyExists
+                }
                 try releasedLease.unlinkPathIfStillOwned()
                 return try DebugEditorFindFixtureLease.create(at: leaseURL)
             }
@@ -180,14 +245,19 @@
             at workspaceURL: URL,
             identity expectedIdentity: EntryIdentity,
             fileManager: FileManager
-        ) {
+        ) -> Bool {
             guard let status = try? entryStatus(at: workspaceURL),
                   fileType(of: status) == mode_t(S_IFDIR),
                   identity(of: status) == expectedIdentity
             else {
-                return
+                return false
             }
-            try? fileManager.removeItem(at: workspaceURL)
+            do {
+                try fileManager.removeItem(at: workspaceURL)
+                return try entryMode(at: workspaceURL) == nil
+            } catch {
+                return false
+            }
         }
 
         private static func createFixturesRootIfNeeded(
@@ -234,78 +304,10 @@
     }
 
     extension DebugEditorFindFixture {
-        static func removeStaleFixtures(
-            in fixturesRoot: URL,
-            excluding currentIdentifier: String,
-            fileManager: FileManager = .default,
-            now: Date = Date()
-        ) throws {
-            guard try validateFixturesRootIfPresent(
-                fixturesRoot,
-                fileManager: fileManager
-            ) else {
-                return
-            }
-            let keys: Set<URLResourceKey> = [.contentModificationDateKey]
-            let candidates = try fileManager.contentsOfDirectory(
-                at: fixturesRoot,
-                includingPropertiesForKeys: Array(keys),
-                options: [.skipsHiddenFiles]
-            )
-            let staleBefore = now.addingTimeInterval(-staleFixtureAge)
-
-            for candidate in candidates {
-                guard candidate.lastPathComponent.hasPrefix(identifierPrefix),
-                      candidate.lastPathComponent != currentIdentifier
-                else {
-                    continue
-                }
-                guard let candidateStatus = try entryStatus(at: candidate),
-                      fileType(of: candidateStatus) == mode_t(S_IFDIR)
-                else {
-                    continue
-                }
-                let candidateIdentity = identity(of: candidateStatus)
-                let values = try candidate.resourceValues(forKeys: keys)
-                guard let modificationDate = values.contentModificationDate,
-                      modificationDate <= staleBefore
-                else {
-                    continue
-                }
-
-                let leaseURL = ownershipLeaseURL(
-                    for: candidate.lastPathComponent,
-                    in: fixturesRoot
-                )
-                guard let lease = try DebugEditorFindFixtureLease
-                    .tryAcquireExisting(at: leaseURL)
-                else {
-                    // A locked lease belongs to a live or paused run. Missing or legacy
-                    // leases are preserved because ownership cannot be proven.
-                    continue
-                }
-                guard let revalidatedStatus = try entryStatus(at: candidate),
-                      fileType(of: revalidatedStatus) == mode_t(S_IFDIR),
-                      identity(of: revalidatedStatus) == candidateIdentity
-                else {
-                    continue
-                }
-                try lease.validatePath()
-                try fileManager.removeItem(at: candidate)
-                guard try entryMode(at: candidate) == nil,
-                      try lease.linkCount() == 1
-                else {
-                    throw FixtureError.fixtureRemovalDidNotComplete
-                }
-                try lease.unlinkPathIfStillOwned()
-            }
-        }
-    }
-
-    extension DebugEditorFindFixture {
         private static func removeCreatedFixture(
             _ fixture: CreatedFixture,
-            fileManager: FileManager
+            fileManager: FileManager,
+            workspaceRemover: ((URL) throws -> Void)?
         ) throws {
             if fixture.isVerifiedRemoved {
                 return
@@ -337,10 +339,20 @@
                 else {
                     throw FixtureError.unsafeCreatedFixture
                 }
-                try fileManager.removeItem(at: workspaceURL)
+                try fixture.workspaceHandle.validatePath(
+                    allowingRemovedOwnershipMarker:
+                    fixture.workspaceRemovalAttemptStarted
+                )
+                fixture.workspaceRemovalAttemptStarted = true
+                if let workspaceRemover {
+                    try workspaceRemover(workspaceURL)
+                } else {
+                    try fileManager.removeItem(at: workspaceURL)
+                }
                 guard try entryMode(at: workspaceURL) == nil else {
                     throw FixtureError.fixtureRemovalDidNotComplete
                 }
+                try fixture.workspaceHandle.verifyRemoved()
                 fixture.workspaceWasVerifiedRemoved = true
             }
             try fixture.lease.unlinkPathIfStillOwned()
@@ -352,141 +364,6 @@
         private static func fixturesRoot(fileManager: FileManager) -> URL {
             fileManager.temporaryDirectory
                 .appendingPathComponent("PlainsongEditorFindUITests", isDirectory: true)
-        }
-
-        static func ownershipLeaseURL(
-            for identifier: String,
-            in fixturesRoot: URL
-        ) -> URL {
-            fixturesRoot.appendingPathComponent(
-                leaseFilePrefix + identifier,
-                isDirectory: false
-            )
-        }
-
-        private static func validatedIdentifier(_ identifier: String) throws -> String {
-            let safeScalars = identifier.unicodeScalars.filter { scalar in
-                CharacterSet.alphanumerics.contains(scalar)
-                    || scalar == "-"
-                    || scalar == "_"
-            }
-            guard !safeScalars.isEmpty,
-                  safeScalars.count <= 64,
-                  String(String.UnicodeScalarView(safeScalars)) == identifier,
-                  identifier.hasPrefix(identifierPrefix)
-            else {
-                throw FixtureError.invalidIdentifier
-            }
-            return identifier
-        }
-
-        static func cleanupReceipt(identifier: String, token: String) -> String {
-            "removed:\(identifier):\(token)"
-        }
-
-        static func cleanupRequest(identifier: String, token: String) -> String {
-            "quit:\(identifier):\(token)"
-        }
-
-        static func cleanupPasteboardName(token: String) -> String {
-            "app.plainsong.editor.debug.editor-find-cleanup.\(token)"
-        }
-
-        static func cleanupRequestMatches(
-            fixtureIdentifier: String,
-            cleanupToken: String,
-            request: String
-        ) -> Bool {
-            !cleanupToken.isEmpty
-                && request == cleanupRequest(
-                    identifier: fixtureIdentifier,
-                    token: cleanupToken
-                )
-        }
-
-        struct EntryIdentity: Equatable {
-            let device: dev_t
-            let inode: ino_t
-        }
-
-        /// Returns the no-follow file type, including dangling symbolic links.
-        static func entryMode(at url: URL) throws -> mode_t? {
-            try entryStatus(at: url).map { fileType(of: $0) }
-        }
-
-        static func entryStatus(at url: URL) throws -> stat? {
-            var fileStatus = stat()
-            let result = url.path.withCString { path in
-                lstat(path, &fileStatus)
-            }
-            guard result != 0 else {
-                return fileStatus
-            }
-            let errorCode = errno
-            guard errorCode == ENOENT else {
-                throw FixtureError.couldNotInspectFixture(errorCode)
-            }
-            return nil
-        }
-
-        static func fileType(of fileStatus: stat) -> mode_t {
-            fileStatus.st_mode & mode_t(S_IFMT)
-        }
-
-        static func identity(of fileStatus: stat) -> EntryIdentity {
-            EntryIdentity(
-                device: fileStatus.st_dev,
-                inode: fileStatus.st_ino
-            )
-        }
-
-        private static func validateFixturesRootIfPresent(
-            _ fixturesRoot: URL,
-            fileManager: FileManager
-        ) throws -> Bool {
-            if (try? fileManager.destinationOfSymbolicLink(
-                atPath: fixturesRoot.path
-            )) != nil {
-                throw FixtureError.unsafeFixturesRoot
-            }
-
-            var isDirectory = ObjCBool(false)
-            guard fileManager.fileExists(
-                atPath: fixturesRoot.path,
-                isDirectory: &isDirectory
-            ) else {
-                return false
-            }
-            let values = try fixturesRoot.resourceValues(forKeys: [
-                .isDirectoryKey,
-                .isSymbolicLinkKey,
-            ])
-            guard isDirectory.boolValue,
-                  values.isDirectory == true,
-                  values.isSymbolicLink != true
-            else {
-                throw FixtureError.unsafeFixturesRoot
-            }
-            return true
-        }
-
-        enum FixtureError: Error {
-            case invalidIdentifier
-            case fixtureAlreadyExists
-            case unsafeFixturesRoot
-            case unsafeCreatedFixture
-            case capturedFixturesRootMissing
-            case capturedWorkspaceMissing
-            case fixtureRemovalDidNotComplete
-            case couldNotInspectFixture(Int32)
-            case couldNotCreateFixturesRoot(Int32)
-            case couldNotCreateWorkspace(Int32)
-            case couldNotCreateLease(Int32)
-            case couldNotOpenLease(Int32)
-            case couldNotLockLease(Int32)
-            case couldNotRemoveLease(Int32)
-            case unsafeLease
-            case couldNotInspectLease(Int32)
         }
     }
 #endif

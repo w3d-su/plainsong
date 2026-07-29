@@ -225,6 +225,24 @@ final class EditorFindInputSourceTests: XCTestCase {
         XCTAssertTrue(readbacks.isEmpty)
     }
 
+    func testSelectedCandidateReturningToOriginalDuringShortcutIsNotAccepted() {
+        XCTAssertThrowsError(
+            try EditorFindSyntheticShortcutInputSource
+                .requireStableSelectedCandidateRestoration(
+                    .alreadyOriginal,
+                    originalIdentifier: "original",
+                    selectedIdentifier: "selected"
+                )
+        ) { error in
+            guard case let EditorFindSyntheticShortcutInputSource.InputSourceError
+                .currentSourceChangedDuringShortcut(identifier) = error
+            else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(identifier, "original")
+        }
+    }
+
     private func capabilities(
         identifier: String,
         isKeyboardInputSource: Bool = true,

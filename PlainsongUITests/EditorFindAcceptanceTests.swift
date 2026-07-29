@@ -35,16 +35,17 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         waitForKeyboardBlur(queryField)
 
         let findBar = findElement("plainsong.editorFind.bar")
-        XCTAssertTrue(
-            findBar.exists,
-            "The find bar must already be open immediately before repeated Command-F"
-        )
-        waitForValue(
-            "needle",
-            of: queryField,
-            description: "retained query immediately before repeated Command-F"
-        )
-        try pressCommandF()
+        try pressCommandF {
+            XCTAssertTrue(
+                findBar.exists,
+                "The find bar must already be open immediately before repeated Command-F"
+            )
+            XCTAssertEqual(
+                queryField.value as? String,
+                "needle",
+                "The retained query must still be needle immediately before repeated Command-F"
+            )
+        }
         waitForKeyboardFocus(queryField)
         try paste("q")
 
@@ -158,7 +159,9 @@ extension EditorFindAcceptanceTests {
         return queryField
     }
 
-    private func pressCommandF() throws {
+    private func pressCommandF(
+        immediatelyBeforeInjection: (() -> Void)? = nil
+    ) throws {
         let menuItem = app.menuItems["Find…"].firstMatch
         wait(
             for: NSPredicate(format: "exists == true AND enabled == true"),
@@ -169,18 +172,24 @@ extension EditorFindAcceptanceTests {
 
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         waitForKeyboardFocus(editor)
-        try typeCommandKey("f", on: editor)
+        try typeCommandKey(
+            "f",
+            on: editor,
+            immediatelyBeforeInjection: immediatelyBeforeInjection
+        )
     }
 
     func typeCommandKey(
         _ key: String,
-        on element: XCUIElement
+        on element: XCUIElement,
+        immediatelyBeforeInjection: (() -> Void)? = nil
     ) throws {
         // XCUI's public textual-key API is interpreted through the selected input source.
         // Scope it to any enabled, selectable ASCII-capable source only while testmanagerd
         // synthesizes this shortcut, then restore and read back the exact prior source.
         do {
             let identifier = try shortcutInputSource.withASCIICapableInputSource {
+                immediatelyBeforeInjection?()
                 element.typeKey(
                     XCUIKeyboardKey(rawValue: key),
                     modifierFlags: .command

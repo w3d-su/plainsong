@@ -142,11 +142,11 @@
             XCTAssertFalse(fileManager.fileExists(atPath: workspaceURL.path))
         }
 
-        func testPreWorkspaceLeaseBlocksLiveDuplicateAndRecoversAfterOwnerExit() throws {
+        func testStaleSweepRejectsReplacementAtReleasedFixturesPublishedName() throws {
             let fileManager = FileManager.default
             let testContainer = fileManager.temporaryDirectory
                 .appendingPathComponent(
-                    "EditorFindPreWorkspaceLease-\(UUID().uuidString)",
+                    "EditorFindStaleReplacement-\(UUID().uuidString)",
                     isDirectory: true
                 )
             let root = testContainer.appendingPathComponent(
@@ -154,48 +154,77 @@
                 isDirectory: true
             )
             try fileManager.createDirectory(
-                at: root,
-                withIntermediateDirectories: true
+                at: testContainer,
+                withIntermediateDirectories: false
             )
             defer { try? fileManager.removeItem(at: testContainer) }
-            let identifier = "f9-pre-workspace-\(UUID().uuidString)"
-            let workspaceURL = root.appendingPathComponent(
-                identifier,
-                isDirectory: true
-            )
-            var preWorkspaceLease: DebugEditorFindFixtureLease? =
-                try DebugEditorFindFixtureLease.create(
-                    at: DebugEditorFindFixture.ownershipLeaseURL(
-                        for: identifier,
-                        in: root
-                    )
-                )
-
-            XCTAssertThrowsError(
+            let identifier = "f9-stale-replacement-\(UUID().uuidString)"
+            var fixture: DebugEditorFindFixture.CreatedFixture? =
                 try DebugEditorFindFixture.create(
                     identifier: identifier,
                     fileManager: fileManager,
                     fixturesRootOverride: root
                 )
-            ) { error in
-                guard case DebugEditorFindFixture.FixtureError
-                    .fixtureAlreadyExists = error
-                else {
-                    return XCTFail("Unexpected error: \(error)")
-                }
-            }
-            XCTAssertFalse(fileManager.fileExists(atPath: workspaceURL.path))
-
-            preWorkspaceLease = nil
-            let recoveredFixture = try DebugEditorFindFixture.create(
-                identifier: identifier,
-                fileManager: fileManager,
-                fixturesRootOverride: root
+            let workspaceURL = try XCTUnwrap(fixture?.workspaceURL)
+            let heldWorkspace = testContainer.appendingPathComponent(
+                "held-captured-workspace",
+                isDirectory: true
             )
-            try recoveredFixture.remove(fileManager: fileManager)
+            let leaseURL = DebugEditorFindFixture.ownershipLeaseURL(
+                for: identifier,
+                in: root
+            )
+            try fileManager.moveItem(
+                at: workspaceURL,
+                to: heldWorkspace
+            )
+            try fileManager.createDirectory(
+                at: workspaceURL,
+                withIntermediateDirectories: false
+            )
+            let replacementSentinel = workspaceURL.appendingPathComponent(
+                "replacement-sentinel"
+            )
+            try Data("preserve".utf8).write(to: replacementSentinel)
+            let now = Date()
+            try makeExpired(workspaceURL, relativeTo: now)
 
-            XCTAssertNil(preWorkspaceLease)
+            weak let releasedFixture = fixture
+            fixture = nil
+            XCTAssertNil(releasedFixture)
+
+            try DebugEditorFindFixture.removeStaleFixtures(
+                in: root,
+                excluding: "f9-different-current",
+                fileManager: fileManager,
+                now: now
+            )
+
+            XCTAssertEqual(
+                try String(
+                    contentsOf: replacementSentinel,
+                    encoding: .utf8
+                ),
+                "preserve"
+            )
+            XCTAssertTrue(fileManager.fileExists(atPath: heldWorkspace.path))
+            XCTAssertTrue(fileManager.fileExists(atPath: leaseURL.path))
+
+            try fileManager.removeItem(at: workspaceURL)
+            try fileManager.moveItem(
+                at: heldWorkspace,
+                to: workspaceURL
+            )
+            try makeExpired(workspaceURL, relativeTo: now)
+            try DebugEditorFindFixture.removeStaleFixtures(
+                in: root,
+                excluding: "f9-different-current",
+                fileManager: fileManager,
+                now: now
+            )
+
             XCTAssertFalse(fileManager.fileExists(atPath: workspaceURL.path))
+            XCTAssertFalse(fileManager.fileExists(atPath: leaseURL.path))
         }
 
         private func makeExpired(_ url: URL, relativeTo now: Date) throws {
