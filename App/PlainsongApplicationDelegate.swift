@@ -4,6 +4,9 @@ import AppKit
 final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
         private var didHandleDebugFixtureRequest = false
+        private var debugEditorFindFixture: DebugEditorFindFixture.CreatedFixture?
+        private var debugEditorFindCleanupToken: String?
+        private var debugEditorFindCleanupRequestTimer: Timer?
         private var debugFixtureURL: URL?
     #endif
 
@@ -27,6 +30,8 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_: Notification) {
         PlainsongWorkspaceSearchHotKey.tearDown()
         #if DEBUG
+            _ = cleanUpDebugEditorFindFixtureIfNeeded()
+            stopPollingForDebugEditorFindCleanupRequests()
             if let debugFixtureURL {
                 try? FileManager.default.removeItem(at: debugFixtureURL)
             }
@@ -37,8 +42,15 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(
         _: NSApplication
     ) -> NSApplication.TerminateReply {
-        guard let appState else { return .terminateNow }
-        return appState.prepareForTermination() ? .terminateNow : .terminateCancel
+        if let appState, !appState.prepareForTermination() {
+            return .terminateCancel
+        }
+        #if DEBUG
+            guard cleanUpDebugEditorFindFixtureIfNeeded() else {
+                return .terminateCancel
+            }
+        #endif
+        return .terminateNow
     }
 
     /// Debug-only workspace entry points run once after `appState` is wired. The UI-test
@@ -51,36 +63,20 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             if let fixtureIdentifier = ProcessInfo.processInfo.environment[
                 DebugEditorFindFixture.environmentKey
             ], !fixtureIdentifier.isEmpty {
-                didHandleDebugFixtureRequest = true
-                do {
-                    let url = try DebugEditorFindFixture.create(identifier: fixtureIdentifier)
-                    debugFixtureURL = url
-                    Task { @MainActor in
-                        await Task.yield()
-                        appState.openDebugUITestWorkspaceFixture(url)
-                    }
-                } catch {
-                    assertionFailure("Could not create Debug editor-find fixture: \(error)")
-                }
+                handleDebugEditorFindFixtureRequest(
+                    fixtureIdentifier,
+                    appState: appState
+                )
                 return
             }
 
             if let fixtureIdentifier = ProcessInfo.processInfo.environment[
                 DebugWorkspaceSearchFixture.environmentKey
             ], !fixtureIdentifier.isEmpty {
-                didHandleDebugFixtureRequest = true
-                do {
-                    let url = try DebugWorkspaceSearchFixture.create(
-                        identifier: fixtureIdentifier
-                    )
-                    debugFixtureURL = url
-                    Task { @MainActor in
-                        await Task.yield()
-                        appState.openDebugUITestWorkspaceFixture(url)
-                    }
-                } catch {
-                    assertionFailure("Could not create Debug workspace-search fixture: \(error)")
-                }
+                handleDebugWorkspaceSearchFixtureRequest(
+                    fixtureIdentifier,
+                    appState: appState
+                )
                 return
             }
 
@@ -97,4 +93,130 @@ final class PlainsongApplicationDelegate: NSObject, NSApplicationDelegate {
             }
         #endif
     }
+
+    #if DEBUG
+        private func handleDebugEditorFindFixtureRequest(
+            _ fixtureIdentifier: String,
+            appState: AppState
+        ) {
+            didHandleDebugFixtureRequest = true
+            do {
+                let fixture = try DebugEditorFindFixture.create(
+                    identifier: fixtureIdentifier
+                )
+                debugEditorFindFixture = fixture
+                debugEditorFindCleanupToken = ProcessInfo.processInfo.environment[
+                    DebugEditorFindFixture.cleanupTokenEnvironmentKey
+                ]
+                startPollingForDebugEditorFindCleanupRequests()
+                Task { @MainActor in
+                    await Task.yield()
+                    appState.openDebugUITestWorkspaceFixture(fixture.workspaceURL)
+                }
+            } catch {
+                assertionFailure("Could not create Debug editor-find fixture: \(error)")
+            }
+        }
+
+        private func handleDebugWorkspaceSearchFixtureRequest(
+            _ fixtureIdentifier: String,
+            appState: AppState
+        ) {
+            didHandleDebugFixtureRequest = true
+            do {
+                let url = try DebugWorkspaceSearchFixture.create(
+                    identifier: fixtureIdentifier
+                )
+                debugFixtureURL = url
+                Task { @MainActor in
+                    await Task.yield()
+                    appState.openDebugUITestWorkspaceFixture(url)
+                }
+            } catch {
+                assertionFailure("Could not create Debug workspace-search fixture: \(error)")
+            }
+        }
+
+        private func startPollingForDebugEditorFindCleanupRequests() {
+            guard debugEditorFindCleanupRequestTimer == nil,
+                  let debugEditorFindCleanupToken,
+                  !debugEditorFindCleanupToken.isEmpty
+            else {
+                return
+            }
+            let timer = Timer(
+                timeInterval: 0.05,
+                target: self,
+                selector: #selector(handleDebugEditorFindCleanupRequestTimer(_:)),
+                userInfo: nil,
+                repeats: true
+            )
+            RunLoop.main.add(timer, forMode: .common)
+            debugEditorFindCleanupRequestTimer = timer
+        }
+
+        private func stopPollingForDebugEditorFindCleanupRequests() {
+            debugEditorFindCleanupRequestTimer?.invalidate()
+            debugEditorFindCleanupRequestTimer = nil
+        }
+
+        /// The UI runner supplies only the nonce-bound identity for its own app-created
+        /// handle. The app still owns cleanup authority and enters normal termination.
+        @objc private func handleDebugEditorFindCleanupRequestTimer(
+            _: Timer
+        ) {
+            guard let fixture = debugEditorFindFixture,
+                  let cleanupToken = debugEditorFindCleanupToken,
+                  let request = NSPasteboard.general.string(
+                      forType: NSPasteboard.PasteboardType(
+                          DebugEditorFindFixture.cleanupRequestPasteboardType
+                      )
+                  ),
+                  DebugEditorFindFixture.cleanupRequestMatches(
+                      fixtureIdentifier: fixture.identifier,
+                      cleanupToken: cleanupToken,
+                      request: request
+                  )
+            else {
+                return
+            }
+            stopPollingForDebugEditorFindCleanupRequests()
+            NSApplication.shared.terminate(nil)
+        }
+
+        /// Graceful Quit cleanup is synchronous. A receipt is published only after the
+        /// app-owned handle has verified that its exact no-follow fixture entry is absent.
+        private func cleanUpDebugEditorFindFixtureIfNeeded() -> Bool {
+            guard let fixture = debugEditorFindFixture else {
+                return true
+            }
+            do {
+                try fixture.remove()
+            } catch {
+                return false
+            }
+
+            if let token = debugEditorFindCleanupToken, !token.isEmpty {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                let receipt = DebugEditorFindFixture.cleanupReceipt(
+                    identifier: fixture.identifier,
+                    token: token
+                )
+                guard pasteboard.setString(
+                    receipt,
+                    forType: NSPasteboard.PasteboardType(
+                        DebugEditorFindFixture.cleanupReceiptPasteboardType
+                    )
+                ) else {
+                    return false
+                }
+            }
+
+            debugEditorFindFixture = nil
+            debugEditorFindCleanupToken = nil
+            stopPollingForDebugEditorFindCleanupRequests()
+            return true
+        }
+    #endif
 }

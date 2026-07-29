@@ -657,7 +657,8 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   evidence).
 - Evidence (2026-07-29): `EditorFindAcceptanceTests` launches the real Debug app against a
   unique app-container-owned `editor-find.md` fixture and enters the production workspace-open
-  path. `testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen` proves first-`⌘F` open/focus
+  path. Before the first shortcut it predicate-waits for the find bar to be absent;
+  `testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen` then proves first-`⌘F` open/focus
   plus the F7 repeated-shortcut contract while exercising the bar, query, case, whole-word,
   previous, next, Done, and match-counter identifiers.
   `testExactAndTruncatedCountersAreObservablyDistinct` observes exact `1 / 3` with no
@@ -665,13 +666,40 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   the stable truncated identifier and its non-color-only accessibility value. The final
   command
   `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -destination 'platform=macOS'
-  -derivedDataPath /private/tmp/plainsong-f9-derived
+  -derivedDataPath /private/tmp/plainsong-f9-review-derived
+  -resultBundlePath /private/tmp/plainsong-f9-review-final5.xcresult
   -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3 test`
-  executed 6 tests with 0 failures. All state waits are predicate-based and no
-  `NSOpenPanel` is involved. Shortcut injection uses XCUI's public synthetic `typeKey`
-  surface with a scoped enabled Latin input source that is restored immediately and again
-  during teardown; this is UI-acceptance evidence only and adds no physical-keyboard F0
-  evidence.
+  executed 6 tests with 0 failures. Every iteration obtained its exact nonce-bound cleanup
+  receipt and observed the app reach `notRunning`: the Debug app accepted only the current
+  fixture's identifier/token request, entered normal termination, removed its identity-bound
+  app-created directory, verified no-follow absence, and only then published the receipt.
+  The UI runner never receives a fixture path or deletion authority. A one-hour stale sweep
+  remains for crash/interruption recovery. The focused cleanup/input-source command passed
+  13 fixture tests and 4 TIS tests, including fail-closed replacement of the captured fixture
+  root. No-follow-aware host inspection after the final run found each of its six exact
+  fixture UUIDs absent and the fixture root empty; two directories left by an earlier
+  automation-launch failure had already been separately removed by the developer.
+  All state waits are predicate-based and no `NSOpenPanel` is involved. Shortcut injection
+  uses XCUI's public synthetic `typeKey` surface with the first enabled, select-capable,
+  ASCII-capable keyboard source from current → recent ASCII → enabled ASCII-list discovery,
+  with exact source-ID readback and restoration immediately after every shortcut plus a
+  teardown fallback. Capability-policy tests admit British, Dvorak, and Colemak without an
+  identifier allowlist; the repeated launched-app run itself used the host's ABC layout.
+  This is synthetic UI-acceptance evidence only: no alternate-layout launched-app matrix,
+  physical-keyboard, or IME evidence is claimed, and a hard runner-process death can still
+  bypass input-source teardown. The retained result is warning-bearing: six SwiftUI
+  state-during-view-update runtime warnings and six QoS-inversion runtime warnings, with no
+  file/line attribution; build warnings were zero, and the artifact does not support
+  attributing those runtime warnings to `WorkspaceWindow`. An earlier full `make test`
+  attempt was not green: after all four package suites passed, both F9 and both pre-existing
+  WorkspaceSearch acceptance tests hit the same runner activation failure before product
+  assertions because the runner could not promote the app from `Running Background`; both
+  failed F9 launches still completed nonce-bound cleanup. The final-code rerun then passed
+  end-to-end: MarkdownCore 164/164; EditorKit 296 executed with 7 skips and 0 failures;
+  PreviewKit 20/20; WorkspaceKit 283/283; the Xcode scheme 614 passed, 1 skipped, 0 failed;
+  and preview `vitest` 27/27. The passing Xcode run includes F9 2/2, TIS 4/4, and the two
+  existing WorkspaceSearch acceptance tests, so no assertion or runner failure remains in
+  the final gate.
 
 ## 9. Performance gate (PR D)
 

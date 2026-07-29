@@ -4,16 +4,26 @@ import XCTest
 
 @MainActor
 final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
-    private var app: XCUIApplication!
-    private var workspaceWindow: XCUIElement!
-    private var savedPasteboardItems: [[NSPasteboard.PasteboardType: Data]] = []
-    private var savedKeyboardInputSource: TISInputSource?
+    static let cleanupReceiptType = NSPasteboard.PasteboardType(
+        "app.plainsong.editor.debug.editor-find-cleanup"
+    )
+    static let cleanupRequestType = NSPasteboard.PasteboardType(
+        "app.plainsong.editor.debug.editor-find-cleanup-request"
+    )
 
-    func testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen() {
+    var app: XCUIApplication!
+    var workspaceWindow: XCUIElement!
+    var savedPasteboardItems: [[NSPasteboard.PasteboardType: Data]] = []
+    var savedKeyboardInputSource: TISInputSource?
+    var fixtureIdentifier = ""
+    var cleanupToken = ""
+    var selectedASCIISourceIdentifiers = Set<String>()
+
+    func testRepeatedCommandFRefocusesSelectsAllAndLeavesBarOpen() throws {
         launchApplication()
-        let queryField = openFindWithShortcut()
+        let queryField = try openFindWithShortcut()
         assertStableFindChromeExists(queryField: queryField)
-        paste("needle")
+        try paste("needle")
         waitForValue("needle", of: queryField, description: "initial find query")
         XCTAssertTrue(
             findElement("plainsong.editorFind.matchCounter").waitForExistence(timeout: 10),
@@ -25,9 +35,9 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         waitForKeyboardFocus(editor)
         waitForKeyboardBlur(queryField)
 
-        pressCommandF()
+        try pressCommandF()
         waitForKeyboardFocus(queryField)
-        paste("q")
+        try paste("q")
 
         waitForValue(
             "q",
@@ -40,21 +50,21 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         )
     }
 
-    func testExactAndTruncatedCountersAreObservablyDistinct() {
+    func testExactAndTruncatedCountersAreObservablyDistinct() throws {
         launchApplication()
-        let queryField = openFindWithShortcut()
+        let queryField = try openFindWithShortcut()
         let counter = findElement("plainsong.editorFind.matchCounter")
         let truncated = findElement("plainsong.editorFind.truncated")
 
-        paste("needle")
+        try paste("needle")
         waitForValue("1 / 3", of: counter, description: "exact match counter")
         XCTAssertFalse(
             truncated.exists,
             "An exact match total must not expose the truncated-state indicator"
         )
 
-        typeCommandKey("a", on: queryField)
-        paste("x")
+        try typeCommandKey("a", on: queryField)
+        try paste("x")
         waitForValue("x", of: queryField, description: "overflow query")
         waitForValueSuffix(
             " / 10000+",
@@ -67,16 +77,22 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
             description: "non-color-only truncated-state indicator"
         )
     }
+}
 
+extension EditorFindAcceptanceTests {
     private func launchApplication() {
         continueAfterFailure = false
         savedPasteboardItems = snapshotGeneralPasteboard()
         savedKeyboardInputSource =
             TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        fixtureIdentifier = "f9-\(UUID().uuidString)"
+        cleanupToken = UUID().uuidString
         app = XCUIApplication()
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["PLAINSONG_DEBUG_EDITOR_FIND_FIXTURE"] =
-            "f9-\(UUID().uuidString)"
+            fixtureIdentifier
+        app.launchEnvironment["PLAINSONG_DEBUG_EDITOR_FIND_CLEANUP_TOKEN"] =
+            cleanupToken
 
         addTeardownBlock {
             await self.terminateApplication()
@@ -98,23 +114,8 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
             .allElementsBoundByAccessibilityElement
             .first(where: \.isHittable)
         XCTAssertNotNil(workspaceWindow, "The fixture workspace has no hittable window")
+        print("F9 fixture opened: \(fixtureIdentifier)")
         makeFixtureWindowKey()
-    }
-
-    private func terminateApplication() {
-        let keyboardRestoreStatus = savedKeyboardInputSource.map(TISSelectInputSource)
-        savedKeyboardInputSource = nil
-        app.terminate()
-        app = nil
-        workspaceWindow = nil
-        restoreGeneralPasteboard()
-        if let keyboardRestoreStatus {
-            XCTAssertEqual(
-                keyboardRestoreStatus,
-                noErr,
-                "Could not restore the launch-time keyboard input source during teardown"
-            )
-        }
     }
 
     private func makeFixtureWindowKey() {
@@ -131,10 +132,17 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         waitForKeyboardFocus(editor)
     }
 
-    private func openFindWithShortcut() -> XCUIElement {
+    private func openFindWithShortcut() throws -> XCUIElement {
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         waitForKeyboardFocus(editor)
-        pressCommandF()
+        let findBar = findElement("plainsong.editorFind.bar")
+        wait(
+            for: NSPredicate(format: "exists == false"),
+            on: findBar,
+            timeout: 2,
+            description: "find bar to be absent before the first Command-F"
+        )
+        try pressCommandF()
 
         let queryField = findElement("plainsong.editorFind.queryField")
         XCTAssertTrue(queryField.waitForExistence(timeout: 5))
@@ -142,7 +150,7 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         return queryField
     }
 
-    private func pressCommandF() {
+    private func pressCommandF() throws {
         let menuItem = app.menuItems["Find…"].firstMatch
         wait(
             for: NSPredicate(format: "exists == true AND enabled == true"),
@@ -153,79 +161,40 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
 
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         waitForKeyboardFocus(editor)
-        typeCommandKey("f", on: editor)
+        try typeCommandKey("f", on: editor)
     }
 
-    private func typeCommandKey(_ key: String, on element: XCUIElement) {
+    private func typeCommandKey(
+        _ key: String,
+        on element: XCUIElement
+    ) throws {
         // XCUI's public textual-key API is interpreted through the selected input source.
-        // Scope it to a Latin keyboard only while testmanagerd synthesizes this shortcut,
-        // then restore the user's source immediately. This remains synthetic UI-acceptance
-        // evidence; it is deliberately not described as physical-keyboard evidence.
-        withLatinInputSource {
-            element.typeKey(XCUIKeyboardKey(rawValue: key), modifierFlags: .command)
-        }
-    }
-
-    private func withLatinInputSource(_ body: () -> Void) {
-        let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        let identifiers = ["com.apple.keylayout.ABC", "com.apple.keylayout.US"]
-        var selectedLatinSource: TISInputSource?
-        for identifier in identifiers {
-            for candidate in inputSources(identifier: identifier)
-                where TISSelectInputSource(candidate) == noErr
-            {
-                selectedLatinSource = candidate
-                break
-            }
-            if selectedLatinSource != nil {
-                break
-            }
-        }
-        guard selectedLatinSource != nil else {
-            return XCTFail("No enabled, select-capable Latin keyboard input source is available")
-        }
-        defer {
-            XCTAssertEqual(
-                TISSelectInputSource(original),
-                noErr,
-                "Could not restore the original keyboard input source"
-            )
-        }
-        body()
-    }
-
-    private func inputSources(identifier: String) -> [TISInputSource] {
-        let properties = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-        let sources = TISCreateInputSourceList(properties, false).takeRetainedValue() as NSArray
-        return sources.compactMap { source in
-            // swiftlint:disable:next force_cast
-            let inputSource = (source as! TISInputSource)
-            guard
-                inputSourceHasTrueProperty(
-                    inputSource,
-                    key: kTISPropertyInputSourceIsEnabled
-                ),
-                inputSourceHasTrueProperty(
-                    inputSource,
-                    key: kTISPropertyInputSourceIsSelectCapable
+        // Scope it to any enabled, selectable ASCII-capable source only while testmanagerd
+        // synthesizes this shortcut, then restore and read back the exact prior source.
+        do {
+            let identifier = try EditorFindSyntheticShortcutInputSource
+                .withASCIICapableInputSource {
+                    element.typeKey(
+                        XCUIKeyboardKey(rawValue: key),
+                        modifierFlags: .command
+                    )
+                }
+            selectedASCIISourceIdentifiers.insert(identifier)
+        } catch let error as EditorFindSyntheticShortcutInputSource.InputSourceError {
+            switch error {
+            case .noEligibleInputSource:
+                throw XCTSkip(
+                    "This runner has no enabled, select-capable ASCII input source"
                 )
-            else {
-                return nil
+            case let .couldNotUseEligibleInputSources(failures):
+                throw XCTSkip(
+                    "This runner could not select/read back an eligible ASCII input source: "
+                        + failures.joined(separator: "; ")
+                )
+            default:
+                throw error
             }
-            return inputSource
         }
-    }
-
-    private func inputSourceHasTrueProperty(
-        _ inputSource: TISInputSource,
-        key: CFString
-    ) -> Bool {
-        guard let rawValue = TISGetInputSourceProperty(inputSource, key) else {
-            return false
-        }
-        return CFBooleanGetValue(
-            Unmanaged<CFBoolean>.fromOpaque(rawValue).takeUnretainedValue()
-        )
     }
 
     private func assertStableFindChromeExists(queryField: XCUIElement) {
@@ -249,34 +218,11 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
         workspaceWindow.descendants(matching: .any)[identifier]
     }
 
-    private func paste(_ value: String) {
+    private func paste(_ value: String) throws {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         XCTAssertTrue(pasteboard.setString(value, forType: .string))
-        typeCommandKey("v", on: workspaceWindow)
-    }
-
-    private func snapshotGeneralPasteboard() -> [[NSPasteboard.PasteboardType: Data]] {
-        NSPasteboard.general.pasteboardItems?.map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            })
-        } ?? []
-    }
-
-    private func restoreGeneralPasteboard() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let items = savedPasteboardItems.map { values in
-            let item = NSPasteboardItem()
-            for (type, data) in values {
-                item.setData(data, forType: type)
-            }
-            return item
-        }
-        if !items.isEmpty {
-            pasteboard.writeObjects(items)
-        }
+        try typeCommandKey("v", on: workspaceWindow)
     }
 
     private func waitForKeyboardFocus(
