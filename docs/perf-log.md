@@ -409,38 +409,55 @@ only then writes `status=pass` to the evidence manifest.
 
 ### Reproduction
 
+The build wrapper archives the `HEAD` of the checkout that contains the invoked script. Therefore,
+running it from a later documentation commit does **not** reproduce this baseline. Start from any
+repository checkout that already contains the measured object, create a fresh detached worktree at
+the full measured commit, prove that worktree is detached and clean, and place every new build/run
+artifact under one newly allocated prefix:
+
 ```sh
-Scripts/build-editor-find-f2-performance-gate.sh \
-  Debug /private/tmp/plainsong-f2-c871ddf-debug
-Scripts/build-editor-find-f2-performance-gate.sh \
-  Release /private/tmp/plainsong-f2-c871ddf-release
+set -euo pipefail
 
-Scripts/run-editor-find-f2-performance-gate.sh Debug \
-  /private/tmp/plainsong-f2-c871ddf-debug \
-  /private/tmp/plainsong-f2-c871ddf-debug-run1.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-debug-run1.log
-Scripts/run-editor-find-f2-performance-gate.sh Debug \
-  /private/tmp/plainsong-f2-c871ddf-debug \
-  /private/tmp/plainsong-f2-c871ddf-debug-run2.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-debug-run2.log
-Scripts/run-editor-find-f2-performance-gate.sh Debug \
-  /private/tmp/plainsong-f2-c871ddf-debug \
-  /private/tmp/plainsong-f2-c871ddf-debug-run3.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-debug-run3.log
+F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+F2_REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
+F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
+F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
 
-Scripts/run-editor-find-f2-performance-gate.sh Release \
-  /private/tmp/plainsong-f2-c871ddf-release \
-  /private/tmp/plainsong-f2-c871ddf-release-run1.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-release-run1.log
-Scripts/run-editor-find-f2-performance-gate.sh Release \
-  /private/tmp/plainsong-f2-c871ddf-release \
-  /private/tmp/plainsong-f2-c871ddf-release-run2.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-release-run2.log
-Scripts/run-editor-find-f2-performance-gate.sh Release \
-  /private/tmp/plainsong-f2-c871ddf-release \
-  /private/tmp/plainsong-f2-c871ddf-release-run3.xcresult \
-  /private/tmp/plainsong-f2-c871ddf-release-run3.log
+git -C "$F2_REPOSITORY_ROOT" cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
+git -C "$F2_REPOSITORY_ROOT" worktree add --detach \
+  "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
+test "$(git -C "$F2_SOURCE_WORKTREE" rev-parse HEAD)" = "$F2_MEASURED_COMMIT"
+if git -C "$F2_SOURCE_WORKTREE" symbolic-ref -q HEAD >/dev/null; then
+  echo "F2 reproduction worktree must be detached" >&2
+  exit 1
+fi
+test -z "$(git -C "$F2_SOURCE_WORKTREE" status --porcelain=v1 --untracked-files=all)"
+cd "$F2_SOURCE_WORKTREE"
+
+Scripts/build-editor-find-f2-performance-gate.sh \
+  Debug "$F2_REPRO_ROOT/debug-build"
+Scripts/build-editor-find-f2-performance-gate.sh \
+  Release "$F2_REPRO_ROOT/release-build"
+
+for F2_RUN in 1 2 3; do
+  Scripts/run-editor-find-f2-performance-gate.sh Debug \
+    "$F2_REPRO_ROOT/debug-build" \
+    "$F2_REPRO_ROOT/debug-run${F2_RUN}.xcresult" \
+    "$F2_REPRO_ROOT/debug-run${F2_RUN}.log"
+done
+
+for F2_RUN in 1 2 3; do
+  Scripts/run-editor-find-f2-performance-gate.sh Release \
+    "$F2_REPRO_ROOT/release-build" \
+    "$F2_REPRO_ROOT/release-run${F2_RUN}.xcresult" \
+    "$F2_REPRO_ROOT/release-run${F2_RUN}.log"
+done
 ```
+
+`mktemp` makes these output prefixes fresh. Do not substitute the retained artifact paths listed
+above: those paths are immutable evidence, and both wrappers intentionally reject reuse. The new
+run is a reproduction attempt whose results must be reported separately; it does not replace or
+silently mix with the six retained samples.
 
 Both wrappers reject a dirty worktree, CI budget mode, reused output paths, source/build
 mismatches, and post-run mutation. The build wrapper archives the exact commit, generates the
@@ -645,9 +662,10 @@ eliminate these pre-existing warnings.
 
 This baseline is accepted only under that exact three-warning, pre-measure exception and is not
 warning-free UI evidence. Under the current checker, any signature/count change — including fewer
-warnings — any warning at or after `BEGIN`, or a relevant editor/F8/toolchain/OS change fails and
-requires fresh investigation. If the production path is fixed, the checker and this exception
-must be deliberately replaced with a zero-warning contract before new evidence is accepted.
+warnings — or any warning at or after `BEGIN` fails the run. A relevant editor/F8/toolchain/OS
+change is not compared by that checker; it invalidates this baseline and requires a fresh six-run
+evidence set. If the production path is fixed, the checker and this exception must be deliberately
+replaced with a zero-warning contract before new evidence is accepted.
 
 ### F8 boundary
 
