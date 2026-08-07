@@ -7,10 +7,11 @@
 > open** until their named hosted/owner evidence lands. A separate F2 measurement tip
 > records query-completion and hosted native-edit admission/root-update **proxies only**;
 > full physical-input → child-layout → compositor keystroke-to-screen latency remains
-> open. This dedicated `phase3-editor-find-f9-ui-acceptance` follow-up closes F9 and the
-> repeated-⌘F sub-gate of F7. F8 remains a separate pending follow-up; no F2/F8/F9
-> combined-tip evidence is claimed. Precedent: PR #45, link-folding, image-thumbnail gate
-> docs.
+> open. This dedicated `phase3-editor-find-f9-ui-acceptance` follow-up implements F9 and the
+> repeated-⌘F sub-gate of F7; §8 records the one remaining unlocked exact-tree rerun after a
+> final test-only assertion strengthening. F8 remains a separate pending follow-up; no
+> F2/F8/F9 combined-tip evidence is claimed. Precedent: PR #45, link-folding,
+> image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
@@ -640,7 +641,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
   SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all, nor that
   the bridge receives a window in the shipped view tree.
-- [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
+- [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.
   Evidence (2026-07-29):
@@ -650,8 +651,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   then sends a second `⌘F`. Predicate waits observe the query field regain native
   `hasKeyboardFocus`; pasting `q` without a test-side select-all replaces the whole existing
   `needle` query, and the launched app still exposes `plainsong.editorFind.bar`.
-- Evidence: _partially closed — repeated-⌘F has launched-app first-responder proof; the
-  cross-feature, dual-window, and Full Keyboard Access hosted matrix remains open_
+- Evidence: _implementation complete; the pre-strengthening launched-app artifact proves
+  first-responder refocus/replacement, but the exact-tree 3× run for the added retained-query
+  assertion is blocked by the locked console. The cross-feature, dual-window, and Full
+  Keyboard Access hosted matrix also remains open._
 
 ### F8 — Highlight-all survives highlight re-application
 
@@ -672,56 +675,75 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `retainedMatchCeiling + 1` overflow).
 - [x] Match counter’s truncated presentation is distinct from an exact total (not
   color alone).
-- [x] `PlainsongUITests` asserts that `⌘F` while the bar is already open re-focuses the
+- [ ] `PlainsongUITests` asserts that `⌘F` while the bar is already open re-focuses the
   query field, selects its text, and leaves the bar open (never closes) — out of
   process, following the WS4A fixture pattern.
 - [x] `PlainsongUITests` coverage following the WS4A fixture pattern: app-container
   fixture, predicate waits, no `NSOpenPanel` automation, synthetic events only (not F0
   evidence).
-- Evidence (2026-07-30): `EditorFindAcceptanceTests` launches the Debug app against a unique
+- Evidence (2026-08-08): `EditorFindAcceptanceTests` launches the Debug app against a unique
   app-container-owned `editor-find.md` fixture and enters the production workspace-open path.
   Three separate methods cover the gate. The repeated-`⌘F` test predicate-waits for the bar
   to be absent, proves the first shortcut opens and focuses it, enters `needle`, blurs the
   query field, and — at the immediate pre-injection boundary of the second shortcut — asserts
   that the same bar still exists and still contains `needle`. It then proves production
-  refocus/select-all by typing a replacement without issuing a test-side select-all, and
-  verifies that the bar remains open. The counter test distinguishes exact `1 / 3` with no
+  refocus, reasserts the retained `needle` query after focus returns, proves select-all by
+  typing a replacement without issuing a test-side select-all, and verifies that the bar
+  remains open. The counter test distinguishes exact `1 / 3` with no
   truncated element from `… / 10000+` plus the stable truncated identifier and its
   non-color-only accessibility value. The chrome test verifies the query/toggle/button AX
   roles, empty-query enabled states, case and whole-word value/count transitions,
   Previous/Next ordinal changes, and Done closing the bar with editor focus restored.
-  The final three-iteration command
-  `xcodebuild -quiet -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug
-  -destination 'platform=macOS' -derivedDataPath
-  /private/tmp/plainsong-f9-currentmain-derived -resultBundlePath
-  /private/tmp/plainsong-f9-final-ui-3x-20260730j.xcresult
-  -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3
-  test-without-building` passed all 9 launched-app test runs with no failure or skip.
-  A preceding latest-code attempt produced 1 pass and 8 runner-activation failures at
-  `Running Background`; no product assertion failed, and every failed launch still completed
-  its exact app-side cleanup handshake.
+  The last successful three-iteration command before the final test-only strengthening
+  `xcodebuild test -project Plainsong.xcodeproj -scheme Plainsong
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath
+  /private/tmp/plainsong-f9-review-dd-20260808 -resultBundlePath
+  /private/tmp/plainsong-f9-review-f9-ui-3x-20260808a.xcresult
+  -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3`
+  passed all 9 launched-app test runs with no failure or skip. Every run completed the exact
+  nonce-bound app-side cleanup handshake before termination. That artifact proves the
+  immediate pre-second-shortcut `needle` check plus refocus/select-all replacement, but it
+  predates the final additional assertion that `needle` is still retained after refocus and
+  immediately before replacement. Two exact-tree three-iteration attempts retained at
+  `/private/tmp/plainsong-f9-review-f9-ui-strengthened-3x-20260808a.xcresult` and
+  `/private/tmp/plainsong-f9-review-f9-ui-strengthened-3x-20260808b.xcresult` each executed zero
+  product tests: the locked macOS console made `PlainsongUITests-Runner` fail initialization
+  with `Authentication canceled. System authentication is running.` Those are runner/
+  automation failures, not assertion failures; an unlocked exact-tree 3× rerun remains the
+  final launched-app evidence gap for the strengthened contract.
 
   Fixture creation acquires and locks a root-anchored, exclusive, no-follow per-run lease
   before publishing the workspace name. The retained app-side handle holds the workspace
   directory descriptor plus a random ownership-marker descriptor/inode created inside that
   workspace, then persists that workspace and marker device/inode binding in the locked lease.
-  Cleanup fails closed if the captured root/workspace is missing, renamed, or swapped; it
-  verifies the marker unlink reached the captured workspace, checks the retained directory
-  path with `F_GETPATH`, requires no-follow absence at that exact name, and removes the exact
-  lease link before publishing a receipt. The UI runner receives neither a path nor deletion
-  authority. The one-hour crash/interruption sweep reclaims only an expired fixture whose
-  released lease it can lock **and** whose persisted workspace/marker binding still matches;
-  a lexical same-name replacement is preserved. Released pre-workspace leases remain
-  reclaimable only while unbound. Another live or paused run keeps its lock and is preserved,
-  while bound missing-name/corrupt leases and unleased legacy entries fail closed.
-  Focused fixture/lease coverage passed 25/25 in
-  `/private/tmp/plainsong-f9-final-fixture-20260730f.xcresult`, including root/workspace
-  rename-away, path replacement during deletion, marker-unlink/path-rename failure, live-lease
-  preservation, released orphan recovery, preservation of a pre-existing unleased directory
-  after failed creation, and rejection of a released lease's same-name replacement. The nine
-  launched-app runs each verified their exact nonce-bound app-side receipt and `notRunning`;
-  read-only no-follow host inspection found all nine current-run workspace names and lease
-  names absent, with zero entries left in the fixture root.
+  Cleanup fails closed if the captured root/workspace is missing, renamed, or swapped. The
+  exact captured workspace is first moved under the root to a random quarantine name; its
+  workspace and marker identity is re-proved there before recursive removal, so a lexical
+  replacement at the published name cannot inherit deletion authority. The marker link must
+  reach zero, the retained directory path is checked with `F_GETPATH`, and no-follow absence at
+  the exact published name is required before the exact lease is removed and a receipt can be
+  published. The UI runner receives neither a path nor deletion authority. The one-hour
+  crash/interruption sweep reclaims only an expired fixture whose released lease it can lock
+  **and** whose persisted workspace/marker binding still matches; a lexical same-name
+  replacement and a live/paused run remain protected. Initial orphan-lease inspection carries
+  the captured inode through descriptor validation, so an entry swapped between `lstat` and
+  `open` cannot inherit stale-unbound deletion authority. Released pre-workspace leases remain
+  reclaimable only while exact and unbound; bound missing-name/corrupt leases and unleased
+  legacy entries fail closed.
+
+  Lease rename/unlink retry state is recorded before each mutating syscall. If a rename or
+  unlink succeeds and a following sync/root revalidation throws, retry reconciles the exact
+  random quarantine destination plus the retained descriptor's identity/link count; it does
+  not treat a missing lexical source as success. Workspace removal likewise re-enumerates a
+  partially emptied quarantine, and its regression fixes child order and proves named children
+  were removed before the injected first failure. Focused fixture/lease coverage passed 42/42
+  in `/private/tmp/plainsong-f9-review-fixtures-20260808c.xcresult`, including deterministic
+  initial-inspection swaps, live/stale replacement sentinels, post-rename and post-unlink
+  throw/retry, remove-then-throw recovery, rename-away, live-lease preservation, and partial
+  recursive-removal retry. The nine launched-app runs each verified their exact nonce-bound
+  app-side receipt and `notRunning`; read-only host inspection found every current-run fixture
+  ID absent. A separate concurrently running F9 fixture kept its open lease and survived the
+  stale sweep, then its owning app removed it; the fixture root was empty afterwards.
 
   Cleanup traffic uses a per-run named pasteboard. General-pasteboard shortcut text captures
   the item-ordered type/data byte mappings observable through AppKit before mutation and retains
@@ -732,9 +754,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   only its exact empty generation. Originally empty pasteboards restore through that clear
   generation. AppKit exposes no getter for active pasteboard contents options, so the evidence
   does not claim restoration of an unobservable option such as `currentHostOnly`. Focused
-  restoration coverage passed 23/23 in
-  `/private/tmp/plainsong-f9-final-restoration-20260730g.xcresult` (9 TIS + 14 pasteboard),
-  including identical-byte/new-generation ABA rejection. AppKit offers no atomic pasteboard
+  restoration coverage passed 24/24 by direct `xctest` execution (10 TIS + 14 pasteboard),
+  including input-source readback mismatch retry and identical-byte/new-generation pasteboard
+  ABA rejection. AppKit offers no atomic pasteboard
   compare-and-swap, leaving a documented final check-to-clear micro-race; `nil` items with
   advertised types fail closed, while `nil`/`nil` is accepted as an observably empty
   pasteboard and cannot distinguish total retrieval failure.
@@ -752,17 +774,24 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   warnings with no file/line root-cause attribution; it does not support assigning existing
   `WorkspaceWindow` warnings to this branch.
 
-  The final full `make test` gate is not green. All four Swift package suites passed
-  (MarkdownCore 164/164; EditorKit 296 executed / 7 skipped / 0 failed; PreviewKit 20/20;
-  WorkspaceKit 283/283), then Xcode passed F9 3/3, TIS 9/9, pasteboard 14/14,
-  `PlainsongTests` 603 executed / 1 skipped / 0 failed, and `PerformanceTests` 23/23.
-  Both existing `WorkspaceSearchAcceptanceTests` then made real assertions at line 162:
-  after synthetic Command-Shift-F, the `plainsong.workspaceSearch.queryField` did not appear
-  within five seconds. These were not runner-activation failures, and there is no root-cause
-  evidence assigning them to the F9 files. Xcode exited 65 before Make reached preview;
-  a separate final preview `vitest` run passed 41/41. An immediately preceding full attempt
-  stopped on MarkdownCore's existing 3-second resource-bound assertion at 3.095 s; its exact
-  isolated rerun passed at 2.485 s. All F9 state waits are predicate-based; no
+  The final full `make test` gate is not green. An earlier ordinary invocation stopped in its
+  first Swift package at the existing MarkdownCore
+  `TextSearchResourceBoundTests.testOneMegabyteContinuousUnicodeWordSkipsRejectedCandidatesLinearly`
+  assertion: 3.086859833 seconds exceeded the 3-second local budget. Its exact isolated rerun
+  also failed at 3.045512125 seconds. A separate `CI=1 make test` treated the MarkdownCore
+  measurement as informational, then exited during Xcode testing after one WorkspaceKit
+  assertion failure among 283 tests; the retained output did not preserve the failing test
+  identifier, so no narrower attribution is claimed, and Make did not reach preview. A fresh
+  ordinary invocation on the reviewed tree then passed all four Swift package suites; its
+  Xcode phase passed 642 tests with one skip, but the sole failed entry was
+  `PlainsongUITests-Runner` initialization before any UI assertion because macOS reported
+  `Authentication canceled. System authentication is running.` Xcodebuild exited 65, Make
+  exited 2, and Make again did not reach preview. A separate Xcode rerun excluding only
+  `PlainsongUITests` passed the same 642 tests with one skip and zero failures in
+  `/private/tmp/plainsong-f9-review-nonui-20260808a.xcresult`. Separate launched-app reruns
+  passed WorkspaceSearch acceptance 2/2 and pre-strengthening F9 9/9, but those focused
+  results do not recharacterize any full `make test` invocation as green. All F9 state waits
+  are predicate-based; no
   `NSOpenPanel` is used. Synthetic XCUI `typeKey` evidence is not physical-keyboard or IME
   evidence. On macOS
   there is no descriptor-bound conditional `rmdir`; the marker + descriptor-path checks cover
@@ -774,7 +803,8 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   a false receipt.
   `project.yml` is unchanged; XcodeGen only refreshed source inventory for the folder-backed
   test/app targets, and the generated project was not hand-edited. F9 and only the repeated-
-  `⌘F` sub-gate of F7 close here; F2 retains only its separately named proxies, F8 stays
+  `⌘F` sub-gate of F7 are the scope of this branch; the unlocked exact-tree rerun above remains
+  the only current F9 evidence gap. F2 retains only its separately named proxies, F8 stays
   separate and pending, and no combined-tip evidence is claimed.
 
 ## 9. Performance gate (separate F2 follow-up)

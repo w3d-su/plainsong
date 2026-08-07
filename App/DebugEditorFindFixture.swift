@@ -29,6 +29,7 @@
             fileprivate let workspaceIdentity: EntryIdentity
             fileprivate let workspaceHandle: DebugEditorFindFixtureWorkspaceHandle
             fileprivate let lease: DebugEditorFindFixtureLease
+            fileprivate var quarantineURL: URL?
             fileprivate var workspaceRemovalAttemptStarted = false
             fileprivate var workspaceWasVerifiedRemoved = false
             fileprivate var isVerifiedRemoved = false
@@ -58,12 +59,19 @@
             /// from widening deletion authority.
             func remove(
                 fileManager: FileManager = .default,
-                workspaceRemover: ((URL) throws -> Void)? = nil
+                workspaceRemover: ((URL) throws -> Void)? = nil,
+                afterRemovingWorkspaceChild:
+                ((String) throws -> Void)? = nil,
+                cleanupBoundaryHandler:
+                EditorFindFixtureCleanupHandler? = nil
             ) throws {
                 try DebugEditorFindFixture.removeCreatedFixture(
                     self,
                     fileManager: fileManager,
-                    workspaceRemover: workspaceRemover
+                    workspaceRemover: workspaceRemover,
+                    afterRemovingWorkspaceChild:
+                    afterRemovingWorkspaceChild,
+                    cleanupBoundaryHandler: cleanupBoundaryHandler
                 )
             }
         }
@@ -99,10 +107,15 @@
                 throw FixtureError.unsafeCreatedFixture
             }
             let createdRootIdentity = identity(of: createdRootStatus)
+            let rootHandle = try DebugEditorFindFixtureRootHandle(
+                fixturesRoot: fixturesRoot,
+                expectedIdentity: createdRootIdentity
+            )
             let lease = try createOwnershipLease(
                 identifier: currentIdentifier,
                 fixturesRoot: fixturesRoot,
-                workspaceURL: workspaceURL
+                workspaceURL: workspaceURL,
+                rootHandle: rootHandle
             )
             var didCreateWorkspaceDirectory = false
             var createdWorkspaceIdentity: EntryIdentity?
@@ -136,14 +149,9 @@
                     workspaceRemovalWasVerified = removeFailedCreationIfStillOwned(
                         at: workspaceURL,
                         identity: createdWorkspaceIdentity,
-                        fileManager: fileManager
+                        fixturesRootIdentity: createdRootIdentity,
+                        workspaceHandle: workspaceHandle
                     )
-                    if workspaceRemovalWasVerified,
-                       let workspaceHandle
-                    {
-                        workspaceRemovalWasVerified =
-                            (try? workspaceHandle.verifyRemoved()) != nil
-                    }
                 }
                 if workspaceRemovalWasVerified {
                     try? lease.unlinkPathIfStillOwned()
@@ -213,20 +221,27 @@
         private static func createOwnershipLease(
             identifier: String,
             fixturesRoot: URL,
-            workspaceURL: URL
+            workspaceURL: URL,
+            rootHandle: DebugEditorFindFixtureRootHandle
         ) throws -> DebugEditorFindFixtureLease {
             let leaseURL = ownershipLeaseURL(
                 for: identifier,
                 in: fixturesRoot
             )
             do {
-                return try DebugEditorFindFixtureLease.create(at: leaseURL)
+                return try DebugEditorFindFixtureLease.create(
+                    at: leaseURL,
+                    rootHandle: rootHandle
+                )
             } catch let FixtureError.couldNotCreateLease(errorCode) where errorCode == EEXIST {
                 guard try entryMode(at: workspaceURL) == nil else {
                     throw FixtureError.fixtureAlreadyExists
                 }
                 guard let releasedLease = try DebugEditorFindFixtureLease
-                    .tryAcquireExisting(at: leaseURL)
+                    .tryAcquireExisting(
+                        at: leaseURL,
+                        rootHandle: rootHandle
+                    )
                 else {
                     throw FixtureError.fixtureAlreadyExists
                 }
@@ -237,24 +252,51 @@
                     throw FixtureError.fixtureAlreadyExists
                 }
                 try releasedLease.unlinkPathIfStillOwned()
-                return try DebugEditorFindFixtureLease.create(at: leaseURL)
+                return try DebugEditorFindFixtureLease.create(
+                    at: leaseURL,
+                    rootHandle: rootHandle
+                )
             }
         }
 
         private static func removeFailedCreationIfStillOwned(
             at workspaceURL: URL,
             identity expectedIdentity: EntryIdentity,
-            fileManager: FileManager
+            fixturesRootIdentity: EntryIdentity,
+            workspaceHandle: DebugEditorFindFixtureWorkspaceHandle?
         ) -> Bool {
-            guard let status = try? entryStatus(at: workspaceURL),
+            guard let workspaceHandle,
+                  let status = try? entryStatus(at: workspaceURL),
                   fileType(of: status) == mode_t(S_IFDIR),
                   identity(of: status) == expectedIdentity
             else {
                 return false
             }
             do {
-                try fileManager.removeItem(at: workspaceURL)
-                return try entryMode(at: workspaceURL) == nil
+                let fixturesRoot = workspaceURL.deletingLastPathComponent()
+                let rootHandle = try DebugEditorFindFixtureRootHandle(
+                    fixturesRoot: fixturesRoot,
+                    expectedIdentity: fixturesRootIdentity
+                )
+                try workspaceHandle.validatePath(at: workspaceURL)
+                let quarantineURL = try makeQuarantineURL(
+                    for: workspaceURL.lastPathComponent,
+                    in: fixturesRoot
+                )
+                try rootHandle.quarantine(
+                    source: workspaceURL,
+                    destination: quarantineURL
+                )
+                try workspaceHandle.validatePath(at: quarantineURL)
+                try workspaceHandle.removeAnchored(
+                    at: quarantineURL,
+                    rootHandle: rootHandle
+                )
+                guard try entryMode(at: quarantineURL) == nil else {
+                    return false
+                }
+                try workspaceHandle.verifyRemoved()
+                return true
             } catch {
                 return false
             }
@@ -306,8 +348,11 @@
     extension DebugEditorFindFixture {
         private static func removeCreatedFixture(
             _ fixture: CreatedFixture,
-            fileManager: FileManager,
-            workspaceRemover: ((URL) throws -> Void)?
+            fileManager _: FileManager,
+            workspaceRemover: ((URL) throws -> Void)?,
+            afterRemovingWorkspaceChild: ((String) throws -> Void)?,
+            cleanupBoundaryHandler:
+            EditorFindFixtureCleanupHandler?
         ) throws {
             if fixture.isVerifiedRemoved {
                 return
@@ -329,34 +374,121 @@
             else {
                 throw FixtureError.unsafeFixturesRoot
             }
+            let rootHandle = try DebugEditorFindFixtureRootHandle(
+                fixturesRoot: fixtureRoot,
+                expectedIdentity: fixture.fixturesRootIdentity
+            )
             if !fixture.workspaceWasVerifiedRemoved {
                 try fixture.lease.validatePath()
-                guard let workspaceStatus = try entryStatus(at: workspaceURL) else {
-                    throw FixtureError.capturedWorkspaceMissing
+                if fixture.workspaceRemovalAttemptStarted,
+                   try entryMode(at: workspaceURL) == nil,
+                   try fixture.quarantineURL.map({ try entryMode(at: $0) == nil })
+                   ?? true,
+                   (try? fixture.workspaceHandle.verifyRemoved()) != nil
+                {
+                    fixture.workspaceWasVerifiedRemoved = true
                 }
-                guard fileType(of: workspaceStatus) == mode_t(S_IFDIR),
-                      identity(of: workspaceStatus) == fixture.workspaceIdentity
-                else {
-                    throw FixtureError.unsafeCreatedFixture
-                }
+            }
+            if !fixture.workspaceWasVerifiedRemoved {
+                let quarantineURL = try preparedQuarantineURL(
+                    for: fixture,
+                    fixtureRoot: fixtureRoot,
+                    workspaceURL: workspaceURL,
+                    rootHandle: rootHandle,
+                    cleanupBoundaryHandler: cleanupBoundaryHandler
+                )
                 try fixture.workspaceHandle.validatePath(
-                    allowingRemovedOwnershipMarker:
-                    fixture.workspaceRemovalAttemptStarted
+                    at: quarantineURL
+                )
+                try cleanupBoundaryHandler?(
+                    .willRemoveQuarantine(quarantineURL)
+                )
+                try rootHandle.validatePath()
+                try fixture.workspaceHandle.validatePath(
+                    at: quarantineURL
+                )
+                try cleanupBoundaryHandler?(
+                    .didValidateQuarantineForRemoval(quarantineURL)
                 )
                 fixture.workspaceRemovalAttemptStarted = true
                 if let workspaceRemover {
-                    try workspaceRemover(workspaceURL)
+                    try workspaceRemover(quarantineURL)
                 } else {
-                    try fileManager.removeItem(at: workspaceURL)
+                    try fixture.workspaceHandle.removeAnchored(
+                        at: quarantineURL,
+                        rootHandle: rootHandle,
+                        afterRemovingChild:
+                        afterRemovingWorkspaceChild
+                    )
                 }
-                guard try entryMode(at: workspaceURL) == nil else {
+                guard try entryMode(at: quarantineURL) == nil else {
                     throw FixtureError.fixtureRemovalDidNotComplete
                 }
                 try fixture.workspaceHandle.verifyRemoved()
                 fixture.workspaceWasVerifiedRemoved = true
             }
-            try fixture.lease.unlinkPathIfStillOwned()
+            try fixture.lease.unlinkPathIfStillOwned(
+                cleanupBoundaryHandler: cleanupBoundaryHandler
+            )
             fixture.isVerifiedRemoved = true
+        }
+
+        private static func preparedQuarantineURL(
+            for fixture: CreatedFixture,
+            fixtureRoot: URL,
+            workspaceURL: URL,
+            rootHandle: DebugEditorFindFixtureRootHandle,
+            cleanupBoundaryHandler:
+            EditorFindFixtureCleanupHandler?
+        ) throws -> URL {
+            if let quarantineURL = fixture.quarantineURL {
+                if try entryMode(at: quarantineURL) != nil {
+                    try fixture.workspaceHandle.validatePath(at: quarantineURL)
+                    return quarantineURL
+                }
+                fixture.quarantineURL = nil
+            }
+
+            guard let workspaceStatus = try entryStatus(at: workspaceURL) else {
+                throw FixtureError.capturedWorkspaceMissing
+            }
+            guard fileType(of: workspaceStatus) == mode_t(S_IFDIR),
+                  identity(of: workspaceStatus) == fixture.workspaceIdentity
+            else {
+                throw FixtureError.unsafeCreatedFixture
+            }
+            try fixture.workspaceHandle.validatePath(
+                at: workspaceURL
+            )
+            let quarantineURL = try makeQuarantineURL(
+                for: fixture.identifier,
+                in: fixtureRoot
+            )
+            fixture.quarantineURL = quarantineURL
+            try cleanupBoundaryHandler?(
+                .willQuarantine(
+                    source: workspaceURL,
+                    destination: quarantineURL
+                )
+            )
+            try rootHandle.quarantine(
+                source: workspaceURL,
+                destination: quarantineURL
+            )
+            try fixture.workspaceHandle.validatePath(
+                at: quarantineURL
+            )
+            try cleanupBoundaryHandler?(
+                .didQuarantine(
+                    source: workspaceURL,
+                    destination: quarantineURL
+                )
+            )
+            try rootHandle.validatePath()
+            try fixture.workspaceHandle.validatePath(
+                at: quarantineURL
+            )
+            return quarantineURL
         }
     }
 

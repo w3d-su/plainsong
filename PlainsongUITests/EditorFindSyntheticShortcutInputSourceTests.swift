@@ -199,6 +199,51 @@ final class EditorFindInputSourceTests: XCTestCase {
         XCTAssertTrue(selectionStatuses.isEmpty)
     }
 
+    func testRestoreReadbackMismatchRetainsLeaseUntilVerifiedRetry() throws {
+        var readbacks: [String?] = [
+            "selected",
+            "selected",
+            "selected",
+            "selected",
+            "selected",
+            "original",
+        ]
+        var selectionCount = 0
+        let inputSource = EditorFindSyntheticShortcutInputSource(
+            currentIdentifierReader: {
+                readbacks.removeFirst()
+            },
+            selector: { _ in
+                selectionCount += 1
+                return noErr
+            }
+        )
+        inputSource.installPendingSelectionLeaseForTesting(
+            originalIdentifier: "original",
+            selectedIdentifier: "selected"
+        )
+
+        XCTAssertThrowsError(
+            try inputSource.restorePendingSelectionIfOwned()
+        ) { error in
+            guard case let EditorFindSyntheticShortcutInputSource.InputSourceError
+                .restoredSourceDidNotBecomeCurrent(identifier) = error
+            else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(identifier, "original")
+        }
+        XCTAssertTrue(inputSource.hasPendingRestoration)
+
+        XCTAssertEqual(
+            try inputSource.restorePendingSelectionIfOwned(),
+            .restored
+        )
+        XCTAssertFalse(inputSource.hasPendingRestoration)
+        XCTAssertEqual(selectionCount, 2)
+        XCTAssertTrue(readbacks.isEmpty)
+    }
+
     func testExternalChangeAtRestoreBoundaryIsPreservedWithoutSelection() throws {
         var readbacks: [String?] = ["selected", "external"]
         var selectionCount = 0

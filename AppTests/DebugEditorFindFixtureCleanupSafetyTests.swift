@@ -313,8 +313,24 @@
                 at: heldWorkspace,
                 to: fixture.workspaceURL
             )
-            try fixture.remove(fileManager: fileManager)
-            XCTAssertFalse(fileManager.fileExists(atPath: fixture.workspaceURL.path))
+            XCTAssertThrowsError(
+                try fixture.remove(fileManager: fileManager)
+            ) { error in
+                guard case DebugEditorFindFixture.FixtureError
+                    .unsafeCreatedFixture = error
+                else {
+                    return XCTFail("Unexpected error: \(error)")
+                }
+            }
+            XCTAssertTrue(fileManager.fileExists(atPath: fixture.workspaceURL.path))
+            XCTAssertTrue(
+                fileManager.fileExists(
+                    atPath: DebugEditorFindFixture.ownershipLeaseURL(
+                        for: fixture.identifier,
+                        in: isolatedRoot
+                    ).path
+                )
+            )
         }
     }
 #endif

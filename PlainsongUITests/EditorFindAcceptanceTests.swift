@@ -47,6 +47,11 @@ final class EditorFindAcceptanceTests: XCTestCase, @unchecked Sendable {
             )
         }
         waitForKeyboardFocus(queryField)
+        waitForValue(
+            "needle",
+            of: queryField,
+            description: "retained query after repeated Command-F refocus"
+        )
         try paste("q")
 
         waitForValue(

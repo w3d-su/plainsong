@@ -2,6 +2,12 @@
     import Darwin
     import Foundation
 
+    struct EditorFindFixtureWorkspaceIdentity {
+        let workspace: DebugEditorFindFixture.EntryIdentity
+        let ownershipMarkerName: String
+        let ownershipMarker: DebugEditorFindFixture.EntryIdentity
+    }
+
     /// An advisory lock and inode identity retained for a fixture's full app lifetime.
     ///
     /// A stale sweep can reclaim a crashed run after Darwin closes its descriptor, while
@@ -37,23 +43,18 @@
             }
 
             func matchesWorkspace(at workspaceURL: URL) throws -> Bool {
-                guard formatVersion == 1,
-                      isSafeOwnershipMarkerName,
+                guard let identity = validatedIdentity,
                       let workspaceStatus =
                       try DebugEditorFindFixture.entryStatus(at: workspaceURL),
                       DebugEditorFindFixture.fileType(of: workspaceStatus)
                       == mode_t(S_IFDIR),
-                      workspaceDevice == UInt64(
-                          truncatingIfNeeded: workspaceStatus.st_dev
-                      ),
-                      workspaceInode == UInt64(
-                          truncatingIfNeeded: workspaceStatus.st_ino
-                      )
+                      DebugEditorFindFixture.identity(of: workspaceStatus)
+                      == identity.workspace
                 else {
                     return false
                 }
                 let markerURL = workspaceURL.appendingPathComponent(
-                    ownershipMarkerName,
+                    identity.ownershipMarkerName,
                     isDirectory: false
                 )
                 guard let markerStatus =
@@ -63,12 +64,50 @@
                 else {
                     return false
                 }
-                return ownershipMarkerDevice == UInt64(
-                    truncatingIfNeeded: markerStatus.st_dev
+                return DebugEditorFindFixture.identity(of: markerStatus)
+                    == identity.ownershipMarker
+            }
+
+            var validatedIdentity: EditorFindFixtureWorkspaceIdentity? {
+                guard formatVersion == 1,
+                      isSafeOwnershipMarkerName
+                else {
+                    return nil
+                }
+                let workspaceDeviceValue = dev_t(
+                    truncatingIfNeeded: workspaceDevice
                 )
-                    && ownershipMarkerInode == UInt64(
-                        truncatingIfNeeded: markerStatus.st_ino
+                let workspaceInodeValue = ino_t(
+                    truncatingIfNeeded: workspaceInode
+                )
+                let markerDeviceValue = dev_t(
+                    truncatingIfNeeded: ownershipMarkerDevice
+                )
+                let markerInodeValue = ino_t(
+                    truncatingIfNeeded: ownershipMarkerInode
+                )
+                guard UInt64(truncatingIfNeeded: workspaceDeviceValue)
+                    == workspaceDevice,
+                    UInt64(truncatingIfNeeded: workspaceInodeValue)
+                    == workspaceInode,
+                    UInt64(truncatingIfNeeded: markerDeviceValue)
+                    == ownershipMarkerDevice,
+                    UInt64(truncatingIfNeeded: markerInodeValue)
+                    == ownershipMarkerInode
+                else {
+                    return nil
+                }
+                return EditorFindFixtureWorkspaceIdentity(
+                    workspace: DebugEditorFindFixture.EntryIdentity(
+                        device: workspaceDeviceValue,
+                        inode: workspaceInodeValue
+                    ),
+                    ownershipMarkerName: ownershipMarkerName,
+                    ownershipMarker: DebugEditorFindFixture.EntryIdentity(
+                        device: markerDeviceValue,
+                        inode: markerInodeValue
                     )
+                )
             }
 
             private var isSafeOwnershipMarkerName: Bool {
@@ -91,38 +130,44 @@
         private let descriptor: Int32
         private let leaseURL: URL
         private let leaseIdentity: DebugEditorFindFixture.EntryIdentity
+        private let rootHandle: DebugEditorFindFixtureRootHandle
+        private var quarantineURL: URL?
+        private var unlinkAttemptStarted = false
         private var didUnlinkPath = false
         private var isVerifiedUnlinked = false
 
         private init(
             descriptor: Int32,
             leaseURL: URL,
-            leaseIdentity: DebugEditorFindFixture.EntryIdentity
+            leaseIdentity: DebugEditorFindFixture.EntryIdentity,
+            rootHandle: DebugEditorFindFixtureRootHandle,
+            quarantineURL: URL? = nil
         ) {
             self.descriptor = descriptor
             self.leaseURL = leaseURL
             self.leaseIdentity = leaseIdentity
+            self.rootHandle = rootHandle
+            self.quarantineURL = quarantineURL
         }
 
         deinit {
             close(descriptor)
         }
+    }
 
-        static func create(at leaseURL: URL) throws -> DebugEditorFindFixtureLease {
-            let descriptor = leaseURL.path.withCString { path in
-                open(
-                    path,
-                    O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-                    mode_t(S_IRUSR | S_IWUSR)
-                )
-            }
-            guard descriptor >= 0 else {
-                throw DebugEditorFindFixture.FixtureError.couldNotCreateLease(errno)
-            }
+    extension DebugEditorFindFixtureLease {
+        static func create(
+            at leaseURL: URL,
+            rootHandle suppliedRootHandle: DebugEditorFindFixtureRootHandle? = nil
+        ) throws -> DebugEditorFindFixtureLease {
+            let rootHandle = try suppliedRootHandle
+                ?? makeRootHandle(for: leaseURL)
+            let descriptor = try rootHandle.createRegularFile(at: leaseURL)
             do {
                 let identity = try validateDescriptor(
                     descriptor,
-                    matches: leaseURL
+                    matches: leaseURL,
+                    rootHandle: rootHandle
                 )
                 let lockResult = flock(descriptor, LOCK_EX | LOCK_NB)
                 guard lockResult == 0 else {
@@ -131,7 +176,8 @@
                 return DebugEditorFindFixtureLease(
                     descriptor: descriptor,
                     leaseURL: leaseURL,
-                    leaseIdentity: identity
+                    leaseIdentity: identity,
+                    rootHandle: rootHandle
                 )
             } catch {
                 close(descriptor)
@@ -141,23 +187,25 @@
 
         /// Returns nil when the lease is actively locked or no lease exists.
         static func tryAcquireExisting(
-            at leaseURL: URL
+            at leaseURL: URL,
+            publishedLeaseURL: URL? = nil,
+            expectedIdentity: DebugEditorFindFixture.EntryIdentity? = nil,
+            rootHandle suppliedRootHandle: DebugEditorFindFixtureRootHandle? = nil
         ) throws -> DebugEditorFindFixtureLease? {
-            let descriptor = leaseURL.path.withCString { path in
-                open(path, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
-            }
-            guard descriptor >= 0 else {
-                let errorCode = errno
-                if errorCode == ENOENT {
-                    return nil
-                }
-                throw DebugEditorFindFixture.FixtureError.couldNotOpenLease(errorCode)
-            }
+            let publishedLeaseURL = publishedLeaseURL ?? leaseURL
+            let rootHandle = try suppliedRootHandle
+                ?? makeRootHandle(for: leaseURL)
+            guard let descriptor = try rootHandle.openRegularFile(at: leaseURL)
+            else { return nil }
             do {
                 let identity = try validateDescriptor(
                     descriptor,
-                    matches: leaseURL
+                    matches: leaseURL,
+                    rootHandle: rootHandle
                 )
+                guard expectedIdentity == nil || identity == expectedIdentity else {
+                    throw DebugEditorFindFixture.FixtureError.unsafeLease
+                }
                 guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
                     let errorCode = errno
                     if errorCode == EWOULDBLOCK || errorCode == EAGAIN {
@@ -169,8 +217,11 @@
                 }
                 return DebugEditorFindFixtureLease(
                     descriptor: descriptor,
-                    leaseURL: leaseURL,
-                    leaseIdentity: identity
+                    leaseURL: publishedLeaseURL,
+                    leaseIdentity: identity,
+                    rootHandle: rootHandle,
+                    quarantineURL:
+                    publishedLeaseURL == leaseURL ? nil : leaseURL
                 )
             } catch {
                 close(descriptor)
@@ -182,9 +233,11 @@
             guard !didUnlinkPath else {
                 throw DebugEditorFindFixture.FixtureError.unsafeLease
             }
+            let currentLeaseURL = quarantineURL ?? leaseURL
             let currentIdentity = try Self.validateDescriptor(
                 descriptor,
-                matches: leaseURL
+                matches: currentLeaseURL,
+                rootHandle: rootHandle
             )
             guard currentIdentity == leaseIdentity else {
                 throw DebugEditorFindFixture.FixtureError.unsafeLease
@@ -287,22 +340,64 @@
             }
         }
 
-        func unlinkPathIfStillOwned() throws {
+        func unlinkPathIfStillOwned(
+            cleanupBoundaryHandler:
+            EditorFindFixtureCleanupHandler? = nil
+        ) throws {
             if isVerifiedUnlinked {
                 return
             }
+            try reconcileRecordedMutation()
             if !didUnlinkPath {
+                if quarantineURL == nil {
+                    try validatePath()
+                    let destination = try DebugEditorFindFixture
+                        .makeLeaseQuarantineURL(for: leaseURL)
+                    quarantineURL = destination
+                    try cleanupBoundaryHandler?(
+                        .willQuarantineLease(
+                            source: leaseURL,
+                            destination: destination
+                        )
+                    )
+                    try rootHandle.quarantine(
+                        source: leaseURL,
+                        destination: destination,
+                        afterRename: {
+                            try cleanupBoundaryHandler?(
+                                .didRenameLeaseQuarantine(
+                                    source: self.leaseURL,
+                                    destination: destination
+                                )
+                            )
+                        }
+                    )
+                    try validatePath()
+                    try cleanupBoundaryHandler?(
+                        .didQuarantineLease(
+                            source: leaseURL,
+                            destination: destination
+                        )
+                    )
+                }
+                guard let quarantineURL else {
+                    throw DebugEditorFindFixture.FixtureError.unsafeLease
+                }
                 try validatePath()
-                let result = leaseURL.path.withCString { path in
-                    unlink(path)
-                }
-                guard result == 0 else {
-                    throw DebugEditorFindFixture.FixtureError
-                        .couldNotRemoveLease(errno)
-                }
+                unlinkAttemptStarted = true
+                try rootHandle.removeRegularFile(
+                    at: quarantineURL,
+                    expectedIdentity: leaseIdentity,
+                    afterUnlink: {
+                        try cleanupBoundaryHandler?(
+                            .didUnlinkLeaseQuarantine(quarantineURL)
+                        )
+                    }
+                )
                 didUnlinkPath = true
             }
-            guard try DebugEditorFindFixture.entryMode(at: leaseURL) == nil,
+            guard let quarantineURL,
+                  try rootHandle.regularFileIdentity(at: quarantineURL) == nil,
                   try linkCount() == 0
             else {
                 throw DebugEditorFindFixture.FixtureError
@@ -311,30 +406,70 @@
             isVerifiedUnlinked = true
         }
 
+        private func reconcileRecordedMutation() throws {
+            let retainedLinkCount = try linkCount()
+            if unlinkAttemptStarted, retainedLinkCount == 0 {
+                guard let quarantineURL,
+                      try rootHandle.regularFileIdentity(at: quarantineURL) == nil
+                else {
+                    throw DebugEditorFindFixture.FixtureError
+                        .fixtureRemovalDidNotComplete
+                }
+                didUnlinkPath = true
+                return
+            }
+            guard retainedLinkCount == 1 else {
+                throw DebugEditorFindFixture.FixtureError
+                    .fixtureRemovalDidNotComplete
+            }
+            guard let quarantineURL else {
+                try validatePath()
+                return
+            }
+
+            let quarantineIdentity = try rootHandle.regularFileIdentity(
+                at: quarantineURL
+            )
+            if quarantineIdentity == leaseIdentity {
+                try validatePath()
+                return
+            }
+            let publishedIdentity = try rootHandle.regularFileIdentity(
+                at: leaseURL
+            )
+            guard publishedIdentity == leaseIdentity else {
+                throw DebugEditorFindFixture.FixtureError.unsafeLease
+            }
+            self.quarantineURL = nil
+            unlinkAttemptStarted = false
+            try validatePath()
+        }
+
         private static func validateDescriptor(
             _ descriptor: Int32,
-            matches leaseURL: URL
+            matches leaseURL: URL,
+            rootHandle: DebugEditorFindFixtureRootHandle
         ) throws -> DebugEditorFindFixture.EntryIdentity {
-            var descriptorStatus = stat()
-            guard fstat(descriptor, &descriptorStatus) == 0 else {
-                throw DebugEditorFindFixture.FixtureError
-                    .couldNotInspectLease(errno)
-            }
-            guard DebugEditorFindFixture.fileType(of: descriptorStatus)
-                == mode_t(S_IFREG),
-                let pathStatus = try DebugEditorFindFixture.entryStatus(at: leaseURL),
-                DebugEditorFindFixture.fileType(of: pathStatus) == mode_t(S_IFREG)
-            else {
-                throw DebugEditorFindFixture.FixtureError.unsafeLease
-            }
-            let descriptorIdentity = DebugEditorFindFixture.identity(
-                of: descriptorStatus
+            try rootHandle.validateRegularFileDescriptor(
+                descriptor,
+                at: leaseURL
             )
-            guard descriptorIdentity == DebugEditorFindFixture.identity(of: pathStatus)
+        }
+
+        private static func makeRootHandle(
+            for leaseURL: URL
+        ) throws -> DebugEditorFindFixtureRootHandle {
+            let fixturesRoot = leaseURL.deletingLastPathComponent()
+            guard let rootStatus = try DebugEditorFindFixture.entryStatus(
+                at: fixturesRoot
+            ), DebugEditorFindFixture.fileType(of: rootStatus) == mode_t(S_IFDIR)
             else {
-                throw DebugEditorFindFixture.FixtureError.unsafeLease
+                throw DebugEditorFindFixture.FixtureError.unsafeFixturesRoot
             }
-            return descriptorIdentity
+            return try DebugEditorFindFixtureRootHandle(
+                fixturesRoot: fixturesRoot,
+                expectedIdentity: DebugEditorFindFixture.identity(of: rootStatus)
+            )
         }
     }
 #endif
