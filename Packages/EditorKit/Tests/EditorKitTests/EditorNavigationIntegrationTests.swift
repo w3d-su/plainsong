@@ -22,10 +22,10 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let model = NavigationModel(text: source, selection: NSRange(location: 0, length: 0))
         let fixture = try makeWindowedFixture(model: model, source: source, height: 100)
         let scrollProxy = EditorScrollProxy()
-        var emittedLine: Int?
-        scrollProxy.onVisibleLineChanged = { emittedLine = $0 }
+        var emittedIntent: EditorScrollIntent?
+        scrollProxy.onScrollIntent = { emittedIntent = $0 }
         fixture.coordinator.attachScrollProxy(scrollProxy, to: fixture.textView)
-        emittedLine = nil
+        emittedIntent = nil
         fixture.textView.textSelection = NSRange(location: 0, length: 0)
         fixture.textView.undoManager?.removeAllActions()
         fixture.window.makeFirstResponder(nil)
@@ -38,7 +38,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(model.selection, target)
         XCTAssertTrue(fixture.window.firstResponder === fixture.textView)
         XCTAssertGreaterThan(fixture.scrollView.contentView.bounds.origin.y, initialOrigin.y)
-        XCTAssertEqual(emittedLine, 281)
+        XCTAssertEqual(emittedIntent, .navigation(line: 281))
         XCTAssertEqual(Data(Self.text(in: fixture.textView).utf8), sourceBytes)
         XCTAssertFalse(fixture.textView.undoManager?.canUndo == true)
         XCTAssertFalse(fixture.textView.undoManager?.canRedo == true)

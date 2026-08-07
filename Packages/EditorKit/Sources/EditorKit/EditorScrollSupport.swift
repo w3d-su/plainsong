@@ -1,11 +1,18 @@
 import AppKit
 import STTextView
 
+/// Distinguishes ordinary viewport observation from an explicit navigation that must
+/// stay visible in every mounted presentation.
+public enum EditorScrollIntent: Equatable, Sendable {
+    case viewportChanged(line: Int)
+    case navigation(line: Int)
+}
+
 /// Public scroll bridge for the app layer. It intentionally exposes source-line
 /// concepts only, keeping STTextView and TextKit details inside EditorKit.
 @MainActor
 public final class EditorScrollProxy: ObservableObject {
-    public var onVisibleLineChanged: ((Int) -> Void)?
+    public var onScrollIntent: ((EditorScrollIntent) -> Void)?
 
     private var attachment: EditorScrollAttachment?
 
@@ -18,6 +25,11 @@ public final class EditorScrollProxy: ObservableObject {
     func emitVisibleLine(containingUTF16Offset offset: Int, in textView: STTextView) {
         guard attachment?.isAttached(to: textView) == true else { return }
         attachment?.emitVisibleLine(containingUTF16Offset: offset)
+    }
+
+    func emitNavigationLine(containingUTF16Offset offset: Int, in textView: STTextView) {
+        guard attachment?.isAttached(to: textView) == true else { return }
+        attachment?.emitNavigationLine(containingUTF16Offset: offset)
     }
 
     func attach(to textView: STTextView) {
@@ -150,6 +162,15 @@ private final class EditorScrollAttachment {
         emitVisibleLineIfNeeded(currentLineIndex().oneBasedLine(containingUTF16Offset: offset))
     }
 
+    func emitNavigationLine(containingUTF16Offset offset: Int) {
+        let line = currentLineIndex().oneBasedLine(containingUTF16Offset: offset)
+        // Forced navigation is never deduplicated against ordinary viewport reporting.
+        // Updating the viewport receipt still prevents the ensuing bounds notification
+        // from forwarding the same line a second time.
+        lastEmittedLine = line
+        proxy?.onScrollIntent?(.navigation(line: line))
+    }
+
     private func emitVisibleLineIfNeeded() {
         guard let line = firstVisibleLine(), line != lastEmittedLine else { return }
 
@@ -160,7 +181,7 @@ private final class EditorScrollAttachment {
         guard line != lastEmittedLine else { return }
 
         lastEmittedLine = line
-        proxy?.onVisibleLineChanged?(line)
+        proxy?.onScrollIntent?(.viewportChanged(line: line))
     }
 
     private func firstVisibleLine() -> Int? {

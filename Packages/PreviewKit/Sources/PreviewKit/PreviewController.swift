@@ -112,8 +112,15 @@ public final class PreviewController: NSObject, ObservableObject {
         return renderID
     }
 
-    public func scrollToLine(_ line: Int, animated: Bool) {
-        send(.scrollToLine(ScrollToLinePayload(line: line, animated: animated)))
+    public func scrollToLine(
+        _ line: Int,
+        animated: Bool,
+        completion: (@MainActor (Bool) -> Void)? = nil
+    ) {
+        send(
+            .scrollToLine(ScrollToLinePayload(line: line, animated: animated)),
+            completion: completion
+        )
     }
 
     public func setTheme(_ theme: String) {
@@ -130,14 +137,38 @@ public final class PreviewController: NSObject, ObservableObject {
         workspaceAssetRootURL = rootURL?.standardizedFileURL
     }
 
-    private func send(_ message: BridgeMessage) {
+    /// Test-owned lifecycle shutdown. Production keeps one controller alive with its
+    /// editor workspace even while the preview pane is hidden.
+    func shutdownForTesting() {
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+        scriptMessageProxy.delegate = nil
+        onPreviewScrolled = nil
+        onLinkClicked = nil
+        onCheckboxToggled = nil
+        renderCompletionObserver = nil
+    }
+
+    private func send(
+        _ message: BridgeMessage,
+        completion: (@MainActor (Bool) -> Void)? = nil
+    ) {
         guard let source = try? jsonEncoder.encode(message),
               let json = String(data: source, encoding: .utf8)
         else {
+            completion?(false)
             return
         }
 
-        webView.evaluateJavaScript("window.PlainsongBridge.receive(\(json));")
+        let script = "window.PlainsongBridge.receive(\(json));"
+        if let completion {
+            webView.evaluateJavaScript(script) { _, error in
+                completion(error == nil)
+            }
+        } else {
+            webView.evaluateJavaScript(script)
+        }
     }
 
     private func sendPreviewSettings() {

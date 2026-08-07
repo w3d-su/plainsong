@@ -89,6 +89,9 @@ struct MarkdownTextView: NSViewRepresentable {
             return scrollView
         }
 
+        context.coordinator.beginRepresentableUpdate()
+        defer { context.coordinator.endRepresentableUpdate() }
+        context.coordinator.isUpdating = true
         textView.textDelegate = context.coordinator
         textView.highlightSelectedLine = true
         textView.isHorizontallyResizable = false
@@ -111,7 +114,6 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isSelectable = isEnabled
         textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
 
-        context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
         let candidate = prepareCoordinatorInputs(context.coordinator, for: textView)
@@ -148,6 +150,8 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
+        coordinator.beginRepresentableUpdate()
+        defer { coordinator.endRepresentableUpdate() }
         let candidate = prepareCoordinatorInputs(coordinator, for: textView)
         coordinator.attachFocusHandler(to: textView)
 
@@ -286,21 +290,6 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         onWYSIWYGMechanismFailure?("TextKit 2 content storage was unavailable for WYSIWYG folding")
-    }
-
-    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
-        guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
-        coordinator.detachFocusHandler(from: textView)
-        coordinator.detachPasteAndDragHandlers(from: textView)
-        coordinator.detachCommandProxy(from: textView)
-        coordinator.detachScrollProxy()
-        coordinator.detachVisibleRangeReporter()
-        coordinator.cancelCompletionRequest()
-        coordinator.cancelPendingNavigationTasks()
-        coordinator.detachDeferredDocumentTransitionInstallationHandler()
-        coordinator.revokeInstalledDocumentBinding()
-        coordinator.detachImageThumbnailPresentation(from: textView)
-        textView.textDelegate = nil
     }
 
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME

@@ -3,6 +3,7 @@ import AppKit
 import Foundation
 import MarkdownCore
 @testable import Plainsong
+import PreviewKit
 import SwiftUI
 import WebKit
 import XCTest
@@ -60,16 +61,18 @@ final class EditorFindHostedGateTests: XCTestCase {
         XCTAssertNil(appState.editorFindHost.controller.session)
     }
 
-    func testHostedSourcePreviewFindSelectsExactRangeAndScrollsLivePreview() async throws {
+    func testHostedSourcePreviewFindBypassesDisabledTypewriterSync() async throws {
         let document = makeLongPreviewDocument()
         let fixture = try makeWorkspaceFixture(files: ["post.md": document.source])
         let appState = fixture.appState
         appState.setLayoutMode(.sourcePreview)
+        appState.preferences.setTypewriterSyncEnabled(false)
         appState.openExternalFile(fixture.root)
         try await waitUntil("workspace document opens in source and preview") {
             appState.currentDocument.fileURL?.lastPathComponent == "post.md"
                 && appState.isPreviewVisible
         }
+        XCTAssertFalse(appState.preferences.typewriterSyncEnabled)
 
         let host = makeWorkspaceHost(appState: appState, width: 1280, height: 760)
         registerTeardown(host: host, fixture: fixture)
@@ -99,7 +102,7 @@ final class EditorFindHostedGateTests: XCTestCase {
             EditorSelectionProbe.appliedEditorSelection(in: host.window)?.range == expectedRange
         }
         try await waitUntil("editor selection scrolls the live preview to the matching block") {
-            // The existing scroll proxy forwards the editor's first visible source line.
+            // Explicit navigation forwards the selected source line as a forced intent.
             // `scrollRangeToVisible` only promises that the match becomes visible; it does
             // not promise that the match itself is placed near the top of either viewport.
             let value = try await webView.evaluateJavaScript(
@@ -117,6 +120,99 @@ final class EditorFindHostedGateTests: XCTestCase {
         XCTAssertEqual(appState.currentDocument.text, sourceBefore)
         XCTAssertEqual(appState.currentDocument.text.utf8.elementsEqual(sourceBefore.utf8), true)
         XCTAssertTrue(appState.isPreviewVisible)
+    }
+
+    func testHostedSourcePreviewFindBypassesActivePreviewScrollOwner() async throws {
+        let document = makeTwoMatchPreviewDocument()
+        let fixture = try makeWorkspaceFixture(files: ["post.md": document.source])
+        let appState = fixture.appState
+        appState.setLayoutMode(.sourcePreview)
+        appState.openExternalFile(fixture.root)
+        try await waitUntil("workspace document opens in source and preview") {
+            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+                && appState.isPreviewVisible
+        }
+
+        let host = makeWorkspaceHost(appState: appState, width: 1280, height: 760)
+        registerTeardown(host: host, fixture: fixture)
+        let webView = try await waitForView(WKWebView.self, in: host.window)
+        try await waitUntil("live preview renders the second match", timeout: 8) {
+            let value = try await webView.evaluateJavaScript(
+                "document.querySelector('[data-line=\"\(document.secondLine)\"]') !== null"
+            )
+            return value as? Bool == true
+        }
+
+        let sourceBefore = appState.currentDocument.text
+        openFindBar(appState, query: document.needle)
+        try await waitUntil("first find match is selected") {
+            EditorSelectionProbe.appliedEditorSelection(in: host.window)?.range == document.firstRange
+                && appState.editorFindHost.controller.session?.currentOrdinal == 1
+        }
+        let secondStartsOffscreen = try await webView.evaluateJavaScript(
+            """
+            document.querySelector('[data-line="\(document.secondLine)"]')
+              .getBoundingClientRect().top >= window.innerHeight
+            """
+        ) as? Bool
+        XCTAssertEqual(secondStartsOffscreen, true)
+
+        let scrollCoordinator = try XCTUnwrap(EditorPreviewScrollCoordinator.latestDebugInstance)
+        try await waitUntil("first match scroll ownership decays") {
+            scrollCoordinator.scrollOwner == .none
+        }
+        // Drive the live callback installed by `WorkspaceWindow`, then navigate before
+        // its 100 ms preview-owner token can decay. The forced navigation intent must
+        // reach the same live WebView without letting the queued editor echo undo it.
+        let previewController = try XCTUnwrap(webView.navigationDelegate as? PreviewController)
+        previewController.onPreviewScrolled?(1)
+        XCTAssertEqual(scrollCoordinator.scrollOwner, .preview)
+        let previousDeliveryID = scrollCoordinator.previewScrollDeliveryReceipt?.requestID ?? 0
+        appState.stepEditorFindFromBarControl(.next)
+
+        try await waitUntil("second find match is selected") {
+            EditorSelectionProbe.appliedEditorSelection(in: host.window)?.range == document.secondRange
+        }
+        try await waitUntil("forced preview navigation is delivered") {
+            guard let receipt = scrollCoordinator.previewScrollDeliveryReceipt else { return false }
+            guard receipt.requestID > previousDeliveryID else { return false }
+            guard receipt.ownerAtDispatch == .preview else {
+                XCTFail(
+                    "Preview request \(receipt.requestID) dispatched under " +
+                        "\(receipt.ownerAtDispatch), expected preview ownership"
+                )
+                return true
+            }
+            guard receipt.succeeded else {
+                XCTFail(
+                    "Preview delivery failed for request \(receipt.requestID), line \(receipt.line)"
+                )
+                return true
+            }
+            guard receipt.line == document.secondLine else {
+                XCTFail(
+                    "Preview delivered line \(receipt.line), expected \(document.secondLine) " +
+                        "for request \(receipt.requestID)"
+                )
+                return true
+            }
+            return true
+        }
+        try await waitUntil("second match becomes visible after preview-owned handoff") {
+            let value = try await webView.evaluateJavaScript(
+                """
+                (() => {
+                  const target = document.querySelector('[data-line="\(document.secondLine)"]');
+                  const rect = target.getBoundingClientRect();
+                  return window.scrollY > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+                })()
+                """
+            )
+            return value as? Bool == true
+        }
+
+        XCTAssertEqual(appState.currentDocument.text, sourceBefore)
+        XCTAssertEqual(appState.currentDocument.text.utf8.elementsEqual(sourceBefore.utf8), true)
     }
 
     func testHostedMarkedTextCommandsStayInFindFieldAndDoNotMutateDocument() async throws {
@@ -158,7 +254,7 @@ final class EditorFindHostedGateTests: XCTestCase {
         fieldEditor.unmarkText()
     }
 
-    func testHostedFindToWorkspaceSearchHandoffCannotBeStolenByOlderFindFocus() async throws {
+    func testHostedFindToWorkspaceSearchHandoffSupersedesOlderFindFocusWhileHostIsIneligible() async throws {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "alpha"])
         let appState = fixture.appState
         appState.setLayoutMode(.sourceOnly)
@@ -184,215 +280,14 @@ final class EditorFindHostedGateTests: XCTestCase {
             appState.workspaceSearchUI.focusAppliedID == searchRequest
                 && WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window)
         }
-        try await Task.sleep(nanoseconds: 100_000_000)
 
+        // App-hosted unit tests cannot make their utility window the process key window.
+        // This therefore proves token supersession and real Search first-responder ownership
+        // while the older Find retry remains ineligible. The eligible-after-handoff race
+        // stays open for an out-of-process two-window acceptance gate.
         XCTAssertEqual(appState.editorFindHost.ui.focusSupersededID, findRequest)
         XCTAssertNotEqual(appState.editorFindHost.ui.focusAppliedID, findRequest)
         XCTAssertTrue(WorkspaceSearchFieldFocus.isSearchFieldFirstResponder(in: host.window))
         XCTAssertNotNil(findQueryField(in: host.window), "Find stays open during the focus handoff")
-    }
-}
-
-@MainActor
-private extension EditorFindHostedGateTests {
-    private func registerTeardown(host: HostedWorkspace, fixture: WorkspaceFixture) {
-        addTeardownBlock { @MainActor in
-            let appState = fixture.appState
-            let tasks = [appState.autosaveTask, appState.statisticsTask, appState.workspaceReloadTask,
-                         appState.workspaceSearchTask, appState.completionWorkspaceTask].compactMap { $0 }
-            appState.closeWorkspace()
-            if let webView = self.firstDescendant(of: WKWebView.self, in: host.hostingView) {
-                webView.stopLoading()
-                webView.navigationDelegate = nil
-                webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
-            }
-            host.window.makeFirstResponder(nil)
-            host.hostingView.rootView = AnyView(EmptyView())
-            host.window.contentView = nil
-            host.window.close()
-            for task in tasks {
-                task.cancel()
-                await task.value
-            }
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            fixture.cleanUp()
-        }
-    }
-
-    private func openFindBar(_ appState: AppState, query: String) {
-        appState.editorFindHost.controller.debounceNanoseconds = 0
-        appState.editorFindHost.commandContextOverride = true
-        appState.showOrRefocusEditorFind()
-        appState.handleEditorFindQueryTextChange(query)
-    }
-
-    private func makeWorkspaceHost(
-        appState: AppState,
-        width: CGFloat = 1000,
-        height: CGFloat = 680
-    ) -> HostedWorkspace {
-        let root = WorkspaceWindow()
-            .environmentObject(appState)
-            .frame(width: width, height: height)
-        let hostingView = NSHostingView(rootView: AnyView(root))
-        hostingView.frame = NSRect(x: 0, y: 0, width: width, height: height)
-        let window = NSWindow(
-            contentRect: hostingView.frame,
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.isReleasedWhenClosed = false
-        window.contentView = hostingView
-        window.orderFront(nil)
-        hostingView.layoutSubtreeIfNeeded()
-        return HostedWorkspace(window: window, hostingView: hostingView)
-    }
-
-    private func findQueryField(in window: NSWindow) -> NSTextField? {
-        firstDescendant(of: NSTextField.self, in: window.contentView) {
-            $0.accessibilityIdentifier() == EditorFindAccessibility.queryField
-        }
-    }
-
-    private func waitForFindQueryField(in window: NSWindow) async throws -> NSTextField {
-        try await waitUntil("production find field mounts") {
-            self.findQueryField(in: window) != nil
-        }
-        return try XCTUnwrap(findQueryField(in: window))
-    }
-
-    private func waitForView<View: NSView>(
-        _ type: View.Type,
-        in window: NSWindow
-    ) async throws -> View {
-        try await waitUntil("\(View.self) mounts in production WorkspaceWindow") {
-            self.firstDescendant(of: type, in: window.contentView) != nil
-        }
-        return try XCTUnwrap(firstDescendant(of: type, in: window.contentView))
-    }
-
-    private func firstDescendant<View: NSView>(
-        of type: View.Type,
-        in root: NSView?,
-        where predicate: (View) -> Bool = { _ in true }
-    ) -> View? {
-        guard let root else { return nil }
-        if let match = root as? View, predicate(match) {
-            return match
-        }
-        for child in root.subviews {
-            if let match = firstDescendant(of: type, in: child, where: predicate) {
-                return match
-            }
-        }
-        return nil
-    }
-
-    private func waitUntil(
-        _ description: String,
-        timeout: TimeInterval = 5,
-        predicate: @escaping @MainActor () async throws -> Bool
-    ) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if try await predicate() { return }
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
-    }
-
-    private func makeWorkspaceFixture(files: [String: String]) throws -> WorkspaceFixture {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("EditorFindHostedGates")
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        for (path, text) in files {
-            let url = root.appendingPathComponent(path)
-            try FileManager.default.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try text.write(to: url, atomically: true, encoding: .utf8)
-        }
-
-        let suiteName = "EditorFindHostedGateTests.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
-        let appState = AppState(
-            lastOpenedFileStore: MemoryLastOpenedFileStore(),
-            recentItemStore: MemoryRecentItemStore(),
-            shouldRestoreLastOpenedFile: false,
-            userDefaults: defaults
-        )
-        return WorkspaceFixture(
-            root: root,
-            appState: appState,
-            defaults: defaults,
-            defaultsSuiteName: suiteName
-        )
-    }
-
-    private func makeLongPreviewDocument() -> LongPreviewDocument {
-        let needle = "PLAINSONG_HOSTED_FIND_TARGET"
-        var lines = ["# Hosted preview"]
-        lines += (1 ... 180).flatMap { ["Paragraph before \($0)", ""] }
-        let targetLine = lines.count + 1
-        lines.append(needle)
-        lines.append("")
-        lines += (1 ... 180).flatMap { ["Paragraph after \($0)", ""] }
-        return LongPreviewDocument(source: lines.joined(separator: "\n"), needle: needle, targetLine: targetLine)
-    }
-}
-
-private struct HostedWorkspace {
-    let window: NSWindow
-    let hostingView: NSHostingView<AnyView>
-}
-
-private struct LongPreviewDocument {
-    let source: String
-    let needle: String
-    let targetLine: Int
-}
-
-@MainActor
-private struct WorkspaceFixture {
-    let root: URL
-    let appState: AppState
-    let defaults: UserDefaults
-    let defaultsSuiteName: String
-
-    func cleanUp() {
-        appState.workspaceSearchFocusKeyWindowCheck = nil
-        appState.workspaceSearchTask?.cancel()
-        appState.workspaceReloadTask?.cancel()
-        defaults.removePersistentDomain(forName: defaultsSuiteName)
-        try? FileManager.default.removeItem(at: root)
-    }
-}
-
-private final class MemoryLastOpenedFileStore: LastOpenedFilePersisting {
-    private var storedURL: URL?
-
-    func save(_ url: URL) throws {
-        storedURL = url
-    }
-
-    func restore() throws -> URL? {
-        storedURL
-    }
-}
-
-private final class MemoryRecentItemStore: RecentItemPersisting {
-    private var storedURLs: [URL] = []
-
-    func save(_ url: URL) throws {
-        storedURLs.removeAll { $0 == url }
-        storedURLs.insert(url, at: 0)
-    }
-
-    func restore() throws -> [URL] {
-        storedURLs
     }
 }
