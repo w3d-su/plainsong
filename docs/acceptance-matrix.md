@@ -1,6 +1,7 @@
 # Acceptance Matrix
 
-Status snapshot: 2026-06-27.
+Status snapshot: 2026-06-27 for M0-M5/release posture; Workspace Search evidence audited
+2026-08-08.
 
 This matrix is the short operational view of `agent.md` milestones. It does not replace
 `agent.md`; it records whether the evidence currently on the repository is enough to treat
@@ -26,6 +27,7 @@ a milestone or gate as accepted.
 | M5 final editor-input acceptance | Broken-MDX edit/recovery, MDX completion popup tag-context pass, and fenced-code completion suppression | PR #32 and PR #33 | Accepted |
 | Phase 2 WYSIWYG design gate | M1-M5 accepted and `docs/wysiwyg-design.md` approved | PR #36 and follow-up design notes | Accepted; superseded by the Experimental mode checklist |
 | Phase 2 WYSIWYG Experimental mode | Off-by-default Settings gate, source/source+preview regressions preserved, native gates complete, stable promotion blocked | PR #41-#49 plus 2026-06-27 manual sign-off in `docs/wysiwyg-design.md` §19 and `docs/wysiwyg-release-checklist.md` | Accepted as Experimental/off by default only |
+| Phase 3 Workspace Search | In-process Markdown/MDX search, dirty-overlay refresh, exact navigation, keyboard-accessible sidebar, resource/performance bounds, and regression coverage | PR #89/#91/#92/#93; `TextSearch*`, `WorkspaceSearch*`, `EditorNavigation*`, AppState/active-refresh/presentation/selection tests, `WorkspaceSearchAcceptanceTests`, and `WorkspaceSearchPerformanceTests` | In progress — WS4 named regression suites are present, but the overall DoD still needs fresh current-tip full validation plus direct click→cross-file selection/scroll and production reader/matcher off-main gates; automated input does not replace the owner physical-keyboard evidence |
 
 ## Current release posture
 

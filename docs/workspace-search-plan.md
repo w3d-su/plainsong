@@ -18,9 +18,12 @@
 > both the `.sensitive` and default `.smart` case policies, exactly-admitted 512 KiB file, a
 > 512 KiB CJK file under `.smart`, an oversized sibling proving reads stay bounded, dense
 > whole-word rejection, the global 10,000-match ceiling, pinned resource ceilings, and rapid
-> cancellation of a saturated read window; see `docs/perf-log.md`). The remaining WS4
-> regression-suite item and the overall Definition of Done remain open. Workspace Search as a
-> whole stays **IN PROGRESS**.**
+> cancellation of a saturated read window; see `docs/perf-log.md`). A 2026-08-08 evidence audit
+> confirmed that the WS4 regression suites named in the CI matrix are present across
+> MarkdownCore, WorkspaceKit, AppState, EditorKit, XCUITest, and PerformanceTests. The fresh
+> package slice is green, but that does not replace the current-tip App/UI/performance/full-suite
+> gates below. The overall Definition of Done remains open, so Workspace Search as a whole stays
+> **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -845,8 +848,18 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
 
 ### WS4 — CI, performance, and acceptance
 
-- [ ] Add MarkdownCore, WorkspaceKit, AppState, and EditorKit regression suites from the
-  matrix below.
+- [x] Add MarkdownCore, WorkspaceKit, AppState, and EditorKit regression suites from the
+  matrix below. Evidence: `TextSearch*` and document-session tests cover MarkdownCore;
+  `WorkspaceSearch*` tests cover the service, resources, ignore rules, and containment;
+  `AppStateTests`, `WorkspaceSearchActiveRefreshTests`, `WorkspaceSearchResultsPresentationTests`,
+  and `WorkspaceSearchSelectionTests` cover App orchestration and presentation; and
+  `EditorNavigation*` tests cover exact install/selection/scroll/focus and monotonic replay.
+  `WorkspaceSearchAcceptanceTests` and `WorkspaceSearchPerformanceTests` provide the matrix's
+  UI and performance suites. The 2026-08-08 audit freshly passed MarkdownCore (164 tests),
+  WorkspaceKit (283 tests), and the EditorKit `EditorNavigation` slice (22 tests). A subsequent
+  full `make test` reached 600 passed and 1 skipped Xcode tests, but remained red because
+  `PlainsongUITests-Runner` could not initialize while system authentication was active. This
+  checkbox records suite presence and named coverage, not a fresh current-tip full-suite pass.
 - [x] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
   flow, using a deterministic Debug-only fixture inside the app container rather than
   automating `NSOpenPanel`. Evidence: `PlainsongUITests` launches the real app with a unique,
@@ -964,6 +977,8 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   probes carry `.sensitive` controls that must find nothing.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
+  The 2026-08-08 audit synchronized the acceptance matrix and risk register. `agent.md` remains
+  intentionally pending until the remaining direct gates and serialized full-suite evidence land.
 
 ## 6. CI Validation Matrix
 
@@ -987,21 +1002,43 @@ CI gates.
 
 ## 7. Definition of Done
 
+Evidence boundary for the 2026-08-08 audit: merged PR #89/#91/#92/#93 checks are historical
+implementation evidence, not a fresh current-tip full-suite run. XCUITest input is synthetic;
+the hosted `NSEvent` gate and owner physical-keyboard smoke retain their distinct scopes. A gate
+below is checked only when one same-repository production path plus a directly relevant named
+test support it without composing two partial workflows.
+
 - [ ] `make lint`, `make test`, and `make build` pass.
+  On 2026-08-08, fresh `make lint` and `make build` passed. The package slice above is green,
+  and `make test` recorded 600 passed plus 1 skipped Xcode tests, including 23/23 performance
+  tests, but the command exited 65 because `PlainsongUITests-Runner` failed to initialize while
+  system authentication was active (`Authentication canceled`). Rerun the exact-tip full test
+  command without that runner-level interruption before checking this gate.
 - [ ] No functional acceptance item depends on a manual-only checklist.
+  Physical ⇧⌘F has owner smoke evidence, but the automated XCUITest remains synthetic and the
+  hosted gate injects AppKit events. Keep this open until the physical-input requirement has a
+  repeatable non-manual gate or is explicitly accepted as residual owner evidence.
 - [x] A newly typed unsaved string appears in workspace search results after debounce.
 - [ ] Clicking a result in another file selects the exact UTF-16 match and scrolls it
   into view.
-- [ ] Repeating the same result activation works because navigation uses a monotonic ID.
-- [ ] Closing or switching workspaces cancels active work and removes old results.
-- [ ] A slower old query cannot overwrite a newer query.
-- [ ] FSEvents, rename/delete races, and dirty overlays cannot produce an unsafe or stale
+  The XCUITest observes exact native selection after Return activation; the hosted gate drives a
+  real row click but observes only the navigation command. Neither directly proves the complete
+  click → cross-file editor selection → scroll workflow.
+- [x] Repeating the same result activation works because navigation uses a monotonic ID.
+- [x] Closing or switching workspaces cancels active work and removes old results.
+- [x] A slower old query cannot overwrite a newer query.
+- [x] FSEvents, rename/delete races, and dirty overlays cannot produce an unsafe or stale
   jump.
-- [ ] Hidden/ignored entries and symlinks outside the granted root are not read.
-- [ ] Truncated and skipped files are visible to the user.
+- [x] Hidden/ignored entries and symlinks outside the granted root are not read.
+- [x] Truncated and skipped files are visible to the user.
 - [ ] Disk I/O and full-text matching do not run on the main actor.
+  The production service is nonisolated and creates a utility-priority producer task, while the
+  authority-capture test proves only its own capture closure runs off-main. Add a direct gate that
+  observes the production disk reader and full matcher off the main actor before closing this.
 - [ ] Existing file tree, preview, source-only, and Experimental WYSIWYG behavior remain green;
   `Command-F` editor find remains separate unfinished work.
+  Keep this open until the exact current tip completes the serialized App, UI, performance, and
+  full `make test`/`make build` regressions.
 
 ## 8. WS1 Implementation Prompt
 
