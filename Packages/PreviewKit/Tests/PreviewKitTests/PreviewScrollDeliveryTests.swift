@@ -7,8 +7,8 @@ final class PreviewScrollDeliveryTests: XCTestCase {
         var controller: PreviewController? = try PreviewController(
             previewIndexURL: previewIndexFixtureURL()
         )
-        weak let weakController = controller
-        weak let weakWebView = controller?.webView
+        let weakController = WeakBox(controller)
+        let weakWebView = WeakBox(controller?.webView)
         try await waitUntil("preview bridge ready") {
             controller?.isReady == true
         }
@@ -25,7 +25,7 @@ final class PreviewScrollDeliveryTests: XCTestCase {
         controller?.shutdownForTesting()
         controller = nil
         try await waitUntil("preview controller and WebView deallocate") {
-            weakController == nil && weakWebView == nil
+            weakController.value == nil && weakWebView.value == nil
         }
     }
 
@@ -52,5 +52,13 @@ final class PreviewScrollDeliveryTests: XCTestCase {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTFail("Timed out waiting for \(description)")
+    }
+}
+
+private final class WeakBox<Object: AnyObject> {
+    weak var value: Object?
+
+    init(_ value: Object?) {
+        self.value = value
     }
 }
