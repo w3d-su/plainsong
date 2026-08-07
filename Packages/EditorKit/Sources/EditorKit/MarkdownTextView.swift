@@ -19,11 +19,12 @@ struct MarkdownTextView: NSViewRepresentable {
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
-    private let documentIdentity: EditorDocumentIdentity?
+    let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
     private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
     private let documentSourceContract: EditorDocumentSourceContract?
     private let navigationCommand: EditorNavigationCommand?
+    let findMatchHighlight: EditorFindMatchHighlightRequest?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -47,6 +48,7 @@ struct MarkdownTextView: NSViewRepresentable {
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
         documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
+        findMatchHighlight: EditorFindMatchHighlightRequest? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -69,6 +71,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
         self.documentSourceContract = documentSourceContract
         self.navigationCommand = navigationCommand
+        self.findMatchHighlight = findMatchHighlight
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -243,6 +246,10 @@ struct MarkdownTextView: NSViewRepresentable {
                 forceReapply: false
             )
         }
+        // After styled text: the highlight pass preserves existing find decoration, but a
+        // changed request must still replace it. Applying here keeps decoration and syntax
+        // attributes in one ordering instead of racing them.
+        applyFindMatchHighlightIfNeeded(coordinator, to: textView)
 
         let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
             !textView.hasMarkedText()
@@ -328,7 +335,7 @@ struct MarkdownTextView: NSViewRepresentable {
     @MainActor
     @discardableResult
     static func applyHighlightedText(_ styledText: HighlightedText, to textView: STTextView) -> Bool {
-        applyHighlightedTextPreservingImageMarkers(styledText, to: textView)
+        applyHighlightedTextPreservingPresentationMarkers(styledText, to: textView)
     }
 
     @MainActor

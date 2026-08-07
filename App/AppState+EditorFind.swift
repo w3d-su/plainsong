@@ -324,7 +324,35 @@ extension AppState {
         // Counter + selection apply via onSessionDidChange when the debounced match lands.
     }
 
+    /// Find-match decoration for the focused editor (docs/editor-find-gates.md F8).
+    ///
+    /// Cached beside the controller rather than mirrored into `EditorFindUIState`: a query can
+    /// retain up to `EditorFindLimits.retainedMatchCeiling` matches. Materializing that array
+    /// from the controller on every `WorkspaceWindow.body` evaluation would put O(matches)
+    /// work on unrelated editor updates; putting it in the diffed UI state would make every
+    /// unrelated chrome update compare it.
+    ///
+    /// `nil` while the bar is closed, so closing find clears decoration instead of leaving the
+    /// last query lit behind a hidden bar.
+    var editorFindMatchHighlight: EditorFindMatchHighlightRequest? {
+        guard editorFindHost.ui.isBarVisible else { return nil }
+        return editorFindHost.matchHighlightRequest
+    }
+
     private func publishEditorFindSessionPresentation() {
+        if let session = editorFindHost.controller.session,
+           !session.query.pattern.isEmpty,
+           !session.matches.isEmpty
+        {
+            editorFindHost.matchHighlightRequest = EditorFindMatchHighlightRequest(
+                generation: editorFindHost.controller.queryGeneration,
+                matches: session.matches.map(\.range),
+                // `currentOrdinal` is the 1-based UI ordinal; the request wants a 0-based index.
+                currentIndex: session.currentOrdinal.map { $0 - 1 }
+            )
+        } else {
+            editorFindHost.matchHighlightRequest = nil
+        }
         var ui = editorFindHost.ui
         ui.applySessionPresentation(editorFindHost.controller.session)
         setEditorFindUI(ui)
