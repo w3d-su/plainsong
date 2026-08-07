@@ -1,0 +1,10 @@
+format=1
+phase=postflight
+captured_utc=2026-08-07T21:32:48.623912Z
+source_commit=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+source_status=clean
+process_filter=xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner
+competing_process_lines=0
+load_average_1m=8.37
+thermal_warning=none
+power_source=AC

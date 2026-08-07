@@ -1,0 +1,17 @@
+format=1
+source_commit=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+configuration=Debug
+build_manifest_path=/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/debug-build/f2-editor-find-build-manifest.txt
+build_manifest_sha256=fe374662a09ccb452ce55f0796740c96b66624483afe55aa53fcff2c8dfb3510
+raw_log_path=/private/tmp/plainsong-f2-final-six-v2.9p66Jp/debug-2.log
+raw_log_sha256=f423e80f01fe3358e4f8c74937af32234e348a9118c3e773746ddcaa54fa295b
+raw_log_bytes=21013
+xcresult_path=/private/tmp/plainsong-f2-final-six-v2.9p66Jp/debug-2.xcresult
+xcresult_sha256=a743d37e8af25036b53b1a02daa54785d15313d2115a1de821fa070b8a84ffab
+xcresult_inspection_path=/private/tmp/plainsong-f2-final-six-v2.9p66Jp/debug-2.inspection.xcresult
+xcresult_inspection_input_sha256=a743d37e8af25036b53b1a02daa54785d15313d2115a1de821fa070b8a84ffab
+xcresult_inspection_result_sha256=5482591b7c99424c3bb480a8f03d8b8a12768a92c7f85840578c6902a247d9a3
+warning_check_path=/private/tmp/plainsong-f2-final-six-v2.9p66Jp/debug-2.warning-check.txt
+warning_check_sha256=d37f6218eda964fce2d7f0c02681f0ae412c1649d123bcbd2de012d4569e3927
+warning_check_bytes=1424
+status=pass

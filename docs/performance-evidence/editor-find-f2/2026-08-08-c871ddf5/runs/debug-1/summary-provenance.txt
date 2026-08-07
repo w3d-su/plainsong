@@ -1,0 +1,11 @@
+format=1
+source_commit=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+configuration=Debug
+run_id=debug-1
+command=/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcresulttool get test-results summary --compact --path FRESH_COPY
+xcresult_sha256=2a36f1f0f1552e8405aea6a9c6e37cedb7aeed25c1468b2fcc31a17c59025d36
+inspection_copy_input_sha256=2a36f1f0f1552e8405aea6a9c6e37cedb7aeed25c1468b2fcc31a17c59025d36
+inspection_copy_disposition=deleted-after-summary-read
+summary_sha256=81ec95e677bb31ed524ed7b03a503f5a3914ff744541a0bafd88428a872c7d23
+summary_bytes=949
+xcresulttool_exit_status=0

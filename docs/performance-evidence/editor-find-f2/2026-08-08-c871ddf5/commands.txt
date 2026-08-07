@@ -1,0 +1,4 @@
+measured-source=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+capture-helper-sha256=c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef
+audit-compact=python3 Scripts/check-editor-find-f2-retained-evidence.py PACK --allow-partial
+audit-full=python3 Scripts/check-editor-find-f2-retained-evidence.py PACK --artifact-root OWNER_LOCAL_ROOT

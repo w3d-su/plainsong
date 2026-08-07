@@ -361,318 +361,289 @@ evidence, and these budgets stay informational on CI regardless.
 
 ## Phase 3 F2 In-Document Find Performance Gate
 
-This is the complete authoritative baseline for the F2 query-completion and production-hosted
-state-update receipt proxies. All six retained runs measured the exact clean source at
-`c871ddf5c66c17f03fd9456b53f79411f9b2e979`. That commit contains the warning-phase checker,
-exact-source build/run wrappers, and resolved-package-input seal used by every retained run.
+The six-run proxy baseline is locally auditable again. Three Debug and three Release runs measure
+the exact clean detached source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979`; the compact
+records are committed under `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5`, and
+the omitted 1.2 GiB source/build/result artifacts are retained read-only at the owner-local root
+shown below. The compact audit is deliberately `PARTIAL/OPEN`; only an audit that also receives
+that full root prints proxy `PASS`.
+
+This is not a portable or externally durable closure. The full root has not been replicated off
+this Mac, and no authority to upload 1.2 GiB of artifacts was granted. Loss of that root invalidates
+the full baseline and requires six fresh runs. Consequently the overall F2 retention item remains
+open even though the currently present full root passes. The full `<16 ms` keystroke-to-screen,
+F8 highlight apply/clear, F9, and combined-tip gates also remain open.
+
+### Recovery finding and replacement policy
+
+The July record claimed six `/private/tmp/plainsong-f2-c871ddf-{debug,release}-run{1,2,3}`
+prefixes retained raw logs, digests, warning checks, manifests, xcresults, inspection copies, and
+products. Those directories no longer contained the claimed files. An exhaustive local/session
+search recovered exact copies of 18 of the 24 text-hash rows, but none of the six raw xcresult
+bundles. Because warning/result and product provenance could not be fully audited, every July raw
+number and hash is superseded and is not used below.
+
+The replacement policy is fail-closed:
+
+- `/private/tmp` is execution staging only and is never described as durable evidence.
+- Every accepted run uses a fresh output prefix and is copied from execution staging to an
+  owner-local, read-only Documents root before staging cleanup. Reused paths are rejected.
+- The Git pack retains every raw text artifact, a strict inventory, summaries, and provenance. Its
+  exact `SHA256SUMS` bytes are frozen by the checker.
+- Full audit additionally rehashes private snapshots of the source archive/generated source,
+  resolved package inputs, build manifests, host bundles, xctestrun files, raw logs, raw xcresults,
+  and authoritative inspection xcresults. Source/build/product and per-run result identities are
+  baseline-specific constants, not values trusted from the pack itself.
+- Owner-local storage is not off-machine durability. Until the full root is published to an
+  authorized durable store and re-audited there, F2 retention stays open.
+
+### Exact environment and retained locations
 
 | Field | Value |
 |---|---|
-| Date | 2026-07-30 (Asia/Taipei) |
-| Branch | `codex/editor-find-f2-performance-probe`; `origin/main` at `250e91e16a1fd5339096ec96b84fcfe6e9790c4c` is an ancestor |
-| Measured source commit | `c871ddf5c66c17f03fd9456b53f79411f9b2e979` |
-| macOS | macOS 27.0 (26A5388g) |
-| Xcode | Xcode 27.0 (27A5194q) |
-| XcodeGen | 2.45.4; binary SHA-256 `3b483413a801394b00adb2fabf3c06ff8f800c73c8698e1f9a9d8a95d73939ef` |
-| Machine | MacBook Pro (MacBookPro18,3), Apple M1 Pro (8 cores), arm64, 16 GB RAM |
-| Fixture | `Fixtures/large-1mb.md`: 1,048,962 bytes; SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
-| Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets` |
-| Result | Pass — three Debug and three Release local-hard runs, two tests per run, zero failures; warning exception passed the raw-log phase checker in all six runs. |
+| Measurement date | 2026-08-08 (Asia/Taipei) |
+| Branch | `codex/editor-find-f2-performance-probe` |
+| Measured source | clean detached `c871ddf5c66c17f03fd9456b53f79411f9b2e979`; `origin/main` at `250e91e16a1fd5339096ec96b84fcfe6e9790c4c` is an ancestor |
+| macOS | 27.0 (26A5388g) |
+| Xcode / SDK | Xcode 27.0 (27A5194q); macOS SDK 27.0 (26A5353p); selected developer `/Applications/Xcode-beta.app/Contents/Developer` |
+| XcodeGen | 2.45.4; SHA-256 `3b483413a801394b00adb2fabf3c06ff8f800c73c8698e1f9a9d8a95d73939ef` |
+| `xcresulttool` | `/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcresulttool`; SHA-256 `7aada4a60aad3de62bc7fbda7afd990e53d8335710d1a8792fd279d42491a5c9` |
+| Machine | MacBookPro18,3, Apple M1 Pro, arm64, 8 physical/logical cores, 16 GiB RAM, AC power, no thermal warning at each accepted boundary |
+| Fixture | `Fixtures/large-1mb.md`, 1,048,962 UTF-8 bytes, SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
+| Capture helper | `Scripts/capture-editor-find-f2-authoritative-run.sh`; SHA-256 `c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef` |
+| Pack assembler | `Scripts/assemble-editor-find-f2-retained-evidence.py`; SHA-256 `5ec0f6503d8e04f59120be090dd450f98a3b24fde1560d570d7996aa7cc1f06b` |
+| Retained-evidence checker | `Scripts/check-editor-find-f2-retained-evidence.py`; SHA-256 `b9e241019550558614c93770a85f75a8b509c0031f3e7fab17a9264b2096c5fc` |
+| Compact pack | `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5`; `SHA256SUMS` SHA-256 `d2f1497b19c37db3b49b5028292871fe6194752d94de05f55d5e7b6337767e22` |
+| Full owner-local root | `/Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2`; read-only; approximately 1.2 GiB; not externally replicated |
 
-The exact retained run prefixes are:
-
-```text
-/private/tmp/plainsong-f2-c871ddf-debug-run1
-/private/tmp/plainsong-f2-c871ddf-debug-run2
-/private/tmp/plainsong-f2-c871ddf-debug-run3
-/private/tmp/plainsong-f2-c871ddf-release-run1
-/private/tmp/plainsong-f2-c871ddf-release-run2
-/private/tmp/plainsong-f2-c871ddf-release-run3
-```
-
-Each prefix has a raw `.log`, immutable raw `.xcresult`, `.log.sha256`,
-`.warning-check.txt`, `.warning-check.txt.sha256`, `.evidence-manifest.txt`, immutable
-`.inspection.xcresult` copy, and immutable `.products` snapshot. The run wrapper refuses to
-overwrite any of them. It streams the raw console to the log without hiding `xcodebuild` failure,
-hashes and freezes the log/result before inspection, checks the warning phase against the raw log,
-checks the coalesced issue against the inspection copy, re-verifies all source/build hashes, and
-only then writes `status=pass` to the evidence manifest.
-
-| Run | Raw log SHA-256 | Raw `.xcresult` SHA-256 | Warning-check SHA-256 | Evidence-manifest SHA-256 |
-|---|---|---|---|---|
-| Debug 1 | `cbe75c955dad38fe8999c4a746c6f4ef2766d73aed3e7ef70f16084970eb8bb6` | `13e460fe2ecef5fa1f8939fe46f4a95c4375ff35d37435753b8cc8fa313fab85` | `79858fe61a377bc8795eac499628c1ba533dfb0ee2029d12bccadec8e3fbf61a` | `1d502e7481e15d5ec7db8b0808037649f9eee08fb343d29787a615cfb90f786c` |
-| Debug 2 | `60a353889d68108a142dd43fc7b179e21ddbdee854e9f162b48a8e7c874eb43f` | `21ad5fe629e40e7c16134df23db13c49cac1d6dbdbe766b3d111fc046bb712c4` | `09a15b6593e3a6d968b28bc161dc0ca6ef35b579eb6f3725a0da7b37003055fd` | `fcaf40cf836a08f642fcfa8cb77da708870b61dd795d52bfd9ad88ff69be97cc` |
-| Debug 3 | `9c66f5c3a92a09d6aa007413950c1cca7a88922b5702dd69fda28ff60c0f6a34` | `b638c8545af783a6cb2b8b192c4b10a1e90bc9845147c9781b93f4960c7bf816` | `c1a294fb1f685655e716ed8311a0216197c5674010d3fd5fae12535464b83395` | `0c10ad4cbd9724d48c7c25f42291716b1468592a848f031cc99eddef136a59dd` |
-| Release 1 | `ddb0167554cb6f1e67adc03665369d768aeb980611e3cee980aaf4660fe35867` | `d92926cb34a3e585c50937d6b773cb931cfa5b3f140163903773df8c6d369c73` | `e3c21d138f1ab6d2fbb2fd4132d41225020a63dc3ddcd8e193d3f3977d17d147` | `0e5eb045b1b95ff8ad1b140af594bacdf8f208985b5a3934a18d7a568857d957` |
-| Release 2 | `513777480b74f4e7a946256ab9c657fc437d4cf42a7423e5061104ff5ed970ae` | `a8361ff89597fd16c5ae4705cddfb446e1acae5f085d632bbadcf847acfc39fe` | `c82983c59044a024316c1056007cf7e81c9209ddbe2f50dd60c6a40867cfab20` | `da08390f737d99ea1f70f3347eec4ca67c6c72c5553fc9421ee1d0e343eaf6a4` |
-| Release 3 | `1f02a44a62853b5a0f9209dcf7a8fa196461777b7b9eb0e4a2ee71c7a7c447b8` | `d0e98d9258d9d1458a4986e536e0b231f942b44cef5a26a04dd9d12552e57348` | `4ecc5b64d58316fafce68ef1a62581440802fb01ee507a9add4e519f3577498d` | `ee420d0fae18837161486e7b560b52051c84573e98b7e0aa0f24562af9af0ab9` |
-
-### Reproduction
-
-The build wrapper archives the `HEAD` of the checkout that contains the invoked script. Therefore,
-running it from a later documentation commit does **not** reproduce this baseline. Start from any
-repository checkout that already contains the measured object, create a fresh detached worktree at
-the full measured commit, prove that worktree is detached and clean, and place every new build/run
-artifact under one newly allocated prefix:
-
-```sh
-set -euo pipefail
-
-F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
-F2_REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
-F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
-F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
-
-git -C "$F2_REPOSITORY_ROOT" cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
-git -C "$F2_REPOSITORY_ROOT" worktree add --detach \
-  "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
-test "$(git -C "$F2_SOURCE_WORKTREE" rev-parse HEAD)" = "$F2_MEASURED_COMMIT"
-if git -C "$F2_SOURCE_WORKTREE" symbolic-ref -q HEAD >/dev/null; then
-  echo "F2 reproduction worktree must be detached" >&2
-  exit 1
-fi
-test -z "$(git -C "$F2_SOURCE_WORKTREE" status --porcelain=v1 --untracked-files=all)"
-cd "$F2_SOURCE_WORKTREE"
-
-Scripts/build-editor-find-f2-performance-gate.sh \
-  Debug "$F2_REPRO_ROOT/debug-build"
-Scripts/build-editor-find-f2-performance-gate.sh \
-  Release "$F2_REPRO_ROOT/release-build"
-
-for F2_RUN in 1 2 3; do
-  Scripts/run-editor-find-f2-performance-gate.sh Debug \
-    "$F2_REPRO_ROOT/debug-build" \
-    "$F2_REPRO_ROOT/debug-run${F2_RUN}.xcresult" \
-    "$F2_REPRO_ROOT/debug-run${F2_RUN}.log"
-done
-
-for F2_RUN in 1 2 3; do
-  Scripts/run-editor-find-f2-performance-gate.sh Release \
-    "$F2_REPRO_ROOT/release-build" \
-    "$F2_REPRO_ROOT/release-run${F2_RUN}.xcresult" \
-    "$F2_REPRO_ROOT/release-run${F2_RUN}.log"
-done
-```
-
-`mktemp` makes these output prefixes fresh. Do not substitute the retained artifact paths listed
-above: those paths are immutable evidence, and both wrappers intentionally reject reuse. The new
-run is a reproduction attempt whose results must be reported separately; it does not replace or
-silently mix with the six retained samples.
-
-Both wrappers reject a dirty worktree, CI budget mode, reused output paths, source/build
-mismatches, and post-run mutation. The build wrapper archives the exact commit, generates the
-project inside a source snapshot, resolves packages once, seals the consumed source/package
-inputs read-only, then uses `-disableAutomaticPackageResolution` for `build-for-testing`.
-`ENABLE_TESTABILITY=YES` is added only for Release because the reusable harness observes internal
-EditorKit transition state; it does not enable `DEBUG` compilation or change the production
-debounce.
-
-Both builds have source-archive SHA-256
+Both builds retain source-archive SHA-256
 `f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506` and pre-generation
 source-tree SHA-256
 `51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94`.
 The Debug/Release generated build-input hashes are respectively
-`688be8f5e444142d281b1a5e3167e607c27cf410ffdd1d968b1988b10668eb80` and
-`4f18738efceebe42159e8413a3d61cfdba81282ebb4b507edaac4a00707babdc`.
+`2093bf7df313cc13ae24c964a6661ae05d15471547c553fc295003bbebeba3b6` and
+`3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6`.
 Both resolved-package-input hashes are
 `ed48178719a6c72d2880d3972e900d3bbe51f180d13e01dffd452de936f779c3`.
-That last digest deliberately covers the consumed checkout bytes (excluding checkout/submodule
-`.git` administration), all artifact bytes, and `workspace-state.json`; mutable top-level bare
-repository caches are not treated as source provenance. Unknown top-level entries fail closed.
 The Debug/Release build-manifest hashes are
-`f686590407861591caaddc30e96987e5bf927f9906f4692c15ffdcac327e10d0` and
-`e8a8f02f83c8b4b919aa697fefa148f3bbee5c3f65850d731bd5526970fa861e`.
+`fe374662a09ccb452ce55f0796740c96b66624483afe55aa53fcff2c8dfb3510` and
+`5ca8c353ad557267745566ec597ba5971b024afb2796237158b062e3fcdd6a8a`.
 
-### Procedure and scope
+### Reproduction with fresh outputs
 
-The query probe starts its clock immediately before
-`AppState.handleEditorFindQueryTextChange`. It includes App query publication, the production
-150 ms debounce, detached `TextSearchEngine` matching, revision/query fencing, main-actor session
-application, and App presentation. Every scenario gets one unmeasured warm-up and three measured
-samples. Every sample hard-asserts the exact retained count/truncation shape, first and last retained
-match endpoints, and that the matcher observed itself off the main thread.
+The measured build wrapper archives the `HEAD` of the checkout containing it. Running that wrapper
+from this later documentation commit would therefore measure the wrong source. Start with a clean
+detached worktree at the full measured commit, but invoke the newer capture helper from a separate
+evidence checkout whose hash is verified. Allocate a new mode-0700 staging root; never reuse the
+retained paths.
 
-| Shape | Deterministic pattern | Expected result | Exact retained endpoints |
+```sh
+set -euo pipefail
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+export GIT_NO_REPLACE_OBJECTS=1
+
+F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+F2_REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
+F2_EVIDENCE_CHECKOUT="$F2_REPOSITORY_ROOT"
+F2_CAPTURE="$F2_EVIDENCE_CHECKOUT/Scripts/capture-editor-find-f2-authoritative-run.sh"
+F2_CAPTURE_SHA=c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef
+F2_SOURCE_ARCHIVE_SHA=f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506
+F2_SOURCE_TREE_SHA=51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94
+F2_PACKAGE_INPUT_SHA=ed48178719a6c72d2880d3972e900d3bbe51f180d13e01dffd452de936f779c3
+F2_DEBUG_BUILD_INPUT_SHA=2093bf7df313cc13ae24c964a6661ae05d15471547c553fc295003bbebeba3b6
+F2_RELEASE_BUILD_INPUT_SHA=3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6
+F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
+F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
+
+test "$(/usr/bin/shasum -a 256 "$F2_CAPTURE" | /usr/bin/awk '{print $1}')" = \
+  "$F2_CAPTURE_SHA"
+test "$(/usr/bin/stat -f '%Lp' "$F2_REPRO_ROOT")" = 700
+/usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
+  cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
+/usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
+  worktree add --detach "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
+test "$(/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" rev-parse HEAD)" = \
+  "$F2_MEASURED_COMMIT"
+if /usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
+  symbolic-ref -q HEAD >/dev/null; then
+  echo "F2 reproduction source must be detached" >&2
+  exit 1
+fi
+test -z "$(/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
+  status --porcelain=v1 --untracked-files=all)"
+
+"$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+  Debug "$F2_REPRO_ROOT/debug-build"
+"$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+  Release "$F2_REPRO_ROOT/release-build"
+
+f2_manifest_value() {
+  /usr/bin/awk -F= -v key="$1" \
+    '$1 == key { value = substr($0, length($1) + 2); count += 1 }
+     END { if (count != 1) exit 1; print value }' "$2"
+}
+F2_DEBUG_MANIFEST="$F2_REPRO_ROOT/debug-build/f2-editor-find-build-manifest.txt"
+F2_RELEASE_MANIFEST="$F2_REPRO_ROOT/release-build/f2-editor-find-build-manifest.txt"
+for F2_MANIFEST in "$F2_DEBUG_MANIFEST" "$F2_RELEASE_MANIFEST"; do
+  test "$(f2_manifest_value source_commit "$F2_MANIFEST")" = "$F2_MEASURED_COMMIT"
+  test "$(f2_manifest_value source_archive_sha256 "$F2_MANIFEST")" = \
+    "$F2_SOURCE_ARCHIVE_SHA"
+  test "$(f2_manifest_value source_tree_sha256 "$F2_MANIFEST")" = \
+    "$F2_SOURCE_TREE_SHA"
+  test "$(f2_manifest_value resolved_package_input_sha256 "$F2_MANIFEST")" = \
+    "$F2_PACKAGE_INPUT_SHA"
+done
+test "$(f2_manifest_value configuration "$F2_DEBUG_MANIFEST")" = Debug
+test "$(f2_manifest_value build_input_sha256 "$F2_DEBUG_MANIFEST")" = \
+  "$F2_DEBUG_BUILD_INPUT_SHA"
+test "$(f2_manifest_value configuration "$F2_RELEASE_MANIFEST")" = Release
+test "$(f2_manifest_value build_input_sha256 "$F2_RELEASE_MANIFEST")" = \
+  "$F2_RELEASE_BUILD_INPUT_SHA"
+
+for F2_RUN in 1 2 3; do
+  "$F2_CAPTURE" Debug "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/debug-build" \
+    "$F2_REPRO_ROOT/debug-$F2_RUN"
+done
+for F2_RUN in 1 2 3; do
+  "$F2_CAPTURE" Release "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/release-build" \
+    "$F2_REPRO_ROOT/release-$F2_RUN"
+done
+```
+
+Each new run is a separate reproduction attempt. Copy it to a newly allocated durable root before
+staging cleanup, freeze a new compact inventory, and report its numbers separately. It must not be
+mixed into this pack. A relevant source, fixture, dependency, XcodeGen, Xcode/SDK,
+`xcresulttool`, macOS, machine, or capture-policy change invalidates this baseline and requires a
+new six-run set; the checker enforces the identities recorded for this set but does not claim that
+every future OS/toolchain change automatically fails before new evidence is assembled.
+
+Audit the retained pack with:
+
+```sh
+# Compact records only: prints PARTIAL/OPEN and exits 3 by default.
+test "$(/usr/bin/shasum -a 256 Scripts/check-editor-find-f2-retained-evidence.py | \
+  /usr/bin/awk '{print $1}')" = \
+  b9e241019550558614c93770a85f75a8b509c0031f3e7fab17a9264b2096c5fc
+/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5
+
+# Explicitly accept the limited compact audit: still prints PARTIAL/OPEN.
+/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 --allow-partial
+
+# Current owner-local full audit: prints proxy/warning PASS while the root exists.
+/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 \
+  --artifact-root \
+  /Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2
+```
+
+### Procedure and measured boundary
+
+The query clock starts immediately before `AppState.handleEditorFindQueryTextChange`. It includes
+App query publication, the production 150 ms debounce, detached `TextSearchEngine` matching,
+revision/query fencing, main-actor session application, and App presentation. Each deterministic
+scenario gets one unmeasured warm-up and three measured samples. Every sample hard-asserts the
+fixture identity, retained/truncated shape, exact endpoint positions, and off-main matcher receipt.
+
+| Shape | Query | Expected result | Exact retained endpoints |
 |---|---|---|---|
-| Zero | `plainsong-f2-zero-hit` | 0 retained; not truncated | first `nil`; last `nil` |
-| Sparse | `generated sections: 1274` | 1 retained; not truncated | first = last: `NSRange(location: 1_048_904, length: 24)`, line 33,140 |
-| Dense | `section` (default smart case) | 10,000 retained; truncated by the 10,001st overflow match | first: `NSRange(location: 399, length: 7)`, line 15; last retained: `NSRange(location: 914_752, length: 7)`, line 28,901 |
+| Zero | `plainsong-f2-zero-hit` | 0 retained; not truncated | first/last `nil` |
+| Sparse | `generated sections: 1274` | 1 retained; not truncated | first = last: location 1,048,904, length 24, line 33,140 |
+| Dense | `section` | 10,000 retained; truncated by overflow 10,001 | first: location 399, length 7, line 15; last: location 914,752, length 7, line 28,901 |
 
-The production-hosted probe mounts the shipped `WorkspaceWindow` in a 1,100 × 720
-`NSHostingController`/`NSWindow`, injects the real `AppState`, and waits for both the production
-`MarkdownSTTextView` and shipped `EditorFindBar` query `NSTextField`. It opens find through
-`showOrRefocusEditorFind()`, drives the dense query through
-`handleEditorFindQueryTextChange`, and confirms the visible `1 / 10000+` truncated presentation.
-Mount, find-bar creation, and dense-query priming all occur before measured editing starts.
+The hosted probe mounts the shipped `WorkspaceWindow` with real observed `AppState`, the public
+editor, and the shipped `EditorFindBar`. It opens find, primes the dense query, verifies visible
+`1 / 10000+`, then performs five native `insertText` edits. Admission ends when `insertText`
+returns. Root receipt ends when the test-only root representable enters its update transaction with
+the new revision, query/bar still present, and old find presentation invalidated. It does not
+require child layout or compositor presentation and includes no physical keyboard delivery.
+Therefore neither proxy proves the product `<16 ms` keystroke-to-screen criterion.
 
-With the real editor already focused, each of five measured edits calls its native
-`insertText("x", replacementRange: .notFound)` at the mounted visible-range start. **Admission**
-starts immediately before that call and stops when it returns. **Root state-update receipt** stops
-at the timestamp captured synchronously when the root's test-only
-`NSViewRepresentable.updateNSView` enters with the new document revision, bar/query still present,
-and the old find presentation invalidated. The receipt is stored with a monotonic generation and
-bounded history so a later update cannot overwrite the awaited snapshot.
+The capture helper records clean/AC/no-thermal preflight and postflight boundaries and waits 200 ms
+after each completed scan of the target process set. It retains every sample plus every exemption attributable by
+runner ancestry, exact private host path, or a token-bound private output prefix. The checker
+rejects exemptions at or after the runner-finished sample. This proves no *sampled* uncorrelated
+target process during accepted intervals; it does not claim continuous absence between samples.
 
-Before the first suspension, hard assertions require the completed-match count to remain unchanged,
-`session == nil`, and no pending navigation. This proves that the old presentation was invalidated
-and no new match completion or navigation was applied synchronously; it does not prove that no
-matcher work began synchronously. The polling loop calls `layoutSubtreeIfNeeded()` to drive pending
-SwiftUI/AppKit work, so incidental layout may occur before the timestamped root receipt. The
-endpoint does not require or prove that child layout completed. After finding the receipt, the test
-forces any remaining layout and proves the production editor representable updated. The eventual
-recompute is outside the two measured intervals and must run off-main, retain/truncate the same
-10,000 matches, and shift both endpoint locations by exactly the insertion count while preserving
-their line numbers.
+For non-authoritative operator context, one attempted Debug 3 run was rejected after the monitor
+observed nine foreign monitored-process records: five `swift-frontend` and four `xctest` records
+across five unique PIDs. That rejected attempt remains only in the `/private/tmp` staging area and
+is not part of either retained evidence copy. A fresh-prefix retry began only after those processes
+ended. Accepted run sample/owned-record counts were respectively
+74/33, 74/33, 77/34, 61/18, 61/17, and 61/19, with zero uncorrelated matches in every accepted run.
 
-The receipt proves entry into the root SwiftUI/AppKit update transaction. It excludes compositor
-presentation and physical keyboard delivery, and does not require or prove child-layout completion;
-therefore it does not close the separate `<16 ms` keystroke-to-screen criterion or claim equality
-with a find-closed distribution.
+### Exact raw measurements
 
-### Raw query-completion results
-
-All values are milliseconds. Bold values are the median of the three samples in that cell.
+All values are milliseconds. Bold is the median within the displayed sample array.
 
 | Configuration / run | Zero samples; median | Sparse samples; median | Dense samples; median |
 |---|---|---|---|
-| Debug 1 | `[234.121, 236.297, 233.791]`; **234.121** | `[242.229, 259.028, 275.307]`; **259.028** | `[647.930, 671.841, 690.992]`; **671.841** |
-| Debug 2 | `[322.109, 267.309, 295.671]`; **295.671** | `[237.678, 251.572, 302.016]`; **251.572** | `[619.368, 614.958, 609.108]`; **614.958** |
-| Debug 3 | `[244.517, 256.913, 234.795]`; **244.517** | `[243.530, 244.823, 266.772]`; **244.823** | `[652.836, 667.837, 654.409]`; **654.409** |
-| Release 1 | `[166.167, 178.732, 173.033]`; **173.033** | `[183.565, 187.881, 178.594]`; **183.565** | `[244.551, 237.605, 245.864]`; **244.551** |
-| Release 2 | `[179.494, 176.742, 171.902]`; **176.742** | `[185.900, 181.848, 187.980]`; **185.900** | `[248.075, 266.569, 245.316]`; **248.075** |
-| Release 3 | `[165.195, 179.275, 178.648]`; **178.648** | `[175.217, 184.089, 185.648]`; **184.089** | `[237.652, 238.846, 239.970]`; **238.846** |
+| Debug 1 | `[241.020, 223.153, 247.238]`; **241.020** | `[259.014, 250.378, 239.762]`; **250.378** | `[580.960, 580.041, 585.822]`; **580.960** |
+| Debug 2 | `[235.082, 245.107, 231.740]`; **235.082** | `[255.892, 232.944, 254.619]`; **254.619** | `[591.634, 600.164, 587.173]`; **591.634** |
+| Debug 3 | `[226.407, 241.879, 229.118]`; **229.118** | `[256.710, 241.698, 271.743]`; **256.710** | `[601.683, 607.733, 575.622]`; **601.683** |
+| Release 1 | `[171.100, 174.493, 178.240]`; **174.493** | `[186.542, 192.538, 184.102]`; **186.542** | `[235.831, 243.462, 237.281]`; **237.281** |
+| Release 2 | `[170.424, 171.058, 171.917]`; **171.058** | `[192.345, 189.156, 194.835]`; **192.345** | `[245.958, 221.562, 253.468]`; **245.958** |
+| Release 3 | `[177.752, 170.781, 165.903]`; **170.781** | `[181.082, 188.834, 181.319]`; **181.319** | `[215.846, 260.129, 233.066]`; **233.066** |
 
-### Raw production-hosted edit results
-
-All values are milliseconds. Bold values are the five-sample median; the last value in the receipt
-cell is the diagnostic maximum. Budgets apply to each run's median, not its maximum.
-
-| Configuration / run | Admission samples; median | Root state-update receipt samples; median; maximum |
+| Configuration / run | Admission samples; median | Root receipt samples; median; maximum |
 |---|---|---|
-| Debug 1 | `[1.587, 1.296, 16.514, 1.206, 1.094]`; **1.296** | `[6.072, 4.297, 19.593, 4.353, 4.055]`; **4.353**; max **19.593** |
-| Debug 2 | `[1.784, 1.246, 16.573, 1.090, 1.796]`; **1.784** | `[8.970, 4.885, 20.772, 5.183, 8.635]`; **8.635**; max **20.772** |
-| Debug 3 | `[1.664, 3.271, 25.264, 1.215, 1.655]`; **1.664** | `[6.272, 6.850, 29.979, 4.621, 6.010]`; **6.272**; max **29.979** |
-| Release 1 | `[1.695, 1.080, 14.444, 1.069, 1.013]`; **1.080** | `[7.171, 5.644, 17.877, 4.027, 4.355]`; **5.644**; max **17.877** |
-| Release 2 | `[1.543, 1.164, 14.386, 1.015, 1.138]`; **1.164** | `[5.832, 4.248, 17.791, 4.564, 4.788]`; **4.788**; max **17.791** |
-| Release 3 | `[1.292, 1.075, 1.033, 0.984, 0.975]`; **1.033** | `[6.811, 4.999, 3.745, 3.774, 3.731]`; **3.774**; max **6.811** |
+| Debug 1 | `[1.091, 0.995, 15.802, 1.098, 1.017]`; **1.091** | `[4.535, 3.599, 18.454, 3.825, 3.625]`; **3.825**; max **18.454** |
+| Debug 2 | `[1.119, 1.051, 15.787, 1.042, 0.953]`; **1.051** | `[4.568, 3.732, 18.667, 3.759, 3.506]`; **3.759**; max **18.667** |
+| Debug 3 | `[1.129, 1.062, 15.974, 1.171, 1.021]`; **1.129** | `[4.452, 3.715, 18.839, 4.259, 3.661]`; **4.259**; max **18.839** |
+| Release 1 | `[1.148, 1.015, 14.057, 0.993, 0.867]`; **1.015** | `[4.738, 4.016, 17.016, 4.252, 3.623]`; **4.252**; max **17.016** |
+| Release 2 | `[1.132, 0.904, 13.466, 0.937, 0.839]`; **0.937** | `[4.775, 3.282, 16.473, 3.355, 2.990]`; **3.355**; max **16.473** |
+| Release 3 | `[1.250, 1.036, 13.521, 1.039, 0.866]`; **1.039** | `[4.797, 3.745, 16.199, 3.791, 3.377]`; **3.791**; max **16.199** |
 
-### Budgets and enforcement
+The repeated third-edit tail remains visible rather than prewarmed away. It is the existing
+main-actor `EditorScrollLineIndex` rebuild after scroll-sync cache invalidation, not in-document
+matching. Its presence is another reason not to reinterpret median admission as full screen
+latency.
 
-The five round ceilings were already present in measured commit `c871ddf` before the
-authoritative sequence. They were derived from earlier Debug measurements, remain defensible
-against this final same-source rerun, and were not widened after any retained result. Release is
-confirmation only and did not justify a threshold.
+### Budgets and medians
 
-| Metric | Debug run medians | Debug median of run medians | Release run medians | Release median of run medians | Budget | Budget / slowest Debug run median |
+The existing 400 / 400 / 1,100 / 5 / 15 ms local-hard ceilings were not widened. They were derived
+from earlier Debug measurements and now have the following measured headroom over the slowest new
+Debug run median. Release is confirmation only. On CI, wall-clock treatment remains informational
+under R15; fixture, result shape, warning phase, source identity, and state invariants remain hard.
+
+| Metric | Debug run medians | Debug median of run medians | Release run medians | Release median of run medians | Budget | Budget / slowest Debug median |
 |---|---|---:|---|---:|---:|---:|
-| Zero query completion | 234.121, 295.671, 244.517 | **244.517** | 173.033, 176.742, 178.648 | **176.742** | < 400 ms | 1.35x |
-| Sparse query completion | 259.028, 251.572, 244.823 | **251.572** | 183.565, 185.900, 184.089 | **184.089** | < 400 ms | 1.54x |
-| Dense-truncated query completion | 671.841, 614.958, 654.409 | **654.409** | 244.551, 248.075, 238.846 | **244.551** | < 1,100 ms | 1.64x |
-| Native edit admission | 1.296, 1.784, 1.664 | **1.664** | 1.080, 1.164, 1.033 | **1.080** | < 5 ms | 2.80x |
-| Root state-update receipt | 4.353, 8.635, 6.272 | **6.272** | 5.644, 4.788, 3.774 | **4.788** | < 15 ms | 1.74x |
+| Zero query completion | 241.020, 235.082, 229.118 | **235.082** | 174.493, 171.058, 170.781 | **171.058** | < 400 | 1.66x |
+| Sparse query completion | 250.378, 254.619, 256.710 | **254.619** | 186.542, 192.345, 181.319 | **186.542** | < 400 | 1.56x |
+| Dense-truncated query completion | 580.960, 591.634, 601.683 | **591.634** | 237.281, 245.958, 233.066 | **237.281** | < 1,100 | 1.83x |
+| Native edit admission | 1.091, 1.051, 1.129 | **1.091** | 1.015, 0.937, 1.039 | **1.015** | < 5 | 4.43x |
+| Root state-update receipt | 3.825, 3.759, 4.259 | **3.825** | 4.252, 3.355, 3.791 | **3.791** | < 15 | 3.52x |
 
-Query gates enforce each run's three-sample median. The production-hosted gates enforce each run's
-five-sample admission and receipt medians. Deterministic fixture identity, endpoints,
-count/truncation, session invalidation, transition generation, and off-main assertions remain hard
-everywhere. Wall-clock thresholds are hard locally and print informational failures on hosted CI
-under R15.
+### Frozen run identities and warning phase
 
-### Retained cold-path tail samples
+| Run | Raw log SHA-256 | Raw xcresult SHA-256 | Inspection xcresult SHA-256 | Warning phase UUID |
+|---|---|---|---|---|
+| Debug 1 | `7f5b2555b869eb4272f3b41e682d3b58fb4d1f9d736cf28f74d08a19f10c9c87` | `2a36f1f0f1552e8405aea6a9c6e37cedb7aeed25c1468b2fcc31a17c59025d36` | `2e0b3ba8fda4525f84f87e9f221dca3b5c9b9155ce93da1f25d72f3743f81b1c` | `b8bd411a-f084-4bd6-96d7-f3c9643e0932` |
+| Debug 2 | `f423e80f01fe3358e4f8c74937af32234e348a9118c3e773746ddcaa54fa295b` | `a743d37e8af25036b53b1a02daa54785d15313d2115a1de821fa070b8a84ffab` | `5482591b7c99424c3bb480a8f03d8b8a12768a92c7f85840578c6902a247d9a3` | `3b3ad8c9-2487-4ae7-ae91-a037344d058b` |
+| Debug 3 | `b97bf3663dbc79316c3312b6238736e3bf7a33e8960985dee38b4da2547e5507` | `4b64721255085afbfbc5cf2365c7f1824b7195ee9c766e837f600b8a45841bdb` | `6bac0e9446f10eeec09896dae932a942e26a9a88f5f8d6ce6f68353e7e48b4f9` | `bc493029-237a-4438-af59-c778f4f294f6` |
+| Release 1 | `7b2320385c7f5293fe81f3b8a481c17a577d4a6739b44595867c23ce09aaa771` | `8e4a78681a1ca1f0e6f214a137deeab5c2ae18ffbb01876f4fbd57b74cf2826f` | `0a1a5dc3f4e5d587677089461f07ada1a957182ef74c1135d0fd3145cab8409b` | `6c68a1f6-7cd6-4b19-9959-40ddab397737` |
+| Release 2 | `307ca9866fb40f9942b80db59617d6f7dd68e570a77207ba496228ed936918f3` | `d400fa26d00c67ecd8ffff56b7288a303f4e9cfee769015f4c0a8f9103d430b0` | `466aa01922200f8677810398857fcfcdba769f0c6cbce89e1ada00a6e0e0294e` | `c6abf3b0-a1e3-49cd-829a-d15fd49c9d99` |
+| Release 3 | `50be75593b20576ce8fad502328b87fb936c6142ee31baee14d58989fa5094f1` | `07c2b39e2d93a1b09dce353acac815328cee0bb4b44b3e328efc46ccdbc53e59` | `f212519e07cf8e6ff3f480babe47f43d6184d9c69d8f58dff780f53b841dad28` | `6b3b97ed-37c5-4fc5-b24f-34e6ddb464e9` |
 
-Five of the six retained runs have a large synchronous sample at exactly the third insertion:
-Debug admission is 16.514–25.264 ms in all three runs, and Release admission is 14.386–14.444 ms
-in runs 1–2. The corresponding receipt samples are 19.593–29.979 ms in Debug and
-17.791–17.877 ms in Release. Release run 3 does not reproduce the spike. No sample is discarded;
-the complete arrays above retain both the slow and non-slow shapes.
+Every accepted raw log has exactly three known SwiftUI warnings before its same-UUID
+`F2_WARNING_PHASE_BEGIN`, zero during the five edits, zero after `END`, and no unknown SwiftUI
+warning. Each xcresult coalesces the three emissions into one known Runtime Warning issue. The
+existing negative control moves one warning inside the interval and must exit 1 even though the
+coalesced issue stays one. The full retained audit rechecks the raw phase, the negative control,
+the frozen result bundles, and a fresh summary from a disposable copy.
 
-Repeated sampling attributed that spike to the editor/preview scroll-sync bridge's
-`EditorScrollLineIndex.init(text:)`: after the text-change observer invalidates its cache, the next
-visible-line request synchronously rebuilds line starts by walking the full 1 MiB string's UTF-16
-units. This O(n) main-actor work extends `insertText` admission. It is not find matching: before
-every await the probe proves no new match result or navigation was applied and the old
-session/navigation are gone, while the later exact dense recompute again reports that it ran
-off-main.
+This is a narrow exception, not warning-free evidence. A warning during a measured edit fails; a
+signature/count change also fails the frozen baseline. The pre-measure warnings remain in the
+pre-F2 selection-binding/navigation path. F8-owned production files were not modified here.
 
-Time-profile investigation localized the repeated shape to the editor/preview scroll-sync
-line-index rebuild. That diagnostic was not used as an authoritative timing run. The final
-same-source arrays above are the only retained baseline numbers. The cold-path production debt
-remains real even though it is not universal; the median-based F2 proxies pass, while the full
-`<16 ms` keystroke-to-screen criterion remains open.
+### F8 and full-product boundary
 
-### Narrow pre-measure warning exception
-
-Each of the six authoritative logs contains exactly three
-`Modifying state during view update, this will cause undefined behavior.` warnings, all before
-measured editing begins: two while the production editor representable mounts and one while the
-dense prime applies its initial navigation. The six paired `.xcresult` bundles each coalesce those
-three console emissions into one Runtime Warning issue.
-
-The test prints one unambiguous
-`F2_WARNING_PHASE_BEGIN id=<UUID> edits=5` line immediately before the five-edit loop and the
-matching `F2_WARNING_PHASE_END` immediately after it. The six phase IDs are:
-
-| Run | Phase ID | Raw known warnings |
-|---|---|---|
-| Debug 1 | `5a7bd097-bc00-4050-b354-49f52433b7ee` | pre 3; measured 0; post 0 |
-| Debug 2 | `463f3270-d8d2-4723-945a-e7f61c5b613c` | pre 3; measured 0; post 0 |
-| Debug 3 | `5dd77f2b-20a5-477d-8cd3-c882bb8345ba` | pre 3; measured 0; post 0 |
-| Release 1 | `55e59e44-3c6a-4130-98db-c8a63113cd58` | pre 3; measured 0; post 0 |
-| Release 2 | `5f06379b-1e54-4801-8b23-6035252d15dc` | pre 3; measured 0; post 0 |
-| Release 3 | `4b7a2305-fa36-48f3-a55b-bb5fa73fca7a` | pre 3; measured 0; post 0 |
-
-`Scripts/run-editor-find-f2-performance-gate.sh` automatically invokes
-`Scripts/check-editor-find-f2-warning-phase.py` before accepting a run. The checker verifies the
-sealed raw-log and raw-result digests, exactly one ordered marker pair with the same UUID and
-`edits=5`, exactly three known warnings before `BEGIN`, zero known warnings between `BEGIN` and
-`END`, zero after `END`, zero other SwiftUI diagnostics, and two `local-hard` budget markers. It
-also requires the `.xcresult` inspection copy to report exactly two passing tests, zero failures,
-and exactly one coalesced Runtime Warning issue with the known message. Thus the raw log, rather
-than coalesced issue count, is authoritative for warning phase.
-
-A negative control moved one known warning from before `BEGIN` to immediately after `BEGIN` in a
-copy of Debug run 1's log while retaining the same coalesced `.xcresult`. The checker exited 1 with:
-
-```text
-F2 WARNING CHECK FAIL: known warning occurred during the five measured edits at lines [113]
-```
-
-That proves a warning during the five measured edits fails even when `.xcresult` still exposes only
-the same single coalesced issue. The temporary negative-control copies were removed and are not
-baseline artifacts.
-
-The `.xcresult` issue has no `sourceURL` in Debug and generically attributes
-`PerformanceTests/EditorFindProductionHostSupport.swift` in Release, so it proves warning
-presence but not the phase or origin of each console emission. Break-at-warning diagnosis localized the
-mount pair to the pre-F2 `MarkdownTextView.makeNSView` setup ordering: the coordinator becomes the
-text delegate and initial selection is assigned before the coordinator enters its update guard, so
-the selection callback writes the SwiftUI selection binding during view construction. Running the
-pre-existing hosted
-`AppBackedEditorPerformanceTests.testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget`
-without the F2 root receipt produces the same coalesced Runtime Warning family in
-`/private/tmp/f2-warning-appbacked.xcresult`, confirming that the family is not introduced by the
-receipt. That bundle does not retain a per-emission console log and is not used to prove the
-authoritative two-emission mount count; that count comes from each of the six retained F2 logs.
-
-The dense-prime warning localizes to the pre-F2 navigation path assigning the applied selection.
-In the probe, `primeProductionWorkspaceFind` returns before the begin marker and measured-edit loop,
-so this navigation warning is independently proven pre-measure by each raw log. The test-only root
-receipt is plain storage and publishes no SwiftUI state; it is not the warning source. The
-concurrently F8-owned `MarkdownTextView`, coordinator, and highlight files were not changed to
-eliminate these pre-existing warnings.
-
-This baseline is accepted only under that exact three-warning, pre-measure exception and is not
-warning-free UI evidence. Under the current checker, any signature/count change — including fewer
-warnings — or any warning at or after `BEGIN` fails the run. A relevant editor/F8/toolchain/OS
-change is not compared by that checker; it invalidates this baseline and requires a fresh six-run
-evidence set. If the production path is fixed, the checker and this exception must be deliberately
-replaced with a zero-warning contract before new evidence is accepted.
-
-### F8 boundary
-
-F8 remains deferred. Commit `c871ddf` has no production highlight-all apply/clear implementation,
-so this work records no highlight preservation, apply-latency, or clear-latency claim. The exact
-fixture, scenarios, full `WorkspaceWindow` host, and generation-stamped receipt are reusable after
-that production surface lands; no unmerged F8 behavior was optimized or manufactured here.
+Measured commit `c871ddf` has no production highlight-all apply/clear surface. The fixture,
+deterministic scenarios, production host, and generation-stamped receipt can be reused after F8
+lands, but no apply, clear, preservation, physical-input, screen-presentation, F9, or combined-tip
+evidence is claimed here.
 
 ## Typing Latency
 

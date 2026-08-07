@@ -1,0 +1,7 @@
+format=3
+wrapper_exit_status=0
+capture_exit_status=0
+run_timeout_seconds=180
+timed_out=0
+termination_failed=0
+runner_environment_policy=env-i-git-no-replace-home-lang-lc-all-path-tmpdir-user-logname

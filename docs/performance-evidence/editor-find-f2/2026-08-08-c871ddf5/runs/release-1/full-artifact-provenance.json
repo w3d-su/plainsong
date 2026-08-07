@@ -1,0 +1,65 @@
+{
+  "artifacts": {
+    "buildManifest": {
+      "artifactRootPath": "builds/release/build-manifest.txt",
+      "hashMode": "file-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/release-build/f2-editor-find-build-manifest.txt",
+      "sha256": "5ca8c353ad557267745566ec597ba5971b024afb2796237158b062e3fcdd6a8a"
+    },
+    "hostBundle": {
+      "artifactRootPath": "builds/release/Plainsong.app",
+      "hashMode": "artifact-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-final-six-v2.9p66Jp/release-1.products/Build/Products/Release/Plainsong.app",
+      "sha256": "636f6b4b26a22964250675b15b0dbca6b57d1ebb3d54289312c95a82b0b9487c"
+    },
+    "inspectionXcresult": {
+      "artifactRootPath": "runs/release-1/inspection.xcresult",
+      "hashMode": "artifact-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-final-six-v2.9p66Jp/release-1.inspection.xcresult",
+      "sha256": "0a1a5dc3f4e5d587677089461f07ada1a957182ef74c1135d0fd3145cab8409b"
+    },
+    "rawLog": {
+      "artifactRootPath": "runs/release-1/raw.log",
+      "hashMode": "file-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-final-six-v2.9p66Jp/release-1.log",
+      "sha256": "7b2320385c7f5293fe81f3b8a481c17a577d4a6739b44595867c23ce09aaa771"
+    },
+    "resolvedPackageInput": {
+      "artifactRootPath": "packages/resolved",
+      "hashMode": "resolved-package-input-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/release-build/SourcePackages",
+      "sha256": "ed48178719a6c72d2880d3972e900d3bbe51f180d13e01dffd452de936f779c3"
+    },
+    "sourceArchive": {
+      "artifactRootPath": "source/c871ddf.source.tar",
+      "hashMode": "file-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/release-build.source.tar",
+      "sha256": "f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506"
+    },
+    "sourceSnapshot": {
+      "artifactRootPath": "source/release.source",
+      "hashMode": "artifact-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/release-build.source",
+      "sha256": "3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6"
+    },
+    "xcresult": {
+      "artifactRootPath": "runs/release-1/raw.xcresult",
+      "hashMode": "artifact-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-final-six-v2.9p66Jp/release-1.xcresult",
+      "sha256": "8e4a78681a1ca1f0e6f214a137deeab5c2ae18ffbb01876f4fbd57b74cf2826f"
+    },
+    "xctestrun": {
+      "artifactRootPath": "builds/release/Plainsong_macosx27.0-arm64-x86_64.xctestrun",
+      "hashMode": "artifact-sha256",
+      "originalPath": "/private/tmp/plainsong-f2-final-six-v2.9p66Jp/release-1.products/Build/Products/Plainsong_macosx27.0-arm64-x86_64.xctestrun",
+      "sha256": "1eae5b26c52fa6f58146e487dce6d846216f653f541c3c2b41ed706a54ec0fc6"
+    }
+  },
+  "configuration": "Release",
+  "format": 1,
+  "retainedAtArtifactRoot": true,
+  "retainedInPack": false,
+  "runId": "release-1",
+  "sourceCommit": "c871ddf5c66c17f03fd9456b53f79411f9b2e979",
+  "verificationScope": "owner-local-full-artifact"
+}

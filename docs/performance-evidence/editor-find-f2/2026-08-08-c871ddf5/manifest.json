@@ -1,0 +1,292 @@
+{
+  "boundaries": {
+    "combinedTip": "open",
+    "f8HighlightApplyClear": "open",
+    "f9": "open",
+    "fullKeystrokeToScreen": "open",
+    "nativeEditAdmissionProxy": "pass",
+    "queryCompletionProxy": "pass",
+    "rootStateUpdateReceiptProxy": "pass",
+    "warningPhase": "audited"
+  },
+  "budgetsMilliseconds": {
+    "denseTruncatedQueryCompletion": 1100,
+    "nativeEditAdmission": 5,
+    "rootStateUpdateReceipt": 15,
+    "sparseQueryCompletion": 400,
+    "zeroQueryCompletion": 400
+  },
+  "builds": [
+    {
+      "configuration": "Debug",
+      "manifestPath": "builds/debug-build-manifest.txt",
+      "sha256": "fe374662a09ccb452ce55f0796740c96b66624483afe55aa53fcff2c8dfb3510"
+    },
+    {
+      "configuration": "Release",
+      "manifestPath": "builds/release-build-manifest.txt",
+      "sha256": "5ca8c353ad557267745566ec597ba5971b024afb2796237158b062e3fcdd6a8a"
+    }
+  ],
+  "environment": {
+    "architecture": "arm64",
+    "logicalCPUCount": 8,
+    "macOSBuild": "26A5388g",
+    "macOSSDKBuild": "26A5353p",
+    "macOSSDKPath": "/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk",
+    "macOSSDKVersion": "27.0",
+    "macOSVersion": "27.0",
+    "machineModel": "MacBookPro18,3",
+    "memoryBytes": 17179869184,
+    "physicalCPUCount": 8,
+    "recordedAt": "2026-08-07T19:35:36Z",
+    "selectedDeveloperDir": "/Applications/Xcode-beta.app/Contents/Developer",
+    "timeZone": "Asia/Taipei",
+    "xcodeBuild": "27A5194q",
+    "xcodeVersion": "27.0",
+    "xcodegenSHA256": "3b483413a801394b00adb2fabf3c06ff8f800c73c8698e1f9a9d8a95d73939ef",
+    "xcodegenVersion": "2.45.4",
+    "xcresulttoolPath": "/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcresulttool",
+    "xcresulttoolSHA256": "7aada4a60aad3de62bc7fbda7afd990e53d8335710d1a8792fd279d42491a5c9"
+  },
+  "fixture": {
+    "bytes": 1048962,
+    "expectations": {
+      "denseTruncated": {
+        "first": {
+          "length": 7,
+          "line": 15,
+          "location": 399
+        },
+        "last": {
+          "length": 7,
+          "line": 28901,
+          "location": 914752
+        },
+        "overflowOrdinal": 10001,
+        "query": "section",
+        "retained": 10000,
+        "truncated": true
+      },
+      "sparse": {
+        "first": {
+          "length": 24,
+          "line": 33140,
+          "location": 1048904
+        },
+        "last": {
+          "length": 24,
+          "line": 33140,
+          "location": 1048904
+        },
+        "query": "generated sections: 1274",
+        "retained": 1,
+        "truncated": false
+      },
+      "zero": {
+        "first": null,
+        "last": null,
+        "query": "plainsong-f2-zero-hit",
+        "retained": 0,
+        "truncated": false
+      }
+    },
+    "path": "Fixtures/large-1mb.md",
+    "sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247"
+  },
+  "format": 1,
+  "gate": "editor-find-f2-retained-evidence",
+  "runs": [
+    {
+      "configuration": "Debug",
+      "directory": "runs/debug-1",
+      "files": {
+        "competitionMonitor": "runs/debug-1/competition-monitor.log",
+        "competitionMonitorDigest": "runs/debug-1/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/debug-1/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/debug-1/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/debug-1/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/debug-1/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/debug-1/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/debug-1/full-artifact-provenance.json",
+        "outerLog": "runs/debug-1/outer.log",
+        "outerLogDigest": "runs/debug-1/outer.log.sha256",
+        "outerStatus": "runs/debug-1/outer.status.txt",
+        "postflight": "runs/debug-1/postflight.txt",
+        "postflightDigest": "runs/debug-1/postflight.txt.sha256",
+        "preflight": "runs/debug-1/preflight.txt",
+        "preflightDigest": "runs/debug-1/preflight.txt.sha256",
+        "rawLog": "runs/debug-1/raw.log",
+        "rawLogDigest": "runs/debug-1/raw.log.sha256",
+        "runOwnedProcesses": "runs/debug-1/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/debug-1/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/debug-1/summary-provenance.txt",
+        "warningCheck": "runs/debug-1/warning-check.txt",
+        "warningCheckDigest": "runs/debug-1/warning-check.txt.sha256",
+        "xcresultSummary": "runs/debug-1/xcresult-summary.json"
+      },
+      "id": "debug-1",
+      "ordinal": 1
+    },
+    {
+      "configuration": "Debug",
+      "directory": "runs/debug-2",
+      "files": {
+        "competitionMonitor": "runs/debug-2/competition-monitor.log",
+        "competitionMonitorDigest": "runs/debug-2/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/debug-2/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/debug-2/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/debug-2/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/debug-2/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/debug-2/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/debug-2/full-artifact-provenance.json",
+        "outerLog": "runs/debug-2/outer.log",
+        "outerLogDigest": "runs/debug-2/outer.log.sha256",
+        "outerStatus": "runs/debug-2/outer.status.txt",
+        "postflight": "runs/debug-2/postflight.txt",
+        "postflightDigest": "runs/debug-2/postflight.txt.sha256",
+        "preflight": "runs/debug-2/preflight.txt",
+        "preflightDigest": "runs/debug-2/preflight.txt.sha256",
+        "rawLog": "runs/debug-2/raw.log",
+        "rawLogDigest": "runs/debug-2/raw.log.sha256",
+        "runOwnedProcesses": "runs/debug-2/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/debug-2/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/debug-2/summary-provenance.txt",
+        "warningCheck": "runs/debug-2/warning-check.txt",
+        "warningCheckDigest": "runs/debug-2/warning-check.txt.sha256",
+        "xcresultSummary": "runs/debug-2/xcresult-summary.json"
+      },
+      "id": "debug-2",
+      "ordinal": 2
+    },
+    {
+      "configuration": "Debug",
+      "directory": "runs/debug-3",
+      "files": {
+        "competitionMonitor": "runs/debug-3/competition-monitor.log",
+        "competitionMonitorDigest": "runs/debug-3/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/debug-3/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/debug-3/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/debug-3/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/debug-3/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/debug-3/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/debug-3/full-artifact-provenance.json",
+        "outerLog": "runs/debug-3/outer.log",
+        "outerLogDigest": "runs/debug-3/outer.log.sha256",
+        "outerStatus": "runs/debug-3/outer.status.txt",
+        "postflight": "runs/debug-3/postflight.txt",
+        "postflightDigest": "runs/debug-3/postflight.txt.sha256",
+        "preflight": "runs/debug-3/preflight.txt",
+        "preflightDigest": "runs/debug-3/preflight.txt.sha256",
+        "rawLog": "runs/debug-3/raw.log",
+        "rawLogDigest": "runs/debug-3/raw.log.sha256",
+        "runOwnedProcesses": "runs/debug-3/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/debug-3/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/debug-3/summary-provenance.txt",
+        "warningCheck": "runs/debug-3/warning-check.txt",
+        "warningCheckDigest": "runs/debug-3/warning-check.txt.sha256",
+        "xcresultSummary": "runs/debug-3/xcresult-summary.json"
+      },
+      "id": "debug-3",
+      "ordinal": 3
+    },
+    {
+      "configuration": "Release",
+      "directory": "runs/release-1",
+      "files": {
+        "competitionMonitor": "runs/release-1/competition-monitor.log",
+        "competitionMonitorDigest": "runs/release-1/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/release-1/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/release-1/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/release-1/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/release-1/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/release-1/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/release-1/full-artifact-provenance.json",
+        "outerLog": "runs/release-1/outer.log",
+        "outerLogDigest": "runs/release-1/outer.log.sha256",
+        "outerStatus": "runs/release-1/outer.status.txt",
+        "postflight": "runs/release-1/postflight.txt",
+        "postflightDigest": "runs/release-1/postflight.txt.sha256",
+        "preflight": "runs/release-1/preflight.txt",
+        "preflightDigest": "runs/release-1/preflight.txt.sha256",
+        "rawLog": "runs/release-1/raw.log",
+        "rawLogDigest": "runs/release-1/raw.log.sha256",
+        "runOwnedProcesses": "runs/release-1/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/release-1/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/release-1/summary-provenance.txt",
+        "warningCheck": "runs/release-1/warning-check.txt",
+        "warningCheckDigest": "runs/release-1/warning-check.txt.sha256",
+        "xcresultSummary": "runs/release-1/xcresult-summary.json"
+      },
+      "id": "release-1",
+      "ordinal": 1
+    },
+    {
+      "configuration": "Release",
+      "directory": "runs/release-2",
+      "files": {
+        "competitionMonitor": "runs/release-2/competition-monitor.log",
+        "competitionMonitorDigest": "runs/release-2/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/release-2/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/release-2/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/release-2/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/release-2/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/release-2/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/release-2/full-artifact-provenance.json",
+        "outerLog": "runs/release-2/outer.log",
+        "outerLogDigest": "runs/release-2/outer.log.sha256",
+        "outerStatus": "runs/release-2/outer.status.txt",
+        "postflight": "runs/release-2/postflight.txt",
+        "postflightDigest": "runs/release-2/postflight.txt.sha256",
+        "preflight": "runs/release-2/preflight.txt",
+        "preflightDigest": "runs/release-2/preflight.txt.sha256",
+        "rawLog": "runs/release-2/raw.log",
+        "rawLogDigest": "runs/release-2/raw.log.sha256",
+        "runOwnedProcesses": "runs/release-2/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/release-2/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/release-2/summary-provenance.txt",
+        "warningCheck": "runs/release-2/warning-check.txt",
+        "warningCheckDigest": "runs/release-2/warning-check.txt.sha256",
+        "xcresultSummary": "runs/release-2/xcresult-summary.json"
+      },
+      "id": "release-2",
+      "ordinal": 2
+    },
+    {
+      "configuration": "Release",
+      "directory": "runs/release-3",
+      "files": {
+        "competitionMonitor": "runs/release-3/competition-monitor.log",
+        "competitionMonitorDigest": "runs/release-3/competition-monitor.log.sha256",
+        "competitionMonitorSamples": "runs/release-3/competition-monitor.samples.txt",
+        "competitionMonitorSamplesDigest": "runs/release-3/competition-monitor.samples.txt.sha256",
+        "competitionMonitorStatus": "runs/release-3/competition-monitor.status.txt",
+        "competitionMonitorStatusDigest": "runs/release-3/competition-monitor.status.txt.sha256",
+        "evidenceManifest": "runs/release-3/evidence-manifest.txt",
+        "fullArtifactProvenance": "runs/release-3/full-artifact-provenance.json",
+        "outerLog": "runs/release-3/outer.log",
+        "outerLogDigest": "runs/release-3/outer.log.sha256",
+        "outerStatus": "runs/release-3/outer.status.txt",
+        "postflight": "runs/release-3/postflight.txt",
+        "postflightDigest": "runs/release-3/postflight.txt.sha256",
+        "preflight": "runs/release-3/preflight.txt",
+        "preflightDigest": "runs/release-3/preflight.txt.sha256",
+        "rawLog": "runs/release-3/raw.log",
+        "rawLogDigest": "runs/release-3/raw.log.sha256",
+        "runOwnedProcesses": "runs/release-3/run-owned-processes.log",
+        "runOwnedProcessesDigest": "runs/release-3/run-owned-processes.log.sha256",
+        "summaryProvenance": "runs/release-3/summary-provenance.txt",
+        "warningCheck": "runs/release-3/warning-check.txt",
+        "warningCheckDigest": "runs/release-3/warning-check.txt.sha256",
+        "xcresultSummary": "runs/release-3/xcresult-summary.json"
+      },
+      "id": "release-3",
+      "ordinal": 3
+    }
+  ],
+  "sourceCommit": "c871ddf5c66c17f03fd9456b53f79411f9b2e979",
+  "warningChecker": {
+    "path": "reference/check-editor-find-f2-warning-phase.py",
+    "sha256": "385e83e5f0f30192ee9ff3f429fe342b5e7a52dabd5b784b3b998a0800956aac"
+  }
+}

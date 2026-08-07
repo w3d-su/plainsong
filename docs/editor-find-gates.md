@@ -7,8 +7,9 @@
 > identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
 > production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
 > navigation ID domain is wired via App `navigationIDProvider`. **F2 structural work and the
-> named proxy budgets are closed, but the full §12 keystroke-to-screen criterion remains
-> open; F8 and F9 also remain open follow-ups.** Precedent: PR #45, link-folding,
+> named proxy checks have frozen budgets, but F2 remains open overall: its complete artifacts
+> exist only in owner-local storage, and the full §12 keystroke-to-screen criterion is also
+> unproven. F8 and F9 remain open follow-ups.** Precedent: PR #45, link-folding,
 > image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
@@ -332,7 +333,7 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
 | **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
 | **C** (merged as #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
-| **D** (split follow-ups) | F2 query-completion and production-hosted state-receipt proxies have frozen budgets. Remaining scope includes the full keystroke-to-screen criterion, XCUITest (F9, including truncated counter state and `⌘F` re-focus), and any later highlight-all implementation/F8 evidence. | **Closes the named F2 proxy budgets only. Full screen latency, F8, and F9 remain open.** |
+| **D** (split follow-ups) | F2 query-completion and production-hosted state-receipt proxies have frozen budgets. Remaining scope includes durable evidence retention, the full keystroke-to-screen criterion, XCUITest (F9, including truncated counter state and `⌘F` re-focus), and any later highlight-all implementation/F8 evidence. | **Freezes the named F2 proxy budgets only. F2 overall, full screen latency, F8, and F9 remain open.** |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
 and `git diff --check`. PR body must list which F-gates it closes and which remain
@@ -445,11 +446,17 @@ interruption of in-flight engine work.
   This receipt does not require or prove child-layout completion, though layout used to
   drive the SwiftUI update can occur before it; it excludes compositor presentation and
   physical keyboard delivery.
+- [ ] The complete six-run evidence is retained independently of this owner's Mac. The
+  committed compact pack deliberately audits as `PARTIAL/OPEN`; the omitted 1.2 GiB source,
+  build, product, and result bundles currently pass the full checker from a read-only
+  owner-local Documents root, but have no authorized off-machine replica. Loss of that root
+  invalidates the baseline and requires six fresh runs, so F2 remains open overall.
+  Evidence and exact audit commands: `docs/perf-log.md`.
 - [ ] Full agent.md §12 &lt;16 ms **keystroke-to-screen** latency with find open is proven
   end-to-end. The current harness begins at programmatic `insertText` and stops at root
   update-transaction entry, so it cannot close this criterion. The retained raw samples
   also expose a real one-off synchronous O(n) preview-scroll line-index rebuild
-  (Debug admission up to 25.264 ms; Release up to 14.444 ms), which is separate production
+  (Debug admission up to 15.974 ms; Release up to 14.057 ms), which is separate production
   performance debt rather than find matching. Physical-input, child-layout/compositor, and
   that cold rebuild must be resolved or explicitly covered before checking this box.
 
@@ -699,14 +706,16 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
 
 **F2 result:** source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979` passed three
-Debug and three Release runs. Frozen query-completion budgets are &lt;400 ms zero,
-&lt;400 ms sparse, and &lt;1,100 ms dense-truncated. The production-hosted five-edit median
-budgets are &lt;5 ms for synchronous admission and &lt;15 ms for root state-update receipt.
-The complete command/environment record, exact fixture identity/endpoints, raw samples,
-sealed source/package/artifact hashes, warning-phase negative control, outlier diagnosis, and
-narrow warning exception are in `docs/perf-log.md`. These results
-close only the named F2 proxy contracts; the full &lt;16 ms keystroke-to-screen criterion,
-F8, and F9 remain open.
+replacement Debug and three replacement Release runs. The Debug medians of run medians are
+235.082 / 254.619 / 591.634 ms for zero/sparse/dense query completion, 1.091 ms for native-edit
+admission, and 3.825 ms for root state-update receipt; the frozen budgets remain &lt;400 / &lt;400 /
+&lt;1,100 / &lt;5 / &lt;15 ms. The complete command/environment record, exact fixture
+identity/endpoints, every raw sample, source/package/artifact hashes, warning-phase negative
+control, accepted-run process screens, and narrow warning exception are in
+`docs/perf-log.md`. The committed compact pack is intentionally insufficient by itself, while
+the full owner-local artifact root currently audits successfully. These results satisfy only the
+named proxy checks: durable independent retention, the full &lt;16 ms keystroke-to-screen
+criterion, F8, and F9 remain open.
 
 ## 10. Non-goals for this gate set
 
