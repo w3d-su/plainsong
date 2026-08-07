@@ -856,10 +856,11 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   `EditorNavigation*` tests cover exact install/selection/scroll/focus and monotonic replay.
   `WorkspaceSearchAcceptanceTests` and `WorkspaceSearchPerformanceTests` provide the matrix's
   UI and performance suites. The 2026-08-08 audit freshly passed MarkdownCore (164 tests),
-  WorkspaceKit (283 tests), and the EditorKit `EditorNavigation` slice (22 tests). A subsequent
-  full `make test` reached 600 passed and 1 skipped Xcode tests, but remained red because
-  `PlainsongUITests-Runner` could not initialize while system authentication was active. This
-  checkbox records suite presence and named coverage, not a fresh current-tip full-suite pass.
+  WorkspaceKit (283 tests), and the EditorKit `EditorNavigation` slice (22 tests). Two subsequent
+  full `make test` attempts remained red: both hit the system-authentication UI-runner
+  initialization error, and the serialized retry also measured the 1 MiB Markdown visible-range
+  highlight at 51.506 ms against its 50 ms budget. This checkbox records suite presence and named
+  coverage, not a fresh current-tip full-suite pass.
 - [x] Add a minimal XCUITest target for the actual sidebar shortcut/search/open/reveal
   flow, using a deterministic Debug-only fixture inside the app container rather than
   automating `NSOpenPanel`. Evidence: `PlainsongUITests` launches the real app with a unique,
@@ -1009,11 +1010,15 @@ below is checked only when one same-repository production path plus a directly r
 test support it without composing two partial workflows.
 
 - [ ] `make lint`, `make test`, and `make build` pass.
-  On 2026-08-08, fresh `make lint` and `make build` passed. The package slice above is green,
-  and `make test` recorded 600 passed plus 1 skipped Xcode tests, including 23/23 performance
-  tests, but the command exited 65 because `PlainsongUITests-Runner` failed to initialize while
-  system authentication was active (`Authentication canceled`). Rerun the exact-tip full test
-  command without that runner-level interruption before checking this gate.
+  On 2026-08-08, fresh `make lint` and `make build` passed. The package slice above is green.
+  The first `make test` recorded 600 passed plus 1 skipped Xcode tests, including 23/23
+  performance tests, but exited 65 because `PlainsongUITests-Runner` failed to initialize while
+  system authentication was active (`Authentication canceled`). A serialized retry recorded
+  599 passed plus 1 skipped; the UI runner hit the same initialization error, and
+  `testVisibleRangeHighlightUpdateAfterEditStaysUnderBudgetForLargeMarkdownAndMDX` failed its
+  Markdown measurement at 51.506 ms versus the 50 ms budget. Workspace Search performance was
+  14/14 green in both attempts. Rerun the exact-tip full command without either failure before
+  checking this gate.
 - [ ] No functional acceptance item depends on a manual-only checklist.
   Physical ⇧⌘F has owner smoke evidence, but the automated XCUITest remains synthetic and the
   hosted gate injects AppKit events. Keep this open until the physical-input requirement has a
