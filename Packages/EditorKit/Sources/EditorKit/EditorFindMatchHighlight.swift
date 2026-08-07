@@ -37,6 +37,10 @@ public struct EditorFindMatchHighlightRequest: Equatable, Sendable {
 final class EditorFindMatchHighlightMarker: NSObject {
     static let attribute = NSAttributedString.Key("app.plainsong.editorFind.matchHighlight")
 
+    // Keep NSObject's identity equality. Adjacent matches can have the same role/generation but
+    // distinct covered backgrounds; semantic equality lets NSTextStorage merge those runs and
+    // discard one marker's restoration metadata.
+
     enum Role: Equatable {
         /// The match the user is currently on.
         case current
@@ -61,18 +65,6 @@ final class EditorFindMatchHighlightMarker: NSObject {
         self.role = role
         self.generation = generation
         self.coveredBackgrounds = coveredBackgrounds
-    }
-
-    override func isEqual(_ object: Any?) -> Bool {
-        guard let other = object as? EditorFindMatchHighlightMarker else { return false }
-        return role == other.role && generation == other.generation
-    }
-
-    override var hash: Int {
-        var hasher = Hasher()
-        hasher.combine(generation)
-        hasher.combine(role == .current)
-        return hasher.finalize()
     }
 }
 
