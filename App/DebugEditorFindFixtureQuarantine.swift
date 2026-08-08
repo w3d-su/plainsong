@@ -7,6 +7,7 @@
         case didQuarantine(source: URL, destination: URL)
         case willRemoveQuarantine(URL)
         case didValidateQuarantineForRemoval(URL)
+        case didUnlinkWorkspaceOwnershipMarker(URL)
         case didInspectOrphanLease(URL)
         case willQuarantineLease(source: URL, destination: URL)
         case didRenameLeaseQuarantine(source: URL, destination: URL)

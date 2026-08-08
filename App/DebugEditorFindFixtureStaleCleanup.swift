@@ -208,7 +208,8 @@
                 } else {
                     try stale.workspaceHandle.removeAnchored(
                         at: quarantineURL,
-                        rootHandle: rootHandle
+                        rootHandle: rootHandle,
+                        cleanupBoundaryHandler: cleanupBoundaryHandler
                     )
                 }
                 guard try entryMode(at: quarantineURL) == nil else {
@@ -216,11 +217,12 @@
                 }
                 try stale.workspaceHandle.verifyRemoved()
             } catch {
-                guard try entryMode(at: quarantineURL) == nil,
-                      (try? stale.workspaceHandle.verifyRemoved()) != nil
-                else {
-                    throw error
-                }
+                try reconcileStaleWorkspaceRemovalAfterFailure(
+                    error,
+                    quarantineURL: quarantineURL,
+                    stale: stale,
+                    rootHandle: rootHandle
+                )
             }
             guard try stale.lease.linkCount() == 1 else {
                 throw FixtureError.fixtureRemovalDidNotComplete
@@ -228,6 +230,35 @@
             try stale.lease.unlinkPathIfStillOwned(
                 cleanupBoundaryHandler: cleanupBoundaryHandler
             )
+        }
+
+        private static func reconcileStaleWorkspaceRemovalAfterFailure(
+            _ originalError: Error,
+            quarantineURL: URL,
+            stale: StaleCandidate,
+            rootHandle: DebugEditorFindFixtureRootHandle
+        ) throws {
+            if try entryMode(at: quarantineURL) != nil,
+               (try? stale.workspaceHandle
+                   .canResumeAfterOwnershipMarkerUnlink(
+                       at: quarantineURL
+                   )) == true
+            {
+                try stale.workspaceHandle.removeAnchored(
+                    at: quarantineURL,
+                    rootHandle: rootHandle
+                )
+                guard try entryMode(at: quarantineURL) == nil else {
+                    throw FixtureError.fixtureRemovalDidNotComplete
+                }
+                try stale.workspaceHandle.verifyRemoved()
+                return
+            }
+            guard try entryMode(at: quarantineURL) == nil,
+                  (try? stale.workspaceHandle.verifyRemoved()) != nil
+            else {
+                throw originalError
+            }
         }
 
         private static func removeOrphanedStaleLeases(

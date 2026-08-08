@@ -397,14 +397,16 @@
                     rootHandle: rootHandle,
                     cleanupBoundaryHandler: cleanupBoundaryHandler
                 )
-                try fixture.workspaceHandle.validatePath(
+                try validateWorkspacePathForCleanup(
+                    fixture,
                     at: quarantineURL
                 )
                 try cleanupBoundaryHandler?(
                     .willRemoveQuarantine(quarantineURL)
                 )
                 try rootHandle.validatePath()
-                try fixture.workspaceHandle.validatePath(
+                try validateWorkspacePathForCleanup(
+                    fixture,
                     at: quarantineURL
                 )
                 try cleanupBoundaryHandler?(
@@ -418,7 +420,9 @@
                         at: quarantineURL,
                         rootHandle: rootHandle,
                         afterRemovingChild:
-                        afterRemovingWorkspaceChild
+                        afterRemovingWorkspaceChild,
+                        cleanupBoundaryHandler:
+                        cleanupBoundaryHandler
                     )
                 }
                 guard try entryMode(at: quarantineURL) == nil else {
@@ -443,7 +447,10 @@
         ) throws -> URL {
             if let quarantineURL = fixture.quarantineURL {
                 if try entryMode(at: quarantineURL) != nil {
-                    try fixture.workspaceHandle.validatePath(at: quarantineURL)
+                    try validateWorkspacePathForCleanup(
+                        fixture,
+                        at: quarantineURL
+                    )
                     return quarantineURL
                 }
                 fixture.quarantineURL = nil
@@ -489,6 +496,19 @@
                 at: quarantineURL
             )
             return quarantineURL
+        }
+
+        private static func validateWorkspacePathForCleanup(
+            _ fixture: CreatedFixture,
+            at workspaceURL: URL
+        ) throws {
+            if fixture.workspaceRemovalAttemptStarted {
+                try fixture.workspaceHandle.validatePathForRemovalRetry(
+                    at: workspaceURL
+                )
+            } else {
+                try fixture.workspaceHandle.validatePath(at: workspaceURL)
+            }
         }
     }
 

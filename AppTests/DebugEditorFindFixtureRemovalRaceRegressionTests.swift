@@ -6,6 +6,7 @@
         case afterMarkerReplacement
         case afterKnownChildRemoval
         case afterLeaseQuarantine
+        case afterOwnershipMarkerUnlink
     }
 
     final class DebugEditorFindFixtureRemovalRetryTests: XCTestCase {
@@ -143,6 +144,288 @@
                         in: locations.root
                     ).path
                 )
+            )
+        }
+
+        func testLiveCleanupRetriesAfterOwnershipMarkerUnlink() throws {
+            let fileManager = FileManager.default
+            let locations = try makeRemovalRaceLocations(
+                prefix: "MarkerUnlinkRetry"
+            )
+            defer { try? fileManager.removeItem(at: locations.container) }
+            let fixture = try DebugEditorFindFixture.create(
+                identifier: "f9-marker-unlink-retry-\(UUID().uuidString)",
+                fileManager: fileManager,
+                fixturesRootOverride: locations.root
+            )
+            let workspaceStatus = try XCTUnwrap(
+                DebugEditorFindFixture.entryStatus(at: fixture.workspaceURL)
+            )
+            let workspaceIdentity = DebugEditorFindFixture.identity(
+                of: workspaceStatus
+            )
+            let leaseURL = DebugEditorFindFixture.ownershipLeaseURL(
+                for: fixture.identifier,
+                in: locations.root
+            )
+            let rootSentinel = locations.root.appendingPathComponent(
+                "root-sentinel"
+            )
+            try Data("root-sentinel".utf8).write(to: rootSentinel)
+            var quarantineURL: URL?
+            var markerURL: URL?
+            var markerUnlinkCount = 0
+            let replacementSentinel = fixture.workspaceURL
+                .appendingPathComponent("replacement-sentinel")
+
+            XCTAssertThrowsError(
+                try fixture.remove(
+                    fileManager: fileManager,
+                    cleanupBoundaryHandler: { boundary in
+                        switch boundary {
+                        case let .didQuarantine(_, destination):
+                            quarantineURL = destination
+                        case let .didUnlinkWorkspaceOwnershipMarker(marker):
+                            markerUnlinkCount += 1
+                            markerURL = marker
+                            XCTAssertFalse(
+                                fileManager.fileExists(atPath: marker.path)
+                            )
+                            let quarantine = try XCTUnwrap(quarantineURL)
+                            XCTAssertEqual(
+                                marker.deletingLastPathComponent(),
+                                quarantine
+                            )
+                            let quarantineStatus = try XCTUnwrap(
+                                DebugEditorFindFixture.entryStatus(
+                                    at: quarantine
+                                )
+                            )
+                            XCTAssertEqual(
+                                DebugEditorFindFixture.identity(
+                                    of: quarantineStatus
+                                ),
+                                workspaceIdentity
+                            )
+                            try fileManager.createDirectory(
+                                at: fixture.workspaceURL,
+                                withIntermediateDirectories: false
+                            )
+                            try Data("replacement".utf8).write(
+                                to: replacementSentinel
+                            )
+                            throw EditorFindRemovalRaceTestError
+                                .afterOwnershipMarkerUnlink
+                        default:
+                            break
+                        }
+                    }
+                )
+            ) { error in
+                guard case EditorFindRemovalRaceTestError
+                    .afterOwnershipMarkerUnlink = error
+                else { return XCTFail("Unexpected error: \(error)") }
+            }
+
+            let quarantine = try XCTUnwrap(quarantineURL)
+            let marker = try XCTUnwrap(markerURL)
+            XCTAssertEqual(markerUnlinkCount, 1)
+            XCTAssertTrue(fileManager.fileExists(atPath: quarantine.path))
+            XCTAssertFalse(fileManager.fileExists(atPath: marker.path))
+            XCTAssertTrue(fileManager.fileExists(atPath: leaseURL.path))
+            XCTAssertEqual(
+                try String(contentsOf: replacementSentinel, encoding: .utf8),
+                "replacement"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: rootSentinel, encoding: .utf8),
+                "root-sentinel"
+            )
+
+            try fixture.remove(
+                fileManager: fileManager,
+                cleanupBoundaryHandler: { boundary in
+                    guard case .didUnlinkWorkspaceOwnershipMarker = boundary
+                    else { return }
+                    XCTFail("A reconciled marker unlink must not be repeated")
+                }
+            )
+            try fixture.remove(fileManager: fileManager)
+
+            XCTAssertEqual(markerUnlinkCount, 1)
+            XCTAssertFalse(fileManager.fileExists(atPath: quarantine.path))
+            XCTAssertFalse(fileManager.fileExists(atPath: leaseURL.path))
+            XCTAssertEqual(
+                try String(contentsOf: replacementSentinel, encoding: .utf8),
+                "replacement"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: rootSentinel, encoding: .utf8),
+                "root-sentinel"
+            )
+        }
+    }
+
+    final class DebugEditorFindFixtureStaleMarkerRetryTests: XCTestCase {
+        func testStaleSweepRetriesAfterOwnershipMarkerUnlinkInSameInvocation() throws {
+            let fileManager = FileManager.default
+            let locations = try makeRemovalRaceLocations(
+                prefix: "StaleMarkerUnlinkRetry"
+            )
+            defer { try? fileManager.removeItem(at: locations.container) }
+            let identifier = "f9-stale-marker-retry-\(UUID().uuidString)"
+            var fixture: DebugEditorFindFixture.CreatedFixture? =
+                try DebugEditorFindFixture.create(
+                    identifier: identifier,
+                    fileManager: fileManager,
+                    fixturesRootOverride: locations.root
+                )
+            let workspaceURL = try XCTUnwrap(fixture?.workspaceURL)
+            let leaseURL = DebugEditorFindFixture.ownershipLeaseURL(
+                for: identifier,
+                in: locations.root
+            )
+            let rootSentinel = locations.root.appendingPathComponent(
+                "root-sentinel"
+            )
+            try Data("root-sentinel".utf8).write(to: rootSentinel)
+            let now = Date()
+            try makeRemovalRaceEntryExpired(workspaceURL, relativeTo: now)
+            fixture = nil
+            let replacementSentinel = workspaceURL.appendingPathComponent(
+                "replacement-sentinel"
+            )
+            var quarantineURL: URL?
+            var markerURL: URL?
+            var markerUnlinkCount = 0
+
+            try DebugEditorFindFixture.removeStaleFixtures(
+                in: locations.root,
+                excluding: "f9-current-\(UUID().uuidString)",
+                fileManager: fileManager,
+                now: now,
+                cleanupBoundaryHandler: { boundary in
+                    switch boundary {
+                    case let .didQuarantine(_, destination):
+                        quarantineURL = destination
+                    case let .didUnlinkWorkspaceOwnershipMarker(marker):
+                        markerUnlinkCount += 1
+                        markerURL = marker
+                        XCTAssertFalse(
+                            fileManager.fileExists(atPath: marker.path)
+                        )
+                        try fileManager.createDirectory(
+                            at: workspaceURL,
+                            withIntermediateDirectories: false
+                        )
+                        try Data("replacement".utf8).write(
+                            to: replacementSentinel
+                        )
+                        throw EditorFindRemovalRaceTestError
+                            .afterOwnershipMarkerUnlink
+                    default:
+                        break
+                    }
+                }
+            )
+
+            let quarantine = try XCTUnwrap(quarantineURL)
+            let marker = try XCTUnwrap(markerURL)
+            XCTAssertEqual(markerUnlinkCount, 1)
+            XCTAssertFalse(fileManager.fileExists(atPath: quarantine.path))
+            XCTAssertFalse(fileManager.fileExists(atPath: marker.path))
+            XCTAssertFalse(fileManager.fileExists(atPath: leaseURL.path))
+            XCTAssertEqual(
+                try String(contentsOf: replacementSentinel, encoding: .utf8),
+                "replacement"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: rootSentinel, encoding: .utf8),
+                "root-sentinel"
+            )
+        }
+
+        func testLaterStaleSweepPreservesPostUnlinkMarkerReplacement() throws {
+            let fileManager = FileManager.default
+            let locations = try makeRemovalRaceLocations(
+                prefix: "StaleMarkerReplacement"
+            )
+            defer { try? fileManager.removeItem(at: locations.container) }
+            let identifier = "f9-stale-marker-replacement-\(UUID().uuidString)"
+            var fixture: DebugEditorFindFixture.CreatedFixture? =
+                try DebugEditorFindFixture.create(
+                    identifier: identifier,
+                    fileManager: fileManager,
+                    fixturesRootOverride: locations.root
+                )
+            let workspaceURL = try XCTUnwrap(fixture?.workspaceURL)
+            let leaseURL = DebugEditorFindFixture.ownershipLeaseURL(
+                for: identifier,
+                in: locations.root
+            )
+            let rootSentinel = locations.root.appendingPathComponent(
+                "root-sentinel"
+            )
+            try Data("root-sentinel".utf8).write(to: rootSentinel)
+            let now = Date()
+            try makeRemovalRaceEntryExpired(workspaceURL, relativeTo: now)
+            fixture = nil
+            var quarantineURL: URL?
+            var replacementMarkerURL: URL?
+
+            XCTAssertThrowsError(
+                try DebugEditorFindFixture.removeStaleFixtures(
+                    in: locations.root,
+                    excluding: "f9-current-\(UUID().uuidString)",
+                    fileManager: fileManager,
+                    now: now,
+                    cleanupBoundaryHandler: { boundary in
+                        switch boundary {
+                        case let .didQuarantine(_, destination):
+                            quarantineURL = destination
+                        case let .didUnlinkWorkspaceOwnershipMarker(marker):
+                            try Data("replacement-marker".utf8).write(
+                                to: marker
+                            )
+                            replacementMarkerURL = marker
+                            throw EditorFindRemovalRaceTestError
+                                .afterOwnershipMarkerUnlink
+                        default:
+                            break
+                        }
+                    }
+                )
+            ) { error in
+                guard case EditorFindRemovalRaceTestError
+                    .afterOwnershipMarkerUnlink = error
+                else { return XCTFail("Unexpected error: \(error)") }
+            }
+
+            let quarantine = try XCTUnwrap(quarantineURL)
+            let marker = try XCTUnwrap(replacementMarkerURL)
+            XCTAssertTrue(fileManager.fileExists(atPath: quarantine.path))
+            XCTAssertTrue(fileManager.fileExists(atPath: leaseURL.path))
+            XCTAssertEqual(
+                try String(contentsOf: marker, encoding: .utf8),
+                "replacement-marker"
+            )
+
+            try DebugEditorFindFixture.removeStaleFixtures(
+                in: locations.root,
+                excluding: "f9-current-\(UUID().uuidString)",
+                fileManager: fileManager,
+                now: now
+            )
+
+            XCTAssertTrue(fileManager.fileExists(atPath: quarantine.path))
+            XCTAssertTrue(fileManager.fileExists(atPath: leaseURL.path))
+            XCTAssertEqual(
+                try String(contentsOf: marker, encoding: .utf8),
+                "replacement-marker"
+            )
+            XCTAssertEqual(
+                try String(contentsOf: rootSentinel, encoding: .utf8),
+                "root-sentinel"
             )
         }
     }

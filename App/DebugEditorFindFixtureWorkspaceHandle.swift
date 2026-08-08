@@ -10,12 +10,25 @@
     /// evidence that deletion reached the captured workspace; descriptor-tracked path absence
     /// supplies the complementary directory-name postcondition.
     final class DebugEditorFindFixtureWorkspaceHandle {
+        private enum OwnershipMarkerRemovalState {
+            case notAttempted
+            case attempted
+            case verifiedUnlinked
+        }
+
+        private enum OwnershipMarkerLinkState {
+            case linked
+            case unlinked
+        }
+
         private let descriptor: Int32
         private let ownershipMarkerDescriptor: Int32
         private let ownershipMarkerName: String
         private let workspaceURL: URL
         private let workspaceIdentity: DebugEditorFindFixture.EntryIdentity
         private let ownershipMarkerIdentity: DebugEditorFindFixture.EntryIdentity
+        private var ownershipMarkerRemovalState:
+            OwnershipMarkerRemovalState = .notAttempted
 
         private init(
             descriptor: Int32,
@@ -169,6 +182,37 @@
             at currentWorkspaceURL: URL? = nil
         ) throws {
             let currentWorkspaceURL = currentWorkspaceURL ?? workspaceURL
+            try validateWorkspacePath(at: currentWorkspaceURL)
+            guard try ownershipMarkerLinkCount() == 1 else {
+                throw DebugEditorFindFixture.FixtureError
+                    .unsafeCreatedFixture
+            }
+            try validateOwnershipMarkerPath()
+        }
+
+        /// Allows only this retained handle to reconcile an ownership-marker unlink that it
+        /// recorded before issuing the syscall. A missing marker without that attempt, or any
+        /// replacement at the marker name, remains an unsafe fixture.
+        func validatePathForRemovalRetry(
+            at currentWorkspaceURL: URL
+        ) throws {
+            try validateWorkspacePath(at: currentWorkspaceURL)
+            _ = try reconcileOwnershipMarkerRemoval()
+        }
+
+        func canResumeAfterOwnershipMarkerUnlink(
+            at currentWorkspaceURL: URL
+        ) throws -> Bool {
+            guard ownershipMarkerRemovalState != .notAttempted else {
+                return false
+            }
+            try validateWorkspacePath(at: currentWorkspaceURL)
+            return try reconcileOwnershipMarkerRemoval() == .unlinked
+        }
+
+        private func validateWorkspacePath(
+            at currentWorkspaceURL: URL
+        ) throws {
             let descriptorIdentity = try Self.descriptorIdentity(descriptor)
             guard descriptorIdentity == workspaceIdentity,
                   let pathStatus = try DebugEditorFindFixture.entryStatus(
@@ -184,11 +228,6 @@
                 throw DebugEditorFindFixture.FixtureError
                     .unsafeCreatedFixture
             }
-            guard try ownershipMarkerLinkCount() == 1 else {
-                throw DebugEditorFindFixture.FixtureError
-                    .unsafeCreatedFixture
-            }
-            try validateOwnershipMarkerPath()
         }
 
         /// Removes children through the retained exact directory descriptor, then performs only
@@ -197,19 +236,23 @@
         func removeAnchored(
             at workspaceURL: URL,
             rootHandle: DebugEditorFindFixtureRootHandle,
-            afterRemovingChild: ((String) throws -> Void)? = nil
+            afterRemovingChild: ((String) throws -> Void)? = nil,
+            cleanupBoundaryHandler:
+            EditorFindFixtureCleanupHandler? = nil
         ) throws {
-            try Self.removeContents(
-                of: descriptor,
-                excluding: [ownershipMarkerName],
-                afterRemovingChild: afterRemovingChild
-            )
-            try validateOwnershipMarkerPath()
-            try Self.removeChild(
-                named: ownershipMarkerName,
-                from: descriptor,
-                expectedIdentity: ownershipMarkerIdentity
-            )
+            try validateWorkspacePath(at: workspaceURL)
+            let markerState = try reconcileOwnershipMarkerRemoval()
+            if markerState == .linked {
+                try Self.removeContents(
+                    of: descriptor,
+                    excluding: [ownershipMarkerName],
+                    afterRemovingChild: afterRemovingChild
+                )
+                try removeOwnershipMarker(
+                    at: workspaceURL,
+                    cleanupBoundaryHandler: cleanupBoundaryHandler
+                )
+            }
             guard try Self.childNames(of: descriptor).isEmpty,
                   fsync(descriptor) == 0
             else {
@@ -487,6 +530,86 @@
                 throw DebugEditorFindFixture.FixtureError
                     .unsafeCreatedFixture
             }
+        }
+
+        private func removeOwnershipMarker(
+            at currentWorkspaceURL: URL,
+            cleanupBoundaryHandler: EditorFindFixtureCleanupHandler?
+        ) throws {
+            guard try reconcileOwnershipMarkerRemoval() == .linked else {
+                return
+            }
+            ownershipMarkerRemovalState = .attempted
+            do {
+                try Self.removeChild(
+                    named: ownershipMarkerName,
+                    from: descriptor,
+                    expectedIdentity: ownershipMarkerIdentity
+                )
+                _ = try reconcileOwnershipMarkerRemoval()
+            } catch {
+                _ = try reconcileOwnershipMarkerRemoval()
+                throw error
+            }
+            try cleanupBoundaryHandler?(
+                .didUnlinkWorkspaceOwnershipMarker(
+                    currentWorkspaceURL.appendingPathComponent(
+                        ownershipMarkerName,
+                        isDirectory: false
+                    )
+                )
+            )
+        }
+
+        private func reconcileOwnershipMarkerRemoval()
+            throws -> OwnershipMarkerLinkState
+        {
+            let linkCount = try ownershipMarkerLinkCount()
+            if ownershipMarkerRemovalState == .notAttempted {
+                guard linkCount == 1 else {
+                    throw DebugEditorFindFixture.FixtureError
+                        .unsafeCreatedFixture
+                }
+                try validateOwnershipMarkerPath()
+                return .linked
+            }
+            if linkCount == 0 {
+                guard try ownershipMarkerPathIsAbsent() else {
+                    throw DebugEditorFindFixture.FixtureError
+                        .unsafeCreatedFixture
+                }
+                ownershipMarkerRemovalState = .verifiedUnlinked
+                return .unlinked
+            }
+            guard linkCount == 1,
+                  ownershipMarkerRemovalState != .verifiedUnlinked
+            else {
+                throw DebugEditorFindFixture.FixtureError
+                    .fixtureRemovalDidNotComplete
+            }
+            try validateOwnershipMarkerPath()
+            return .linked
+        }
+
+        private func ownershipMarkerPathIsAbsent() throws -> Bool {
+            var pathStatus = stat()
+            let result = ownershipMarkerName.withCString { markerName in
+                fstatat(
+                    descriptor,
+                    markerName,
+                    &pathStatus,
+                    AT_SYMLINK_NOFOLLOW
+                )
+            }
+            guard result != 0 else {
+                return false
+            }
+            let errorCode = errno
+            guard errorCode == ENOENT else {
+                throw DebugEditorFindFixture.FixtureError
+                    .couldNotInspectFixture(errorCode)
+            }
+            return true
         }
 
         private func ownershipMarkerLinkCount() throws -> nlink_t {
