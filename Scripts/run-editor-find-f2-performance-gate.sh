@@ -109,6 +109,7 @@ f2_verify_module "editor-find-f2-runner/setup.sh" "4f5ee56e7314963103f40f60379cf
 f2_verify_module "editor-find-f2-runner/build-integrity.sh" "b910cc6d6e2b8e7020d5e23a138f7d23f016f874fbf3ad88c4f921a11a3781ae"
 f2_verify_module "editor-find-f2-runner/capture-integrity.sh" "d208a3a0ef886483bba79df1d99bdf5f44bf84392217ca915fa7f0b08443ca83"
 f2_verify_module "editor-find-f2-runner/inspection.sh" "12921ec63354a5ee5be3073040eb82eebd9444483892d3b5b876cc812b1ded14"
+f2_verify_module "hash-editor-find-f2-artifact.py" "eb120ca20da97fed1308a77166435f6a95536d0af0a5222ed4a7bc5122b260a6"
 
 builtin source "$f2_script_directory/editor-find-f2-runner/setup.sh"
 builtin source "$f2_script_directory/editor-find-f2-runner/build-integrity.sh"

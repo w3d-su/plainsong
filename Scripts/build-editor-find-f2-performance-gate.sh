@@ -77,6 +77,28 @@ with open(sys.argv[1], "rb") as stream:
 print(digest.hexdigest())' "$1"
 }
 
+artifact_hasher="$script_directory/hash-editor-find-f2-artifact.py"
+artifact_hasher_mode=""
+artifact_hasher_owner=""
+artifact_hasher_digest=""
+expected_artifact_hasher_digest="eb120ca20da97fed1308a77166435f6a95536d0af0a5222ed4a7bc5122b260a6"
+if [[ -f "$artifact_hasher" && ! -L "$artifact_hasher" ]]; then
+    artifact_hasher_mode="$(/usr/bin/stat -f '%Lp' "$artifact_hasher")"
+    artifact_hasher_owner="$(/usr/bin/stat -f '%u' "$artifact_hasher")"
+    if [[ "$artifact_hasher_owner" == "$(/usr/bin/id -u)" &&
+        "$((8#$artifact_hasher_mode & 8#022))" == "0" ]] &&
+        f2_reject_acl_allows "$artifact_hasher"; then
+        artifact_hasher_digest="$(f2_sha256_file "$artifact_hasher")"
+    fi
+fi
+if [[ ! -f "$artifact_hasher" || -L "$artifact_hasher" ||
+    "$artifact_hasher_owner" != "$(/usr/bin/id -u)" ||
+    -z "$artifact_hasher_mode" || "$((8#$artifact_hasher_mode & 8#022))" != "0" ||
+    "$artifact_hasher_digest" != "$expected_artifact_hasher_digest" ]]; then
+    echo "F2 artifact hasher is not the pinned owner-controlled file" >&2
+    exit 2
+fi
+
 if [[ "$derived_data_path" != /* || "$derived_data_path" == *[[:space:]]* ||
     ! "${derived_data_path##*/}" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "F2 DerivedData must be an absolute path with a simple leaf" >&2
@@ -123,8 +145,6 @@ if [[ "$derived_data_path" == "$repository_root" ||
     echo "F2 DerivedData must be disjoint from the source repository" >&2
     exit 2
 fi
-artifact_hasher="$script_directory/hash-editor-find-f2-artifact.py"
-
 trusted_git() {
     /usr/bin/env -i \
         GIT_CONFIG_GLOBAL=/dev/null \

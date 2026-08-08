@@ -434,7 +434,8 @@ interruption of in-flight engine work.
   per-run three-sample-median budgets.
   Evidence:
   `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`;
-  exact content SHA, match endpoints, six raw runs, and budgets are in `docs/perf-log.md`.
+  exact content SHA, match endpoints, six raw runs, and budgets are in `docs/perf-log.md`;
+  the Git-versioned compact pack is `docs/evidence/editor-find-f2-c871ddf-retained-pack/`.
 - [x] With a dense live query open, the shipped `WorkspaceWindow`, real `AppState`, public
   editor, and shipped `EditorFindBar` path admit five deterministic native edits with a
   per-run median &lt;5 ms and deliver the invalidated AppState snapshot into the root
@@ -447,16 +448,16 @@ interruption of in-flight engine work.
   drive the SwiftUI update can occur before it; it excludes compositor presentation and
   physical keyboard delivery.
 - [ ] The complete six-run evidence is retained independently of this owner's Mac. The
-  committed compact pack deliberately audits as `PARTIAL/OPEN`; the omitted 1.2 GiB source,
-  build, product, and result bundles currently pass the full checker from a read-only
-  owner-local Documents root, but have no authorized off-machine replica. Loss of that root
+  committed compact pack deliberately audits as `PARTIAL/OPEN`; the omitted 1.0 GiB source,
+  build, product, and result bundles currently pass the full checker from a purgeable
+  owner-local `/private/tmp` root, but have no authorized independently retained replica. Loss of that root
   invalidates the baseline and requires six fresh runs, so F2 remains open overall.
   Evidence and exact audit commands: `docs/perf-log.md`.
 - [ ] Full agent.md §12 &lt;16 ms **keystroke-to-screen** latency with find open is proven
   end-to-end. The current harness begins at programmatic `insertText` and stops at root
   update-transaction entry, so it cannot close this criterion. The retained raw samples
   also expose a real one-off synchronous O(n) preview-scroll line-index rebuild
-  (Debug admission up to 15.974 ms; Release up to 14.057 ms), which is separate production
+  (Debug admission up to 16.620 ms; Release up to 13.701 ms), which is separate production
   performance debt rather than find matching. Physical-input, child-layout/compositor, and
   that cold rebuild must be resolved or explicitly covered before checking this box.
 
@@ -673,11 +674,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   assertion (proves preservation, not just initial paint).
 - [ ] If highlight-all is deferred out of v1, this gate stays open and PR D must say so
   explicitly rather than checking the box.
-- Evidence: **open / explicitly deferred.** The measured `c871ddf` source includes
-  `origin/main` at `250e91e` and has no production highlight-all apply/clear surface. The F2
-  fixture, hosted harness, and zero/sparse/dense scenarios are reusable for a later F8 probe,
-  but this branch-only evidence neither measures nor claims highlight preservation, apply
-  latency, or clear latency on any combined tip.
+- Evidence: **open in this F2 baseline.** The measured `c871ddf` source includes
+  `origin/main` at `250e91e` and has no production highlight-all apply/clear surface. Separate
+  Draft PR #106 owns F8 implementation/evidence; nothing in the F2 retained pack measures or
+  claims highlight preservation, apply latency, clear latency, or a combined-tip result.
 
 ### F9 — Accessibility + XCUITest
 
@@ -706,16 +706,16 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
 
 **F2 result:** source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979` passed three
-replacement Debug and three replacement Release runs. The Debug medians of run medians are
-235.082 / 254.619 / 591.634 ms for zero/sparse/dense query completion, 1.091 ms for native-edit
-admission, and 3.825 ms for root state-update receipt; the frozen budgets remain &lt;400 / &lt;400 /
-&lt;1,100 / &lt;5 / &lt;15 ms. The complete command/environment record, exact fixture
-identity/endpoints, every raw sample, source/package/artifact hashes, warning-phase negative
-control, accepted-run process screens, and narrow warning exception are in
-`docs/perf-log.md`. The committed compact pack is intentionally insufficient by itself, while
-the full owner-local artifact root currently audits successfully. These results satisfy only the
-named proxy checks: durable independent retention, the full &lt;16 ms keystroke-to-screen
-criterion, F8, and F9 remain open.
+Debug and three Release runs under evidence tooling `03ffd7024ac248977a802bb46b7f0413293979cd`.
+The versioned compact pack audits all six runs; the owner's non-portable full-artifact root also
+passed exact rehash. Frozen query-completion budgets are &lt;400 ms zero,
+&lt;400 ms sparse, and &lt;1,100 ms dense-truncated. The production-hosted five-edit median
+budgets are &lt;5 ms for synchronous admission and &lt;15 ms for root state-update receipt.
+The complete command/environment record, exact fixture identity/endpoints, raw samples,
+sealed source/package/artifact hashes, warning-phase negative control, outlier diagnosis, and
+narrow warning exception are in `docs/perf-log.md`. These results close only the named F2 proxy
+contracts; independent durable retention, full &lt;16 ms keystroke-to-screen, F8 apply/clear,
+F9, and combined-tip remain open.
 
 ## 10. Non-goals for this gate set
 

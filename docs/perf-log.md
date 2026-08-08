@@ -361,76 +361,288 @@ evidence, and these budgets stay informational on CI regardless.
 
 ## Phase 3 F2 In-Document Find Performance Gate
 
-The six-run proxy baseline is locally auditable again. Three Debug and three Release runs measure
-the exact clean detached source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979`; the compact
-records are committed under `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5`, and
-the omitted 1.2 GiB source/build/result artifacts are retained read-only at the owner-local root
-shown below. The compact audit is deliberately `PARTIAL/OPEN`; only an audit that also receives
-that full root prints proxy `PASS`.
-
-This is not a portable or externally durable closure. The full root has not been replicated off
-this Mac, and no authority to upload 1.2 GiB of artifacts was granted. Loss of that root invalidates
-the full baseline and requires six fresh runs. Consequently the overall F2 retention item remains
-open even though the currently present full root passes. The full `<16 ms` keystroke-to-screen,
-F8 highlight apply/clear, F9, and combined-tip gates also remain open.
-
-### Recovery finding and replacement policy
-
-The July record claimed six `/private/tmp/plainsong-f2-c871ddf-{debug,release}-run{1,2,3}`
-prefixes retained raw logs, digests, warning checks, manifests, xcresults, inspection copies, and
-products. Those directories no longer contained the claimed files. An exhaustive local/session
-search recovered exact copies of 18 of the 24 text-hash rows, but none of the six raw xcresult
-bundles. Because warning/result and product provenance could not be fully audited, every July raw
-number and hash is superseded and is not used below.
-
-The replacement policy is fail-closed:
-
-- `/private/tmp` is execution staging only and is never described as durable evidence.
-- Every accepted run uses a fresh output prefix and is copied from execution staging to an
-  owner-local, read-only Documents root before staging cleanup. Reused paths are rejected.
-- The Git pack retains every raw text artifact, a strict inventory, summaries, and provenance. Its
-  exact `SHA256SUMS` bytes are frozen by the checker.
-- Full audit additionally rehashes private snapshots of the source archive/generated source,
-  resolved package inputs, build manifests, host bundles, xctestrun files, raw logs, raw xcresults,
-  and authoritative inspection xcresults. Source/build/product and per-run result identities are
-  baseline-specific constants, not values trusted from the pack itself.
-- Owner-local storage is not off-machine durability. Until the full root is published to an
-  authorized durable store and re-audited there, F2 retention stays open.
-
-### Exact environment and retained locations
+This is the current authoritative baseline for the F2 query-completion and production-hosted
+state-update receipt proxies. The six runs measured exact clean source
+`c871ddf5c66c17f03fd9456b53f79411f9b2e979`; historical tooling commit
+`03ffd7024ac248977a802bb46b7f0413293979cd` owns the exact capture, retained-pack builder, and
+auditor bytes used to produce and retain them. The current responsibility-split, isolated tooling
+audits those historical bytes independently; it did **not** produce the six runs. Keeping those
+identities separate prevents a later documentation/tooling commit from being misrepresented as
+the measured product source.
 
 | Field | Value |
 |---|---|
-| Measurement date | 2026-08-08 (Asia/Taipei) |
-| Branch | `codex/editor-find-f2-performance-probe` |
-| Measured source | clean detached `c871ddf5c66c17f03fd9456b53f79411f9b2e979`; `origin/main` at `250e91e16a1fd5339096ec96b84fcfe6e9790c4c` is an ancestor |
-| macOS | 27.0 (26A5388g) |
-| Xcode / SDK | Xcode 27.0 (27A5194q); macOS SDK 27.0 (26A5353p); selected developer `/Applications/Xcode-beta.app/Contents/Developer` |
-| XcodeGen | 2.45.4; SHA-256 `3b483413a801394b00adb2fabf3c06ff8f800c73c8698e1f9a9d8a95d73939ef` |
-| `xcresulttool` | `/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcresulttool`; SHA-256 `7aada4a60aad3de62bc7fbda7afd990e53d8335710d1a8792fd279d42491a5c9` |
-| Machine | MacBookPro18,3, Apple M1 Pro, arm64, 8 physical/logical cores, 16 GiB RAM, AC power, no thermal warning at each accepted boundary |
-| Fixture | `Fixtures/large-1mb.md`, 1,048,962 UTF-8 bytes, SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
-| Historical measured capture helper | `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5/reference/capture-editor-find-f2-authoritative-run.sh`; SHA-256 `c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef` |
-| Historical measured exact-source runner | Same pack, `reference/run-editor-find-f2-performance-gate.sh`; SHA-256 `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
-| Maintained tooling inventory | `Scripts/editor-find-f2-tooling.sha256`; SHA-256 `ab38b8068abfc03e063bce4208ce11aa96e0236eaf687b5e8014fdb2c4ce7974` |
-| Maintained modular capture / exact-source runner | Thin wrappers SHA-256 `d188fcbd66a3c93907c0880bbe1cb94e15c09bbd0712d753d399334a41af285c` / `a5a05f706906f19c24fd3025cb7f387a41be7767a0e1b05b763139e837971340`; every sourced module is pinned by its wrapper and the tooling inventory |
-| Maintained pack assembler | `Scripts/assemble-editor-find-f2-retained-evidence.py`; thin-wrapper SHA-256 `05f37034a892edd9d87481486e3a282f5582b03edb4263a0efc38816f5df4151`; module hashes are in the tooling inventory |
-| Maintained retained-evidence checker | `Scripts/check-editor-find-f2-retained-evidence.py`; thin-wrapper SHA-256 `6b258d724a7a841b92b8f54cc5b53283d4b7bbf23eb2c1bc171520cd5927cc43`; module hashes are in the tooling inventory |
-| Compact pack | `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5`; `SHA256SUMS` SHA-256 `d2f1497b19c37db3b49b5028292871fe6194752d94de05f55d5e7b6337767e22` |
-| Full owner-local root | `/Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2`; read-only; approximately 1.2 GiB; not externally replicated |
+| Date | 2026-08-08 (Asia/Taipei) |
+| Branch | `codex/editor-find-f2-performance-probe`; `origin/main` at `250e91e16a1fd5339096ec96b84fcfe6e9790c4c` is an ancestor |
+| Measured source commit | `c871ddf5c66c17f03fd9456b53f79411f9b2e979` |
+| macOS | macOS 27.0 (26A5388g) |
+| Xcode | Xcode 27.0 (27A5194q) |
+| XcodeGen | 2.45.4; binary SHA-256 `3b483413a801394b00adb2fabf3c06ff8f800c73c8698e1f9a9d8a95d73939ef` |
+| Machine | MacBook Pro (MacBookPro18,3), Apple M1 Pro (8 cores), arm64, 16 GB RAM |
+| Fixture | `Fixtures/large-1mb.md`: 1,048,962 bytes; SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
+| Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets` |
+| Historical evidence-tooling commit | `03ffd7024ac248977a802bb46b7f0413293979cd` |
+| Result | Named proxies pass — three Debug and three Release local-hard runs, two tests per run, zero failures; compact and owner-local full-artifact audits both validate all six runs. Independent durable retention and the other open boundaries below prevent overall F2 closure. |
 
-Current Python operator entry points require `/usr/bin/python3 -I`. Current maintained shell entry
-points require an absolute entry-point path; direct execution supplies `bash -p` via the shebang,
-while an explicit shell caller must use an allowlisted `env -i ... /bin/bash -p ABSOLUTE_PATH`
-launcher. Maintained file digests use an empty environment and `/usr/bin/python3 -I -S`, not the
-ambient-Perl `/usr/bin/shasum` path; executable/package paths reject non-owner or group/world-write
-authority and ACL `allow` entries, while sealed input/output trees reject every ACL. In every case,
-verify the tooling inventory and its pinned hash before execution. As with the owner-local evidence
-itself, this trust root assumes files remain stable against a concurrent process already trusted as
-the current UID between verification and pathname reopening; that same-UID boundary is explicit,
-not a claim of race-proof loading.
+The Git-versioned compact evidence is retained at
+`docs/evidence/editor-find-f2-c871ddf-retained-pack/`: 145 files (916 KiB), including all six raw
+logs, per-file digests, boundary/competition-monitor records, normalized xcresult summaries,
+warning checks, manifests, and the exact retained capture/auditor sources. Its `manifest.json`
+SHA-256 is `c7d1a3c68285aa0aac35914fe7d4d60c1bfbc8401b0055e689365b1bbe9989c5`;
+the `SHA256SUMS` file SHA-256 is
+`23d3ec514e1a99f65093dede22af190dece22a936d56e999c2bf0740b5bb50bd`.
 
-Both builds retain source-archive SHA-256
+The 1.0 GiB source snapshots, resolved packages, frozen products, raw/inspection xcresults, and
+build manifests are currently present only in the owner's purgeable local artifact root
+`/private/tmp/plainsong-f2-evidence-review.SnCT6g/full-artifacts`. A full audit rehashed that root
+and passed six runs, but `/private/tmp` is not durable, Git does not carry it, and no independently
+retained copy is authorized or claimed. Loss of that root invalidates the full-artifact audit and
+requires fresh evidence before that audit can pass again.
+The versioned compact audit is intentionally reported as `PARTIAL runs=6` unless that full root is
+supplied. Both audit modes keep independent durable retention, full-keystroke-to-screen, F8
+apply/clear, F9, and combined-tip open.
+
+### Historical provenance and current operator trust root
+
+The retained pack is byte-for-byte unchanged by the integration. Its reference tree and manifest
+pin the `03ffd70` historical capture/auditor family, including the per-run combined capture digest
+`5a8ff6ca023de2954847d3e9903413daab7b52434ce24efac8536f9b016d5136`.
+The measured source commit preserves the monolithic build and runner bytes used by the runs; they
+are historical artifacts, not maintained large-file exceptions in the current checkout.
+
+| Trust-root item | SHA-256 |
+|---|---|
+| Historical measured-source build wrapper (`c871ddf`) | `02249b49aabc80286cb17e668edebfeef987a9ae4abe75d6ee3aeceeeb084598` |
+| Historical measured-source runner (`c871ddf`) | `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
+| Historical outer capture wrapper (`03ffd70`) | `2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf` |
+| Historical pack builder / auditor (`03ffd70`) | `11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9` / `605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819` |
+| Current `Scripts/editor-find-f2-tooling.sha256` | `3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b` |
+| Current inventory verifier | `30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351` |
+| Current isolated bootstrap | `665bf66c400e4a9193e7090b76962a4e490795946f219a7e239458383b652c8b` |
+| Current auditor / builder entry points | `525913298ba1f510f2df19911689b310e67854e6ff2be22cc528c2e2a8ad66fb` / `bb62262df80ad5e8c48d63c9f6f00c390b95962a92dfc2e293d1ef2d7a45a9a7` |
+| Current capture / runner / build entry points | `3d71c7adbdccd0274e83edec12cea2e2b8409f4dadd54eb209d6c887ea7dc3f9` / `2cf8c9a4e62ffe7cb1c145006eb435d2923b1714c549f1ebf94a5698da9de366` / `ae68561d94c1d41c33d6d7d761cc195a9765b1d219e97c8a7efc363f70fcf345` |
+
+All 34 maintained executable/support modules are in the external inventory. Current Python entry
+points require isolated `-I` startup, verify canonical current-UID-owned non-symlink paths with no
+group/world write or ACL `allow`, hash-pin the bootstrap and exact package inventory, then import.
+Current shell entry points require `bash -p`; the capture and runner wrappers pin every sourced
+module before loading it, and the current build/runner entry points also pin the artifact hasher
+they execute. Maintained digest paths use empty-environment `/usr/bin/python3 -I -S`, not ambient
+Perl-backed `shasum`. The exact pack inventory and full-artifact audit additionally reject
+symlinks, foreign owners, group/world writers, ACLs, and unsupported entries before exact rehash;
+the full audit then cross-binds all nine retained artifacts to the compact evidence manifest and
+its exact retained build manifest. Historical format-2 packs keep their exact reference set;
+newly built format-3 packs additionally retain the isolated bootstrap required by their thin
+auditor/builder wrappers. Pathname reopening cannot exclude a concurrent mutation by another
+process already trusted as this same UID; that boundary is explicit and is not described as
+race-proof loading.
+
+The authoritative current-checkout audit sequence is:
+
+```sh
+set -euo pipefail
+F2_CHECKOUT="$(/usr/bin/git --no-replace-objects rev-parse --show-toplevel)"
+F2_PACK="$F2_CHECKOUT/docs/evidence/editor-find-f2-c871ddf-retained-pack"
+F2_FULL_ROOT=/private/tmp/plainsong-f2-evidence-review.SnCT6g/full-artifacts
+F2_PACK_INVENTORY_SHA=23d3ec514e1a99f65093dede22af190dece22a936d56e999c2bf0740b5bb50bd
+
+f2_sha256() {
+  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    /usr/bin/python3 -I -S -c \
+    'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' \
+    "$1"
+}
+
+test "$(f2_sha256 "$F2_CHECKOUT/Scripts/editor-find-f2-tooling.sha256")" = \
+  3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b
+test "$(f2_sha256 "$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
+  30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
+test "$(f2_sha256 "$F2_PACK/manifest.json")" = \
+  c7d1a3c68285aa0aac35914fe7d4d60c1bfbc8401b0055e689365b1bbe9989c5
+test "$(f2_sha256 "$F2_PACK/SHA256SUMS")" = "$F2_PACK_INVENTORY_SHA"
+"$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py"
+set +e
+"$F2_CHECKOUT/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_PACK" --expected-inventory-sha256 "$F2_PACK_INVENTORY_SHA"
+F2_COMPACT_STATUS=$?
+set -e
+test "$F2_COMPACT_STATUS" -eq 3
+"$F2_CHECKOUT/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_PACK" --allow-partial \
+  --expected-inventory-sha256 "$F2_PACK_INVENTORY_SHA"
+"$F2_CHECKOUT/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_PACK" --artifact-root "$F2_FULL_ROOT" \
+  --expected-inventory-sha256 "$F2_PACK_INVENTORY_SHA"
+```
+
+Default compact exit 3 is the expected `PARTIAL/OPEN` result; `--allow-partial` makes that
+explicit and returns 0. The final command returns 0 only while the owner-local full root is still
+present, owner-controlled, ACL-free, and byte-identical. It does not turn that purgeable copy into
+independent durable retention.
+
+| Run | Raw log SHA-256 | Raw `.xcresult` SHA-256 | Warning-check SHA-256 | Evidence-manifest SHA-256 |
+|---|---|---|---|---|
+| Debug 1 | `98bc3307d0759958ac0e5cf29a34b467c608927c02543d13f7dcff806362f2d5` | `54a7445954b87725386204da01102de81e7e5abfb37a11770c7e1c3696f02866` | `66012706d2338217c1793bab0d82fa7f96121bfcfcf635087b00e95ba51d4d45` | `0a034776d0b7f214b35309382a515f082e57b817e305516d3b518fff8e912916` |
+| Debug 2 | `b6dba2c69b5b240e9d7295876121df8c86d3669ed4b2899360ef74984d6e7f82` | `6acdc2bcb01f847ec6db4bed30f47431187892d4853457e6daab04c0210ee8a3` | `2619744ecafaef54a2db9063f51ffd4c02bc96cf0fb0028f26c504e6974ad9c4` | `97c21e67c6f7ae18e62890d1384a30a548eaeab50ee2d14dd9e3c52cb7e59e6a` |
+| Debug 3 | `e82d1876fa6e0fa0ddb734d20f506529b00c6951f57bb6fa4090a53606d3e620` | `e1c5830dc4c9be361d0b3bde0989149d8c75678daadb212994ae85e092025f5e` | `f4eb98a8f1304de4c7380960a23b9f0dbfaa6b61c41bd1cae518751d1f9ce582` | `b129e9e4373d40d94883afc372ec2d9e2570f1ac62d436329dcc8d12922c0028` |
+| Release 1 | `2fa204b2f074d289b68b402019429fb93a8616530e846b56e3c6bd0e167fc600` | `9e953cc6f1f63b806c2e5c4e3fdd7a325173f543b52a9756d1e5768961bd1bf9` | `6fd7532de227b69d791712bcc76d15ac8da09ad6216c2b83b8e8531ed5e6c562` | `a00663e2c981daeab502690825edde00f7f511f374bae3776373a45a9a07fa5e` |
+| Release 2 | `c87d7e33eb07a073b646bb2e927e9cf83da76563e00a7bd8c2ed71a2658a4c27` | `4f1a203d853e74d72f91890a43ed4ca1bfcb314294294e0626764cedb8c9155a` | `e7aea10447d4c1aed1d0b65dbaaef0c2a4a1f0b88825e8323bbfd0126175cbb3` | `8da37e1d3294dbb8e0bd9b60a249e8a7f50769aa308a08c0b84f6930e20ce2c3` |
+| Release 3 | `25b1af1acca12dee4147556d9c08d9b6b97c4739430ae506a697356842ce2748` | `c13e9ec49c8fba416e8cfe01f9aa92e2ae1a1cfa008a00465e007a518c9a4aba` | `1cbb9d8e83c9700470d8ceca77b1ad3c79d36adb9a611881f9edf137a5c07cd5` | `4aa9893fc3baaba624d14e354485e3d7e10edf1aa29362ae57a65d92eaecaba4` |
+
+### Reproduction with fresh outputs
+
+The product source, historical evidence tooling, and current audit tooling have different
+identities. Reproduce the measured mechanism with one clean detached source worktree at the full
+`c871ddf` commit and one clean detached historical-tooling worktree at the full `03ffd70` commit.
+The source worktree owns the exact build wrapper and product tests; the historical-tooling worktree
+owns the exact outer capture, process monitor, pack builder, and auditor that produced this pack.
+The current checkout is used only to verify its maintained trust inventory and to independently
+audit the new pack. Every output goes below a newly allocated mode-0700 root, so none of the six
+versioned paths or hashes can be reused accidentally. This workflow needs enough free disk for two
+builds plus a new full-artifact root.
+
+```sh
+set -euo pipefail
+
+F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+F2_TOOLING_COMMIT=03ffd7024ac248977a802bb46b7f0413293979cd
+F2_REPOSITORY_ROOT="$(/usr/bin/git --no-replace-objects rev-parse --show-toplevel)"
+F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
+F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
+F2_TOOLING_WORKTREE="$F2_REPRO_ROOT/tooling"
+F2_ACCOUNT_NAME="$(/usr/bin/id -un)"
+F2_ACCOUNT_HOME="$(/usr/bin/python3 -I -S -c \
+  'import os,pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
+F2_DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+
+f2_sha256() {
+  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    /usr/bin/python3 -I -S -c \
+    'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' \
+    "$1"
+}
+
+test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/editor-find-f2-tooling.sha256")" = \
+  3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b
+test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
+  30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
+"$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py"
+
+/usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects \
+  cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
+/usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects \
+  cat-file -e "${F2_TOOLING_COMMIT}^{commit}"
+/usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects worktree add --detach \
+  "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
+/usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects worktree add --detach \
+  "$F2_TOOLING_WORKTREE" "$F2_TOOLING_COMMIT"
+test "$(/usr/bin/git -C "$F2_SOURCE_WORKTREE" --no-replace-objects rev-parse HEAD)" = \
+  "$F2_MEASURED_COMMIT"
+test "$(/usr/bin/git -C "$F2_TOOLING_WORKTREE" --no-replace-objects rev-parse HEAD)" = \
+  "$F2_TOOLING_COMMIT"
+! /usr/bin/git -C "$F2_SOURCE_WORKTREE" symbolic-ref -q HEAD >/dev/null
+! /usr/bin/git -C "$F2_TOOLING_WORKTREE" symbolic-ref -q HEAD >/dev/null
+test -z "$(/usr/bin/git -C "$F2_SOURCE_WORKTREE" status --porcelain=v1 --untracked-files=all)"
+test -z "$(/usr/bin/git -C "$F2_TOOLING_WORKTREE" status --porcelain=v1 --untracked-files=all)"
+
+test "$(f2_sha256 "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh")" = \
+  02249b49aabc80286cb17e668edebfeef987a9ae4abe75d6ee3aeceeeb084598
+test "$(f2_sha256 "$F2_SOURCE_WORKTREE/Scripts/run-editor-find-f2-performance-gate.sh")" = \
+  90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d
+test "$(f2_sha256 "$F2_TOOLING_WORKTREE/Scripts/capture-editor-find-f2-authoritative-run.sh")" = \
+  2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf
+test "$(f2_sha256 "$F2_TOOLING_WORKTREE/Scripts/build-editor-find-f2-retained-pack.py")" = \
+  11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9
+test "$(f2_sha256 "$F2_TOOLING_WORKTREE/Scripts/check-editor-find-f2-retained-evidence.py")" = \
+  605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819
+
+f2_historical_bash() {
+  /usr/bin/env -i \
+    DEVELOPER_DIR="$F2_DEVELOPER_DIR" \
+    HOME="$F2_ACCOUNT_HOME" \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LOGNAME="$F2_ACCOUNT_NAME" \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    TMPDIR=/private/tmp \
+    USER="$F2_ACCOUNT_NAME" \
+    /bin/bash -p "$@"
+}
+
+f2_historical_bash \
+  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+  Debug "$F2_REPRO_ROOT/debug-build"
+f2_historical_bash \
+  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+  Release "$F2_REPRO_ROOT/release-build"
+
+for F2_RUN in 1 2 3; do
+  f2_historical_bash \
+    "$F2_TOOLING_WORKTREE/Scripts/capture-editor-find-f2-authoritative-run.sh" \
+    Debug "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/debug-build" \
+    "$F2_REPRO_ROOT/debug-${F2_RUN}"
+done
+
+for F2_RUN in 1 2 3; do
+  f2_historical_bash \
+    "$F2_TOOLING_WORKTREE/Scripts/capture-editor-find-f2-authoritative-run.sh" \
+    Release "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/release-build" \
+    "$F2_REPRO_ROOT/release-${F2_RUN}"
+done
+
+/usr/bin/env -i \
+  DEVELOPER_DIR="$F2_DEVELOPER_DIR" HOME="$F2_ACCOUNT_HOME" \
+  LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 LOGNAME="$F2_ACCOUNT_NAME" \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR=/private/tmp USER="$F2_ACCOUNT_NAME" \
+  /usr/bin/python3 -I \
+  "$F2_TOOLING_WORKTREE/Scripts/build-editor-find-f2-retained-pack.py" \
+  --pack-root "$F2_REPRO_ROOT/retained-pack" \
+  --artifact-root "$F2_REPRO_ROOT/full-artifacts" \
+  --run debug-1="$F2_REPRO_ROOT/debug-1" \
+  --run debug-2="$F2_REPRO_ROOT/debug-2" \
+  --run debug-3="$F2_REPRO_ROOT/debug-3" \
+  --run release-1="$F2_REPRO_ROOT/release-1" \
+  --run release-2="$F2_REPRO_ROOT/release-2" \
+  --run release-3="$F2_REPRO_ROOT/release-3"
+
+/usr/bin/python3 -I \
+  "$F2_TOOLING_WORKTREE/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_REPRO_ROOT/retained-pack" --allow-partial
+/usr/bin/python3 -I \
+  "$F2_TOOLING_WORKTREE/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_REPRO_ROOT/retained-pack" \
+  --artifact-root "$F2_REPRO_ROOT/full-artifacts"
+
+"$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-retained-evidence.py" \
+  "$F2_REPRO_ROOT/retained-pack" \
+  --artifact-root "$F2_REPRO_ROOT/full-artifacts"
+```
+
+These commands intentionally execute the immutable historical helpers; they do not claim the
+current refactor produced a rerun. The empty outer environment and `bash -p` remove ambient
+`BASH_ENV`, inherited functions, and user PATH authority, while `python3 -I` isolates the two
+historical Python operator entry points. This cannot retrofit isolation into every Python process
+spawned internally by the immutable shell bytes; the clean detached/current-UID-owned worktrees,
+fixed system paths, and exact hashes above are the historical mechanism's explicit boundary.
+
+The historical capture and builder refuse reused destinations, symlinks, non-owner inputs,
+path/case collisions, source/build/hash mismatches, target processes found at the retained boundary
+checks or periodic samples, non-AC power, or thermal warnings. The monitor used a configured 200 ms
+sleep after each scan; scan time makes this neither a 200 ms cadence nor continuous-absence proof.
+The builder retains full artifacts by exact hash, deduplicates only identical shared inputs,
+creates normalized summaries from private xcresult copies, and runs both audits before reporting
+success. A reproduction is a new evidence set and must never silently replace or mix with the
+versioned six-run compact pack.
+
+The measured-source build/run helpers reject a dirty worktree, CI budget mode, reused output paths,
+source/build mismatches, and post-run mutation. The build wrapper archives the exact commit, generates the
+project inside a source snapshot, resolves packages once, seals the consumed source/package
+inputs read-only, then uses `-disableAutomaticPackageResolution` for `build-for-testing`.
+`ENABLE_TESTABILITY=YES` is added only for Release because the reusable harness observes internal
+EditorKit transition state; it does not enable `DEBUG` compilation or change the production
+debounce.
+
+Both builds have source-archive SHA-256
 `f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506` and pre-generation
 source-tree SHA-256
 `51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94`.
@@ -439,417 +651,201 @@ The Debug/Release generated build-input hashes are respectively
 `3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6`.
 Both resolved-package-input hashes are
 `ed48178719a6c72d2880d3972e900d3bbe51f180d13e01dffd452de936f779c3`.
+That last digest deliberately covers the consumed checkout bytes (excluding checkout/submodule
+`.git` administration), all artifact bytes, and `workspace-state.json`; mutable top-level bare
+repository caches are not treated as source provenance. Unknown top-level entries fail closed.
 The Debug/Release build-manifest hashes are
 `fe374662a09ccb452ce55f0796740c96b66624483afe55aa53fcff2c8dfb3510` and
 `5ca8c353ad557267745566ec597ba5971b024afb2796237158b062e3fcdd6a8a`.
 
-### Reproduction with fresh outputs
+### Procedure and scope
 
-The measured build wrapper archives the `HEAD` of the checkout containing it. Running that wrapper
-from this later documentation commit would therefore measure the wrong source. Start with a clean
-detached worktree at the full measured commit, but invoke the exact retained historical capture
-helper from a separate evidence checkout whose hash is verified. Allocate a new mode-0700 staging
-root; never reuse any retained path. The immutable historical shell helpers predate the maintained
-`bash -p` bootstrap, so the recipe launches them through an empty outer-shell allowlist that removes
-inherited shell functions and `BASH_ENV` and supplies a fixed system-only `PATH`.
+The query probe starts its clock immediately before
+`AppState.handleEditorFindQueryTextChange`. It includes App query publication, the production
+150 ms debounce, detached `TextSearchEngine` matching, revision/query fencing, main-actor session
+application, and App presentation. Every scenario gets one unmeasured warm-up and three measured
+samples. Every sample hard-asserts the exact retained count/truncation shape, first and last retained
+match endpoints, and that the matcher observed itself off the main thread.
 
-That outer launcher cannot retrofit isolated Python into immutable helpers: the historical build
-and runner invoke Xcode's `/usr/bin/python3` without `-I`, and the runner recreates its own child
-environment. The exact measured source tree prevents an untracked `Scripts/` shadow module, and the
-recipe below requires the current user-site directory to be absent or empty, checks that every
-existing directory from the user site to the canonical home is current-UID-owned and not
-group/world-writable, rejects every access-control-list `allow` entry, and repeats that check before
-every historical-helper invocation. This is a current-UID boundary, not protection against a
-concurrent process already trusted as that same UID.
-Xcode's system-site startup remains part of the selected historical toolchain and is not separately
-hash-pinned by the retained checker. Treat any reproduction as a separately reported
-historical-tool attempt, never as evidence produced by the current isolated maintained tooling.
-
-```sh
-set -euo pipefail
-export GIT_CONFIG_GLOBAL=/dev/null
-export GIT_CONFIG_NOSYSTEM=1
-export GIT_NO_REPLACE_OBJECTS=1
-
-F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
-F2_REPOSITORY_ROOT="$(/usr/bin/git --no-replace-objects rev-parse --show-toplevel)"
-F2_EVIDENCE_CHECKOUT="$F2_REPOSITORY_ROOT"
-F2_CAPTURE_REFERENCE="$F2_EVIDENCE_CHECKOUT/docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5/reference/capture-editor-find-f2-authoritative-run.sh"
-F2_CAPTURE_SHA=c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef
-F2_SOURCE_ARCHIVE_SHA=f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506
-F2_SOURCE_TREE_SHA=51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94
-F2_PACKAGE_INPUT_SHA=ed48178719a6c72d2880d3972e900d3bbe51f180d13e01dffd452de936f779c3
-F2_DEBUG_BUILD_INPUT_SHA=2093bf7df313cc13ae24c964a6661ae05d15471547c553fc295003bbebeba3b6
-F2_RELEASE_BUILD_INPUT_SHA=3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6
-F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
-F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
-F2_CAPTURE="$F2_REPRO_ROOT/historical-capture-helper.sh"
-F2_RUNNER_USER="$(/usr/bin/id -un)"
-F2_RUNNER_UID="$(/usr/bin/id -u)"
-F2_RUNNER_HOME="$(
-  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
-    /usr/bin/python3 -I -c \
-    'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)'
-)"
-F2_HISTORICAL_USER_SITE="$(
-  /usr/bin/env -i HOME="$F2_RUNNER_HOME" LANG=C LC_ALL=C PATH=/usr/bin:/bin \
-    USER="$F2_RUNNER_USER" /usr/bin/python3 -I -c \
-    'import site; print(site.getusersitepackages())'
-)"
-
-f2_sha256_file() {
-  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
-    /usr/bin/python3 -I -S -c \
-    'import hashlib, sys
-digest = hashlib.sha256()
-with open(sys.argv[1], "rb") as stream:
-    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-        digest.update(chunk)
-print(digest.hexdigest())' "$1"
-}
-
-test -n "$F2_RUNNER_USER"
-case "$F2_RUNNER_UID" in
-  ''|*[!0-9]*) exit 1 ;;
-esac
-case "$F2_RUNNER_HOME" in
-  *$'\n'*|'') exit 1 ;;
-  /*) ;;
-  *) exit 1 ;;
-esac
-case "$F2_HISTORICAL_USER_SITE" in
-  *$'\n'*) exit 1 ;;
-  "$F2_RUNNER_HOME"/*) ;;
-  *) exit 1 ;;
-esac
-
-f2_require_owner_controlled_directory() {
-  F2_CONTROLLED_DIRECTORY="$1"
-  test -d "$F2_CONTROLLED_DIRECTORY"
-  test ! -L "$F2_CONTROLLED_DIRECTORY"
-  test "$(builtin cd "$F2_CONTROLLED_DIRECTORY" && /bin/pwd -P)" = \
-    "$F2_CONTROLLED_DIRECTORY"
-  test "$(/usr/bin/stat -f '%u' "$F2_CONTROLLED_DIRECTORY")" = \
-    "$F2_RUNNER_UID"
-  F2_CONTROLLED_MODE="$(/usr/bin/stat -f '%Lp' "$F2_CONTROLLED_DIRECTORY")"
-  case "$F2_CONTROLLED_MODE" in
-    ''|*[!0-7]*|*[2367]?|*[2367]) exit 1 ;;
-  esac
-  if ! F2_CONTROLLED_ACL="$(
-    LC_ALL=C /bin/ls -lde "$F2_CONTROLLED_DIRECTORY"
-  )"; then
-    echo "could not inspect historical Python user-site ACL boundary" >&2
-    exit 1
-  fi
-  case "$F2_CONTROLLED_ACL" in
-    *$'\n'*' allow '*) exit 1 ;;
-  esac
-}
-
-f2_require_empty_historical_user_site() {
-  F2_EXISTING_SITE_ANCESTOR="$F2_HISTORICAL_USER_SITE"
-  while ! test -d "$F2_EXISTING_SITE_ANCESTOR"; do
-    F2_NEXT_SITE_ANCESTOR="$(/usr/bin/dirname "$F2_EXISTING_SITE_ANCESTOR")"
-    test "$F2_NEXT_SITE_ANCESTOR" != "$F2_EXISTING_SITE_ANCESTOR"
-    F2_EXISTING_SITE_ANCESTOR="$F2_NEXT_SITE_ANCESTOR"
-  done
-  case "$F2_EXISTING_SITE_ANCESTOR" in
-    "$F2_RUNNER_HOME"|"$F2_RUNNER_HOME"/*) ;;
-    *) exit 1 ;;
-  esac
-  while :; do
-    f2_require_owner_controlled_directory "$F2_EXISTING_SITE_ANCESTOR"
-    test "$F2_EXISTING_SITE_ANCESTOR" != "$F2_RUNNER_HOME" || break
-    F2_EXISTING_SITE_ANCESTOR="$(/usr/bin/dirname "$F2_EXISTING_SITE_ANCESTOR")"
-  done
-  if test -d "$F2_HISTORICAL_USER_SITE"; then
-    if ! F2_USER_SITE_FIRST_ENTRY="$(
-      /usr/bin/find "$F2_HISTORICAL_USER_SITE" -mindepth 1 -print -quit
-    )"; then
-      echo "could not inspect historical Python user site" >&2
-      exit 1
-    fi
-    test -z "$F2_USER_SITE_FIRST_ENTRY"
-  fi
-}
-
-f2_require_empty_historical_user_site
-
-f2_clean_historical_bash() {
-  /usr/bin/env -i \
-    GIT_CONFIG_GLOBAL=/dev/null \
-    GIT_CONFIG_NOSYSTEM=1 \
-    GIT_NO_REPLACE_OBJECTS=1 \
-    HOME="$F2_RUNNER_HOME" \
-    LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8 \
-    LOGNAME="$F2_RUNNER_USER" \
-    PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-    TMPDIR=/private/tmp \
-    USER="$F2_RUNNER_USER" \
-    /bin/bash "$@"
-}
-
-test -f "$F2_CAPTURE_REFERENCE" && test ! -L "$F2_CAPTURE_REFERENCE"
-test "$(f2_sha256_file "$F2_CAPTURE_REFERENCE")" = "$F2_CAPTURE_SHA"
-test "$(/usr/bin/stat -f '%Lp' "$F2_REPRO_ROOT")" = 700
-/bin/cp "$F2_CAPTURE_REFERENCE" "$F2_CAPTURE"
-test "$(f2_sha256_file "$F2_CAPTURE")" = "$F2_CAPTURE_SHA"
-/bin/chmod 400 "$F2_CAPTURE"
-/usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
-  cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
-/usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
-  worktree add --detach "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
-test "$(/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" rev-parse HEAD)" = \
-  "$F2_MEASURED_COMMIT"
-F2_SYMBOLIC_REF_STATUS=0
-/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
-  symbolic-ref -q HEAD >/dev/null || F2_SYMBOLIC_REF_STATUS=$?
-case "$F2_SYMBOLIC_REF_STATUS" in
-  0)
-    echo "F2 reproduction source must be detached" >&2
-    exit 1
-    ;;
-  1) ;;
-  *)
-    echo "could not inspect F2 reproduction HEAD attachment" >&2
-    exit 1
-    ;;
-esac
-if ! F2_SOURCE_STATUS="$(
-  /usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
-    status --porcelain=v1 --untracked-files=all
-)"; then
-  echo "could not inspect F2 reproduction source status" >&2
-  exit 1
-fi
-test -z "$F2_SOURCE_STATUS"
-
-f2_require_empty_historical_user_site
-f2_clean_historical_bash \
-  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
-  Debug "$F2_REPRO_ROOT/debug-build"
-f2_require_empty_historical_user_site
-f2_clean_historical_bash \
-  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
-  Release "$F2_REPRO_ROOT/release-build"
-
-f2_manifest_value() {
-  /usr/bin/awk -F= -v key="$1" \
-    '$1 == key { value = substr($0, length($1) + 2); count += 1 }
-     END { if (count != 1) exit 1; print value }' "$2"
-}
-F2_DEBUG_MANIFEST="$F2_REPRO_ROOT/debug-build/f2-editor-find-build-manifest.txt"
-F2_RELEASE_MANIFEST="$F2_REPRO_ROOT/release-build/f2-editor-find-build-manifest.txt"
-for F2_MANIFEST in "$F2_DEBUG_MANIFEST" "$F2_RELEASE_MANIFEST"; do
-  test "$(f2_manifest_value source_commit "$F2_MANIFEST")" = "$F2_MEASURED_COMMIT"
-  test "$(f2_manifest_value source_archive_sha256 "$F2_MANIFEST")" = \
-    "$F2_SOURCE_ARCHIVE_SHA"
-  test "$(f2_manifest_value source_tree_sha256 "$F2_MANIFEST")" = \
-    "$F2_SOURCE_TREE_SHA"
-  test "$(f2_manifest_value resolved_package_input_sha256 "$F2_MANIFEST")" = \
-    "$F2_PACKAGE_INPUT_SHA"
-done
-test "$(f2_manifest_value configuration "$F2_DEBUG_MANIFEST")" = Debug
-test "$(f2_manifest_value build_input_sha256 "$F2_DEBUG_MANIFEST")" = \
-  "$F2_DEBUG_BUILD_INPUT_SHA"
-test "$(f2_manifest_value configuration "$F2_RELEASE_MANIFEST")" = Release
-test "$(f2_manifest_value build_input_sha256 "$F2_RELEASE_MANIFEST")" = \
-  "$F2_RELEASE_BUILD_INPUT_SHA"
-
-for F2_RUN in 1 2 3; do
-  f2_require_empty_historical_user_site
-  f2_clean_historical_bash \
-    "$F2_CAPTURE" Debug "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/debug-build" \
-    "$F2_REPRO_ROOT/debug-$F2_RUN"
-done
-for F2_RUN in 1 2 3; do
-  f2_require_empty_historical_user_site
-  f2_clean_historical_bash \
-    "$F2_CAPTURE" Release "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/release-build" \
-    "$F2_REPRO_ROOT/release-$F2_RUN"
-done
-```
-
-Each new run is a separate reproduction attempt. Copy it to a newly allocated durable root before
-staging cleanup, freeze a new compact inventory, and report its numbers separately. It must not be
-mixed into this pack. A relevant source, fixture, dependency, XcodeGen, Xcode/SDK,
-`xcresulttool`, macOS, machine, or capture-policy change invalidates this baseline and requires a
-new six-run set; the checker enforces the identities recorded for this set but does not claim that
-every future OS/toolchain change automatically fails before new evidence is assembled.
-
-The current modular capture and runner are future maintained tooling and are **not** substituted
-into the command above: these six artifacts were captured by the exact retained `c5f36fa…`
-monolith, which in turn executed the exact `90e5aa9e…` runner in the detached measured source.
-Likewise, the modular assembler is a baseline-specific resealer, not evidence that the original
-runs used new tooling. It requires an explicit `--historical-capture-helper`, pins all historical
-reference scripts/build manifests/tool identities, and refuses output unless the result is the
-unchanged `d2f1497b…` pack. Its exact rebuild check may use still-present staging as an input, but
-that staging is neither durable evidence nor required by the checker.
-The pack's `commands.txt` is also immutable historical receipt text; the maintained operator audit
-below supersedes its unqualified `python3` spelling and requires isolated `/usr/bin/python3 -I`.
-
-Audit the retained pack with:
-
-```sh
-# Verify the current maintained operator trust root before importing/sourcing any module.
-f2_sha256_file() {
-  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
-    /usr/bin/python3 -I -S -c \
-    'import hashlib, sys
-digest = hashlib.sha256()
-with open(sys.argv[1], "rb") as stream:
-    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-        digest.update(chunk)
-print(digest.hexdigest())' "$1"
-}
-f2_require_trusted_tool_path() {
-  F2_TOOL_PATH="$1"
-  test -f "$F2_TOOL_PATH" && test ! -L "$F2_TOOL_PATH" || return 1
-  test "$(/usr/bin/stat -f '%u' "$F2_TOOL_PATH")" = "$(/usr/bin/id -u)" || return 1
-  F2_TOOL_MODE="$(/usr/bin/stat -f '%Lp' "$F2_TOOL_PATH")" || return 1
-  case "$F2_TOOL_MODE" in
-    ''|*[!0-7]*|*[2367]?|*[2367]) return 1 ;;
-  esac
-  if ! F2_TOOL_ACL="$(
-    /usr/bin/find "$F2_TOOL_PATH" -maxdepth 0 -acl -print
-  )"; then
-    return 1
-  fi
-  test -z "$F2_TOOL_ACL"
-}
-test "$(f2_sha256_file Scripts/editor-find-f2-tooling.sha256)" = \
-  ab38b8068abfc03e063bce4208ce11aa96e0236eaf687b5e8014fdb2c4ce7974
-f2_require_trusted_tool_path Scripts/editor-find-f2-tooling.sha256 || exit 1
-while read -r F2_TOOL_DIGEST F2_TOOL_PATH; do
-  [[ "$F2_TOOL_DIGEST" =~ ^[0-9a-f]{64}$ ]] || exit 1
-  f2_require_trusted_tool_path "$F2_TOOL_PATH" || exit 1
-done < Scripts/editor-find-f2-tooling.sha256
-/usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
-  /usr/bin/shasum -a 256 -c Scripts/editor-find-f2-tooling.sha256
-
-# Compact records only: prints PARTIAL/OPEN and exits 3 by default.
-test "$(f2_sha256_file Scripts/check-editor-find-f2-retained-evidence.py)" = \
-  6b258d724a7a841b92b8f54cc5b53283d4b7bbf23eb2c1bc171520cd5927cc43
-/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
-  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5
-
-# Explicitly accept the limited compact audit: still prints PARTIAL/OPEN.
-/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
-  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 --allow-partial
-
-# Current owner-local full audit: prints proxy/warning PASS while the root exists.
-/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
-  docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 \
-  --artifact-root \
-  /Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2
-```
-
-### Procedure and measured boundary
-
-The query clock starts immediately before `AppState.handleEditorFindQueryTextChange`. It includes
-App query publication, the production 150 ms debounce, detached `TextSearchEngine` matching,
-revision/query fencing, main-actor session application, and App presentation. Each deterministic
-scenario gets one unmeasured warm-up and three measured samples. Every sample hard-asserts the
-fixture identity, retained/truncated shape, exact endpoint positions, and off-main matcher receipt.
-
-| Shape | Query | Expected result | Exact retained endpoints |
+| Shape | Deterministic pattern | Expected result | Exact retained endpoints |
 |---|---|---|---|
-| Zero | `plainsong-f2-zero-hit` | 0 retained; not truncated | first/last `nil` |
-| Sparse | `generated sections: 1274` | 1 retained; not truncated | first = last: location 1,048,904, length 24, line 33,140 |
-| Dense | `section` | 10,000 retained; truncated by overflow 10,001 | first: location 399, length 7, line 15; last: location 914,752, length 7, line 28,901 |
+| Zero | `plainsong-f2-zero-hit` | 0 retained; not truncated | first `nil`; last `nil` |
+| Sparse | `generated sections: 1274` | 1 retained; not truncated | first = last: `NSRange(location: 1_048_904, length: 24)`, line 33,140 |
+| Dense | `section` (default smart case) | 10,000 retained; truncated by the 10,001st overflow match | first: `NSRange(location: 399, length: 7)`, line 15; last retained: `NSRange(location: 914_752, length: 7)`, line 28,901 |
 
-The hosted probe mounts the shipped `WorkspaceWindow` with real observed `AppState`, the public
-editor, and the shipped `EditorFindBar`. It opens find, primes the dense query, verifies visible
-`1 / 10000+`, then performs five native `insertText` edits. Admission ends when `insertText`
-returns. Root receipt ends when the test-only root representable enters its update transaction with
-the new revision, query/bar still present, and old find presentation invalidated. It does not
-require child layout or compositor presentation and includes no physical keyboard delivery.
-Therefore neither proxy proves the product `<16 ms` keystroke-to-screen criterion.
+The production-hosted probe mounts the shipped `WorkspaceWindow` in a 1,100 × 720
+`NSHostingController`/`NSWindow`, injects the real `AppState`, and waits for both the production
+`MarkdownSTTextView` and shipped `EditorFindBar` query `NSTextField`. It opens find through
+`showOrRefocusEditorFind()`, drives the dense query through
+`handleEditorFindQueryTextChange`, and confirms the visible `1 / 10000+` truncated presentation.
+Mount, find-bar creation, and dense-query priming all occur before measured editing starts.
 
-The capture helper records clean/AC/no-thermal preflight and postflight boundaries and waits 200 ms
-after each completed scan of the target process set. It retains every sample plus every exemption attributable by
-runner ancestry, exact private host path, or a token-bound private output prefix. The checker
-rejects exemptions at or after the runner-finished sample. This proves no *sampled* uncorrelated
-target process during accepted intervals; it does not claim continuous absence between samples.
+With the real editor already focused, each of five measured edits calls its native
+`insertText("x", replacementRange: .notFound)` at the mounted visible-range start. **Admission**
+starts immediately before that call and stops when it returns. **Root state-update receipt** stops
+at the timestamp captured synchronously when the root's test-only
+`NSViewRepresentable.updateNSView` enters with the new document revision, bar/query still present,
+and the old find presentation invalidated. The receipt is stored with a monotonic generation and
+bounded history so a later update cannot overwrite the awaited snapshot.
 
-For non-authoritative operator context, one attempted Debug 3 run was rejected after the monitor
-observed nine foreign monitored-process records: five `swift-frontend` and four `xctest` records
-across five unique PIDs. That rejected attempt remains only in the `/private/tmp` staging area and
-is not part of either retained evidence copy. A fresh-prefix retry began only after those processes
-ended. Accepted run sample/owned-record counts were respectively
-74/33, 74/33, 77/34, 61/18, 61/17, and 61/19, with zero uncorrelated matches in every accepted run.
+Before the first suspension, hard assertions require the completed-match count to remain unchanged,
+`session == nil`, and no pending navigation. This proves that the old presentation was invalidated
+and no new match completion or navigation was applied synchronously; it does not prove that no
+matcher work began synchronously. The polling loop calls `layoutSubtreeIfNeeded()` to drive pending
+SwiftUI/AppKit work, so incidental layout may occur before the timestamped root receipt. The
+endpoint does not require or prove that child layout completed. After finding the receipt, the test
+forces any remaining layout and proves the production editor representable updated. The eventual
+recompute is outside the two measured intervals and must run off-main, retain/truncate the same
+10,000 matches, and shift both endpoint locations by exactly the insertion count while preserving
+their line numbers.
 
-### Exact raw measurements
+The receipt proves entry into the root SwiftUI/AppKit update transaction. It excludes compositor
+presentation and physical keyboard delivery, and does not require or prove child-layout completion;
+therefore it does not close the separate `<16 ms` keystroke-to-screen criterion or claim equality
+with a find-closed distribution.
 
-All values are milliseconds. Bold is the median within the displayed sample array.
+### Raw query-completion results
+
+All values are milliseconds. Bold values are the median of the three samples in that cell.
 
 | Configuration / run | Zero samples; median | Sparse samples; median | Dense samples; median |
 |---|---|---|---|
-| Debug 1 | `[241.020, 223.153, 247.238]`; **241.020** | `[259.014, 250.378, 239.762]`; **250.378** | `[580.960, 580.041, 585.822]`; **580.960** |
-| Debug 2 | `[235.082, 245.107, 231.740]`; **235.082** | `[255.892, 232.944, 254.619]`; **254.619** | `[591.634, 600.164, 587.173]`; **591.634** |
-| Debug 3 | `[226.407, 241.879, 229.118]`; **229.118** | `[256.710, 241.698, 271.743]`; **256.710** | `[601.683, 607.733, 575.622]`; **601.683** |
-| Release 1 | `[171.100, 174.493, 178.240]`; **174.493** | `[186.542, 192.538, 184.102]`; **186.542** | `[235.831, 243.462, 237.281]`; **237.281** |
-| Release 2 | `[170.424, 171.058, 171.917]`; **171.058** | `[192.345, 189.156, 194.835]`; **192.345** | `[245.958, 221.562, 253.468]`; **245.958** |
-| Release 3 | `[177.752, 170.781, 165.903]`; **170.781** | `[181.082, 188.834, 181.319]`; **181.319** | `[215.846, 260.129, 233.066]`; **233.066** |
+| Debug 1 | `[225.510, 233.913, 228.660]`; **228.660** | `[235.019, 240.331, 245.017]`; **240.331** | `[602.360, 630.569, 599.486]`; **602.360** |
+| Debug 2 | `[225.879, 254.087, 239.759]`; **239.759** | `[261.634, 247.120, 238.273]`; **247.120** | `[589.766, 582.622, 595.543]`; **589.766** |
+| Debug 3 | `[238.206, 223.878, 254.123]`; **238.206** | `[233.184, 268.060, 255.494]`; **255.494** | `[600.940, 585.915, 608.818]`; **600.940** |
+| Release 1 | `[174.740, 175.865, 177.079]`; **175.865** | `[187.643, 187.466, 185.949]`; **187.466** | `[240.922, 216.404, 256.174]`; **240.922** |
+| Release 2 | `[171.491, 181.598, 178.105]`; **178.105** | `[182.054, 200.184, 184.481]`; **184.481** | `[231.986, 215.828, 257.420]`; **231.986** |
+| Release 3 | `[178.451, 171.086, 173.628]`; **173.628** | `[187.924, 191.544, 185.269]`; **187.924** | `[220.235, 220.595, 232.867]`; **220.595** |
 
-| Configuration / run | Admission samples; median | Root receipt samples; median; maximum |
+### Raw production-hosted edit results
+
+All values are milliseconds. Bold values are the five-sample median; the last value in the receipt
+cell is the diagnostic maximum. Budgets apply to each run's median, not its maximum.
+
+| Configuration / run | Admission samples; median | Root state-update receipt samples; median; maximum |
 |---|---|---|
-| Debug 1 | `[1.091, 0.995, 15.802, 1.098, 1.017]`; **1.091** | `[4.535, 3.599, 18.454, 3.825, 3.625]`; **3.825**; max **18.454** |
-| Debug 2 | `[1.119, 1.051, 15.787, 1.042, 0.953]`; **1.051** | `[4.568, 3.732, 18.667, 3.759, 3.506]`; **3.759**; max **18.667** |
-| Debug 3 | `[1.129, 1.062, 15.974, 1.171, 1.021]`; **1.129** | `[4.452, 3.715, 18.839, 4.259, 3.661]`; **4.259**; max **18.839** |
-| Release 1 | `[1.148, 1.015, 14.057, 0.993, 0.867]`; **1.015** | `[4.738, 4.016, 17.016, 4.252, 3.623]`; **4.252**; max **17.016** |
-| Release 2 | `[1.132, 0.904, 13.466, 0.937, 0.839]`; **0.937** | `[4.775, 3.282, 16.473, 3.355, 2.990]`; **3.355**; max **16.473** |
-| Release 3 | `[1.250, 1.036, 13.521, 1.039, 0.866]`; **1.039** | `[4.797, 3.745, 16.199, 3.791, 3.377]`; **3.791**; max **16.199** |
+| Debug 1 | `[1.150, 1.027, 16.620, 1.152, 1.025]`; **1.150** | `[4.811, 3.664, 19.917, 4.126, 3.981]`; **4.126**; max **19.917** |
+| Debug 2 | `[1.212, 1.109, 15.871, 1.037, 0.973]`; **1.109** | `[4.975, 4.035, 18.488, 3.718, 3.842]`; **4.035**; max **18.488** |
+| Debug 3 | `[1.159, 1.036, 16.001, 1.019, 0.976]`; **1.036** | `[4.799, 3.533, 18.990, 3.467, 3.618]`; **3.618**; max **18.990** |
+| Release 1 | `[1.306, 0.869, 13.346, 1.079, 0.896]`; **1.079** | `[4.912, 3.234, 15.666, 3.900, 3.361]`; **3.900**; max **15.666** |
+| Release 2 | `[1.117, 0.944, 13.367, 0.921, 0.909]`; **0.944** | `[4.582, 3.410, 16.106, 3.320, 3.419]`; **3.419**; max **16.106** |
+| Release 3 | `[1.136, 0.930, 13.701, 0.888, 0.839]`; **0.930** | `[4.918, 3.281, 16.407, 3.465, 3.171]`; **3.465**; max **16.407** |
 
-The repeated third-edit tail remains visible rather than prewarmed away. It is the existing
-main-actor `EditorScrollLineIndex` rebuild after scroll-sync cache invalidation, not in-document
-matching. Its presence is another reason not to reinterpret median admission as full screen
-latency.
+### Budgets and enforcement
 
-### Budgets and medians
+The five round ceilings were already present in measured commit `c871ddf` before the
+authoritative sequence. They were derived from earlier Debug measurements, remain defensible
+against this final same-source rerun, and were not widened after any retained result. Release is
+confirmation only and did not justify a threshold.
 
-The existing 400 / 400 / 1,100 / 5 / 15 ms local-hard ceilings were not widened. They were derived
-from earlier Debug measurements and now have the following measured headroom over the slowest new
-Debug run median. Release is confirmation only. On CI, wall-clock treatment remains informational
-under R15; fixture, result shape, warning phase, source identity, and state invariants remain hard.
-
-| Metric | Debug run medians | Debug median of run medians | Release run medians | Release median of run medians | Budget | Budget / slowest Debug median |
+| Metric | Debug run medians | Debug median of run medians | Release run medians | Release median of run medians | Budget | Budget / slowest Debug run median |
 |---|---|---:|---|---:|---:|---:|
-| Zero query completion | 241.020, 235.082, 229.118 | **235.082** | 174.493, 171.058, 170.781 | **171.058** | < 400 | 1.66x |
-| Sparse query completion | 250.378, 254.619, 256.710 | **254.619** | 186.542, 192.345, 181.319 | **186.542** | < 400 | 1.56x |
-| Dense-truncated query completion | 580.960, 591.634, 601.683 | **591.634** | 237.281, 245.958, 233.066 | **237.281** | < 1,100 | 1.83x |
-| Native edit admission | 1.091, 1.051, 1.129 | **1.091** | 1.015, 0.937, 1.039 | **1.015** | < 5 | 4.43x |
-| Root state-update receipt | 3.825, 3.759, 4.259 | **3.825** | 4.252, 3.355, 3.791 | **3.791** | < 15 | 3.52x |
+| Zero query completion | 228.660, 239.759, 238.206 | **238.206** | 175.865, 178.105, 173.628 | **175.865** | < 400 ms | 1.67x |
+| Sparse query completion | 240.331, 247.120, 255.494 | **247.120** | 187.466, 184.481, 187.924 | **187.466** | < 400 ms | 1.57x |
+| Dense-truncated query completion | 602.360, 589.766, 600.940 | **600.940** | 240.922, 231.986, 220.595 | **231.986** | < 1,100 ms | 1.83x |
+| Native edit admission | 1.150, 1.109, 1.036 | **1.109** | 1.079, 0.944, 0.930 | **0.944** | < 5 ms | 4.35x |
+| Root state-update receipt | 4.126, 4.035, 3.618 | **4.035** | 3.900, 3.419, 3.465 | **3.465** | < 15 ms | 3.64x |
 
-### Frozen run identities and warning phase
+Query gates enforce each run's three-sample median. The production-hosted gates enforce each run's
+five-sample admission and receipt medians. Deterministic fixture identity, endpoints,
+count/truncation, session invalidation, transition generation, and off-main assertions remain hard
+everywhere. Wall-clock thresholds are hard locally and print informational failures on hosted CI
+under R15.
 
-| Run | Raw log SHA-256 | Raw xcresult SHA-256 | Inspection xcresult SHA-256 | Warning phase UUID |
-|---|---|---|---|---|
-| Debug 1 | `7f5b2555b869eb4272f3b41e682d3b58fb4d1f9d736cf28f74d08a19f10c9c87` | `2a36f1f0f1552e8405aea6a9c6e37cedb7aeed25c1468b2fcc31a17c59025d36` | `2e0b3ba8fda4525f84f87e9f221dca3b5c9b9155ce93da1f25d72f3743f81b1c` | `b8bd411a-f084-4bd6-96d7-f3c9643e0932` |
-| Debug 2 | `f423e80f01fe3358e4f8c74937af32234e348a9118c3e773746ddcaa54fa295b` | `a743d37e8af25036b53b1a02daa54785d15313d2115a1de821fa070b8a84ffab` | `5482591b7c99424c3bb480a8f03d8b8a12768a92c7f85840578c6902a247d9a3` | `3b3ad8c9-2487-4ae7-ae91-a037344d058b` |
-| Debug 3 | `b97bf3663dbc79316c3312b6238736e3bf7a33e8960985dee38b4da2547e5507` | `4b64721255085afbfbc5cf2365c7f1824b7195ee9c766e837f600b8a45841bdb` | `6bac0e9446f10eeec09896dae932a942e26a9a88f5f8d6ce6f68353e7e48b4f9` | `bc493029-237a-4438-af59-c778f4f294f6` |
-| Release 1 | `7b2320385c7f5293fe81f3b8a481c17a577d4a6739b44595867c23ce09aaa771` | `8e4a78681a1ca1f0e6f214a137deeab5c2ae18ffbb01876f4fbd57b74cf2826f` | `0a1a5dc3f4e5d587677089461f07ada1a957182ef74c1135d0fd3145cab8409b` | `6c68a1f6-7cd6-4b19-9959-40ddab397737` |
-| Release 2 | `307ca9866fb40f9942b80db59617d6f7dd68e570a77207ba496228ed936918f3` | `d400fa26d00c67ecd8ffff56b7288a303f4e9cfee769015f4c0a8f9103d430b0` | `466aa01922200f8677810398857fcfcdba769f0c6cbce89e1ada00a6e0e0294e` | `c6abf3b0-a1e3-49cd-829a-d15fd49c9d99` |
-| Release 3 | `50be75593b20576ce8fad502328b87fb936c6142ee31baee14d58989fa5094f1` | `07c2b39e2d93a1b09dce353acac815328cee0bb4b44b3e328efc46ccdbc53e59` | `f212519e07cf8e6ff3f480babe47f43d6184d9c69d8f58dff780f53b841dad28` | `6b3b97ed-37c5-4fc5-b24f-34e6ddb464e9` |
+### Retained cold-path tail samples
 
-Every accepted raw log has exactly three known SwiftUI warnings before its same-UUID
-`F2_WARNING_PHASE_BEGIN`, zero during the five edits, zero after `END`, and no unknown SwiftUI
-warning. Each xcresult coalesces the three emissions into one known Runtime Warning issue. The
-existing negative control moves one warning inside the interval and must exit 1 even though the
-coalesced issue stays one. The full retained audit rechecks the raw phase, the negative control,
-the frozen result bundles, and a fresh summary from a disposable copy.
+All six retained runs have a larger synchronous sample at exactly the third insertion: Debug
+admission is 15.871–16.620 ms and Release admission is 13.346–13.701 ms. The corresponding
+receipt samples are 18.488–19.917 ms in Debug and 15.666–16.407 ms in Release. No sample is
+discarded; the complete arrays above retain both the slow and non-slow shapes.
 
-This is a narrow exception, not warning-free evidence. A warning during a measured edit fails; a
-signature/count change also fails the frozen baseline. The pre-measure warnings remain in the
-pre-F2 selection-binding/navigation path. F8-owned production files were not modified here.
+Repeated sampling attributed that spike to the editor/preview scroll-sync bridge's
+`EditorScrollLineIndex.init(text:)`: after the text-change observer invalidates its cache, the next
+visible-line request synchronously rebuilds line starts by walking the full 1 MiB string's UTF-16
+units. This O(n) main-actor work extends `insertText` admission. It is not find matching: before
+every await the probe proves no new match result or navigation was applied and the old
+session/navigation are gone, while the later exact dense recompute again reports that it ran
+off-main.
 
-### F8 and full-product boundary
+Time-profile investigation localized the repeated shape to the editor/preview scroll-sync
+line-index rebuild. That diagnostic was not used as an authoritative timing run. The final
+same-source arrays above are the only retained baseline numbers. The cold-path production debt
+remains real even though it is not universal; the median-based F2 proxies pass, while the full
+`<16 ms` keystroke-to-screen criterion remains open.
 
-Measured commit `c871ddf` has no production highlight-all apply/clear surface. The fixture,
-deterministic scenarios, production host, and generation-stamped receipt can be reused after F8
-lands, but no apply, clear, preservation, physical-input, screen-presentation, F9, or combined-tip
-evidence is claimed here.
+### Narrow pre-measure warning exception
+
+Each of the six authoritative logs contains exactly three
+`Modifying state during view update, this will cause undefined behavior.` warnings, all before
+measured editing begins: two while the production editor representable mounts and one while the
+dense prime applies its initial navigation. The six paired `.xcresult` bundles each coalesce those
+three console emissions into one Runtime Warning issue.
+
+The test prints one unambiguous
+`F2_WARNING_PHASE_BEGIN id=<UUID> edits=5` line immediately before the five-edit loop and the
+matching `F2_WARNING_PHASE_END` immediately after it. The six phase IDs are:
+
+| Run | Phase ID | Raw known warnings |
+|---|---|---|
+| Debug 1 | `ef9d4898-ec6d-462e-a00e-372d9ac8370a` | pre 3; measured 0; post 0 |
+| Debug 2 | `6292d0a5-dab2-4180-a1df-69d19754323c` | pre 3; measured 0; post 0 |
+| Debug 3 | `c4a4a9c6-6f22-42b0-90a7-324cab6bcb0c` | pre 3; measured 0; post 0 |
+| Release 1 | `a4f1fb48-efe6-417c-8f5a-a6b645ce4d6e` | pre 3; measured 0; post 0 |
+| Release 2 | `d49f668f-4a51-46ae-8efc-37ee25e973f6` | pre 3; measured 0; post 0 |
+| Release 3 | `9ff731a8-5bc9-4449-b715-e25c0587577c` | pre 3; measured 0; post 0 |
+
+The measured-source runner invokes `Scripts/check-editor-find-f2-warning-phase.py` before the
+outer capture can accept a run, and the retained-pack auditor independently replays the same
+warning-phase and negative-control contracts from each sealed raw log. The checks verify the
+sealed raw-log and raw-result digests, exactly one ordered marker pair with the same UUID and
+`edits=5`, exactly three known warnings before `BEGIN`, zero known warnings between `BEGIN` and
+`END`, zero after `END`, zero other SwiftUI diagnostics, and two `local-hard` budget markers. It
+also requires the `.xcresult` inspection copy to report exactly two passing tests, zero failures,
+and exactly one coalesced Runtime Warning issue with the known message. Thus the raw log, rather
+than coalesced issue count, is authoritative for warning phase.
+
+For every retained run, the auditor moves one known pre-measure warning inside the measured interval
+in memory and requires validation to fail specifically because a warning occurred during the five
+edits. This proves a measured warning cannot pass merely because `.xcresult` still exposes the same
+single coalesced issue; no mutated negative-control artifact is retained.
+
+The `.xcresult` issue has no `sourceURL` in Debug and generically attributes
+`PerformanceTests/EditorFindProductionHostSupport.swift` in Release, so it proves warning
+presence but not the phase or origin of each console emission. Break-at-warning diagnosis localized the
+mount pair to the pre-F2 `MarkdownTextView.makeNSView` setup ordering: the coordinator becomes the
+text delegate and initial selection is assigned before the coordinator enters its update guard, so
+the selection callback writes the SwiftUI selection binding during view construction. Running the
+pre-existing hosted
+`AppBackedEditorPerformanceTests.testHostedPublicEditorCurrentRevisionInputAndMarkedTextStayWithinFrameBudget`
+without the F2 root receipt produces the same coalesced Runtime Warning family in
+`/private/tmp/f2-warning-appbacked.xcresult`, confirming that the family is not introduced by the
+receipt. That bundle does not retain a per-emission console log and is not used to prove the
+authoritative two-emission mount count; that count comes from each of the six retained F2 logs.
+
+The dense-prime warning localizes to the pre-F2 navigation path assigning the applied selection.
+In the probe, `primeProductionWorkspaceFind` returns before the begin marker and measured-edit loop,
+so this navigation warning is independently proven pre-measure by each raw log. The test-only root
+receipt is plain storage and publishes no SwiftUI state; it is not the warning source. The
+concurrently F8-owned `MarkdownTextView`, coordinator, and highlight files were not changed to
+eliminate these pre-existing warnings.
+
+This baseline is accepted only under that exact three-warning, pre-measure exception and is not
+warning-free UI evidence. Under the current checker, any signature/count change — including fewer
+warnings — or any warning at or after `BEGIN` fails the run. A relevant editor/F8/toolchain/OS
+change is not compared by that checker; it invalidates this baseline and requires a fresh six-run
+evidence set. If the production path is fixed, the checker and this exception must be deliberately
+replaced with a zero-warning contract before new evidence is accepted.
+
+### Open boundaries
+
+Measured commit `c871ddf` has no production highlight-all apply/clear implementation, so this F2
+evidence records no F8 preservation, apply-latency, or clear-latency claim; later F8 work must carry
+its own evidence. The harness begins at programmatic insertion and stops at root update receipt, so
+full keystroke-to-screen remains open. F9 launched-app/physical-input acceptance is also outside
+this pack, and no combined-tip result is claimed. These four boundaries are encoded as `open` in
+the immutable retained manifest. The maintained auditor also prints the current policy boundary
+`independent-durable-retention` as open without rewriting that historical manifest; both compact
+and full audits therefore report all five open boundaries.
 
 ## Typing Latency
 

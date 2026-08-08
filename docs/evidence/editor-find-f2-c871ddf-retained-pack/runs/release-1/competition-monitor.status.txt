@@ -1,0 +1,15 @@
+format=4
+monitor_pid=50156
+runner_pid=50189
+started_utc=2026-08-07T21:46:41.302525Z
+finished_utc=2026-08-07T21:47:03.681464Z
+first_sample_finished_utc=2026-08-07T21:46:41.392373Z
+last_sample_started_utc=2026-08-07T21:47:03.592235Z
+sample_interval_ms=200
+sample_count=60
+match_count=0
+process_filter=xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner
+process_ownership_rule=runner-descendants-or-exact-frozen-product-host
+capture_tooling_sha256=5a8ff6ca023de2954847d3e9903413daab7b52434ce24efac8536f9b016d5136
+allowed_host_executable=/private/tmp/plainsong-f2-evidence-review.SnCT6g/release-1.products/Build/Products/Release/Plainsong.app/Contents/MacOS/Plainsong
+exit_status=0
