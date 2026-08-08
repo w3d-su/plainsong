@@ -128,7 +128,8 @@
             let now = Date()
             try makeExpired(workspaceURL, relativeTo: now)
 
-            weak let releasedFixture = fixture
+            weak var releasedFixture: DebugEditorFindFixture.CreatedFixture?
+            releasedFixture = fixture
             fixture = nil
             XCTAssertNil(releasedFixture)
 
@@ -189,7 +190,8 @@
             let now = Date()
             try makeExpired(workspaceURL, relativeTo: now)
 
-            weak let releasedFixture = fixture
+            weak var releasedFixture: DebugEditorFindFixture.CreatedFixture?
+            releasedFixture = fixture
             fixture = nil
             XCTAssertNil(releasedFixture)
 
