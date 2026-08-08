@@ -699,11 +699,15 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   The strengthened exact-implementation-tree command
   `xcodebuild test -project Plainsong.xcodeproj -scheme Plainsong
   -destination 'platform=macOS,arch=arm64' -derivedDataPath
-  /private/tmp/plainsong-f9-review-dd-20260808 -resultBundlePath
-  /private/tmp/plainsong-f9-authenticated-3x-20260808-ready.xcresult
+  /private/tmp/plainsong-pr109-c0df6ec-f9-dd -resultBundlePath
+  /private/tmp/plainsong-pr109-c0df6ec-f9-3x.xcresult
   -only-testing:PlainsongUITests/EditorFindAcceptanceTests -test-iterations 3`
   passed all 9 launched-app executions (three methods × three iterations), with zero failure
-  or skip. Every execution completed its exact nonce-bound app-side cleanup handshake before
+  or skip on exact code/test commit `c0df6ec`. That commit replaces two Xcode-16.4-invalid
+  `weak let` test bindings with an explicitly assigned mutable weak reference; clearing the
+  fixture still releases the only strong reference before the same `XCTAssertNil` lease-release
+  proof, so the regression contract is unchanged. Every execution completed its exact
+  nonce-bound app-side cleanup handshake before
   termination; all nine current-run fixture identifiers had neither a workspace nor lease entry
   afterwards, and the app-container fixture root was empty. The canonical xcresult summary
   reports no test failure
@@ -745,8 +749,8 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   exact workspace/marker handle. Once marker removal is verified, retry requires the exact
   quarantine to be empty and does not recursively delete any newly appeared occupant.
 
-  Current-tree focused fixture/lease coverage passed 46/46 with no failure, skip, or runtime
-  warning in `/private/tmp/plainsong-f9-final-split-fixtures-20260808.xcresult`. It includes
+  Exact-`c0df6ec` focused fixture/lease coverage passed 46/46 with no failure or skip in
+  `/private/tmp/plainsong-pr109-c0df6ec-focused46.xcresult`. It includes
   deterministic initial-inspection swaps, live/stale replacement sentinels, post-rename and
   post-unlink throw/retry, remove-then-throw recovery, rename-away, live-lease preservation,
   deterministic pre-marker partial-removal retry, live retained-handle post-marker retry, and
@@ -833,11 +837,12 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `PlainsongUITests-Runner` launch before UI assertions (`LaunchServices` error `-600`);
   Xcodebuild exited 65, Make exited 2, and Make did not reach preview. This remains a runner/
   automation failure and not a green full-suite run. After normal macOS UI Automation
-  authentication, the final ordinary `make test` completed all four Swift package stages,
+  authentication, a fresh ordinary `make test` on the compatibility-adjusted `c0df6ec`
+  code/test tree completed all four Swift package stages,
   passed the Xcode phase with 675 tests passed, one skipped, and zero failed (including F9
   3/3, all `PlainsongUITests` 29/29, and performance 23/23), then passed preview `vitest`
   41/41; Make exited zero. The Xcode artifact is
-  `Test-Plainsong-2026.08.08_22-01-29-+0800.xcresult`. All
+  `Test-Plainsong-2026.08.08_22-52-38-+0800.xcresult`. All
   F9 state waits are
   predicate-based; no
   `NSOpenPanel` is used. Synthetic XCUI `typeKey` evidence is not physical-keyboard or IME
