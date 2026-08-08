@@ -433,7 +433,8 @@ interruption of in-flight engine work.
   per-run three-sample-median budgets.
   Evidence:
   `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`;
-  exact content SHA, match endpoints, six raw runs, and budgets are in `docs/perf-log.md`.
+  exact content SHA, match endpoints, six raw runs, and budgets are in `docs/perf-log.md`;
+  the durable compact pack is `docs/evidence/editor-find-f2-c871ddf-retained-pack/`.
 - [x] With a dense live query open, the shipped `WorkspaceWindow`, real `AppState`, public
   editor, and shipped `EditorFindBar` path admit five deterministic native edits with a
   per-run median &lt;5 ms and deliver the invalidated AppState snapshot into the root
@@ -449,7 +450,7 @@ interruption of in-flight engine work.
   end-to-end. The current harness begins at programmatic `insertText` and stops at root
   update-transaction entry, so it cannot close this criterion. The retained raw samples
   also expose a real one-off synchronous O(n) preview-scroll line-index rebuild
-  (Debug admission up to 25.264 ms; Release up to 14.444 ms), which is separate production
+  (Debug admission up to 16.620 ms; Release up to 13.701 ms), which is separate production
   performance debt rather than find matching. Physical-input, child-layout/compositor, and
   that cold rebuild must be resolved or explicitly covered before checking this box.
 
@@ -666,11 +667,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   assertion (proves preservation, not just initial paint).
 - [ ] If highlight-all is deferred out of v1, this gate stays open and PR D must say so
   explicitly rather than checking the box.
-- Evidence: **open / explicitly deferred.** The measured `c871ddf` source includes
-  `origin/main` at `250e91e` and has no production highlight-all apply/clear surface. The F2
-  fixture, hosted harness, and zero/sparse/dense scenarios are reusable for a later F8 probe,
-  but this branch-only evidence neither measures nor claims highlight preservation, apply
-  latency, or clear latency on any combined tip.
+- Evidence: **open in this F2 baseline.** The measured `c871ddf` source includes
+  `origin/main` at `250e91e` and has no production highlight-all apply/clear surface. Separate
+  Draft PR #106 owns F8 implementation/evidence; nothing in the F2 retained pack measures or
+  claims highlight preservation, apply latency, clear latency, or a combined-tip result.
 
 ### F9 — Accessibility + XCUITest
 
@@ -699,14 +699,15 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 | CI | Wall-clock hard locally, informational on hosted CI under R15; deterministic correctness assertions hard everywhere. |
 
 **F2 result:** source commit `c871ddf5c66c17f03fd9456b53f79411f9b2e979` passed three
-Debug and three Release runs. Frozen query-completion budgets are &lt;400 ms zero,
+Debug and three Release runs under evidence tooling `03ffd7024ac248977a802bb46b7f0413293979cd`.
+The versioned compact pack audits all six runs; the owner's non-portable full-artifact root also
+passed exact rehash. Frozen query-completion budgets are &lt;400 ms zero,
 &lt;400 ms sparse, and &lt;1,100 ms dense-truncated. The production-hosted five-edit median
 budgets are &lt;5 ms for synchronous admission and &lt;15 ms for root state-update receipt.
 The complete command/environment record, exact fixture identity/endpoints, raw samples,
 sealed source/package/artifact hashes, warning-phase negative control, outlier diagnosis, and
-narrow warning exception are in `docs/perf-log.md`. These results
-close only the named F2 proxy contracts; the full &lt;16 ms keystroke-to-screen criterion,
-F8, and F9 remain open.
+narrow warning exception are in `docs/perf-log.md`. These results close only the named F2 proxy
+contracts; full &lt;16 ms keystroke-to-screen, F8 apply/clear, F9, and combined-tip remain open.
 
 ## 10. Non-goals for this gate set
 
