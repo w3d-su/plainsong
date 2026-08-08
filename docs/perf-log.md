@@ -410,11 +410,25 @@ The replacement policy is fail-closed:
 | `xcresulttool` | `/Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcresulttool`; SHA-256 `7aada4a60aad3de62bc7fbda7afd990e53d8335710d1a8792fd279d42491a5c9` |
 | Machine | MacBookPro18,3, Apple M1 Pro, arm64, 8 physical/logical cores, 16 GiB RAM, AC power, no thermal warning at each accepted boundary |
 | Fixture | `Fixtures/large-1mb.md`, 1,048,962 UTF-8 bytes, SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
-| Capture helper | `Scripts/capture-editor-find-f2-authoritative-run.sh`; SHA-256 `c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef` |
-| Pack assembler | `Scripts/assemble-editor-find-f2-retained-evidence.py`; SHA-256 `5ec0f6503d8e04f59120be090dd450f98a3b24fde1560d570d7996aa7cc1f06b` |
-| Retained-evidence checker | `Scripts/check-editor-find-f2-retained-evidence.py`; SHA-256 `b9e241019550558614c93770a85f75a8b509c0031f3e7fab17a9264b2096c5fc` |
+| Historical measured capture helper | `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5/reference/capture-editor-find-f2-authoritative-run.sh`; SHA-256 `c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef` |
+| Historical measured exact-source runner | Same pack, `reference/run-editor-find-f2-performance-gate.sh`; SHA-256 `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
+| Maintained tooling inventory | `Scripts/editor-find-f2-tooling.sha256`; SHA-256 `ab38b8068abfc03e063bce4208ce11aa96e0236eaf687b5e8014fdb2c4ce7974` |
+| Maintained modular capture / exact-source runner | Thin wrappers SHA-256 `d188fcbd66a3c93907c0880bbe1cb94e15c09bbd0712d753d399334a41af285c` / `a5a05f706906f19c24fd3025cb7f387a41be7767a0e1b05b763139e837971340`; every sourced module is pinned by its wrapper and the tooling inventory |
+| Maintained pack assembler | `Scripts/assemble-editor-find-f2-retained-evidence.py`; thin-wrapper SHA-256 `05f37034a892edd9d87481486e3a282f5582b03edb4263a0efc38816f5df4151`; module hashes are in the tooling inventory |
+| Maintained retained-evidence checker | `Scripts/check-editor-find-f2-retained-evidence.py`; thin-wrapper SHA-256 `6b258d724a7a841b92b8f54cc5b53283d4b7bbf23eb2c1bc171520cd5927cc43`; module hashes are in the tooling inventory |
 | Compact pack | `docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5`; `SHA256SUMS` SHA-256 `d2f1497b19c37db3b49b5028292871fe6194752d94de05f55d5e7b6337767e22` |
 | Full owner-local root | `/Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2`; read-only; approximately 1.2 GiB; not externally replicated |
+
+Current Python operator entry points require `/usr/bin/python3 -I`. Current maintained shell entry
+points require an absolute entry-point path; direct execution supplies `bash -p` via the shebang,
+while an explicit shell caller must use an allowlisted `env -i ... /bin/bash -p ABSOLUTE_PATH`
+launcher. Maintained file digests use an empty environment and `/usr/bin/python3 -I -S`, not the
+ambient-Perl `/usr/bin/shasum` path; executable/package paths reject non-owner or group/world-write
+authority and ACL `allow` entries, while sealed input/output trees reject every ACL. In every case,
+verify the tooling inventory and its pinned hash before execution. As with the owner-local evidence
+itself, this trust root assumes files remain stable against a concurrent process already trusted as
+the current UID between verification and pathname reopening; that same-UID boundary is explicit,
+not a claim of race-proof loading.
 
 Both builds retain source-archive SHA-256
 `f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506` and pre-generation
@@ -433,9 +447,23 @@ The Debug/Release build-manifest hashes are
 
 The measured build wrapper archives the `HEAD` of the checkout containing it. Running that wrapper
 from this later documentation commit would therefore measure the wrong source. Start with a clean
-detached worktree at the full measured commit, but invoke the newer capture helper from a separate
-evidence checkout whose hash is verified. Allocate a new mode-0700 staging root; never reuse the
-retained paths.
+detached worktree at the full measured commit, but invoke the exact retained historical capture
+helper from a separate evidence checkout whose hash is verified. Allocate a new mode-0700 staging
+root; never reuse any retained path. The immutable historical shell helpers predate the maintained
+`bash -p` bootstrap, so the recipe launches them through an empty outer-shell allowlist that removes
+inherited shell functions and `BASH_ENV` and supplies a fixed system-only `PATH`.
+
+That outer launcher cannot retrofit isolated Python into immutable helpers: the historical build
+and runner invoke Xcode's `/usr/bin/python3` without `-I`, and the runner recreates its own child
+environment. The exact measured source tree prevents an untracked `Scripts/` shadow module, and the
+recipe below requires the current user-site directory to be absent or empty, checks that every
+existing directory from the user site to the canonical home is current-UID-owned and not
+group/world-writable, rejects every access-control-list `allow` entry, and repeats that check before
+every historical-helper invocation. This is a current-UID boundary, not protection against a
+concurrent process already trusted as that same UID.
+Xcode's system-site startup remains part of the selected historical toolchain and is not separately
+hash-pinned by the retained checker. Treat any reproduction as a separately reported
+historical-tool attempt, never as evidence produced by the current isolated maintained tooling.
 
 ```sh
 set -euo pipefail
@@ -444,9 +472,9 @@ export GIT_CONFIG_NOSYSTEM=1
 export GIT_NO_REPLACE_OBJECTS=1
 
 F2_MEASURED_COMMIT=c871ddf5c66c17f03fd9456b53f79411f9b2e979
-F2_REPOSITORY_ROOT="$(git rev-parse --show-toplevel)"
+F2_REPOSITORY_ROOT="$(/usr/bin/git --no-replace-objects rev-parse --show-toplevel)"
 F2_EVIDENCE_CHECKOUT="$F2_REPOSITORY_ROOT"
-F2_CAPTURE="$F2_EVIDENCE_CHECKOUT/Scripts/capture-editor-find-f2-authoritative-run.sh"
+F2_CAPTURE_REFERENCE="$F2_EVIDENCE_CHECKOUT/docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5/reference/capture-editor-find-f2-authoritative-run.sh"
 F2_CAPTURE_SHA=c5f36fa61dc8cd3c9c465f61ec10695b3d21016bb16058f0ab66198f234597ef
 F2_SOURCE_ARCHIVE_SHA=f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506
 F2_SOURCE_TREE_SHA=51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94
@@ -455,27 +483,155 @@ F2_DEBUG_BUILD_INPUT_SHA=2093bf7df313cc13ae24c964a6661ae05d15471547c553fc295003b
 F2_RELEASE_BUILD_INPUT_SHA=3b8012362941b304eb7d7812a8b6e3c9196b49555060af8164db4dadbe4f1fb6
 F2_REPRO_ROOT="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-c871ddf-repro.XXXXXX)"
 F2_SOURCE_WORKTREE="$F2_REPRO_ROOT/source"
+F2_CAPTURE="$F2_REPRO_ROOT/historical-capture-helper.sh"
+F2_RUNNER_USER="$(/usr/bin/id -un)"
+F2_RUNNER_UID="$(/usr/bin/id -u)"
+F2_RUNNER_HOME="$(
+  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    /usr/bin/python3 -I -c \
+    'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)'
+)"
+F2_HISTORICAL_USER_SITE="$(
+  /usr/bin/env -i HOME="$F2_RUNNER_HOME" LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    USER="$F2_RUNNER_USER" /usr/bin/python3 -I -c \
+    'import site; print(site.getusersitepackages())'
+)"
 
-test "$(/usr/bin/shasum -a 256 "$F2_CAPTURE" | /usr/bin/awk '{print $1}')" = \
-  "$F2_CAPTURE_SHA"
+f2_sha256_file() {
+  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    /usr/bin/python3 -I -S -c \
+    'import hashlib, sys
+digest = hashlib.sha256()
+with open(sys.argv[1], "rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+print(digest.hexdigest())' "$1"
+}
+
+test -n "$F2_RUNNER_USER"
+case "$F2_RUNNER_UID" in
+  ''|*[!0-9]*) exit 1 ;;
+esac
+case "$F2_RUNNER_HOME" in
+  *$'\n'*|'') exit 1 ;;
+  /*) ;;
+  *) exit 1 ;;
+esac
+case "$F2_HISTORICAL_USER_SITE" in
+  *$'\n'*) exit 1 ;;
+  "$F2_RUNNER_HOME"/*) ;;
+  *) exit 1 ;;
+esac
+
+f2_require_owner_controlled_directory() {
+  F2_CONTROLLED_DIRECTORY="$1"
+  test -d "$F2_CONTROLLED_DIRECTORY"
+  test ! -L "$F2_CONTROLLED_DIRECTORY"
+  test "$(builtin cd "$F2_CONTROLLED_DIRECTORY" && /bin/pwd -P)" = \
+    "$F2_CONTROLLED_DIRECTORY"
+  test "$(/usr/bin/stat -f '%u' "$F2_CONTROLLED_DIRECTORY")" = \
+    "$F2_RUNNER_UID"
+  F2_CONTROLLED_MODE="$(/usr/bin/stat -f '%Lp' "$F2_CONTROLLED_DIRECTORY")"
+  case "$F2_CONTROLLED_MODE" in
+    ''|*[!0-7]*|*[2367]?|*[2367]) exit 1 ;;
+  esac
+  if ! F2_CONTROLLED_ACL="$(
+    LC_ALL=C /bin/ls -lde "$F2_CONTROLLED_DIRECTORY"
+  )"; then
+    echo "could not inspect historical Python user-site ACL boundary" >&2
+    exit 1
+  fi
+  case "$F2_CONTROLLED_ACL" in
+    *$'\n'*' allow '*) exit 1 ;;
+  esac
+}
+
+f2_require_empty_historical_user_site() {
+  F2_EXISTING_SITE_ANCESTOR="$F2_HISTORICAL_USER_SITE"
+  while ! test -d "$F2_EXISTING_SITE_ANCESTOR"; do
+    F2_NEXT_SITE_ANCESTOR="$(/usr/bin/dirname "$F2_EXISTING_SITE_ANCESTOR")"
+    test "$F2_NEXT_SITE_ANCESTOR" != "$F2_EXISTING_SITE_ANCESTOR"
+    F2_EXISTING_SITE_ANCESTOR="$F2_NEXT_SITE_ANCESTOR"
+  done
+  case "$F2_EXISTING_SITE_ANCESTOR" in
+    "$F2_RUNNER_HOME"|"$F2_RUNNER_HOME"/*) ;;
+    *) exit 1 ;;
+  esac
+  while :; do
+    f2_require_owner_controlled_directory "$F2_EXISTING_SITE_ANCESTOR"
+    test "$F2_EXISTING_SITE_ANCESTOR" != "$F2_RUNNER_HOME" || break
+    F2_EXISTING_SITE_ANCESTOR="$(/usr/bin/dirname "$F2_EXISTING_SITE_ANCESTOR")"
+  done
+  if test -d "$F2_HISTORICAL_USER_SITE"; then
+    if ! F2_USER_SITE_FIRST_ENTRY="$(
+      /usr/bin/find "$F2_HISTORICAL_USER_SITE" -mindepth 1 -print -quit
+    )"; then
+      echo "could not inspect historical Python user site" >&2
+      exit 1
+    fi
+    test -z "$F2_USER_SITE_FIRST_ENTRY"
+  fi
+}
+
+f2_require_empty_historical_user_site
+
+f2_clean_historical_bash() {
+  /usr/bin/env -i \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_NO_REPLACE_OBJECTS=1 \
+    HOME="$F2_RUNNER_HOME" \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LOGNAME="$F2_RUNNER_USER" \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    TMPDIR=/private/tmp \
+    USER="$F2_RUNNER_USER" \
+    /bin/bash "$@"
+}
+
+test -f "$F2_CAPTURE_REFERENCE" && test ! -L "$F2_CAPTURE_REFERENCE"
+test "$(f2_sha256_file "$F2_CAPTURE_REFERENCE")" = "$F2_CAPTURE_SHA"
 test "$(/usr/bin/stat -f '%Lp' "$F2_REPRO_ROOT")" = 700
+/bin/cp "$F2_CAPTURE_REFERENCE" "$F2_CAPTURE"
+test "$(f2_sha256_file "$F2_CAPTURE")" = "$F2_CAPTURE_SHA"
+/bin/chmod 400 "$F2_CAPTURE"
 /usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
   cat-file -e "${F2_MEASURED_COMMIT}^{commit}"
 /usr/bin/git --no-replace-objects -C "$F2_REPOSITORY_ROOT" \
   worktree add --detach "$F2_SOURCE_WORKTREE" "$F2_MEASURED_COMMIT"
 test "$(/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" rev-parse HEAD)" = \
   "$F2_MEASURED_COMMIT"
-if /usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
-  symbolic-ref -q HEAD >/dev/null; then
-  echo "F2 reproduction source must be detached" >&2
+F2_SYMBOLIC_REF_STATUS=0
+/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
+  symbolic-ref -q HEAD >/dev/null || F2_SYMBOLIC_REF_STATUS=$?
+case "$F2_SYMBOLIC_REF_STATUS" in
+  0)
+    echo "F2 reproduction source must be detached" >&2
+    exit 1
+    ;;
+  1) ;;
+  *)
+    echo "could not inspect F2 reproduction HEAD attachment" >&2
+    exit 1
+    ;;
+esac
+if ! F2_SOURCE_STATUS="$(
+  /usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
+    status --porcelain=v1 --untracked-files=all
+)"; then
+  echo "could not inspect F2 reproduction source status" >&2
   exit 1
 fi
-test -z "$(/usr/bin/git --no-replace-objects -C "$F2_SOURCE_WORKTREE" \
-  status --porcelain=v1 --untracked-files=all)"
+test -z "$F2_SOURCE_STATUS"
 
-"$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+f2_require_empty_historical_user_site
+f2_clean_historical_bash \
+  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
   Debug "$F2_REPRO_ROOT/debug-build"
-"$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
+f2_require_empty_historical_user_site
+f2_clean_historical_bash \
+  "$F2_SOURCE_WORKTREE/Scripts/build-editor-find-f2-performance-gate.sh" \
   Release "$F2_REPRO_ROOT/release-build"
 
 f2_manifest_value() {
@@ -502,11 +658,15 @@ test "$(f2_manifest_value build_input_sha256 "$F2_RELEASE_MANIFEST")" = \
   "$F2_RELEASE_BUILD_INPUT_SHA"
 
 for F2_RUN in 1 2 3; do
-  "$F2_CAPTURE" Debug "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/debug-build" \
+  f2_require_empty_historical_user_site
+  f2_clean_historical_bash \
+    "$F2_CAPTURE" Debug "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/debug-build" \
     "$F2_REPRO_ROOT/debug-$F2_RUN"
 done
 for F2_RUN in 1 2 3; do
-  "$F2_CAPTURE" Release "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/release-build" \
+  f2_require_empty_historical_user_site
+  f2_clean_historical_bash \
+    "$F2_CAPTURE" Release "$F2_SOURCE_WORKTREE" "$F2_REPRO_ROOT/release-build" \
     "$F2_REPRO_ROOT/release-$F2_RUN"
 done
 ```
@@ -518,22 +678,68 @@ mixed into this pack. A relevant source, fixture, dependency, XcodeGen, Xcode/SD
 new six-run set; the checker enforces the identities recorded for this set but does not claim that
 every future OS/toolchain change automatically fails before new evidence is assembled.
 
+The current modular capture and runner are future maintained tooling and are **not** substituted
+into the command above: these six artifacts were captured by the exact retained `c5f36fa…`
+monolith, which in turn executed the exact `90e5aa9e…` runner in the detached measured source.
+Likewise, the modular assembler is a baseline-specific resealer, not evidence that the original
+runs used new tooling. It requires an explicit `--historical-capture-helper`, pins all historical
+reference scripts/build manifests/tool identities, and refuses output unless the result is the
+unchanged `d2f1497b…` pack. Its exact rebuild check may use still-present staging as an input, but
+that staging is neither durable evidence nor required by the checker.
+The pack's `commands.txt` is also immutable historical receipt text; the maintained operator audit
+below supersedes its unqualified `python3` spelling and requires isolated `/usr/bin/python3 -I`.
+
 Audit the retained pack with:
 
 ```sh
+# Verify the current maintained operator trust root before importing/sourcing any module.
+f2_sha256_file() {
+  /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+    /usr/bin/python3 -I -S -c \
+    'import hashlib, sys
+digest = hashlib.sha256()
+with open(sys.argv[1], "rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+print(digest.hexdigest())' "$1"
+}
+f2_require_trusted_tool_path() {
+  F2_TOOL_PATH="$1"
+  test -f "$F2_TOOL_PATH" && test ! -L "$F2_TOOL_PATH" || return 1
+  test "$(/usr/bin/stat -f '%u' "$F2_TOOL_PATH")" = "$(/usr/bin/id -u)" || return 1
+  F2_TOOL_MODE="$(/usr/bin/stat -f '%Lp' "$F2_TOOL_PATH")" || return 1
+  case "$F2_TOOL_MODE" in
+    ''|*[!0-7]*|*[2367]?|*[2367]) return 1 ;;
+  esac
+  if ! F2_TOOL_ACL="$(
+    /usr/bin/find "$F2_TOOL_PATH" -maxdepth 0 -acl -print
+  )"; then
+    return 1
+  fi
+  test -z "$F2_TOOL_ACL"
+}
+test "$(f2_sha256_file Scripts/editor-find-f2-tooling.sha256)" = \
+  ab38b8068abfc03e063bce4208ce11aa96e0236eaf687b5e8014fdb2c4ce7974
+f2_require_trusted_tool_path Scripts/editor-find-f2-tooling.sha256 || exit 1
+while read -r F2_TOOL_DIGEST F2_TOOL_PATH; do
+  [[ "$F2_TOOL_DIGEST" =~ ^[0-9a-f]{64}$ ]] || exit 1
+  f2_require_trusted_tool_path "$F2_TOOL_PATH" || exit 1
+done < Scripts/editor-find-f2-tooling.sha256
+/usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+  /usr/bin/shasum -a 256 -c Scripts/editor-find-f2-tooling.sha256
+
 # Compact records only: prints PARTIAL/OPEN and exits 3 by default.
-test "$(/usr/bin/shasum -a 256 Scripts/check-editor-find-f2-retained-evidence.py | \
-  /usr/bin/awk '{print $1}')" = \
-  b9e241019550558614c93770a85f75a8b509c0031f3e7fab17a9264b2096c5fc
-/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+test "$(f2_sha256_file Scripts/check-editor-find-f2-retained-evidence.py)" = \
+  6b258d724a7a841b92b8f54cc5b53283d4b7bbf23eb2c1bc171520cd5927cc43
+/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
   docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5
 
 # Explicitly accept the limited compact audit: still prints PARTIAL/OPEN.
-/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
   docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 --allow-partial
 
 # Current owner-local full audit: prints proxy/warning PASS while the root exists.
-/usr/bin/python3 Scripts/check-editor-find-f2-retained-evidence.py \
+/usr/bin/python3 -I Scripts/check-editor-find-f2-retained-evidence.py \
   docs/performance-evidence/editor-find-f2/2026-08-08-c871ddf5 \
   --artifact-root \
   /Users/davis._.su/Documents/PlainsongPerformanceEvidence/editor-find-f2/2026-08-08-c871ddf.mYSJrs/authoritative-final-v2

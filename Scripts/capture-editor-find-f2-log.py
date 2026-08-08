@@ -1,12 +1,18 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -I
 
 """Capture an F2 evidence stream while binding and sealing its exact bytes."""
 
 from __future__ import annotations
 
+import sys
+
+if not sys.flags.isolated:
+    raise SystemExit(
+        "F2 tooling entry point requires isolated Python; use /usr/bin/python3 -I"
+    )
+
 import hashlib
 import os
-import sys
 from pathlib import Path
 
 

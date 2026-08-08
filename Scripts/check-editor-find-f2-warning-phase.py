@@ -1,14 +1,20 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -I
 
 """Validate the narrow F2 hosted SwiftUI-warning exception."""
 
 from __future__ import annotations
 
+import sys
+
+if not sys.flags.isolated:
+    raise SystemExit(
+        "F2 tooling entry point requires isolated Python; use /usr/bin/python3 -I"
+    )
+
 import hashlib
 import json
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -67,7 +73,7 @@ def validate_artifact_digest(result_path: Path, expected_sha256: str) -> None:
 
     hasher = Path(__file__).with_name("hash-editor-find-f2-artifact.py")
     completed = subprocess.run(
-        ["/usr/bin/python3", str(hasher), str(result_path)],
+        ["/usr/bin/python3", "-I", str(hasher), str(result_path)],
         check=False,
         capture_output=True,
         text=True,

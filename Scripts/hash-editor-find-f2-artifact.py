@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -I
 
 """Hash F2 artifact content, tree shape, and executable bits.
 
@@ -10,10 +10,16 @@ when the bytes consumed by the build are unchanged.
 
 from __future__ import annotations
 
+import sys
+
+if not sys.flags.isolated:
+    raise SystemExit(
+        "F2 tooling entry point requires isolated Python; use /usr/bin/python3 -I"
+    )
+
 import hashlib
 import os
 import stat
-import sys
 from pathlib import Path
 
 
