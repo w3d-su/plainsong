@@ -326,20 +326,30 @@ def validate_pack(
             "pack inventory trust-root SHA-256 differs",
         )
     inventory = validate_inventory(pack_root)
-    schema = load_schema()
     manifest_path = pack_file(pack_root, inventory, "manifest.json", "manifest")
     manifest = _exact_keys(
         _json_file(manifest_path, "manifest.json"),
         {"format", "gate", "schemaSHA256", "sourceCommit", "tooling", "runs", "boundaries"},
         "manifest.json",
     )
+    manifest_format = manifest["format"]
     require(
-        manifest["format"] in (2, CURRENT_MANIFEST_FORMAT)
+        manifest_format in (2, CURRENT_MANIFEST_FORMAT)
         and manifest["gate"] == "editor-find-f2-retained-evidence",
         "manifest identity differs",
     )
+    if manifest_format == 2:
+        retained_schema_path = pack_file(
+            pack_root,
+            inventory,
+            "reference/editor-find-f2-evidence/schema.json",
+            "retained schema",
+        )
+        schema = load_schema(retained_schema_path)
+    else:
+        schema = load_schema()
     require(manifest["schemaSHA256"] == schema.digest and manifest["sourceCommit"] == schema.source_commit, "manifest schema/source binding differs")
-    auditor_paths = auditor_paths_for_manifest(schema, manifest["format"])
+    auditor_paths = auditor_paths_for_manifest(schema, manifest_format)
     tooling_paths = tuple(
         dict.fromkeys(
             f"reference/{path}"

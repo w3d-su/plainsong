@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "sourceCommit": "c871ddf5c66c17f03fd9456b53f79411f9b2e979",
   "processFilter": "xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner",
-  "processOwnershipRule": "runner-descendants-or-exact-frozen-product-host",
+  "processOwnershipRule": "runner-process-group-single-frozen-host",
   "captureToolingPaths": [
     "capture-editor-find-f2-authoritative-run.sh",
     "editor-find-f2-capture/common.sh",
@@ -33,7 +33,7 @@
     "editor_find_f2_evidence/strict_io.py"
   ],
   "monitor": {
-    "format": 4,
+    "format": 5,
     "sampleIntervalMilliseconds": 200,
     "maximumSampleGapMilliseconds": 1000,
     "statusKeys": [

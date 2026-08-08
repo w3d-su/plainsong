@@ -8,7 +8,8 @@
 > production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
 > navigation ID domain is wired via App `navigationIDProvider`. **F2 structural work and the
 > named proxy checks have frozen budgets, but F2 remains open overall: its complete artifacts
-> exist only in owner-local storage, and the full §12 keystroke-to-screen criterion is also
+> exist only in owner-local storage, the historical monitor did not distinguish an unrelated
+> same-path host from the launched host, and the full §12 keystroke-to-screen criterion is also
 > unproven. F8 and F9 remain open follow-ups.** Precedent: PR #45, link-folding,
 > image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
@@ -453,6 +454,14 @@ interruption of in-flight engine work.
   owner-local `/private/tmp` root, but have no authorized independently retained replica. Loss of that root
   invalidates the baseline and requires six fresh runs, so F2 remains open overall.
   Evidence and exact audit commands: `docs/perf-log.md`.
+- [ ] The six-run historical pack proves there was no uncorrelated target process during
+  measurement. Its immutable format-2 monitor allowed every process whose executable path
+  matched the frozen host, so a second unrelated same-path host would have produced zero
+  competitors. The historical bytes remain authenticated but cannot close process isolation.
+  Current capture tooling instead requires a single host correlated by the runner's dedicated
+  process group and never performs path-wide cleanup. Closing this item requires a fresh
+  exact-source six-run pack from those corrected bytes; this PR deliberately does not create or
+  retrofit one.
 - [ ] Full agent.md §12 &lt;16 ms **keystroke-to-screen** latency with find open is proven
   end-to-end. The current harness begins at programmatic `insertText` and stops at root
   update-transaction entry, so it cannot close this criterion. The retained raw samples

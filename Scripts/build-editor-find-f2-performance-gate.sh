@@ -1,7 +1,7 @@
 #!/bin/bash -p
 
 set -euo pipefail
-/usr/bin/umask 077
+builtin umask 077
 
 if [[ "$-" != *p* ]]; then
     echo "F2 tooling entry point requires privileged Bash mode" >&2

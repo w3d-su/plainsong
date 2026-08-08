@@ -1,7 +1,7 @@
 #!/bin/bash -p
 
 set -euo pipefail
-/usr/bin/umask 077
+builtin umask 077
 
 if [[ "$-" != *p* ]]; then
     echo "F2 tooling entry point requires privileged Bash mode" >&2
@@ -90,11 +90,11 @@ f2_verify_module() {
     fi
 }
 
-f2_verify_module "editor-find-f2-capture/common.sh" "3be0b7b3cdfcf984bea979a09ec7e42525e442d3ca6121fc3b7997c9ebff1066"
-f2_verify_module "editor-find-f2-capture/processes.sh" "9be3f2864a28cb592cf88cbfe08b681b2322179505b3fa33b6939205cf062b4e"
-f2_verify_module "editor-find-f2-capture/monitor.sh" "787664cfde9f9d022f41472d6cdcee89eeff90ad0c3c343cdcadcce5649f1c98"
-f2_verify_module "editor-find-f2-capture/run.sh" "0a45ab0243a74aa841db05c22b5fa18b4f9fdb5752ab2ec5e19046b871d850eb"
-f2_verify_module "editor-find-f2-evidence/schema.json" "99e9a0163e80c0e69d993f2b8e8572271a7eaeb20e2dea89951ae0a83acb313a"
+f2_verify_module "editor-find-f2-capture/common.sh" "51e98bb54cc426621fd5b0fd5acff15be9fd655d06609c16626651586de11703"
+f2_verify_module "editor-find-f2-capture/processes.sh" "d445f55451e9b412a57ca7fbc1e3efe3f16ef342dff3962f0d7f123b0ba21ae8"
+f2_verify_module "editor-find-f2-capture/monitor.sh" "e8e0e1691bb1bb9b4b11cd7be72c9eda70f49633047b31253f508366962f32b1"
+f2_verify_module "editor-find-f2-capture/run.sh" "4664a4f2591c15a5cb31c365bd558482fa7c5a501d628276346018b230f1fa29"
+f2_verify_module "editor-find-f2-evidence/schema.json" "fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21"
 f2_verify_module "editor-find-f2-evidence/schema_check.py" "ffacce11ab1fdaac1dd2a328900d2eb98794650801eb028363f9de444b6f93f4"
 
 builtin source "$f2_script_directory/editor-find-f2-capture/common.sh"

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .errors import AuditError
 from .pack import validate_pack
+from .schema import load_json_bytes
 
 PARTIAL_EXIT_STATUS = 3
 
@@ -41,6 +42,12 @@ def main() -> None:
     print("F2 OPEN F9")
     print("F2 OPEN combined-tip")
     print("F2 OPEN independent-durable-retention")
+    manifest = load_json_bytes(
+        (arguments.pack / "manifest.json").read_bytes(),
+        "validated manifest.json",
+    )
+    if isinstance(manifest, dict) and manifest.get("format") == 2:
+        print("F2 OPEN historical-uncorrelated-target-process")
     if arguments.artifact_root is None and not arguments.allow_partial:
         print("F2 RETAINED EVIDENCE AUDIT OPEN: full artifacts were not rehashed", file=sys.stderr)
         raise SystemExit(PARTIAL_EXIT_STATUS)

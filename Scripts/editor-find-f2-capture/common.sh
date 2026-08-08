@@ -2,8 +2,8 @@
 
 F2_SOURCE_COMMIT="c871ddf5c66c17f03fd9456b53f79411f9b2e979"
 F2_PROCESS_FILTER="xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner"
-F2_PROCESS_OWNERSHIP_RULE="runner-descendants-or-exact-frozen-product-host"
-F2_MONITOR_FORMAT=4
+F2_PROCESS_OWNERSHIP_RULE="runner-process-group-single-frozen-host"
+F2_MONITOR_FORMAT=5
 F2_MONITOR_INTERVAL_MS=200
 F2_MONITOR_MAX_GAP_MS=1000
 F2_OUTER_FORMAT=3
@@ -38,7 +38,7 @@ f2_require_canonical_directory() {
 
     [[ "$path" == /* && -d "$path" && ! -L "$path" &&
         "$path" != *[[:space:]]* &&
-        "$(cd "$path" && /bin/pwd -P)" == "$path" ]] ||
+        "$(builtin cd "$path" && /bin/pwd -P)" == "$path" ]] ||
         f2_die "$label must be a real canonical whitespace-free directory: $path"
 }
 
@@ -133,7 +133,7 @@ f2_capture_boundary() {
     local power
     local load
 
-    processes="$(f2_competitor_processes 0 0)" || return
+    processes="$(f2_competitor_processes 0)" || return
     process_count="$(printf '%s\n' "$processes" | /usr/bin/awk 'NF {n++} END {print n+0}')"
     commit="$(f2_trusted_git -C "$F2_SOURCE_ROOT" rev-parse HEAD)" || return
     status="$(f2_trusted_git -C "$F2_SOURCE_ROOT" status --porcelain=v1 --untracked-files=all)" || return

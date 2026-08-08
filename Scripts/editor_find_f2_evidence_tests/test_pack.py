@@ -189,6 +189,20 @@ class PackTests(unittest.TestCase):
         )
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
         self.assertIn("F2 OPEN F8", allowed.stdout)
+        self.assertNotIn("historical-uncorrelated-target-process", allowed.stdout)
+
+    def test_versioned_format_two_pack_keeps_historical_process_boundary_open(self) -> None:
+        repository = Path(__file__).resolve().parents[2]
+        script = repository / "Scripts/check-editor-find-f2-retained-evidence.py"
+        pack = repository / "docs/evidence/editor-find-f2-c871ddf-retained-pack"
+        result = subprocess.run(
+            [str(script), str(pack), "--allow-partial"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("F2 OPEN historical-uncorrelated-target-process", result.stdout)
 
 
 if __name__ == "__main__":

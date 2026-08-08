@@ -361,14 +361,17 @@ evidence, and these budgets stay informational on CI regardless.
 
 ## Phase 3 F2 In-Document Find Performance Gate
 
-This is the current authoritative baseline for the F2 query-completion and production-hosted
-state-update receipt proxies. The six runs measured exact clean source
+This is the retained historical baseline for the F2 query-completion and production-hosted
+state-update receipt proxy samples. The six runs measured exact clean source
 `c871ddf5c66c17f03fd9456b53f79411f9b2e979`; historical tooling commit
 `03ffd7024ac248977a802bb46b7f0413293979cd` owns the exact capture, retained-pack builder, and
 auditor bytes used to produce and retain them. The current responsibility-split, isolated tooling
 audits those historical bytes independently; it did **not** produce the six runs. Keeping those
 identities separate prevents a later documentation/tooling commit from being misrepresented as
-the measured product source.
+the measured product source. The historical process classifier, however, exempted every
+same-path frozen host rather than one host correlated with the launch. Those bytes therefore do
+not prove absence of an uncorrelated target process; process isolation is an explicit open
+boundary unless a fresh six-run pack is captured with the corrected maintained tooling.
 
 | Field | Value |
 |---|---|
@@ -382,7 +385,7 @@ the measured product source.
 | Fixture | `Fixtures/large-1mb.md`: 1,048,962 bytes; SHA-256 `d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247` |
 | Tests | `EditorFindPerformanceTests.testLargeFixtureFindQueryCompletionForZeroSparseAndDenseCases`; `...testProductionWorkspaceFindOpenEditAdmissionAndStateReceiptStayWithinMeasuredBudgets` |
 | Historical evidence-tooling commit | `03ffd7024ac248977a802bb46b7f0413293979cd` |
-| Result | Named proxies pass — three Debug and three Release local-hard runs, two tests per run, zero failures; compact and owner-local full-artifact audits both validate all six runs. Independent durable retention and the other open boundaries below prevent overall F2 closure. |
+| Result | All retained samples are within the named proxy budgets — three Debug and three Release runs, two tests per run, zero test failures. Compact and owner-local full-artifact audits authenticate all six historical runs, but do not repair their process-correlation flaw. Historical process isolation, independent durable retention, and the other open boundaries below prevent overall F2 closure. |
 
 The Git-versioned compact evidence is retained at
 `docs/evidence/editor-find-f2-c871ddf-retained-pack/`: 145 files (916 KiB), including all six raw
@@ -399,8 +402,8 @@ and passed six runs, but `/private/tmp` is not durable, Git does not carry it, a
 retained copy is authorized or claimed. Loss of that root invalidates the full-artifact audit and
 requires fresh evidence before that audit can pass again.
 The versioned compact audit is intentionally reported as `PARTIAL runs=6` unless that full root is
-supplied. Both audit modes keep independent durable retention, full-keystroke-to-screen, F8
-apply/clear, F9, and combined-tip open.
+supplied. Both audit modes keep historical uncorrelated-target-process isolation, independent
+durable retention, full-keystroke-to-screen, F8 apply/clear, F9, and combined-tip open.
 
 ### Historical provenance and current operator trust root
 
@@ -416,18 +419,21 @@ are historical artifacts, not maintained large-file exceptions in the current ch
 | Historical measured-source runner (`c871ddf`) | `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
 | Historical outer capture wrapper (`03ffd70`) | `2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf` |
 | Historical pack builder / auditor (`03ffd70`) | `11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9` / `605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819` |
-| Current `Scripts/editor-find-f2-tooling.sha256` | `3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b` |
+| Current `Scripts/editor-find-f2-tooling.sha256` | `3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3` |
 | Current inventory verifier | `30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351` |
-| Current isolated bootstrap | `665bf66c400e4a9193e7090b76962a4e490795946f219a7e239458383b652c8b` |
-| Current auditor / builder entry points | `525913298ba1f510f2df19911689b310e67854e6ff2be22cc528c2e2a8ad66fb` / `bb62262df80ad5e8c48d63c9f6f00c390b95962a92dfc2e293d1ef2d7a45a9a7` |
-| Current capture / runner / build entry points | `3d71c7adbdccd0274e83edec12cea2e2b8409f4dadd54eb209d6c887ea7dc3f9` / `2cf8c9a4e62ffe7cb1c145006eb435d2923b1714c549f1ebf94a5698da9de366` / `ae68561d94c1d41c33d6d7d761cc195a9765b1d219e97c8a7efc363f70fcf345` |
+| Current isolated bootstrap | `af986e0e285fd361cb34ae00b7982adb13604e44d125ea0c3e47ef889568fdaa` |
+| Current capture schema | `fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21` |
+| Current auditor / builder entry points | `e422d62098d4761ad8584331d95fda6ae18e6e19228d814056fee99bdc15878e` / `fafb3caee0bf1c960e045f4b7dffa30810fcddc4c6e8ee7f80eb7a6920162e32` |
+| Current capture / runner / build entry points | `1a720b1a2a39bbb66073aee60ca61ef9951522716bc0d38d4e4cf1e4f0156024` / `91f517c26fee8ab3f9d39555771ebd43baa6034afca24751d2655c1005578dc8` / `ac02d8a3e6fae9433338ada0373b6cff8fbb3bbc34d09e675d1b436ffa821e02` |
 
 All 34 maintained executable/support modules are in the external inventory. Current Python entry
 points require isolated `-I` startup, verify canonical current-UID-owned non-symlink paths with no
 group/world write or ACL `allow`, hash-pin the bootstrap and exact package inventory, then import.
 Current shell entry points require `bash -p`; the capture and runner wrappers pin every sourced
 module before loading it, and the current build/runner entry points also pin the artifact hasher
-they execute. Maintained digest paths use empty-environment `/usr/bin/python3 -I -S`, not ambient
+they execute. Their parent shell sets `umask 077` with the Bash builtin, and every command before
+owner/hash verification is either a shell builtin or a fixed absolute system path; inherited
+`PATH` is not consulted. Maintained digest paths use empty-environment `/usr/bin/python3 -I -S`, not ambient
 Perl-backed `shasum`. The exact pack inventory and full-artifact audit additionally reject
 symlinks, foreign owners, group/world writers, ACLs, and unsupported entries before exact rehash;
 the full audit then cross-binds all nine retained artifacts to the compact evidence manifest and
@@ -454,7 +460,7 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/editor-find-f2-tooling.sha256")" = \
-  3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b
+  3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
   30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
 test "$(f2_sha256 "$F2_PACK/manifest.json")" = \
@@ -523,7 +529,7 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/editor-find-f2-tooling.sha256")" = \
-  3aaebac6b069b6da74820e213e3294f9b9c344b124fa7ceaea33046902d4c27b
+  3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
   30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py"
@@ -626,9 +632,14 @@ spawned internally by the immutable shell bytes; the clean detached/current-UID-
 fixed system paths, and exact hashes above are the historical mechanism's explicit boundary.
 
 The historical capture and builder refuse reused destinations, symlinks, non-owner inputs,
-path/case collisions, source/build/hash mismatches, target processes found at the retained boundary
-checks or periodic samples, non-AC power, or thermal warnings. The monitor used a configured 200 ms
-sleep after each scan; scan time makes this neither a 200 ms cadence nor continuous-absence proof.
+path/case collisions, source/build/hash mismatches, target processes that the historical classifier
+reported at retained boundary checks or periodic samples, non-AC power, or thermal warnings. That
+classifier exempted every exact frozen-host path during the runner interval, so its zero-match
+records cannot exclude a duplicate or unrelated same-path host. The current maintained classifier
+correlates a single host by the runner's dedicated process group, rejects duplicate/unrelated
+same-path hosts, and cleanup signals only that process group; none of this is
+retroactive evidence for the historical runs. The old monitor used a configured 200 ms sleep after
+each scan; scan time makes this neither a 200 ms cadence nor continuous-absence proof.
 The builder retains full artifacts by exact hash, deduplicates only identical shared inputs,
 creates normalized summaries from private xcresult copies, and runs both audits before reporting
 success. A reproduction is a new evidence set and must never silently replace or mix with the
@@ -844,8 +855,10 @@ its own evidence. The harness begins at programmatic insertion and stops at root
 full keystroke-to-screen remains open. F9 launched-app/physical-input acceptance is also outside
 this pack, and no combined-tip result is claimed. These four boundaries are encoded as `open` in
 the immutable retained manifest. The maintained auditor also prints the current policy boundary
-`independent-durable-retention` as open without rewriting that historical manifest; both compact
-and full audits therefore report all five open boundaries.
+`independent-durable-retention` and `historical-uncorrelated-target-process` as open without
+rewriting that historical manifest; both compact and full audits therefore report all six open
+boundaries.
+
 ## MarkdownCore Whole-Word Boundary Cost
 
 Investigation of an intermittent local failure in

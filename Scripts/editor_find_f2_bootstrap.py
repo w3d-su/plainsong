@@ -21,16 +21,16 @@ EXPECTED_MODULES = {
     "builder_inputs.py": "aa56cba08fc90b8c629a8b53441688a81bca14d41c55525417457cff8ea55650",
     "builder_io.py": "e6e656c2aa261bfa6a28d3c2cf7640d12a2d02b717695ed49faa3d2ef694b67a",
     "builder_summary.py": "743e5618a5b561b60c8af9c8ef67d166bf11a8a712e66b15054f0c9462b5967e",
-    "cli.py": "a8e4baaa85cabaf12376de0696a00ab24e110edb209d15ee3e32ec322278a914",
+    "cli.py": "060645c7c5f8611240a2b4dd409f2ac43ea134f3767446822779c8cdf1af7bd5",
     "errors.py": "754eacf487bfa61ab55f2703faad6698433d80310bd03b83798b2515aa6882f4",
     "logs.py": "bb9823aed728b948b78c4cf8a96a7c256f3fa433ffcf3a43250fa6843cfd6b8c",
     "monitor.py": "9d518622dda53ba61a4a3f20ae4b367758e526f89db899ad271d52ec890d3d6c",
-    "pack.py": "1a2eb861fecdc34b664d3c79034c69a4ee71fdef4f2cf53657b95c58c35cd505",
-    "schema.py": "ccaa6b2e23fa34fbd086957b50f521a9796e9fd1246d720bcc226bbc9961aad8",
+    "pack.py": "42c2e375eae28cf28e08f50d207934370b4476d31dc16d3b890380d850008e0e",
+    "schema.py": "00ddf982dea5adab3829375150b8113431977cc315c3fc9b35498b19e78fd2cf",
     "strict_io.py": "2cf5df2332bead720f1dd6b37331d9d464e67382d1e0dd1fc34d2073bf98889b",
 }
 EXPECTED_SUPPORT_FILES = {
-    "editor-find-f2-evidence/schema.json": "99e9a0163e80c0e69d993f2b8e8572271a7eaeb20e2dea89951ae0a83acb313a",
+    "editor-find-f2-evidence/schema.json": "fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21",
 }
 
 

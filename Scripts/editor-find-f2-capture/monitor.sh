@@ -9,7 +9,6 @@ f2_monitor_loop() {
     local ready_signal="$control_directory/ready"
     local sample_count=0
     local runner_pid=0
-    local allow_host=0
     local done_before_sample
     local started
     local finished
@@ -23,13 +22,11 @@ f2_monitor_loop() {
         [[ -e "$done_signal" ]] && done_before_sample=1
         started="$(f2_utc_now)"
         runner_pid=0
-        allow_host=0
         if [[ ! -e "$runner_finished_record" && -e "$runner_pid_record" ]]; then
             [[ -f "$runner_pid_record" && ! -L "$runner_pid_record" ]] || return 22
             runner_pid="$(/usr/bin/awk 'NR==1 && /^[0-9]+$/ {print; ok=1} END {if (!ok || NR != 1) exit 1}' "$runner_pid_record")" || return 22
-            allow_host=1
         fi
-        competitors="$(f2_competitor_processes "$runner_pid" "$allow_host")" || return 21
+        competitors="$(f2_competitor_processes "$runner_pid")" || return 21
         finished="$(f2_utc_now)"
         sample_count=$((sample_count + 1))
         matches="$(printf '%s\n' "$competitors" | /usr/bin/awk 'NF {n++} END {print n+0}')"

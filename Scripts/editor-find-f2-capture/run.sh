@@ -189,8 +189,8 @@ f2_write_outer_status() {
 }
 
 f2_capture_main() {
-    F2_SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && /bin/pwd -P)"
-    /usr/bin/umask 077
+    F2_SCRIPT_DIRECTORY="$(builtin cd "$(/usr/bin/dirname "${BASH_SOURCE[0]}")/.." && /bin/pwd -P)"
+    builtin umask 077
     f2_validate_capture_arguments "$@" || return
     f2_validate_schema || return
     F2_CAPTURE_TOOLING_SHA256="$(f2_capture_tooling_digest)" || return

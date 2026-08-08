@@ -79,8 +79,9 @@ def _tooling_paths(value: object, label: str) -> tuple[str, ...]:
     return paths
 
 
-def load_schema() -> EvidenceSchema:
-    path = Path(__file__).resolve().parent.parent / "editor-find-f2-evidence" / "schema.json"
+def load_schema(path: Path | None = None) -> EvidenceSchema:
+    if path is None:
+        path = Path(__file__).resolve().parent.parent / "editor-find-f2-evidence" / "schema.json"
     data = path.read_bytes()
     root = _exact_keys(
         load_json_bytes(data, "schema.json"),
