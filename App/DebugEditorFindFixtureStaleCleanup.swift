@@ -33,6 +33,10 @@
                 fixturesRoot: fixturesRoot,
                 expectedIdentity: identity(of: rootStatus)
             )
+            let validationContext = StaleCandidateValidationContext(
+                rootHandle: rootHandle,
+                cleanupBoundaryHandler: cleanupBoundaryHandler
+            )
             try removeOrphanedStaleLeases(
                 from: candidates,
                 in: fixturesRoot,
@@ -48,7 +52,7 @@
                     in: fixturesRoot,
                     excluding: currentIdentifier,
                     staleBefore: staleBefore,
-                    rootHandle: rootHandle
+                    context: validationContext
                 ),
                     let quarantineURL = try quarantineStaleCandidate(
                         stale,
@@ -77,13 +81,19 @@
             let workspaceHandle: DebugEditorFindFixtureWorkspaceHandle
         }
 
+        private struct StaleCandidateValidationContext {
+            let rootHandle: DebugEditorFindFixtureRootHandle
+            let cleanupBoundaryHandler: EditorFindFixtureCleanupHandler?
+        }
+
         private static func validatedStaleCandidate(
             _ candidate: URL,
             in fixturesRoot: URL,
             excluding currentIdentifier: String,
             staleBefore: Date,
-            rootHandle: DebugEditorFindFixtureRootHandle
+            context: StaleCandidateValidationContext
         ) throws -> StaleCandidate? {
+            let rootHandle = context.rootHandle
             try rootHandle.validatePath()
             let candidateName = candidate.lastPathComponent
             let publishedIdentifier =
@@ -128,11 +138,16 @@
             } catch {
                 return nil
             }
-            guard (try? binding.matchesWorkspace(at: candidate)) == true,
-                  let workspaceHandle = try? DebugEditorFindFixtureWorkspaceHandle
-                  .reopen(at: candidate, binding: binding)
-            else {
+            guard (try? binding.matchesWorkspace(at: candidate)) == true else {
+                try context.cleanupBoundaryHandler?(
+                    .didRejectStaleWorkspaceBinding(candidate)
+                )
                 // Missing, corrupt, or mismatched ownership metadata fails closed.
+                return nil
+            }
+            guard let workspaceHandle = try? DebugEditorFindFixtureWorkspaceHandle
+                .reopen(at: candidate, binding: binding)
+            else {
                 return nil
             }
             try rootHandle.validatePath()

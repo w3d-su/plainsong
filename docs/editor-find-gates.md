@@ -8,8 +8,8 @@
 > records query-completion and hosted native-edit admission/root-update **proxies only**;
 > full physical-input → child-layout → compositor keystroke-to-screen latency remains
 > open. This dedicated `phase3-editor-find-f9-ui-acceptance` follow-up implements F9 and the
-> repeated-⌘F sub-gate of F7; §8 records the one remaining unlocked exact-tree rerun after a
-> final test-only assertion strengthening. F8 remains a separate pending follow-up; no
+> repeated-⌘F sub-gate of F7; §8 records the still-pending successful exact-tree strengthened
+> 3× execution. F8 remains a separate pending follow-up; no
 > F2/F8/F9 combined-tip evidence is claimed. Precedent: PR #45, link-folding,
 > image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
@@ -337,7 +337,7 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** full F2 keystroke-to-screen latency; F4b hosted UI; F5 source+preview; F6–F9. |
 | **C** (merged as #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b hosted UI / F5 live preview / F6 / F7 until named hosted evidence |
 | **F2 proxy follow-up** (separate tip) | Measures exact 1 MiB query completion plus production-hosted native `insertText` admission and root App/SwiftUI update receipt. | Closes only the named proxy budgets. Full physical-input, child-layout, compositor, and cold O(n) scroll-index work remain outside the proof. |
-| **F9 follow-up** (`phase3-editor-find-f9-ui-acceptance`) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | Implements F9 and the repeated-⌘F sub-gate of F7; exact-tip closure remains pending the unlocked strengthened 3× run. Does not claim physical-keyboard/IME evidence. |
+| **F9 follow-up** (`phase3-editor-find-f9-ui-acceptance`) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | Implements F9 and the repeated-⌘F sub-gate of F7; exact-tip closure remains pending a successful strengthened 3× execution. Does not claim physical-keyboard/IME evidence. |
 | **F8 follow-up** (separate, pending) | Highlight-all implementation, if retained, plus preservation across highlight re-application. | F8 remains open; no highlight-all work or evidence is part of F9. |
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
@@ -653,8 +653,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `needle` query, and the launched app still exposes `plainsong.editorFind.bar`.
 - Evidence: _implementation complete; the pre-strengthening launched-app artifact proves
   first-responder refocus/replacement, but the exact-tree 3× run for the added retained-query
-  assertion is blocked by the locked console. The cross-feature, dual-window, and Full
-  Keyboard Access hosted matrix also remains open._
+  assertion remains pending after two unlocked attempts executed zero product tests because the
+  runner timed out enabling automation mode. The cross-feature, dual-window, and Full Keyboard
+  Access hosted matrix also remains open._
 
 ### F8 — Highlight-all survives highlight re-application
 
@@ -709,8 +710,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `/private/tmp/plainsong-f9-review-f9-ui-strengthened-3x-20260808b.xcresult` each executed zero
   product tests: the locked macOS console made `PlainsongUITests-Runner` fail initialization
   with `Authentication canceled. System authentication is running.` Those are runner/
-  automation failures, not assertion failures; an unlocked exact-tree 3× rerun remains the
-  final launched-app evidence gap for the strengthened contract.
+  automation failures, not assertion failures. After the final responsibility split, two more
+  exact-tree 3× attempts started with `IOConsoleLocked = No` but likewise executed zero product
+  tests: `/private/tmp/plainsong-f9-final-tip-ui-3x-20260808.xcresult` and its `b` retry both
+  report `Timed out while enabling automation mode.` A successful exact-tree 3× execution
+  remains the final launched-app evidence gap for the strengthened contract.
 
   Fixture creation acquires and locks a root-anchored, exclusive, no-follow per-run lease
   before publishing the workspace name. The retained app-side handle holds the workspace
@@ -721,8 +725,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   workspace and marker identity is re-proved there before recursive removal, so a lexical
   replacement at the published name cannot inherit deletion authority. The marker link must
   reach zero, the retained directory path is checked with `F_GETPATH`, and no-follow absence at
-  the exact published name is required before the exact lease is removed and a receipt can be
-  published. The UI runner receives neither a path nor deletion authority. The one-hour
+  the exact recorded quarantine name is required before the exact lease is removed and a receipt
+  can be published. Once those retained-handle checks prove that quarantine was removed, a new
+  same-name occupant at the published workspace path is unrelated and survives retry. The UI
+  runner receives neither a path nor deletion authority. The one-hour
   crash/interruption sweep reclaims only an expired fixture whose released lease it can lock
   **and** whose persisted workspace/marker binding still matches; a lexical same-name
   replacement and a live/paused run remain protected. Initial orphan-lease inspection carries
@@ -743,19 +749,27 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   exact workspace/marker handle. Once marker removal is verified, retry requires the exact
   quarantine to be empty and does not recursively delete any newly appeared occupant.
 
-  Exact-tip focused fixture/lease coverage passed 45/45 with no failure, skip, or runtime warning
-  in `/private/tmp/plainsong-f9-marker-retry-fixtures-20260808b.xcresult`. It includes
+  Current-tree focused fixture/lease coverage passed 46/46 with no failure, skip, or runtime
+  warning in `/private/tmp/plainsong-f9-final-split-fixtures-20260808.xcresult`. It includes
   deterministic initial-inspection swaps, live/stale replacement sentinels, post-rename and
   post-unlink throw/retry, remove-then-throw recovery, rename-away, live-lease preservation,
   deterministic pre-marker partial-removal retry, live retained-handle post-marker retry, and
   stale same-invocation post-marker retry. The latter two prove exact quarantine and lease
-  removal while published-name and fixture-root sentinels remain byte-for-byte intact. A
-  separate regression creates a replacement at the removed marker name; the current invocation
-  and a later stale sweep preserve that marker, the bound quarantine, and its lease. Earlier nine
+  removal while published-name and fixture-root sentinels remain byte-for-byte intact. A live
+  post-rmdir regression additionally creates a same-name published replacement after the exact
+  quarantine removal and injected throw; retained-handle retry removes only the owned lease and
+  preserves that replacement plus the root sentinel. A separate regression creates a replacement
+  at the removed marker name, re-expires the quarantine before the later sweep, observes the exact
+  stale binding-rejection boundary, and proves that both sweeps preserve the marker, bound
+  quarantine, lease, and root sentinel. Earlier nine
   launched-app runs each verified their exact nonce-bound app-side receipt and `notRunning`;
   read-only host inspection found every current-run fixture ID absent. A separate concurrently
   running F9 fixture kept its open lease and survived the stale sweep, then its owning app removed
-  it; the fixture root was empty afterwards.
+  it; the fixture root was empty afterwards. The Debug fixture implementation is split along
+  creation/live-cleanup, lease-binding/lease-operation, quarantine-naming/root-I/O, and retained-
+  workspace-authority/anchored-I/O seams; the resulting production files are 101–375 lines. The
+  removal-race regression suite is likewise split by retry, stale-marker, lease-quarantine, and
+  shared-support responsibility, with files of 48–348 lines.
 
   Cleanup traffic uses a per-run named pasteboard. General-pasteboard shortcut text captures
   the item-ordered type/data byte mappings observable through AppKit before mutation and retains
@@ -811,6 +825,17 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   is recorded as an xcresult-finalization I/O failure under ENOSPC-level disk pressure, not a
   product assertion and not a green full-suite run. The incomplete 297 MiB result bundle from
   that invocation was removed; no unrelated DerivedData or retained evidence was deleted. All
+  four Swift package stages in the current review-fix invocation passed, as did the Xcode phase's
+  646 tests with one skip and the displayed 23/23 performance tests. Its only failed xcresult
+  entry was again `PlainsongUITests-Runner` initialization before any UI assertion while
+  `IOConsoleLocked = Yes` (`Authentication canceled. System authentication is running.`);
+  Xcodebuild exited 65, Make exited 2, and Make did not reach preview. This is a locked-console
+  automation failure, not a product assertion and not a green full-suite run. The final split
+  tree's `make test` again passed all four Swift package stages and 646 Xcode tests with one skip,
+  including 23/23 performance tests. Its only failed xcresult entry was
+  `PlainsongUITests-Runner` launch before UI assertions (`LaunchServices` error `-600`);
+  Xcodebuild exited 65, Make exited 2, and Make did not reach preview. This remains a runner/
+  automation failure and not a green full-suite run. All
   F9 state waits are
   predicate-based; no
   `NSOpenPanel` is used. Synthetic XCUI `typeKey` evidence is not physical-keyboard or IME
@@ -826,7 +851,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   than broadening deletion authority or publishing a false receipt.
   `project.yml` is unchanged; XcodeGen only refreshed source inventory for the folder-backed
   test/app targets, and the generated project was not hand-edited. F9 and only the repeated-
-  `⌘F` sub-gate of F7 are the scope of this branch; the unlocked exact-tree rerun above remains
+  `⌘F` sub-gate of F7 are the scope of this branch; a successful exact-tree 3× run remains
   the only current F9 launched-app assertion-evidence gap, while the unsuccessful full
   `make test` is a separate validation gap. F2 retains only its separately named proxies, F8
   stays separate and pending, and no combined-tip evidence is claimed.
