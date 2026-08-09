@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from editor_find_f2_evidence.artifact_hash import hash_artifact, hash_source_archive_tree
 from editor_find_f2_evidence.builder import build_pack
 from editor_find_f2_evidence.builder_io import DestinationRegistry
 from editor_find_f2_evidence.errors import AuditError
@@ -16,14 +17,14 @@ from editor_find_f2_evidence.schema import load_schema
 from editor_find_f2_evidence.strict_io import sha256_file
 
 from .builder_fixture import create_builder_inputs
-from .fixture import write
+from .fixture import write, write_source_archive
 
 
 class BuilderTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="f2-builder-tests.", dir="/private/tmp")
         self.root = Path(self.temporary.name)
-        self.prefixes, self.summary = create_builder_inputs(self.root / "inputs")
+        self.prefixes, self.summary, self.schema = create_builder_inputs(self.root / "inputs")
         self.pack = self.root / "pack"
         self.artifacts = self.root / "artifacts"
 
@@ -31,12 +32,36 @@ class BuilderTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def build(self) -> None:
-        build_pack(self.pack, self.artifacts, self.prefixes, lambda _path: self.summary)
+        build_pack(
+            self.pack,
+            self.artifacts,
+            self.prefixes,
+            lambda _path: self.summary,
+            self.schema,
+        )
+
+    def rewrite_build_manifest(self, configuration: str, replacements: dict[str, str]) -> None:
+        manifest = self.root / "inputs" / "builds" / configuration.lower() / "f2-editor-find-build-manifest.txt"
+        lines = []
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            key, _ = line.split("=", 1)
+            lines.append(f"{key}={replacements.get(key, line.split('=', 1)[1])}")
+        write(manifest, "\n".join(lines) + "\n")
+        digest = sha256_file(manifest)
+        prefix = configuration.lower()
+        for run_id in (f"{prefix}-1", f"{prefix}-2", f"{prefix}-3"):
+            evidence = Path(f"{self.prefixes[run_id]}.evidence-manifest.txt")
+            text = re.sub(
+                r"build_manifest_sha256=[0-9a-f]{64}",
+                f"build_manifest_sha256={digest}",
+                evidence.read_text(encoding="utf-8"),
+            )
+            write(evidence, text)
 
     def test_builder_round_trips_compact_and_full_with_deduplication(self) -> None:
         self.build()
-        self.assertEqual(len(validate_pack(self.pack, None)), 6)
-        self.assertEqual(len(validate_pack(self.pack, self.artifacts)), 6)
+        self.assertEqual(len(validate_pack(self.pack, None, integrity_schema=self.schema)), 6)
+        self.assertEqual(len(validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)), 6)
         provenances = []
         for run_id in load_schema().run_ids:
             path = self.pack / "runs" / run_id / "full-artifact-provenance.json"
@@ -97,6 +122,36 @@ class BuilderTests(unittest.TestCase):
             self.build()
         self.assertFalse(self.pack.exists())
 
+    def test_builder_rejects_rewritten_unrelated_source_archive(self) -> None:
+        archive = self.root / "inputs" / "builds" / "debug.source.tar"
+        write_source_archive(archive, {"unrelated.txt": b"unrelated source\n"})
+        self.rewrite_build_manifest(
+            "Debug",
+            {
+                "source_archive_sha256": sha256_file(archive),
+                "source_tree_sha256": hash_source_archive_tree(archive),
+            },
+        )
+        with self.assertRaisesRegex(AuditError, "external anchor"):
+            self.build()
+        self.assertFalse(self.pack.exists())
+
+    def test_builder_rejects_app_executable_as_xctestrun(self) -> None:
+        executable = (
+            Path(f"{self.prefixes['debug-1']}.products")
+            / "Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong"
+        )
+        self.rewrite_build_manifest(
+            "Debug",
+            {
+                "xctestrun_relative_path": "Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong",
+                "xctestrun_sha256": hash_artifact(executable),
+            },
+        )
+        with self.assertRaisesRegex(AuditError, r"Build/Products/\*\.xctestrun"):
+            self.build()
+        self.assertFalse(self.pack.exists())
+
     def test_builder_rejects_capture_digest_tamper(self) -> None:
         path = Path(f"{self.prefixes['debug-1']}.log")
         path.write_bytes(path.read_bytes() + b"tamper\n")
@@ -125,7 +180,7 @@ class BuilderTests(unittest.TestCase):
             raise AuditError("injected summary failure")
 
         with self.assertRaisesRegex(AuditError, "injected summary"):
-            build_pack(self.pack, self.artifacts, self.prefixes, fail)
+            build_pack(self.pack, self.artifacts, self.prefixes, fail, self.schema)
         self.assertFalse(self.pack.exists())
         self.assertFalse(self.artifacts.exists())
 

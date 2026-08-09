@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_BOOTSTRAP_SHA256 = "af986e0e285fd361cb34ae00b7982adb13604e44d125ea0c3e47ef889568fdaa"
+EXPECTED_BOOTSTRAP_SHA256 = "5e93864259a88dfe7d37dfc519c2e257de1cd05f69d5b5f9a73a022ec41f355d"
 
 
 def _load_bootstrap():

@@ -69,12 +69,51 @@ f2_wait_monitor() {
         state="$(/bin/ps -o state= -p "$monitor_pid" 2>/dev/null | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
         [[ "$state" != Z* ]] || break
         if (( SECONDS - started >= 5 )); then
-            /bin/kill -TERM "$monitor_pid" 2>/dev/null || true
+            f2_stop_monitor "$monitor_pid" || return 125
             return 124
         fi
         /bin/sleep 0.05
     done
-    wait "$monitor_pid"
+    if builtin wait "$monitor_pid"; then
+        F2_ACTIVE_MONITOR_PID=""
+        return 0
+    else
+        local status=$?
+        F2_ACTIVE_MONITOR_PID=""
+        return "$status"
+    fi
+}
+
+f2_wait_monitor_stopped() {
+    local monitor_pid="$1"
+    local attempts="${2:-100}"
+    local state
+
+    for _ in $(/usr/bin/seq 1 "$attempts"); do
+        /bin/kill -0 "$monitor_pid" 2>/dev/null || return 0
+        state="$(
+            /bin/ps -o state= -p "$monitor_pid" 2>/dev/null |
+                /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}'
+        )"
+        [[ -n "$state" && "$state" != Z* ]] || return 0
+        /bin/sleep 0.05
+    done
+    return 1
+}
+
+f2_stop_monitor() {
+    local monitor_pid="$1"
+    local attempts="${2:-100}"
+
+    [[ "$F2_ACTIVE_MONITOR_PID" == "$monitor_pid" &&
+        "$monitor_pid" =~ ^[0-9]+$ && "$monitor_pid" != 0 ]] || return 2
+    /bin/kill -TERM "$monitor_pid" 2>/dev/null || true
+    if ! f2_wait_monitor_stopped "$monitor_pid" "$attempts"; then
+        /bin/kill -KILL "$monitor_pid" 2>/dev/null || true
+        f2_wait_monitor_stopped "$monitor_pid" "$attempts" || return 1
+    fi
+    builtin wait "$monitor_pid" 2>/dev/null || true
+    F2_ACTIVE_MONITOR_PID=""
 }
 
 f2_write_monitor_status() {

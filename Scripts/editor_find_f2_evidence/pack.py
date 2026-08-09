@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
-from .artifact_hash import hash_artifact
 from .errors import AuditError, require
+from .full_artifacts import load_provenance, validate_artifacts
 from .logs import WARNING, validate_timings, validate_warning_negative_control, validate_warning_phase
 from .monitor import validate_boundary, validate_monitor, validate_outer
 from .schema import (
@@ -72,27 +73,6 @@ EVIDENCE_KEYS = (
     "warning_check_bytes",
     "status",
 )
-BUILD_KEYS = (
-    "format", "source_commit", "configuration", "repository_root",
-    "source_snapshot_path", "source_archive_path", "source_archive_sha256",
-    "source_tree_sha256", "build_input_sha256", "package_input_path",
-    "resolved_package_input_sha256", "xcodegen_path", "xcodegen_sha256",
-    "destination", "budget_mode", "host_bundle_sha256",
-    "xctestrun_relative_path", "xctestrun_sha256",
-)
-EXPECTED_ARTIFACTS = {
-    "sourceArchive": ("file", "file-sha256"),
-    "sourceSnapshot": ("directory", "artifact-sha256"),
-    "resolvedPackageInput": ("directory", "resolved-package-input-sha256"),
-    "buildManifest": ("file", "file-sha256"),
-    "hostBundle": ("directory", "artifact-sha256"),
-    "xctestrun": ("file", "artifact-sha256"),
-    "rawLog": ("file", "file-sha256"),
-    "xcresult": ("directory", "artifact-sha256"),
-    "inspectionXcresult": ("directory", "artifact-sha256"),
-}
-
-
 def _exact_keys(value: object, keys: set[str], label: str) -> dict:
     require(isinstance(value, dict) and set(value) == keys, f"{label} keys differ")
     return value
@@ -116,115 +96,6 @@ def _summary_times(summary: dict, label: str) -> tuple[datetime, datetime]:
     finished = datetime.fromtimestamp(finish, timezone.utc)
     require(started <= finished, f"{label} summary chronology differs")
     return started, finished
-
-
-def _validate_artifacts(
-    provenance_path: Path,
-    artifact_root: Path,
-    run_id: str,
-    configuration: str,
-    schema: EvidenceSchema,
-    evidence: dict[str, str],
-    output_prefix: str,
-) -> None:
-    provenance = _exact_keys(
-        _json_file(provenance_path, f"{run_id} artifact provenance"),
-        {
-            "format", "sourceCommit", "configuration", "runId",
-            "retainedInPack", "retainedAtArtifactRoot", "verificationScope", "artifacts",
-        },
-        f"{run_id} artifact provenance",
-    )
-    require(
-        provenance["format"] == 1
-        and provenance["sourceCommit"] == schema.source_commit
-        and provenance["configuration"] == configuration
-        and provenance["runId"] == run_id
-        and provenance["retainedInPack"] is False
-        and provenance["retainedAtArtifactRoot"] is True
-        and provenance["verificationScope"] == "owner-local-full-artifact",
-        f"{run_id} provenance identity/scope differs",
-    )
-    records = provenance["artifacts"]
-    require(isinstance(records, dict) and set(records) == set(EXPECTED_ARTIFACTS), f"{run_id} full artifact set differs")
-    verified: dict[str, tuple[dict, Path, str]] = {}
-    for name, (kind, hash_mode) in EXPECTED_ARTIFACTS.items():
-        record = _exact_keys(
-            records[name],
-            {"originalPath", "artifactRootPath", "hashMode", "sha256"},
-            f"{run_id} {name}",
-        )
-        require(
-            isinstance(record["originalPath"], str)
-            and PurePosixPath(record["originalPath"]).is_absolute(),
-            f"{run_id} {name} original path differs",
-        )
-        relative = safe_relative_path(record["artifactRootPath"], f"{run_id} {name} path")
-        require(
-            record["hashMode"] == hash_mode
-            and isinstance(record["sha256"], str)
-            and SHA256.fullmatch(record["sha256"]) is not None,
-            f"{run_id} {name} metadata differs",
-        )
-        path = artifact_root / relative
-        require(path.resolve(strict=True).is_relative_to(artifact_root), f"{run_id} {name} escapes artifact root")
-        require((path.is_file() if kind == "file" else path.is_dir()) and not path.is_symlink(), f"{run_id} {name} kind differs")
-        if hash_mode == "file-sha256":
-            digest = sha256_file(path)
-        else:
-            digest = hash_artifact(path, hash_mode == "resolved-package-input-sha256")
-        require(digest == record["sha256"], f"{run_id} {name} hash differs")
-        verified[name] = (record, path, digest)
-
-    build_record, build_path, build_digest = verified["buildManifest"]
-    require(
-        build_digest == evidence["build_manifest_sha256"]
-        and build_record["originalPath"] == evidence["build_manifest_path"],
-        f"{run_id} build manifest evidence binding differs",
-    )
-    build = parse_key_values(build_path, BUILD_KEYS, f"{run_id} retained build manifest")
-    require(
-        build["format"] == "5"
-        and build["source_commit"] == schema.source_commit
-        and build["configuration"] == configuration
-        and build["budget_mode"] == "local-hard",
-        f"{run_id} retained build identity/budget differs",
-    )
-    xctestrun_relative = safe_relative_path(
-        build["xctestrun_relative_path"],
-        f"{run_id} retained xctestrun relative path",
-    )
-    expected = {
-        "sourceArchive": (build["source_archive_sha256"], build["source_archive_path"]),
-        "sourceSnapshot": (build["build_input_sha256"], build["source_snapshot_path"]),
-        "resolvedPackageInput": (
-            build["resolved_package_input_sha256"],
-            build["package_input_path"],
-        ),
-        "buildManifest": (evidence["build_manifest_sha256"], evidence["build_manifest_path"]),
-        "hostBundle": (
-            build["host_bundle_sha256"],
-            f"{output_prefix}.products/Build/Products/{configuration}/Plainsong.app",
-        ),
-        "xctestrun": (
-            build["xctestrun_sha256"],
-            f"{output_prefix}.products/{xctestrun_relative}",
-        ),
-        "rawLog": (evidence["raw_log_sha256"], evidence["raw_log_path"]),
-        "xcresult": (evidence["xcresult_sha256"], evidence["xcresult_path"]),
-        "inspectionXcresult": (
-            evidence["xcresult_inspection_result_sha256"],
-            evidence["xcresult_inspection_path"],
-        ),
-    }
-    for name, (expected_digest, expected_original) in expected.items():
-        record, _, digest = verified[name]
-        require(
-            SHA256.fullmatch(expected_digest) is not None
-            and digest == expected_digest
-            and record["originalPath"] == expected_original,
-            f"{run_id} {name} retained-evidence binding differs",
-        )
 
 
 def _run_path(root: Path, inventory: dict[str, str], directory: str, key: str, label: str) -> Path:
@@ -296,9 +167,15 @@ def _validate_run(
         test_finish <= monitor.last_sample_started <= monitor.finished <= postflight,
         f"{run_id} retained chronology is not enclosed by the monitor and boundaries",
     )
+    provenance = load_provenance(
+        paths["fullArtifactProvenance"],
+        run_id,
+        configuration,
+        schema,
+    )
     if artifact_root is not None:
-        _validate_artifacts(
-            paths["fullArtifactProvenance"],
+        validate_artifacts(
+            provenance,
             artifact_root,
             run_id,
             configuration,
@@ -313,6 +190,7 @@ def validate_pack(
     pack_root: Path,
     artifact_root: Path | None,
     expected_inventory_sha256: str | None = None,
+    integrity_schema: EvidenceSchema | None = None,
 ) -> list[dict[str, object]]:
     require(pack_root.is_absolute() and pack_root.is_dir() and not pack_root.is_symlink(), "pack root must be an absolute real directory")
     require(pack_root.resolve(strict=True) == pack_root, "pack root must be canonical")
@@ -325,6 +203,12 @@ def validate_pack(
             sha256_file(pack_root / "SHA256SUMS") == expected_inventory_sha256,
             "pack inventory trust-root SHA-256 differs",
         )
+    current_schema = integrity_schema or load_schema()
+    require(
+        current_schema.source_archive_sha256 is not None
+        and current_schema.source_tree_sha256 is not None,
+        "current source-integrity anchors are missing",
+    )
     inventory = validate_inventory(pack_root)
     manifest_path = pack_file(pack_root, inventory, "manifest.json", "manifest")
     manifest = _exact_keys(
@@ -347,7 +231,16 @@ def validate_pack(
         )
         schema = load_schema(retained_schema_path)
     else:
-        schema = load_schema()
+        schema = current_schema
+    require(
+        schema.source_commit == current_schema.source_commit,
+        "retained source differs from the current external source-integrity anchor",
+    )
+    schema = replace(
+        schema,
+        source_archive_sha256=current_schema.source_archive_sha256,
+        source_tree_sha256=current_schema.source_tree_sha256,
+    )
     require(manifest["schemaSHA256"] == schema.digest and manifest["sourceCommit"] == schema.source_commit, "manifest schema/source binding differs")
     auditor_paths = auditor_paths_for_manifest(schema, manifest_format)
     tooling_paths = tuple(

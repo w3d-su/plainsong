@@ -15,22 +15,23 @@ from pathlib import Path, PurePosixPath
 PACKAGE = "editor_find_f2_evidence"
 EXPECTED_MODULES = {
     "__init__.py": "cc0d37361990dd37588ed12435dacf358536a8ce736c0b1ab959ee33ac07a46a",
-    "artifact_hash.py": "bfdc207fb9d0f6f2df76db5e289aead16aa9239748cdb72fffc578db833492ef",
-    "builder.py": "791af18beab958a0b310d8dc0374f10865ca3a15273e03afb25bf00a1d814e5c",
+    "artifact_hash.py": "e93a066d9edc36fbaf4780cd0573b2fe08f953b02e6aec7645e580e99f0e9623",
+    "builder.py": "1dd7869d18bd0e82f0021870b30fb4a98a0aa37b168378a912595b1b2032dc3b",
     "builder_cli.py": "1805d741ede66b04c809e783e8307965994391dc10c935f7a0ea2b9e5c050748",
-    "builder_inputs.py": "aa56cba08fc90b8c629a8b53441688a81bca14d41c55525417457cff8ea55650",
+    "builder_inputs.py": "e97f2f351a464b0f5c280e47fe1421ac2489e8e299527e26af3617fdb4b1b499",
     "builder_io.py": "e6e656c2aa261bfa6a28d3c2cf7640d12a2d02b717695ed49faa3d2ef694b67a",
     "builder_summary.py": "743e5618a5b561b60c8af9c8ef67d166bf11a8a712e66b15054f0c9462b5967e",
     "cli.py": "060645c7c5f8611240a2b4dd409f2ac43ea134f3767446822779c8cdf1af7bd5",
     "errors.py": "754eacf487bfa61ab55f2703faad6698433d80310bd03b83798b2515aa6882f4",
+    "full_artifacts.py": "ad25831c66eba3f35d33321d15a7bc9fd56b1e0675f5deda1c196c9988251cdb",
     "logs.py": "bb9823aed728b948b78c4cf8a96a7c256f3fa433ffcf3a43250fa6843cfd6b8c",
     "monitor.py": "9d518622dda53ba61a4a3f20ae4b367758e526f89db899ad271d52ec890d3d6c",
-    "pack.py": "42c2e375eae28cf28e08f50d207934370b4476d31dc16d3b890380d850008e0e",
-    "schema.py": "00ddf982dea5adab3829375150b8113431977cc315c3fc9b35498b19e78fd2cf",
-    "strict_io.py": "2cf5df2332bead720f1dd6b37331d9d464e67382d1e0dd1fc34d2073bf98889b",
+    "pack.py": "c6c23902567677fd47b67931b7a8e319ff69d4a8983c89a90aa7b95d1fb615ca",
+    "schema.py": "076a49e6684f85a86dc657f4b8ed16d15c2beb506118bfe156f1dc8ea8fce484",
+    "strict_io.py": "772e9b7d2ac049a6a256a43d7c586df23e1e7bcfa3de61a3e98c0838ce8c6195",
 }
 EXPECTED_SUPPORT_FILES = {
-    "editor-find-f2-evidence/schema.json": "fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21",
+    "editor-find-f2-evidence/schema.json": "03f0f05762775e0e1f0cd9f807ba61de269a434f49070a65f1688fcb8a03b4e3",
 }
 
 

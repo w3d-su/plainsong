@@ -5,12 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from .artifact_hash import hash_artifact
+from .artifact_hash import hash_artifact, hash_source_archive_tree
 from .builder_io import canonical_prefix, canonical_source, reject_tree_symlinks
 from .errors import require
-from .pack import BUILD_KEYS, EVIDENCE_KEYS
+from .full_artifacts import BUILD_KEYS
+from .pack import EVIDENCE_KEYS
 from .schema import EvidenceSchema
-from .strict_io import SHA256, parse_key_values, safe_relative_path, sha256_file, validate_digest
+from .strict_io import (
+    SHA256,
+    parse_key_values,
+    sha256_file,
+    validate_digest,
+    xctestrun_relative_path,
+)
 
 SOURCE_SUFFIXES = {
     "preflight": "preflight.txt",
@@ -127,11 +134,26 @@ def load_run_input(run_id: str, prefix_value: Path, schema: EvidenceSchema) -> R
         f"{run_id} build identity/budget differs",
     )
     source_archive = _absolute_manifest_path(build["source_archive_path"], "file", f"{run_id} source archive")
+    require(
+        schema.source_archive_sha256 is not None
+        and schema.source_tree_sha256 is not None
+        and build["source_archive_sha256"] == schema.source_archive_sha256
+        and build["source_tree_sha256"] == schema.source_tree_sha256
+        and sha256_file(source_archive) == schema.source_archive_sha256,
+        f"{run_id} source archive/tree differs from the external anchor",
+    )
+    require(
+        hash_source_archive_tree(source_archive) == schema.source_tree_sha256,
+        f"{run_id} reconstructed source archive tree differs",
+    )
     source_snapshot = _absolute_manifest_path(build["source_snapshot_path"], "directory", f"{run_id} source snapshot")
     package_input = _absolute_manifest_path(build["package_input_path"], "directory", f"{run_id} package input")
     reject_tree_symlinks(source_snapshot, f"{run_id} source snapshot")
     reject_tree_symlinks(package_input, f"{run_id} package input", exclude_git=True)
-    xctestrun_relative = safe_relative_path(build["xctestrun_relative_path"], f"{run_id} xctestrun relative path")
+    xctestrun_relative = xctestrun_relative_path(
+        build["xctestrun_relative_path"],
+        f"{run_id} xctestrun relative path",
+    )
     frozen_products = _prefix_path(prefix, "products", "directory")
     host = canonical_source(
         frozen_products / "Build" / "Products" / configuration / "Plainsong.app",

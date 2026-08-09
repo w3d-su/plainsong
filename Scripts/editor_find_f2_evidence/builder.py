@@ -176,8 +176,9 @@ def build_pack(
     artifact_root: Path,
     run_prefixes: dict[str, Path],
     summary_provider: SummaryProvider = xcresult_summary,
+    schema: EvidenceSchema | None = None,
 ) -> None:
-    schema = load_schema()
+    schema = schema or load_schema()
     require(tuple(run_prefixes) == schema.run_ids, "run prefixes must follow the six schema IDs")
     require(
         pack_root != artifact_root
@@ -221,8 +222,8 @@ def build_pack(
         }
         write_exclusive(pack_root / "manifest.json", _json_bytes(manifest), pack_registry)
         _write_inventory(pack_root, pack_registry)
-        validate_pack(pack_root, None)
-        validate_pack(pack_root, artifact_root)
+        validate_pack(pack_root, None, integrity_schema=schema)
+        validate_pack(pack_root, artifact_root, integrity_schema=schema)
     except Exception:
         if artifact_identity is not None:
             remove_fresh_root(artifact_root, artifact_identity)

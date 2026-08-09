@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import io
+import stat
+import tarfile
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Union
 
-from editor_find_f2_evidence.artifact_hash import hash_artifact
-from editor_find_f2_evidence.pack import BUILD_KEYS, EXPECTED_ARTIFACTS
+from editor_find_f2_evidence.artifact_hash import hash_artifact, hash_source_archive_tree
+from editor_find_f2_evidence.full_artifacts import BUILD_KEYS, EXPECTED_ARTIFACTS
 from editor_find_f2_evidence.schema import (
     CURRENT_MANIFEST_FORMAT,
     auditor_paths_for_manifest,
@@ -32,6 +36,19 @@ def digest_record(path: Path) -> str:
 
 def write_digest(path: Path) -> None:
     write(Path(str(path) + ".sha256"), digest_record(path))
+
+
+def write_source_archive(path: Path, files: dict[str, bytes]) -> None:
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w") as archive:
+        for name in sorted(files):
+            data = files[name]
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            member.mode = 0o644
+            member.mtime = 0
+            archive.addfile(member, io.BytesIO(data))
+    write(path, stream.getvalue())
 
 
 def boundary(phase: str, timestamp: str, schema: object) -> str:
@@ -152,12 +169,21 @@ def create_artifacts(
 ) -> dict[str, dict[str, str]]:
     prefix = f"/private/tmp/f2/{run_id}"
     paths = {name: root / run_id / name for name in EXPECTED_ARTIFACTS}
-    write(paths["sourceArchive"], f"{run_id}:source-archive\n")
-    write(paths["sourceSnapshot"] / "payload", f"{run_id}:source-snapshot\n")
+    source = b"fixture:source-snapshot\n"
+    write(paths["sourceSnapshot"] / "payload", source)
+    paths["sourceSnapshot"].chmod(0o755)
+    (paths["sourceSnapshot"] / "payload").chmod(0o644)
+    write_source_archive(paths["sourceArchive"], {"payload": source})
+    require_tree = hash_source_archive_tree(paths["sourceArchive"])
+    if require_tree != hash_artifact(paths["sourceSnapshot"]):
+        raise AssertionError("fixture source archive/tree mismatch")
     write(paths["resolvedPackageInput"] / "artifacts" / "payload", b"artifact")
     write(paths["resolvedPackageInput"] / "checkouts" / "source", b"checkout")
     write(paths["resolvedPackageInput"] / "workspace-state.json", "{}\n")
-    write(paths["hostBundle"] / "payload", f"{run_id}:host\n")
+    write(
+        paths["hostBundle"] / "Contents" / "MacOS" / "Plainsong",
+        f"{run_id}:host\n",
+    )
     write(paths["xctestrun"], f"{run_id}:xctestrun\n")
     write(paths["rawLog"], raw)
     write(paths["xcresult"] / "payload", f"{run_id}:xcresult\n")
@@ -230,8 +256,9 @@ def rewrite_inventory(root: Path) -> None:
     write(root / "SHA256SUMS", "".join(f"{sha256_file(root / path)}  {path}\n" for path in paths))
 
 
-def create_pack(pack_root: Path, artifact_root: Path) -> None:
+def create_pack(pack_root: Path, artifact_root: Path):
     schema = load_schema()
+    integrity_schema = None
     scripts = Path(__file__).resolve().parent.parent
     tooling: list[dict[str, str]] = []
     auditor_paths = auditor_paths_for_manifest(schema, CURRENT_MANIFEST_FORMAT)
@@ -268,6 +295,17 @@ def create_pack(pack_root: Path, artifact_root: Path) -> None:
         raw = raw_log().encode()
         warning = b"F2 WARNING CHECK PASS pre=3 measured=0 post=0\n"
         artifacts = create_artifacts(artifact_root, run_id, configuration, raw)
+        if integrity_schema is None:
+            build_manifest = artifact_root / artifacts["buildManifest"]["artifactRootPath"]
+            build_values = dict(
+                line.split("=", 1)
+                for line in build_manifest.read_text(encoding="utf-8").splitlines()
+            )
+            integrity_schema = replace(
+                schema,
+                source_archive_sha256=artifacts["sourceArchive"]["sha256"],
+                source_tree_sha256=build_values["source_tree_sha256"],
+            )
         write(directory / "raw.log", raw)
         write_digest(directory / "raw.log")
         write(directory / "warning-check.txt", warning)
@@ -330,3 +368,6 @@ def create_pack(pack_root: Path, artifact_root: Path) -> None:
     write(pack_root / "manifest.json", json.dumps(manifest, sort_keys=True) + "\n")
     rewrite_inventory(pack_root)
     os.chmod(pack_root, 0o700)
+    if integrity_schema is None:
+        raise AssertionError("fixture did not create source-integrity anchors")
+    return integrity_schema

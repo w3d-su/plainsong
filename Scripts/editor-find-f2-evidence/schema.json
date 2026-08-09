@@ -1,6 +1,10 @@
 {
   "schemaVersion": 1,
   "sourceCommit": "c871ddf5c66c17f03fd9456b53f79411f9b2e979",
+  "sourceIntegrity": {
+    "archiveSHA256": "f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506",
+    "treeSHA256": "51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94"
+  },
   "processFilter": "xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner",
   "processOwnershipRule": "runner-process-group-single-frozen-host",
   "captureToolingPaths": [
@@ -26,6 +30,7 @@
     "editor_find_f2_evidence/builder_summary.py",
     "editor_find_f2_evidence/cli.py",
     "editor_find_f2_evidence/errors.py",
+    "editor_find_f2_evidence/full_artifacts.py",
     "editor_find_f2_evidence/logs.py",
     "editor_find_f2_evidence/monitor.py",
     "editor_find_f2_evidence/pack.py",

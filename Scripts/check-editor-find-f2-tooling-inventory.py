@@ -44,6 +44,7 @@ DIRECTORIES = {
         "builder_summary.py",
         "cli.py",
         "errors.py",
+        "full_artifacts.py",
         "logs.py",
         "monitor.py",
         "pack.py",

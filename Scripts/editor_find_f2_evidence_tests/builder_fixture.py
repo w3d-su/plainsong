@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from editor_find_f2_evidence.artifact_hash import hash_artifact
+from editor_find_f2_evidence.artifact_hash import hash_artifact, hash_source_archive_tree
 from editor_find_f2_evidence.builder_inputs import BUILD_KEYS
 from editor_find_f2_evidence.schema import load_schema, tooling_digest
 from editor_find_f2_evidence.strict_io import sha256_bytes, sha256_file
 
-from .fixture import boundary, digest_record, outer_status, raw_log, write, write_digest
+from .fixture import (
+    boundary,
+    digest_record,
+    outer_status,
+    raw_log,
+    write,
+    write_digest,
+    write_source_archive,
+)
 
 
 def _key_values(keys: tuple[str, ...], values: dict[str, str]) -> str:
@@ -50,8 +59,13 @@ def _build(root: Path, configuration: str) -> tuple[Path, dict[str, str]]:
     archive = Path(f"{directory}.source.tar")
     snapshot = Path(f"{directory}.source")
     packages = directory / "SourcePackages"
-    write(archive, f"archive:{configuration}\n")
-    write(snapshot / "project.yml", f"configuration: {configuration}\n")
+    source = b"fixture: exact source\n"
+    write(snapshot / "project.yml", source)
+    snapshot.chmod(0o755)
+    (snapshot / "project.yml").chmod(0o644)
+    write_source_archive(archive, {"project.yml": source})
+    if hash_source_archive_tree(archive) != hash_artifact(snapshot):
+        raise AssertionError("builder fixture source archive/tree mismatch")
     write(packages / "artifacts" / "payload", "artifact\n")
     write(packages / "checkouts" / "source", "checkout\n")
     write(packages / "repositories" / "mutable-cache", "not hash bound\n")
@@ -98,9 +112,15 @@ def _summary() -> bytes:
     return (json.dumps(value, sort_keys=True) + "\n").encode()
 
 
-def create_builder_inputs(root: Path) -> tuple[dict[str, Path], bytes]:
+def create_builder_inputs(root: Path):
     schema = load_schema()
     builds = {configuration: _build(root, configuration) for configuration in ("Debug", "Release")}
+    first_build = builds["Debug"][1]
+    integrity_schema = replace(
+        schema,
+        source_archive_sha256=first_build["source_archive_sha256"],
+        source_tree_sha256=first_build["source_tree_sha256"],
+    )
     prefixes: dict[str, Path] = {}
     for run_id in schema.run_ids:
         configuration = "Debug" if run_id.startswith("debug-") else "Release"
@@ -169,4 +189,4 @@ def create_builder_inputs(root: Path) -> tuple[dict[str, Path], bytes]:
             "status": "pass",
         }
         write(Path(f"{prefix}.evidence-manifest.txt"), _key_values(evidence_keys, evidence))
-    return prefixes, _summary()
+    return prefixes, _summary(), integrity_schema

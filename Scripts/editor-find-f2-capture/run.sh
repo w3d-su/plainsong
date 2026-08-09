@@ -4,6 +4,7 @@ F2_CONTROL_DIRECTORY=""
 F2_CONTROL_IDENTITY=""
 F2_ACTIVE_RUNNER_PID=""
 F2_ACTIVE_MONITOR_PID=""
+F2_RUNNER_REAPED=1
 
 f2_control_directory_is_exact() {
     local identity
@@ -19,6 +20,7 @@ f2_control_directory_is_exact() {
 
 f2_cleanup_control_directory() {
     [[ -n "$F2_CONTROL_DIRECTORY" ]] || return 0
+    [[ -z "$F2_ACTIVE_MONITOR_PID" && -z "$F2_ACTIVE_RUNNER_PID" ]] || return 1
     f2_control_directory_is_exact || return 1
     /bin/rm -rf -- "$F2_CONTROL_DIRECTORY" || return
     F2_CONTROL_DIRECTORY=""
@@ -31,15 +33,13 @@ f2_capture_exit() {
     trap - EXIT HUP INT TERM
     set +e
     if [[ "$F2_ACTIVE_RUNNER_PID" =~ ^[0-9]+$ ]]; then
-        f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM
-        f2_wait_run_tree_gone "$F2_ACTIVE_RUNNER_PID" || status=9
+        f2_stop_and_reap_runner "$F2_ACTIVE_RUNNER_PID" || status=9
     fi
     if f2_control_directory_is_exact; then
         : > "$F2_CONTROL_DIRECTORY/done"
     fi
     if [[ "$F2_ACTIVE_MONITOR_PID" =~ ^[0-9]+$ ]]; then
-        /bin/kill -TERM "$F2_ACTIVE_MONITOR_PID" 2>/dev/null || true
-        wait "$F2_ACTIVE_MONITOR_PID" 2>/dev/null || true
+        f2_stop_monitor "$F2_ACTIVE_MONITOR_PID" || status=9
     fi
     f2_cleanup_control_directory || status=9
     exit "$status"
@@ -111,6 +111,8 @@ f2_require_exact_source() {
 f2_start_runner() {
     local session_ready="$F2_CONTROL_DIRECTORY/session-ready"
     local session_go="$F2_CONTROL_DIRECTORY/session-go"
+    local session_status="$F2_CONTROL_DIRECTORY/session-status"
+    local session_drain="$F2_CONTROL_DIRECTORY/session-drain"
     local runner_user
     local runner_home
     local pgid
@@ -130,17 +132,30 @@ f2_start_runner() {
         TMPDIR=/private/tmp \
         USER="$runner_user" \
         /usr/bin/python3 -I -c \
-        'import os,sys,time
+        'import os,signal,sys,time
 os.setsid()
 fd=os.open(sys.argv[1], os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o400)
 os.write(fd,b"ready\n"); os.close(fd)
 while not os.path.exists(sys.argv[2]): time.sleep(0.005)
-os.execv(sys.argv[3], sys.argv[3:])' \
-        "$session_ready" "$session_go" "$F2_RUNNER" \
+child=os.fork()
+if child == 0:
+    os.execv(sys.argv[5], sys.argv[5:])
+for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+    signal.signal(signum, signal.SIG_IGN)
+_, status=os.waitpid(child, 0)
+code=os.waitstatus_to_exitcode(status)
+if code < 0: code=128-code
+fd=os.open(sys.argv[3], os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o400)
+os.write(fd,(str(code)+"\n").encode("ascii")); os.close(fd)
+while not os.path.exists(sys.argv[4]): time.sleep(0.005)
+raise SystemExit(code)' \
+        "$session_ready" "$session_go" "$session_status" "$session_drain" \
+        "$F2_RUNNER" \
         "$F2_CONFIGURATION" "$F2_DERIVED_DATA_PATH" \
         "$F2_OUTPUT_PREFIX.xcresult" "$F2_OUTPUT_PREFIX.log" >> \
         "$F2_OUTPUT_PREFIX.outer.log" 2>&1 &
     F2_ACTIVE_RUNNER_PID=$!
+    F2_RUNNER_REAPED=0
     f2_wait_for_file "$session_ready" "$F2_ACTIVE_RUNNER_PID" || return 1
     pgid="$(/bin/ps -o pgid= -p "$F2_ACTIVE_RUNNER_PID" | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
     [[ "$pgid" == "$F2_ACTIVE_RUNNER_PID" ]] || return 1
@@ -152,25 +167,63 @@ os.execv(sys.argv[3], sys.argv[3:])' \
 
 f2_wait_runner() {
     local started=$SECONDS
-    local state
+    local session_status="$F2_CONTROL_DIRECTORY/session-status"
+    local session_drain="$F2_CONTROL_DIRECTORY/session-drain"
 
     F2_TIMED_OUT=0
-    while /bin/kill -0 "$F2_ACTIVE_RUNNER_PID" 2>/dev/null; do
-        state="$(/bin/ps -o state= -p "$F2_ACTIVE_RUNNER_PID" 2>/dev/null | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
-        [[ "$state" != Z* ]] || break
+    F2_WRAPPER_STATUS=""
+    while [[ ! -f "$session_status" ]]; do
+        f2_runner_group_identity_is_owned "$F2_ACTIVE_RUNNER_PID" || {
+            F2_TERMINATION_FAILED=1
+            break
+        }
         if (( SECONDS - started >= F2_RUN_TIMEOUT_SECONDS )); then
             F2_TIMED_OUT=1
-            f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM
-            f2_wait_run_tree_gone "$F2_ACTIVE_RUNNER_PID" || F2_TERMINATION_FAILED=1
             break
         fi
         /bin/sleep 0.2
     done
-    if wait "$F2_ACTIVE_RUNNER_PID"; then
-        F2_WRAPPER_STATUS=0
-    else
-        F2_WRAPPER_STATUS=$?
+    if [[ -f "$session_status" ]]; then
+        F2_WRAPPER_STATUS="$(/usr/bin/awk 'NR==1 && /^[0-9]+$/ {print; ok=1} END {if (!ok || NR != 1) exit 1}' "$session_status")" || F2_TERMINATION_FAILED=1
     fi
+    if [[ "$F2_TIMED_OUT" == 1 ]]; then
+        f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM || F2_TERMINATION_FAILED=1
+    fi
+    if f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50; then
+        : > "$session_drain"
+    else
+        f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM || F2_TERMINATION_FAILED=1
+        if f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50; then
+            : > "$session_drain"
+        else
+            f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" KILL || F2_TERMINATION_FAILED=1
+            f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50 || F2_TERMINATION_FAILED=1
+        fi
+    fi
+    if builtin wait "$F2_ACTIVE_RUNNER_PID"; then
+        [[ -n "${F2_WRAPPER_STATUS:-}" ]] || F2_WRAPPER_STATUS=0
+    else
+        local status=$?
+        [[ -n "${F2_WRAPPER_STATUS:-}" ]] || F2_WRAPPER_STATUS="$status"
+    fi
+    F2_RUNNER_REAPED=1
+    F2_ACTIVE_RUNNER_PID=""
+}
+
+f2_stop_and_reap_runner() {
+    local runner_pid="$1"
+
+    f2_terminate_run_tree "$runner_pid" TERM || return
+    if ! f2_wait_run_group_members_gone "$runner_pid" 50; then
+        f2_terminate_run_tree "$runner_pid" KILL || return
+        f2_wait_run_group_members_gone "$runner_pid" 50 || return
+    fi
+    if f2_runner_group_identity_is_owned "$runner_pid"; then
+        : > "$F2_CONTROL_DIRECTORY/session-drain"
+    fi
+    builtin wait "$runner_pid" 2>/dev/null || true
+    F2_RUNNER_REAPED=1
+    F2_ACTIVE_RUNNER_PID=""
 }
 
 f2_write_outer_status() {
@@ -189,7 +242,7 @@ f2_write_outer_status() {
 }
 
 f2_capture_main() {
-    F2_SCRIPT_DIRECTORY="$(builtin cd "$(/usr/bin/dirname "${BASH_SOURCE[0]}")/.." && /bin/pwd -P)"
+    F2_SCRIPT_DIRECTORY="$(builtin cd "${BASH_SOURCE[0]%/*}/.." && /bin/pwd -P)"
     builtin umask 077
     f2_validate_capture_arguments "$@" || return
     f2_validate_schema || return
@@ -225,11 +278,6 @@ f2_capture_main() {
     else
         F2_MONITOR_STATUS=$?
     fi
-    F2_ACTIVE_MONITOR_PID=""
-    if ! f2_wait_run_tree_gone "$recorded_runner_pid"; then
-        F2_TERMINATION_FAILED=1
-    fi
-    F2_ACTIVE_RUNNER_PID=""
     [[ -f "$F2_OUTPUT_PREFIX.outer.log" ]] && F2_CAPTURE_STATUS=0 || F2_CAPTURE_STATUS=1
     if f2_capture_boundary postflight \
         "$F2_OUTPUT_PREFIX.postflight.txt" \

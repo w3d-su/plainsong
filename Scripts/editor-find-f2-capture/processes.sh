@@ -57,36 +57,47 @@ f2_competitor_processes() {
             "$F2_ALLOWED_HOST_EXECUTABLE"
 }
 
+f2_runner_group_identity_is_owned() {
+    local runner_pid="$1"
+    local identity
+
+    [[ "${F2_RUNNER_REAPED:-1}" == 0 &&
+        "$runner_pid" =~ ^[0-9]+$ && "$runner_pid" != 0 ]] || return 1
+    identity="$(
+        /bin/ps -o pid=,pgid= -p "$runner_pid" 2>/dev/null |
+            /usr/bin/awk 'NR == 1 {print $1 " " $2}'
+    )" || return 1
+    [[ "$identity" == "$runner_pid $runner_pid" ]]
+}
+
+# The session leader deliberately remains alive until the capture shell writes
+# session-drain. That makes the process-group ID non-reusable while cleanup can
+# still signal it. Once the leader is reaped, F2_RUNNER_REAPED permanently
+# disables this signal path.
 f2_terminate_run_tree() {
     local runner_pid="$1"
     local signal="${2:-TERM}"
 
-    [[ "$runner_pid" =~ ^[0-9]+$ && "$runner_pid" != 0 ]] || return 2
+    f2_runner_group_identity_is_owned "$runner_pid" || return 2
     /bin/kill -"$signal" "-$runner_pid" 2>/dev/null || true
-    /bin/kill -"$signal" "$runner_pid" 2>/dev/null || true
 }
 
-f2_wait_run_tree_gone() {
+f2_run_group_has_live_member() {
     local runner_pid="$1"
-    local state
 
-    for _ in $(/usr/bin/seq 1 50); do
-        state="$(/bin/ps -o state= -p "$runner_pid" 2>/dev/null | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
-        if [[ -z "$state" || "$state" == Z* ]]; then
-            if ! /bin/kill -0 "-$runner_pid" 2>/dev/null; then
-                return 0
-            fi
-        fi
-        /bin/sleep 0.1
-    done
-    f2_terminate_run_tree "$runner_pid" KILL
-    for _ in $(/usr/bin/seq 1 50); do
-        state="$(/bin/ps -o state= -p "$runner_pid" 2>/dev/null | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
-        if [[ -z "$state" || "$state" == Z* ]]; then
-            if ! /bin/kill -0 "-$runner_pid" 2>/dev/null; then
-                return 0
-            fi
-        fi
+    /bin/ps -ww -axo pid=,pgid=,state= |
+        /usr/bin/awk -v runner_pid="$runner_pid" '
+            $2 == runner_pid && $1 != runner_pid && $3 !~ /^Z/ { found=1 }
+            END { exit(found ? 0 : 1) }
+        '
+}
+
+f2_wait_run_group_members_gone() {
+    local runner_pid="$1"
+    local attempts="${2:-50}"
+
+    for _ in $(/usr/bin/seq 1 "$attempts"); do
+        f2_run_group_has_live_member "$runner_pid" || return 0
         /bin/sleep 0.1
     done
     return 1

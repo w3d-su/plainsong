@@ -419,14 +419,14 @@ are historical artifacts, not maintained large-file exceptions in the current ch
 | Historical measured-source runner (`c871ddf`) | `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
 | Historical outer capture wrapper (`03ffd70`) | `2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf` |
 | Historical pack builder / auditor (`03ffd70`) | `11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9` / `605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819` |
-| Current `Scripts/editor-find-f2-tooling.sha256` | `3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3` |
-| Current inventory verifier | `30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351` |
-| Current isolated bootstrap | `af986e0e285fd361cb34ae00b7982adb13604e44d125ea0c3e47ef889568fdaa` |
-| Current capture schema | `fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21` |
-| Current auditor / builder entry points | `e422d62098d4761ad8584331d95fda6ae18e6e19228d814056fee99bdc15878e` / `fafb3caee0bf1c960e045f4b7dffa30810fcddc4c6e8ee7f80eb7a6920162e32` |
-| Current capture / runner / build entry points | `1a720b1a2a39bbb66073aee60ca61ef9951522716bc0d38d4e4cf1e4f0156024` / `91f517c26fee8ab3f9d39555771ebd43baa6034afca24751d2655c1005578dc8` / `ac02d8a3e6fae9433338ada0373b6cff8fbb3bbc34d09e675d1b436ffa821e02` |
+| Current `Scripts/editor-find-f2-tooling.sha256` | `5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd` |
+| Current inventory verifier | `71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a` |
+| Current isolated bootstrap | `5e93864259a88dfe7d37dfc519c2e257de1cd05f69d5b5f9a73a022ec41f355d` |
+| Current capture schema | `03f0f05762775e0e1f0cd9f807ba61de269a434f49070a65f1688fcb8a03b4e3` |
+| Current auditor / builder entry points | `7250f84581aa127511c80d22a81d7a78305333f9b5680c374bf240190b6e6c81` / `046f3e164fe32422338ad7d3c0bdb3cb59549151244329300ae0e93e6fcb7229` |
+| Current capture / runner / build entry points | `6dab2762922502ee184bc842296ca7f4e8617467888671eba9cfef544fcc3020` / `91f517c26fee8ab3f9d39555771ebd43baa6034afca24751d2655c1005578dc8` / `ac02d8a3e6fae9433338ada0373b6cff8fbb3bbc34d09e675d1b436ffa821e02` |
 
-All 34 maintained executable/support modules are in the external inventory. Current Python entry
+All 35 maintained executable/support modules are in the external inventory. Current Python entry
 points require isolated `-I` startup, verify canonical current-UID-owned non-symlink paths with no
 group/world write or ACL `allow`, hash-pin the bootstrap and exact package inventory, then import.
 Current shell entry points require `bash -p`; the capture and runner wrappers pin every sourced
@@ -437,7 +437,12 @@ owner/hash verification is either a shell builtin or a fixed absolute system pat
 Perl-backed `shasum`. The exact pack inventory and full-artifact audit additionally reject
 symlinks, foreign owners, group/world writers, ACLs, and unsupported entries before exact rehash;
 the full audit then cross-binds all nine retained artifacts to the compact evidence manifest and
-its exact retained build manifest. Historical format-2 packs keep their exact reference set;
+its exact retained build manifest. The current schema independently anchors the retained source
+archive (`f0b84f1b…`) and its reconstructed logical tree (`51b3c530…`): compact mode rejects a
+rewritten archive claim, and full mode parses the uncompressed tar without extraction, rejects
+unsafe members, and recomputes the tree hash. A retained test-runner input must be the non-overlapping
+direct child `Build/Products/*.xctestrun`, not an arbitrary regular build product. Historical
+format-2 packs keep their exact reference set;
 newly built format-3 packs additionally retain the isolated bootstrap required by their thin
 auditor/builder wrappers. Pathname reopening cannot exclude a concurrent mutation by another
 process already trusted as this same UID; that boundary is explicit and is not described as
@@ -460,9 +465,9 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/editor-find-f2-tooling.sha256")" = \
-  3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3
+  5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
-  30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
+  71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a
 test "$(f2_sha256 "$F2_PACK/manifest.json")" = \
   c7d1a3c68285aa0aac35914fe7d4d60c1bfbc8401b0055e689365b1bbe9989c5
 test "$(f2_sha256 "$F2_PACK/SHA256SUMS")" = "$F2_PACK_INVENTORY_SHA"
@@ -529,9 +534,9 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/editor-find-f2-tooling.sha256")" = \
-  3e8919a9ba722ae1c04670474c6093dfc968b09a8555d00d167cca9b61a22fb3
+  5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
-  30eb6343b47ede1b28af9c1ad3a65da9663a481fe708eb71d0133d252ef94351
+  71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a
 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py"
 
 /usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects \

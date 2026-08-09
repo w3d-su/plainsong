@@ -91,10 +91,10 @@ f2_verify_module() {
 }
 
 f2_verify_module "editor-find-f2-capture/common.sh" "51e98bb54cc426621fd5b0fd5acff15be9fd655d06609c16626651586de11703"
-f2_verify_module "editor-find-f2-capture/processes.sh" "d445f55451e9b412a57ca7fbc1e3efe3f16ef342dff3962f0d7f123b0ba21ae8"
-f2_verify_module "editor-find-f2-capture/monitor.sh" "e8e0e1691bb1bb9b4b11cd7be72c9eda70f49633047b31253f508366962f32b1"
-f2_verify_module "editor-find-f2-capture/run.sh" "4664a4f2591c15a5cb31c365bd558482fa7c5a501d628276346018b230f1fa29"
-f2_verify_module "editor-find-f2-evidence/schema.json" "fdd3197290f477cd06db567a36d53fa3b2c7180a06641fed86678287b2081e21"
+f2_verify_module "editor-find-f2-capture/processes.sh" "5a630bab9d0e244c60ba5ecde36df6155fcc267010cdfd9a21b802ae4e4f6e44"
+f2_verify_module "editor-find-f2-capture/monitor.sh" "c3ac1d366592e0f4e6d84dd169c58e5037d04dde125ffef07ccca558aaea921e"
+f2_verify_module "editor-find-f2-capture/run.sh" "41b14c7b8b631ca1cf5a4017a182d13c4693281dca5d0b2d0707257d6ef00654"
+f2_verify_module "editor-find-f2-evidence/schema.json" "03f0f05762775e0e1f0cd9f807ba61de269a434f49070a65f1688fcb8a03b4e3"
 f2_verify_module "editor-find-f2-evidence/schema_check.py" "ffacce11ab1fdaac1dd2a328900d2eb98794650801eb028363f9de444b6f93f4"
 
 builtin source "$f2_script_directory/editor-find-f2-capture/common.sh"

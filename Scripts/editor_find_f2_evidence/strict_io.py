@@ -112,6 +112,25 @@ def safe_relative_path(value: object, label: str) -> str:
     return value
 
 
+def xctestrun_relative_path(value: object, label: str) -> str:
+    relative = safe_relative_path(value, label)
+    parts = PurePosixPath(relative).parts
+    require(
+        len(parts) == 3
+        and parts[:2] == ("Build", "Products")
+        and parts[2].endswith(".xctestrun")
+        and parts[2] != ".xctestrun",
+        f"{label} must match Build/Products/*.xctestrun",
+    )
+    return relative
+
+
+def paths_overlap(first: str, second: str) -> bool:
+    left = PurePosixPath(first)
+    right = PurePosixPath(second)
+    return left == right or left in right.parents or right in left.parents
+
+
 def strict_pack_files(root: Path) -> set[str]:
     files: set[str] = set()
 

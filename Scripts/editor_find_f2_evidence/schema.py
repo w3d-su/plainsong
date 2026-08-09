@@ -20,6 +20,8 @@ class EvidenceSchema:
     path: Path
     digest: str
     source_commit: str
+    source_archive_sha256: str | None
+    source_tree_sha256: str | None
     process_filter: str
     process_ownership_rule: str
     capture_tooling_paths: tuple[str, ...]
@@ -80,12 +82,13 @@ def _tooling_paths(value: object, label: str) -> tuple[str, ...]:
 
 
 def load_schema(path: Path | None = None) -> EvidenceSchema:
-    if path is None:
+    is_current = path is None
+    if is_current:
         path = Path(__file__).resolve().parent.parent / "editor-find-f2-evidence" / "schema.json"
     data = path.read_bytes()
-    root = _exact_keys(
-        load_json_bytes(data, "schema.json"),
-        {
+    loaded = load_json_bytes(data, "schema.json")
+    require(isinstance(loaded, dict), "schema.json must be an object")
+    keys = {
             "schemaVersion",
             "sourceCommit",
             "processFilter",
@@ -96,9 +99,15 @@ def load_schema(path: Path | None = None) -> EvidenceSchema:
             "outer",
             "runnerEnvironmentPolicy",
             "expectedRunIDs",
-        },
+        }
+    if "sourceIntegrity" in loaded:
+        keys.add("sourceIntegrity")
+    root = _exact_keys(
+        loaded,
+        keys,
         "schema.json",
     )
+    require(not is_current or "sourceIntegrity" in root, "current schema lacks source-integrity anchors")
     require(root["schemaVersion"] == 1, "unsupported schema version")
     monitor = _exact_keys(
         root["monitor"],
@@ -113,10 +122,32 @@ def load_schema(path: Path | None = None) -> EvidenceSchema:
     run_ids = root["expectedRunIDs"]
     require(isinstance(run_ids, list) and all(isinstance(item, str) for item in run_ids), "invalid run IDs")
     require(len(set(run_ids)) == len(run_ids) == 6, "schema must name six unique runs")
+    source_integrity = None
+    if "sourceIntegrity" in root:
+        source_integrity = _exact_keys(
+            root["sourceIntegrity"],
+            {"archiveSHA256", "treeSHA256"},
+            "source integrity",
+        )
+        require(
+            all(
+                isinstance(source_integrity[key], str)
+                and len(source_integrity[key]) == 64
+                and all(character in "0123456789abcdef" for character in source_integrity[key])
+                for key in ("archiveSHA256", "treeSHA256")
+            ),
+            "source-integrity anchor is not SHA-256",
+        )
     return EvidenceSchema(
         path=path,
         digest=hashlib.sha256(data).hexdigest(),
         source_commit=str(root["sourceCommit"]),
+        source_archive_sha256=(
+            str(source_integrity["archiveSHA256"]) if source_integrity is not None else None
+        ),
+        source_tree_sha256=(
+            str(source_integrity["treeSHA256"]) if source_integrity is not None else None
+        ),
         process_filter=str(root["processFilter"]),
         process_ownership_rule=str(root["processOwnershipRule"]),
         capture_tooling_paths=_tooling_paths(root["captureToolingPaths"], "capture tooling paths"),

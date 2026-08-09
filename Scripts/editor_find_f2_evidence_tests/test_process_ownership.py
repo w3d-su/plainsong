@@ -91,6 +91,7 @@ class ProcessOwnershipTests(unittest.TestCase):
                 command = (
                     f"source {shlex.quote(str(self.helper))}; "
                     f"F2_ALLOWED_HOST_EXECUTABLE={shlex.quote(str(host))}; "
+                    "F2_RUNNER_REAPED=0; "
                     f"f2_terminate_run_tree {runner.pid} TERM"
                 )
                 subprocess.run(
@@ -114,6 +115,88 @@ class ProcessOwnershipTests(unittest.TestCase):
         self.assertNotIn("f2_exact_host_pids", source)
         self.assertNotIn("f2_owned_run_pids", source)
         self.assertIn('/bin/kill -"$signal" "-$runner_pid"', source)
+
+    def test_reaped_runner_state_never_signals_a_reused_pid(self) -> None:
+        unrelated = subprocess.Popen(["/bin/sleep", "30"], start_new_session=True)
+        try:
+            command = (
+                f"source {shlex.quote(str(self.helper))}; "
+                "F2_RUNNER_REAPED=1; "
+                f"f2_terminate_run_tree {unrelated.pid} TERM"
+            )
+            completed = subprocess.run(
+                ["/bin/bash", "--noprofile", "--norc", "-c", command],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            self.assertIsNone(unrelated.poll())
+        finally:
+            if unrelated.poll() is None:
+                os.killpg(unrelated.pid, signal.SIGTERM)
+                unrelated.wait(timeout=2)
+
+    def test_runner_reap_permanently_closes_the_group_signal_path(self) -> None:
+        run_source = self.helper.with_name("run.sh").read_text(encoding="utf-8")
+        wait_function = run_source.split("f2_wait_runner() {", 1)[1].split(
+            "\nf2_stop_and_reap_runner()", 1
+        )[0]
+        reap = wait_function.index('builtin wait "$F2_ACTIVE_RUNNER_PID"')
+        closed = wait_function.index("F2_RUNNER_REAPED=1", reap)
+        cleared = wait_function.index('F2_ACTIVE_RUNNER_PID=""', closed)
+        self.assertNotIn("f2_terminate_run_tree", wait_function[reap:closed])
+        self.assertLess(reap, closed)
+        self.assertLess(closed, cleared)
+
+    def test_term_resistant_monitor_is_killed_reaped_before_control_cleanup(self) -> None:
+        capture = self.helper.parent
+        command = f"""
+source {shlex.quote(str(capture / 'processes.sh'))}
+source {shlex.quote(str(capture / 'monitor.sh'))}
+source {shlex.quote(str(capture / 'run.sh'))}
+F2_CONTROL_DIRECTORY=$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-monitor.XXXXXX)
+F2_CONTROL_IDENTITY=$(/usr/bin/stat -f '%d:%i' "$F2_CONTROL_DIRECTORY")
+/bin/bash --noprofile --norc -c 'trap "" TERM; while :; do /bin/sleep 1; done' &
+F2_ACTIVE_MONITOR_PID=$!
+/bin/sleep 0.1
+if f2_cleanup_control_directory; then exit 20; fi
+[[ -d "$F2_CONTROL_DIRECTORY" ]] || exit 21
+f2_stop_monitor "$F2_ACTIVE_MONITOR_PID" 2 || exit 22
+[[ -z "$F2_ACTIVE_MONITOR_PID" ]] || exit 23
+f2_cleanup_control_directory || exit 24
+[[ -z "$F2_CONTROL_DIRECTORY" ]] || exit 25
+"""
+        completed = subprocess.run(
+            ["/bin/bash", "--noprofile", "--norc", "-c", command],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_stopped_monitor_is_not_mistaken_for_a_reaped_job(self) -> None:
+        capture = self.helper.parent
+        command = f"""
+source {shlex.quote(str(capture / 'processes.sh'))}
+source {shlex.quote(str(capture / 'monitor.sh'))}
+/bin/bash --noprofile --norc -c 'while :; do /bin/sleep 1; done' &
+F2_ACTIVE_MONITOR_PID=$!
+/bin/kill -STOP "$F2_ACTIVE_MONITOR_PID"
+/bin/sleep 0.1
+if f2_wait_monitor_stopped "$F2_ACTIVE_MONITOR_PID" 1; then exit 20; fi
+f2_stop_monitor "$F2_ACTIVE_MONITOR_PID" 1 || exit 21
+[[ -z "$F2_ACTIVE_MONITOR_PID" ]] || exit 22
+"""
+        completed = subprocess.run(
+            ["/bin/bash", "--noprofile", "--norc", "-c", command],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_classifier_never_uses_command_arguments_for_path_correlation(self) -> None:
         source = self.helper.read_text(encoding="utf-8")
