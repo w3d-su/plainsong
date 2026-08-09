@@ -12,6 +12,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 
+SUPERVISOR_SIGNALS = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+
+
 def _write_all(descriptor: int, data: bytes) -> None:
     offset = 0
     while offset < len(data):
@@ -56,6 +59,18 @@ def main() -> None:
         )
     ready, go, status_path, drain = map(Path, sys.argv[1:5])
     runner_arguments = sys.argv[5:]
+
+    cancelled_signal: int | None = None
+
+    def record_cancellation(signum: int, _frame: object) -> None:
+        nonlocal cancelled_signal
+        cancelled_signal = signum
+
+    # The shell owns this process as the stable session/PGID identity. Install
+    # the absorbing supervisor policy before publishing readiness so pre-go
+    # cleanup cannot make that identity disappear while it is still signalable.
+    for signum in SUPERVISOR_SIGNALS:
+        signal.signal(signum, record_cancellation)
     os.setsid()
     ready_descriptor = os.open(
         ready,
@@ -67,14 +82,40 @@ def main() -> None:
         os.fsync(ready_descriptor)
     finally:
         os.close(ready_descriptor)
-    while not go.exists():
+    while (
+        not go.exists()
+        and not drain.exists()
+        and cancelled_signal is None
+    ):
         time.sleep(0.005)
+    if drain.exists() or cancelled_signal is not None:
+        while not drain.exists():
+            time.sleep(0.005)
+        return
     child = os.fork()
     if child == 0:
+        # The handler survives exec. Restore the runner's normal signal policy
+        # and honor cancellation inherited across the fork boundary.
+        for signum in SUPERVISOR_SIGNALS:
+            signal.signal(signum, signal.SIG_DFL)
+        if cancelled_signal is not None or drain.exists():
+            os._exit(128 + (cancelled_signal or signal.SIGTERM))
         os.execv(runner_arguments[0], runner_arguments)
-    for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
-        signal.signal(signum, signal.SIG_IGN)
-    _, status = os.waitpid(child, 0)
+    forwarded_signal: int | None = None
+    while True:
+        waited, status = os.waitpid(child, os.WNOHANG)
+        if waited == child:
+            break
+        if (
+            cancelled_signal is not None
+            and forwarded_signal != cancelled_signal
+        ):
+            try:
+                os.kill(child, cancelled_signal)
+            except ProcessLookupError:
+                pass
+            forwarded_signal = cancelled_signal
+        time.sleep(0.005)
     code = os.waitstatus_to_exitcode(status)
     if code < 0:
         code = 128 - code

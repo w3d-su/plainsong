@@ -1,6 +1,6 @@
 9c54513d118bf150d52aa8f781933df98fc2141959c988e67dcf42718cd9e6a2  Scripts/build-editor-find-f2-performance-gate.sh
 6cab5471e11f06cb9b853a54c209fd9f87279330975da696a74c33c5094b3b4f  Scripts/build-editor-find-f2-retained-pack.py
-9ba1dea7c5bc7d61b853290ab0254a947a4c3e49032bb9833a1bf91c49e5fe04  Scripts/capture-editor-find-f2-authoritative-run.sh
+8317ac44819387ac0b53167643be3c3f5e023b4ee1d6c3cb2dad1f38686c7f8e  Scripts/capture-editor-find-f2-authoritative-run.sh
 2977049c7fec74b1dadf1f3cf13436780fadd3bc1d3ee12ef8ac9536a286406e  Scripts/capture-editor-find-f2-log.py
 ed9ad47f21d6a4df4ae1dc24a76c669e9eac11548fbdcab1bd0a49722cf3a9f2  Scripts/check-editor-find-f2-retained-evidence.py
 047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c  Scripts/check-editor-find-f2-tooling-inventory.py
@@ -9,7 +9,7 @@ e8a41b63d2b1fb4042aff7412cdacf7be2e19fd2c1b8e0cf3ac5c656a7d9ad7e  Scripts/editor
 755249f0798091a7fb4c857bd619894754b3ec21bf59385a6bc856094e6f15b4  Scripts/editor-find-f2-capture/monitor.sh
 196f82193a08fafd3b530a81c1795d63e950a31cc2c1647f3a6183c073ef9098  Scripts/editor-find-f2-capture/processes.sh
 528eb4519cb8aca241a8d8544411c67529294266d2c9996e6c199e1bed0dcd9d  Scripts/editor-find-f2-capture/run.sh
-521df514adf39a87132f95326148818fe0bc250caba87266b193e83524ec73e1  Scripts/editor-find-f2-capture/session_status.py
+3cff713e0bf7385eaa355b0f116e142bf7a76736007294d20fb3c21a45ef33e5  Scripts/editor-find-f2-capture/session_status.py
 156177ae6c047e7f1295381c557c440263dcac63d48a3fbaf01dd69d4bcb3d56  Scripts/editor-find-f2-evidence/schema.json
 ffacce11ab1fdaac1dd2a328900d2eb98794650801eb028363f9de444b6f93f4  Scripts/editor-find-f2-evidence/schema_check.py
 b910cc6d6e2b8e7020d5e23a138f7d23f016f874fbf3ad88c4f921a11a3781ae  Scripts/editor-find-f2-runner/build-integrity.sh
