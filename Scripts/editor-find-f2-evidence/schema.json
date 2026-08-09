@@ -6,13 +6,14 @@
     "treeSHA256": "51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94"
   },
   "processFilter": "xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner",
-  "processOwnershipRule": "runner-process-group-single-frozen-host",
+  "processOwnershipRule": "runner-process-group-single-frozen-host-owned-lifecycle",
   "captureToolingPaths": [
     "capture-editor-find-f2-authoritative-run.sh",
     "editor-find-f2-capture/common.sh",
     "editor-find-f2-capture/monitor.sh",
     "editor-find-f2-capture/processes.sh",
     "editor-find-f2-capture/run.sh",
+    "editor-find-f2-capture/session_status.py",
     "editor-find-f2-evidence/schema.json",
     "editor-find-f2-evidence/schema_check.py"
   ],
@@ -38,7 +39,7 @@
     "editor_find_f2_evidence/strict_io.py"
   ],
   "monitor": {
-    "format": 5,
+    "format": 6,
     "sampleIntervalMilliseconds": 200,
     "maximumSampleGapMilliseconds": 1000,
     "statusKeys": [
@@ -60,7 +61,7 @@
     ]
   },
   "outer": {
-    "format": 3,
+    "format": 4,
     "runTimeoutSeconds": 180,
     "statusKeys": [
       "format",

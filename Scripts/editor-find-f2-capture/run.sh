@@ -4,7 +4,8 @@ F2_CONTROL_DIRECTORY=""
 F2_CONTROL_IDENTITY=""
 F2_ACTIVE_RUNNER_PID=""
 F2_ACTIVE_MONITOR_PID=""
-F2_RUNNER_REAPED=1
+F2_RUNNER_LIFECYCLE=cleared
+F2_MONITOR_LIFECYCLE=cleared
 
 f2_control_directory_is_exact() {
     local identity
@@ -33,13 +34,21 @@ f2_capture_exit() {
     trap - EXIT HUP INT TERM
     set +e
     if [[ "$F2_ACTIVE_RUNNER_PID" =~ ^[0-9]+$ ]]; then
-        f2_stop_and_reap_runner "$F2_ACTIVE_RUNNER_PID" || status=9
+        if [[ "$F2_RUNNER_LIFECYCLE" == signalable ]]; then
+            f2_stop_and_reap_runner "$F2_ACTIVE_RUNNER_PID" || status=9
+        else
+            f2_reap_runner_only "$F2_ACTIVE_RUNNER_PID" || status=9
+        fi
     fi
     if f2_control_directory_is_exact; then
         : > "$F2_CONTROL_DIRECTORY/done"
     fi
     if [[ "$F2_ACTIVE_MONITOR_PID" =~ ^[0-9]+$ ]]; then
-        f2_stop_monitor "$F2_ACTIVE_MONITOR_PID" || status=9
+        if [[ "$F2_MONITOR_LIFECYCLE" == signalable ]]; then
+            f2_stop_monitor "$F2_ACTIVE_MONITOR_PID" || status=9
+        else
+            f2_reap_monitor_only "$F2_ACTIVE_MONITOR_PID" || status=9
+        fi
     fi
     f2_cleanup_control_directory || status=9
     exit "$status"
@@ -131,31 +140,15 @@ f2_start_runner() {
         PATH=/usr/bin:/bin:/usr/sbin:/sbin \
         TMPDIR=/private/tmp \
         USER="$runner_user" \
-        /usr/bin/python3 -I -c \
-        'import os,signal,sys,time
-os.setsid()
-fd=os.open(sys.argv[1], os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o400)
-os.write(fd,b"ready\n"); os.close(fd)
-while not os.path.exists(sys.argv[2]): time.sleep(0.005)
-child=os.fork()
-if child == 0:
-    os.execv(sys.argv[5], sys.argv[5:])
-for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
-    signal.signal(signum, signal.SIG_IGN)
-_, status=os.waitpid(child, 0)
-code=os.waitstatus_to_exitcode(status)
-if code < 0: code=128-code
-fd=os.open(sys.argv[3], os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o400)
-os.write(fd,(str(code)+"\n").encode("ascii")); os.close(fd)
-while not os.path.exists(sys.argv[4]): time.sleep(0.005)
-raise SystemExit(code)' \
+        /usr/bin/python3 -I \
+        "$F2_SCRIPT_DIRECTORY/editor-find-f2-capture/session_status.py" \
         "$session_ready" "$session_go" "$session_status" "$session_drain" \
         "$F2_RUNNER" \
         "$F2_CONFIGURATION" "$F2_DERIVED_DATA_PATH" \
         "$F2_OUTPUT_PREFIX.xcresult" "$F2_OUTPUT_PREFIX.log" >> \
         "$F2_OUTPUT_PREFIX.outer.log" 2>&1 &
     F2_ACTIVE_RUNNER_PID=$!
-    F2_RUNNER_REAPED=0
+    F2_RUNNER_LIFECYCLE=signalable
     f2_wait_for_file "$session_ready" "$F2_ACTIVE_RUNNER_PID" || return 1
     pgid="$(/bin/ps -o pgid= -p "$F2_ACTIVE_RUNNER_PID" | /usr/bin/awk 'NR==1 {gsub(/[[:space:]]/, ""); print}')"
     [[ "$pgid" == "$F2_ACTIVE_RUNNER_PID" ]] || return 1
@@ -190,14 +183,17 @@ f2_wait_runner() {
         f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM || F2_TERMINATION_FAILED=1
     fi
     if f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50; then
+        f2_runner_enter_reap_only "$F2_ACTIVE_RUNNER_PID" || F2_TERMINATION_FAILED=1
         : > "$session_drain"
     else
+        local drain_status=$?
+        [[ "$drain_status" == 1 ]] || F2_TERMINATION_FAILED=1
         f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" TERM || F2_TERMINATION_FAILED=1
         if f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50; then
+            f2_runner_enter_reap_only "$F2_ACTIVE_RUNNER_PID" || F2_TERMINATION_FAILED=1
             : > "$session_drain"
         else
             f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" KILL || F2_TERMINATION_FAILED=1
-            f2_wait_run_group_members_gone "$F2_ACTIVE_RUNNER_PID" 50 || F2_TERMINATION_FAILED=1
         fi
     fi
     if builtin wait "$F2_ACTIVE_RUNNER_PID"; then
@@ -206,23 +202,41 @@ f2_wait_runner() {
         local status=$?
         [[ -n "${F2_WRAPPER_STATUS:-}" ]] || F2_WRAPPER_STATUS="$status"
     fi
-    F2_RUNNER_REAPED=1
+    F2_RUNNER_LIFECYCLE=cleared
+    F2_ACTIVE_RUNNER_PID=""
+}
+
+f2_reap_runner_only() {
+    local runner_pid="$1"
+
+    [[ "$F2_ACTIVE_RUNNER_PID" == "$runner_pid" &&
+        "$F2_RUNNER_LIFECYCLE" == reap-only ]] || return 2
+    [[ -e "$F2_CONTROL_DIRECTORY/session-drain" ]] ||
+        : > "$F2_CONTROL_DIRECTORY/session-drain"
+    builtin wait "$runner_pid" 2>/dev/null || true
+    F2_RUNNER_LIFECYCLE=cleared
     F2_ACTIVE_RUNNER_PID=""
 }
 
 f2_stop_and_reap_runner() {
     local runner_pid="$1"
 
-    f2_terminate_run_tree "$runner_pid" TERM || return
-    if ! f2_wait_run_group_members_gone "$runner_pid" 50; then
-        f2_terminate_run_tree "$runner_pid" KILL || return
-        f2_wait_run_group_members_gone "$runner_pid" 50 || return
+    if ! f2_terminate_run_tree "$runner_pid" TERM; then
+        f2_runner_enter_reap_only "$runner_pid" || return
+        /bin/kill -KILL "-$runner_pid" 2>/dev/null || true
+        builtin wait "$runner_pid" 2>/dev/null || true
+        F2_RUNNER_LIFECYCLE=cleared
+        F2_ACTIVE_RUNNER_PID=""
+        return 1
     fi
-    if f2_runner_group_identity_is_owned "$runner_pid"; then
+    if f2_wait_run_group_members_gone "$runner_pid" 50; then
+        f2_runner_enter_reap_only "$runner_pid" || return
         : > "$F2_CONTROL_DIRECTORY/session-drain"
+    else
+        f2_terminate_run_tree "$runner_pid" KILL || return
     fi
     builtin wait "$runner_pid" 2>/dev/null || true
-    F2_RUNNER_REAPED=1
+    F2_RUNNER_LIFECYCLE=cleared
     F2_ACTIVE_RUNNER_PID=""
 }
 
@@ -262,8 +276,9 @@ f2_capture_main() {
     F2_CONTROL_DIRECTORY="$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-monitor.XXXXXX)"
     F2_CONTROL_IDENTITY="$(/usr/bin/stat -f '%d:%i' "$F2_CONTROL_DIRECTORY")"
     f2_control_directory_is_exact || return 4
-    f2_monitor_loop "$F2_OUTPUT_PREFIX" "$F2_CONTROL_DIRECTORY" &
+    f2_monitor_supervisor "$F2_OUTPUT_PREFIX" "$F2_CONTROL_DIRECTORY" &
     F2_ACTIVE_MONITOR_PID=$!
+    F2_MONITOR_LIFECYCLE=signalable
     f2_wait_for_file "$F2_CONTROL_DIRECTORY/ready" "$F2_ACTIVE_MONITOR_PID" || return 5
     f2_start_runner || return 6
     local recorded_runner_pid="$F2_ACTIVE_RUNNER_PID"

@@ -32,9 +32,14 @@ def update_entry_identity(
     digest: hashlib._Hash,
     path: Path,
     relative_path: str,
+    executable_override: int | None = None,
 ) -> os.stat_result:
     metadata = path.lstat()
-    executable_mode = stat.S_IMODE(metadata.st_mode) & 0o111
+    executable_mode = (
+        stat.S_IMODE(metadata.st_mode) & 0o111
+        if executable_override is None
+        else executable_override
+    )
     update_field(digest, relative_path.encode("utf-8", errors="surrogateescape"))
     update_field(digest, f"{executable_mode:o}".encode("ascii"))
     return metadata
@@ -45,8 +50,14 @@ def hash_entry(
     path: Path,
     relative_path: str,
     exclude_git_administration: bool = False,
+    executable_override: int | None = None,
 ) -> None:
-    metadata = update_entry_identity(digest, path, relative_path)
+    metadata = update_entry_identity(
+        digest,
+        path,
+        relative_path,
+        executable_override,
+    )
 
     if stat.S_ISLNK(metadata.st_mode):
         update_field(digest, b"symlink")
@@ -140,15 +151,19 @@ def hash_resolved_package_input(digest: hashlib._Hash, path: Path) -> None:
 
 def main() -> None:
     resolved_package_input = False
+    source_tree = False
     if len(sys.argv) == 2:
         artifact_path = Path(sys.argv[1])
     elif len(sys.argv) == 3 and sys.argv[1] == "--resolved-package-input":
         resolved_package_input = True
         artifact_path = Path(sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "--source-tree":
+        source_tree = True
+        artifact_path = Path(sys.argv[2])
     else:
         print(
             f"usage: {sys.argv[0]} "
-            "[--resolved-package-input] ARTIFACT_PATH",
+            "[--resolved-package-input|--source-tree] ARTIFACT_PATH",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -161,6 +176,14 @@ def main() -> None:
     try:
         if resolved_package_input:
             hash_resolved_package_input(digest, artifact_path)
+        elif source_tree:
+            require_entry_type(artifact_path, "directory")
+            hash_entry(
+                digest,
+                artifact_path,
+                "artifact",
+                executable_override=0o111,
+            )
         else:
             hash_entry(digest, artifact_path, "artifact")
     except (OSError, ValueError) as error:

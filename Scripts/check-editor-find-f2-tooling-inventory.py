@@ -26,7 +26,13 @@ ROOT_FILES = {
     "run-editor-find-f2-performance-gate.sh",
 }
 DIRECTORIES = {
-    "editor-find-f2-capture": {"common.sh", "monitor.sh", "processes.sh", "run.sh"},
+    "editor-find-f2-capture": {
+        "common.sh",
+        "monitor.sh",
+        "processes.sh",
+        "run.sh",
+        "session_status.py",
+    },
     "editor-find-f2-evidence": {"schema.json", "schema_check.py"},
     "editor-find-f2-runner": {
         "build-integrity.sh",

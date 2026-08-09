@@ -8,7 +8,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from editor_find_f2_evidence.artifact_hash import hash_artifact, hash_source_archive_tree
+from editor_find_f2_evidence.artifact_hash import (
+    hash_artifact,
+    hash_source_archive_tree,
+    hash_source_tree,
+)
 from editor_find_f2_evidence.builder import build_pack
 from editor_find_f2_evidence.builder_io import DestinationRegistry
 from editor_find_f2_evidence.errors import AuditError
@@ -135,6 +139,55 @@ class BuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(AuditError, "external anchor"):
             self.build()
         self.assertFalse(self.pack.exists())
+
+    def test_builder_rejects_replaced_snapshot_after_resealing_build_hash(self) -> None:
+        snapshot = self.root / "inputs" / "builds" / "debug.source"
+        write(snapshot / "project.yml", b"replacement source\n")
+        self.rewrite_build_manifest(
+            "Debug",
+            {"build_input_sha256": hash_artifact(snapshot)},
+        )
+        with self.assertRaisesRegex(AuditError, "source snapshot (bytes|size) differs"):
+            self.build()
+        self.assertFalse(self.pack.exists())
+
+    def test_builder_allows_only_documented_generated_project_addition(self) -> None:
+        snapshot = self.root / "inputs" / "builds" / "debug.source"
+        write(snapshot / "Plainsong.xcodeproj" / "project.pbxproj", b"generated\n")
+        self.rewrite_build_manifest(
+            "Debug",
+            {"build_input_sha256": hash_artifact(snapshot)},
+        )
+        self.build()
+        self.assertEqual(
+            len(validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)),
+            6,
+        )
+
+    def test_source_tree_hash_contract_normalizes_umask_private_root(self) -> None:
+        archive = self.root / "source.tar"
+        snapshot = self.root / "snapshot"
+        source = b"exact source\n"
+        write_source_archive(archive, {"project.yml": source})
+        snapshot.mkdir(mode=0o700)
+        snapshot.chmod(0o700)
+        subprocess.run(
+            ["/usr/bin/tar", "-xf", str(archive), "-C", str(snapshot)],
+            check=True,
+        )
+        self.assertEqual(snapshot.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(
+            hash_source_tree(snapshot),
+            hash_source_archive_tree(archive),
+        )
+        script = Path(__file__).resolve().parent.parent / "hash-editor-find-f2-artifact.py"
+        completed = subprocess.run(
+            ["/usr/bin/python3", "-I", str(script), "--source-tree", str(snapshot)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(completed.stdout.strip(), hash_source_archive_tree(archive))
 
     def test_builder_rejects_app_executable_as_xctestrun(self) -> None:
         executable = (

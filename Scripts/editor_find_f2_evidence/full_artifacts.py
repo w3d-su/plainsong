@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 
-from .artifact_hash import hash_artifact, hash_source_archive_tree
+from .artifact_hash import hash_artifact, hash_source_archive_tree, validate_source_snapshot
 from .errors import require
 from .schema import EvidenceSchema, load_json_bytes
 from .strict_io import (
     SHA256,
+    filesystem_paths_overlap,
     parse_key_values,
     paths_overlap,
     safe_relative_path,
@@ -91,7 +92,7 @@ def load_provenance(
     for index, name in enumerate(names):
         for other in names[index + 1:]:
             require(
-                not paths_overlap(relatives[name], relatives[other]),
+                not paths_overlap(relatives[name], relatives[other], case_insensitive=True),
                 f"{run_id} artifact paths overlap: {name}/{other}",
             )
     require(
@@ -113,12 +114,24 @@ def validate_artifacts(
 ) -> None:
     records = provenance["artifacts"]
     verified: dict[str, tuple[dict, Path, str]] = {}
+    resolved_paths: dict[str, Path] = {}
+    artifact_root_resolved = artifact_root.resolve(strict=True)
     for name, (kind, hash_mode) in EXPECTED_ARTIFACTS.items():
         record = records[name]
         relative = safe_relative_path(record["artifactRootPath"], f"{run_id} {name} path")
         path = artifact_root / relative
-        require(path.resolve(strict=True).is_relative_to(artifact_root), f"{run_id} {name} escapes artifact root")
+        resolved = path.resolve(strict=True)
+        require(
+            resolved.is_relative_to(artifact_root_resolved),
+            f"{run_id} {name} escapes artifact root",
+        )
         require((path.is_file() if kind == "file" else path.is_dir()) and not path.is_symlink(), f"{run_id} {name} kind differs")
+        for other, other_path in resolved_paths.items():
+            require(
+                not filesystem_paths_overlap(path, other_path),
+                f"{run_id} artifact filesystem paths overlap: {name}/{other}",
+            )
+        resolved_paths[name] = path
         digest = (
             sha256_file(path)
             if hash_mode == "file-sha256"
@@ -151,6 +164,10 @@ def validate_artifacts(
     require(
         hash_source_archive_tree(verified["sourceArchive"][1]) == schema.source_tree_sha256,
         f"{run_id} reconstructed source archive tree differs",
+    )
+    validate_source_snapshot(
+        verified["sourceArchive"][1],
+        verified["sourceSnapshot"][1],
     )
     xctestrun_relative = xctestrun_relative_path(
         build["xctestrun_relative_path"],

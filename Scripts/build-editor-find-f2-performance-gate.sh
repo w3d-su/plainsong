@@ -81,7 +81,7 @@ artifact_hasher="$script_directory/hash-editor-find-f2-artifact.py"
 artifact_hasher_mode=""
 artifact_hasher_owner=""
 artifact_hasher_digest=""
-expected_artifact_hasher_digest="eb120ca20da97fed1308a77166435f6a95536d0af0a5222ed4a7bc5122b260a6"
+expected_artifact_hasher_digest="6d81f45d947200a9791cab9f3700d767e393b1e4a2483880ad39229f25faadc0"
 if [[ -f "$artifact_hasher" && ! -L "$artifact_hasher" ]]; then
     artifact_hasher_mode="$(/usr/bin/stat -f '%Lp' "$artifact_hasher")"
     artifact_hasher_owner="$(/usr/bin/stat -f '%u' "$artifact_hasher")"
@@ -188,7 +188,7 @@ trusted_git -C "$repository_root" archive \
 /usr/bin/tar -xf "$source_archive_path" -C "$source_snapshot_path"
 source_archive_sha256="$(f2_sha256_file "$source_archive_path")"
 source_tree_sha256="$(
-    /usr/bin/python3 -I "$artifact_hasher" "$source_snapshot_path"
+    /usr/bin/python3 -I "$artifact_hasher" --source-tree "$source_snapshot_path"
 )"
 /bin/chmod a-w "$source_archive_path"
 source_archive_writable_entry="$(

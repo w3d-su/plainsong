@@ -2,11 +2,11 @@
 
 F2_SOURCE_COMMIT="c871ddf5c66c17f03fd9456b53f79411f9b2e979"
 F2_PROCESS_FILTER="xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner"
-F2_PROCESS_OWNERSHIP_RULE="runner-process-group-single-frozen-host"
-F2_MONITOR_FORMAT=5
+F2_PROCESS_OWNERSHIP_RULE="runner-process-group-single-frozen-host-owned-lifecycle"
+F2_MONITOR_FORMAT=6
 F2_MONITOR_INTERVAL_MS=200
 F2_MONITOR_MAX_GAP_MS=1000
-F2_OUTER_FORMAT=3
+F2_OUTER_FORMAT=4
 F2_RUN_TIMEOUT_SECONDS=180
 F2_RUNNER_ENVIRONMENT_POLICY="env-i-git-no-replace-home-lang-lc-all-path-tmpdir-user-logname"
 

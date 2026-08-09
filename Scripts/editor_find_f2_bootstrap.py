@@ -15,23 +15,23 @@ from pathlib import Path, PurePosixPath
 PACKAGE = "editor_find_f2_evidence"
 EXPECTED_MODULES = {
     "__init__.py": "cc0d37361990dd37588ed12435dacf358536a8ce736c0b1ab959ee33ac07a46a",
-    "artifact_hash.py": "e93a066d9edc36fbaf4780cd0573b2fe08f953b02e6aec7645e580e99f0e9623",
+    "artifact_hash.py": "331a81afe021ce663b6f7129b5bdb07e0dda67eeccdbe693cca9030fa5feb269",
     "builder.py": "1dd7869d18bd0e82f0021870b30fb4a98a0aa37b168378a912595b1b2032dc3b",
     "builder_cli.py": "1805d741ede66b04c809e783e8307965994391dc10c935f7a0ea2b9e5c050748",
-    "builder_inputs.py": "e97f2f351a464b0f5c280e47fe1421ac2489e8e299527e26af3617fdb4b1b499",
+    "builder_inputs.py": "a712344ff2c5b3a3a83737dd1923c2fa7383a54f340b40c24189589b737fab82",
     "builder_io.py": "e6e656c2aa261bfa6a28d3c2cf7640d12a2d02b717695ed49faa3d2ef694b67a",
     "builder_summary.py": "743e5618a5b561b60c8af9c8ef67d166bf11a8a712e66b15054f0c9462b5967e",
     "cli.py": "060645c7c5f8611240a2b4dd409f2ac43ea134f3767446822779c8cdf1af7bd5",
     "errors.py": "754eacf487bfa61ab55f2703faad6698433d80310bd03b83798b2515aa6882f4",
-    "full_artifacts.py": "ad25831c66eba3f35d33321d15a7bc9fd56b1e0675f5deda1c196c9988251cdb",
+    "full_artifacts.py": "aab66e401c1d1ca82e72f9d1283723830e6b66b95848142a8e20e91bd6275fef",
     "logs.py": "bb9823aed728b948b78c4cf8a96a7c256f3fa433ffcf3a43250fa6843cfd6b8c",
     "monitor.py": "9d518622dda53ba61a4a3f20ae4b367758e526f89db899ad271d52ec890d3d6c",
     "pack.py": "c6c23902567677fd47b67931b7a8e319ff69d4a8983c89a90aa7b95d1fb615ca",
     "schema.py": "076a49e6684f85a86dc657f4b8ed16d15c2beb506118bfe156f1dc8ea8fce484",
-    "strict_io.py": "772e9b7d2ac049a6a256a43d7c586df23e1e7bcfa3de61a3e98c0838ce8c6195",
+    "strict_io.py": "4a730e85547dbb3d90eaa8b5a962e8c98de64682f60bdc85538d4ee6bc24f49e",
 }
 EXPECTED_SUPPORT_FILES = {
-    "editor-find-f2-evidence/schema.json": "03f0f05762775e0e1f0cd9f807ba61de269a434f49070a65f1688fcb8a03b4e3",
+    "editor-find-f2-evidence/schema.json": "156177ae6c047e7f1295381c557c440263dcac63d48a3fbaf01dd69d4bcb3d56",
 }
 
 

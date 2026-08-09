@@ -61,43 +61,97 @@ f2_runner_group_identity_is_owned() {
     local runner_pid="$1"
     local identity
 
-    [[ "${F2_RUNNER_REAPED:-1}" == 0 &&
+    [[ "${F2_RUNNER_LIFECYCLE:-cleared}" == signalable &&
         "$runner_pid" =~ ^[0-9]+$ && "$runner_pid" != 0 ]] || return 1
-    identity="$(
-        /bin/ps -o pid=,pgid= -p "$runner_pid" 2>/dev/null |
-            /usr/bin/awk 'NR == 1 {print $1 " " $2}'
-    )" || return 1
+    f2_runner_job_is_owned "$runner_pid" || return 1
+    identity="$(f2_runner_identity_snapshot "$runner_pid" 2>/dev/null)" || return 2
     [[ "$identity" == "$runner_pid $runner_pid" ]]
 }
 
-# The session leader deliberately remains alive until the capture shell writes
-# session-drain. That makes the process-group ID non-reusable while cleanup can
-# still signal it. Once the leader is reaped, F2_RUNNER_REAPED permanently
-# disables this signal path.
+f2_runner_identity_snapshot() {
+    local runner_pid="$1"
+    local snapshot
+
+    snapshot="$(/bin/ps -o pid=,pgid= -p "$runner_pid" 2>/dev/null)" || return 2
+    printf '%s\n' "$snapshot" |
+        /usr/bin/awk 'NR == 1 {print $1 " " $2; found=1} END {if (!found || NR != 1) exit 1}' || return 2
+}
+
+f2_runner_job_is_owned() {
+    local runner_pid="$1"
+    local job_pid
+    local job_pids
+
+    job_pids="$(builtin jobs -p)"
+    while IFS= read -r job_pid; do
+        [[ "$job_pid" == "$runner_pid" ]] && return 0
+    done <<< "$job_pids"
+    return 1
+}
+
+f2_runner_enter_reap_only() {
+    local runner_pid="$1"
+
+    [[ "$F2_ACTIVE_RUNNER_PID" == "$runner_pid" &&
+        "${F2_RUNNER_LIFECYCLE:-cleared}" == signalable ]] || return 2
+    f2_runner_job_is_owned "$runner_pid" || return 2
+    F2_RUNNER_LIFECYCLE=reap-only
+}
+
+# TERM cannot remove the session leader because the supervisor ignores it.
+# KILL is final: close the signal path before the owned PGID may disappear.
 f2_terminate_run_tree() {
     local runner_pid="$1"
     local signal="${2:-TERM}"
 
-    f2_runner_group_identity_is_owned "$runner_pid" || return 2
+    if [[ "$signal" == KILL ]]; then
+        f2_runner_enter_reap_only "$runner_pid" || return 2
+    else
+        f2_runner_group_identity_is_owned "$runner_pid" || return 2
+    fi
     /bin/kill -"$signal" "-$runner_pid" 2>/dev/null || true
+}
+
+f2_process_table_snapshot() {
+    /bin/ps -ww -axo pid=,pgid=,state=
 }
 
 f2_run_group_has_live_member() {
     local runner_pid="$1"
+    local snapshot
+    local status
 
-    /bin/ps -ww -axo pid=,pgid=,state= |
-        /usr/bin/awk -v runner_pid="$runner_pid" '
-            $2 == runner_pid && $1 != runner_pid && $3 !~ /^Z/ { found=1 }
-            END { exit(found ? 0 : 1) }
-        '
+    snapshot="$(f2_process_table_snapshot 2>/dev/null)" || return 2
+    printf '%s\n' "$snapshot" | /usr/bin/awk -v runner_pid="$runner_pid" '
+        NF != 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[A-Za-z+<]+$/ {
+            invalid=1
+        }
+        NF == 3 { rows++ }
+        $2 == runner_pid && $1 != runner_pid && $3 !~ /^Z/ { found=1 }
+        END {
+            if (invalid || rows == 0) exit 2
+            exit(found ? 0 : 1)
+        }
+    '
+    status=$?
+    [[ "$status" == 0 || "$status" == 1 ]] || return 2
+    return "$status"
 }
 
 f2_wait_run_group_members_gone() {
     local runner_pid="$1"
     local attempts="${2:-50}"
 
+    local status
+
     for _ in $(/usr/bin/seq 1 "$attempts"); do
-        f2_run_group_has_live_member "$runner_pid" || return 0
+        if f2_run_group_has_live_member "$runner_pid"; then
+            status=0
+        else
+            status=$?
+            [[ "$status" == 1 ]] && return 0
+            return 2
+        fi
         /bin/sleep 0.1
     done
     return 1

@@ -454,6 +454,15 @@ interruption of in-flight engine work.
   owner-local `/private/tmp` root, but have no authorized independently retained replica. Loss of that root
   invalidates the baseline and requires six fresh runs, so F2 remains open overall.
   Evidence and exact audit commands: `docs/perf-log.md`.
+  The maintained builder and full auditor bind every archived source member to the retained
+  `sourceSnapshot`; the only permitted snapshot-only entries are XcodeGen's documented
+  `Plainsong.xcodeproj` tree and generated `App/Info.plist` and `App/Plainsong.entitlements`
+  files, plus Xcode's empty `Packages/*/.swiftpm/xcode` directory chain for archived local
+  packages. The source-tree digest
+  canonicalizes the extraction container root as
+  0755, so a private 0700 extraction created under `umask 077` hashes to the externally anchored
+  logical Git tree without exposing that directory. These current checks authenticate retained
+  bytes but do not make the owner-local root durable.
 - [ ] The six-run historical pack proves there was no uncorrelated target process during
   measurement. Its immutable format-2 monitor allowed every process whose executable path
   matched the frozen host, so a second unrelated same-path host would have produced zero

@@ -125,10 +125,26 @@ def xctestrun_relative_path(value: object, label: str) -> str:
     return relative
 
 
-def paths_overlap(first: str, second: str) -> bool:
+def paths_overlap(first: str, second: str, case_insensitive: bool = False) -> bool:
     left = PurePosixPath(first)
     right = PurePosixPath(second)
+    if case_insensitive:
+        left = PurePosixPath(*(part.casefold() for part in left.parts))
+        right = PurePosixPath(*(part.casefold() for part in right.parts))
     return left == right or left in right.parents or right in left.parents
+
+
+def filesystem_paths_overlap(first: Path, second: Path) -> bool:
+    """Reject identical inodes and resolved ancestor/descendant aliases."""
+
+    try:
+        if os.path.samefile(first, second):
+            return True
+    except OSError as error:
+        raise AuditError(f"could not compare retained artifact identity: {error}") from error
+    left = first.resolve(strict=True)
+    right = second.resolve(strict=True)
+    return left in right.parents or right in left.parents
 
 
 def strict_pack_files(root: Path) -> set[str]:

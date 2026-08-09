@@ -250,7 +250,48 @@ class PackTests(unittest.TestCase):
     def test_rehashed_source_snapshot_must_bind_to_build_manifest(self) -> None:
         write(self.artifacts / "debug-1/sourceSnapshot/tampered", b"tampered")
         self.reseal_full_artifact("sourceSnapshot")
-        with self.assertRaisesRegex(AuditError, "sourceSnapshot retained-evidence binding"):
+        with self.assertRaisesRegex(
+            AuditError,
+            "source snapshot has non-generated addition|sourceSnapshot retained-evidence binding",
+        ):
+            validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)
+
+    def test_full_audit_rejects_replaced_snapshot_after_resealing_every_binding(self) -> None:
+        snapshot = self.artifacts / "debug-1/sourceSnapshot"
+        write(snapshot / "payload", b"replacement source\n")
+        snapshot_digest = hash_artifact(snapshot)
+        self.rewrite_run_binding(
+            {"build_input_sha256": snapshot_digest},
+            {"sourceSnapshot": (snapshot_digest, None)},
+        )
+        with self.assertRaisesRegex(AuditError, "source snapshot (bytes|size) differs"):
+            validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)
+
+    def test_full_audit_rejects_casefolded_artifact_ancestry_alias(self) -> None:
+        provenance_path = self.pack / "runs/debug-1/full-artifact-provenance.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        host_relative = provenance["artifacts"]["hostBundle"]["artifactRootPath"]
+        executable_alias = (
+            host_relative.upper()
+            + "/Contents/MacOS/Plainsong"
+        )
+        provenance["artifacts"]["xctestrun"]["artifactRootPath"] = executable_alias
+        write(provenance_path, json.dumps(provenance, sort_keys=True) + "\n")
+        rewrite_inventory(self.pack)
+        with self.assertRaisesRegex(AuditError, "artifact paths overlap"):
+            validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)
+
+    def test_full_audit_rejects_hard_linked_artifact_identity_alias(self) -> None:
+        provenance_path = self.pack / "runs/debug-1/full-artifact-provenance.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        source = self.artifacts / provenance["artifacts"]["rawLog"]["artifactRootPath"]
+        alias = self.artifacts / "debug-1/rawLogAlias"
+        os.link(source, alias)
+        provenance["artifacts"]["xctestrun"]["artifactRootPath"] = "debug-1/rawLogAlias"
+        provenance["artifacts"]["xctestrun"]["sha256"] = hash_artifact(alias)
+        write(provenance_path, json.dumps(provenance, sort_keys=True) + "\n")
+        rewrite_inventory(self.pack)
+        with self.assertRaisesRegex(AuditError, "artifact filesystem paths overlap"):
             validate_pack(self.pack, self.artifacts, integrity_schema=self.schema)
 
     def test_pack_group_writable_file_is_rejected(self) -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from .artifact_hash import hash_artifact, hash_source_archive_tree
+from .artifact_hash import hash_artifact, hash_source_archive_tree, validate_source_snapshot
 from .builder_io import canonical_prefix, canonical_source, reject_tree_symlinks
 from .errors import require
 from .full_artifacts import BUILD_KEYS
@@ -150,6 +150,7 @@ def load_run_input(run_id: str, prefix_value: Path, schema: EvidenceSchema) -> R
     package_input = _absolute_manifest_path(build["package_input_path"], "directory", f"{run_id} package input")
     reject_tree_symlinks(source_snapshot, f"{run_id} source snapshot")
     reject_tree_symlinks(package_input, f"{run_id} package input", exclude_git=True)
+    validate_source_snapshot(source_archive, source_snapshot)
     xctestrun_relative = xctestrun_relative_path(
         build["xctestrun_relative_path"],
         f"{run_id} xctestrun relative path",

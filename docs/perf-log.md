@@ -654,6 +654,15 @@ The measured-source build/run helpers reject a dirty worktree, CI budget mode, r
 source/build mismatches, and post-run mutation. The build wrapper archives the exact commit, generates the
 project inside a source snapshot, resolves packages once, seals the consumed source/package
 inputs read-only, then uses `-disableAutomaticPackageResolution` for `build-for-testing`.
+For the pre-generation tree digest, the maintained hasher treats the extraction container root as
+a synthetic 0755 Git-tree root; this intentionally makes the wrapper's private 0700 directory
+under `umask 077` agree with archive reconstruction. The builder and full auditor then compare
+every archive member's kind, executable bits, and bytes against `sourceSnapshot`. The only
+documented snapshot-only generated entries are the `Plainsong.xcodeproj` tree and
+`App/Info.plist` and `App/Plainsong.entitlements` files, plus Xcode's empty
+`Packages/*/.swiftpm/xcode`
+directory chain for archived local packages; all other additions or missing or changed archived
+members fail even if mutable build/provenance hashes are resealed.
 `ENABLE_TESTABILITY=YES` is added only for Release because the reusable harness observes internal
 EditorKit transition state; it does not enable `DEBUG` compilation or change the production
 debounce.
@@ -1039,6 +1048,7 @@ loaded `make test`.
 - Same-session before/after pairs are what the comparison rests on. Absolute numbers from
   different sessions are not comparable here: identical `dbc341c` source measured 2.25 s and 8.41 s
   in the same scenario a few hours apart.
+
 ## Typing Latency
 
 - Fixture: `Fixtures/large-1mb.md`
