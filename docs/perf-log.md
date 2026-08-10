@@ -419,14 +419,14 @@ are historical artifacts, not maintained large-file exceptions in the current ch
 | Historical measured-source runner (`c871ddf`) | `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
 | Historical outer capture wrapper (`03ffd70`) | `2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf` |
 | Historical pack builder / auditor (`03ffd70`) | `11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9` / `605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819` |
-| Current `Scripts/editor-find-f2-tooling.sha256` | `5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd` |
-| Current inventory verifier | `71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a` |
-| Current isolated bootstrap | `5e93864259a88dfe7d37dfc519c2e257de1cd05f69d5b5f9a73a022ec41f355d` |
-| Current capture schema | `03f0f05762775e0e1f0cd9f807ba61de269a434f49070a65f1688fcb8a03b4e3` |
-| Current auditor / builder entry points | `7250f84581aa127511c80d22a81d7a78305333f9b5680c374bf240190b6e6c81` / `046f3e164fe32422338ad7d3c0bdb3cb59549151244329300ae0e93e6fcb7229` |
-| Current capture / runner / build entry points | `6dab2762922502ee184bc842296ca7f4e8617467888671eba9cfef544fcc3020` / `91f517c26fee8ab3f9d39555771ebd43baa6034afca24751d2655c1005578dc8` / `ac02d8a3e6fae9433338ada0373b6cff8fbb3bbc34d09e675d1b436ffa821e02` |
+| Current `Scripts/editor-find-f2-tooling.sha256` | `c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec` |
+| Current inventory verifier | `047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c` |
+| Current isolated bootstrap | `b67dac167543c83b0c8c4e1844dbe2421c1d16a6bcff301603bf2c3ac0bfa59d` |
+| Current capture schema | `156177ae6c047e7f1295381c557c440263dcac63d48a3fbaf01dd69d4bcb3d56` |
+| Current auditor / builder entry points | `ed9ad47f21d6a4df4ae1dc24a76c669e9eac11548fbdcab1bd0a49722cf3a9f2` / `6cab5471e11f06cb9b853a54c209fd9f87279330975da696a74c33c5094b3b4f` |
+| Current capture / runner / build entry points | `8317ac44819387ac0b53167643be3c3f5e023b4ee1d6c3cb2dad1f38686c7f8e` / `0d220849377cd21d11207ebd35056b7ce9a21f93df23592945fd9ee5bcd169c5` / `9c54513d118bf150d52aa8f781933df98fc2141959c988e67dcf42718cd9e6a2` |
 
-All 35 maintained executable/support modules are in the external inventory. Current Python entry
+All 36 maintained executable/support modules are in the external inventory. Current Python entry
 points require isolated `-I` startup, verify canonical current-UID-owned non-symlink paths with no
 group/world write or ACL `allow`, hash-pin the bootstrap and exact package inventory, then import.
 Current shell entry points require `bash -p`; the capture and runner wrappers pin every sourced
@@ -465,9 +465,9 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/editor-find-f2-tooling.sha256")" = \
-  5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd
+  c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
-  71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a
+  047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c
 test "$(f2_sha256 "$F2_PACK/manifest.json")" = \
   c7d1a3c68285aa0aac35914fe7d4d60c1bfbc8401b0055e689365b1bbe9989c5
 test "$(f2_sha256 "$F2_PACK/SHA256SUMS")" = "$F2_PACK_INVENTORY_SHA"
@@ -534,9 +534,9 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/editor-find-f2-tooling.sha256")" = \
-  5d1feb8e940b5f88828945f4f351b3990bf8fd481f4f28da8640265f965ae6cd
+  c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
-  71250bc8b36aef141864c7e3b6c3cc1eb4e2e680dd490d492375e9d5d29aa24a
+  047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c
 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py"
 
 /usr/bin/git -C "$F2_REPOSITORY_ROOT" --no-replace-objects \

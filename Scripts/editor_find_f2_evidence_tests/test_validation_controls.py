@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +14,44 @@ from .fixture import outer_status, raw_log
 
 
 class ValidationControlTests(unittest.TestCase):
+    def test_perf_log_current_trust_roots_match_checkout(self) -> None:
+        repository = Path(__file__).parents[2]
+        perf_log = (repository / "docs/perf-log.md").read_text(encoding="utf-8")
+
+        def digest(relative: str) -> str:
+            return hashlib.sha256((repository / relative).read_bytes()).hexdigest()
+
+        inventory_path = "Scripts/editor-find-f2-tooling.sha256"
+        verifier_path = "Scripts/check-editor-find-f2-tooling-inventory.py"
+        inventory_digest = digest(inventory_path)
+        verifier_digest = digest(verifier_path)
+        expected_rows = (
+            f"| Current `{inventory_path}` | `{inventory_digest}` |",
+            f"| Current inventory verifier | `{verifier_digest}` |",
+            "| Current isolated bootstrap | "
+            f"`{digest('Scripts/editor_find_f2_bootstrap.py')}` |",
+            "| Current capture schema | "
+            f"`{digest('Scripts/editor-find-f2-evidence/schema.json')}` |",
+            "| Current auditor / builder entry points | "
+            f"`{digest('Scripts/check-editor-find-f2-retained-evidence.py')}` / "
+            f"`{digest('Scripts/build-editor-find-f2-retained-pack.py')}` |",
+            "| Current capture / runner / build entry points | "
+            f"`{digest('Scripts/capture-editor-find-f2-authoritative-run.sh')}` / "
+            f"`{digest('Scripts/run-editor-find-f2-performance-gate.sh')}` / "
+            f"`{digest('Scripts/build-editor-find-f2-performance-gate.sh')}` |",
+        )
+        for row in expected_rows:
+            self.assertEqual(perf_log.count(row), 1, row)
+
+        inventory_count = len((repository / inventory_path).read_text(encoding="ascii").splitlines())
+        self.assertEqual(inventory_count, 36)
+        self.assertIn(
+            f"All {inventory_count} maintained executable/support modules are in the external inventory.",
+            perf_log,
+        )
+        self.assertEqual(perf_log.count(inventory_digest), 3)
+        self.assertEqual(perf_log.count(verifier_digest), 3)
+
     def test_warning_position_and_timing_positive_controls(self) -> None:
         text = raw_log()
         validate_warning_phase(text)
