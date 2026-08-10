@@ -15,13 +15,22 @@ final class EditorScrollIntentTests: XCTestCase {
         let thirdLineOffset = "one\ntwo\n".utf16.count
 
         proxy.emitVisibleLine(containingUTF16Offset: thirdLineOffset, in: textView)
-        proxy.emitNavigationLine(containingUTF16Offset: thirdLineOffset, in: textView)
-        proxy.emitNavigationLine(containingUTF16Offset: thirdLineOffset, in: textView)
+        let document = EditorDocumentIdentity(rawValue: "document")
+        proxy.emitNavigationLine(
+            containingUTF16Offset: thirdLineOffset,
+            documentIdentity: document,
+            in: textView
+        )
+        proxy.emitNavigationLine(
+            containingUTF16Offset: thirdLineOffset,
+            documentIdentity: document,
+            in: textView
+        )
 
         XCTAssertEqual(emittedIntents, [
             .viewportChanged(line: 3),
-            .navigation(line: 3),
-            .navigation(line: 3),
+            .navigation(line: 3, documentIdentity: document),
+            .navigation(line: 3, documentIdentity: document),
         ])
     }
 }

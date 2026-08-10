@@ -19,9 +19,9 @@ public final class PreviewController: NSObject, ObservableObject {
     private let previewIndexURL: URL?
     private let jsonEncoder = JSONEncoder()
     private var queuedRender: RenderPayload?
+    var scrollDeliveryState = PreviewScrollDeliveryState()
+    var presentedDocumentIdentifier: String?
     private var nextRenderID = 0
-    private var latestRequestedRenderID = -1
-    private var latestCompletedRenderID = -1
     private var theme = "system"
     private var allowRemoteImages = false
     private var workspaceAssetRootURL: URL?
@@ -101,7 +101,11 @@ public final class PreviewController: NSObject, ObservableObject {
             allowRemoteImages: allowRemoteImages,
             baseDir: assetContext.baseDir
         )
-        latestRequestedRenderID = renderID
+        scrollDeliveryState.registerRender(
+            renderID,
+            documentIdentifier: presentedDocumentIdentifier
+                ?? change.fileURL?.standardizedFileURL.absoluteString
+        )
 
         guard isReady else {
             queuedRender = payload
@@ -110,17 +114,6 @@ public final class PreviewController: NSObject, ObservableObject {
 
         send(.render(payload))
         return renderID
-    }
-
-    public func scrollToLine(
-        _ line: Int,
-        animated: Bool,
-        completion: (@MainActor (Bool) -> Void)? = nil
-    ) {
-        send(
-            .scrollToLine(ScrollToLinePayload(line: line, animated: animated)),
-            completion: completion
-        )
     }
 
     public func setTheme(_ theme: String) {
@@ -140,6 +133,7 @@ public final class PreviewController: NSObject, ObservableObject {
     /// Test-owned lifecycle shutdown. Production keeps one controller alive with its
     /// editor workspace even while the preview pane is hidden.
     func shutdownForTesting() {
+        scrollDeliveryState.failPendingDelivery()
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
@@ -150,7 +144,7 @@ public final class PreviewController: NSObject, ObservableObject {
         renderCompletionObserver = nil
     }
 
-    private func send(
+    func send(
         _ message: BridgeMessage,
         completion: (@MainActor (Bool) -> Void)? = nil
     ) {
@@ -185,11 +179,11 @@ public final class PreviewController: NSObject, ObservableObject {
             markReadyAndFlushQueuedRender()
 
         case let .renderComplete(payload):
-            guard payload.renderID >= latestRequestedRenderID else {
+            guard scrollDeliveryState.recordRenderCompletion(payload.renderID) else {
                 return
             }
-            latestCompletedRenderID = max(latestCompletedRenderID, payload.renderID)
             renderCompletionObserver?(payload)
+            flushPendingScrollDeliveryIfReady()
 
         case let .previewScrolled(payload):
             onPreviewScrolled?(payload.topVisibleLine)

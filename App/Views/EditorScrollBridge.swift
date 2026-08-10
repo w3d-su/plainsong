@@ -17,7 +17,7 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
     private var previewScrollRequestID: UInt64 = 0
     private var ownerDecayGeneration: UInt64 = 0
     private var previewScrollDeliveryOverride:
-        ((Int, Bool, @escaping @MainActor (Bool) -> Void) -> Void)?
+        ((Int, Bool, String?, @escaping @MainActor (Bool) -> Void) -> Void)?
     private var ownerDecayScheduler: OwnerDecayScheduler
 
     #if DEBUG
@@ -63,8 +63,8 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
         case let .viewportChanged(line):
             guard isEditorScrollForwardingEnabled, scrollOwner != .preview else { return }
             setScrollOwner(.editor)
-            deliverPreviewScroll(to: line)
-        case let .navigation(line):
+            deliverPreviewScroll(to: line, documentIdentifier: nil)
+        case let .navigation(line, documentIdentity):
             // Explicit navigation is presentation consistency, not typewriter sync. It
             // must reach a mounted preview even while that preference is disabled or a
             // preview-owned scroll token is still inside its 100 ms decay window. Re-arm
@@ -73,11 +73,14 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
             if scrollOwner == .preview {
                 setScrollOwner(.preview)
             }
-            deliverPreviewScroll(to: line)
+            deliverPreviewScroll(
+                to: line,
+                documentIdentifier: documentIdentity.rawValue
+            )
         }
     }
 
-    private func deliverPreviewScroll(to line: Int) {
+    private func deliverPreviewScroll(to line: Int, documentIdentifier: String?) {
         previewScrollRequestID &+= 1
         let requestID = previewScrollRequestID
         let ownerAtDispatch = scrollOwner
@@ -86,21 +89,27 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
             previewScrollDeliveryReceipt = PreviewScrollDeliveryReceipt(
                 requestID: requestID,
                 line: line,
+                documentIdentifier: documentIdentifier,
                 ownerAtDispatch: ownerAtDispatch,
                 succeeded: succeeded
             )
         }
         if let previewScrollDeliveryOverride {
-            previewScrollDeliveryOverride(line, false, completion)
+            previewScrollDeliveryOverride(line, false, documentIdentifier, completion)
         } else if let previewController {
-            previewController.scrollToLine(line, animated: false, completion: completion)
+            previewController.scrollToLine(
+                line,
+                animated: false,
+                documentIdentifier: documentIdentifier,
+                completion: completion
+            )
         } else {
             completion(false)
         }
     }
 
     func installPreviewScrollDeliveryOverrideForTesting(
-        _ delivery: @escaping (Int, Bool, @escaping @MainActor (Bool) -> Void) -> Void
+        _ delivery: @escaping (Int, Bool, String?, @escaping @MainActor (Bool) -> Void) -> Void
     ) {
         previewScrollDeliveryOverride = delivery
     }
@@ -137,6 +146,7 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
 struct PreviewScrollDeliveryReceipt: Equatable {
     let requestID: UInt64
     let line: Int
+    let documentIdentifier: String?
     let ownerAtDispatch: EditorPreviewScrollCoordinator.ScrollOwner
     let succeeded: Bool
 }

@@ -38,7 +38,7 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(model.selection, target)
         XCTAssertTrue(fixture.window.firstResponder === fixture.textView)
         XCTAssertGreaterThan(fixture.scrollView.contentView.bounds.origin.y, initialOrigin.y)
-        XCTAssertEqual(emittedIntent, .navigation(line: 281))
+        XCTAssertEqual(emittedIntent, .navigation(line: 281, documentIdentity: documentA))
         XCTAssertEqual(Data(Self.text(in: fixture.textView).utf8), sourceBytes)
         XCTAssertFalse(fixture.textView.undoManager?.canUndo == true)
         XCTAssertFalse(fixture.textView.undoManager?.canRedo == true)

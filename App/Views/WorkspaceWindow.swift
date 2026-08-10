@@ -364,10 +364,15 @@ private struct PreviewPane: View {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
             controller.setTheme(appState.preferences.previewTheme.rawValue)
             controller.setAllowsRemoteImages(appState.preferences.allowsRemoteImages)
+            controller.setPresentedDocumentIdentifier(appState.activeEditorDocumentIdentity?.rawValue)
             controller.render(session.currentTextChange)
         }
         .onChange(of: appState.previewAssetRootURL) { _, rootURL in
             controller.setWorkspaceAssetRoot(rootURL)
+            controller.render(session.currentTextChange)
+        }
+        .onChange(of: appState.activeEditorDocumentIdentity) { _, identity in
+            controller.setPresentedDocumentIdentifier(identity?.rawValue)
             controller.render(session.currentTextChange)
         }
         .onChange(of: appState.preferences.previewTheme) { _, theme in
@@ -380,6 +385,7 @@ private struct PreviewPane: View {
             controller.setWorkspaceAssetRoot(appState.previewAssetRootURL)
             controller.setTheme(appState.preferences.previewTheme.rawValue)
             controller.setAllowsRemoteImages(appState.preferences.allowsRemoteImages)
+            controller.setPresentedDocumentIdentifier(appState.activeEditorDocumentIdentity?.rawValue)
             await controller.observe(session)
         }
     }

@@ -5,7 +5,7 @@ import STTextView
 /// stay visible in every mounted presentation.
 public enum EditorScrollIntent: Equatable, Sendable {
     case viewportChanged(line: Int)
-    case navigation(line: Int)
+    case navigation(line: Int, documentIdentity: EditorDocumentIdentity)
 }
 
 /// Public scroll bridge for the app layer. It intentionally exposes source-line
@@ -27,9 +27,16 @@ public final class EditorScrollProxy: ObservableObject {
         attachment?.emitVisibleLine(containingUTF16Offset: offset)
     }
 
-    func emitNavigationLine(containingUTF16Offset offset: Int, in textView: STTextView) {
+    func emitNavigationLine(
+        containingUTF16Offset offset: Int,
+        documentIdentity: EditorDocumentIdentity,
+        in textView: STTextView
+    ) {
         guard attachment?.isAttached(to: textView) == true else { return }
-        attachment?.emitNavigationLine(containingUTF16Offset: offset)
+        attachment?.emitNavigationLine(
+            containingUTF16Offset: offset,
+            documentIdentity: documentIdentity
+        )
     }
 
     func attach(to textView: STTextView) {
@@ -162,13 +169,16 @@ private final class EditorScrollAttachment {
         emitVisibleLineIfNeeded(currentLineIndex().oneBasedLine(containingUTF16Offset: offset))
     }
 
-    func emitNavigationLine(containingUTF16Offset offset: Int) {
+    func emitNavigationLine(
+        containingUTF16Offset offset: Int,
+        documentIdentity: EditorDocumentIdentity
+    ) {
         let line = currentLineIndex().oneBasedLine(containingUTF16Offset: offset)
         // Forced navigation is never deduplicated against ordinary viewport reporting.
         // Updating the viewport receipt still prevents the ensuing bounds notification
         // from forwarding the same line a second time.
         lastEmittedLine = line
-        proxy?.onScrollIntent?(.navigation(line: line))
+        proxy?.onScrollIntent?(.navigation(line: line, documentIdentity: documentIdentity))
     }
 
     private func emitVisibleLineIfNeeded() {
