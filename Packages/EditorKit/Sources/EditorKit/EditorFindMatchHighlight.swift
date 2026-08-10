@@ -36,10 +36,17 @@ public struct EditorFindMatchHighlightRequest: Equatable, Sendable {
 /// recompute — the failure this gate (F8) exists to prevent.
 final class EditorFindMatchHighlightMarker: NSObject {
     static let attribute = NSAttributedString.Key("app.plainsong.editorFind.matchHighlight")
+    /// Original `.backgroundColor` stored as an attributed-string run while find paints over it.
+    ///
+    /// This must be a separate attribute rather than an `NSRange` inside the marker value:
+    /// `NSTextStorage` moves, expands, shrinks, and splits attribute runs with character edits,
+    /// while ranges captured inside an arbitrary object stay frozen at decoration time.
+    static let coveredBackgroundAttribute = NSAttributedString.Key(
+        "app.plainsong.editorFind.coveredBackground"
+    )
 
-    // Keep NSObject's identity equality. Adjacent matches can have the same role/generation but
-    // distinct covered backgrounds; semantic equality lets NSTextStorage merge those runs and
-    // discard one marker's restoration metadata.
+    // Keep NSObject's identity equality. Adjacent matches can have the same role/generation;
+    // semantic equality would let NSTextStorage merge them and erase the per-match boundary.
 
     enum Role: Equatable {
         /// The match the user is currently on.
@@ -48,23 +55,12 @@ final class EditorFindMatchHighlightMarker: NSObject {
         case other
     }
 
-    /// A `.backgroundColor` run this decoration painted over, so clearing can put it back.
-    struct CoveredBackground {
-        let range: NSRange
-        let color: NSColor
-    }
-
     let role: Role
     let generation: UInt64
-    /// Syntax backgrounds (inline code, fenced blocks, frontmatter) hidden under this match.
-    /// Ranges are relative to the marker so they stay valid when NSTextStorage moves the marker
-    /// through a character edit. A single match can span several, so this is a list, not one colour.
-    let coveredBackgrounds: [CoveredBackground]
 
-    init(role: Role, generation: UInt64, coveredBackgrounds: [CoveredBackground]) {
+    init(role: Role, generation: UInt64) {
         self.role = role
         self.generation = generation
-        self.coveredBackgrounds = coveredBackgrounds
     }
 }
 
@@ -251,47 +247,12 @@ enum EditorFindMatchHighlight {
     /// Clears several independent windows without enumerating the gaps between them.
     @discardableResult
     static func clear(in textStorage: NSTextStorage, searching searchRanges: [NSRange]) -> Int {
-        let clampedBounds = searchRanges
-            .map { $0.clamped(toLength: textStorage.length) }
-            .filter { $0.length > 0 }
-            .sorted { $0.location < $1.location }
-        var bounds: [NSRange] = []
-        for candidate in clampedBounds {
-            if let last = bounds.last,
-               last.location + last.length >= candidate.location
-            {
-                bounds[bounds.count - 1] = NSUnionRange(last, candidate)
-            } else {
-                bounds.append(candidate)
-            }
-        }
+        let bounds = mergedSearchBounds(searchRanges, storageLength: textStorage.length)
         guard !bounds.isEmpty else { return 0 }
-        var decorated: [(range: NSRange, marker: EditorFindMatchHighlightMarker)] = []
-        for bound in bounds {
-            textStorage.enumerateAttribute(
-                EditorFindMatchHighlightMarker.attribute,
-                in: bound
-            ) { value, range, _ in
-                guard let marker = value as? EditorFindMatchHighlightMarker else { return }
-                decorated.append((range, marker))
-            }
-        }
-        for entry in decorated {
-            textStorage.removeAttribute(
-                EditorFindMatchHighlightMarker.attribute,
-                range: entry.range
-            )
-            textStorage.removeAttribute(.backgroundColor, range: entry.range)
-            for covered in entry.marker.coveredBackgrounds {
-                let (location, overflow) = entry.range.location
-                    .addingReportingOverflow(covered.range.location)
-                guard !overflow else { continue }
-                let clamped = NSRange(location: location, length: covered.range.length)
-                    .clamped(toLength: textStorage.length)
-                guard clamped.length > 0 else { continue }
-                textStorage.addAttribute(.backgroundColor, value: covered.color, range: clamped)
-            }
-        }
+        let decorated = decoratedRanges(in: textStorage, searching: bounds)
+        let coveredBackgrounds = coveredBackgrounds(in: textStorage, ranges: decorated)
+        removeDecoration(in: textStorage, ranges: decorated, searchBounds: bounds)
+        restore(coveredBackgrounds, in: textStorage)
         return bounds.reduce(0) { $0 + $1.length }
     }
 
@@ -340,23 +301,27 @@ enum EditorFindMatchHighlight {
     ) {
         // Captured at decoration time, not once per query: after a syntax recompute the
         // restore path re-decorates, and the backgrounds underneath are the fresh ones.
-        var covered: [EditorFindMatchHighlightMarker.CoveredBackground] = []
+        var coveredBackgrounds: [(range: NSRange, color: NSColor)] = []
         textStorage.enumerateAttribute(.backgroundColor, in: range) { value, subrange, _ in
             guard let color = value as? NSColor else { return }
-            covered.append(.init(
-                range: NSRange(
-                    location: subrange.location - range.location,
-                    length: subrange.length
-                ),
-                color: color
-            ))
+            coveredBackgrounds.append((subrange, color))
+        }
+        textStorage.removeAttribute(
+            EditorFindMatchHighlightMarker.coveredBackgroundAttribute,
+            range: range
+        )
+        for covered in coveredBackgrounds {
+            textStorage.addAttribute(
+                EditorFindMatchHighlightMarker.coveredBackgroundAttribute,
+                value: covered.color,
+                range: covered.range
+            )
         }
         textStorage.addAttribute(
             EditorFindMatchHighlightMarker.attribute,
             value: EditorFindMatchHighlightMarker(
                 role: role,
-                generation: generation,
-                coveredBackgrounds: covered
+                generation: generation
             ),
             range: range
         )
