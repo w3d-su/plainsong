@@ -1,12 +1,51 @@
 import Foundation
 
+/// Fixed-capacity set of recently loaded composed-character ranges.
+///
+/// Composed character sequences partition the storage, so at most one retained range can
+/// contain a given location and any hit is *the* answer. Retention order therefore only
+/// affects hit rate, never correctness. Eviction overwrites the oldest slot in place: the
+/// previous `append` + `removeFirst` pair ran on every cache miss, and while skipping a
+/// rejected whole-word run in a 1 MiB non-ASCII document that is one miss per character.
+private struct TextSearchComposedRangeRing {
+    private var slots: [NSRange]
+    private var count = 0
+    private var oldest = 0
+
+    init(capacity: Int) {
+        slots = Array(repeating: NSRange(location: NSNotFound, length: 0), count: capacity)
+    }
+
+    func range(containing location: Int) -> NSRange? {
+        var index = 0
+        while index < count {
+            let candidate = slots[index]
+            if location >= candidate.location, location - candidate.location < candidate.length {
+                return candidate
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    mutating func insert(_ range: NSRange) {
+        slots[oldest] = range
+        oldest = (oldest + 1) % slots.count
+        if count < slots.count { count += 1 }
+    }
+}
+
 struct TextSearchComposedSequenceCache {
     private static let capacity = 8
 
     let storage: NSString
     let instrumentation: TextSearchInstrumentation?
-    private var recentRanges: [NSRange] = []
-    private var pinnedOversizedRanges: [NSRange] = []
+    private var recentRanges = TextSearchComposedRangeRing(capacity: capacity)
+    private var pinnedOversizedRanges = TextSearchComposedRangeRing(capacity: capacity)
+    /// Serves the marching linear scans, where the range containing `location - 1` is the
+    /// one the previous step just loaded. Retained separately so that hit costs a single
+    /// bounds check rather than a scan of both rings.
+    private var mostRecentRange: NSRange?
 
     init(storage: NSString, instrumentation: TextSearchInstrumentation?) {
         self.storage = storage
@@ -16,29 +55,25 @@ struct TextSearchComposedSequenceCache {
     mutating func range(containing location: Int) -> NSRange {
         precondition(location >= 0 && location < storage.length)
 
-        if let index = pinnedOversizedRanges.lastIndex(where: { $0.contains(location) }) {
-            let pinned = pinnedOversizedRanges.remove(at: index)
-            pinnedOversizedRanges.append(pinned)
+        if let mostRecent = mostRecentRange, mostRecent.contains(location) {
+            return mostRecent
+        }
+        if let pinned = pinnedOversizedRanges.range(containing: location) {
+            mostRecentRange = pinned
             return pinned
         }
-        if let index = recentRanges.lastIndex(where: { $0.contains(location) }) {
-            let cached = recentRanges.remove(at: index)
-            recentRanges.append(cached)
+        if let cached = recentRanges.range(containing: location) {
+            mostRecentRange = cached
             return cached
         }
 
         let loaded = storage.rangeOfComposedCharacterSequence(at: location)
         instrumentation?.recordComposedSequenceLoad(length: loaded.length)
+        mostRecentRange = loaded
         if loaded.length > TextSearchEngine.maximumPreviewContextUTF16PerSide {
-            pinnedOversizedRanges.append(loaded)
-            if pinnedOversizedRanges.count > Self.capacity {
-                pinnedOversizedRanges.removeFirst()
-            }
-            return loaded
-        }
-        recentRanges.append(loaded)
-        if recentRanges.count > Self.capacity {
-            recentRanges.removeFirst()
+            pinnedOversizedRanges.insert(loaded)
+        } else {
+            recentRanges.insert(loaded)
         }
         return loaded
     }
@@ -96,8 +131,37 @@ enum TextSearchWordBoundary {
         return isWordCharacter(in: cache.range(containing: location), storage: storage)
     }
 
+    /// Decodes `range` straight out of `storage` instead of materializing a substring.
+    /// This runs once per composed character while skipping a rejected whole-word run,
+    /// so allocating a `String` per character dominated 1 MiB non-ASCII searches.
+    ///
+    /// Equivalent to `storage.substring(with: range).unicodeScalars.contains(where:)`:
+    /// a well-formed range decodes to the same scalars, and a range that splits a
+    /// surrogate pair yields U+FFFD from `substring(with:)`, which is not a word scalar
+    /// either — so skipping the unpaired unit reaches the same answer.
     static func isWordCharacter(in range: NSRange, storage: NSString) -> Bool {
-        storage.substring(with: range).unicodeScalars.contains(where: isWordScalar)
+        var location = range.location
+        let end = NSMaxRange(range)
+        while location < end {
+            let unit = storage.character(at: location)
+            location += 1
+
+            if let scalar = Unicode.Scalar(unit) {
+                if isWordScalar(scalar) { return true }
+                continue
+            }
+            guard UTF16.isLeadSurrogate(unit), location < end else { continue }
+            let trail = storage.character(at: location)
+            guard UTF16.isTrailSurrogate(trail) else { continue }
+            location += 1
+
+            let value = 0x10000
+                + (UInt32(unit - 0xD800) << 10)
+                + UInt32(trail - 0xDC00)
+            guard let scalar = Unicode.Scalar(value) else { continue }
+            if isWordScalar(scalar) { return true }
+        }
+        return false
     }
 
     static func isWordCharacter(in character: Character) -> Bool {
@@ -110,6 +174,14 @@ enum TextSearchWordBoundary {
 
     private static func isWordScalar(_ scalar: Unicode.Scalar) -> Bool {
         if scalar.value == 0x5F { return true }
+        // ASCII resolves without an ICU general-category lookup, and to the same answer:
+        // digits are decimalNumber, letters are upper/lowercaseLetter, and no other ASCII
+        // scalar falls in a category below.
+        if scalar.value < 0x80 {
+            return (scalar.value >= 0x30 && scalar.value <= 0x39)
+                || (scalar.value >= 0x41 && scalar.value <= 0x5A)
+                || (scalar.value >= 0x61 && scalar.value <= 0x7A)
+        }
         switch scalar.properties.generalCategory {
         case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter,
              .otherLetter, .decimalNumber, .letterNumber, .otherNumber:

@@ -250,6 +250,24 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    /// Find-match decoration currently on the storage, so an unchanged request costs nothing.
+    /// The highlight pass preserves decoration, so re-application is needed only on change.
+    var appliedFindMatchHighlight: EditorFindMatchHighlightRequest?
+    /// Document the applied decoration belongs to.
+    ///
+    /// This must not be reset per update. `finishDocumentTransition` runs on *every*
+    /// representable update, so forgetting there made `applied` and an incoming `nil` request
+    /// compare equal and skipped the storage clear — closing the find bar left its highlight
+    /// behind. Only a genuine identity change may forget.
+    var appliedFindMatchHighlightDocumentIdentity: EditorDocumentIdentity?
+    /// Union of the ranges currently decorated, so removal searches there instead of walking
+    /// every syntax run in the document.
+    var appliedFindMatchHighlightSpan: NSRange?
+    /// Padded viewport span the decoration was materialised for. Decoration refreshes when the
+    /// viewport leaves it, not on every scroll tick.
+    var appliedFindMatchHighlightMaterialisation: NSRange?
+    weak var findHighlightStorage: NSTextStorage?
+    var findHighlightEditObserver: CoordinatorNotificationObserver?
     var currentDocumentIdentity: EditorDocumentIdentity? {
         installedDocument.identity
     }

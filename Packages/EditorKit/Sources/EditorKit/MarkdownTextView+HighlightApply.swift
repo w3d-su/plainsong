@@ -3,9 +3,12 @@ import STTextView
 
 @MainActor
 extension MarkdownTextView {
-    /// Applies highlight attributes while preserving image-presentation markers so a
-    /// visible-range recompute does not force a full image-marker rewrite every keystroke.
-    static func applyHighlightedTextPreservingImageMarkers(
+    /// Applies highlight attributes while preserving presentation markers that this pass must
+    /// not own: image projections (so a visible-range recompute does not force a full
+    /// image-marker rewrite every keystroke) and find-match decoration (docs/editor-find-gates.md
+    /// F8 — `setAttributes` below replaces the whole attribute dictionary, so anything not
+    /// collected and restored here is silently wiped on the next recompute).
+    static func applyHighlightedTextPreservingPresentationMarkers(
         _ styledText: HighlightedText,
         to textView: STTextView
     ) -> Bool {
@@ -61,6 +64,10 @@ extension MarkdownTextView {
             in: textStorage,
             range: targetRange
         )
+        let preservedFindHighlights = EditorFindMatchHighlight.collect(
+            in: textStorage,
+            range: targetRange
+        )
 
         textStorage.beginEditing()
         incoming.enumerateAttributes(
@@ -73,6 +80,7 @@ extension MarkdownTextView {
             textStorage.setAttributes(attributes, range: destinationRange)
         }
         restoreImagePresentationMarkers(preservedImageMarkers, in: textStorage)
+        EditorFindMatchHighlight.restore(preservedFindHighlights, in: textStorage)
         textStorage.endEditing()
         if styledText.foldPlan != nil,
            let textRange = NSTextRange(targetRange, in: textView.textContentManager)

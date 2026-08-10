@@ -1,6 +1,6 @@
 # Risk Register
 
-Status snapshot: 2026-07-12.
+Status snapshot: 2026-07-12; Workspace Search evidence boundary audited 2026-08-08.
 
 This register captures the risks that should drive the next roadmap decisions. Severity is based on
 impact to editor correctness, user trust, or ability to enter Phase 2 safely.
@@ -26,6 +26,7 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 | R17 | Restoring the native adjustable sidebar can reintroduce launch instability | Medium | PR #30 replaced `NavigationSplitView` after AppKit constraint-loop crash | Keep fixed-width `HStack` during Phase 2; restore adjustable sidebar only as post-M5 polish | App |
 | R18 (closed 2026-06-26) | The `baselineOffset(-1000)` zero-width fold mechanism distorts multi-line layout/viewport | Closed | The baseline-offset/tiny-font hiding path was removed and replaced by a TextKit 2 content-storage paragraph projection behind WYSIWYG presentation. Checklist §A invariants are green, B1-B13 reran against the replacement mechanism, and `WYSIWYGNativePointerGateTests.testFoldedLineGeometryMatchesUnfoldedLineAndKeepsSiblingLinesInViewport` proves folded-line geometry no longer inflates to ~1013 pt or displaces sibling lines. | Keep B13 plus the IME/selection/pointer/accessibility/performance gates as regression coverage. WYSIWYG remains off by default behind the Experimental kill switch until the stable-promotion gate is explicitly approved. | EditorKit |
 | R19 | Self-contained export can amplify raster bytes across data URIs, bridge strings, DOM copies, and repeated references | Medium | `docs/export-gates.md` is spec-only; production export does not exist. Per-image 10 MiB alone would not bound aggregate WebContent/App memory or final HTML size. | Keep export blocked behind E0–E9. D3 fixes 32 MiB distinct decoded raster and 64 MiB final-HTML UTF-8 limits, stable-order omission, repeated-reference accounting, and measurement before implementation; changing either limit needs owner-approved evidence and a Decision Log entry. | PreviewKit, preview-src, App, PerformanceTests |
+| R20 | Workspace Search is declared complete from compositional, synthetic, or stale evidence | Medium | The WS4 matrix has named tests and PR #89/#91/#92/#93 implementation evidence, but current tests split click routing from final editor selection/scroll, do not directly observe the production disk reader/full matcher off-main, and historical checks are not a fresh current-tip full suite | Keep the overall DoD in progress; add one direct click→cross-file exact UTF-16 selection/scroll XCUITest and one direct production reader/matcher off-main gate, preserve the synthetic/hosted/physical-input distinction, then serialize `make test` and `make build` on the exact tip | App, WorkspaceKit, EditorKit, PlainsongUITests, CI, docs |
 
 ## Immediate risk burn-down order
 
@@ -36,3 +37,4 @@ impact to editor correctness, user trust, or ability to enter Phase 2 safely.
 5. Keep R17 as post-M5 polish; do not fold adjustable/native sidebar work into WYSIWYG gates.
 6. Keep release hardening separate from Phase 2 feature work.
 7. Keep export spec-only until E0 passes and D3–D5 receive explicit owner sign-off; retain R19 aggregate limits and repeated-reference tests in every implementation split.
+8. Keep Workspace Search in progress until R20's two direct gates and fresh exact-tip full validation land; do not compose partial click/Return tests or historical CI into completion evidence.

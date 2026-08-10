@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "c871ddf5c66c17f03fd9456b53f79411f9b2e979",
+  "sourceIntegrity": {
+    "archiveSHA256": "f0b84f1b43145b443364b28666710166debcd0c0342dad6e90092c2c70e55506",
+    "treeSHA256": "51b3c5309d67603ac8a4f298deed795d3c4afa597f0ac83cfcc3632e0abfda94"
+  },
+  "processFilter": "xcodebuild|swift-frontend|swiftc|swift-driver|xctest|Plainsong|PlainsongUITests-Runner",
+  "processOwnershipRule": "runner-process-group-single-frozen-host-owned-lifecycle",
+  "captureToolingPaths": [
+    "capture-editor-find-f2-authoritative-run.sh",
+    "editor-find-f2-capture/common.sh",
+    "editor-find-f2-capture/monitor.sh",
+    "editor-find-f2-capture/processes.sh",
+    "editor-find-f2-capture/run.sh",
+    "editor-find-f2-capture/session_status.py",
+    "editor-find-f2-evidence/schema.json",
+    "editor-find-f2-evidence/schema_check.py"
+  ],
+  "auditorToolingPaths": [
+    "build-editor-find-f2-retained-pack.py",
+    "check-editor-find-f2-retained-evidence.py",
+    "editor-find-f2-evidence/schema.json",
+    "editor-find-f2-evidence/schema_check.py",
+    "editor_find_f2_evidence/__init__.py",
+    "editor_find_f2_evidence/artifact_hash.py",
+    "editor_find_f2_evidence/builder.py",
+    "editor_find_f2_evidence/builder_cli.py",
+    "editor_find_f2_evidence/builder_inputs.py",
+    "editor_find_f2_evidence/builder_io.py",
+    "editor_find_f2_evidence/builder_summary.py",
+    "editor_find_f2_evidence/cli.py",
+    "editor_find_f2_evidence/errors.py",
+    "editor_find_f2_evidence/full_artifacts.py",
+    "editor_find_f2_evidence/logs.py",
+    "editor_find_f2_evidence/monitor.py",
+    "editor_find_f2_evidence/pack.py",
+    "editor_find_f2_evidence/schema.py",
+    "editor_find_f2_evidence/strict_io.py"
+  ],
+  "monitor": {
+    "format": 6,
+    "sampleIntervalMilliseconds": 200,
+    "maximumSampleGapMilliseconds": 1000,
+    "statusKeys": [
+      "format",
+      "monitor_pid",
+      "runner_pid",
+      "started_utc",
+      "finished_utc",
+      "first_sample_finished_utc",
+      "last_sample_started_utc",
+      "sample_interval_ms",
+      "sample_count",
+      "match_count",
+      "process_filter",
+      "process_ownership_rule",
+      "capture_tooling_sha256",
+      "allowed_host_executable",
+      "exit_status"
+    ]
+  },
+  "outer": {
+    "format": 4,
+    "runTimeoutSeconds": 180,
+    "statusKeys": [
+      "format",
+      "wrapper_exit_status",
+      "capture_exit_status",
+      "monitor_exit_status",
+      "postflight_exit_status",
+      "run_timeout_seconds",
+      "timed_out",
+      "termination_failed",
+      "runner_environment_policy"
+    ]
+  },
+  "runnerEnvironmentPolicy": "env-i-git-no-replace-home-lang-lc-all-path-tmpdir-user-logname",
+  "expectedRunIDs": [
+    "debug-1",
+    "debug-2",
+    "debug-3",
+    "release-1",
+    "release-2",
+    "release-3"
+  ]
+}
