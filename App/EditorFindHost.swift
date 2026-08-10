@@ -22,6 +22,9 @@ struct EditorFindCachedSelection: Equatable {
 final class EditorFindHost {
     let controller = EditorFindController()
     var ui = EditorFindUIState()
+    /// Materialized once per controller session change so ordinary SwiftUI updates do not map
+    /// the retained (up to 10,000) match list back into `NSRange`s again.
+    var matchHighlightRequest: EditorFindMatchHighlightRequest?
     var presentationTask: Task<Void, Never>?
     /// Last find navigation ID already published on `editorNavigationCommand`.
     var lastPublishedFindNavigationID: UInt64?

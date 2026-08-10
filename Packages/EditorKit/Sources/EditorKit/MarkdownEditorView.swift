@@ -34,6 +34,7 @@ public struct MarkdownEditorView: View {
     private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
     private let documentSourceContract: EditorDocumentSourceContract?
     private let navigationCommand: EditorNavigationCommand?
+    private let findMatchHighlight: EditorFindMatchHighlightRequest?
     private let scrollProxy: EditorScrollProxy?
     private let commandProxy: EditorCommandProxy?
     private let completionWorkspace: CompletionWorkspace
@@ -57,6 +58,7 @@ public struct MarkdownEditorView: View {
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
         documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
+        findMatchHighlight: EditorFindMatchHighlightRequest? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -79,6 +81,7 @@ public struct MarkdownEditorView: View {
         self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
         self.documentSourceContract = documentSourceContract
         self.navigationCommand = navigationCommand
+        self.findMatchHighlight = findMatchHighlight
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -115,6 +118,7 @@ public struct MarkdownEditorView: View {
             onDocumentBindingLifecycle: onDocumentBindingLifecycle,
             documentSourceContract: documentSourceContract,
             navigationCommand: navigationCommand,
+            findMatchHighlight: findMatchHighlight,
             scrollProxy: scrollProxy,
             commandProxy: activeCommandProxy,
             completionWorkspace: completionWorkspace,

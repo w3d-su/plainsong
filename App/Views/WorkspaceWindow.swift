@@ -314,6 +314,7 @@ private struct DocumentEditor: View {
             onDocumentBindingLifecycle: editorBinding.onLifecycle,
             documentSourceContract: editorBinding.sourceContract,
             navigationCommand: appState.editorNavigationCommand,
+            findMatchHighlight: appState.editorFindMatchHighlight,
             scrollProxy: scrollCoordinator.editorProxy,
             completionWorkspace: appState.completionWorkspace,
             imageAssetInserter: appState.editorImageAssetInserter,
