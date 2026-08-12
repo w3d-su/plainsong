@@ -22,6 +22,9 @@ public final class PreviewController: NSObject, ObservableObject {
     var scrollDeliveryState = PreviewScrollDeliveryState()
     var presentedDocumentIdentifier: String?
     private var nextRenderID = 0
+    var nextExportID = 0
+    var latestCompletedRenderID = -1
+    var pendingHTMLExport: PendingHTMLExport?
     private var theme = "system"
     private var allowRemoteImages = false
     private var workspaceAssetRootURL: URL?
@@ -92,6 +95,8 @@ public final class PreviewController: NSObject, ObservableObject {
         )
         assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
+        failPendingHTMLExport(reason: "render-superseded")
+
         let renderID = nextRenderID
         nextRenderID += 1
         let payload = RenderPayload(
@@ -142,6 +147,7 @@ public final class PreviewController: NSObject, ObservableObject {
         onLinkClicked = nil
         onCheckboxToggled = nil
         renderCompletionObserver = nil
+        failPendingHTMLExport(reason: "shutdown")
     }
 
     func send(
@@ -182,6 +188,7 @@ public final class PreviewController: NSObject, ObservableObject {
             guard scrollDeliveryState.recordRenderCompletion(payload.renderID) else {
                 return
             }
+            latestCompletedRenderID = payload.renderID
             renderCompletionObserver?(payload)
             flushPendingScrollDeliveryIfReady()
 
@@ -194,7 +201,10 @@ public final class PreviewController: NSObject, ObservableObject {
         case let .checkboxToggled(payload):
             onCheckboxToggled?(payload.line, payload.checked, payload.version)
 
-        case .render, .scrollToLine, .setTheme:
+        case let .exportHTMLResult(payload):
+            handleExportHTMLResult(payload)
+
+        case .render, .scrollToLine, .setTheme, .exportHTML:
             break
         }
     }

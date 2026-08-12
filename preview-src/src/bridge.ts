@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -9,6 +9,8 @@ export const MESSAGE_NAMES = [
   "linkClicked",
   "checkboxToggled",
   "setTheme",
+  "exportHTML",
+  "exportHTMLResult",
 ] as const;
 
 export type BridgeMessageName = (typeof MESSAGE_NAMES)[number];
@@ -61,6 +63,42 @@ export interface SetThemePayload {
   allowRemoteImages: boolean;
 }
 
+export type ExportHTMLPhase = "discovery" | "finalization";
+export type ExportResourceKind = "image" | "font";
+export type ExportResourceAction = "embed" | "omit";
+
+export interface ExportResourceDescriptor {
+  resourceID: string;
+  kind: ExportResourceKind;
+  src: string;
+}
+
+export interface ExportResourceOutcome {
+  resourceID: string;
+  kind: ExportResourceKind;
+  action: ExportResourceAction;
+  dataURI?: string | null;
+  reason?: string | null;
+}
+
+export interface ExportHTMLPayload {
+  exportID: number;
+  renderID: number;
+  phase: ExportHTMLPhase;
+  resourceOutcomes: ExportResourceOutcome[];
+}
+
+export type ExportHTMLResultState =
+  | { kind: "resourcesNeeded"; resources: ExportResourceDescriptor[] }
+  | { kind: "ready"; html: string }
+  | { kind: "failed"; reason: string };
+
+export interface ExportHTMLResultPayload {
+  exportID: number;
+  renderID: number;
+  state: ExportHTMLResultState;
+}
+
 export type BridgeMessage =
   | { name: "ready"; payload: ReadyPayload }
   | { name: "render"; payload: RenderPayload }
@@ -69,7 +107,9 @@ export type BridgeMessage =
   | { name: "previewScrolled"; payload: PreviewScrolledPayload }
   | { name: "linkClicked"; payload: LinkClickedPayload }
   | { name: "checkboxToggled"; payload: CheckboxToggledPayload }
-  | { name: "setTheme"; payload: SetThemePayload };
+  | { name: "setTheme"; payload: SetThemePayload }
+  | { name: "exportHTML"; payload: ExportHTMLPayload }
+  | { name: "exportHTMLResult"; payload: ExportHTMLResultPayload };
 
 declare global {
   interface Window {

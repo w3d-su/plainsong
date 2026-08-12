@@ -17,6 +17,10 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
+import {
+  collectPreviewStyleText,
+  handleExportHTML,
+} from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
 import {
   patchPreviewRoot,
@@ -127,11 +131,28 @@ async function receive(message: BridgeMessage): Promise<void> {
       }
       break;
     }
+    case "exportHTML":
+      await handleExportHTML(message.payload, {
+        previewRoot,
+        latestRenderID,
+        documentTheme: document.documentElement.dataset.theme ?? "system",
+        collectStyleText: () => collectPreviewStyleText(document),
+        waitForFonts: async () => {
+          if (document.fonts?.ready) {
+            await document.fonts.ready;
+          }
+        },
+        postResult: (payload) => {
+          postBridgeMessage({ name: "exportHTMLResult", payload });
+        },
+      });
+      break;
     case "ready":
     case "renderComplete":
     case "previewScrolled":
     case "linkClicked":
     case "checkboxToggled":
+    case "exportHTMLResult":
       break;
   }
 }
