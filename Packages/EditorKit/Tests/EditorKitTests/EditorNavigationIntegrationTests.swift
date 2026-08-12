@@ -21,24 +21,24 @@ final class EditorNavigationIntegrationTests: XCTestCase {
         let target = (source as NSString).range(of: "exact 🧪 needle")
         let model = NavigationModel(text: source, selection: NSRange(location: 0, length: 0))
         let fixture = try makeWindowedFixture(model: model, source: source, height: 100)
+        let scrollProxy = EditorScrollProxy()
+        var emittedIntent: EditorScrollIntent?
+        scrollProxy.onScrollIntent = { emittedIntent = $0 }
+        fixture.coordinator.attachScrollProxy(scrollProxy, to: fixture.textView)
+        emittedIntent = nil
         fixture.textView.textSelection = NSRange(location: 0, length: 0)
         fixture.textView.undoManager?.removeAllActions()
         fixture.window.makeFirstResponder(nil)
         let initialOrigin = fixture.scrollView.contentView.bounds.origin
         let sourceBytes = Data(source.utf8)
-
-        let request = EditorNavigationRequest(
-            id: 1,
-            documentIdentity: documentA,
-            selection: target
-        )
+        let request = EditorNavigationRequest(id: 1, documentIdentity: documentA, selection: target)
         fixture.coordinator.observeNavigationCommand(.navigate(request))
         fixture.coordinator.applyPendingNavigationIfPossible(in: fixture.textView)
-
         XCTAssertEqual(fixture.textView.selectedRange(), target)
         XCTAssertEqual(model.selection, target)
         XCTAssertTrue(fixture.window.firstResponder === fixture.textView)
         XCTAssertGreaterThan(fixture.scrollView.contentView.bounds.origin.y, initialOrigin.y)
+        XCTAssertEqual(emittedIntent, .navigation(line: 281, documentIdentity: documentA))
         XCTAssertEqual(Data(Self.text(in: fixture.textView).utf8), sourceBytes)
         XCTAssertFalse(fixture.textView.undoManager?.canUndo == true)
         XCTAssertFalse(fixture.textView.undoManager?.canRedo == true)

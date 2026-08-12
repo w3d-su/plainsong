@@ -24,16 +24,15 @@
                 throw DebugEditorFindFixture.FixtureError
                     .couldNotInspectFixture(errno)
             }
-            do {
-                try validatePath()
-            } catch {
-                close(descriptor)
-                throw error
-            }
+            // `deinit` is the only closer. Closing here would double-close after
+            // the stored properties are already initialized.
+            try validatePath()
         }
 
         deinit {
-            close(descriptor)
+            if descriptor >= 0 {
+                close(descriptor)
+            }
         }
 
         func validatePath() throws {

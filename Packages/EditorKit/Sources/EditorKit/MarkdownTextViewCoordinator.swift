@@ -250,6 +250,24 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    /// Find-match decoration currently on the storage, so an unchanged request costs nothing.
+    /// The highlight pass preserves decoration, so re-application is needed only on change.
+    var appliedFindMatchHighlight: EditorFindMatchHighlightRequest?
+    /// Document the applied decoration belongs to.
+    ///
+    /// This must not be reset per update. `finishDocumentTransition` runs on *every*
+    /// representable update, so forgetting there made `applied` and an incoming `nil` request
+    /// compare equal and skipped the storage clear — closing the find bar left its highlight
+    /// behind. Only a genuine identity change may forget.
+    var appliedFindMatchHighlightDocumentIdentity: EditorDocumentIdentity?
+    /// Union of the ranges currently decorated, so removal searches there instead of walking
+    /// every syntax run in the document.
+    var appliedFindMatchHighlightSpan: NSRange?
+    /// Padded viewport span the decoration was materialised for. Decoration refreshes when the
+    /// viewport leaves it, not on every scroll tick.
+    var appliedFindMatchHighlightMaterialisation: NSRange?
+    weak var findHighlightStorage: NSTextStorage?
+    var findHighlightEditObserver: CoordinatorNotificationObserver?
     var currentDocumentIdentity: EditorDocumentIdentity? {
         installedDocument.identity
     }
@@ -287,6 +305,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
+    var representableUpdateDepth = 0
+    var selectionPublicationGeneration: UInt64 = 0
     var isSourceSynchronizationPending = false
     var asynchronousTextMutationLeaseCount = 0
     var isNativeSourceSynchronized = true
@@ -414,6 +434,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         clearDeferredDocumentTransition()
         preparedNativeSourceCandidateGeneration = nil
         let (installation, bindingTransition) = installedDocument.install(candidate)
+        // Any queued selection receipt addressed the binding that was installed before
+        // this exact transition. Invalidate it before the new binding can be observed.
+        invalidateDeferredSelectionPublication()
         isNativeSourceSynchronized = true
         bindingTransition.notify(installationID: documentBindingInstallationID)
         bindingTransition.updateSourceSynchronizers(
@@ -830,7 +853,7 @@ extension MarkdownTextViewCoordinator {
         if let textView = textView as? MarkdownSTTextView {
             scheduleMarkedTextReplacementRangeCleanup(for: textView)
         }
-        selection = textView.selectedRange()
+        publishObservedSelection(textView.selectedRange())
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)

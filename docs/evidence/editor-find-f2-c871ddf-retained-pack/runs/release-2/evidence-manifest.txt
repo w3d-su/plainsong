@@ -1,0 +1,17 @@
+format=1
+source_commit=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+configuration=Release
+build_manifest_path=/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/release-build/f2-editor-find-build-manifest.txt
+build_manifest_sha256=5ca8c353ad557267745566ec597ba5971b024afb2796237158b062e3fcdd6a8a
+raw_log_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/release-2.log
+raw_log_sha256=c87d7e33eb07a073b646bb2e927e9cf83da76563e00a7bd8c2ed71a2658a4c27
+raw_log_bytes=21034
+xcresult_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/release-2.xcresult
+xcresult_sha256=4f1a203d853e74d72f91890a43ed4ca1bfcb314294294e0626764cedb8c9155a
+xcresult_inspection_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/release-2.inspection.xcresult
+xcresult_inspection_input_sha256=4f1a203d853e74d72f91890a43ed4ca1bfcb314294294e0626764cedb8c9155a
+xcresult_inspection_result_sha256=0a947234e51a1ebd25aa653cf411dc1d78fe7d030a4f2ebdb8010a124e6e3e64
+warning_check_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/release-2.warning-check.txt
+warning_check_sha256=e7aea10447d4c1aed1d0b65dbaaef0c2a4a1f0b88825e8323bbfd0126175cbb3
+warning_check_bytes=1431
+status=pass

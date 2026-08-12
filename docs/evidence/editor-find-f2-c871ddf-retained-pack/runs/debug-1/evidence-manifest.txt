@@ -1,0 +1,17 @@
+format=1
+source_commit=c871ddf5c66c17f03fd9456b53f79411f9b2e979
+configuration=Debug
+build_manifest_path=/private/tmp/plainsong-f2-c871ddf-rerun.kLonnL/debug-build/f2-editor-find-build-manifest.txt
+build_manifest_sha256=fe374662a09ccb452ce55f0796740c96b66624483afe55aa53fcff2c8dfb3510
+raw_log_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/debug-1.log
+raw_log_sha256=98bc3307d0759958ac0e5cf29a34b467c608927c02543d13f7dcff806362f2d5
+raw_log_bytes=20879
+xcresult_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/debug-1.xcresult
+xcresult_sha256=54a7445954b87725386204da01102de81e7e5abfb37a11770c7e1c3696f02866
+xcresult_inspection_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/debug-1.inspection.xcresult
+xcresult_inspection_input_sha256=54a7445954b87725386204da01102de81e7e5abfb37a11770c7e1c3696f02866
+xcresult_inspection_result_sha256=eba6117cacddb475d0563a118f62d13ae8796ad376ea1c7d955481ea40c34903
+warning_check_path=/private/tmp/plainsong-f2-evidence-review.SnCT6g/debug-1.warning-check.txt
+warning_check_sha256=66012706d2338217c1793bab0d82fa7f96121bfcfcf635087b00e95ba51d4d45
+warning_check_bytes=1427
+status=pass

@@ -147,11 +147,17 @@ extension MarkdownTextViewCoordinator {
         ) else {
             return false
         }
+        // Programmatic navigation runs with `isUpdating` set, so the ordinary
+        // selection-change callback cannot forward this applied line to scroll sync.
+        // This forced intent is distinct from preference-gated viewport observation.
+        scrollProxy?.emitNavigationLine(
+            containingUTF16Offset: request.selection.location, documentIdentity: request.documentIdentity, in: textView
+        )
         if !request.shouldFocusEditor {
             restoreFocusOwner(previousFocusOwner, in: window, editor: textView)
         }
 
-        selection = request.selection
+        publishAppliedSelection(request.selection)
         publishNavigationDebugProbe(request)
         didComplete = true
         return true

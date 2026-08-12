@@ -19,11 +19,12 @@ struct MarkdownTextView: NSViewRepresentable {
     private let styledText: HighlightedText?
     private let showsLineNumbers: Bool
     private let focusRequestID: Int
-    private let documentIdentity: EditorDocumentIdentity?
+    let documentIdentity: EditorDocumentIdentity?
     private let documentBindingID: EditorDocumentBindingID?
     private let onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)?
     private let documentSourceContract: EditorDocumentSourceContract?
     private let navigationCommand: EditorNavigationCommand?
+    let findMatchHighlight: EditorFindMatchHighlightRequest?
     private let font: NSFont
     private let lineHeightMultiple: CGFloat
     private let scrollProxy: EditorScrollProxy?
@@ -47,6 +48,7 @@ struct MarkdownTextView: NSViewRepresentable {
         onDocumentBindingLifecycle: ((EditorDocumentBindingLifecycleEvent) -> Void)? = nil,
         documentSourceContract: EditorDocumentSourceContract? = nil,
         navigationCommand: EditorNavigationCommand? = nil,
+        findMatchHighlight: EditorFindMatchHighlightRequest? = nil,
         scrollProxy: EditorScrollProxy? = nil,
         commandProxy: EditorCommandProxy? = nil,
         completionWorkspace: CompletionWorkspace = .empty,
@@ -69,6 +71,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.onDocumentBindingLifecycle = onDocumentBindingLifecycle
         self.documentSourceContract = documentSourceContract
         self.navigationCommand = navigationCommand
+        self.findMatchHighlight = findMatchHighlight
         self.scrollProxy = scrollProxy
         self.commandProxy = commandProxy
         self.completionWorkspace = completionWorkspace
@@ -89,6 +92,9 @@ struct MarkdownTextView: NSViewRepresentable {
             return scrollView
         }
 
+        context.coordinator.beginRepresentableUpdate()
+        defer { context.coordinator.endRepresentableUpdate() }
+        context.coordinator.isUpdating = true
         textView.textDelegate = context.coordinator
         textView.highlightSelectedLine = true
         textView.isHorizontallyResizable = false
@@ -111,7 +117,6 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isSelectable = isEnabled
         textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
 
-        context.coordinator.isUpdating = true
         textView.text = text
         context.coordinator.isUpdating = false
         let candidate = prepareCoordinatorInputs(context.coordinator, for: textView)
@@ -148,6 +153,8 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
+        coordinator.beginRepresentableUpdate()
+        defer { coordinator.endRepresentableUpdate() }
         let candidate = prepareCoordinatorInputs(coordinator, for: textView)
         coordinator.attachFocusHandler(to: textView)
 
@@ -243,6 +250,10 @@ struct MarkdownTextView: NSViewRepresentable {
                 forceReapply: false
             )
         }
+        // After styled text: the highlight pass preserves existing find decoration, but a
+        // changed request must still replace it. Applying here keeps decoration and syntax
+        // attributes in one ordering instead of racing them.
+        applyFindMatchHighlightIfNeeded(coordinator, to: textView)
 
         let shouldApplySelection = candidate.requestedSelection.map { proposedSelection in
             !textView.hasMarkedText()
@@ -288,21 +299,6 @@ struct MarkdownTextView: NSViewRepresentable {
         onWYSIWYGMechanismFailure?("TextKit 2 content storage was unavailable for WYSIWYG folding")
     }
 
-    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
-        guard let textView = scrollView.documentView as? MarkdownSTTextView else { return }
-        coordinator.detachFocusHandler(from: textView)
-        coordinator.detachPasteAndDragHandlers(from: textView)
-        coordinator.detachCommandProxy(from: textView)
-        coordinator.detachScrollProxy()
-        coordinator.detachVisibleRangeReporter()
-        coordinator.cancelCompletionRequest()
-        coordinator.cancelPendingNavigationTasks()
-        coordinator.detachDeferredDocumentTransitionInstallationHandler()
-        coordinator.revokeInstalledDocumentBinding()
-        coordinator.detachImageThumbnailPresentation(from: textView)
-        textView.textDelegate = nil
-    }
-
     /// Applies the debounced highlight as an in-place attribute pass: the caret, IME
     /// state, and scroll position survive because the characters never change. Stale
     /// styling (the text moved on) is dropped — a newer revision is already scheduled.
@@ -328,7 +324,7 @@ struct MarkdownTextView: NSViewRepresentable {
     @MainActor
     @discardableResult
     static func applyHighlightedText(_ styledText: HighlightedText, to textView: STTextView) -> Bool {
-        applyHighlightedTextPreservingImageMarkers(styledText, to: textView)
+        applyHighlightedTextPreservingPresentationMarkers(styledText, to: textView)
     }
 
     @MainActor
