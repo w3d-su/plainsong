@@ -1,18 +1,13 @@
 # In-Document Replace — Gate Specification
 
-> **Status: spec only on `phase3-editor-replace-gates-spec`, targeting `main`.**
-> This is the successor to the in-document Find work merged as PR #95/#96/#97.
-> It changes no behavior, adds no dependency, and closes no gate. Every R0–R10
-> checkbox starts unchecked and stays unchecked in this PR.
->
-> A separate PR is in flight for Find highlight-all, XCUITest, and the Find
-> latency budget. Replace implementation must start from updated `main` after
-> that work lands; this spec PR does not edit any `*EditorFind*`,
-> `MarkdownTextView*`, `App/Views/`, `project.yml`, production code, or tests.
+> **Status: R0 is GO on Candidate B1 (minimal enclosing range).** Spec PR A (#100)
+> remains merged. This mechanism-spike PR does not ship user-facing Replace.
+> R1–R10 stay open. Candidate A is one native undo group but publishes once per
+> match, so it is NO-GO for Replace All. Candidate B2 works as a fallback and is
+> not chosen while B1 preserves source, undo, dirty, and presentation.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
-> implementation commit. In particular, **R0 is a blocking mechanism spike at
-> the start of implementation, not late Replace All verification.**
+> implementation commit.
 
 Created 2026-07-29 as the current-document Replace gate set. See `agent.md`
 §6.1 (STTextView abstraction), §6.4 (shortcuts), §12 (performance), §13
@@ -647,38 +642,63 @@ All boxes intentionally start unchecked.
 
 ### R0 — Batch writer activation + one undo (blocking mechanism spike)
 
-- [ ] Build a hosted coordinator fixture with a real App source contract,
+- [x] Build a hosted coordinator fixture with a real App source contract,
   writer activation, native undo manager, source publication observation, and
   Experimental WYSIWYG path.
-- [ ] Candidate A: one activation, `breakUndoCoalescing()` before an explicit
+  Evidence: `EditorReplaceBatchSpikeSupport` + `EditorReplaceBatchSpikeAppTests`
+  (`DocumentSession` / `AppState.editorDocumentBinding`).
+- [x] Candidate A: one activation, `breakUndoCoalescing()` before an explicit
   outer undo group, reverse-ordered replacements through the authorized native
   edit helper.
-- [ ] Candidate B1: exact final source built before activation, then one native
+  Evidence: `EditorReplaceBatchSpikeTests.testCandidateAPublishesOncePerMatch`
+  and `EditorReplaceBatchSpikeUndoTests.testReverseOrderedEditsShareOneOuterUndoGroup`.
+  **NO-GO for Replace All:** one undo group, but N source publications.
+- [x] Candidate B1: exact final source built before activation, then one native
   edit of the minimal enclosing raw range.
-- [ ] Candidate B2 is measured separately, and only if B1 fails: one
+  Evidence: `testCandidateB1PublishesOnceForTheEnclosingRange` — 1 writer
+  activation, 1 authorized native edit, 1 publication.
+- [x] Candidate B2 is measured separately, and only if B1 fails: one
   full-document native replacement.
-- [ ] One Undo restores literal UTF-16-code-unit-exact source, selection, dirty
+  Evidence: `testCandidateB2PublishesOnceForTheFullDocument`. B1 did not fail;
+  B2 remains an unused fallback.
+- [x] One Undo restores literal UTF-16-code-unit-exact source, selection, dirty
   baseline, and presentation for the entire batch; no second Undo is needed
   for another match.
-- [ ] One Redo reapplies the exact whole batch.
-- [ ] Seed prior typed/coalesced input first: Replace All must not merge with
+  Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo` (source/selection/dirty);
+  `EditorReplaceBatchSpikeWYSIWYGTests.testMinimalEnclosingRangeUndoRestoresFoldPresentation`.
+- [x] One Redo reapplies the exact whole batch.
+  Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo`.
+- [x] Seed prior typed/coalesced input first: Replace All must not merge with
   it; the next Undo after undoing Replace All reaches the prior input.
-- [ ] Record activation, native edit, source publication, revision, and
+  Evidence: `testReplaceAllDoesNotMergeWithPriorTyping`.
+- [x] Record activation, native edit, source publication, revision, and
   presentation-apply counts. One undo with N intermediate publications is not
   sufficient evidence.
-- [ ] Cover unequal lengths, deletion, Unicode/canonical-equivalent match
+  Evidence: A = N edits / N publications (NO-GO); B1 = 1/1 (GO); B2 = 1/1
+  (fallback). Presentation applies stay outside the mutation (one apply after).
+- [x] Cover unequal lengths, deletion, Unicode/canonical-equivalent match
   lengths, replacement containing the query, 256-code-unit replacement, and a
   near-10,000 exact set.
-- [ ] App authorization refusal opens no writer/undo work. Stale writer
+  Evidence: `testDeletionAndUnequalLengths`,
+  `testCanonicalEquivalentMatchLengthComesFromTheEngineRange`,
+  `testReplacementContainingTheQueryIsNotRescannedInTheBatch`,
+  `testTwoHundredFiftySixCodeUnitReplacement`,
+  `EditorReplaceBatchSpikeLargeDocumentTests` (`an` × 8,921 on `large-1mb.md`).
+- [x] App authorization refusal opens no writer/undo work. Stale writer
   preflight may perform only its existing authoritative convergence; it applies
   no replacement, opens no replacement undo group, and requires counter-only
   recompute.
-- [ ] Run the combined worst v1 shape: `Fixtures/large-1mb.md`, an exact
+  Evidence: `testAuthorizationRefusalOpensNoWriterOrUndo`,
+  `testStaleWriterPreflightDoesNotOpenAReplacementUndoGroup`.
+- [x] Run the combined worst v1 shape: `Fixtures/large-1mb.md`, an exact
   near-10,000 non-truncated set, and a 256-code-unit replacement; record
   construction, main-thread, allocation, and typing impact.
-- [ ] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
+  Evidence: 8,921 matches; construction ≈ 4.5 ms; B1 commit ≈ 42 ms; post-batch
+  `insertText` ≈ 0.5 ms; planned UTF-16 length 3,314,896.
+- [x] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
   remains deferred and this design changes before any product UI claims it.
-- Evidence: _open — mandatory first implementation PR_
+- Evidence: **GO — Candidate B1.** No user-facing Replace. PR C may consume the
+  B1 construction helper; product mutation stays behind later PRs.
 
 ### R1 — One literal match semantics
 
