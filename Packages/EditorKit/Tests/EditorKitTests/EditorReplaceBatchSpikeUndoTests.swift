@@ -80,17 +80,19 @@ final class EditorReplaceBatchSpikeUndoTests: XCTestCase {
             selection: selection
         )
         let ranges = EditorReplaceBatchSpikeSupport.matchRanges(in: source, query: "one")
+        let postSelection = NSRange(location: 3, length: 0)
         let result = fixture.coordinator.performReplaceBatchSpike(
             EditorReplaceBatchRequest(
                 ranges: ranges,
                 replacement: "ONE",
-                postSelection: NSRange(location: 3, length: 0)
+                postSelection: postSelection
             ),
             using: mechanism,
             in: fixture.textView
         )
         XCTAssertTrue(result.applied)
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), "ONE two ONE")
+        XCTAssertEqual(fixture.textView.selectedRange(), postSelection)
         XCTAssertTrue(fixture.model.isDirty)
         XCTAssertTrue(fixture.textView.undoManager?.canUndo == true)
 
@@ -105,6 +107,7 @@ final class EditorReplaceBatchSpikeUndoTests: XCTestCase {
         fixture.textView.undoManager?.redo()
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), "ONE two ONE")
         XCTAssertEqual(fixture.model.source, "ONE two ONE")
+        XCTAssertEqual(fixture.textView.selectedRange(), postSelection)
         XCTAssertTrue(fixture.model.isDirty)
         XCTAssertFalse(fixture.textView.undoManager?.canRedo == true)
     }

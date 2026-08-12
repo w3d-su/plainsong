@@ -4,13 +4,12 @@ import STTextView
 
 /// R0-only Replace All mechanism candidates (`docs/editor-replace-gates.md` §3.3).
 ///
-/// Not a user-facing Replace API. App UI must not call this.
+/// Not a user-facing Replace API. App UI must not call this. `ranges` must be
+/// left-to-right, non-overlapping, and inside the live source; otherwise the
+/// spike refuses before writer activation or undo grouping.
 enum EditorReplaceBatchMechanism: String {
-    /// One writer activation, outer undo group, reverse-ordered native inserts.
     case reverseOrderedNativeEdits
-    /// One native edit of the minimal enclosing raw range.
     case minimalEnclosingRange
-    /// One full-document native replacement.
     case fullDocument
 }
 
@@ -77,6 +76,58 @@ enum EditorReplaceBatchSpike {
         }
         return parts.joined()
     }
+
+    static func plan(
+        source: String,
+        ranges: [NSRange],
+        replacement: String,
+        mechanism: EditorReplaceBatchMechanism
+    ) -> EditorReplaceBatchPlan? {
+        guard !ranges.isEmpty,
+              replacedSource(source, ranges: ranges, replacement: replacement) != nil
+        else {
+            return nil
+        }
+
+        switch mechanism {
+        case .reverseOrderedNativeEdits:
+            return .reverseOrderedNativeEdits
+        case .minimalEnclosingRange:
+            guard let enclosing = enclosingRange(of: ranges) else { return nil }
+            let nsSource = source as NSString
+            guard NSMaxRange(enclosing) <= nsSource.length else { return nil }
+            let localRanges = ranges.map { range in
+                NSRange(
+                    location: range.location - enclosing.location,
+                    length: range.length
+                )
+            }
+            let slice = nsSource.substring(with: enclosing)
+            guard let newSlice = replacedSource(
+                slice,
+                ranges: localRanges,
+                replacement: replacement
+            ) else {
+                return nil
+            }
+            return .minimalEnclosingRange(range: enclosing, text: newSlice)
+        case .fullDocument:
+            guard let final = replacedSource(
+                source,
+                ranges: ranges,
+                replacement: replacement
+            ) else {
+                return nil
+            }
+            return .fullDocument(text: final)
+        }
+    }
+}
+
+enum EditorReplaceBatchPlan: Equatable {
+    case reverseOrderedNativeEdits
+    case minimalEnclosingRange(range: NSRange, text: String)
+    case fullDocument(text: String)
 }
 
 @MainActor
@@ -87,7 +138,17 @@ extension MarkdownTextViewCoordinator {
         using mechanism: EditorReplaceBatchMechanism,
         in textView: STTextView
     ) -> EditorReplaceBatchResult {
-        guard request.isAuthorized, !request.ranges.isEmpty else {
+        let source = MarkdownTextView.textStorage(of: textView)?.string
+            ?? textView.text
+            ?? ""
+        guard request.isAuthorized,
+              let plan = EditorReplaceBatchSpike.plan(
+                  source: source,
+                  ranges: request.ranges,
+                  replacement: request.replacement,
+                  mechanism: mechanism
+              )
+        else {
             return EditorReplaceBatchResult(
                 applied: false,
                 mechanism: mechanism,
@@ -96,74 +157,13 @@ extension MarkdownTextViewCoordinator {
         }
 
         var nativeEditCount = 0
-        let priorSelection = textView.selectedRange()
         let applied = performPreflightedTextMutation(in: textView) {
-            textView.breakUndoCoalescing()
-            let undoManager = textView.undoManager
-            undoManager?.beginUndoGrouping()
-            defer { undoManager?.endUndoGrouping() }
-            // Register first so this runs last on undo, after STTextView restores
-            // the replaced range, and can put the exact pre-batch selection back.
-            undoManager?.registerUndo(withTarget: textView) { view in
-                view.textSelection = priorSelection
-            }
-
-            switch mechanism {
-            case .reverseOrderedNativeEdits:
-                for range in request.ranges.reversed() {
-                    insertAuthorizedText(
-                        request.replacement,
-                        replacementRange: range,
-                        in: textView
-                    )
-                    nativeEditCount += 1
-                }
-            case .minimalEnclosingRange:
-                guard let enclosing = EditorReplaceBatchSpike.enclosingRange(
-                    of: request.ranges
-                ) else {
-                    return
-                }
-                let source = MarkdownTextView.textStorage(of: textView)?.string
-                    ?? textView.text
-                    ?? ""
-                let nsSource = source as NSString
-                guard NSMaxRange(enclosing) <= nsSource.length else { return }
-                let localRanges = request.ranges.map { range in
-                    NSRange(
-                        location: range.location - enclosing.location,
-                        length: range.length
-                    )
-                }
-                let slice = nsSource.substring(with: enclosing)
-                guard let newSlice = EditorReplaceBatchSpike.replacedSource(
-                    slice,
-                    ranges: localRanges,
-                    replacement: request.replacement
-                ) else {
-                    return
-                }
-                insertAuthorizedText(newSlice, replacementRange: enclosing, in: textView)
-                nativeEditCount += 1
-            case .fullDocument:
-                let source = MarkdownTextView.textStorage(of: textView)?.string
-                    ?? textView.text
-                    ?? ""
-                guard let final = EditorReplaceBatchSpike.replacedSource(
-                    source,
-                    ranges: request.ranges,
-                    replacement: request.replacement
-                ) else {
-                    return
-                }
-                let full = NSRange(location: 0, length: (source as NSString).length)
-                insertAuthorizedText(final, replacementRange: full, in: textView)
-                nativeEditCount += 1
-            }
-
-            if let postSelection = request.postSelection {
-                textView.textSelection = postSelection
-            }
+            nativeEditCount = applyPreparedReplaceBatch(
+                plan,
+                request: request,
+                sourceLength: (source as NSString).length,
+                in: textView
+            )
         }
 
         return EditorReplaceBatchResult(
@@ -171,6 +171,57 @@ extension MarkdownTextViewCoordinator {
             mechanism: mechanism,
             nativeEditCount: nativeEditCount
         )
+    }
+
+    private func applyPreparedReplaceBatch(
+        _ plan: EditorReplaceBatchPlan,
+        request: EditorReplaceBatchRequest,
+        sourceLength: Int,
+        in textView: STTextView
+    ) -> Int {
+        textView.breakUndoCoalescing()
+        let undoManager = textView.undoManager
+        undoManager?.beginUndoGrouping()
+        defer { undoManager?.endUndoGrouping() }
+        let priorSelection = textView.selectedRange()
+        // First so undo applies prior selection after STTextView restores text.
+        undoManager?.registerUndo(withTarget: textView) { view in
+            view.textSelection = priorSelection
+        }
+
+        var nativeEditCount = 0
+        switch plan {
+        case .reverseOrderedNativeEdits:
+            for range in request.ranges.reversed() {
+                insertAuthorizedText(
+                    request.replacement,
+                    replacementRange: range,
+                    in: textView
+                )
+                nativeEditCount += 1
+            }
+        case let .minimalEnclosingRange(range, text):
+            insertAuthorizedText(text, replacementRange: range, in: textView)
+            nativeEditCount += 1
+        case let .fullDocument(text):
+            insertAuthorizedText(
+                text,
+                replacementRange: NSRange(location: 0, length: sourceLength),
+                in: textView
+            )
+            nativeEditCount += 1
+        }
+
+        if let postSelection = request.postSelection {
+            textView.textSelection = postSelection
+            // Last so redo reapplies the planned caret after STTextView redo.
+            undoManager?.registerUndo(withTarget: textView) { _ in
+                undoManager?.registerUndo(withTarget: textView) { redoView in
+                    redoView.textSelection = postSelection
+                }
+            }
+        }
+        return nativeEditCount
     }
 
     private func insertAuthorizedText(

@@ -31,6 +31,46 @@ final class EditorReplaceBatchSpikeTests: XCTestCase {
         XCTAssertFalse(fixture.model.isDirty)
     }
 
+    func testInvalidRangesOpenNoWriterOrUndo() throws {
+        let source = "one two one"
+        let overlapping = [
+            NSRange(location: 0, length: 5),
+            NSRange(location: 3, length: 4),
+        ]
+        XCTAssertNil(
+            EditorReplaceBatchSpike.replacedSource(
+                source,
+                ranges: overlapping,
+                replacement: "ONE"
+            )
+        )
+
+        for mechanism in [
+            EditorReplaceBatchMechanism.minimalEnclosingRange,
+            .fullDocument,
+            .reverseOrderedNativeEdits,
+        ] {
+            let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(source: source)
+            let result = fixture.coordinator.performReplaceBatchSpike(
+                EditorReplaceBatchRequest(ranges: overlapping, replacement: "ONE"),
+                using: mechanism,
+                in: fixture.textView
+            )
+
+            XCTAssertFalse(result.applied, "\(mechanism)")
+            XCTAssertEqual(result.nativeEditCount, 0, "\(mechanism)")
+            XCTAssertEqual(fixture.model.writerActivations, 0, "\(mechanism)")
+            XCTAssertTrue(fixture.model.publications.isEmpty, "\(mechanism)")
+            XCTAssertEqual(
+                EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView),
+                source,
+                "\(mechanism)"
+            )
+            XCTAssertFalse(fixture.textView.undoManager?.canUndo == true, "\(mechanism)")
+            XCTAssertFalse(fixture.model.isDirty, "\(mechanism)")
+        }
+    }
+
     func testCandidateAPublishesOncePerMatch() throws {
         let outcome = try runSmallBatch(using: .reverseOrderedNativeEdits)
         XCTAssertTrue(outcome.result.applied)

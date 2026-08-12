@@ -151,7 +151,7 @@ enum EditorReplaceBatchSpikeSupport {
         selection: NSRange,
         revision: Int,
         to textView: STTextView
-    ) -> Int {
+    ) {
         let highlighted = MarkdownSyntaxHighlighter().highlight(
             source,
             fileKind: .markdown,
@@ -168,6 +168,5 @@ enum EditorReplaceBatchSpikeSupport {
             ),
             to: textView
         ))
-        return 1
     }
 }

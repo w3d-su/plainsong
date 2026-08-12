@@ -18,9 +18,8 @@ final class EditorReplaceBatchSpikeLargeDocumentTests: XCTestCase {
         )
         let query = "an"
         let ranges = EditorReplaceBatchSpikeSupport.matchRanges(in: source, query: query)
-        XCTAssertGreaterThan(ranges.count, 8000)
+        XCTAssertEqual(ranges.count, 8921)
         XCTAssertLessThanOrEqual(ranges.count, EditorFindLimits.retainedMatchCeiling)
-        XCTAssertFalse(ranges.count > EditorFindLimits.retainedMatchCeiling)
 
         let replacement = String(repeating: "z", count: 256)
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(source: source)
@@ -46,6 +45,7 @@ final class EditorReplaceBatchSpikeLargeDocumentTests: XCTestCase {
         XCTAssertEqual(fixture.model.publications.count, 1)
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), planned)
         XCTAssertEqual(fixture.model.source, planned)
+        XCTAssertEqual((planned as NSString).length, 3_314_896)
 
         let typingStart = DispatchTime.now()
         fixture.textView.insertText("!", replacementRange: NSRange(location: 0, length: 0))

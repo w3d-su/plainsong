@@ -1,5 +1,6 @@
 import AppKit
 @testable import EditorKit
+import STTextView
 import XCTest
 
 @MainActor
@@ -15,13 +16,14 @@ final class EditorReplaceBatchSpikeWYSIWYGTests: XCTestCase {
             source: source,
             enableWYSIWYG: true
         )
-        var presentationApplies = 0
-        presentationApplies += EditorReplaceBatchSpikeSupport.applyPresentation(
+        let outsideFolds = NSRange(location: 8, length: 0)
+        EditorReplaceBatchSpikeSupport.applyPresentation(
             source,
-            selection: NSRange(location: 0, length: 0),
+            selection: outsideFolds,
             revision: 1,
             to: fixture.textView
         )
+        assertFoldedDelimiters(in: fixture.textView, source: source, span: "**one**")
 
         let ranges = EditorReplaceBatchSpikeSupport.matchRanges(in: source, query: "one")
         XCTAssertEqual(ranges.count, 2)
@@ -32,7 +34,6 @@ final class EditorReplaceBatchSpikeWYSIWYGTests: XCTestCase {
         )
         XCTAssertTrue(result.applied)
         XCTAssertEqual(fixture.model.publications.count, 1)
-        XCTAssertEqual(presentationApplies, 1)
 
         let replaced = EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView)
         XCTAssertEqual(replaced, "**ONE** two **ONE**")
@@ -41,12 +42,50 @@ final class EditorReplaceBatchSpikeWYSIWYGTests: XCTestCase {
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), source)
         XCTAssertEqual(fixture.model.source, source)
 
-        presentationApplies += EditorReplaceBatchSpikeSupport.applyPresentation(
+        EditorReplaceBatchSpikeSupport.applyPresentation(
             source,
-            selection: NSRange(location: 0, length: 0),
+            selection: outsideFolds,
             revision: 2,
             to: fixture.textView
         )
-        XCTAssertEqual(presentationApplies, 2)
+        assertFoldedDelimiters(in: fixture.textView, source: source, span: "**one**")
+    }
+
+    private func assertFoldedDelimiters(
+        in textView: STTextView,
+        source: String,
+        span: String
+    ) {
+        guard let textStorage = MarkdownTextView.textStorage(of: textView) else {
+            XCTFail("Expected text storage")
+            return
+        }
+
+        for delimiter in emphasisDelimiters(in: source, span: span) {
+            let attributes = textStorage.attributes(at: delimiter.location, effectiveRange: nil)
+            XCTAssertTrue(
+                WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes),
+                "Expected folded delimiter at \(delimiter)"
+            )
+        }
+    }
+
+    private func emphasisDelimiters(in source: String, span: String) -> [NSRange] {
+        let nsSource = source as NSString
+        let markerLength = 2
+        var search = NSRange(location: 0, length: nsSource.length)
+        var delimiters: [NSRange] = []
+        while search.length > 0 {
+            let found = nsSource.range(of: span, options: [], range: search)
+            guard found.location != NSNotFound else { break }
+            delimiters.append(NSRange(location: found.location, length: markerLength))
+            delimiters.append(NSRange(
+                location: NSMaxRange(found) - markerLength,
+                length: markerLength
+            ))
+            let next = NSMaxRange(found)
+            search = NSRange(location: next, length: nsSource.length - next)
+        }
+        return delimiters
     }
 }

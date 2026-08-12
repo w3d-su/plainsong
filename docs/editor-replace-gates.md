@@ -655,27 +655,34 @@ All boxes intentionally start unchecked.
   **NO-GO for Replace All:** one undo group, but N source publications.
 - [x] Candidate B1: exact final source built before activation, then one native
   edit of the minimal enclosing raw range.
-  Evidence: `testCandidateB1PublishesOnceForTheEnclosingRange` — 1 writer
-  activation, 1 authorized native edit, 1 publication.
+  Evidence: `EditorReplaceBatchSpike.plan` +
+  `testCandidateB1PublishesOnceForTheEnclosingRange` — 1 writer activation, 1
+  authorized native edit, 1 publication.
+  `testInvalidRangesOpenNoWriterOrUndo` refuses overlapping ranges before
+  writer activation or undo grouping.
 - [x] Candidate B2 is measured separately, and only if B1 fails: one
   full-document native replacement.
   Evidence: `testCandidateB2PublishesOnceForTheFullDocument`. B1 did not fail;
   B2 remains an unused fallback.
-- [x] One Undo restores literal UTF-16-code-unit-exact source, selection, dirty
-  baseline, and presentation for the entire batch; no second Undo is needed
-  for another match.
+- [x] One Undo restores literal UTF-16-code-unit-exact source, selection, and
+  dirty baseline for the entire batch; no second Undo is needed for another
+  match. Fold-delimiter attributes are reasserted by the existing highlight
+  presentation pass after the undo publication, not by the batch helper.
   Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo` (source/selection/dirty);
-  `EditorReplaceBatchSpikeWYSIWYGTests.testMinimalEnclosingRangeUndoRestoresFoldPresentation`.
-- [x] One Redo reapplies the exact whole batch.
+  `EditorReplaceBatchSpikeWYSIWYGTests.testMinimalEnclosingRangeUndoRestoresFoldPresentation`
+  (live `foldedDelimiterAttribute` on the `**` ranges of `**one**` after apply
+  and again after undo + presentation reapply).
+- [x] One Redo reapplies the exact whole batch, including the planned
+  post-batch caret.
   Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo`.
 - [x] Seed prior typed/coalesced input first: Replace All must not merge with
   it; the next Undo after undoing Replace All reaches the prior input.
   Evidence: `testReplaceAllDoesNotMergeWithPriorTyping`.
-- [x] Record activation, native edit, source publication, revision, and
-  presentation-apply counts. One undo with N intermediate publications is not
-  sufficient evidence.
+- [x] Record activation, native edit, source publication, and revision.
+  One undo with N intermediate publications is not sufficient evidence.
   Evidence: A = N edits / N publications (NO-GO); B1 = 1/1 (GO); B2 = 1/1
-  (fallback). Presentation applies stay outside the mutation (one apply after).
+  (fallback). Presentation stays outside the mutation; the WYSIWYG test
+  asserts live folded-delimiter attributes after apply and after undo.
 - [x] Cover unequal lengths, deletion, Unicode/canonical-equivalent match
   lengths, replacement containing the query, 256-code-unit replacement, and a
   near-10,000 exact set.
@@ -692,9 +699,10 @@ All boxes intentionally start unchecked.
   `testStaleWriterPreflightDoesNotOpenAReplacementUndoGroup`.
 - [x] Run the combined worst v1 shape: `Fixtures/large-1mb.md`, an exact
   near-10,000 non-truncated set, and a 256-code-unit replacement; record
-  construction, main-thread, allocation, and typing impact.
-  Evidence: 8,921 matches; construction ≈ 4.5 ms; B1 commit ≈ 42 ms; post-batch
-  `insertText` ≈ 0.5 ms; planned UTF-16 length 3,314,896.
+  construction, main-thread, and typing impact.
+  Evidence: asserted `an` × 8,921 and planned UTF-16 length 3,314,896;
+  printed (not wall-clock-gated) construction ≈ 4.5 ms; B1 commit ≈ 42 ms;
+  post-batch `insertText` ≈ 0.5 ms. Allocation is not measured.
 - [x] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
   remains deferred and this design changes before any product UI claims it.
 - Evidence: **GO — Candidate B1.** No user-facing Replace. PR C may consume the
