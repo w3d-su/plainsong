@@ -1,9 +1,10 @@
 # Phase 3 Export (HTML / PDF / Print) — Gate Specification
 
-> **Status: E0 mechanism gate closed as GO (paginated); E1–E9 remain open.** Precedent:
+> **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
+> 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
+> PR C lands protocol v6 + static-document semantics. E1–E9 remain open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
-> or an owner-recorded result in the same commit. Decisions D3–D5 require explicit owner
-> sign-off before any implementation PR starts.
+> or an owner-recorded result in the same commit.
 
 Created 2026-07-29 as a Phase 3 export candidate from `agent.md` §14. See `agent.md`
 §7 (preview and bridge), §11 (themes), §17.5 (bridge mirroring), the PR #24/#27
@@ -52,8 +53,10 @@ work.
 | **D4** | Both silent **Export as PDF…** and panel-based **Print…**, using different WebKit APIs. | **Required.** |
 | **D5** | One-shot `NSSavePanel` destination, deliberately outside the retained workspace-file write path. | **Required.** |
 
-Explicit approval of D3–D5 must be recorded by the owner in this PR before PR B begins.
-Silence, implementation activity, or a green CI run is not owner sign-off.
+**Owner sign-off 2026-08-13:** D3, D4, and D5 are accepted as specified. D4’s v1 page
+model is the E0-recorded fixed-height pagination, not a continuous page. This unlocks
+implementation PR C; it is not itself a product-surface change. Silence, implementation
+activity, or a green CI run remains insufficient for any later change to these choices.
 
 ### D1 — Export source: dedicated offscreen preview
 
@@ -469,9 +472,9 @@ own PR.
 | **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
 | **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
 
-D3–D5 owner sign-off is required before PR B starts. If a later implementation needs a
-different fixed choice, update this spec and the Decision Log in a separate reviewed
-docs PR before changing production behavior.
+D3–D5 owner sign-off was recorded 2026-08-13 (after E0, before PR C). If a later
+implementation needs a different fixed choice, update this spec and the Decision Log in
+a separate reviewed docs PR before changing production behavior.
 
 ## 8. Gates
 
