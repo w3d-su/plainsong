@@ -88,6 +88,8 @@ struct EditorFindBar: View {
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier(EditorFindAccessibility.truncatedIndicator)
                     .accessibilityLabel("Results truncated at match ceiling")
+                    // F9 probes `value`; the visible title is only "Truncated".
+                    .accessibilityValue("Results truncated at match ceiling")
             }
 
             Button {

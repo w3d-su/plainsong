@@ -46,7 +46,7 @@
             var createdWorkspaceIdentity: EntryIdentity?
             var workspaceHandle: DebugEditorFindFixtureWorkspaceHandle?
             do {
-                try createWorkspaceDirectoryExclusively(workspaceURL)
+                try createWorkspaceDirectoryExclusively(workspaceURL, rootHandle: rootHandle)
                 didCreateWorkspaceDirectory = true
                 guard let createdWorkspaceStatus = try entryStatus(
                     at: workspaceURL
@@ -255,13 +255,12 @@
         }
 
         private static func createWorkspaceDirectoryExclusively(
-            _ workspaceURL: URL
+            _ workspaceURL: URL,
+            rootHandle: DebugEditorFindFixtureRootHandle
         ) throws {
-            let result = workspaceURL.path.withCString {
-                mkdir($0, mode_t(S_IRWXU))
-            }
-            guard result == 0 else {
-                let errorCode = errno
+            do {
+                try rootHandle.createDirectory(at: workspaceURL)
+            } catch let FixtureError.couldNotCreateWorkspace(errorCode) {
                 if errorCode == EEXIST {
                     throw FixtureError.fixtureAlreadyExists
                 }
