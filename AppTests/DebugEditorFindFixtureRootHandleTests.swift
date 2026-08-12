@@ -69,7 +69,10 @@
             for candidate in Int32(0) ..< 1024 {
                 var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
                 let result = buffer.withUnsafeMutableBufferPointer { pointer in
-                    fcntl(candidate, F_GETPATH, pointer.baseAddress)
+                    guard let baseAddress = pointer.baseAddress else {
+                        return Int32(-1)
+                    }
+                    return Darwin.fcntl(candidate, F_GETPATH, baseAddress)
                 }
                 guard result == 0 else { continue }
                 if String(cString: buffer) == expected {
