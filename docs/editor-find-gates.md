@@ -1,17 +1,17 @@
 # In-Document Find (⌘F) — Gate Specification
 
-> **Status: PR C merged as #97 at `384786e`; the F2 query-completion and production-hosted
-> state-receipt proxies are measured independently at source commit `c871ddf`.** §2 is
-> resolved **(b)**;
-> F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half + F5 WYSIWYG/source
-> identity closed in PR B. **F4b UI, F5 source+preview, F6 IME, F7 focus remain open** until
-> production-path/hosted evidence lands (App-state unit tests alone do not close them). Shared
-> navigation ID domain is wired via App `navigationIDProvider`. **F2 structural work and the
-> named proxy checks have frozen budgets, but F2 remains open overall: its complete artifacts
-> exist only in owner-local storage, the historical monitor did not distinguish an unrelated
-> same-path host from the launched host, and the full §12 keystroke-to-screen criterion is also
-> unproven. F8 and F9 remain open follow-ups.** Precedent: PR #45, link-folding,
-> image-thumbnail gate docs.
+> **Status: PR B (#96), PR C (#97), the F2 proxy follow-up (#105), and the F8 highlight
+> follow-up (#106) are merged; hosted source-preview evidence is tracked in PR #108.** §2 is
+> resolved **(b)**; F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half +
+> F5 WYSIWYG/source identity closed in PR B, and F8 closed in #106. **PR #108 closes F5
+> source+preview with hosted production-path evidence. F4b UI, F6 IME, and the remaining F7
+> focus matrix stay open** because those transitions still require broader hosted or owner
+> evidence. Shared navigation ID domain is wired via App `navigationIDProvider`. **F2's named
+> query-completion and production-hosted state-receipt proxies have frozen budgets, but F2
+> remains open overall: complete artifacts exist only in owner-local storage, the historical
+> monitor did not distinguish an unrelated same-path host from the launched host, and the full
+> §12 keystroke-to-screen criterion is unproven. F9 remains a separate follow-up.** Precedent:
+> PR #45, link-folding, image-thumbnail gate docs.
 > Check a gate box only with named-test or owner-recorded evidence in the same commit.
 >
 > The 2026-07-27 review restack moved the navigation transport (`shouldFocusEditor`) into
@@ -332,9 +332,16 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | PR | Scope | Gates closed |
 |---|---|---|
 | **A** (merged as #95) | Spec only: this file + Decision Log engine entry. No behavior change. | none (documents F0–F9 and F4b open) |
-| **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2 latency (PR D); F4b UI (PR C); F5 source+preview (PR C); F6–F9. |
+| **B** (merged as #96) | **F0 blocking spike + owner physical sign-off.** MarkdownCore find-session model + EditorKit search controller (debounced off-main match; fence drops stale results including after `cancelInFlightWork`; engine `limit: retainedMatchCeiling + 1`; session invalidated at schedule so next/previous cannot use superseded ranges; first next/previous after edit/rebind activates current ordinal; optional `navigationIDProvider` for shared App high-water mark). Lands the **controller half of F4b** without closing F4b. **No App find-bar UI.** | **Closes:** F0; F1; F2 structural; F3 exact-range (+ provider contract for shared ID domain); F4; F5 WYSIWYG off/on + source identity. **Does not close:** F2's remaining evidence boundaries; F4b UI; F5 source+preview (later #108); F6–F9. |
 | **C** (merged as #97) | App find bar UI + menu items + responder-chain delivery + focus arbitration with ⇧⌘F. Installs `navigationIDProvider`. Lifecycle hooks for Reload/rename/Save Copy/close. No built-in-finder disabling (§2 (b)). Decides open `⌘E` (pattern-only, no auto-nav). | Shared navigation ID domain in production; **does not close** F4b UI / F5 live preview / F6 / F7 until hosted evidence |
-| **D** (split follow-ups) | F2 query-completion and production-hosted state-receipt proxies have frozen budgets. Remaining scope includes durable evidence retention, historical-uncorrelated-target-process isolation, the full keystroke-to-screen criterion, XCUITest (F9, including truncated counter state and `⌘F` re-focus), and any later highlight-all implementation/F8 evidence. | **Freezes the named F2 proxy budgets only. F2 overall, historical-uncorrelated-target-process, full screen latency, F8, and F9 remain open.** |
+| **F2 proxy follow-up** (merged as #105) | Query-completion and production-hosted state-receipt proxies with frozen budgets and authenticated retained evidence. | **Freezes the named F2 proxy budgets only. F2 overall, historical-uncorrelated-target-process, durable complete-artifact retention, and full screen latency remain open.** |
+| **F8 highlight follow-up** (merged as #106) | Viewport-bounded highlight-all apply/clear with edit and representable regressions. | **Closes:** F8. |
+| **Hosted follow-up** (#108) | Hosted `WorkspaceWindow` evidence for lifecycle, source+preview, marked-text reservation, and focus handoff. Forced navigation is a typed scroll intent that bypasses typewriter preference and an active preview-owner token while preserving echo suppression. | **Closes:** F5 source+preview. **Partial only:** F4b Reload + missing-file close visibility, F6 programmatic AppKit marked text, F7 ineligible-host supersession + real Search first responder. |
+| **F9 follow-up** (#109) | Launched-app XCUITest, including truncated counter state and repeated `⌘F` refocus. | F9 and repeated-`⌘F` portion of F7 remain dependent on integrated exact-tip evidence. |
+
+Integration ownership: the hosted gate owns the `@MainActor` isolation on
+`EditorFindQueryField.Coordinator`; any later F9 integration must drop a duplicate copy of
+that hunk rather than resolving it as two independent fixes.
 
 Before declaring any PR done: `make format && make lint && make test && make build`,
 and `git diff --check`. PR body must list which F-gates it closes and which remain
@@ -567,6 +574,12 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   transaction fails them (the quarantine ordering bug did). They assert controller identity,
   recount, and absence of navigation — **not** hosted bar visibility, which is why the box
   stays unchecked.
+  Hosted partial evidence in PR #108:
+  `EditorFindHostedGateTests.testHostedFindBarSurvivesExternalReloadAndUnmountsAfterMissingFileClose`
+  mounts the production `WorkspaceWindow`, proves a clean Reload keeps the field mounted and
+  recounts without navigation, then proves closing the missing file unmounts the field and
+  clears the session. Keep Mine, rename, and Save Copy still lack hosted UI-visibility
+  coverage, so this gate remains unchecked.
 - Also covered: a workspace-search activation on the **already-current** document fences an
   in-flight find generation before the search navigation takes an ID
   (`EditorFindReviewFixTests.testWorkspaceSearchHandOffStopsAnInFlightFindFromNavigatingAfterwards`),
@@ -575,9 +588,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   resolved ordinal (`...testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances`,
   `EditorFindControllerSuspendTests`).
 - Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
-  fencing covered in-process; hosted UI-visibility half still open
+  fencing covered in-process; PR #108 adds hosted Reload + missing-file close visibility.
+  Keep Mine, rename, and Save Copy hosted UI visibility remain open.
 
-### F5 — Reveal without source mutation (WYSIWYG closed in PR B; source+preview still open)
+### F5 — Reveal without source mutation
 
 - [x] A match inside a folded WYSIWYG span: navigation selects the match; the fold plan
   recomputed from the **post-navigation** selection marks the region revealed; applying
@@ -588,13 +602,27 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: same test + `testSourceOnlyFindNavigationSelectsWithoutSourceMutation`
 - [x] Covered with Experimental WYSIWYG both **off** and **on**.
   Evidence: `testSourceOnly...` (off) and `testExperimentalWYSIWYG...` (on)
-- [ ] Covered in **source+preview** layout mode with a **live** preview: find navigation
+- [x] Covered in **source+preview** layout mode with a **live** preview: find navigation
   must move editor selection **and** keep preview scroll sync green via the existing
   scroll proxy (Decision Log 2026-06-25). App-state-only checks that set
   `layoutMode` and assert `EditorNavigationCommand` are **not** sufficient.
-  Evidence: _open — needs hosted WorkspaceWindow + PreviewController + scroll coordinator_
-- Evidence: **partial in PR B** — WYSIWYG off/on + source identity closed; source+preview
-  live path open
+  Evidence: PR #108
+  `EditorFindHostedGateTests.testHostedSourcePreviewFindBypassesDisabledTypewriterSync`
+  and `...testHostedSourcePreviewFindBypassesActivePreviewScrollOwner` mount the production
+  `WorkspaceWindow`, live `PreviewController`, and scroll coordinator. They prove exact editor
+  selection plus delivered JavaScript and visible live-preview movement when typewriter sync
+  is disabled and while preview ownership is active; both assert source text and UTF-8 bytes
+  are unchanged. The forced intent carries the exact `EditorDocumentIdentity`; the preview
+  binds it to the matching render and waits for both bridge readiness and the latest
+  `renderComplete` before sending JavaScript. A newer render for that document advances the
+  barrier, while a different-document render fails the pending receipt instead of replaying a
+  stale line into the new DOM. Evidence:
+  `PreviewScrollDeliveryTests.testDocumentNavigationWaitsForMatchingRenderBeforeScrolling`,
+  `...testPendingDocumentNavigationFailsInsteadOfReplayingIntoAnotherDocument`, and
+  `...testUnboundNavigationFailsWhenPresentedDocumentChangesBeforeRender`, plus
+  `...testScrollCompletionReportsJavaScriptDelivery`.
+- Evidence: **closed in PR #108** — PR B covers WYSIWYG off/on + source identity; the two
+  hosted cases above close the live source+preview path.
 
 ### F6 — IME in the find field
 
@@ -608,6 +636,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   with live marked text and asserts neither submit nor close fires. It replaced a
   source-substring scan, which proved nothing and additionally deadlocked the sandboxed
   test host in `open()` once the file's cached sandbox grant went stale.
+  PR #108 adds
+  `EditorFindHostedGateTests.testHostedMarkedTextCommandsStayInFindFieldAndDoNotMutateDocument`,
+  which mounts the production field, installs live AppKit marked text programmatically, and
+  proves Return/Escape remain reserved while source stays unchanged. This is still synthetic
+  marked-text injection, not a real IME or physical-keyboard run, so it does not check F6.
 - [ ] Escape must not reach the bar through any path that outranks the field editor. The
   Done button therefore declares **no** `.keyboardShortcut(.cancelAction)`: a key
   equivalent is resolved before the field editor sees the event, so Escape closed the bar
@@ -633,6 +666,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - [ ] Sequence `⌘F` → `⇧⌘F` leaves focus somewhere sane every time (find field,
   workspace-search field, or editor — never a dead control); older Find focus closures
   must not steal after a newer intent (key-window only, request-token ordered).
+  Partial hosted evidence in PR #108:
+  `EditorFindHostedGateTests.testHostedFindToWorkspaceSearchHandoffSupersedesOlderFindFocusWhileHostIsIneligible`
+  proves the older Find request is superseded and Search owns its real hosted field editor
+  while the utility host remains ineligible. It does not exercise Find becoming eligible
+  after the handoff.
 - [ ] Neither feature's focus receipt is consumed by the other (token independence is
   necessary but not sufficient — first-responder proof required).
 - [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
@@ -680,8 +718,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - [ ] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.
-- Evidence: _open — production focus path fixed for key-window/token ordering; hosted
-  first-responder matrix still required_
+- Evidence: _open — production focus path fixed for key-window/token ordering; PR #108
+  adds ineligible-host supersession + real Search first-responder proof. Eligible-after-handoff,
+  dual-window, Full Keyboard Access, and repeated-⌘F first-responder evidence remain open._
 
 ### F8 — Highlight-all survives highlight re-application
 

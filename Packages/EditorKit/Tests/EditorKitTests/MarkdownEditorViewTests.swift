@@ -382,16 +382,16 @@ final class MarkdownEditorViewTests: XCTestCase {
         let otherTextView = STTextView(frame: .zero)
         otherTextView.text = textView.text
         let proxy = EditorScrollProxy()
-        var emittedLines: [Int] = []
-        proxy.onVisibleLineChanged = { emittedLines.append($0) }
+        var emittedIntents: [EditorScrollIntent] = []
+        proxy.onScrollIntent = { emittedIntents.append($0) }
         proxy.attach(to: textView)
-        emittedLines.removeAll()
+        emittedIntents.removeAll()
 
         proxy.emitVisibleLine(containingUTF16Offset: "one\ntwo\n".utf16.count, in: textView)
         proxy.emitVisibleLine(containingUTF16Offset: "one\ntwo\n".utf16.count, in: textView)
         proxy.emitVisibleLine(containingUTF16Offset: 0, in: otherTextView)
 
-        XCTAssertEqual(emittedLines, [3])
+        XCTAssertEqual(emittedIntents, [.viewportChanged(line: 3)])
     }
 }
 

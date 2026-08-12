@@ -305,6 +305,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var visibleRangeObserver: CoordinatorNotificationObserver?
     var visibleRangeChangeHandler: ((NSRange) -> Void)?
     var lastVisibleTextRange: NSRange?
+    var representableUpdateDepth = 0
+    var selectionPublicationGeneration: UInt64 = 0
     var isSourceSynchronizationPending = false
     var asynchronousTextMutationLeaseCount = 0
     var isNativeSourceSynchronized = true
@@ -432,6 +434,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
         clearDeferredDocumentTransition()
         preparedNativeSourceCandidateGeneration = nil
         let (installation, bindingTransition) = installedDocument.install(candidate)
+        // Any queued selection receipt addressed the binding that was installed before
+        // this exact transition. Invalidate it before the new binding can be observed.
+        invalidateDeferredSelectionPublication()
         isNativeSourceSynchronized = true
         bindingTransition.notify(installationID: documentBindingInstallationID)
         bindingTransition.updateSourceSynchronizers(
@@ -848,7 +853,7 @@ extension MarkdownTextViewCoordinator {
         if let textView = textView as? MarkdownSTTextView {
             scheduleMarkedTextReplacementRangeCleanup(for: textView)
         }
-        selection = textView.selectedRange()
+        publishObservedSelection(textView.selectedRange())
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)

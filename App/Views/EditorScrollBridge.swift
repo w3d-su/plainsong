@@ -4,17 +4,43 @@ import SwiftUI
 
 @MainActor
 final class EditorPreviewScrollCoordinator: ObservableObject {
+    typealias OwnerDecayScheduler =
+        (@escaping @MainActor () -> Void) -> Task<Void, Never>
+
     let editorProxy = EditorScrollProxy()
 
     private weak var previewController: PreviewController?
-    private var scrollOwner: ScrollOwner = .none
+    private(set) var scrollOwner: ScrollOwner = .none
+    private(set) var previewScrollDeliveryReceipt: PreviewScrollDeliveryReceipt?
     private var decayTask: Task<Void, Never>?
     private var isEditorScrollForwardingEnabled = false
+    private var previewScrollRequestID: UInt64 = 0
+    private var ownerDecayGeneration: UInt64 = 0
+    private var previewScrollDeliveryOverride:
+        ((Int, Bool, String?, @escaping @MainActor (Bool) -> Void) -> Void)?
+    private var ownerDecayScheduler: OwnerDecayScheduler
+
+    #if DEBUG
+        weak static var latestDebugInstance: EditorPreviewScrollCoordinator?
+    #endif
 
     init() {
-        editorProxy.onVisibleLineChanged = { [weak self] line in
-            self?.editorScrolledFromProxy(to: line)
+        ownerDecayScheduler = { completion in
+            Task { @MainActor in
+                do {
+                    try await Task.sleep(nanoseconds: 100_000_000)
+                } catch {
+                    return
+                }
+                completion()
+            }
         }
+        editorProxy.onScrollIntent = { [weak self] intent in
+            self?.handleEditorScrollIntent(intent)
+        }
+        #if DEBUG
+            Self.latestDebugInstance = self
+        #endif
     }
 
     func connect(previewController: PreviewController) {
@@ -32,29 +58,95 @@ final class EditorPreviewScrollCoordinator: ObservableObject {
         editorProxy.scrollToLine(line)
     }
 
-    private func editorScrolledFromProxy(to line: Int) {
-        guard isEditorScrollForwardingEnabled, scrollOwner != .preview else { return }
+    private func handleEditorScrollIntent(_ intent: EditorScrollIntent) {
+        switch intent {
+        case let .viewportChanged(line):
+            guard isEditorScrollForwardingEnabled, scrollOwner != .preview else { return }
+            setScrollOwner(.editor)
+            deliverPreviewScroll(to: line, documentIdentifier: nil)
+        case let .navigation(line, documentIdentity):
+            // Explicit navigation is presentation consistency, not typewriter sync. It
+            // must reach a mounted preview even while that preference is disabled or a
+            // preview-owned scroll token is still inside its 100 ms decay window. Re-arm
+            // that token so a nearly-expired timer cannot release it before the queued
+            // editor echo arrives and scrolls the preview back over this intent.
+            if scrollOwner == .preview {
+                setScrollOwner(.preview)
+            }
+            deliverPreviewScroll(
+                to: line,
+                documentIdentifier: documentIdentity.rawValue
+            )
+        }
+    }
 
-        setScrollOwner(.editor)
-        previewController?.scrollToLine(line, animated: false)
+    private func deliverPreviewScroll(to line: Int, documentIdentifier: String?) {
+        previewScrollRequestID &+= 1
+        let requestID = previewScrollRequestID
+        let ownerAtDispatch = scrollOwner
+        let completion: @MainActor (Bool) -> Void = { [weak self] succeeded in
+            guard let self, requestID == previewScrollRequestID else { return }
+            previewScrollDeliveryReceipt = PreviewScrollDeliveryReceipt(
+                requestID: requestID,
+                line: line,
+                documentIdentifier: documentIdentifier,
+                ownerAtDispatch: ownerAtDispatch,
+                succeeded: succeeded
+            )
+        }
+        if let previewScrollDeliveryOverride {
+            previewScrollDeliveryOverride(line, false, documentIdentifier, completion)
+        } else if let previewController {
+            previewController.scrollToLine(
+                line,
+                animated: false,
+                documentIdentifier: documentIdentifier,
+                completion: completion
+            )
+        } else {
+            completion(false)
+        }
+    }
+
+    func installPreviewScrollDeliveryOverrideForTesting(
+        _ delivery: @escaping (Int, Bool, String?, @escaping @MainActor (Bool) -> Void) -> Void
+    ) {
+        previewScrollDeliveryOverride = delivery
+    }
+
+    func installOwnerDecaySchedulerForTesting(_ scheduler: @escaping OwnerDecayScheduler) {
+        decayTask?.cancel()
+        ownerDecayScheduler = scheduler
     }
 
     private func setScrollOwner(_ owner: ScrollOwner) {
         scrollOwner = owner
         decayTask?.cancel()
-        decayTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: 100_000_000)
-            } catch {
-                return
-            }
+        ownerDecayGeneration &+= 1
+        let generation = ownerDecayGeneration
+        decayTask = ownerDecayScheduler { [weak self] in
+            guard self?.ownerDecayGeneration == generation else { return }
             self?.scrollOwner = .none
         }
     }
 
-    private enum ScrollOwner {
+    #if DEBUG
+        var previewControllerForTesting: PreviewController? {
+            previewController
+        }
+    #endif
+
+    enum ScrollOwner: Equatable {
         case editor
         case preview
         case none
     }
+}
+
+struct PreviewScrollDeliveryReceipt: Equatable {
+    let requestID: UInt64
+    let line: Int
+    let documentIdentifier: String?
+    let ownerAtDispatch: EditorPreviewScrollCoordinator.ScrollOwner
+    let succeeded: Bool
 }
