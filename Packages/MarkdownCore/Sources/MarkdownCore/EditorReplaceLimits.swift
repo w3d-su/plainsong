@@ -11,11 +11,11 @@ public enum EditorReplaceLimits {
     /// Maximum UTF-16 growth beyond the already-installed source for one batch.
     public static let maximumGrowthUTF16 = 2_560_000
 
-    /// Cancellation/progress checkpoint: at most this many planned matches.
-    public static let progressMatchChunk = 64
+    /// Cancellation checkpoint: at most this many planned matches.
+    public static let cancellationMatchChunk = 64
 
-    /// Cancellation/progress checkpoint: at most this many copied UTF-16 units.
-    public static let progressUTF16Chunk = 65536
+    /// Cancellation checkpoint: at most this many copied UTF-16 units.
+    public static let cancellationUTF16Chunk = 65536
 
     /// Maximum coalesced progress updates for one Replace All plan.
     public static let maximumProgressUpdates = 100

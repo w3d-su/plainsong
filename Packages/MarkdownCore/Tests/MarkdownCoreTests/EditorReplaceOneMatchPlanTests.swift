@@ -16,6 +16,7 @@ final class EditorReplaceOneMatchPlanTests: XCTestCase {
             replacement: "ONE"
         ).get()
         XCTAssertEqual(plan?.match.range.location, 8)
+        XCTAssertEqual(plan?.query, session.query)
         XCTAssertEqual(plan?.resumeUTF16, 11)
         XCTAssertFalse(plan?.isLiteralIdentical == true)
     }

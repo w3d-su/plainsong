@@ -30,7 +30,10 @@ public enum EditorReplacePlanner {
         let replacementLength = (replacement as NSString).length
         let resume: Int
         if identical {
-            resume = NSMaxRange(match.range)
+            guard let matchEnd = EditorReplacePlanning.rangeEnd(match.range) else {
+                return .failure(.noCurrentMatch)
+            }
+            resume = matchEnd
         } else {
             let (value, overflow) = match.range.location.addingReportingOverflow(
                 replacementLength
@@ -48,6 +51,7 @@ public enum EditorReplacePlanner {
             }
         }
         return .success(EditorReplaceOneMatchPlan(
+            query: session.query,
             match: match,
             replacement: replacement,
             isLiteralIdentical: identical,
@@ -98,6 +102,7 @@ public enum EditorReplacePlanner {
             return .failure(.projectedLengthOverflow)
         }
         return .success(EditorReplaceBatchPlan(
+            query: session.query,
             replacement: replacement,
             allRanges: allRanges,
             differingRanges: differing,

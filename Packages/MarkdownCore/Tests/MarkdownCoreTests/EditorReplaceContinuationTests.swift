@@ -3,6 +3,27 @@ import Foundation
 import XCTest
 
 final class EditorReplaceContinuationTests: XCTestCase {
+    func testPlanBindsTheQueryUsedForPostWriteRescan() throws {
+        let source = "a b a"
+        let session = EditorFindSession.search(
+            in: source,
+            query: TextSearchQuery(pattern: "a", caseSensitivity: .sensitive)
+        )
+        let plan = try EditorReplacePlanner.planOneMatch(
+            session: session,
+            source: source,
+            replacement: "z"
+        ).get()
+        let continued = EditorReplaceContinuationPlanning.afterOneReplace(
+            plan: plan,
+            postWriteSource: "z b a"
+        )
+
+        XCTAssertEqual(plan.query, session.query)
+        XCTAssertEqual(continued.session.query, session.query)
+        XCTAssertEqual(continued.session.currentMatch?.range.location, 4)
+    }
+
     func testSourceChangingOneReplaceRescansAndSkipsInsertedSpan() throws {
         let source = "a b a"
         let session = EditorFindSession.search(
@@ -22,7 +43,6 @@ final class EditorReplaceContinuationTests: XCTestCase {
         XCTAssertEqual(post, "aa b a")
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(plan.resumeUTF16, 2)
@@ -51,7 +71,6 @@ final class EditorReplaceContinuationTests: XCTestCase {
         ))
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(post, "a b z")
@@ -79,12 +98,12 @@ final class EditorReplaceContinuationTests: XCTestCase {
         XCTAssertEqual(post, "aa two aa")
         let continued = EditorReplaceContinuationPlanning.afterBatch(
             plan: plan,
-            query: session.query,
             preWriteCurrentMatch: session.currentMatch,
             preWriteCaretUTF16: session.caretAnchorUTF16,
             postWriteSource: post
         )
         XCTAssertNil(continued.session.currentOrdinal)
+        XCTAssertEqual(continued.session.query, plan.query)
         XCTAssertEqual(continued.session.total, 0)
         XCTAssertEqual(continued.collapsedSelection.location, 2)
         XCTAssertEqual(continued.session.caretAnchorUTF16, 2)
@@ -103,7 +122,6 @@ final class EditorReplaceContinuationTests: XCTestCase {
         ).get()
         let continued = EditorReplaceContinuationPlanning.afterBatch(
             plan: plan,
-            query: session.query,
             preWriteCurrentMatch: nil,
             preWriteCaretUTF16: 4,
             postWriteSource: "ONE two ONE"
@@ -133,7 +151,6 @@ final class EditorReplaceContinuationTests: XCTestCase {
         ))
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertTrue(continued.session.isTruncated)

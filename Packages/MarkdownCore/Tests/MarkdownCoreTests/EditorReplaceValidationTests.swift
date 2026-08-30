@@ -88,4 +88,25 @@ final class EditorReplaceValidationTests: XCTestCase {
             replacementUTF16Length: Int.max
         ))
     }
+
+    func testMalformedRangesFailClosedWithoutEndOverflow() {
+        let overflow = NSRange(location: Int.max, length: 1)
+        XCTAssertNil(EditorReplacePlanning.slice("x", range: overflow))
+        XCTAssertNil(EditorReplaceSourceConstruction.enclosingRange(of: [overflow]))
+        XCTAssertNil(EditorReplaceSourceConstruction.projectedUTF16Length(
+            sourceLength: 1,
+            ranges: [overflow],
+            replacementUTF16Length: 1
+        ))
+        XCTAssertNil(EditorReplaceSourceConstruction.replacedSource(
+            "x",
+            ranges: [overflow],
+            replacement: "y"
+        ))
+        XCTAssertNil(EditorReplaceSourceConstruction.mapUTF16Offset(
+            0,
+            through: [overflow],
+            replacementUTF16Length: 1
+        ))
+    }
 }

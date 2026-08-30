@@ -2,10 +2,19 @@ import Foundation
 
 public enum EditorReplaceSourceConstruction {
     public static func enclosingRange(of ranges: [NSRange]) -> NSRange? {
-        guard let first = ranges.first, let last = ranges.last else { return nil }
-        let end = NSMaxRange(last)
-        guard end >= first.location else { return nil }
-        return NSRange(location: first.location, length: end - first.location)
+        guard let first = ranges.first else { return nil }
+        var previousEnd = first.location
+        var finalEnd = first.location
+        for range in ranges {
+            guard range.location >= previousEnd,
+                  let end = EditorReplacePlanning.rangeEnd(range)
+            else {
+                return nil
+            }
+            previousEnd = end
+            finalEnd = end
+        }
+        return NSRange(location: first.location, length: finalEnd - first.location)
     }
 
     public static func projectedUTF16Length(
@@ -15,8 +24,15 @@ public enum EditorReplaceSourceConstruction {
     ) -> Int? {
         guard sourceLength >= 0, replacementUTF16Length >= 0 else { return nil }
         var removed = 0
+        var previousEnd = 0
         for range in ranges {
-            guard range.location >= 0, range.length >= 0 else { return nil }
+            guard range.location >= previousEnd,
+                  let end = EditorReplacePlanning.rangeEnd(range),
+                  end <= sourceLength
+            else {
+                return nil
+            }
+            previousEnd = end
             let (next, overflow) = removed.addingReportingOverflow(range.length)
             if overflow { return nil }
             removed = next
@@ -50,7 +66,8 @@ public enum EditorReplaceSourceConstruction {
         parts.reserveCapacity(ranges.count * 2 + 1)
         for range in ranges {
             guard range.location >= cursor,
-                  NSMaxRange(range) <= length
+                  let end = EditorReplacePlanning.rangeEnd(range),
+                  end <= length
             else {
                 return nil
             }
@@ -61,7 +78,7 @@ public enum EditorReplaceSourceConstruction {
                 )))
             }
             parts.append(replacement)
-            cursor = NSMaxRange(range)
+            cursor = end
         }
         if cursor < length {
             parts.append(nsSource.substring(from: cursor))
@@ -77,9 +94,14 @@ public enum EditorReplaceSourceConstruction {
     ) -> Int? {
         guard offset >= 0, replacementUTF16Length >= 0 else { return nil }
         var mapped = offset
+        var previousEnd = 0
         for range in ranges {
-            guard range.location >= 0, range.length >= 0 else { return nil }
-            let end = NSMaxRange(range)
+            guard range.location >= previousEnd,
+                  let end = EditorReplacePlanning.rangeEnd(range)
+            else {
+                return nil
+            }
+            previousEnd = end
             if offset < range.location {
                 return mapped
             }
@@ -100,31 +122,29 @@ public enum EditorReplaceSourceConstruction {
         return mapped
     }
 
-    /// Checkpoints for a cancellable off-main plan (R4). Uses the lesser of the
-    /// match-count and copied-UTF-16 chunk sizes.
-    public static func progressCheckpoints(
-        rangeCount: Int,
-        replacementUTF16Length: Int
-    ) -> [Int] {
-        guard rangeCount > 0 else { return [] }
-        let matchChunk = max(1, EditorReplaceLimits.progressMatchChunk)
-        let utf16Chunk = max(1, EditorReplaceLimits.progressUTF16Chunk)
-        let copiedPerMatch = max(1, replacementUTF16Length)
-        let matchesPerUTF16Chunk = max(1, utf16Chunk / copiedPerMatch)
-        let stride = min(matchChunk, matchesPerUTF16Chunk)
-        var points: [Int] = []
-        var next = stride
-        while next < rangeCount, points.count < EditorReplaceLimits.maximumProgressUpdates - 1 {
-            points.append(next)
-            next += stride
+    /// Whether an off-main plan must check cancellation before doing more work.
+    ///
+    /// Cancellation cadence and visible progress cadence are intentionally separate:
+    /// coalescing progress to 100 updates must never create a cancellation blind spot.
+    public static func shouldCheckCancellation(
+        plannedMatchesSinceLastCheck: Int,
+        copiedUTF16SinceLastCheck: Int
+    ) -> Bool {
+        plannedMatchesSinceLastCheck >= EditorReplaceLimits.cancellationMatchChunk
+            || copiedUTF16SinceLastCheck >= EditorReplaceLimits.cancellationUTF16Chunk
+    }
+
+    /// At most 100 monotonically increasing visible-progress milestones, including `total`.
+    public static func progressUpdateMilestones(totalMatchCount: Int) -> [Int] {
+        guard totalMatchCount > 0 else { return [] }
+        let updateCount = min(
+            totalMatchCount,
+            EditorReplaceLimits.maximumProgressUpdates
+        )
+        return (1 ... updateCount).map { index in
+            let quotient = totalMatchCount / updateCount
+            let remainder = totalMatchCount % updateCount
+            return index * quotient + min(index, remainder)
         }
-        if points.last != rangeCount {
-            points.append(rangeCount)
-        }
-        if points.count > EditorReplaceLimits.maximumProgressUpdates {
-            return Array(points.prefix(EditorReplaceLimits.maximumProgressUpdates - 1))
-                + [rangeCount]
-        }
-        return points
     }
 }

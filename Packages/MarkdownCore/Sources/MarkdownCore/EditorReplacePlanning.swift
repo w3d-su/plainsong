@@ -18,6 +18,7 @@ public enum EditorReplacePlanRefusal: Equatable, Sendable, Error {
 
 /// One current-match replacement. The session is the only match source.
 public struct EditorReplaceOneMatchPlan: Equatable, Sendable {
+    public let query: TextSearchQuery
     public let match: TextSearchMatch
     public let replacement: String
     public let isLiteralIdentical: Bool
@@ -28,6 +29,7 @@ public struct EditorReplaceOneMatchPlan: Equatable, Sendable {
 
 /// Exact-set Replace All plan over a non-truncated `EditorFindSession`.
 public struct EditorReplaceBatchPlan: Equatable, Sendable {
+    public let query: TextSearchQuery
     public let replacement: String
     public let allRanges: [NSRange]
     public let differingRanges: [NSRange]
@@ -62,12 +64,18 @@ public enum EditorReplacePlanning {
 
     public static func slice(_ source: String, range: NSRange) -> String? {
         let nsSource = source as NSString
-        guard range.location >= 0,
-              NSMaxRange(range) <= nsSource.length
+        guard let end = rangeEnd(range),
+              end <= nsSource.length
         else {
             return nil
         }
         return nsSource.substring(with: range)
+    }
+
+    static func rangeEnd(_ range: NSRange) -> Int? {
+        guard range.location >= 0, range.length >= 0 else { return nil }
+        let (end, overflow) = range.location.addingReportingOverflow(range.length)
+        return overflow ? nil : end
     }
 
     public static func isLiteralIdentical(

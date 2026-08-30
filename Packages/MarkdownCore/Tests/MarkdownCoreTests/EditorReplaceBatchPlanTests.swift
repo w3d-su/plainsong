@@ -103,20 +103,30 @@ final class EditorReplaceBatchPlanTests: XCTestCase {
         )
     }
 
-    func testProgressCheckpointsHonorBothChunkLimits() {
-        let byMatch = EditorReplaceSourceConstruction.progressCheckpoints(
-            rangeCount: 250,
-            replacementUTF16Length: 256
-        )
-        XCTAssertEqual(byMatch, [64, 128, 192, 250])
+    func testCancellationCadenceIsIndependentFromVisibleProgressCoalescing() {
+        XCTAssertFalse(EditorReplaceSourceConstruction.shouldCheckCancellation(
+            plannedMatchesSinceLastCheck: 63,
+            copiedUTF16SinceLastCheck: 65535
+        ))
+        XCTAssertTrue(EditorReplaceSourceConstruction.shouldCheckCancellation(
+            plannedMatchesSinceLastCheck: 64,
+            copiedUTF16SinceLastCheck: 0
+        ))
+        XCTAssertTrue(EditorReplaceSourceConstruction.shouldCheckCancellation(
+            plannedMatchesSinceLastCheck: 0,
+            copiedUTF16SinceLastCheck: 65536
+        ))
 
-        let byUTF16 = EditorReplaceSourceConstruction.progressCheckpoints(
-            rangeCount: 200,
-            replacementUTF16Length: EditorReplaceLimits.progressUTF16Chunk
+        let milestones = EditorReplaceSourceConstruction.progressUpdateMilestones(
+            totalMatchCount: 10000
         )
-        XCTAssertEqual(byUTF16.count, EditorReplaceLimits.maximumProgressUpdates)
-        XCTAssertEqual(byUTF16.first, 1)
-        XCTAssertEqual(byUTF16.last, 200)
-        XCTAssertEqual(byUTF16[98], 99)
+        XCTAssertEqual(milestones.count, EditorReplaceLimits.maximumProgressUpdates)
+        XCTAssertEqual(milestones.first, 100)
+        XCTAssertEqual(milestones.last, 10000)
+        XCTAssertEqual(milestones, milestones.sorted())
+        XCTAssertEqual(
+            EditorReplaceSourceConstruction.progressUpdateMilestones(totalMatchCount: 3),
+            [1, 2, 3]
+        )
     }
 }

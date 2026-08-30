@@ -23,7 +23,6 @@ final class EditorReplaceContinuationRescanTests: XCTestCase {
         XCTAssertEqual(post, "a x")
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(continued.session.total, 0)
@@ -49,7 +48,6 @@ final class EditorReplaceContinuationRescanTests: XCTestCase {
         XCTAssertEqual(post, "cat cat dog cat")
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(continued.session.matches.map(\.range.location), [0, 4, 12])
@@ -78,7 +76,6 @@ final class EditorReplaceContinuationRescanTests: XCTestCase {
         ))
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(continued.session.total, 1)
@@ -106,7 +103,6 @@ final class EditorReplaceContinuationRescanTests: XCTestCase {
         ))
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertEqual(continued.session.matches.map(\.range.location), [0, 1, 5])
@@ -135,7 +131,6 @@ final class EditorReplaceContinuationRescanTests: XCTestCase {
         ))
         let continued = EditorReplaceContinuationPlanning.afterOneReplace(
             plan: plan,
-            query: session.query,
             postWriteSource: post
         )
         XCTAssertTrue(continued.session.isTruncated)

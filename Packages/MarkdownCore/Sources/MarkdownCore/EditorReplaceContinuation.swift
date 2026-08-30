@@ -4,12 +4,11 @@ public enum EditorReplaceContinuationPlanning {
     /// Source-changing single Replace: one full existing-engine rescan, no wrap.
     public static func afterOneReplace(
         plan: EditorReplaceOneMatchPlan,
-        query: TextSearchQuery,
         postWriteSource: String
     ) -> EditorReplaceContinuation {
         let rescanned = EditorFindSession.search(
             in: postWriteSource,
-            query: query,
+            query: plan.query,
             caretAnchorUTF16: plan.resumeUTF16
         )
         return continuation(
@@ -34,7 +33,6 @@ public enum EditorReplaceContinuationPlanning {
     /// Replace All: one rescan, current always nil, caret mapped through the batch.
     public static func afterBatch(
         plan: EditorReplaceBatchPlan,
-        query: TextSearchQuery,
         preWriteCurrentMatch: TextSearchMatch?,
         preWriteCaretUTF16: Int,
         postWriteSource: String
@@ -46,7 +44,7 @@ public enum EditorReplaceContinuationPlanning {
         )
         let rescanned = EditorFindSession.search(
             in: postWriteSource,
-            query: query,
+            query: plan.query,
             caretAnchorUTF16: mapped
         ).withUnresolvedCurrent(caretAnchorUTF16: mapped)
         let length = (postWriteSource as NSString).length
@@ -89,11 +87,14 @@ public enum EditorReplaceContinuationPlanning {
     ) -> Int {
         let replacementLength = (plan.replacement as NSString).length
         if let current = preWriteCurrentMatch {
+            guard let currentEnd = EditorReplacePlanning.rangeEnd(current.range) else {
+                return preWriteCaretUTF16
+            }
             return EditorReplaceSourceConstruction.mapUTF16Offset(
-                NSMaxRange(current.range),
+                currentEnd,
                 through: plan.differingRanges,
                 replacementUTF16Length: replacementLength
-            ) ?? NSMaxRange(current.range)
+            ) ?? currentEnd
         }
         return EditorReplaceSourceConstruction.mapUTF16Offset(
             preWriteCaretUTF16,

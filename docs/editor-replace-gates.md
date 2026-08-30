@@ -6,8 +6,11 @@
 > claimed here. **PR C (`phase3-editor-replace-model`) is the pure MarkdownCore
 > planner:** it closes R1 and the R3 *model* bullets with named tests, adds
 > `EditorFindSession.withUnresolvedCurrent` for post-replace `0 / total`, and
-> introduces no mutation, UI, STTextView type, dependency, or `project.yml`
-> change. R2, R3 publication/writer bullets, and R4–R10 stay open.
+> binds every continuation rescan to the originating session query. Cancellation
+> cadence remains independent from the at-most-100 visible progress milestones,
+> and malformed public UTF-16 ranges fail closed without end overflow. This PR
+> introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
+> R2, R3 publication/writer bullets, and R4–R10 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit. In particular, **R0 is a blocking mechanism spike at
@@ -709,7 +712,8 @@ separate spike PR.
   `testLiteralDollarAndEscapeSequencesAreValid`,
   `testActualNewlinesAreInvalid`,
   `testTwoHundredFiftySixCodeUnitsAreValidAndTwoFiftySevenAreNot`,
-  `testLiteralIdentityUsesUTF16NotCanonicalStringEquality`).
+  `testLiteralIdentityUsesUTF16NotCanonicalStringEquality`,
+  `testMalformedRangesFailClosedWithoutEndOverflow`).
   Model-only: no Replace surface or regex mode exists; `TextSearchQuery` remains
   literal and `a.b` is not a regex.
 
@@ -762,7 +766,8 @@ separate spike PR.
   current `nil` with the mapped post-batch selection as `caretAnchorUTF16`;
   replacement-created hits are never recursively replaced.
 - Evidence: model bullets —
-  `EditorReplaceContinuationTests` (`testSourceChangingOneReplaceRescansAndSkipsInsertedSpan`,
+  `EditorReplaceContinuationTests` (`testPlanBindsTheQueryUsedForPostWriteRescan`,
+  `testSourceChangingOneReplaceRescansAndSkipsInsertedSpan`,
   `testNoLaterMatchLeavesCurrentNilUntilExplicitNext`,
   `testTruncatedSingleReplaceContinuesOnlyInTheRetainedPrefix`,
   `testReplaceAllRescansOnceAndClearsCurrent`);
