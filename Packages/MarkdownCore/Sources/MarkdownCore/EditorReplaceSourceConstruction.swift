@@ -110,7 +110,11 @@ public enum EditorReplaceSourceConstruction {
             )
             if deltaOverflow { return nil }
             if offset < end {
-                let (result, overflow) = range.location.addingReportingOverflow(
+                // `mapped` already includes every preceding edit. Remove the offset's
+                // distance into this match before advancing to the replacement end.
+                let (start, startOverflow) = mapped.subtractingReportingOverflow(offset - range.location)
+                if startOverflow { return nil }
+                let (result, overflow) = start.addingReportingOverflow(
                     replacementUTF16Length
                 )
                 return overflow ? nil : result
