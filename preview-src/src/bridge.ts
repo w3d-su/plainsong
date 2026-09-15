@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 7;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -27,6 +27,7 @@ export interface RenderPayload {
   fileKind: PreviewFileKind;
   text: string;
   baseDir: string | null;
+  assetRootID: string;
   theme: string;
   allowRemoteImages: boolean;
 }
@@ -51,6 +52,7 @@ export interface LinkClickedPayload {
 }
 
 export interface CheckboxToggledPayload {
+  renderID: number;
   line: number;
   checked: boolean;
   version: number;

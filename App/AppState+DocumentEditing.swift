@@ -72,8 +72,8 @@ extension AppState {
         }
     }
 
-    func setTaskCheckbox(line: Int, checked: Bool, version: Int) {
-        guard version == currentDocument.version else { return }
+    func setTaskCheckbox(line: Int, checked: Bool, version: Int, in session: DocumentSession) {
+        guard session === currentDocument, version == session.version else { return }
         guard let lineRange = currentDocument.text.rangeOfOneBasedLine(line) else { return }
 
         let lineText = String(currentDocument.text[lineRange])

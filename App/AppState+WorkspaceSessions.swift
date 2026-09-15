@@ -389,9 +389,23 @@ extension AppState {
     }
 
     func handleSessionEvictions(_ evictions: [WorkspaceSessionEviction]) {
-        for eviction in evictions {
+        var pending = evictions
+        var nextIndex = 0
+        var retainedURLs: Set<URL> = []
+        while nextIndex < pending.count {
+            let eviction = pending[nextIndex]
+            nextIndex += 1
             guard let session = sessionCache[eviction.url] else { continue }
-            finishSessionEviction(eviction, session: session)
+            if finishSessionEviction(eviction, session: session) { continue }
+
+            // A failed or fenced candidate stays protected for this entire pass.
+            // If every candidate fails, retain the over-limit cache until a later pass.
+            retainedURLs.insert(eviction.url)
+            pending.append(contentsOf: sessionPolicy.access(
+                eviction.url,
+                isDirty: session.isDirty,
+                protectedURLs: protectedSessionURLs().union(retainedURLs)
+            ))
         }
     }
 
@@ -485,34 +499,23 @@ private extension AppState {
     func finishSessionEviction(
         _ eviction: WorkspaceSessionEviction,
         session: DocumentSession
-    ) {
+    ) -> Bool {
         let sessionIdentity = ObjectIdentifier(session)
-        if indeterminateSessionWrites[sessionIdentity] != nil ||
+        if protectedSessionURLs().contains(eviction.url) || indeterminateSessionWrites[sessionIdentity] != nil ||
             indeterminateWorkspaceMutationSessions.contains(sessionIdentity) ||
             workspaceMutationWriteFences.contains(sessionIdentity)
         {
-            _ = sessionPolicy.access(
-                eviction.url,
-                isDirty: session.isDirty,
-                protectedURLs: protectedSessionURLs().union([eviction.url])
-            )
-            return
+            return false
         }
-        if eviction.requiresSave {
+        if eviction.requiresSave || session.isDirty {
             do {
                 try save(session: session)
             } catch {
                 present(error, title: "Could Not Save Warm File")
-                var protectedURLs = protectedSessionURLs()
-                protectedURLs.insert(eviction.url)
-                handleSessionEvictions(sessionPolicy.access(
-                    eviction.url,
-                    isDirty: session.isDirty,
-                    protectedURLs: protectedURLs
-                ))
-                return
+                return false
             }
         }
+        guard !session.isDirty else { return false }
         cancelAutosave(for: session)
         anchoredSessionFileBindings[sessionIdentity] = nil
         unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
@@ -524,6 +527,7 @@ private extension AppState {
         if !isRetiredEditorSession(session) {
             removeEditorDocumentBindingRegistration(for: session)
         }
+        return true
     }
 
     func firstNodeResolvingAlias(

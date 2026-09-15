@@ -9,7 +9,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeProtocolVersionAndMessageOrder() {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 5)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 7)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [
@@ -34,7 +34,8 @@ final class PreviewKitTests: XCTestCase {
                 text: "# Title",
                 baseDir: "content",
                 theme: "dark",
-                allowRemoteImages: true
+                allowRemoteImages: true,
+                assetRootID: "root-generation-a"
             )
         )
 
@@ -42,6 +43,15 @@ final class PreviewKitTests: XCTestCase {
         let decoded = try JSONDecoder().decode(BridgeMessage.self, from: data)
 
         XCTAssertEqual(decoded, message)
+    }
+
+    func testCheckboxPayloadRequiresRenderProvenance() throws {
+        let message = BridgeMessage.checkboxToggled(
+            CheckboxToggledPayload(renderID: 17, line: 2, checked: true, version: 0)
+        )
+        XCTAssertEqual(try JSONDecoder().decode(BridgeMessage.self, from: JSONEncoder().encode(message)), message)
+        let legacy = Data(#"{"name":"checkboxToggled","payload":{"line":2,"checked":true,"version":0}}"#.utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(BridgeMessage.self, from: legacy))
     }
 
     func testSetThemePayloadCarriesRemoteImagePolicy() throws {

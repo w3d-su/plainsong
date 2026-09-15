@@ -168,6 +168,8 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
 - File tree operations: create/rename/delete/move file & folder (Finder-style, with
   trash not hard delete). Watch root recursively via `FSEventStream`; debounce 300 ms;
   reconcile tree diff instead of full reload to preserve expansion state.
+  A reload whose final proof is superseded by document/session changes retries with a
+  fresh capture in the same generation; a newer reload, workspace switch, or close cancels it.
 - External change to the open file: if editor is clean → silently reload; if dirty →
   non-modal banner "File changed on disk: Reload / Keep mine".
 - Multiple workspace windows are structurally allowed, one preview per editor pane, but
@@ -175,7 +177,10 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   windows mirror the same workspace/current document until window-scoped state is built.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Multiple open
-  `DocumentSession`s kept warm in an LRU (max 8) so switching files is instant.
+  `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.
+  A failed or fenced eviction candidate is retained and protected for the whole trim
+  pass; each candidate is tried at most once per pass. The cache may exceed 8 while
+  saves cannot complete, preserving unsaved content until a later trim can succeed.
 
 ---
 
@@ -228,7 +233,8 @@ replacement local to EditorKit.
   inserts `![](path)`. Drag-in image files insert relative-path links (copy into
   `assets/` if outside the workspace).
 - **Table helper:** Tab/Shift-Tab navigate cells; Enter adds a row; `Format Table`
-  command (⌥⌘F) realigns pipes. Pure formatting function lives in MarkdownCore.
+  command (⌥⌘F) realigns pipes, preserving edge cells when outer pipes are omitted
+  and treating escaped pipes as cell content. Pure formatting function lives in MarkdownCore.
 - **Checkbox toggle:** ⌘L toggles `- [ ]`/`- [x]` on current line(s).
 
 ### 6.4 Formatting commands & shortcuts
@@ -292,12 +298,15 @@ compute async, cancel stale requests.
   behavior.
 - **Local assets:** custom scheme `asset://` via `WKURLSchemeHandler`. JS rewrites
   relative image/link `src` to `asset://<workspace-relative-path>`; the handler resolves
-  against the current file's directory / workspace root, enforces path containment
+  against the current file's directory / workspace root. Render payloads carry an opaque
+  `assetRootID`; local image URLs include it as a query token so a root change invalidates
+  retained image loads, and delayed requests with an obsolete token are rejected. The handler enforces path containment
   (reject `..` and symlink escapes outside the workspace), and serves only PNG, JPEG,
   GIF, or WebP assets up to 10 MiB. SVG and other active/ambiguous formats are rejected
   until a separate sanitization policy exists.
 - Link clicks: intercepted in Swift. `http(s)` → `NSWorkspace.open` (external browser).
-  Relative `.md`/`.mdx` → open that file in the editor. `#anchor` → scroll preview.
+  Relative `.md`/`.mdx` → open that file in the editor. `#anchor` stays in JavaScript
+  and scrolls the preview to a generated heading ID (Unicode and duplicate headings supported).
 
 ### 7.2 JS pipeline (preview-src)
 
@@ -346,12 +355,12 @@ must be kept in sync; both list message names in the same order with a
 | Direction | Message | Payload |
 |---|---|---|
 | JS→Swift | `ready` | `{protocolVersion}` |
-| Swift→JS | `render` | `{renderID, version, fileKind, text, baseDir, theme}`; `renderID` is a controller-assigned globally-monotonic stale-drop key (ordered across document switches); `version` is the per-document `DocumentSession.version` used only for `checkboxToggled` round-tripping; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
+| Swift→JS | `render` | `{renderID, version, fileKind, text, baseDir, assetRootID, theme, allowRemoteImages}`; `renderID` is a controller-assigned globally-monotonic stale-drop key (ordered across document switches); `version` is the per-document `DocumentSession.version` used only for `checkboxToggled` round-tripping; `baseDir` is the workspace-root-relative parent directory for the rendered file, or `null` for single-file/root renders |
 | JS→Swift | `renderComplete` | `{renderID, version, blockCount}` |
 | Swift→JS | `scrollToLine` | `{line, animated}` |
 | JS→Swift | `previewScrolled` | `{topVisibleLine}` (only while preview owns scroll) |
 | JS→Swift | `linkClicked` | `{href}` |
-| JS→Swift | `checkboxToggled` | `{line, checked, version}` → Swift edits source text only when `version` matches the current document |
+| JS→Swift | `checkboxToggled` | `{renderID, line, checked, version}` → Swift requires the latest submitted render ID and version, its retained originating `DocumentSession` instance, and the current document/version to match (protocol v7). Retained error DOM keeps its original render ID. |
 | Swift→JS | `setTheme` | `{theme}` |
 
 ### 7.4 Build
@@ -395,7 +404,8 @@ the user's project dependencies — out of scope. Defined behavior:
     (stringified, truncated), body = rendered markdown children if any. Lowercase HTML
     elements (`<div>`, `<img>`) render as real HTML through the sanitizer, but inline
     `style`, event-handler attributes, scripts, `srcdoc`, and user-authored SVG are
-    stripped or dropped.
+    stripped or dropped. Sanitization precedes trusted KaTeX generation so generated
+    math layout styles survive without allowing user-authored styles.
   - `{expression}` inline → rendered as code chip with the raw expression.
 - Parse errors (MDX is stricter than MD): show inline error banner in preview with line
   number; editor keeps last good render below the banner. Never blank the preview while
@@ -417,6 +427,8 @@ attempt without a Decision Log entry.
   the text is the single source of truth).
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
   cannot parse.
+- String and string-list form writes use explicitly quoted YAML scalars with serializer-owned
+  escaping, preserving literal contents and string types through parse/writeback.
 
 ---
 
@@ -810,6 +822,12 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-08-10 | F2 session readiness is published only after the supervisor becomes cancellation-safe | The maintained `session_status.py` installs an absorbing session-leader HUP/INT/TERM handler before creating `session-ready`, treats a pre-go cancellation/`session-drain` as a reap-only release without forking, restores `SIG_DFL` in the child before executing the real runner, and forwards any cancellation caught across the fork boundary. Therefore cleanup immediately after readiness can transition `signalable` → `reap-only` → `cleared`, reap the owned supervisor, and release the control directory instead of losing the supervisor to TERM, racing a post-cancel fork, or hanging while it waits for a `go` that will never arrive. Real-process pre-go and post-go regressions exercise the maintained Python supervisor through the shell ownership lifecycle; the post-go case also proves TERM reaches the runner and is published as status 143. Historical format-2 bytes and all six open boundaries remain unchanged. Alt: publishing readiness under the inherited default handlers, merely moving `SIG_IGN` earlier without recognizing drain, or allowing the child to exec with an inherited non-default handler were rejected because they strand ownership during cancellation or make the runner TERM-resistant. |
 | 2026-08-11 | PR #108 forced preview navigation is render- and document-provenanced | Review found that JavaScript delivery alone could succeed before the requested block existed: `scrollToLine` ran immediately while the bridge or latest render was still pending, and the JavaScript side intentionally no-opped when no matching `data-line` existed. Explicit editor navigation now carries its `EditorDocumentIdentity` through the typed scroll intent and App receipt. `PreviewController` binds the latest request to the matching App-supplied document identifier, waits for bridge readiness plus that document's latest `renderComplete`, advances the barrier across newer same-document renders, coalesces to the newest navigation, and fails a pending request when another document supersedes it, even before the first matching render binds the barrier. This prevents both the open-file/immediate-find loss and stale cross-document replay, including detached documents whose render has no file URL. Real-WebView regressions issue navigation before readiness/render completion and require the target to become visible, then prove a pending request fails and leaves the replacement document at the top; a pre-render negative covers the unbound document-switch window. The existing hosted production path remains responsible for editor selection, App routing, and visible source+preview movement; the new controller negatives close the timing/provenance hole in that evidence. Alt: retrying blindly in JavaScript, keying only by per-document version, treating evaluation completion as DOM success, or replaying an unproven request after document switch were rejected because they permit false-green delivery or cross-document movement. |
 | 2026-08-13 | Preview npm bump supersedes Dependabot #110; lockfile and committed bundle stay in lockstep | Same §7.4 / #63 / #102→#104 pattern. #110 changes only `preview-src/package-lock.json`: **dompurify 3.4.12 → 3.4.13** (runtime, via `mermaid`; GHSA-55q2-fjhq-7xh7, IN_PLACE hook-removal XSS), plus grouped **postcss 8.5.25 → 8.5.26** and **nanoid 3.3.16 → 3.3.18** (both `dev: true`, via vitest/vite; not in the shipped bundle). `package.json` is unchanged. A rebuild from `main`'s lockfile reproduces committed `bundle.js` byte-for-byte (`879ab486…`); this lockfile rebuilds to `11c825f6…` with the license comment `DOMPurify 3.4.13` and a 550-line identifier-reallocation diff. Mermaid sanitizes SVG strings and never passes `IN_PLACE: true`, so the two IN_PLACE CVEs in 3.4.13 are outside the current call path; the hook clone-guard is the remaining reason to take the bump. Token counts for `dominant-baseline` (51) and `text-orientation` (2) are unchanged; 3.4.13 does not advertise SVG allowlist additions. `test/mermaid-dom.test.ts` still stubs `mermaid.render`, so the green 41-test suite is not evidence that Mermaid output changed. No pipeline snapshot moved. Bridge protocol stays v5. Alt: merging #110 as-is was rejected because it desyncs the committed runtime; broader `npm audit fix` / mermaid upgrades were rejected to keep the change byte-identical to #110. |
+
+| 2026-09-05 | Bound failed warm-session eviction and bind checkbox writeback to its DOM and session | A trim pass iterates candidates and protects every failed/fenced session until the pass ends, retaining over-limit dirty content and allowing a later trim to retry. Preview checkbox events gain the displayed DOM's render ID (shipped as protocol v7 together with the 2026-09-06 asset-root identity, because protocol v6 is reserved for Export PR C's `exportHTML` messages); PreviewKit associates the latest request with a weak originating session, and App requires that exact current session plus version. DOM provenance advances synchronously with patching and remains old on MDX parse failure. Table parsing supplies virtual outer boundaries and ignores escaped delimiter pipes so formatting and navigation preserve edge columns. Alt: recursive per-candidate retries, version-only or URL-only checkbox authority, advancing provenance on failed renders, and assuming both outer pipes were rejected because they allow hangs, cross-document writes, or lost source cells. |
+
+| 2026-09-06 | Review fixes preserve form values, reload liveness, raw selections, and preview context | Frontmatter serializes explicitly quoted string scalars through Yams. (The Replace planner's interior offset-mapping fix from the same review lives on the #114 planner branch, not in this batch.) A document-state race retries a workspace capture in its still-current generation while supersession remains cancellation. Ignore rules match ancestor directories even without trailing slashes. Experimental WYSIWYG retains selection anchor/active-end until another native selection replaces it, collapses nonempty ranges before ordinary arrow movement, and applies native word/paragraph selection after projected hit mapping. The main-queue text notification synchronously invalidates the scroll-line cache before same-turn navigation. The same protocol v7 bump carries an opaque asset-root identity used to invalidate image URLs and reject obsolete resource requests. MDX sanitizes user content before trusted math generation, and generated namespaced heading IDs plus local hash handling restore page navigation. Alt: manual scalar quoting, swallowing same-generation state races, unsigned range deltas, directionless selections, deferred cache invalidation, unchanged root-relative asset URLs, globally allowing user style, and forwarding hashes to file opening were rejected because they reproduce the reviewed failures. No Replace UI or Experimental promotion gate is closed. |
+
+| 2026-09-07 | WYSIWYG custom and native selection share affinity | Character extension and Shift-click derive anchor/active-end from the current native `NSTextSelection.affinity`; nonempty custom selections publish range and affinity together. This preserves direction through word, vertical, paragraph, and mouse handoffs without an object-identity cache. Source-mode comparisons and synthetic pointer regressions cover shrinking, reversals, and double/triple clicks. Alt: guessing from the next arrow or publishing only an `NSRange` loses the active edge. Physical-input and Experimental promotion gates remain unchanged. |
 
 ---
 

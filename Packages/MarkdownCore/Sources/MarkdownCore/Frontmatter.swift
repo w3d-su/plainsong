@@ -142,7 +142,9 @@ public enum Frontmatter {
         switch scanFences(in: text) {
         case let .closed(bounds):
             guard parseClosedBlock(bounds).error == nil else { return nil }
-            let updatedYAML = replacing(rawYAML: bounds.rawYAML, key: key, value: value, lineEnding: bounds.lineEnding)
+            guard let updatedYAML = try? replacing(
+                rawYAML: bounds.rawYAML, key: key, value: value, lineEnding: bounds.lineEnding
+            ) else { return nil }
             return "---" + bounds.lineEnding + updatedYAML + "---" + bounds.afterClosingDelimiter
         case .absent, .missingClosing:
             return nil
@@ -344,13 +346,13 @@ private extension Frontmatter {
         key: String,
         value: FrontmatterValue,
         lineEnding: String
-    ) -> String {
+    ) throws -> String {
         var lines = linesWithoutTerminators(rawYAML)
         if hasLineTerminatorSuffix(rawYAML), lines.last == "" {
             lines.removeLast()
         }
 
-        let replacementLines = formattedLines(key: key, value: value)
+        let replacementLines = try formattedLines(key: key, value: value)
         if let startIndex = lines.firstIndex(where: { topLevelKey(in: $0) == key }) {
             let endIndex = valueSpanEndIndex(startingAt: startIndex, in: lines)
             lines.replaceSubrange(startIndex ..< endIndex, with: replacementLines)
@@ -362,43 +364,31 @@ private extension Frontmatter {
         return lines.joined(separator: lineEnding) + lineEnding
     }
 
-    static func formattedLines(key: String, value: FrontmatterValue) -> [String] {
+    static func formattedLines(key: String, value: FrontmatterValue) throws -> [String] {
         switch value {
         case let .bool(value):
             return ["\(key): \(value ? "true" : "false")"]
         case let .date(value):
             return ["\(key): \(value)"]
         case let .string(value):
-            return ["\(key): \(formattedScalar(value))"]
+            return try ["\(key): \(formattedScalar(value))"]
         case let .raw(value):
             return ["\(key): \(value)"]
         case let .stringList(values):
             if values.isEmpty {
                 return ["\(key): []"]
             }
-            return ["\(key):"] + values.map { "  - \(formattedScalar($0))" }
+            return try ["\(key):"] + values.map { try "  - \(formattedScalar($0))" }
         }
     }
 
-    static func formattedScalar(_ value: String) -> String {
-        if value.isEmpty {
-            return #""""#
-        }
-
-        let lowercased = value.lowercased()
-        let needsQuoting = value != value.trimmingCharacters(in: .whitespaces) ||
-            value.contains(":") ||
-            value.contains("#") ||
-            value.contains("[") ||
-            value.contains("]") ||
-            value.contains("{") ||
-            value.contains("}") ||
-            value.contains("\n") ||
-            ["true", "false", "null", "~"].contains(lowercased)
-
-        guard needsQuoting else { return value }
-        return "\"" + value.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    static func formattedScalar(_ value: String) throws -> String {
+        // Quote strings explicitly so YAML implicit typing cannot turn form input into
+        // booleans/numbers. LibYAML owns escaping, including newlines and control scalars.
+        // Disable line wrapping to keep each localized field/list item on one source line.
+        let node = Node.scalar(Node.Scalar(value, Tag(.str), .doubleQuoted))
+        let yaml = try Yams.serialize(node: node, width: -1)
+        return yaml.hasSuffix("\n") ? String(yaml.dropLast()) : yaml
     }
 
     static func scalarStrings(from values: [Any]) -> [String]? {

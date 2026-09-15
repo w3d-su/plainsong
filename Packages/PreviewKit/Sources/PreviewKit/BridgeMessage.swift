@@ -2,7 +2,7 @@ import Foundation
 import MarkdownCore
 
 public enum PreviewBridge {
-    public static let protocolVersion = 5
+    public static let protocolVersion = 7
 }
 
 public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {
@@ -49,6 +49,7 @@ public struct RenderPayload: Codable, Equatable, Sendable {
     public let fileKind: PreviewFileKind
     public let text: String
     public let baseDir: String?
+    public let assetRootID: String
     public let theme: String
     public let allowRemoteImages: Bool
 
@@ -59,13 +60,15 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         text: String,
         baseDir: String?,
         theme: String,
-        allowRemoteImages: Bool
+        allowRemoteImages: Bool,
+        assetRootID: String = ""
     ) {
         self.renderID = renderID
         self.version = version
         self.fileKind = fileKind
         self.text = text
         self.baseDir = baseDir
+        self.assetRootID = assetRootID
         self.theme = theme
         self.allowRemoteImages = allowRemoteImages
     }
@@ -75,7 +78,8 @@ public struct RenderPayload: Codable, Equatable, Sendable {
         renderID: Int,
         theme: String,
         allowRemoteImages: Bool,
-        baseDir: String? = nil
+        baseDir: String? = nil,
+        assetRootID: String = ""
     ) {
         self.init(
             renderID: renderID,
@@ -84,7 +88,8 @@ public struct RenderPayload: Codable, Equatable, Sendable {
             text: change.text,
             baseDir: baseDir,
             theme: theme,
-            allowRemoteImages: allowRemoteImages
+            allowRemoteImages: allowRemoteImages,
+            assetRootID: assetRootID
         )
     }
 }
@@ -128,11 +133,13 @@ public struct LinkClickedPayload: Codable, Equatable, Sendable {
 }
 
 public struct CheckboxToggledPayload: Codable, Equatable, Sendable {
+    public let renderID: Int
     public let line: Int
     public let checked: Bool
     public let version: Int
 
-    public init(line: Int, checked: Bool, version: Int) {
+    public init(renderID: Int, line: Int, checked: Bool, version: Int) {
+        self.renderID = renderID
         self.line = line
         self.checked = checked
         self.version = version
