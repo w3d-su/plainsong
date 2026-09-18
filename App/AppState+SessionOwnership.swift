@@ -86,6 +86,24 @@ struct ObservedRetainedFileVersion: Equatable {
 
 @MainActor
 extension AppState {
+    /// An abandoned untitled session has no URL-keyed retirement cleanup. Remove its
+    /// unavailable proof before its ObjectIdentifier can be reused by a newly loaded file.
+    /// A live editor binding must keep the original fail-closed state until it releases it.
+    func releaseUnreferencedUntitledSessionOwnership(for session: DocumentSession) {
+        let sessionIdentity = ObjectIdentifier(session)
+        guard currentDocument !== session, session.fileURL == nil,
+              case .unavailable(fileURL: nil)? = unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+              !sessionCache.values.contains(where: { $0 === session }),
+              !isRetiredEditorSession(session),
+              !editorDocumentBindingSessions.values.contains(where: { $0 === session }),
+              !editorBindingInstallations.values.contains(where: { $0 === session }),
+              indeterminateSessionWriteContexts[sessionIdentity] == nil,
+              !indeterminateWorkspaceMutationSessions.contains(sessionIdentity),
+              !workspaceMutationWriteFences.contains(sessionIdentity)
+        else { return }
+        unanchoredManagedSessionOwnershipProofs[sessionIdentity] = nil
+    }
+
     /// Captures physical ownership once, when an unanchored session first becomes App-managed.
     /// Later Save Copy arbitration consumes only this retained proof and never re-inspects the
     /// session's mutable display URL.

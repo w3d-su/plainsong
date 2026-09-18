@@ -82,17 +82,26 @@ final class MarkdownSTTextView: STTextView {
         focusForMouseInteractionIfNeeded()
 
         guard wysiwygZeroWidthContentStorageDelegate != nil,
+              !hasMarkedText(),
               let caret = wysiwygZeroWidthCharacterIndex(at: convert(event.locationInWindow, from: nil))
         else {
             super.mouseDown(with: event)
             return
         }
 
-        if event.modifierFlags.contains(.shift) {
+        if event.clickCount >= 2 {
+            textSelection = NSRange(location: caret, length: 0)
+            // Keep native word/paragraph semantics after mapping the projected hit to raw text.
+            if event.clickCount == 2 {
+                super.selectWord(self)
+            } else {
+                super.selectParagraph(self)
+            }
+        } else if event.modifierFlags.contains(.shift) {
             // Pointer-extend (drag/shift-click) keeps raw offsets so the selection can
             // span folded delimiters and copy exact raw Markdown.
-            let anchor = selectedRange().location
-            textSelection = NSRange(location: min(anchor, caret), length: abs(caret - anchor))
+            let anchor = currentWYSIWYGSelectionExtension()?.anchor ?? selectedRange().location
+            setWYSIWYGSelection(anchor: anchor, activeEnd: caret)
         } else {
             // A plain click resolving to a hidden-delimiter offset snaps to the adjacent
             // visible boundary in the same pass as the reveal (no one-frame jump).
@@ -368,44 +377,6 @@ final class MarkdownSTTextView: STTextView {
 
         return nearest?.offset
     }
-
-    private func applyWYSIWYGComposedCharacterMovement(delta: Int, extending: Bool) -> Bool {
-        guard wysiwygZeroWidthContentStorageDelegate != nil,
-              !hasMarkedText(),
-              let textStorage = (textContentManager as? NSTextContentStorage)?.textStorage
-        else {
-            return false
-        }
-
-        let text = textStorage.string as NSString
-        let textLength = text.length
-        let selection = selectedRange().clamped(toLength: textLength)
-
-        if extending {
-            if delta < 0 {
-                let location = text.composedCharacterBoundary(before: selection.location)
-                textSelection = NSRange(location: location, length: NSMaxRange(selection) - location)
-            } else {
-                let end = text.composedCharacterBoundary(after: NSMaxRange(selection))
-                textSelection = NSRange(location: selection.location, length: end - selection.location)
-            }
-        } else {
-            let base = delta < 0 ? selection.location : NSMaxRange(selection)
-            let movedLocation = delta < 0
-                ? text.composedCharacterBoundary(before: base)
-                : text.composedCharacterBoundary(after: base)
-            // Edge-snapping: a collapsed caret never rests inside a folded (zero-width)
-            // delimiter. Selections (the `extending` branch above) are left raw so copy
-            // stays exact Markdown.
-            let snappedLocation = wysiwygSnappedCaretOffset(
-                movedLocation,
-                preferring: delta < 0 ? .backward : .forward
-            )
-            textSelection = NSRange(location: snappedLocation, length: 0)
-        }
-
-        return true
-    }
 }
 
 /// Caret edge-snapping for the non-user-facing WYSIWYG development hook.
@@ -554,26 +525,6 @@ extension MarkdownSTTextView {
     }
 
     private static let pngPasteboardType = NSPasteboard.PasteboardType("public.png")
-}
-
-private extension NSString {
-    func composedCharacterBoundary(before offset: Int) -> Int {
-        let clampedOffset = min(max(offset, 0), length)
-        guard clampedOffset > 0 else {
-            return 0
-        }
-
-        return rangeOfComposedCharacterSequence(at: clampedOffset - 1).location
-    }
-
-    func composedCharacterBoundary(after offset: Int) -> Int {
-        let clampedOffset = min(max(offset, 0), length)
-        guard clampedOffset < length else {
-            return length
-        }
-
-        return NSMaxRange(rangeOfComposedCharacterSequence(at: clampedOffset))
-    }
 }
 
 private extension String {

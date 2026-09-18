@@ -4,13 +4,14 @@ export function rewriteImageSources(
   root: ParentNode,
   baseDir: string | null,
   allowRemoteImages: boolean,
+  assetRootID = "",
 ): void {
   for (const image of root.querySelectorAll<HTMLImageElement>("img")) {
     const source = image.dataset.plainsongOriginalSrc ?? image.getAttribute("src");
     if (!source) continue;
 
     image.dataset.plainsongOriginalSrc = source;
-    const policy = imageSourcePolicy(source, baseDir, allowRemoteImages);
+    const policy = imageSourcePolicy(source, baseDir, allowRemoteImages, assetRootID);
     switch (policy.action) {
       case "keep":
         image.src = source;

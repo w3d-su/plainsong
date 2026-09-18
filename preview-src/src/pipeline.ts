@@ -8,6 +8,7 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
+import { rehypeHeadingAnchors } from "./heading-anchors";
 import {
   mdxSanitizeSchema,
   remarkMdxPlaceholders,
@@ -81,6 +82,7 @@ const markdownProcessor = unified()
   .use(stripFrontmatter)
   .use(remarkMath)
   .use(remarkRehype)
+  .use(rehypeHeadingAnchors)
   .use(rehypeKatex)
   .use(rehypeSourceLines)
   .use(rehypeStringify);
@@ -95,10 +97,12 @@ const mdxProcessor = unified()
   .use(remarkMdxPlaceholders)
   .use(remarkRehype)
   .use(rehypeDropSourceSvgElements)
-  .use(rehypeKatex)
-  .use(rehypeSourceLines)
   .use(rehypeDropScriptLikeElements)
   .use(rehypeSanitize, mdxSanitizeSchema)
+  .use(rehypeHeadingAnchors)
+  // Sanitize user content before trusted KaTeX adds layout styles and generated SVG.
+  .use(rehypeKatex)
+  .use(rehypeSourceLines)
   .use(rehypeStringify);
 
 function stripFrontmatter() {
