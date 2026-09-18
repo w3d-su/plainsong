@@ -18,6 +18,17 @@ public struct WorkspaceSearchService: Sendable {
         failureInjector = WorkspaceSearchPipelineFailureInjector(failurePoint: failurePoint)
     }
 
+    init(
+        reader: any WorkspaceSearchFileReading,
+        checkpointHandler: @escaping @Sendable (WorkspaceSearchPipelineFailurePoint) -> Void
+    ) {
+        self.reader = reader
+        failureInjector = WorkspaceSearchPipelineFailureInjector(
+            failurePoint: nil,
+            checkpointHandler: checkpointHandler
+        )
+    }
+
     /// Starts a search producer. Early termination requires explicitly cancelling the Task
     /// consuming this stream; breaking or abandoning iteration alone is not a cancellation
     /// contract. Cancelling that Task stops all in-flight reads and suppresses terminal events.
