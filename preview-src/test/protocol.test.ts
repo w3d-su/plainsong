@@ -16,6 +16,8 @@ describe("bridge protocol", () => {
       "linkClicked",
       "checkboxToggled",
       "setTheme",
+      "exportHTML",
+      "exportHTMLResult",
     ]);
   });
 });

@@ -17,6 +17,11 @@ import {
   PROTOCOL_VERSION,
   postBridgeMessage,
 } from "./bridge";
+import {
+  collectPreviewStyleText,
+  handleExportHTML,
+  resetExportHTMLSession,
+} from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
 import { scrollPreviewAnchor } from "./heading-anchors";
 import {
@@ -28,6 +33,9 @@ import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
 export { PROTOCOL_VERSION } from "./bridge";
+
+// Injected from the exact bundle.css inputs by build.mjs.
+declare const __PLAINSONG_BUNDLED_CSS__: string;
 
 type ScrollOwner = "editor" | "preview" | "none";
 
@@ -136,17 +144,35 @@ async function receive(message: BridgeMessage): Promise<void> {
       }
       break;
     }
+    case "exportHTML":
+      await handleExportHTML(message.payload, {
+        previewRoot,
+        latestRenderID,
+        documentTheme: document.documentElement.dataset.theme ?? "system",
+        collectStyleText: () => collectPreviewStyleText(document, __PLAINSONG_BUNDLED_CSS__),
+        waitForFonts: async () => {
+          if (document.fonts?.ready) {
+            await document.fonts.ready;
+          }
+        },
+        postResult: (payload) => {
+          postBridgeMessage({ name: "exportHTMLResult", payload });
+        },
+      });
+      break;
     case "ready":
     case "renderComplete":
     case "previewScrolled":
     case "linkClicked":
     case "checkboxToggled":
+    case "exportHTMLResult":
       break;
   }
 }
 
 async function render(payload: Extract<BridgeMessage, { name: "render" }>["payload"]) {
   if (payload.renderID < latestRenderID) return;
+  resetExportHTMLSession();
   latestRenderID = payload.renderID;
   applyPreviewSettings(payload.theme, payload.allowRemoteImages);
 

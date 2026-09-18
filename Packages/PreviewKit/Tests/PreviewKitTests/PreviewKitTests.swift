@@ -21,6 +21,8 @@ final class PreviewKitTests: XCTestCase {
                 "linkClicked",
                 "checkboxToggled",
                 "setTheme",
+                "exportHTML",
+                "exportHTMLResult",
             ]
         )
     }

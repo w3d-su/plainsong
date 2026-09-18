@@ -273,6 +273,8 @@ final class ExportPDFMechanismSpikeTests: XCTestCase {
                 "linkClicked",
                 "checkboxToggled",
                 "setTheme",
+                "exportHTML",
+                "exportHTMLResult",
             ]
         )
 

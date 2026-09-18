@@ -14,6 +14,8 @@ public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {
     case linkClicked
     case checkboxToggled
     case setTheme
+    case exportHTML
+    case exportHTMLResult
 }
 
 public enum PreviewFileKind: String, Codable, Sendable {
@@ -165,6 +167,9 @@ public enum BridgeMessage: Equatable, Sendable {
     case linkClicked(LinkClickedPayload)
     case checkboxToggled(CheckboxToggledPayload)
     case setTheme(SetThemePayload)
+    /// v6 discovery/finalization includes an optional parsed frontmatter documentTitle.
+    case exportHTML(ExportHTMLPayload)
+    case exportHTMLResult(ExportHTMLResultPayload)
 
     public var name: BridgeMessageName {
         switch self {
@@ -184,6 +189,10 @@ public enum BridgeMessage: Equatable, Sendable {
             .checkboxToggled
         case .setTheme:
             .setTheme
+        case .exportHTML:
+            .exportHTML
+        case .exportHTMLResult:
+            .exportHTMLResult
         }
     }
 }
@@ -215,6 +224,10 @@ extension BridgeMessage: Codable {
             self = try .checkboxToggled(container.decode(CheckboxToggledPayload.self, forKey: .payload))
         case .setTheme:
             self = try .setTheme(container.decode(SetThemePayload.self, forKey: .payload))
+        case .exportHTML:
+            self = try .exportHTML(container.decode(ExportHTMLPayload.self, forKey: .payload))
+        case .exportHTMLResult:
+            self = try .exportHTMLResult(container.decode(ExportHTMLResultPayload.self, forKey: .payload))
         }
     }
 
@@ -238,6 +251,10 @@ extension BridgeMessage: Codable {
         case let .checkboxToggled(payload):
             try container.encode(payload, forKey: .payload)
         case let .setTheme(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .exportHTML(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .exportHTMLResult(payload):
             try container.encode(payload, forKey: .payload)
         }
     }
