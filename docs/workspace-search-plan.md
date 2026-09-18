@@ -22,8 +22,11 @@
 > confirmed that the WS4 regression suites named in the CI matrix are present across
 > MarkdownCore, WorkspaceKit, AppState, EditorKit, XCUITest, and PerformanceTests. The fresh
 > package slice is green, but that does not replace the current-tip App/UI/performance/full-suite
-> gates below. The overall Definition of Done remains open, so Workspace Search as a whole stays
-> **IN PROGRESS**.**
+> gates below. A 2026-09-18 DoD pass added named tests for click→cross-file native selection/scroll
+> and production reader/matcher off-main; `make test` still cannot finish while
+> `PlainsongUITests-Runner` fails to initialize, and physical ⇧⌘F still needs maintainer
+> confirmation as residual owner evidence. The overall Definition of Done remains open, so
+> Workspace Search as a whole stays **IN PROGRESS**.**
 > This plan defines an in-process, ripgrep-style workspace search for Markdown authors,
 > with the search model concentrated in MarkdownCore and WorkspaceKit and with a
 > CI-verifiable sidebar workflow.
@@ -978,17 +981,20 @@ either win or fail closed without replay. Bare non-empty UI text that never ran 
   probes carry `.sensitive` controls that must find nothing.
 - [ ] Update `agent.md`, `docs/acceptance-matrix.md`, and `docs/risk-register.md` only
   after their corresponding gates have evidence.
-  The 2026-08-08 audit synchronized the acceptance matrix and risk register. `agent.md` remains
-  intentionally pending until the remaining direct gates and serialized full-suite evidence land.
+  This PR records the click→selection/scroll and off-main reader/matcher gates in the Decision
+  Log, matrix, and risk register. The box stays open because `make test` still cannot complete
+  while `PlainsongUITests-Runner` fails to initialize (`Authentication canceled` / system
+  authentication), and physical ⇧⌘F still needs maintainer confirmation as residual owner
+  evidence.
 
 ## 6. CI Validation Matrix
 
 | Target | Hard CI coverage |
 |---|---|
 | MarkdownCoreTests | Empty/newline queries; literal metacharacters; all case modes; whole word; multiple matches; LF/CRLF; CJK/emoji/combining marks; snippet clipping; UTF-16 ranges; limits; deterministic order; authorized-editor exact no-op and persisted-baseline dirty restoration; saved-baseline rebasing; half-open exact-source reconciliation across surrogate pairs and combining sequences; ambiguous repeated-source alignment rejection |
-| WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts |
+| WorkspaceKitTests | Candidate filtering; alias/outside-root rejection; byte-distinct NFC/NFD candidates, overlays, ignore rules, tree IDs, completion ordering, and longest root spelling; retained-root no-follow component I/O; immutable result authorities; descriptor identity and exact-digest writes; post-swap rollback/cleanup proofs; invalid UTF-8, unreadable, deletion, same-size/restored-mtime, cancellation, cap, sorting, and terminal-count contracts; production disk `readChunk` and `TextSearchEngine.matches` observed off the main actor |
 | EditorKitTests | Same-file/cross-file navigation including IME; monotonic cancellation and transition lifetime; contract-free retry; exact installation/writer/base provenance and literal publication equality; shared preflight for command, completion, smart-paste, and image mutations; async image authority before side effects and across placement validation with no untracked rejected-window artifact; post-validation exact context/source fencing and recovery-preserving discard; literal NFC/NFD image-context supersession and commit fencing; selection-only writer bypass; pending composition and half-open stale publication; revision-only synchronization/reacquisition before native mutation; newest-candidate supersession; dismantle cleanup; exact selection/reveal/scroll/focus; stale request rejection; WYSIWYG reveal without mutation |
-| PlainsongTests | Debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; edited-document-only pending-navigation cancellation; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after a distinct newest snapshot and its freshly captured root authority/generation install, with the latest overlay edited while scan is pending; failed/stale/cancelled reload plus direct late-token/context event rejection; real UI replacement/options and empty-query plus genuinely pending close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
+| PlainsongTests | Hosted click of a result in another file applies the exact native UTF-16 selection and scrolls it into view; debounce/latest-query wins; active-query current/warm dirty-overlay refresh after debounce; edited-document-only pending-navigation cancellation; undo-to-baseline overlay removal; FSEvent/namespace reload intent consumed only after a distinct newest snapshot and its freshly captured root authority/generation install, with the latest overlay edited while scan is pending; failed/stale/cancelled reload plus direct late-token/context event rejection; real UI replacement/options and empty-query plus genuinely pending close/switch/teardown/root-mismatch precedence; mode/options/focus preservation; authority-bound workspace close/switch/reload; transactional result activation with identity/fingerprint/range/hard-link failures preserving prior state; cached/retired physical-ownership collision detachment before stale-inspection eviction; detached observation cancellation propagation; dirty-overlay and clean pending-native activation arbitration before proof adoption; accepted-or-conflicted coherent search observations surviving fingerprint/range rejection and superseding older external work; body-safe exact document-authority caching and fail-closed existing-session cache misses; controlled read-to-adoption parent replacement with the original inode hard-linked into the replacement namespace; retained-parent-lineage rejection after leaf replacement; durable atomic-save and pre-writer Save Copy authority binding through retained destination parents, including committed-but-unadoptable reconciliation with durable cleanup notice retention and visible artifact paths; precommit document, created-asset, and existing-reference component/content validation across move/replacement/hard-link races; workspace-reference authority capture before reads; descriptor-bound discard that durably acquires and fail-closed retains a cleanup racer without a mutable-source restore, reports the separately retained created inode, never attributes a later symlink occupant's path to the acquired racer, distinguishes proven absence from namespace/link inspection failure, refreshes after every successful recovery rename, and never check-then-unlinks a replacement; dirty overlay and completion A/B isolation; exact-path and typed-write recovery/quarantine; session-scoped conflicts; fresh-C Reload/Keep Mine baseline adoption; multi-window installation retirement/reactivation; watcher X-to-Y supersession; native-input and partial-convergence fences; Save Copy during resolution; lifecycle restart; 1 MiB off-main preparation; pending-source and stale-IME arbitration; no-follow substitution races; clean quarantine retention; registration-before-revoke cleanup; stale fingerprint refresh |
 | PlainsongUITests | `Command-Shift-F` focuses search; CJK query displays grouped result; activating it opens the correct file and exposes the expected selected range through accessibility; keyboard: field ↓ selects first result, ↑/↓ move without wrap, Return activates, Escape results→field and field→editor without clearing query/results; click a result then ↑/↓ still routes through search selection (not only native table) |
 | PerformanceTests | 2,000-file workspace; 512 KiB admitted file; hosted public `MarkdownEditorView` plus real AppState/source-contract/coordinator/native-view ordinary, re-entrant pair, and multiple marked-text 1 MiB updates with zero App/native activation full-source comparisons; authorized-session exact no-op, same-length edit, and persisted-baseline literal checks; a local hard `<16 ms` gate for both groups; rapid cancellation; result/read byte caps; memory boundedness. WS4B satisfies the workspace-search half of this row through `WorkspaceSearchPerformanceTests`, where memory boundedness means hard structural limits (four-read window, finite event bound, per-file/per-query match caps, bounded snippets, exact admitted bytes) rather than a resident-memory threshold |
 
@@ -1010,25 +1016,36 @@ below is checked only when one same-repository production path plus a directly r
 test support it without composing two partial workflows.
 
 - [ ] `make lint`, `make test`, and `make build` pass.
-  On 2026-08-08, fresh `make lint` and `make build` passed. The package slice above is green.
-  The first `make test` recorded 600 passed plus 1 skipped Xcode tests, including 23/23
-  performance tests, but exited 65 because `PlainsongUITests-Runner` failed to initialize while
-  system authentication was active (`Authentication canceled`). A serialized retry recorded
-  599 passed plus 1 skipped; the UI runner hit the same initialization error, and
-  `testVisibleRangeHighlightUpdateAfterEditStaysUnderBudgetForLargeMarkdownAndMDX` failed its
-  Markdown measurement at 51.506 ms versus the 50 ms budget. Workspace Search performance was
-  14/14 green in both attempts. Rerun the exact-tip full command without either failure before
-  checking this gate.
+  Exact-tip 2026-09-18 (`phase3-workspace-search-dod`): `make lint` passed (local SwiftFormat
+  0.61.1 warned against the CI pin 0.62.1; 0/382 files required formatting; SwiftLint 283
+  warnings, 0 serious). `make build` passed (`** BUILD SUCCEEDED **`). `make test` package
+  slices were green (MarkdownCore 173, EditorKit 320 with 7 skipped, PreviewKit 24,
+  WorkspaceKit 284 including
+  `testProductionDiskReadAndMatchingExecuteOffTheMainActor`). Xcode `PlainsongTests` 591
+  passed plus 1 skipped, including
+  `testClickingAResultInAnotherFileSelectsTheExactUTF16MatchAndScrollsItIntoView`;
+  `PerformanceTests` 25/25 including WS4B 14/14. `preview-src` `npm test` 41/41. The
+  serialized `make test` still exited 65 because `PlainsongUITests-Runner` failed to
+  initialize (`Authentication canceled` / `System authentication is running.`); a
+  dedicated `-only-testing:PlainsongUITests` retry hit the same runner error. Keep this
+  box open until one `make test` completes without that runner failure.
 - [ ] No functional acceptance item depends on a manual-only checklist.
-  Physical ⇧⌘F has owner smoke evidence, but the automated XCUITest remains synthetic and the
-  hosted gate injects AppKit events. Keep this open until the physical-input requirement has a
-  repeatable non-manual gate or is explicitly accepted as residual owner evidence.
+  Physical ⇧⌘F has owner smoke evidence (PR #89 Carbon hot key + owner-run ABC/Zhuyin).
+  XCUITest remains synthetic; hosted gates inject AppKit events. This PR proposes treating
+  that physical shortcut as residual owner evidence (Decision Log 2026-09-18) and leaves
+  the box unchecked until the maintainer confirms. No repeatable non-manual physical-keyboard
+  gate is added.
 - [x] A newly typed unsaved string appears in workspace search results after debounce.
-- [ ] Clicking a result in another file selects the exact UTF-16 match and scrolls it
+- [x] Clicking a result in another file selects the exact UTF-16 match and scrolls it
   into view.
-  The XCUITest observes exact native selection after Return activation; the hosted gate drives a
-  real row click but observes only the navigation command. Neither directly proves the complete
-  click → cross-file editor selection → scroll workflow.
+  Evidence: `PlainsongTests.WorkspaceSearchHostedActivationTests.testClickingAResultInAnotherFileSelectsTheExactUTF16MatchAndScrollsItIntoView`
+  hosts production `WorkspaceWindow`, publishes the query through
+  `updateWorkspaceSearchQueryText`, drives a real `NSEvent` click on the last search-result
+  table row (a match in `z-other.md` while `a-current.md` is current), and asserts
+  `EditorSelectionProbe.appliedEditorSelection` equals the match UTF-16 range,
+  `visibleTextRange` contains that range, and the Debug selection observation or
+  `plainsong.debug.editor.selectedRange` label agrees. The XCUITest Return path and the
+  keyboard-smoke command-only click remain distinct scopes.
 - [x] Repeating the same result activation works because navigation uses a monotonic ID.
 - [x] Closing or switching workspaces cancels active work and removes old results.
 - [x] A slower old query cannot overwrite a newer query.
@@ -1036,14 +1053,20 @@ test support it without composing two partial workflows.
   jump.
 - [x] Hidden/ignored entries and symlinks outside the granted root are not read.
 - [x] Truncated and skipped files are visible to the user.
-- [ ] Disk I/O and full-text matching do not run on the main actor.
-  The production service is nonisolated and creates a utility-priority producer task, while the
-  authority-capture test proves only its own capture closure runs off-main. Add a direct gate that
-  observes the production disk reader and full matcher off the main actor before closing this.
+- [x] Disk I/O and full-text matching do not run on the main actor.
+  Evidence: `WorkspaceKitTests.WorkspaceSearchOffMainActorTests.testProductionDiskReadAndMatchingExecuteOffTheMainActor`
+  creates the production `WorkspaceSearchService` stream on the main actor (matching AppState),
+  observes live `WorkspaceSearchDiskFileReader` `readChunk` events and the pipeline
+  `.beforeMatching` checkpoint immediately before `TextSearchEngine.matches`, and requires
+  every observation to be off-main. The authority-capture off-main test remains a narrower
+  seam.
 - [ ] Existing file tree, preview, source-only, and Experimental WYSIWYG behavior remain green;
   `Command-F` editor find remains separate unfinished work.
-  Keep this open until the exact current tip completes the serialized App, UI, performance, and
-  full `make test`/`make build` regressions.
+  `PlainsongTests` (591 passed + 1 skipped) and `PerformanceTests` (25/25) were green on the
+  exact tip, including source-only/preview/WYSIWYG suites already in those targets.
+  `Command-F` stays in `docs/editor-find-gates.md`. Keep this box open with line 1012 until
+  `PlainsongUITests` actually execute; the 2026-09-18 serialized `make test` and the UI-only
+  retry both died in `PlainsongUITests-Runner` initialization (`Authentication canceled`).
 
 ## 8. WS1 Implementation Prompt
 
