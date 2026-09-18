@@ -37,13 +37,14 @@ final class ExportHTMLHostedTests: XCTestCase {
         XCTAssertTrue(html.contains("Content-Security-Policy"))
         XCTAssertTrue(html.contains("script-src 'none'"))
         XCTAssertTrue(html.contains("id=\"preview-root\""))
-        XCTAssertFalse(html.contains("Hidden Frontmatter"))
+        XCTAssertTrue(html.contains("<title>Hidden Frontmatter</title>"))
+        XCTAssertFalse(try XCTUnwrap(html.components(separatedBy: "<body>").last?.contains("Hidden Frontmatter")))
         XCTAssertFalse(html.contains("<script"))
         XCTAssertFalse(html.contains("bundle.js"))
         XCTAssertFalse(html.contains("asset://"))
         XCTAssertFalse(html.contains("webkit.messageHandlers"))
         XCTAssertTrue(
-            html.contains("--preview-bg") || html.contains("preview-root"),
+            html.contains("--preview-bg"),
             "PR C must embed the already-loaded preview stylesheet, not an empty style tag."
         )
     }
@@ -145,11 +146,13 @@ final class ExportHTMLHostedTests: XCTestCase {
         XCTAssertNil(controller.pendingHTMLExport)
     }
 
-    private func makeController() throws -> PreviewController {
-        try PreviewController(previewIndexURL: previewIndexFixtureURL())
+    func makeController() throws -> PreviewController {
+        let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
+        return controller
     }
 
-    private func render(
+    func render(
         _ controller: PreviewController,
         text: String,
         fileKind: FileKind,
@@ -168,12 +171,12 @@ final class ExportHTMLHostedTests: XCTestCase {
             )
         )
         try await waitUntil("render \(renderID) completed") {
-            controller.latestCompletedRenderID == renderID
+            controller.scrollDeliveryState.completedRenderID == renderID
         }
         return renderID
     }
 
-    private func previewIndexFixtureURL() throws -> URL {
+    func previewIndexFixtureURL() throws -> URL {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
             .deletingLastPathComponent()
@@ -191,7 +194,7 @@ final class ExportHTMLHostedTests: XCTestCase {
         return indexURL
     }
 
-    private func waitUntil(
+    func waitUntil(
         _ description: String,
         timeoutNanoseconds: UInt64 = 5_000_000_000,
         condition: @escaping @MainActor () async throws -> Bool

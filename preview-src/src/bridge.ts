@@ -85,6 +85,7 @@ export interface ExportHTMLPayload {
   exportID: number;
   renderID: number;
   phase: ExportHTMLPhase;
+  documentTitle?: string | null;
   resourceOutcomes: ExportResourceOutcome[];
 }
 

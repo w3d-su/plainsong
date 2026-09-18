@@ -23,7 +23,9 @@ public final class PreviewController: NSObject, ObservableObject {
     var presentedDocumentIdentifier: String?
     private var nextRenderID = 0
     var nextExportID = 0
-    var latestCompletedRenderID = -1
+    var exportSourceText = ""
+    var exportTimeoutNanoseconds: UInt64 = 15_000_000_000
+    private(set) var isInvalidated = false
     var pendingHTMLExport: PendingHTMLExport?
     private var theme = "system"
     private var allowRemoteImages = false
@@ -89,6 +91,8 @@ public final class PreviewController: NSObject, ObservableObject {
     }
 
     private func submitRender(_ change: DocumentTextChange) -> Int {
+        guard !isInvalidated else { return -1 }
+        exportSourceText = change.text
         let assetContext = Self.assetContext(
             fileURL: change.fileURL,
             workspaceRootURL: workspaceAssetRootURL
@@ -135,9 +139,14 @@ public final class PreviewController: NSObject, ObservableObject {
         workspaceAssetRootURL = rootURL?.standardizedFileURL
     }
 
-    /// Test-owned lifecycle shutdown. Production keeps one controller alive with its
-    /// editor workspace even while the preview pane is hidden.
-    func shutdownForTesting() {
+    /// Permanently releases bridge callbacks and pending work. The owner of a dedicated
+    /// offscreen export controller must call this when the operation ends.
+    public func invalidate() {
+        guard !isInvalidated else { return }
+        isInvalidated = true
+        isReady = false
+        queuedRender = nil
+        exportSourceText = ""
         scrollDeliveryState.failPendingDelivery()
         webView.stopLoading()
         webView.navigationDelegate = nil
@@ -147,7 +156,11 @@ public final class PreviewController: NSObject, ObservableObject {
         onLinkClicked = nil
         onCheckboxToggled = nil
         renderCompletionObserver = nil
-        failPendingHTMLExport(reason: "shutdown")
+        failPendingHTMLExport(reason: "invalidated")
+    }
+
+    func shutdownForTesting() {
+        invalidate()
     }
 
     func send(
@@ -176,7 +189,7 @@ public final class PreviewController: NSObject, ObservableObject {
         send(.setTheme(SetThemePayload(theme: theme, allowRemoteImages: allowRemoteImages)))
     }
 
-    private func receive(_ message: BridgeMessage) {
+    func receive(_ message: BridgeMessage) {
         switch message {
         case let .ready(payload):
             guard payload.protocolVersion == PreviewBridge.protocolVersion else {
@@ -188,7 +201,6 @@ public final class PreviewController: NSObject, ObservableObject {
             guard scrollDeliveryState.recordRenderCompletion(payload.renderID) else {
                 return
             }
-            latestCompletedRenderID = payload.renderID
             renderCompletionObserver?(payload)
             flushPendingScrollDeliveryIfReady()
 
@@ -210,6 +222,7 @@ public final class PreviewController: NSObject, ObservableObject {
     }
 
     private func markReadyAndFlushQueuedRender() {
+        guard !isInvalidated else { return }
         isReady = true
         if let queuedRender {
             self.queuedRender = nil
@@ -236,6 +249,13 @@ public final class PreviewController: NSObject, ObservableObject {
 }
 
 extension PreviewController: WKNavigationDelegate {
+    public func webViewWebContentProcessDidTerminate(_: WKWebView) {
+        isReady = false
+        failPendingHTMLExport(reason: "web-content-process-terminated")
+        scrollDeliveryState.failPendingDelivery()
+        scrollDeliveryState = PreviewScrollDeliveryState()
+    }
+
     public func webView(
         _: WKWebView,
         decidePolicyFor navigationAction: WKNavigationAction,
@@ -347,20 +367,6 @@ private extension URL {
             normalized.removeLast()
         }
         return normalized
-    }
-}
-
-extension PreviewController: WKScriptMessageHandler {
-    public func userContentController(_: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "bridge",
-              JSONSerialization.isValidJSONObject(message.body),
-              let data = try? JSONSerialization.data(withJSONObject: message.body),
-              let bridgeMessage = try? JSONDecoder().decode(BridgeMessage.self, from: data)
-        else {
-            return
-        }
-
-        receive(bridgeMessage)
     }
 }
 

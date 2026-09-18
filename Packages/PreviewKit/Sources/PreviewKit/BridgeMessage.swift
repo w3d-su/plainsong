@@ -160,6 +160,7 @@ public enum BridgeMessage: Equatable, Sendable {
     case linkClicked(LinkClickedPayload)
     case checkboxToggled(CheckboxToggledPayload)
     case setTheme(SetThemePayload)
+    /// v6 discovery/finalization includes an optional parsed frontmatter documentTitle.
     case exportHTML(ExportHTMLPayload)
     case exportHTMLResult(ExportHTMLResultPayload)
 

@@ -8,14 +8,14 @@ import {
   freezeExportTheme,
   handleExportHTML,
   isExportBlocked,
-  resetExportHTMLSessionForTests,
+  resetExportHTMLSession,
   sanitizeStaticClone,
   sanitizeStyleText,
 } from "../src/export-html";
 import { renderMarkdown, renderMdx } from "../src/pipeline";
 
 afterEach(() => {
-  resetExportHTMLSessionForTests();
+  resetExportHTMLSession();
 });
 
 function previewRoot(html: string, extraClass?: string): HTMLElement {
@@ -136,19 +136,19 @@ title: Hidden From Export
     };
 
     await handleExportHTML(
-      { exportID: 1, renderID: 4, phase: "finalization", resourceOutcomes: [] },
+      { exportID: 1, renderID: 4, phase: "finalization", resourceOutcomes: [], documentTitle: null },
       host,
     );
     expect(results).toEqual(["failed"]);
 
     await handleExportHTML(
-      { exportID: 2, renderID: 4, phase: "discovery", resourceOutcomes: [] },
+      { exportID: 2, renderID: 4, phase: "discovery", resourceOutcomes: [], documentTitle: null },
       host,
     );
     expect(results).toEqual(["failed", "resourcesNeeded"]);
 
     await handleExportHTML(
-      { exportID: 2, renderID: 4, phase: "finalization", resourceOutcomes: [] },
+      { exportID: 2, renderID: 4, phase: "finalization", resourceOutcomes: [], documentTitle: null },
       host,
     );
     expect(results).toEqual(["failed", "resourcesNeeded", "ready"]);
@@ -157,7 +157,7 @@ title: Hidden From Export
   it("fails a stale renderID without emitting ready HTML", async () => {
     const kinds: string[] = [];
     await handleExportHTML(
-      { exportID: 9, renderID: 1, phase: "discovery", resourceOutcomes: [] },
+      { exportID: 9, renderID: 1, phase: "discovery", resourceOutcomes: [], documentTitle: null },
       {
         previewRoot: previewRoot("<h1>Hello</h1>"),
         latestRenderID: 2,
@@ -180,7 +180,7 @@ title: Hidden From Export
     root.prepend(banner);
 
     await handleExportHTML(
-      { exportID: 3, renderID: 8, phase: "discovery", resourceOutcomes: [] },
+      { exportID: 3, renderID: 8, phase: "discovery", resourceOutcomes: [], documentTitle: null },
       {
         previewRoot: root,
         latestRenderID: 8,

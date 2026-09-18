@@ -20,6 +20,7 @@ import {
 import {
   collectPreviewStyleText,
   handleExportHTML,
+  resetExportHTMLSession,
 } from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
 import {
@@ -31,6 +32,9 @@ import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
 
 export { PROTOCOL_VERSION } from "./bridge";
+
+// Injected from the exact bundle.css inputs by build.mjs.
+declare const __PLAINSONG_BUNDLED_CSS__: string;
 
 type ScrollOwner = "editor" | "preview" | "none";
 
@@ -136,7 +140,7 @@ async function receive(message: BridgeMessage): Promise<void> {
         previewRoot,
         latestRenderID,
         documentTheme: document.documentElement.dataset.theme ?? "system",
-        collectStyleText: () => collectPreviewStyleText(document),
+        collectStyleText: () => collectPreviewStyleText(document, __PLAINSONG_BUNDLED_CSS__),
         waitForFonts: async () => {
           if (document.fonts?.ready) {
             await document.fonts.ready;
@@ -159,6 +163,7 @@ async function receive(message: BridgeMessage): Promise<void> {
 
 async function render(payload: Extract<BridgeMessage, { name: "render" }>["payload"]) {
   if (payload.renderID < latestRenderID) return;
+  resetExportHTMLSession();
   latestRenderID = payload.renderID;
   currentBaseDir = payload.baseDir;
   applyPreviewSettings(payload.theme, payload.allowRemoteImages);

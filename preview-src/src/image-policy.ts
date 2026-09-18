@@ -35,7 +35,7 @@ export function imageSourcePolicy(
     case "asset:":
       return { action: "keep" };
     case "data:":
-      return allowedDataImageMediaTypes.has(dataURLMediaType(trimmed) ?? "")
+      return isAllowedDataImageSource(trimmed)
         ? { action: "keep" }
         : { action: "block", reason: "unsupported-data-image" };
     case "https:":
@@ -43,6 +43,13 @@ export function imageSourcePolicy(
     default:
       return { action: "block", reason: "unsupported-scheme" };
   }
+}
+
+// Shared live-preview/export MIME policy; decoding and byte caps belong to export PR D.
+export function isAllowedDataImageSource(source: string): boolean {
+  const trimmed = source.trim();
+  return /^data:/iu.test(trimmed) &&
+    allowedDataImageMediaTypes.has(dataURLMediaType(trimmed) ?? "");
 }
 
 function dataURLMediaType(source: string): string | null {

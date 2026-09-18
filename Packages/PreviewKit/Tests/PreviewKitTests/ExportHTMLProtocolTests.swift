@@ -4,7 +4,7 @@ import XCTest
 final class ExportHTMLProtocolTests: XCTestCase {
     func testExportHTMLDiscoveryRoundTrip() throws {
         let message = BridgeMessage.exportHTML(
-            ExportHTMLPayload(exportID: 3, renderID: 8, phase: .discovery)
+            ExportHTMLPayload(exportID: 3, renderID: 8, phase: .discovery, documentTitle: "Frontmatter title")
         )
         let decoded = try JSONDecoder().decode(
             BridgeMessage.self,

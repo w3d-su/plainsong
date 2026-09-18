@@ -1,3 +1,5 @@
+import { isAllowedDataImageSource } from "./image-policy";
+import { escapeHtml } from "./mdx-error";
 import type {
   ExportHTMLPayload,
   ExportHTMLResultPayload,
@@ -10,7 +12,6 @@ export const EXPORT_CSP =
 
 export const EXPORT_IMAGE_PLACEHOLDER_LABEL = "Image unavailable in export";
 export const MAXIMUM_EXPORT_HTML_UTF8_BYTES = 64 * 1024 * 1024;
-export const EXPORT_RESOURCE_ID_ATTRIBUTE = "data-export-resource-id";
 
 export type FrozenExportTheme = "light" | "dark";
 
@@ -26,11 +27,13 @@ export interface ExportHTMLHost {
 interface PendingExport {
   exportID: number;
   renderID: number;
+  documentTitle: string | null;
+  finalizing: boolean;
 }
 
 let pendingExport: PendingExport | null = null;
 
-export function resetExportHTMLSessionForTests(): void {
+export function resetExportHTMLSession(): void {
   pendingExport = null;
 }
 
@@ -53,15 +56,14 @@ export function freezeExportTheme(theme: string): FrozenExportTheme {
 }
 
 export function collectImageResources(root: ParentNode): ExportResourceDescriptor[] {
-  return Array.from(root.querySelectorAll("img")).map((image, index) => {
+  return Array.from(root.querySelectorAll("img")).flatMap((image, index) => {
     const resourceID = `image-${index}`;
-    image.setAttribute(EXPORT_RESOURCE_ID_ATTRIBUTE, resourceID);
     const src =
       image.getAttribute("src") ??
       image.dataset.plainsongBlockedSrc ??
       image.dataset.plainsongOriginalSrc ??
       "";
-    return { resourceID, kind: "image", src };
+    return isAllowedDataImageSource(src) ? [] : [{ resourceID, kind: "image" as const, src }];
   });
 }
 
@@ -70,12 +72,11 @@ export function applyResourceOutcomes(
   outcomes: readonly ExportResourceOutcome[],
 ): void {
   const byID = new Map(outcomes.map((outcome) => [outcome.resourceID, outcome]));
-  for (const image of Array.from(root.querySelectorAll("img"))) {
-    const resourceID = image.getAttribute(EXPORT_RESOURCE_ID_ATTRIBUTE);
-    const outcome = resourceID === null ? undefined : byID.get(resourceID);
+  for (const [index, image] of Array.from(root.querySelectorAll("img")).entries()) {
+    if (isAllowedDataImageSource(image.getAttribute("src") ?? "")) continue;
+    const outcome = byID.get(`image-${index}`);
     if (outcome?.action === "embed" && typeof outcome.dataURI === "string" && outcome.dataURI.length > 0) {
       image.setAttribute("src", outcome.dataURI);
-      image.removeAttribute(EXPORT_RESOURCE_ID_ATTRIBUTE);
       continue;
     }
     replaceImageWithPlaceholder(image);
@@ -97,6 +98,11 @@ export function sanitizeStaticClone(root: HTMLElement): void {
     }
   }
 
+  // Renderer-injected style nodes in the body need the same raw-text protection.
+  for (const style of root.querySelectorAll("style")) {
+    style.textContent = sanitizeStyleText(style.textContent ?? "");
+  }
+
   for (const checkbox of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
     checkbox.disabled = true;
     checkbox.removeAttribute("data-task-checkbox");
@@ -111,18 +117,16 @@ export function sanitizeStaticClone(root: HTMLElement): void {
 
   for (const image of Array.from(root.querySelectorAll("img"))) {
     const src = image.getAttribute("src") ?? "";
-    if (!isAllowedExportImageSrc(src)) {
+    if (!isAllowedDataImageSource(src)) {
       replaceImageWithPlaceholder(image);
     }
   }
 
-  root.querySelectorAll(`[${EXPORT_RESOURCE_ID_ATTRIBUTE}]`).forEach((node) => {
-    node.removeAttribute(EXPORT_RESOURCE_ID_ATTRIBUTE);
-  });
 }
 
 export function sanitizeStyleText(css: string): string {
-  return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/giu, (match, _quote: string, value: string) => {
+  // A style element is HTML raw text: CSS strings do not protect closing tags.
+  return css.replace(/</gu, "\\3c ").replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/giu, (match, _quote: string, value: string) => {
     const trimmed = value.trim();
     if (trimmed.startsWith("#")) return match;
     if (/^data:font\//iu.test(trimmed) || /^data:application\/font/iu.test(trimmed)) {
@@ -147,20 +151,10 @@ export function collectLoadedStyles(styleSheets: StyleSheetList | ArrayLike<CSSS
   return parts.join("\n");
 }
 
-export async function collectPreviewStyleText(doc: Document): Promise<string> {
-  const linked = await Promise.all(
-    Array.from(doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]')).map(
-      async (link) => {
-        try {
-          const response = await fetch(link.href);
-          return response.ok ? await response.text() : "";
-        } catch {
-          return "";
-        }
-      },
-    ),
-  );
-  return [...linked, collectLoadedStyles(doc.styleSheets)].filter((part) => part.length > 0).join("\n");
+export function collectPreviewStyleText(doc: Document, bundledCSS = ""): string {
+  // Linked file:// stylesheets are unreadable through CSSOM in WebKit. The build
+  // supplies their trusted bytes; CSSOM still adds renderer-injected styles.
+  return [bundledCSS, collectLoadedStyles(doc.styleSheets)].filter(Boolean).join("\n");
 }
 
 export function buildStaticExportHTML(options: {
@@ -176,7 +170,7 @@ export function buildStaticExportHTML(options: {
     "<head>",
     '<meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="${EXPORT_CSP}">`,
-    `<title>${escapeHTML(title)}</title>`,
+    `<title>${escapeHtml(title)}</title>`,
     `<style>${sanitizeStyleText(options.styleText)}</style>`,
     "</head>",
     "<body>",
@@ -197,8 +191,9 @@ export async function handleExportHTML(
   host: ExportHTMLHost,
 ): Promise<void> {
   const fail = (reason: string): void => {
-    pendingExport = null;
-    clearExportResourceMarks(host.previewRoot);
+    if (pendingExport?.exportID === payload.exportID && pendingExport.renderID === payload.renderID) {
+      pendingExport = null;
+    }
     host.postResult({
       exportID: payload.exportID,
       renderID: payload.renderID,
@@ -206,74 +201,91 @@ export async function handleExportHTML(
     });
   };
 
-  if (payload.renderID !== host.latestRenderID) {
-    fail("stale-render");
-    return;
-  }
+  try {
+    if (payload.renderID !== host.latestRenderID) {
+      fail("stale-render");
+      return;
+    }
 
-  const blocked = isExportBlocked(host.previewRoot);
-  if (blocked) {
-    fail(blocked);
-    return;
-  }
+    const blocked = isExportBlocked(host.previewRoot);
+    if (blocked) {
+      fail(blocked);
+      return;
+    }
 
-  if (payload.phase === "discovery") {
-    const resources = collectImageResources(host.previewRoot);
-    pendingExport = { exportID: payload.exportID, renderID: payload.renderID };
+    if (payload.phase === "discovery") {
+      const resources = collectImageResources(host.previewRoot);
+      pendingExport = { exportID: payload.exportID, renderID: payload.renderID,
+        documentTitle: payload.documentTitle ?? null, finalizing: false };
+      host.postResult({
+        exportID: payload.exportID,
+        renderID: payload.renderID,
+        state: { kind: "resourcesNeeded", resources },
+      });
+      return;
+    }
+
+    if (
+      payload.phase !== "finalization" ||
+      pendingExport === null ||
+      pendingExport.exportID !== payload.exportID ||
+      pendingExport.renderID !== payload.renderID ||
+      pendingExport.finalizing
+    ) {
+      fail("invalid-finalization");
+      return;
+    }
+
+    const session = pendingExport;
+    session.finalizing = true;
+    const clone = host.previewRoot.cloneNode(true) as HTMLElement;
+    applyResourceOutcomes(clone, payload.resourceOutcomes);
+    sanitizeStaticClone(clone);
+
+    await host.waitForFonts();
+
+    if (pendingExport !== session) {
+      fail("superseded");
+      return;
+    }
+
+    if (isExportBlocked(host.previewRoot)) {
+      fail("became-unready");
+      return;
+    }
+
+    for (const image of clone.querySelectorAll("img")) {
+      if (!isAllowedDataImageSource(image.getAttribute("src") ?? "")) {
+        fail("image-undecoded");
+        return;
+      }
+    }
+
+    const styleText = await host.collectStyleText();
+    if (pendingExport !== session) {
+      fail("superseded");
+      return;
+    }
+    const built = buildStaticExportHTML({
+      bodyHTML: clone.innerHTML,
+      frozenTheme: freezeExportTheme(host.documentTheme),
+      styleText,
+      title: session.documentTitle?.trim() || firstHeadingText(clone),
+    });
+    if ("failed" in built) {
+      fail(built.failed);
+      return;
+    }
+
+    pendingExport = null;
     host.postResult({
       exportID: payload.exportID,
       renderID: payload.renderID,
-      state: { kind: "resourcesNeeded", resources },
+      state: { kind: "ready", html: built.html },
     });
-    return;
+  } catch {
+    fail("serialization-failed");
   }
-
-  if (
-    payload.phase !== "finalization" ||
-    pendingExport === null ||
-    pendingExport.exportID !== payload.exportID ||
-    pendingExport.renderID !== payload.renderID
-  ) {
-    fail("invalid-finalization");
-    return;
-  }
-
-  pendingExport = null;
-  const clone = host.previewRoot.cloneNode(true) as HTMLElement;
-  applyResourceOutcomes(clone, payload.resourceOutcomes);
-  sanitizeStaticClone(clone);
-  clearExportResourceMarks(host.previewRoot);
-
-  await host.waitForFonts();
-
-  if (isExportBlocked(host.previewRoot)) {
-    fail("became-unready");
-    return;
-  }
-
-  for (const image of clone.querySelectorAll("img")) {
-    if (!isAllowedExportImageSrc(image.getAttribute("src") ?? "")) {
-      fail("image-undecoded");
-      return;
-    }
-  }
-
-  const built = buildStaticExportHTML({
-    bodyHTML: clone.innerHTML,
-    frozenTheme: freezeExportTheme(host.documentTheme),
-    styleText: await host.collectStyleText(),
-    title: firstHeadingText(clone),
-  });
-  if ("failed" in built) {
-    fail(built.failed);
-    return;
-  }
-
-  host.postResult({
-    exportID: payload.exportID,
-    renderID: payload.renderID,
-    state: { kind: "ready", html: built.html },
-  });
 }
 
 function replaceImageWithPlaceholder(image: HTMLImageElement): void {
@@ -287,14 +299,9 @@ function replaceImageWithPlaceholder(image: HTMLImageElement): void {
   image.replaceWith(placeholder);
 }
 
-function clearExportResourceMarks(root: ParentNode): void {
-  root.querySelectorAll(`[${EXPORT_RESOURCE_ID_ATTRIBUTE}]`).forEach((node) => {
-    node.removeAttribute(EXPORT_RESOURCE_ID_ATTRIBUTE);
-  });
-}
-
 function firstHeadingText(root: ParentNode): string {
-  return root.querySelector("h1")?.textContent?.trim() ?? "Untitled";
+  return Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+    .find((heading) => !heading.closest(".mdx-component-card"))?.textContent?.trim() || "Untitled";
 }
 
 function isAllowedExportHref(href: string): boolean {
@@ -306,25 +313,4 @@ function isAllowedExportHref(href: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isAllowedExportImageSrc(src: string): boolean {
-  return /^data:image\/(?:png|jpeg|jpg|gif|webp)[;,]/iu.test(src.trim());
-}
-
-function escapeHTML(value: string): string {
-  return value.replace(/[&<>"']/gu, (character) => {
-    switch (character) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#x27;";
-    }
-  });
 }

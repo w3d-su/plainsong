@@ -64,6 +64,7 @@ public struct ExportResourceOutcome: Codable, Equatable, Sendable {
 public struct ExportHTMLPayload: Codable, Equatable, Sendable {
     public let exportID: Int
     public let renderID: Int
+    public let documentTitle: String?
     public let phase: ExportHTMLPhase
     public let resourceOutcomes: [ExportResourceOutcome]
 
@@ -71,10 +72,12 @@ public struct ExportHTMLPayload: Codable, Equatable, Sendable {
         exportID: Int,
         renderID: Int,
         phase: ExportHTMLPhase,
+        documentTitle: String? = nil,
         resourceOutcomes: [ExportResourceOutcome] = []
     ) {
         self.exportID = exportID
         self.renderID = renderID
+        self.documentTitle = documentTitle
         self.phase = phase
         self.resourceOutcomes = resourceOutcomes
     }
