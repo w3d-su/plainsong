@@ -148,6 +148,16 @@ input[type="checkbox"] {
   margin: 0 0 8px;
 }
 
+.export-image-placeholder {
+  background: var(--preview-code-bg);
+  border: 1px dashed var(--preview-border);
+  border-radius: 6px;
+  color: var(--preview-muted);
+  display: inline-block;
+  font-size: 0.88em;
+  padding: 0.2em 0.55em;
+}
+
 .mdx-error-banner {
   background: #fff8c5;
   border: 1px solid #d4a72c;

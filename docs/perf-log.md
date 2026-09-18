@@ -1179,3 +1179,26 @@ loaded `make test`.
   250 KB full-document inline parsing cutoff.
 - [x] [#13](https://github.com/w3d-su/plainsong/issues/13): add a deterministic two-live-webview memory harness under the
   host-process RSS policy. Issue #13 is closed with the scope note above.
+
+## Export E9 informational bridge receipt — 2026-09-18
+
+PR #115 review-fix probe:
+`ExportHTMLBridgeDecodingTests.testMultiMegabyteReadyBridgeReceiptFitsExistingMainActorBudget`.
+Run with `swift test --package-path Packages/PreviewKit --filter ExportHTMLBridgeDecodingTests`.
+Environment: macOS 27.0 (26A428), Apple Swift 6.4, arm64, Debug.
+
+The probe creates a Foundation `NSDictionary`/`NSString` message containing **6,250,000
+UTF-8 bytes**, installs a finalization-phase pending request, and times the production
+`receiveBridgeBody` routing, direct typed-field validation, and continuation resolution
+on the main actor. Five Debug samples from the local 2026-09-18 worktree run were
+**0.049375 / 0.005792 / 0.003834 / 0.003541 / 0.003375 ms** (maximum **0.049375 ms**).
+Payload construction and subsequent full-content equality assertions are outside the
+measured interval. Every sample checks exact content, request correlation, and pending
+state removal. No JSON encoding/decoding or full HTML scan occurs inside receipt.
+
+The existing 16 ms main-actor bound is asserted locally and informational when `CI=true`;
+no new export budget is frozen. This is a synthetic bridge-body receipt measurement,
+not WebKit IPC/string construction, complete offscreen export, image/font readiness,
+physical keystroke-to-screen, concurrent typing, or Debug/Release end-to-end evidence.
+**E9 remains open** for PR G. The full export payload limit and resource-policy gates
+remain separately owned by PR D/G.
