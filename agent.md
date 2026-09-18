@@ -574,6 +574,12 @@ cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this se
 make format           # swiftformat . && swiftlint --fix
 ```
 
+- CI installs **SwiftFormat 0.62.1** as a SHA-256-verified release binary
+  (`.github/workflows/ci.yml`, mirrored by `SWIFTFORMAT_VERSION` in the Makefile), not via
+  Homebrew, so lint results cannot drift with the runner image. Local `make lint` warns when
+  the Homebrew version differs; CI is authoritative. Bumping the pin means updating the
+  version + SHA-256 in `ci.yml`, the Makefile constant, and reformatting the tree in the
+  same PR if rule behavior changed.
 - Xcode 16+. `.xcodeproj` is generated — **never hand-edit, never commit pbxproj
   conflicts; edit `project.yml`.**
 - Code signing: "Sign to Run Locally" for dev; hardened runtime + notarization scripted
@@ -815,6 +821,8 @@ make format           # swiftformat . && swiftlint --fix
 | 2026-09-18 | PR #114 review fixes keep batch caret mapping and B1 construction in MarkdownCore | Interior offset mapping retains every preceding edit delta; a current match owns its trailing edge even when the next edit is adjacent, while a bare caret at that next start maps through its replacement. Batch continuation clamps once so resume, session anchor, and collapsed selection agree. The pure `replacedSlice` builder validates absolute ranges inside the enclosing source span, rebases with proven nonnegative bounded subtraction, and preserves literal gaps; #112 should switch its B1 executor to this helper when integrated. One whole-list validator covers ordering, overlap, bounds, and overflow before any early mapping return. Plans materialize each matched slice once; Find and Replace share newline validation. Replacement size remains independently owned at 256, growth derives from the retained-match ceiling, and projected-length refusal remains documented defense in depth. Named tests cover multiple unequal deltas, no-later selection, clamp boundaries, Unicode/local-slice construction, malformed suffixes, and the exact N=250 progress sequence. No native writer, undo, UI, typing path, or R0/R2/R4-R10 acceptance is added. Alt: discarding prior deltas, storing an unclamped anchor, rebasing separately in EditorKit, duplicated validators, coupling the independently owned query/replacement limits, or treating model tests as executor evidence were rejected because they permit caret drift, range-policy divergence, or false gate closure. |
 
 ---
+
+| 2026-09-18 | CI pins SwiftFormat 0.62.1 as a checksum-verified release binary; Homebrew no longer chooses the lint version | `brew install swiftformat` on the macos-15 runner image moved from 0.62.1 (last green run, 2026-08-12) to 0.63.0 on 2026-09-18, and 0.63.0's `indent` rule rejects the `#if DEBUG` + `.overlay { … }` blocks in `App/Views/WorkspaceSearchSidebar.swift` (33 errors) and `Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift` (8 errors), both untouched since July. That turned every PR's `build-and-test` red with no code change (first seen on #112 after its main merge was pushed) and made the 2026-08-12 green checks on #109/#114/#115 stale. `ci.yml` now downloads `swiftformat.zip` from the tagged GitHub release, verifies SHA-256 `7cb1cb1f…1114a` (matching GitHub's published asset digest), asserts `--version` equals the pin, and prepends it to `PATH`; xcodegen and swiftlint stay on Homebrew. The Makefile carries the same `SWIFTFORMAT_VERSION` and only warns on local drift because Homebrew cannot pin. Verified: the 0.62.1 binary run through `make lint` against `main` reports 0/379 files needing formatting. Alt: reformatting the two files for 0.63.0 was rejected because it fixes one drift and leaves the next runner-image bump free to break `main` again; pinning via `brew extract`/versioned formula was rejected as slower and less deterministic than a checksum-verified release asset; pinning swiftlint too was deferred because it has not drifted and would widen this fix beyond its trigger. |
 
 ## 19. Reference Links
 

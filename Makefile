@@ -7,8 +7,18 @@ SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Sc
 # existing 0.61 layout until a deliberate repo-wide migration, without breaking
 # older SwiftFormat versions that do not recognize the rule names.
 SWIFTFORMAT_COMPAT_FLAGS := $(shell swiftformat --rules 2>/dev/null | grep -q wrapIfStatementBodies && echo --disable wrapIfStatementBodies,wrapIfExpressionBodies)
+# CI installs exactly this SwiftFormat release (.github/workflows/ci.yml). Local
+# Homebrew installs cannot pin, so `make lint`/`make format` only warn on drift;
+# treat CI as authoritative when local and CI lint results disagree.
+SWIFTFORMAT_VERSION := 0.62.1
 
-.PHONY: bootstrap generate build run test test-f2-tooling format lint preview-bundle release clean
+.PHONY: bootstrap generate build run test test-f2-tooling format lint preview-bundle release clean swiftformat-version-check
+
+swiftformat-version-check:
+	@actual="$$(swiftformat --version 2>/dev/null || echo missing)"; \
+	if [ "$$actual" != "$(SWIFTFORMAT_VERSION)" ]; then \
+		echo "warning: local swiftformat is $$actual; CI pins $(SWIFTFORMAT_VERSION), so lint results may differ from CI" >&2; \
+	fi
 
 bootstrap:
 	brew install xcodegen swiftformat swiftlint node
@@ -46,11 +56,11 @@ preview-bundle:
 release:
 	Scripts/release.sh
 
-format:
+format: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint --fix --quiet
 
-lint:
+lint: swiftformat-version-check
 	swiftformat $(SWIFT_FORMAT_PATHS) --lint $(SWIFTFORMAT_COMPAT_FLAGS)
 	swiftlint
 
