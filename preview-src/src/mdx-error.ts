@@ -57,7 +57,7 @@ function lineFromMessage(message: string): number | undefined {
   return Number.isFinite(line) ? line : undefined;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/gu, (character) => {
     switch (character) {
       case "&":
