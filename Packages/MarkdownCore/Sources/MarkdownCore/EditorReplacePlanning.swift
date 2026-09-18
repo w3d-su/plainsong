@@ -13,6 +13,9 @@ public enum EditorReplacePlanRefusal: Equatable, Sendable, Error {
     case emptySession
     case noCurrentMatch
     case truncatedSession
+    /// Defense in depth for checked length arithmetic. A valid retained session,
+    /// materializable source, and the v1 replacement/match bounds cannot reach this
+    /// refusal. Public construction helpers test overflow and growth independently.
     case projectedLengthOverflow
 }
 
@@ -53,7 +56,7 @@ public struct EditorReplaceContinuation: Equatable, Sendable {
 
 public enum EditorReplacePlanning {
     public static func validateReplacement(_ replacement: String) -> EditorReplaceValueValidity {
-        if replacement.contains(where: \.isNewline) {
+        if TextSearchInputValidation.containsNewline(replacement) {
             return .containsNewline
         }
         if (replacement as NSString).length > EditorReplaceLimits.maximumReplacementUTF16Length {

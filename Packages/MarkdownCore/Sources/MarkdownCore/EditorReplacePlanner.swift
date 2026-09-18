@@ -19,14 +19,10 @@ public enum EditorReplacePlanner {
         guard let match = session.currentMatch else {
             return .failure(.noCurrentMatch)
         }
-        guard EditorReplacePlanning.slice(source, range: match.range) != nil else {
+        guard let slice = EditorReplacePlanning.slice(source, range: match.range) else {
             return .failure(.noCurrentMatch)
         }
-        let identical = EditorReplacePlanning.isLiteralIdentical(
-            source: source,
-            range: match.range,
-            replacement: replacement
-        )
+        let identical = ExactSourceText.matches(slice, replacement)
         let replacementLength = (replacement as NSString).length
         let resume: Int
         if identical {
@@ -83,14 +79,10 @@ public enum EditorReplacePlanner {
         allRanges.reserveCapacity(session.matches.count)
         for match in session.matches {
             allRanges.append(match.range)
-            guard EditorReplacePlanning.slice(source, range: match.range) != nil else {
+            guard let slice = EditorReplacePlanning.slice(source, range: match.range) else {
                 return .failure(.noCurrentMatch)
             }
-            if !EditorReplacePlanning.isLiteralIdentical(
-                source: source,
-                range: match.range,
-                replacement: replacement
-            ) {
+            if !ExactSourceText.matches(slice, replacement) {
                 differing.append(match.range)
             }
         }

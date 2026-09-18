@@ -2,19 +2,10 @@ import Foundation
 
 public enum EditorReplaceSourceConstruction {
     public static func enclosingRange(of ranges: [NSRange]) -> NSRange? {
-        guard let first = ranges.first else { return nil }
-        var previousEnd = first.location
-        var finalEnd = first.location
-        for range in ranges {
-            guard range.location >= previousEnd,
-                  let end = EditorReplacePlanning.rangeEnd(range)
-            else {
-                return nil
-            }
-            previousEnd = end
-            finalEnd = end
-        }
-        return NSRange(location: first.location, length: finalEnd - first.location)
+        guard let validated = validatedRanges(ranges),
+              let first = validated.first, let last = validated.last
+        else { return nil }
+        return NSRange(location: first.lowerBound, length: last.upperBound - first.lowerBound)
     }
 
     public static func projectedUTF16Length(
@@ -22,18 +13,12 @@ public enum EditorReplaceSourceConstruction {
         ranges: [NSRange],
         replacementUTF16Length: Int
     ) -> Int? {
-        guard sourceLength >= 0, replacementUTF16Length >= 0 else { return nil }
+        guard replacementUTF16Length >= 0,
+              let validated = validatedRanges(ranges, lengthBound: sourceLength)
+        else { return nil }
         var removed = 0
-        var previousEnd = 0
-        for range in ranges {
-            guard range.location >= previousEnd,
-                  let end = EditorReplacePlanning.rangeEnd(range),
-                  end <= sourceLength
-            else {
-                return nil
-            }
-            previousEnd = end
-            let (next, overflow) = removed.addingReportingOverflow(range.length)
+        for range in validated {
+            let (next, overflow) = removed.addingReportingOverflow(range.count)
             if overflow { return nil }
             removed = next
         }
@@ -59,29 +44,60 @@ public enum EditorReplaceSourceConstruction {
         ranges: [NSRange],
         replacement: String
     ) -> String? {
+        replacedSlice(
+            source,
+            enclosing: NSRange(location: 0, length: (source as NSString).length),
+            ranges: ranges,
+            replacement: replacement
+        )
+    }
+
+    /// Builds only the local replacement text for R0 candidate B1's one native edit.
+    /// Ranges use absolute source UTF-16 offsets; gaps inside `enclosing` are preserved.
+    /// Empty ranges return the unchanged slice. Invalid or escaping ranges fail closed.
+    public static func replacedSlice(
+        _ source: String,
+        enclosing: NSRange,
+        ranges: [NSRange],
+        replacement: String
+    ) -> String? {
         let nsSource = source as NSString
-        let length = nsSource.length
+        guard let enclosingEnd = EditorReplacePlanning.rangeEnd(enclosing),
+              enclosingEnd <= nsSource.length,
+              let validated = validatedRanges(ranges, lengthBound: enclosingEnd),
+              validated.first.map({ $0.lowerBound >= enclosing.location }) ?? true
+        else { return nil }
+        // Validation proves 0 <= enclosing.location <= every endpoint <= enclosingEnd.
+        // These subtractions cannot underflow, overflow, or escape the local slice.
+        let localRanges = validated.map {
+            ($0.lowerBound - enclosing.location) ..< ($0.upperBound - enclosing.location)
+        }
+        return constructSource(
+            nsSource.substring(with: enclosing) as NSString,
+            ranges: localRanges,
+            replacement: replacement
+        )
+    }
+
+    private static func constructSource(
+        _ source: NSString,
+        ranges: [Range<Int>],
+        replacement: String
+    ) -> String {
         var cursor = 0
         var parts: [String] = []
-        parts.reserveCapacity(ranges.count * 2 + 1)
         for range in ranges {
-            guard range.location >= cursor,
-                  let end = EditorReplacePlanning.rangeEnd(range),
-                  end <= length
-            else {
-                return nil
-            }
-            if range.location > cursor {
-                parts.append(nsSource.substring(with: NSRange(
+            if range.lowerBound > cursor {
+                parts.append(source.substring(with: NSRange(
                     location: cursor,
-                    length: range.location - cursor
+                    length: range.lowerBound - cursor
                 )))
             }
             parts.append(replacement)
-            cursor = end
+            cursor = range.upperBound
         }
-        if cursor < length {
-            parts.append(nsSource.substring(from: cursor))
+        if cursor < source.length {
+            parts.append(source.substring(from: cursor))
         }
         return parts.joined()
     }
@@ -92,27 +108,22 @@ public enum EditorReplaceSourceConstruction {
         through ranges: [NSRange],
         replacementUTF16Length: Int
     ) -> Int? {
-        guard offset >= 0, replacementUTF16Length >= 0 else { return nil }
+        guard offset >= 0, replacementUTF16Length >= 0,
+              let validated = validatedRanges(ranges)
+        else { return nil }
         var mapped = offset
-        var previousEnd = 0
-        for range in ranges {
-            guard range.location >= previousEnd,
-                  let end = EditorReplacePlanning.rangeEnd(range)
-            else {
-                return nil
-            }
-            previousEnd = end
-            if offset < range.location {
+        for range in validated {
+            if offset < range.lowerBound {
                 return mapped
             }
             let (delta, deltaOverflow) = replacementUTF16Length.subtractingReportingOverflow(
-                range.length
+                range.count
             )
             if deltaOverflow { return nil }
-            if offset < end {
+            if offset < range.upperBound {
                 // `mapped` already includes every preceding edit. Remove the offset's
                 // distance into this match before advancing to the replacement end.
-                let (start, startOverflow) = mapped.subtractingReportingOverflow(offset - range.location)
+                let (start, startOverflow) = mapped.subtractingReportingOverflow(offset - range.lowerBound)
                 if startOverflow { return nil }
                 let (result, overflow) = start.addingReportingOverflow(
                     replacementUTF16Length
@@ -124,6 +135,26 @@ public enum EditorReplaceSourceConstruction {
             mapped = next
         }
         return mapped
+    }
+
+    /// Validate the entire list before consumers may return early (e.g. offset mapping).
+    private static func validatedRanges(
+        _ ranges: [NSRange],
+        lengthBound: Int? = nil
+    ) -> [Range<Int>]? {
+        if let lengthBound, lengthBound < 0 { return nil }
+        var previousEnd = 0
+        var validated: [Range<Int>] = []
+        validated.reserveCapacity(ranges.count)
+        for range in ranges {
+            guard range.location >= previousEnd,
+                  let end = EditorReplacePlanning.rangeEnd(range),
+                  lengthBound.map({ end <= $0 }) ?? true
+            else { return nil }
+            validated.append(range.location ..< end)
+            previousEnd = end
+        }
+        return validated
     }
 
     /// Whether an off-main plan must check cancellation before doing more work.
@@ -139,6 +170,8 @@ public enum EditorReplaceSourceConstruction {
     }
 
     /// At most 100 monotonically increasing visible-progress milestones, including `total`.
+    /// Distribute the remainder into the earliest intervals (250 => 3...150, 152...250).
+    /// This pure schedule is independent of WorkspaceKit's candidate-progress stride.
     public static func progressUpdateMilestones(totalMatchCount: Int) -> [Int] {
         guard totalMatchCount > 0 else { return [] }
         let updateCount = min(

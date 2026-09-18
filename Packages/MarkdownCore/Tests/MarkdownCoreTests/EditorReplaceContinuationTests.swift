@@ -74,6 +74,9 @@ final class EditorReplaceContinuationTests: XCTestCase {
             postWriteSource: post
         )
         XCTAssertEqual(post, "a b z")
+        XCTAssertEqual(continued.resumeUTF16, 5)
+        XCTAssertEqual(continued.session.caretAnchorUTF16, continued.resumeUTF16)
+        XCTAssertEqual(continued.collapsedSelection, NSRange(location: 5, length: 0))
         XCTAssertNil(continued.session.currentOrdinal)
         XCTAssertEqual(continued.session.total, 1)
         XCTAssertEqual(continued.session.next().currentOrdinal, 1)

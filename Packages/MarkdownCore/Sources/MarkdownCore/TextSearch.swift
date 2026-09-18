@@ -126,6 +126,6 @@ public enum TextSearchEngine {
             && !text.isEmpty
             && !query.pattern.isEmpty
             && query.pattern.utf16.count <= maximumPatternUTF16Length
-            && !query.pattern.contains(where: \.isNewline)
+            && !TextSearchInputValidation.containsNewline(query.pattern)
     }
 }

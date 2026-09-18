@@ -42,13 +42,13 @@ public enum EditorReplaceContinuationPlanning {
             preWriteCurrentMatch: preWriteCurrentMatch,
             preWriteCaretUTF16: preWriteCaretUTF16
         )
+        let length = (postWriteSource as NSString).length
+        let clamped = min(max(0, mapped), length)
         let rescanned = EditorFindSession.search(
             in: postWriteSource,
             query: plan.query,
-            caretAnchorUTF16: mapped
-        ).withUnresolvedCurrent(caretAnchorUTF16: mapped)
-        let length = (postWriteSource as NSString).length
-        let clamped = min(max(0, mapped), length)
+            caretAnchorUTF16: clamped
+        ).withUnresolvedCurrent(caretAnchorUTF16: clamped)
         return EditorReplaceContinuation(
             session: rescanned,
             resumeUTF16: clamped,
@@ -90,9 +90,14 @@ public enum EditorReplaceContinuationPlanning {
             guard let currentEnd = EditorReplacePlanning.rangeEnd(current.range) else {
                 return preWriteCaretUTF16
             }
+            // The current match owns its trailing edge. An adjacent next match
+            // starts at that same offset but must not advance this selection.
+            let precedingAndCurrent = Array(plan.differingRanges.prefix {
+                $0.location < currentEnd
+            })
             return EditorReplaceSourceConstruction.mapUTF16Offset(
                 currentEnd,
-                through: plan.differingRanges,
+                through: precedingAndCurrent,
                 replacementUTF16Length: replacementLength
             ) ?? currentEnd
         }

@@ -3,6 +3,17 @@ import Foundation
 import XCTest
 
 final class EditorReplaceBatchPlanTests: XCTestCase {
+    func testNonDivisibleProgressMilestonesUseEveryBoundedInterval() {
+        // Fifty 3-match intervals, followed by fifty 2-match intervals. A floor-
+        // or ceil-stride scheduler, or truncating 250 unit updates, must fail.
+        let expected = Array(stride(from: 3, through: 150, by: 3))
+            + Array(stride(from: 152, through: 250, by: 2))
+        XCTAssertEqual(EditorReplaceSourceConstruction.progressUpdateMilestones(totalMatchCount: 250), expected)
+        XCTAssertEqual(expected.count, 100)
+        XCTAssertEqual(EditorReplaceSourceConstruction.progressUpdateMilestones(totalMatchCount: 0), [])
+        XCTAssertEqual(EditorReplaceSourceConstruction.progressUpdateMilestones(totalMatchCount: -1), [])
+    }
+
     func testTruncatedSessionRefusesReplaceAll() {
         let source = String(repeating: "x", count: 10001)
         let session = EditorFindSession.search(

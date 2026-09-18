@@ -8,7 +8,9 @@
 > `EditorFindSession.withUnresolvedCurrent` for post-replace `0 / total`, and
 > binds every continuation rescan to the originating session query. Cancellation
 > cadence remains independent from the at-most-100 visible progress milestones,
-> and malformed public UTF-16 ranges fail closed without end overflow. This PR
+> and malformed public UTF-16 ranges fail closed without end overflow. The pure
+> B1 slice builder validates and rebases absolute ranges; mapped batch caret,
+> session anchor, and collapsed selection share one post-write clamp. This PR
 > introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
 > R2, R3 publication/writer bullets, and R4–R10 stay open.
 >
@@ -579,6 +581,15 @@ the existing `EditorFindSession.search` / `TextSearchEngine`.
 
 No I/O, actor, undo, AppKit, STTextView, or document authority lives here.
 
+`EditorReplaceSourceConstruction.replacedSlice(_:enclosing:ranges:replacement:)`
+builds the local text for B1's one enclosing-range edit. It validates the entire
+ordered, non-overlapping range list and enclosing source bounds before rebasing;
+untouched gaps remain literal, and an empty list returns the unchanged slice.
+`EditorReplaceSourceConstructionTests` covers Unicode, deletion, adjacent edits,
+padding, empty ranges, malformed/overflowing lists, and ranges escaping the slice.
+The #112 executor should consume this helper when integrated; no EditorKit or
+R0 mechanism change is claimed by this model-only work.
+
 ### 6.2 EditorKit — installed editor executor
 
 EditorKit owns:
@@ -711,6 +722,8 @@ separate spike PR.
   `EditorReplaceValidationTests` (`testEmptyReplacementIsValid`,
   `testLiteralDollarAndEscapeSequencesAreValid`,
   `testActualNewlinesAreInvalid`,
+  `testFindAndReplaceRejectEverySingleLineSeparator`,
+  `testIndependentReplacementDefaultMatchesQueryScaleAndDerivesGrowthCap`,
   `testTwoHundredFiftySixCodeUnitsAreValidAndTwoFiftySevenAreNot`,
   `testLiteralIdentityUsesUTF16NotCanonicalStringEquality`,
   `testMalformedRangesFailClosedWithoutEndOverflow`).
@@ -779,6 +792,13 @@ separate spike PR.
   `EditorReplaceOneMatchPlanTests` (`testLiteralIdenticalSkipsMutationAndAdvancesToNextStart`,
   `testLiteralIdenticalAtLastMatchLeavesCurrentNilWithoutWrap`);
   `EditorFindSessionUnresolvedCurrentTests`.
+  `testNoLaterMatchLeavesCurrentNilUntilExplicitNext` explicitly asserts the
+  source-changing resume, session anchor, and collapsed selection before wrap.
+  `EditorReplaceOffsetMappingTests` covers two preceding unequal-length edits,
+  adjacent-match start mapping, current-match end ownership at an adjacent
+  following edit, and clamping all three batch caret outputs to
+  the same post-write offset. `EditorReplaceSourceConstructionTests` also proves
+  offset mapping rejects malformed suffixes even when the caret precedes them.
   Publication, writer activation, revision, and undo remain PR D / R2. The
   literal-identical *model* advance is covered; the no-writer/undo half of that
   bullet stays open.
@@ -814,7 +834,12 @@ separate spike PR.
 - [ ] All-literal-identical batches report “No changes” with no writer,
   revision, undo, rescan, selection, or ordinal change. Mixed batches change
   only differing ranges in one undo and report “Changed X of Y matches.”
-- Evidence: _open_
+- Evidence: executor gates remain _open_. Pure model support is covered by
+  `EditorReplaceBatchPlanTests.testNonDivisibleProgressMilestonesUseEveryBoundedInterval`:
+  N=250 emits exactly 3, 6, …, 150, 152, 154, …, 250 (100 milestones),
+  independently of the cancellation cadence. Replacement and growth defaults
+  are pinned in `EditorReplaceValidationTests`; the growth limit derives from
+  the retained-match ceiling times the independently owned replacement cap.
 
 ### R5 — Experimental WYSIWYG raw-source replacement
 

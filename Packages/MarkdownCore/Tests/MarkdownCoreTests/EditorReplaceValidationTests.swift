@@ -3,6 +3,30 @@ import Foundation
 import XCTest
 
 final class EditorReplaceValidationTests: XCTestCase {
+    func testIndependentReplacementDefaultMatchesQueryScaleAndDerivesGrowthCap() {
+        XCTAssertEqual(EditorReplaceLimits.maximumReplacementUTF16Length, 256)
+        XCTAssertEqual(EditorReplaceLimits.maximumReplacementUTF16Length, TextSearchEngine.maximumPatternUTF16Length)
+        XCTAssertEqual(EditorReplaceLimits.maximumGrowthUTF16, 2_560_000)
+        XCTAssertEqual(EditorReplaceLimits.maximumGrowthUTF16,
+                       EditorFindLimits.retainedMatchCeiling * EditorReplaceLimits.maximumReplacementUTF16Length)
+    }
+
+    func testFindAndReplaceRejectEverySingleLineSeparator() {
+        for separator in ["\n", "\r", "\r\n", "\u{000B}", "\u{000C}", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            let value = "a\(separator)b"
+            XCTAssertEqual(EditorReplacePlanning.validateReplacement(value), .containsNewline)
+            XCTAssertTrue(TextSearchEngine.matches(
+                in: value, query: TextSearchQuery(pattern: value), limit: 1
+            ).isEmpty)
+        }
+        for value in ["a b", "a\tb", "a\\nb", "🧪"] {
+            XCTAssertEqual(EditorReplacePlanning.validateReplacement(value), .valid)
+            XCTAssertEqual(TextSearchEngine.matches(
+                in: value, query: TextSearchQuery(pattern: value), limit: 1
+            ).count, 1)
+        }
+    }
+
     func testEmptyReplacementIsValid() {
         XCTAssertEqual(EditorReplacePlanning.validateReplacement(""), .valid)
     }
