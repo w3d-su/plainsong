@@ -5,11 +5,15 @@ import XCTest
 final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
     private var app: XCUIApplication!
     private var workspaceWindow: XCUIElement!
-    private var savedPasteboardItems: [[NSPasteboard.PasteboardType: Data]] = []
+    private var ownedPasteboard = EditorFindOwnedPasteboard()
+    private var shortcutInputSource = EditorFindSyntheticShortcutInputSource()
+    private var selectedASCIISourceIdentifiers = Set<String>()
 
     private func launchApplication() {
         continueAfterFailure = false
-        savedPasteboardItems = snapshotGeneralPasteboard()
+        ownedPasteboard = EditorFindOwnedPasteboard()
+        shortcutInputSource = EditorFindSyntheticShortcutInputSource()
+        selectedASCIISourceIdentifiers = []
         app = XCUIApplication()
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launchEnvironment["PLAINSONG_DEBUG_WORKSPACE_SEARCH_FIXTURE"] =
@@ -17,8 +21,8 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         app.launch()
         app.activate()
 
-        addTeardownBlock { [weak self] in
-            await self?.terminateApplication()
+        addTeardownBlock {
+            await self.terminateApplication()
         }
 
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
@@ -51,16 +55,50 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
     }
 
     private func terminateApplication() {
+        var inputSourceEvents = [attemptInputSourceRestoration(
+            phase: "before app termination"
+        )]
+        var pasteboardEvents = [attemptPasteboardRestoration(
+            phase: "before app termination"
+        )]
         app.terminate()
+        let didTerminate = app.wait(for: .notRunning, timeout: 5)
+
+        if shortcutInputSource.hasPendingRestoration {
+            inputSourceEvents.append(attemptInputSourceRestoration(
+                phase: "after app termination retry"
+            ))
+        }
+        if ownedPasteboard.hasPendingRestoration {
+            pasteboardEvents.append(attemptPasteboardRestoration(
+                phase: "after app termination retry"
+            ))
+        }
+
+        print(
+            "WS4A synthetic ASCII input source(s): "
+                + selectedASCIISourceIdentifiers.sorted().joined(separator: ", ")
+        )
+        print("WS4A input-source restoration: " + inputSourceEvents.joined(separator: "; "))
+        print("WS4A pasteboard restoration: " + pasteboardEvents.joined(separator: "; "))
+        XCTAssertFalse(
+            shortcutInputSource.hasPendingRestoration,
+            "Input-source restoration still failed after the post-termination retry"
+        )
+        XCTAssertFalse(
+            ownedPasteboard.hasPendingRestoration,
+            "General-pasteboard restoration still failed after the post-termination retry"
+        )
+        XCTAssertTrue(didTerminate, "The fixture app did not terminate before teardown finished")
+
         app = nil
         workspaceWindow = nil
-        restoreGeneralPasteboard()
     }
 
-    func testShortcutKeyboardActivationAndEscapeTransitions() {
+    func testShortcutKeyboardActivationAndEscapeTransitions() throws {
         launchApplication()
-        let queryField = openSearchWithShortcut()
-        enterCJKQuery(in: queryField)
+        let queryField = try openSearchWithShortcut()
+        try enterCJKQuery(in: queryField)
 
         let first = resultRow(relativePath: "a-overview.md")
         let target = resultRow(relativePath: "posts/b-target.mdx")
@@ -127,10 +165,10 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         assertQueryAndResultsRemain(queryField: queryField, target: target)
     }
 
-    func testClickThenArrowKeysUseSearchSelection() {
+    func testClickThenArrowKeysUseSearchSelection() throws {
         launchApplication()
-        let queryField = openSearchWithShortcut()
-        enterCJKQuery(in: queryField)
+        let queryField = try openSearchWithShortcut()
+        try enterCJKQuery(in: queryField)
 
         let first = resultRow(relativePath: "a-overview.md")
         let target = resultRow(relativePath: "posts/b-target.mdx")
@@ -153,11 +191,15 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         waitForSelected(target)
     }
 
-    private func openSearchWithShortcut() -> XCUIElement {
+    private func openSearchWithShortcut() throws -> XCUIElement {
         makeFixtureWindowKey()
         let editor = workspaceWindow.textViews["plainsong.editor.textView"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.typeKey("f", modifierFlags: [.command, .shift])
+        try typeSyntheticTextKey(
+            "f",
+            modifierFlags: [.command, .shift],
+            on: editor
+        )
         let queryField = workspaceWindow.textFields["plainsong.workspaceSearch.queryField"]
         XCTAssertTrue(queryField.waitForExistence(timeout: 5))
         let focusProbe = workspaceWindow.descendants(matching: .any)[
@@ -169,41 +211,73 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
             description: "query-field routing after shortcut"
         )
         waitForKeyboardFocus(queryField)
-        app.typeKey("x", modifierFlags: [])
+        try typeSyntheticTextKey("x", modifierFlags: [], on: app)
         waitForValue("x", of: queryField, description: "shortcut-focused query field")
         return queryField
     }
 
-    private func enterCJKQuery(in queryField: XCUIElement) {
+    private func enterCJKQuery(in queryField: XCUIElement) throws {
         queryField.click()
-        queryField.typeKey("a", modifierFlags: .command)
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        XCTAssertTrue(pasteboard.setString("搜尋", forType: .string))
-        app.typeKey("v", modifierFlags: .command)
+        try typeSyntheticTextKey("a", modifierFlags: .command, on: queryField)
+        try ownedPasteboard.writeString("搜尋")
+        try typeSyntheticTextKey("v", modifierFlags: .command, on: app)
         waitForValue("搜尋", of: queryField, description: "CJK query")
     }
 
-    private func snapshotGeneralPasteboard() -> [[NSPasteboard.PasteboardType: Data]] {
-        NSPasteboard.general.pasteboardItems?.map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            })
-        } ?? []
+    /// XCUI's textual key API is interpreted through the selected input source. Each injection
+    /// is scoped to an enabled, select-capable ASCII source and restores the exact prior source
+    /// immediately. This remains synthetic UI-automation evidence, not physical-keyboard evidence.
+    private func typeSyntheticTextKey(
+        _ key: String,
+        modifierFlags: XCUIElement.KeyModifierFlags,
+        on element: XCUIElement
+    ) throws {
+        do {
+            let identifier = try shortcutInputSource.withASCIICapableInputSource {
+                element.typeKey(
+                    XCUIKeyboardKey(rawValue: key),
+                    modifierFlags: modifierFlags
+                )
+            }
+            selectedASCIISourceIdentifiers.insert(identifier)
+        } catch let error as EditorFindSyntheticShortcutInputSource.InputSourceError {
+            switch error {
+            case .noEligibleInputSource:
+                throw XCTSkip(
+                    "This runner has no enabled, select-capable ASCII input source"
+                )
+            case let .couldNotUseEligibleInputSources(failures):
+                throw XCTSkip(
+                    "This runner could not select/read back an eligible ASCII input source: "
+                        + failures.joined(separator: "; ")
+                )
+            case let .currentSourceChangedBeforeSelection(identifier),
+                 let .currentSourceChangedDuringShortcut(identifier):
+                throw XCTSkip(
+                    "The runner's input source changed externally during synthetic input: "
+                        + identifier
+                )
+            default:
+                throw error
+            }
+        }
     }
 
-    private func restoreGeneralPasteboard() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let items = savedPasteboardItems.map { values in
-            let item = NSPasteboardItem()
-            for (type, data) in values {
-                item.setData(data, forType: type)
-            }
-            return item
+    private func attemptInputSourceRestoration(phase: String) -> String {
+        do {
+            let outcome = try shortcutInputSource.restorePendingSelectionIfOwned()
+            return "\(phase): \(outcome)"
+        } catch {
+            return "\(phase) failed: \(error)"
         }
-        if !items.isEmpty {
-            pasteboard.writeObjects(items)
+    }
+
+    private func attemptPasteboardRestoration(phase: String) -> String {
+        do {
+            let outcome = try ownedPasteboard.restoreIfStillOwned()
+            return "\(phase): \(outcome)"
+        } catch {
+            return "\(phase) failed: \(error)"
         }
     }
 
