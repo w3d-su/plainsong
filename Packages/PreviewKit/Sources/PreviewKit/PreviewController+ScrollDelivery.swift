@@ -49,6 +49,12 @@ struct PreviewScrollDeliveryState {
     private var latestRequestedDocumentIdentifier: String?
     private var latestCompletedRenderID = -1
 
+    /// One shared barrier for export and scroll; a newer submitted render invalidates it.
+    var completedRenderID: Int? {
+        latestRequestedRenderID >= 0 && latestCompletedRenderID == latestRequestedRenderID
+            ? latestCompletedRenderID : nil
+    }
+
     mutating func presentedDocumentDidChange(to documentIdentifier: String?) {
         guard let pendingDelivery,
               pendingDelivery.documentIdentifier != documentIdentifier
@@ -121,6 +127,6 @@ struct PreviewScrollDeliveryState {
         else {
             return false
         }
-        return latestCompletedRenderID >= requiredRenderID
+        return completedRenderID == requiredRenderID
     }
 }

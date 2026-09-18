@@ -9,7 +9,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeProtocolVersionAndMessageOrder() {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 5)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 6)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [
@@ -21,6 +21,8 @@ final class PreviewKitTests: XCTestCase {
                 "linkClicked",
                 "checkboxToggled",
                 "setTheme",
+                "exportHTML",
+                "exportHTMLResult",
             ]
         )
     }
