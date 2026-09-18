@@ -23,10 +23,42 @@ jobs:
 
       - name: Install tools
         run: |
-          brew install xcodegen swiftformat swiftlint
+          brew install xcodegen swiftlint
           echo "xcodegen: $(xcodegen --version)"
-          echo "swiftformat: $(swiftformat --version)"
           echo "swiftlint: $(swiftlint --version)"
+
+      # swiftformat is pinned to an exact release binary instead of `brew install`.
+      # Homebrew tracks the latest release, and a runner-image bump from 0.62.1 to
+      # 0.63.0 (2026-09-18) changed the `indent` rule enough to fail `make lint` on
+      # untouched files, turning every PR red without any code change. The pinned
+      # version and SHA-256 are the single source of truth; bump both together in a
+      # PR that also reformats the tree if the new release changes rule behavior.
+      - name: Install pinned swiftformat
+        env:
+          SWIFTFORMAT_VERSION: "0.62.1"
+          SWIFTFORMAT_SHA256: "7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a"
+        run: |
+          set -euo pipefail
+          install_dir="$RUNNER_TEMP/swiftformat-$SWIFTFORMAT_VERSION"
+          mkdir -p "$install_dir"
+          curl -fsSL --retry 3 \
+            -o "$install_dir/swiftformat.zip" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat.zip"
+          echo "$SWIFTFORMAT_SHA256  $install_dir/swiftformat.zip" | shasum -a 256 -c -
+          unzip -oq "$install_dir/swiftformat.zip" -d "$install_dir"
+          chmod +x "$install_dir/swiftformat"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          actual="$("$install_dir/swiftformat" --version)"
+          if [ "$actual" != "$SWIFTFORMAT_VERSION" ]; then
+            echo "pinned swiftformat $SWIFTFORMAT_VERSION but binary reports $actual" >&2
+            exit 1
+          fi
+          echo "swiftformat: $actual (pinned)"
+
+      - name: Verify swiftformat on PATH
+        run: |
+          echo "resolved: $(command -v swiftformat)"
+          echo "swiftformat: $(swiftformat --version)"
 
       - uses: actions/setup-node@v4
         with:
