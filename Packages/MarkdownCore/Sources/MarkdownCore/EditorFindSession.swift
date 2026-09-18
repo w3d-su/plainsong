@@ -108,6 +108,34 @@ public struct EditorFindSession: Equatable, Sendable {
         )
     }
 
+    /// Matches remain, but there is no current hit (`0 / total` after Replace).
+    ///
+    /// Find search still resolves a nearest ordinal. Replace continuation must not
+    /// wrap automatically when nothing starts at or after `resumeUTF16`.
+    public func withUnresolvedCurrent(caretAnchorUTF16: Int) -> EditorFindSession {
+        EditorFindSession(
+            retainedMatches: matches,
+            isTruncated: isTruncated,
+            query: query,
+            caretAnchorUTF16: caretAnchorUTF16,
+            preferredOrdinal: nil,
+            allowUnresolvedCurrent: true
+        )
+    }
+
+    public func withCurrentOrdinal(
+        _ ordinal: Int,
+        caretAnchorUTF16: Int
+    ) -> EditorFindSession {
+        EditorFindSession(
+            retainedMatches: matches,
+            isTruncated: isTruncated,
+            query: query,
+            caretAnchorUTF16: caretAnchorUTF16,
+            preferredOrdinal: ordinal
+        )
+    }
+
     public func next() -> EditorFindSession {
         guard !matches.isEmpty else { return self }
         let nextOrdinal: Int = if let currentOrdinal {
@@ -221,13 +249,16 @@ public struct EditorFindSession: Equatable, Sendable {
         isTruncated: Bool,
         query: TextSearchQuery,
         caretAnchorUTF16: Int,
-        preferredOrdinal: Int?
+        preferredOrdinal: Int?,
+        allowUnresolvedCurrent: Bool = false
     ) {
         self.query = query
         matches = retainedMatches
         self.isTruncated = isTruncated
         self.caretAnchorUTF16 = max(0, caretAnchorUTF16)
         if retainedMatches.isEmpty {
+            currentOrdinal = nil
+        } else if allowUnresolvedCurrent, preferredOrdinal == nil {
             currentOrdinal = nil
         } else if let preferredOrdinal,
                   retainedMatches.indices.contains(preferredOrdinal - 1)

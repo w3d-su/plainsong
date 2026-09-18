@@ -11,8 +11,18 @@ struct WorkspaceSearchPipelineFailureInjector {
     static let disabled = WorkspaceSearchPipelineFailureInjector(failurePoint: nil)
 
     let failurePoint: WorkspaceSearchPipelineFailurePoint?
+    let checkpointHandler: (@Sendable (WorkspaceSearchPipelineFailurePoint) -> Void)?
+
+    init(
+        failurePoint: WorkspaceSearchPipelineFailurePoint?,
+        checkpointHandler: (@Sendable (WorkspaceSearchPipelineFailurePoint) -> Void)? = nil
+    ) {
+        self.failurePoint = failurePoint
+        self.checkpointHandler = checkpointHandler
+    }
 
     func checkpoint(_ checkpoint: WorkspaceSearchPipelineFailurePoint) throws {
+        checkpointHandler?(checkpoint)
         guard failurePoint == checkpoint else { return }
         throw WorkspaceSearchInjectedProducerError()
     }

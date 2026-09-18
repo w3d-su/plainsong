@@ -99,6 +99,17 @@ public enum EditorSelectionProbe {
         )
     }
 
+    /// UTF-16 range currently inside the editor viewport, regardless of first responder.
+    /// Hosted navigation gates use this to prove `scrollRangeToVisible` revealed a match.
+    static func visibleTextRange(in window: NSWindow) -> NSRange? {
+        guard let root = window.contentView,
+              let editor = editorTextView(in: root) as? STTextView
+        else {
+            return nil
+        }
+        return MarkdownTextView.visibleTextRange(of: editor)
+    }
+
     /// Test seam: stands in for `NSApp.keyWindow` in every `keyWindow…` entry point.
     ///
     /// A test process cannot make a programmatic window key (`NSApp.keyWindow` stays nil when

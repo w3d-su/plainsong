@@ -1,9 +1,10 @@
 # Phase 3 Export (HTML / PDF / Print) — Gate Specification
 
-> **Status: E0 mechanism gate closed as GO (paginated); E1–E9 remain open.** Precedent:
+> **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
+> 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
+> PR C lands protocol v6 + static-document semantics. E1–E9 remain open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
-> or an owner-recorded result in the same commit. Decisions D3–D5 require explicit owner
-> sign-off before any implementation PR starts.
+> or an owner-recorded result in the same commit.
 
 Created 2026-07-29 as a Phase 3 export candidate from `agent.md` §14. See `agent.md`
 §7 (preview and bridge), §11 (themes), §17.5 (bridge mirroring), the PR #24/#27
@@ -52,8 +53,10 @@ work.
 | **D4** | Both silent **Export as PDF…** and panel-based **Print…**, using different WebKit APIs. | **Required.** |
 | **D5** | One-shot `NSSavePanel` destination, deliberately outside the retained workspace-file write path. | **Required.** |
 
-Explicit approval of D3–D5 must be recorded by the owner in this PR before PR B begins.
-Silence, implementation activity, or a green CI run is not owner sign-off.
+**Owner sign-off 2026-08-13:** D3, D4, and D5 are accepted as specified. D4’s v1 page
+model is the E0-recorded fixed-height pagination, not a continuous page. This unlocks
+implementation PR C; it is not itself a product-surface change. Silence, implementation
+activity, or a green CI run remains insufficient for any later change to these choices.
 
 ### D1 — Export source: dedicated offscreen preview
 
@@ -95,7 +98,7 @@ the Decision Log first.
 request/result pair:
 
 - Swift → JS: `exportHTML` with an export request ID, the completed `renderID`, and a
-  typed discovery or finalization phase.
+  typed discovery or finalization phase, and an optional parsed frontmatter `documentTitle`.
 - JS → Swift: `exportHTMLResult` with the same IDs and one typed state:
   `resourcesNeeded`, `ready(html)`, or `failed`.
 
@@ -164,6 +167,14 @@ occurrence would cross either limit becomes the same inert placeholder with the 
 If source/markup/styles/fonts without optional images already exceed 64 MiB, the whole
 export fails before any destination write. A future change to any per-image or aggregate
 limit needs measured evidence, owner sign-off, and a Decision Log entry.
+
+#### Document title
+
+The static `<title>` uses the non-empty MarkdownCore-parsed frontmatter `title`,
+otherwise the first document heading (`h1`–`h6` in document order, excluding headings
+inside MDX component cards), otherwise `Untitled`. Frontmatter remains absent from the
+body. Swift sends the optional frontmatter title in both v6 export rounds; JS retains
+that discovery value while choosing the rendered-heading fallback.
 
 #### Rendered styling
 
@@ -469,9 +480,9 @@ own PR.
 | **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
 | **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
 
-D3–D5 owner sign-off is required before PR B starts. If a later implementation needs a
-different fixed choice, update this spec and the Decision Log in a separate reviewed
-docs PR before changing production behavior.
+D3–D5 owner sign-off was recorded 2026-08-13 (after E0, before PR C). If a later
+implementation needs a different fixed choice, update this spec and the Decision Log in
+a separate reviewed docs PR before changing production behavior.
 
 ## 8. Gates
 
@@ -526,11 +537,18 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [ ] Render or MDX error fails explicitly; no blank, prior-document, or stale
   last-good DOM is returned.
 - [ ] Offscreen controller/task/resources are released on success, failure, and cancel.
-- Evidence: _open — PR C/F lifecycle tests_
+- PR C evidence: `ExportHTMLLifecycleTests` covers cancellation (including pre-cancel),
+  timeout (production default 15 seconds), explicit `invalidate()`, the WebContent
+  termination delegate callback, bridge-send failure, supersession, and shared render
+  readiness. The four terminal lifecycle cases assert pending-continuation removal and
+  weak controller/WebView release after owner invalidation. This injects the termination
+  notification; it does not kill an OS WebKit helper. `ExportHTMLHostedTests` rejects
+  MDX stale/error output. App snapshot/destination-write fencing and full resource
+  lifecycle are still PR D/F work, so E1 remains open.
 
 ### E2 — Protocol-v6 export contract
 
-- [ ] Swift and TypeScript list the same 10 ordered message names, including correlated
+- [x] Swift and TypeScript list the same 10 ordered message names, including correlated
   `exportHTML` / `exportHTMLResult`, with `PROTOCOL_VERSION == 6`.
 - [ ] Discovery/finalization rounds, request/result IDs, and completed `renderID` are
   validated; stale, duplicate, out-of-order, malformed, and failure results cannot
@@ -542,7 +560,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   commit as the bridge change.
 - [ ] No production path evaluates `document.documentElement.outerHTML` outside the
   typed protocol.
-- Evidence: _open — PR C/D bridge, resource-readiness tests, and committed preview bundle_
+- Ordered-name/version evidence: `preview-src/test/protocol.test.ts` and
+  `PreviewKitTests.testBridgeProtocolVersionAndMessageOrder` pin the ten ordered names
+  and version 6. `ExportHTMLProtocolTests` covers the mirrored title payload;
+  `ExportHTMLBridgeDecodingTests` checks direct dictionary decoding against Codable,
+  malformed rejection, and a multi-MB receipt. Remaining resource-readiness bullets
+  stay open for PR D; early ready, duplicate discovery responses, and superseded results are fenced.
 
 ### E3 — Static HTML and product semantics
 
@@ -552,11 +575,22 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `url(...)` is accepted only by the documented scheme/fragment/data allowlist.
 - [ ] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
   appearance, and Mermaid output.
-- [ ] Frontmatter is absent from the body.
+- [ ] Frontmatter is absent from the body; `<title>` follows D3's frontmatter / first
+  document heading / `Untitled` rule.
 - [ ] MDX fixture exports ESM/JSX/expression placeholders without component execution;
   syntax-error/stale-render export fails.
 - [ ] `system`, light, and dark themes freeze the correct resolved built-in styling.
-- Evidence: _open — PR C/D serializer and policy snapshots_
+- PR C evidence: `ExportHTMLTitleTests` and `export-html-review.test.ts` cover title
+  precedence, a non-leading H2, MDX component-card headings before the document heading,
+  CSS closing-tag injection, exception-to-failure results, inline raster preservation,
+  shared image MIME policy, and superseded discovery without live DOM attributes.
+  `ExportHTMLHostedTests.testSuccessfulMarkdownExportIsAStaticDocument` requires
+  `--preview-bg`, defined in the bundled CSS, instead of accepting the root element.
+  WebKit refuses CSSOM reads of linked file-origin stylesheets; `build.mjs` supplies
+  the exact same CSS input as `bundle.css`, while readable renderer-injected styles
+  still come from CSSOM. No export-time fetch occurs. Inline raster preservation here
+  uses the existing live MIME policy only; decoded-byte caps, normalization, image
+  decode readiness, fonts, and comprehensive URL-sink validation remain PR D. E3 stays open.
 
 ### E4 — Assets, fonts, and offline fidelity
 

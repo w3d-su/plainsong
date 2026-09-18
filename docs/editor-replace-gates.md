@@ -1,10 +1,21 @@
 # In-Document Replace — Gate Specification
 
-> **Status: R0 is GO on Candidate B1 (minimal enclosing range).** Spec PR A (#100)
-> remains merged. This mechanism-spike PR does not ship user-facing Replace.
-> R1–R10 stay open. Candidate A is one native undo group but publishes once per
-> match, so it is NO-GO for Replace All. Candidate B2 works as a fallback and is
-> not chosen while B1 preserves source, undo, dirty, and presentation.
+> **Status: spec is on `main`; this file now tracks implementation evidence.**
+> The successor to in-document Find (PR #95/#96/#97). **R0 is GO on Candidate B1
+> (minimal enclosing range)** per the hosted writer-undo spike on
+> `phase3-editor-replace-r0` (PR #112): Candidate A is one native undo group but
+> publishes once per match, so it is NO-GO for Replace All; Candidate B2 works as a
+> fallback and is not chosen while B1 preserves source, undo, dirty, and presentation.
+> The spike does not ship user-facing Replace. **PR C (`phase3-editor-replace-model`) is the pure MarkdownCore
+> planner:** it closes R1 and the R3 *model* bullets with named tests, adds
+> `EditorFindSession.withUnresolvedCurrent` for post-replace `0 / total`, and
+> binds every continuation rescan to the originating session query. Cancellation
+> cadence remains independent from the at-most-100 visible progress milestones,
+> and malformed public UTF-16 ranges fail closed without end overflow. The pure
+> B1 slice builder validates and rebases absolute ranges; mapped batch caret,
+> session anchor, and collapsed selection share one post-write clamp. This PR
+> introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
+> R2, R3 publication/writer bullets, and R4–R10 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -572,6 +583,15 @@ the existing `EditorFindSession.search` / `TextSearchEngine`.
 
 No I/O, actor, undo, AppKit, STTextView, or document authority lives here.
 
+`EditorReplaceSourceConstruction.replacedSlice(_:enclosing:ranges:replacement:)`
+builds the local text for B1's one enclosing-range edit. It validates the entire
+ordered, non-overlapping range list and enclosing source bounds before rebasing;
+untouched gaps remain literal, and an empty list returns the unchanged slice.
+`EditorReplaceSourceConstructionTests` covers Unicode, deletion, adjacent edits,
+padding, empty ranges, malformed/overflowing lists, and ranges escaping the slice.
+The #112 executor should consume this helper when integrated; no EditorKit or
+R0 mechanism change is claimed by this model-only work.
+
 ### 6.2 EditorKit — installed editor executor
 
 EditorKit owns:
@@ -638,7 +658,9 @@ Before declaring an implementation PR done: relevant package/hosted tests,
 
 ## 8. Gates
 
-All boxes intentionally start unchecked.
+Boxes stay unchecked until a later PR supplies named-test or owner-recorded
+evidence. R1 and the R3 model bullets are checked in PR C; R0 remains on the
+separate spike PR.
 
 ### R0 — Batch writer activation + one undo (blocking mechanism spike)
 
@@ -710,22 +732,38 @@ All boxes intentionally start unchecked.
 
 ### R1 — One literal match semantics
 
-- [ ] Replacement planner consumes only `EditorFindSession` matches from
+- [x] Replacement planner consumes only `EditorFindSession` matches from
   existing `TextSearchEngine`; no second matching path.
-- [ ] Smart/sensitive/insensitive, whole-word, invalid query, canonical
+- [x] Smart/sensitive/insensitive, whole-word, invalid query, canonical
   equivalence, and non-overlap agree exactly with Find.
-- [ ] Match length is taken from returned UTF-16 range, never query length.
-- [ ] Empty replacement deletes; `$1`, `\1`, and `\n` are literal, not
+- [x] Match length is taken from returned UTF-16 range, never query length.
+- [x] Empty replacement deletes; `$1`, `\1`, and `\n` are literal, not
   templates/escapes.
-- [ ] Replacement accepts at most 256 UTF-16 code units; multiline/over-limit
+- [x] Replacement accepts at most 256 UTF-16 code units; multiline/over-limit
   values are explicitly invalid without changing search semantics.
-- [ ] Source-identical comparison is literal UTF-16 code-unit equality, not
+- [x] Source-identical comparison is literal UTF-16 code-unit equality, not
   canonically equivalent Swift `String ==`.
-- [ ] Regex input or mode cannot be enabled by the Replace surface.
-- [ ] Plans cover the whole current installed document/session only; no
+- [x] Regex input or mode cannot be enabled by the Replace surface.
+- [x] Plans cover the whole current installed document/session only; no
   selection-scoped mode, workspace enumeration/fan-out, or workspace-wide
   replacement path exists.
-- Evidence: _open_
+- Evidence: `EditorReplaceFindAgreementTests` (`testPlannerConsumesExactFindSessionRanges`,
+  `testInvalidFindQueriesProduceEmptySessionRefusal`,
+  `testBatchUsesEntireSessionNotASelection`);
+  `EditorReplaceOneMatchPlanTests` (`testPlanUsesSessionCurrentMatchNotASecondScan`,
+  `testPlannerDoesNotRescanTheProvidedSource`,
+  `testMatchLengthComesFromTheEngineRange`,
+  `testEmptyReplacementDeletesAndTemplatesStayLiteral`);
+  `EditorReplaceValidationTests` (`testEmptyReplacementIsValid`,
+  `testLiteralDollarAndEscapeSequencesAreValid`,
+  `testActualNewlinesAreInvalid`,
+  `testFindAndReplaceRejectEverySingleLineSeparator`,
+  `testIndependentReplacementDefaultMatchesQueryScaleAndDerivesGrowthCap`,
+  `testTwoHundredFiftySixCodeUnitsAreValidAndTwoFiftySevenAreNot`,
+  `testLiteralIdentityUsesUTF16NotCanonicalStringEquality`,
+  `testMalformedRangesFailClosedWithoutEndOverflow`).
+  Model-only: no Replace surface or regex mode exists; `TextSearchQuery` remains
+  literal and `a.b` is not a regex.
 
 ### R2 — Exact current-match mutation through writer activation
 
@@ -755,27 +793,50 @@ All boxes intentionally start unchecked.
 - [ ] Replacement-aware publication consumes that revision once, suppressing/
   coalescing the same revision's ordinary `.edit` Find schedule while all other
   document-text consumers still receive normal publication.
-- [ ] `resumeUTF16 = oldStart + replacementUTF16Length`; new current is the
+- [x] `resumeUTF16 = oldStart + replacementUTF16Length`; new current is the
   first retained recomputed start at/after it.
-- [ ] No automatic wrap; no later retained match means current `nil` /
+- [x] No automatic wrap; no later retained match means current `nil` /
   `0 / total` until explicit Next.
-- [ ] Replacement-created matches are counted but starts inside the inserted
+- [x] Replacement-created matches are counted but starts inside the inserted
   span are skipped for automatic continuation.
-- [ ] Boundary-created/destroyed whole-word and canonical-equivalent matches
+- [x] Boundary-created/destroyed whole-word and canonical-equivalent matches
   come only from the full rescan, not delta-patched ranges.
 - [ ] A literal-identical single Replace performs no writer/revision/undo/
   rescan, but advances within the unchanged retained session without implicit
   wrap.
-- [ ] A no-later source-changing or literal-identical Replace stores
+- [x] A no-later source-changing or literal-identical Replace stores
   `caretAnchorUTF16 = resumeUTF16` / old match end respectively and collapses
   selection there before explicit Next/Previous uses retained-set wrap.
-- [ ] A truncated single Replace, including replacement containing the query
+- [x] A truncated single Replace, including replacement containing the query
   and the 10,000th retained match, continues only within the recomputed retained
   prefix; it never starts an unbounded second scan.
-- [ ] Replace All consumes its pre-write set once, rescans once, and leaves
+- [x] Replace All consumes its pre-write set once, rescans once, and leaves
   current `nil` with the mapped post-batch selection as `caretAnchorUTF16`;
   replacement-created hits are never recursively replaced.
-- Evidence: _open_
+- Evidence: model bullets —
+  `EditorReplaceContinuationTests` (`testPlanBindsTheQueryUsedForPostWriteRescan`,
+  `testSourceChangingOneReplaceRescansAndSkipsInsertedSpan`,
+  `testNoLaterMatchLeavesCurrentNilUntilExplicitNext`,
+  `testTruncatedSingleReplaceContinuesOnlyInTheRetainedPrefix`,
+  `testReplaceAllRescansOnceAndClearsCurrent`);
+  `EditorReplaceContinuationRescanTests` (`testWholeWordDestructionComesFromFullRescan`,
+  `testWholeWordCreationAfterResumeComesFromFullRescan`,
+  `testCanonicalEquivalentRemainderComesFromFullRescan`,
+  `testReplacementCreatedHitsAreCountedAndSkipped`,
+  `testTruncatedReplacementContainingQueryStaysInPrefix`);
+  `EditorReplaceOneMatchPlanTests` (`testLiteralIdenticalSkipsMutationAndAdvancesToNextStart`,
+  `testLiteralIdenticalAtLastMatchLeavesCurrentNilWithoutWrap`);
+  `EditorFindSessionUnresolvedCurrentTests`.
+  `testNoLaterMatchLeavesCurrentNilUntilExplicitNext` explicitly asserts the
+  source-changing resume, session anchor, and collapsed selection before wrap.
+  `EditorReplaceOffsetMappingTests` covers two preceding unequal-length edits,
+  adjacent-match start mapping, current-match end ownership at an adjacent
+  following edit, and clamping all three batch caret outputs to
+  the same post-write offset. `EditorReplaceSourceConstructionTests` also proves
+  offset mapping rejects malformed suffixes even when the caret precedes them.
+  Publication, writer activation, revision, and undo remain PR D / R2. The
+  literal-identical *model* advance is covered; the no-writer/undo half of that
+  bullet stays open.
 
 ### R4 — Replace All ceiling, cancellation, and progress
 
@@ -808,7 +869,12 @@ All boxes intentionally start unchecked.
 - [ ] All-literal-identical batches report “No changes” with no writer,
   revision, undo, rescan, selection, or ordinal change. Mixed batches change
   only differing ranges in one undo and report “Changed X of Y matches.”
-- Evidence: _open_
+- Evidence: executor gates remain _open_. Pure model support is covered by
+  `EditorReplaceBatchPlanTests.testNonDivisibleProgressMilestonesUseEveryBoundedInterval`:
+  N=250 emits exactly 3, 6, …, 150, 152, 154, …, 250 (100 milestones),
+  independently of the cancellation cadence. Replacement and growth defaults
+  are pinned in `EditorReplaceValidationTests`; the growth limit derives from
+  the retained-match ceiling times the independently owned replacement cap.
 
 ### R5 — Experimental WYSIWYG raw-source replacement
 
