@@ -8,7 +8,9 @@ func makePlainsongAppState(
     environment: [String: String] = ProcessInfo.processInfo.environment
 ) -> AppState {
     #if DEBUG
-        if environment[DebugWorkspaceSearchFixture.environmentKey]?.isEmpty == false {
+        if environment[DebugWorkspaceSearchFixture.environmentKey]?.isEmpty == false
+            || environment[DebugEditorFindFixture.environmentKey]?.isEmpty == false
+        {
             return DebugWorkspaceSearchFixture.makeIsolatedAppState()
         }
     #endif

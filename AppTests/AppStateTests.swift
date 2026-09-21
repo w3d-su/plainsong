@@ -680,7 +680,7 @@ final class AppStateTests: XCTestCase {
                 shouldRestoreLastOpenedFile: false
             )
 
-            appState.openDebugWorkspaceSearchFixture(directory)
+            appState.openDebugUITestWorkspaceFixture(directory)
 
             XCTAssertEqual(
                 appState.workspaceRootURL?.standardizedFileURL,
