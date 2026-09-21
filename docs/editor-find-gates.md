@@ -769,8 +769,9 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   refocus, reasserts the retained `needle` query after focus returns, proves select-all by
   typing a replacement without issuing a test-side select-all, and verifies that the bar
   remains open. The counter test distinguishes exact `1 / 3` with no
-  truncated element from `… / 10000+` plus the stable truncated identifier and its
-  non-color-only accessibility value. The chrome test verifies the query/toggle/button AX
+  truncated element from `… / 10000+` plus the stable truncated identifier and the
+  production `accessibilityValue` `Results truncated at match ceiling` (label kept for
+  VoiceOver). The chrome test verifies the query/toggle/button AX
   roles, empty-query enabled states, case and whole-word value/count transitions,
   Previous/Next ordinal changes, and Done closing the bar with editor focus restored.
   The strengthened exact-implementation-tree command

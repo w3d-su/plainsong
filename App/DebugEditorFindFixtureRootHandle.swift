@@ -193,6 +193,19 @@
             return DebugEditorFindFixture.identity(of: pathStatus)
         }
 
+        func createDirectory(at directoryURL: URL) throws {
+            let directoryURL = try validatedDirectChild(directoryURL)
+            try validatePath()
+            let result = directoryURL.lastPathComponent.withCString { name in
+                Darwin.mkdirat(descriptor, name, mode_t(S_IRWXU))
+            }
+            guard result == 0 else {
+                throw DebugEditorFindFixture.FixtureError
+                    .couldNotCreateWorkspace(errno)
+            }
+            try synchronizeAndValidate()
+        }
+
         func createRegularFile(at fileURL: URL) throws -> Int32 {
             let fileURL = try validatedDirectChild(fileURL)
             try validatePath()
