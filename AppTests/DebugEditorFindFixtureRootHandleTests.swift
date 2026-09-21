@@ -134,6 +134,40 @@
             )
         }
 
+        func testCreatedLeaseFileIsAlreadyLockedWhenCreationReturns() throws {
+            let fileManager = FileManager.default
+            let root = try makeTemporaryDirectory(named: "EditorFindRootHandle-lease")
+            defer { try? fileManager.removeItem(at: root) }
+            let handle = try makeRootHandle(at: root)
+            let leaseURL = root.appendingPathComponent("f9-lease", isDirectory: false)
+
+            let descriptor = try handle.createLockedRegularFile(at: leaseURL)
+            var descriptorIsOpen = true
+            defer {
+                if descriptorIsOpen {
+                    close(descriptor)
+                }
+            }
+            let probe = open(leaseURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+            XCTAssertGreaterThanOrEqual(probe, 0)
+            defer {
+                if probe >= 0 {
+                    close(probe)
+                }
+            }
+
+            // A concurrent creator probing for a released lease opens its own file
+            // description; it must find the creator's lock with no unlocked window.
+            let contendedResult = flock(probe, LOCK_EX | LOCK_NB)
+            let contendedError = errno
+            XCTAssertEqual(contendedResult, -1)
+            XCTAssertEqual(contendedError, EWOULDBLOCK)
+
+            close(descriptor)
+            descriptorIsOpen = false
+            XCTAssertEqual(flock(probe, LOCK_EX | LOCK_NB), 0)
+        }
+
         private func makeTemporaryDirectory(named prefix: String) throws -> URL {
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(
                 "\(prefix)-\(UUID().uuidString)",

@@ -49,17 +49,15 @@
         ) throws -> DebugEditorFindFixtureLease {
             let rootHandle = try suppliedRootHandle
                 ?? makeRootHandle(for: leaseURL)
-            let descriptor = try rootHandle.createRegularFile(at: leaseURL)
+            // Locked by the creating openat: a separate flock after validation left a
+            // window in which a concurrent creator could reclaim this lease as released.
+            let descriptor = try rootHandle.createLockedRegularFile(at: leaseURL)
             do {
                 let identity = try validateDescriptor(
                     descriptor,
                     matches: leaseURL,
                     rootHandle: rootHandle
                 )
-                let lockResult = flock(descriptor, LOCK_EX | LOCK_NB)
-                guard lockResult == 0 else {
-                    throw DebugEditorFindFixture.FixtureError.couldNotLockLease(errno)
-                }
                 return DebugEditorFindFixtureLease(
                     descriptor: descriptor,
                     leaseURL: leaseURL,

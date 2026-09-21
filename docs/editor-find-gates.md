@@ -795,9 +795,12 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   the strengthened repeated-`⌘F` contract and F9; it is synthetic XCUI evidence only.
 
   Fixture creation acquires and locks a root-anchored, exclusive, no-follow per-run lease
-  before publishing the workspace name. The retained app-side handle holds the workspace
-  directory descriptor plus a random ownership-marker descriptor/inode created inside that
-  workspace, then persists that workspace and marker device/inode binding in the locked lease.
+  before publishing the workspace name. The creating `openat` takes that exclusive flock
+  itself (`O_EXLOCK | O_NONBLOCK`), so the lease is locked before creation returns and a
+  concurrent same-identifier creator has no user-space window in which to reclaim it as a
+  released pre-workspace lease. The retained app-side handle holds the workspace directory
+  descriptor plus a random ownership-marker descriptor/inode created inside that workspace,
+  then persists that workspace and marker device/inode binding in the locked lease.
   Cleanup fails closed if the captured root/workspace is missing, renamed, or swapped. The
   exact captured workspace is first moved under the root to a random quarantine name; its
   workspace and marker identity is re-proved there before recursive removal, so a lexical

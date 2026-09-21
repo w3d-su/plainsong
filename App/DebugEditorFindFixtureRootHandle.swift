@@ -206,20 +206,30 @@
             try synchronizeAndValidate()
         }
 
-        func createRegularFile(at fileURL: URL) throws -> Int32 {
+        /// Creates a new lease file whose exclusive flock is taken by the creating `openat`
+        /// itself (`O_EXLOCK`), so it is already locked when creation returns and a
+        /// concurrent creator probing for a released pre-workspace lease has no user-space
+        /// window to take it. `O_NONBLOCK` makes a contended lock fail with `EAGAIN` like
+        /// the former `LOCK_NB`; it has no effect on regular-file I/O.
+        func createLockedRegularFile(at fileURL: URL) throws -> Int32 {
             let fileURL = try validatedDirectChild(fileURL)
             try validatePath()
             let fileDescriptor = fileURL.lastPathComponent.withCString { name in
                 openat(
                     descriptor,
                     name,
-                    O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+                    O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_EXLOCK | O_NONBLOCK,
                     mode_t(S_IRUSR | S_IWUSR)
                 )
             }
             guard fileDescriptor >= 0 else {
+                let errorCode = errno
+                if errorCode == EAGAIN {
+                    throw DebugEditorFindFixture.FixtureError
+                        .couldNotLockLease(errorCode)
+                }
                 throw DebugEditorFindFixture.FixtureError
-                    .couldNotCreateLease(errno)
+                    .couldNotCreateLease(errorCode)
             }
             do {
                 _ = try validateRegularFileDescriptor(
