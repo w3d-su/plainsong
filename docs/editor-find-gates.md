@@ -299,7 +299,7 @@ No I/O, no actors, no AppKit.
   without auto-jump. PR B landed the controller half; merged PR #97 owns the App UI,
   while hosted UI-visibility evidence remains separately open.
 - Optional highlight-all attribute application with the same preservation contract as
-  image markers (separate pending F8 follow-up).
+  image markers (landed as F8 in merged #106).
 
 ### 6.3 App — find bar + menus (merged PR #97)
 
