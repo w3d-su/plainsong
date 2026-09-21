@@ -178,7 +178,17 @@ private struct TableRow {
     }
 
     init?(line: MarkdownLine) {
-        let pipePositions = TableRow.pipePositions(in: line.text)
+        var pipePositions = TableRow.pipePositions(in: line.text)
+        guard let firstPipe = pipePositions.first, let lastPipe = pipePositions.last else { return nil }
+        let storage = line.text as NSString
+        // Outer pipes are optional. Virtual boundaries preserve the edge cells
+        // and their original UTF-16 source ranges when either pipe is omitted.
+        if !storage.substring(to: firstPipe).allSatisfy({ $0 == " " || $0 == "\t" }) {
+            pipePositions.insert(-1, at: 0)
+        }
+        if !storage.substring(from: lastPipe + 1).allSatisfy({ $0 == " " || $0 == "\t" }) {
+            pipePositions.append(storage.length)
+        }
         guard pipePositions.count >= 2 else { return nil }
 
         self.line = line
@@ -214,8 +224,14 @@ private struct TableRow {
 
     private static func pipePositions(in line: String) -> [Int] {
         var positions: [Int] = []
-        for index in 0 ..< (line as NSString).length where (line as NSString).character(at: index) == 124 {
-            positions.append(index)
+        let storage = line as NSString
+        var backslashCount = 0
+        for index in 0 ..< storage.length {
+            let unit = storage.character(at: index)
+            if unit == 124, backslashCount.isMultiple(of: 2) {
+                positions.append(index)
+            }
+            backslashCount = unit == 92 ? backslashCount + 1 : 0
         }
         return positions
     }

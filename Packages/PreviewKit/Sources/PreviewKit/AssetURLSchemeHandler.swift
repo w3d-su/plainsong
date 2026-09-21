@@ -63,7 +63,8 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
         return queue
     }()
 
-    func updateAllowedRoot(_ root: URL?) {
+    @discardableResult
+    func updateAllowedRoot(_ root: URL?) -> String {
         state.updateAllowedRoot(root)
     }
 
@@ -73,7 +74,7 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
-        guard let root = state.currentAllowedRoot() else {
+        guard let root = state.currentAllowedRoot(for: url) else {
             fail(urlSchemeTask, error: CocoaError(.fileReadNoPermission))
             return
         }
@@ -123,17 +124,27 @@ final class AssetURLSchemeHandler: NSObject, WKURLSchemeHandler {
 private final class AssetURLSchemeHandlerState: @unchecked Sendable {
     private let lock = NSLock()
     private var allowedRoot: URL?
+    private var rootID = UUID().uuidString
     private var stoppedTaskIDs: Set<ObjectIdentifier> = []
 
-    func updateAllowedRoot(_ root: URL?) {
-        lock.lock()
-        allowedRoot = root
-        lock.unlock()
-    }
-
-    func currentAllowedRoot() -> URL? {
+    func updateAllowedRoot(_ root: URL?) -> String {
         lock.lock()
         defer { lock.unlock() }
+        let previousSpelling = allowedRoot?.absoluteString ?? ""
+        let nextSpelling = root?.absoluteString ?? ""
+        if !previousSpelling.utf8.elementsEqual(nextSpelling.utf8) {
+            rootID = UUID().uuidString
+        }
+        allowedRoot = root
+        return rootID
+    }
+
+    func currentAllowedRoot(for url: URL) -> URL? {
+        lock.lock()
+        defer { lock.unlock() }
+        let requestedID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "plainsong-root" }?.value
+        if let requestedID, requestedID != rootID { return nil }
         return allowedRoot
     }
 

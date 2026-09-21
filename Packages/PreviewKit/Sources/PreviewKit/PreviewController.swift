@@ -11,7 +11,7 @@ public final class PreviewController: NSObject, ObservableObject {
     public let webView: WKWebView
     public var onPreviewScrolled: ((Int) -> Void)?
     public var onLinkClicked: ((String) -> Void)?
-    public var onCheckboxToggled: ((Int, Bool, Int) -> Void)?
+    public var onCheckboxToggled: ((Int, Bool, Int, DocumentSession) -> Void)?
     var renderCompletionObserver: ((RenderCompletePayload) -> Void)?
 
     private let assetSchemeHandler: AssetURLSchemeHandler
@@ -21,6 +21,9 @@ public final class PreviewController: NSObject, ObservableObject {
     private var queuedRender: RenderPayload?
     var scrollDeliveryState = PreviewScrollDeliveryState()
     var presentedDocumentIdentifier: String?
+    private weak var checkboxSession: DocumentSession?
+    private var checkboxRenderID: Int?
+    private var checkboxVersion: Int?
     private var nextRenderID = 0
     var nextExportID = 0
     var exportSourceText = ""
@@ -76,13 +79,13 @@ public final class PreviewController: NSObject, ObservableObject {
                 }
 
                 guard !Task.isCancelled else { return }
-                self?.render(change)
+                self?.render(change, for: session)
             }
         }
     }
 
-    public func render(_ change: DocumentTextChange) {
-        _ = submitRender(change)
+    public func render(_ change: DocumentTextChange, for session: DocumentSession? = nil) {
+        _ = submitRender(change, session: session)
     }
 
     @discardableResult
@@ -90,25 +93,29 @@ public final class PreviewController: NSObject, ObservableObject {
         submitRender(change)
     }
 
-    private func submitRender(_ change: DocumentTextChange) -> Int {
+    private func submitRender(_ change: DocumentTextChange, session: DocumentSession? = nil) -> Int {
         guard !isInvalidated else { return -1 }
         exportSourceText = change.text
         let assetContext = Self.assetContext(
             fileURL: change.fileURL,
             workspaceRootURL: workspaceAssetRootURL
         )
-        assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
+        let assetRootID = assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
         failPendingHTMLExport(reason: "render-superseded")
 
         let renderID = nextRenderID
         nextRenderID += 1
+        checkboxSession = session
+        checkboxRenderID = renderID
+        checkboxVersion = change.version
         let payload = RenderPayload(
             change: change,
             renderID: renderID,
             theme: theme,
             allowRemoteImages: allowRemoteImages,
-            baseDir: assetContext.baseDir
+            baseDir: assetContext.baseDir,
+            assetRootID: assetRootID
         )
         scrollDeliveryState.registerRender(
             renderID,
@@ -211,7 +218,11 @@ public final class PreviewController: NSObject, ObservableObject {
             openOrReportLink(payload.href)
 
         case let .checkboxToggled(payload):
-            onCheckboxToggled?(payload.line, payload.checked, payload.version)
+            guard payload.renderID == checkboxRenderID,
+                  payload.version == checkboxVersion,
+                  let session = checkboxSession
+            else { return }
+            onCheckboxToggled?(payload.line, payload.checked, payload.version, session)
 
         case let .exportHTMLResult(payload):
             handleExportHTMLResult(payload)

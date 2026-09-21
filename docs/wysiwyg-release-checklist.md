@@ -196,7 +196,7 @@ for the dev hook.
   operate on raw UTF-16 source offsets; snapping only adjusts where the caret rests, never
   what bytes a range covers.
   Evidence: snapping only runs for collapsed carets (the extending keyboard branch and the
-  shift `mouseDown` branch are untouched);
+  shift `mouseDown` branch retain raw offsets);
   `WYSIWYGEdgeSnappingGateTests.testShiftSelectionAcrossFoldedDelimitersStillCopiesExactRawMarkdown`
   and the existing `WYSIWYGNativePointerGateTests.testPointerDragSelectionAcrossFoldedSpansKeepsRawRangeAndCopy`
   pass.
@@ -212,6 +212,14 @@ for the dev hook.
   builds a shift-selection that spans `**bold**` and copies it verbatim, and
   `...testComposedCharacterMovementStaysValidWithSnappingEnabled` confirms snapping coexists
   with composed-character movement.
+
+- Direction is shared with native `NSTextSelection.affinity`: upstream keeps the upper
+  raw offset anchored, downstream keeps the lower offset anchored. Custom character
+  movement and Shift-click publish range and direction together. Native word, vertical,
+  paragraph, and mouse selections remain authoritative when control returns to custom
+  movement. `EditorInteractionRegressionTests` covers both handoff directions against
+  Source mode, reverse Shift-click/drag selection, and double/triple-click handoffs via
+  production movement methods and synthetic `NSEvent`s; this is not physical-input evidence.
 
 ### C.4 Copy policy
 

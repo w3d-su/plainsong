@@ -704,7 +704,12 @@ final class AppStateTests: XCTestCase {
             )
         )
 
-        appState.setTaskCheckbox(line: 3, checked: false, version: appState.currentDocument.version)
+        appState.setTaskCheckbox(
+            line: 3,
+            checked: false,
+            version: appState.currentDocument.version,
+            in: appState.currentDocument
+        )
 
         XCTAssertEqual(
             appState.currentDocument.text,
@@ -736,7 +741,7 @@ final class AppStateTests: XCTestCase {
             """
         )
 
-        appState.setTaskCheckbox(line: 1, checked: true, version: staleVersion)
+        appState.setTaskCheckbox(line: 1, checked: true, version: staleVersion, in: appState.currentDocument)
 
         XCTAssertEqual(
             appState.currentDocument.text,
@@ -3028,6 +3033,46 @@ final class AppStateTests: XCTestCase {
         XCTAssertNotNil(appState.anchoredSessionFileBinding(for: appState.currentDocument))
     }
 
+    func testScheduledWorkspaceReloadRetriesAnEditAndRestoresSearchAndSidebarReadiness() async throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("a.md").standardizedFileURL
+        let second = root.appendingPathComponent("b.md").standardizedFileURL
+        try writeText("needle A", to: first)
+        try writeText("needle B", to: second)
+        let scanner = ControlledWorkspaceDirectoryScanner()
+        let appState = AppState(directoryScanner: scanner, shouldRestoreLastOpenedFile: false)
+        appState.workspaceRootURL = root
+        let captured = snapshot(["a.md", "b.md"])
+        let initial = Task { try await appState.reloadWorkspaceTree(root: root, selectFirstIfNeeded: true) }
+        await scanner.waitForRequestCount(1)
+        await scanner.completeRequest(at: 0, with: captured)
+        try await initial.value
+        let session = appState.currentDocument
+        let generation = appState.workspaceGeneration
+        appState.setWorkspaceSearchQuery(TextSearchQuery(pattern: "needle"))
+        appState.workspaceReloadPostPrepareHook = {
+            appState.workspaceReloadPostPrepareHook = nil
+            appState.replaceDocumentText("needle edited during final proof")
+        }
+        appState.scheduleWorkspaceReload(root: root, selectFirstIfNeeded: false, errorTitle: "Reload")
+        await scanner.waitForRequestCount(2)
+        await scanner.completeRequest(at: 1, with: captured)
+        await scanner.waitForRequestCount(3)
+        XCTAssertFalse(appState.isWorkspaceSearchReady)
+        await scanner.completeRequest(at: 2, with: captured)
+        try await waitUntil("retry installed capture") { appState.isWorkspaceSearchReady }
+        XCTAssertEqual(appState.workspaceGeneration, generation + 1)
+        XCTAssertEqual(appState.workspaceInstalledCaptureGeneration, generation + 1)
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(session.text, "needle edited during final proof")
+        XCTAssertEqual(appState.workspaceSearchState.activeQuery?.pattern, "needle")
+        XCTAssertEqual(appState.workspaceSearchState.activeContext?.workspaceGeneration, generation + 1)
+        appState.openWorkspaceFile(second)
+        XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, second)
+        appState.teardownWorkspaceSearch()
+    }
+
     func testWorkspaceRefreshDoesNotOverrideDocumentChangedDuringFinalSuspension() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -3064,19 +3109,18 @@ final class AppStateTests: XCTestCase {
         }
         await scanner.waitForRequestCount(2)
         await scanner.completeRequest(at: 1, with: capturedSnapshot)
-        do {
-            try await refresh.value
-            XCTFail("Expected document-change cancellation")
-        } catch is CancellationError {
-            // A reload suspended on final proof cannot steal a newer document selection.
-        }
+        await scanner.waitForRequestCount(3)
+        await scanner.completeRequest(at: 2, with: capturedSnapshot)
+        try await refresh.value
+        XCTAssertTrue(appState.isWorkspaceSearchReady)
+        XCTAssertEqual(appState.workspaceInstalledCaptureGeneration, appState.workspaceGeneration)
 
         XCTAssertEqual(appState.currentDocument.fileURL?.standardizedFileURL, secondPost)
         XCTAssertEqual(appState.currentDocument.text, "captured B")
         XCTAssertTrue(appState.sessionCache[secondPost] === appState.currentDocument)
     }
 
-    func testWorkspaceRefreshCancelsSameSessionSaveDuringFinalSuspension() async throws {
+    func testWorkspaceRefreshRetriesSameSessionSaveDuringFinalSuspension() async throws {
         let root = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let post = root.appendingPathComponent("post.md").standardizedFileURL
@@ -3105,12 +3149,11 @@ final class AppStateTests: XCTestCase {
         }
         await scanner.waitForRequestCount(2)
         await scanner.completeRequest(at: 1, with: snapshot("post.md"))
-        do {
-            try await refresh.value
-            XCTFail("Expected same-session state-change cancellation")
-        } catch is CancellationError {
-            // A save that wins the suspension cannot be replaced by the stale activation load.
-        }
+        await scanner.waitForRequestCount(3)
+        await scanner.completeRequest(at: 2, with: snapshot("post.md"))
+        try await refresh.value
+        XCTAssertTrue(appState.isWorkspaceSearchReady)
+        XCTAssertEqual(appState.workspaceInstalledCaptureGeneration, appState.workspaceGeneration)
 
         XCTAssertEqual(appState.currentDocument.text, "saved B")
         XCTAssertFalse(appState.currentDocument.isDirty)

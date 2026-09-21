@@ -159,7 +159,9 @@ private final class EditorScrollAttachment {
             object: textView,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            // The observer is delivered on the main queue. Invalidate in this notification,
+            // before a same-turn source installation can issue navigation into the new text.
+            MainActor.assumeIsolated {
                 self?.lineIndex = nil
             }
         })

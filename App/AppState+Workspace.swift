@@ -459,6 +459,7 @@ extension AppState {
         synchronizingWorkspaceTree: Bool = true
     ) {
         guard currentDocument !== session else { return }
+        let previousSession = currentDocument
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
         requestEditorFocus()
         if synchronizingWorkspaceTree {
@@ -466,6 +467,7 @@ extension AppState {
         }
         cancelPendingEditorNavigationIfNeeded()
         currentDocument = session
+        releaseUnreferencedUntitledSessionOwnership(for: previousSession)
         clearPromptsNotMatchingCurrentDocument()
         restoreRecoveryPrompt(for: session)
         if indeterminateSessionWrites[ObjectIdentifier(session)] != nil {

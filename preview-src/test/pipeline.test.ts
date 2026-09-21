@@ -13,7 +13,7 @@ describe("markdown preview pipeline", () => {
   it("adds data-line attributes to block elements", async () => {
     const html = await renderMarkdown("# Title\n\nParagraph\n\n- [ ] Task\n");
 
-    expect(html).toContain('<h1 data-line="1">Title</h1>');
+    expect(html).toContain('<h1 id="plainsong-heading-title" data-line="1">Title</h1>');
     expect(html).toContain('<p data-line="3">Paragraph</p>');
     expect(html).toContain('data-line="5"');
   });
@@ -132,8 +132,8 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
     expect(html).toContain("<math");
     expect(html).toContain("<mover");
     expect(html).toContain('encoding="application/x-tex"');
-    expect(html).not.toContain("<svg");
-    expect(html).not.toContain("<path");
+    expect(html).toContain("<svg");
+    expect(html).toContain("<path");
   });
 
   it("preserves data-line attributes on MDX block elements", async () => {
@@ -144,7 +144,7 @@ Inline <Badge tone="success">Ready</Badge> and {readingTime}.
 </Callout>
 `);
 
-    expect(html).toContain('<h1 data-line="1">Title</h1>');
+    expect(html).toContain('<h1 id="plainsong-heading-title" data-line="1">Title</h1>');
     expect(html).toContain('class="mdx-component-card mdx-component-card-flow" data-line="3"');
   });
 
