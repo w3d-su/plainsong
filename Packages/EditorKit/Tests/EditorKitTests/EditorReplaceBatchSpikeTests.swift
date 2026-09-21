@@ -1,5 +1,6 @@
 import AppKit
 @testable import EditorKit
+import MarkdownCore
 import XCTest
 
 @MainActor
@@ -38,7 +39,7 @@ final class EditorReplaceBatchSpikeTests: XCTestCase {
             NSRange(location: 3, length: 4),
         ]
         XCTAssertNil(
-            EditorReplaceBatchSpike.replacedSource(
+            EditorReplaceSourceConstruction.replacedSource(
                 source,
                 ranges: overlapping,
                 replacement: "ONE"

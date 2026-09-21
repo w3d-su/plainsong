@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import MarkdownCore
 import STTextView
 
 /// R0-only Replace All mechanism candidates (`docs/editor-replace-gates.md` §3.3).
@@ -39,44 +40,8 @@ struct EditorReplaceBatchResult: Equatable {
 }
 
 enum EditorReplaceBatchSpike {
-    static func enclosingRange(of ranges: [NSRange]) -> NSRange? {
-        guard let first = ranges.first, let last = ranges.last else { return nil }
-        let end = NSMaxRange(last)
-        guard end >= first.location else { return nil }
-        return NSRange(location: first.location, length: end - first.location)
-    }
-
-    static func replacedSource(
-        _ source: String,
-        ranges: [NSRange],
-        replacement: String
-    ) -> String? {
-        let nsSource = source as NSString
-        let length = nsSource.length
-        var cursor = 0
-        var parts: [String] = []
-        parts.reserveCapacity(ranges.count * 2 + 1)
-        for range in ranges {
-            guard range.location >= cursor,
-                  NSMaxRange(range) <= length
-            else {
-                return nil
-            }
-            if range.location > cursor {
-                parts.append(nsSource.substring(with: NSRange(
-                    location: cursor,
-                    length: range.location - cursor
-                )))
-            }
-            parts.append(replacement)
-            cursor = NSMaxRange(range)
-        }
-        if cursor < length {
-            parts.append(nsSource.substring(from: cursor))
-        }
-        return parts.joined()
-    }
-
+    /// Range validation and text construction belong to MarkdownCore's
+    /// `EditorReplaceSourceConstruction`; the spike only chooses how to commit.
     static func plan(
         source: String,
         ranges: [NSRange],
@@ -84,7 +49,13 @@ enum EditorReplaceBatchSpike {
         mechanism: EditorReplaceBatchMechanism
     ) -> EditorReplaceBatchPlan? {
         guard !ranges.isEmpty,
-              replacedSource(source, ranges: ranges, replacement: replacement) != nil
+              let enclosing = EditorReplaceSourceConstruction.enclosingRange(of: ranges),
+              let slice = EditorReplaceSourceConstruction.replacedSlice(
+                  source,
+                  enclosing: enclosing,
+                  ranges: ranges,
+                  replacement: replacement
+              )
         else {
             return nil
         }
@@ -93,26 +64,9 @@ enum EditorReplaceBatchSpike {
         case .reverseOrderedNativeEdits:
             return .reverseOrderedNativeEdits
         case .minimalEnclosingRange:
-            guard let enclosing = enclosingRange(of: ranges) else { return nil }
-            let nsSource = source as NSString
-            guard NSMaxRange(enclosing) <= nsSource.length else { return nil }
-            let localRanges = ranges.map { range in
-                NSRange(
-                    location: range.location - enclosing.location,
-                    length: range.length
-                )
-            }
-            let slice = nsSource.substring(with: enclosing)
-            guard let newSlice = replacedSource(
-                slice,
-                ranges: localRanges,
-                replacement: replacement
-            ) else {
-                return nil
-            }
-            return .minimalEnclosingRange(range: enclosing, text: newSlice)
+            return .minimalEnclosingRange(range: enclosing, text: slice)
         case .fullDocument:
-            guard let final = replacedSource(
+            guard let final = EditorReplaceSourceConstruction.replacedSource(
                 source,
                 ranges: ranges,
                 replacement: replacement

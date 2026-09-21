@@ -24,7 +24,7 @@ final class EditorReplaceBatchSpikeLargeDocumentTests: XCTestCase {
         let replacement = String(repeating: "z", count: 256)
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(source: source)
         let constructionStart = DispatchTime.now()
-        let planned = try XCTUnwrap(EditorReplaceBatchSpike.replacedSource(
+        let planned = try XCTUnwrap(EditorReplaceSourceConstruction.replacedSource(
             source,
             ranges: ranges,
             replacement: replacement

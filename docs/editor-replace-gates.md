@@ -13,7 +13,7 @@
 > cadence remains independent from the at-most-100 visible progress milestones,
 > and malformed public UTF-16 ranges fail closed without end overflow. The pure
 > B1 slice builder validates and rebases absolute ranges; mapped batch caret,
-> session anchor, and collapsed selection share one post-write clamp. This PR
+> session anchor, and collapsed selection share one post-write clamp. PR C
 > introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
 > R2, R3 publication/writer bullets, and R4–R10 stay open.
 >
@@ -589,8 +589,10 @@ ordered, non-overlapping range list and enclosing source bounds before rebasing;
 untouched gaps remain literal, and an empty list returns the unchanged slice.
 `EditorReplaceSourceConstructionTests` covers Unicode, deletion, adjacent edits,
 padding, empty ranges, malformed/overflowing lists, and ranges escaping the slice.
-The #112 executor should consume this helper when integrated; no EditorKit or
-R0 mechanism change is claimed by this model-only work.
+The R0 spike (#112) consumes it: `EditorReplaceBatchSpike.plan` takes B1's slice
+and range validation from this type and B2's whole-document text from
+`replacedSource`, keeping no EditorKit construction copy. This model-only work
+claims no R0 mechanism change.
 
 ### 6.2 EditorKit — installed editor executor
 
@@ -659,8 +661,8 @@ Before declaring an implementation PR done: relevant package/hosted tests,
 ## 8. Gates
 
 Boxes stay unchecked until a later PR supplies named-test or owner-recorded
-evidence. R1 and the R3 model bullets are checked in PR C; R0 remains on the
-separate spike PR.
+evidence. R1 and the R3 model bullets are checked in PR C; R0 is checked by the
+hosted spike PR #112.
 
 ### R0 — Batch writer activation + one undo (blocking mechanism spike)
 
@@ -677,7 +679,8 @@ separate spike PR.
   **NO-GO for Replace All:** one undo group, but N source publications.
 - [x] Candidate B1: exact final source built before activation, then one native
   edit of the minimal enclosing raw range.
-  Evidence: `EditorReplaceBatchSpike.plan` +
+  Evidence: `EditorReplaceBatchSpike.plan` (text from MarkdownCore's
+  `EditorReplaceSourceConstruction.replacedSlice`) +
   `testCandidateB1PublishesOnceForTheEnclosingRange` — 1 writer activation, 1
   authorized native edit, 1 publication.
   `testInvalidRangesOpenNoWriterOrUndo` refuses overlapping ranges before
@@ -724,11 +727,14 @@ separate spike PR.
   construction, main-thread, and typing impact.
   Evidence: asserted `an` × 8,921 and planned UTF-16 length 3,314,896;
   printed (not wall-clock-gated) construction ≈ 4.5 ms; B1 commit ≈ 42 ms;
-  post-batch `insertText` ≈ 0.5 ms. Allocation is not measured.
+  post-batch `insertText` ≈ 0.5 ms. Allocation is not measured. These numbers
+  predate the switch to MarkdownCore's builder; the 2026-09-21 Decision Log row
+  records the same-machine before/after comparison.
 - [x] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
   remains deferred and this design changes before any product UI claims it.
-- Evidence: **GO — Candidate B1.** No user-facing Replace. PR C may consume the
-  B1 construction helper; product mutation stays behind later PRs.
+- Evidence: **GO — Candidate B1.** No user-facing Replace. B1 and B2 text come
+  from PR C's `EditorReplaceSourceConstruction`; product mutation stays behind
+  later PRs.
 
 ### R1 — One literal match semantics
 
