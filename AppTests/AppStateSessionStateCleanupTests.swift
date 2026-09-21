@@ -6,6 +6,119 @@ import XCTest
 // swiftlint:disable function_body_length
 @MainActor
 final class AppStateSessionStateCleanupTests: XCTestCase {
+    func testSwitchReleasesUnboundUntitledOwnershipBeforeIdentityCanBeReused() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        weak var initialSession: DocumentSession?
+        initialSession = appState.currentDocument
+        let initialIdentity = ObjectIdentifier(appState.currentDocument)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[initialIdentity],
+            .unavailable(fileURL: nil)
+        )
+        try "disk".write(to: fixture.url("post.md"), atomically: false, encoding: .utf8)
+
+        try appState.activateFileSession(url: fixture.url("post.md"))
+
+        XCTAssertNil(initialSession)
+        XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[initialIdentity])
+        XCTAssertEqual(appState.sessionStateURL(for: appState.currentDocument), fixture.url("post.md"))
+    }
+
+    func testSwitchRetainsBoundUntitledOwnershipUntilRegistrationIsRemoved() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let initialSession = DocumentSession()
+        let appState = fixture.makeAppState(currentDocument: initialSession)
+        let initialIdentity = ObjectIdentifier(initialSession)
+        let binding = appState.editorDocumentBinding(for: initialSession)
+        try "disk".write(to: fixture.url("post.md"), atomically: false, encoding: .utf8)
+
+        try appState.activateFileSession(url: fixture.url("post.md"))
+
+        XCTAssertEqual(appState.editorDocumentBindingIDs[initialIdentity], binding.id)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[initialIdentity],
+            .unavailable(fileURL: nil)
+        )
+        appState.removeEditorDocumentBindingRegistration(for: initialSession)
+        XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[initialIdentity])
+    }
+
+    func testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        var sessions: [DocumentSession] = []
+        for index in 0 ..< 9 {
+            try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
+        }
+        for index in 0 ..< 8 {
+            try appState.activateFileSession(url: fixture.url("\(index).md"))
+            let session = appState.currentDocument
+            appState.replaceDocumentText("unsaved \(index)")
+            appState.cancelAutosave(for: session)
+            XCTAssertEqual(appState.sessionStateURL(for: session), session.fileURL)
+            XCTAssertEqual(appState.sessionPolicy.dirtyState(for: fixture.url("\(index).md")), true)
+            sessions.append(session)
+        }
+        var attempts: [URL: Int] = [:]
+        appState.anchoredFileSaveOverride = { _, location, _ in
+            attempts[location.fileURL, default: 0] += 1
+            // A failing old implementation must terminate the test instead of overflowing its stack.
+            if attempts.values.reduce(0, +) > 16 {
+                appState.sessionPolicy = .init(limit: 100)
+            }
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        try appState.activateFileSession(url: fixture.url("8.md"))
+        XCTAssertEqual(attempts.count, 8)
+        XCTAssertTrue(attempts.values.allSatisfy { $0 == 1 })
+        XCTAssertEqual(appState.sessionCache.count, 9)
+        XCTAssertEqual(Set(appState.sessionPolicy.warmURLsInLeastRecentOrder), Set(appState.sessionCache.keys))
+        XCTAssertEqual(appState.presentedError?.title, "Could Not Save Warm File")
+        for (index, session) in sessions.enumerated() {
+            XCTAssertTrue(try appState.sessionCache[XCTUnwrap(session.fileURL)] === session)
+            XCTAssertTrue(session.isDirty)
+            XCTAssertEqual(session.text, "unsaved \(index)")
+            XCTAssertEqual(try String(contentsOf: fixture.url("\(index).md"), encoding: .utf8), "disk \(index)")
+        }
+
+        // The next independent pass may retry after storage recovers and restore the normal limit.
+        appState.anchoredFileSaveOverride = nil
+        appState.reconcileSessionPolicyAfterEditorLeaseChange()
+        XCTAssertEqual(appState.sessionCache.count, 8)
+        XCTAssertEqual(appState.sessionPolicy.warmURLsInLeastRecentOrder.count, 8)
+        XCTAssertEqual(sessions.filter { !$0.isDirty }.count, 1)
+    }
+
+    func testEvictionContinuesPastFailedSaveToCleanCandidate() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        appState.sessionPolicy = .init(limit: 2)
+        for index in 0 ..< 3 {
+            try "disk \(index)".write(to: fixture.url("\(index).md"), atomically: false, encoding: .utf8)
+        }
+        try appState.activateFileSession(url: fixture.url("0.md"))
+        let dirty = appState.currentDocument
+        appState.replaceDocumentText("unsaved")
+        appState.cancelAutosave(for: dirty)
+        try appState.activateFileSession(url: fixture.url("1.md"))
+        var attempts = 0
+        appState.anchoredFileSaveOverride = { _, _, _ in
+            attempts += 1
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        try appState.activateFileSession(url: fixture.url("2.md"))
+        XCTAssertEqual(attempts, 1)
+        XCTAssertEqual(appState.sessionCache.count, 2)
+        XCTAssertTrue(try appState.sessionCache[XCTUnwrap(dirty.fileURL)] === dirty)
+        XCTAssertNil(appState.sessionCache[fixture.url("1.md")])
+        XCTAssertTrue(dirty.isDirty)
+    }
+
     func testDetachedRecoverySaveCopyPreservesReplacementURLState() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }

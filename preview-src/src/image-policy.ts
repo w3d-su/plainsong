@@ -19,6 +19,7 @@ export function imageSourcePolicy(
   source: string,
   baseDir: string | null,
   allowRemoteImages: boolean,
+  assetRootID = "",
 ): ImageSourcePolicy {
   const trimmed = source.trim();
   if (!trimmed) {
@@ -27,13 +28,15 @@ export function imageSourcePolicy(
 
   if (isWorkspaceRelativeURL(trimmed)) {
     const assetPath = workspaceRelativeAssetPath(trimmed, baseDir);
-    return { action: "rewrite", src: `asset://${assetURLPath(assetPath)}` };
+    return { action: "rewrite", src: scopedAssetURL(`asset://${assetURLPath(assetPath)}`, assetRootID) };
   }
 
   const protocol = protocolForSource(trimmed);
   switch (protocol) {
     case "asset:":
-      return { action: "keep" };
+      return assetRootID
+        ? { action: "rewrite", src: scopedAssetURL(trimmed, assetRootID) }
+        : { action: "keep" };
     case "data:":
       return isAllowedDataImageSource(trimmed)
         ? { action: "keep" }
@@ -43,6 +46,13 @@ export function imageSourcePolicy(
     default:
       return { action: "block", reason: "unsupported-scheme" };
   }
+}
+
+function scopedAssetURL(source: string, assetRootID: string): string {
+  if (!assetRootID) return source;
+  const url = new URL(source);
+  url.searchParams.set("plainsong-root", assetRootID);
+  return url.href;
 }
 
 // Shared live-preview/export MIME policy; decoding and byte caps belong to export PR D.

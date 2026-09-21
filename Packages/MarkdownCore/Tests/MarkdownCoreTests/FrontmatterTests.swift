@@ -34,7 +34,7 @@ final class FrontmatterTests: XCTestCase {
 
         XCTAssertEqual(
             updated,
-            "---\r\ntitle: New\r\ncustom:\r\n  nested: yes\r\ndraft: false\r\n---\r\n# Body\r\n"
+            "---\r\ntitle: \"New\"\r\ncustom:\r\n  nested: yes\r\ndraft: false\r\n---\r\n# Body\r\n"
         )
     }
 
@@ -54,7 +54,7 @@ final class FrontmatterTests: XCTestCase {
             updated,
             """
             ---
-            title: World
+            title: "World"
             # important note about tags
             tags: [a]
             ---
@@ -81,7 +81,7 @@ final class FrontmatterTests: XCTestCase {
             ---
             title: Hello
             tags:
-              - b
+              - "b"
             # trailing note
             ---
             Body
@@ -105,7 +105,7 @@ final class FrontmatterTests: XCTestCase {
             updated,
             """
             ---
-            title: World
+            title: "World"
 
             tags: [a]
             ---
@@ -132,7 +132,7 @@ final class FrontmatterTests: XCTestCase {
             updated,
             """
             ---
-            title: New
+            title: \"New\"
             description: |
               ---
               inside
@@ -169,7 +169,7 @@ final class FrontmatterTests: XCTestCase {
 
         XCTAssertEqual(
             updated,
-            "---\r\ntitle: New\r\nauthor:\r\n  name: Ann\r\n  url: https://example.com\r\ndraft: false\r\n---\r\nBody\r\n"
+            "---\r\ntitle: \"New\"\r\nauthor:\r\n  name: Ann\r\n  url: https://example.com\r\ndraft: false\r\n---\r\nBody\r\n"
         )
     }
 
@@ -189,7 +189,7 @@ final class FrontmatterTests: XCTestCase {
             key: "tags",
             value: .stringList(["swift", "frontmatter"])
         ))
-        XCTAssertTrue(tagsUpdated.contains("tags:\n  - swift\n  - frontmatter\n"))
+        XCTAssertTrue(tagsUpdated.contains("tags:\n  - \"swift\"\n  - \"frontmatter\"\n"))
 
         let dateUpdated = try XCTUnwrap(Frontmatter.updating(
             tagsUpdated,

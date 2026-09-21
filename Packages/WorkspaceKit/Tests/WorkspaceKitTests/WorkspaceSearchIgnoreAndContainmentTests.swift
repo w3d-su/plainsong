@@ -3,6 +3,34 @@ import MarkdownCore
 import XCTest
 
 final class WorkspaceSearchIgnoreAndContainmentTests: XCTestCase {
+    func testRootedRulesIgnoreAncestorDirectoriesWithoutTrailingSlash() async throws {
+        let root = try makeTemporaryDirectory()
+        let paths = [
+            "private/post.md", "private/deep/post.md", "private/keep.md",
+            "docs/private/post.md", "docs/private/deep/post.md", "docs/private/keep.md",
+            "nested/private/post.md", "nested/local/post.md", "nested/deeper/local/post.md",
+            "private.md", "private-other/post.md", "docs/private-other/post.md", "visible.md",
+        ]
+        let reader = IgnoreReader(responses: [
+            root.appendingPathComponent(".gitignore").path: .data("/private\ndocs/private\n"),
+            root.appendingPathComponent(".ignore").path: .data("!private/keep.md\n!docs/private/keep.md\n"),
+            root.appendingPathComponent("nested/.gitignore").path: .data("/local\n"),
+        ])
+        for path in paths {
+            await reader.set(.data("needle"), at: root.appendingPathComponent(path).path)
+        }
+        let events = try await collectEvents(
+            WorkspaceSearchService(reader: reader), request: request(root: root, paths: paths)
+        )
+        XCTAssertEqual(fileResults(in: events).map(\.relativePath), [
+            "docs/private-other/post.md", "docs/private/keep.md", "nested/deeper/local/post.md",
+            "nested/private/post.md", "private-other/post.md", "private.md", "private/keep.md", "visible.md",
+        ])
+        let summary = try XCTUnwrap(completedSummary(in: events))
+        XCTAssertEqual(summary.ignoredFileCount, 5)
+        XCTAssertEqual(summary.searchedFileCount, 8)
+    }
+
     func testIgnoreSubsetSupportsRootNestedGlobDirectoryAndNegationRules() async throws {
         let root = try makeTemporaryDirectory()
         let paths = [

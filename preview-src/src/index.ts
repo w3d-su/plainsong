@@ -23,6 +23,7 @@ import {
   resetExportHTMLSession,
 } from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
+import { scrollPreviewAnchor } from "./heading-anchors";
 import {
   patchPreviewRoot,
   rerenderVisibleMermaidBlocks,
@@ -46,7 +47,9 @@ const previewRoot = requirePreviewRoot();
 let latestRenderID = -1;
 // Document version of the currently displayed render; only used for checkbox writeback.
 let currentRenderedVersion = -1;
+let currentRenderedID = -1;
 let currentBaseDir: string | null = null;
+let currentAssetRootID = "";
 let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
@@ -95,7 +98,7 @@ previewRoot.addEventListener("click", (event) => {
     if (line !== undefined) {
       postBridgeMessage({
         name: "checkboxToggled",
-        payload: { line, checked: checkbox.checked, version: currentRenderedVersion },
+        payload: { line, checked: checkbox.checked, version: currentRenderedVersion, renderID: currentRenderedID },
       });
     }
     return;
@@ -105,9 +108,15 @@ previewRoot.addEventListener("click", (event) => {
   if (!link) return;
 
   event.preventDefault();
+  const href = link.getAttribute("href") ?? "";
+  if (href.startsWith("#")) {
+    setScrollOwner("preview");
+    scrollPreviewAnchor(previewRoot, href);
+    return;
+  }
   postBridgeMessage({
     name: "linkClicked",
-    payload: { href: link.getAttribute("href") ?? "" },
+    payload: { href },
   });
 });
 
@@ -129,7 +138,7 @@ async function receive(message: BridgeMessage): Promise<void> {
         message.payload.theme,
         message.payload.allowRemoteImages,
       );
-      rewriteImageSources(previewRoot, currentBaseDir, currentAllowRemoteImages);
+      rewriteImageSources(previewRoot, currentBaseDir, currentAllowRemoteImages, currentAssetRootID);
       if (themeChanged) {
         await rerenderVisibleMermaidBlocks(previewRoot, mermaidRenderer);
       }
@@ -165,7 +174,6 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   if (payload.renderID < latestRenderID) return;
   resetExportHTMLSession();
   latestRenderID = payload.renderID;
-  currentBaseDir = payload.baseDir;
   applyPreviewSettings(payload.theme, payload.allowRemoteImages);
 
   let html: string;
@@ -195,14 +203,18 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   const nextRoot = document.createElement("main");
   nextRoot.id = "preview-root";
   nextRoot.innerHTML = html;
-  rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages);
+  rewriteImageSources(nextRoot, payload.baseDir, payload.allowRemoteImages, payload.assetRootID);
 
   clearMdxErrorBanner();
   const mermaidPatch = patchPreviewRoot(previewRoot, nextRoot, mermaidRenderer);
+  // The checkbox provenance changes with the DOM, before asynchronous diagrams settle.
+  currentRenderedID = payload.renderID;
+  currentRenderedVersion = payload.version;
+  currentBaseDir = payload.baseDir;
+  currentAssetRootID = payload.assetRootID;
   highlightCodeBlocks();
   await mermaidPatch;
   if (payload.renderID < latestRenderID) return;
-  currentRenderedVersion = payload.version;
 
   postBridgeMessage({
     name: "renderComplete",

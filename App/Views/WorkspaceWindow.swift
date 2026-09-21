@@ -172,8 +172,8 @@ private struct EditorWorkspace: View {
             guard appState.preferences.typewriterSyncEnabled else { return }
             scrollCoordinator.previewScrolled(to: line)
         }
-        previewController.onCheckboxToggled = { line, checked, version in
-            appState.setTaskCheckbox(line: line, checked: checked, version: version)
+        previewController.onCheckboxToggled = { line, checked, version, session in
+            appState.setTaskCheckbox(line: line, checked: checked, version: version, in: session)
         }
         previewController.onLinkClicked = { href in
             appState.openPreviewLink(href)
@@ -365,15 +365,15 @@ private struct PreviewPane: View {
             controller.setTheme(appState.preferences.previewTheme.rawValue)
             controller.setAllowsRemoteImages(appState.preferences.allowsRemoteImages)
             controller.setPresentedDocumentIdentifier(appState.activeEditorDocumentIdentity?.rawValue)
-            controller.render(session.currentTextChange)
+            controller.render(session.currentTextChange, for: session)
         }
         .onChange(of: appState.previewAssetRootURL) { _, rootURL in
             controller.setWorkspaceAssetRoot(rootURL)
-            controller.render(session.currentTextChange)
+            controller.render(session.currentTextChange, for: session)
         }
         .onChange(of: appState.activeEditorDocumentIdentity) { _, identity in
             controller.setPresentedDocumentIdentifier(identity?.rawValue)
-            controller.render(session.currentTextChange)
+            controller.render(session.currentTextChange, for: session)
         }
         .onChange(of: appState.preferences.previewTheme) { _, theme in
             controller.setTheme(theme.rawValue)

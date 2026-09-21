@@ -122,10 +122,9 @@ private struct WorkspaceSearchIgnoreRule {
     func matches(relativePath: String) -> Bool {
         guard let localPath = pathRelativeToBase(relativePath) else { return false }
 
-        if isDirectoryOnly {
-            return directoryPrefixes(of: localPath).contains { matchesTarget($0) }
-        }
-        return matchesTarget(localPath)
+        if !isDirectoryOnly, matchesTarget(localPath) { return true }
+        // A matching directory excludes its descendants even without a trailing slash.
+        return directoryPrefixes(of: localPath).contains { matchesTarget($0) }
     }
 
     private func pathRelativeToBase(_ relativePath: String) -> String? {

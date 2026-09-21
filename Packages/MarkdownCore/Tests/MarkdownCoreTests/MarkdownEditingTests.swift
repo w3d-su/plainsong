@@ -212,6 +212,44 @@ final class MarkdownEditingTests: XCTestCase {
         )
     }
 
+    func testTableFormattingPreservesOptionalOuterPipes() {
+        for (leading, trailing) in [("|", "|"), ("|", ""), ("", "|"), ("", "")] {
+            assertEdit(
+                .formatTable,
+                from: "\(leading)A|B|C\(trailing)\n\(leading)---|:---|---:\(trailing)\n\(leading)one|two|三😀\(trailing)",
+                to: "| A   | B   | C    |\n| --- | :-- | ---: |\n| one | two | 三😀 |"
+            )
+        }
+        assertEdit(
+            .formatTable,
+            from: "  A|B  \n---|---\n  one|two  ",
+            to: "| A   | B   |\n| --- | --- |\n| one | two |"
+        )
+        assertEdit(
+            .formatTable,
+            from: #"| A\|B | C"# + "\n| --- | ---\n| one | two",
+            to: #"| A\|B | C   |"# + "\n| ---- | --- |\n| one  | two |"
+        )
+    }
+
+    func testTableNavigationIncludesCellsWithoutOuterPipes() {
+        assertEdit(
+            .insertTab(backwards: false),
+            from: "A|B|C\n---|---|---\none|two<caret>|三😀",
+            to: "A|B|C\n---|---|---\none|two|[[三😀]]"
+        )
+        assertEdit(
+            .insertTab(backwards: true),
+            from: "A|B|C\n---|---|---\none|[[two]]|三😀",
+            to: "A|B|C\n---|---|---\n[[one]]|two|三😀"
+        )
+        assertEdit(
+            .insertNewline(fileKind: .markdown),
+            from: "A|B|C\n---|---|---\none|two|三😀<caret>",
+            to: "A|B|C\n---|---|---\none|two|三😀\n| [[ ]]|  |  |"
+        )
+    }
+
     func testFormattingCommands() {
         assertEdit(
             .format(.bold),

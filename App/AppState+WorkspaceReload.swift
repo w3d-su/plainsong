@@ -108,9 +108,10 @@ extension AppState {
             do {
                 let capture = try await scanner.snapshotCapture(root: selectedRoot)
                 guard let self else { return }
-                try await applyWorkspaceReload(
+                try await reloadWorkspaceCapture(
                     root: selectedRoot,
-                    capture: capture,
+                    scanner: scanner,
+                    initialCapture: capture,
                     generation: generation,
                     selectFirstIfNeeded: selectFirstIfNeeded
                 )
@@ -134,12 +135,46 @@ extension AppState {
         let selectedRoot = root
         let generation = advanceWorkspaceGeneration()
         let capture = try await directoryScanner.snapshotCapture(root: selectedRoot)
-        try await applyWorkspaceReload(
+        try await reloadWorkspaceCapture(
             root: selectedRoot,
-            capture: capture,
+            scanner: directoryScanner,
+            initialCapture: capture,
             generation: generation,
             selectFirstIfNeeded: selectFirstIfNeeded
         )
+    }
+
+    private func reloadWorkspaceCapture(
+        root: URL,
+        scanner: any WorkspaceDirectoryScanning,
+        initialCapture: WorkspaceDirectorySnapshotCapture,
+        generation: UInt64,
+        selectFirstIfNeeded: Bool
+    ) async throws {
+        var shouldSelectFirst = selectFirstIfNeeded
+        var capture = initialCapture
+        while true {
+            guard isCurrentWorkspaceReload(root: root, generation: generation) else {
+                throw CancellationError()
+            }
+            do {
+                try await applyWorkspaceReload(
+                    root: root,
+                    capture: capture,
+                    generation: generation,
+                    selectFirstIfNeeded: shouldSelectFirst
+                )
+                return
+            } catch WorkspaceReloadRetry.documentStateChanged {
+                // The same reload still owns this generation. Re-capture and prepare
+                // against the user's newest session instead of leaving readiness fenced.
+                shouldSelectFirst = false
+                guard isCurrentWorkspaceReload(root: root, generation: generation) else {
+                    throw CancellationError()
+                }
+                capture = try await scanner.snapshotCapture(root: root)
+            }
+        }
     }
 
     func advanceWorkspaceGeneration() -> UInt64 {
@@ -250,7 +285,7 @@ extension AppState {
         else {
             // User/session lifecycle work won the suspension. Do not apply a tree selection,
             // missing-file disposition, or activation prepared for the superseded document.
-            throw CancellationError()
+            throw WorkspaceReloadRetry.documentStateChanged
         }
 
         // Cache and retirement state can change while the final root proof suspends. Re-derive the
@@ -490,6 +525,10 @@ extension AppState {
             && workspaceGeneration == generation
             && workspaceRootURL.map { exactFileURLSpellingMatches($0, root) } == true
     }
+}
+
+private enum WorkspaceReloadRetry: Error {
+    case documentStateChanged
 }
 
 private enum PreparedWorkspaceReloadCurrentDocumentDisposition {
