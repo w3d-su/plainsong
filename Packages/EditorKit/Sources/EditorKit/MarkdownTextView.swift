@@ -204,6 +204,9 @@ struct MarkdownTextView: NSViewRepresentable {
         )
         coordinator.isUpdating = false
         coordinator.notePreparedNativeSource(candidate)
+        // Programmatic installs (document switch, external reload) bypass the
+        // text-change delegate that normally refreshes math menu eligibility.
+        coordinator.refreshMathCommandEligibility(for: textView)
     }
 
     private func prepareCoordinatorInputs(
@@ -285,6 +288,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private func updateNonDocumentCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
         coordinator.attachScrollProxy(scrollProxy, to: textView)
         coordinator.attachCommandProxy(commandProxy, to: textView)
+        coordinator.attachMathCommandEligibility(to: textView)
         coordinator.updateCompletionWorkspace(completionWorkspace)
         coordinator.updateImageAssetInserter(imageAssetInserter)
         coordinator.updateImageAssetContextID(imageAssetContextID)

@@ -291,6 +291,13 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var scrollProxy: EditorScrollProxy?
     var commandProxy: EditorCommandProxy?
     let editingBehaviorGuard = EditingBehaviorGuard()
+    var mathEligibilityGeneration: UInt64 = 0
+    var mathEligibilityInFlight = false
+    var mathEligibilityPending = false
+    var mathEligibilityWindowObservers: [CoordinatorNotificationObserver] = []
+    weak var mathEligibilityObservedWindow: NSWindow?
+    var isMathEligibilityAttached = false
+    var mathEligibilityFileKind: FileKind?
     var writerAuthorizedTextMutationDepth = 0
     weak var writerAuthorizedTextView: STTextView?
     var completionWorkspace: CompletionWorkspace = .empty
@@ -717,6 +724,7 @@ extension MarkdownTextViewCoordinator {
         }
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)
+        refreshMathCommandEligibility(for: textView)
     }
 
     func textView(
@@ -835,6 +843,7 @@ extension MarkdownTextViewCoordinator {
             scheduleMarkedTextReplacementRangeCleanup(for: textView)
         }
         schedulePendingNavigationAfterInput(in: textView)
+        refreshMathCommandEligibility(for: textView)
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
@@ -857,6 +866,7 @@ extension MarkdownTextViewCoordinator {
         scrollProxy?.emitVisibleLine(containingUTF16Offset: textView.selectedRange().location, in: textView)
         reportVisibleRangeIfNeeded(in: textView)
         schedulePendingNavigationAfterInput(in: textView)
+        refreshMathCommandEligibility(for: textView)
     }
 
     @discardableResult

@@ -1202,3 +1202,28 @@ not WebKit IPC/string construction, complete offscreen export, image/font readin
 physical keystroke-to-screen, concurrent typing, or Debug/Release end-to-end evidence.
 **E9 remains open** for PR G. The full export payload limit and resource-policy gates
 remain separately owned by PR D/G.
+
+## Math-Dense Preview Render (informational, 2026-09-21)
+
+- Fixture: `Fixtures/math-dense-100kb.md` — 100,156 bytes at measurement
+  (100,155 bytes after removing one trailing blank line before commit); remark-AST count:
+  292 `$$`/`aligned`/`pmatrix` display blocks + 292 ` ```math ` fences
+  + 1,168 inline `$…$` formulas = 1,752 formulas total.
+- Procedure: `preview-src/test/math-perf.test.ts` — vitest/JSDOM pipeline render,
+  one warmup + three samples per pipeline, median reported.
+- Environment: Node v24.16.0, vitest 4.1.8, Apple M-series arm64, macOS 27.
+- Measured value: Markdown median 937.178 ms, samples `[875.318, 937.178, 1200.392]`;
+  MDX median 940.342 ms, samples `[956.188, 940.342, 887.465]`.
+- Baseline comparison (2026-09-21 review probe, same machine/Node/fixture, one
+  warmup + three samples): pre-change `HEAD` pipeline medians were
+  910.39 ms (Markdown) / 954.16 ms (MDX) vs 837.86 ms / 824.85 ms after the math
+  wrapper changes — the ~1 s magnitude predates this work and is not a regression
+  introduced by it. Order-fixed, low-sample, Node-only: directional evidence, not
+  a speedup claim.
+- Result: **Over budget (recorded, not relaxed).** The 100 ms/100 KB preview budget is
+  measured in WebKit as a settled-update gate by `PerformanceTests`; this Node/JSDOM
+  number is informational, not the WebKit gate. It is roughly 10x the general-document
+  median at this formula density; whether KaTeX CPU dominates is an unverified
+  hypothesis — a segmented measurement or profile would be required to attribute it.
+  Real WebKit acceptance for math remains a PR C gate; no budget was changed and no
+  caching layer was added (per the math plan: measure first, cache only with evidence).

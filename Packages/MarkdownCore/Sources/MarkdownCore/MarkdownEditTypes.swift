@@ -22,6 +22,8 @@ public enum MarkdownFormattingCommand: Equatable, Sendable {
     case paragraph
     case quote
     case codeFence
+    case insertInlineMath
+    case insertDisplayMath
 }
 
 public enum MarkdownEditCommand: Equatable, Sendable {
@@ -33,6 +35,19 @@ public enum MarkdownEditCommand: Equatable, Sendable {
     case format(MarkdownFormattingCommand)
 }
 
+/// Whether the math insertion commands can apply at a selection. Produced by the
+/// same `MathEditing` predicates that execute the commands, so a `true` here
+/// means the command would perform an edit rather than no-op.
+public struct MarkdownMathCommandAvailability: Equatable, Sendable {
+    public let canInsertInlineMath: Bool
+    public let canInsertDisplayMath: Bool
+
+    public init(canInsertInlineMath: Bool = false, canInsertDisplayMath: Bool = false) {
+        self.canInsertInlineMath = canInsertInlineMath
+        self.canInsertDisplayMath = canInsertDisplayMath
+    }
+}
+
 public enum MarkdownEditing {
     public static func shouldHandleBehavior(hasMarkedText: Bool) -> Bool {
         !hasMarkedText
@@ -41,7 +56,8 @@ public enum MarkdownEditing {
     public static func apply(
         _ command: MarkdownEditCommand,
         to text: String,
-        selection: NSRange
+        selection: NSRange,
+        fileKind: FileKind = .markdown
     ) -> MarkdownEditResult? {
         switch command {
         case let .insertNewline(fileKind):
@@ -58,7 +74,18 @@ public enum MarkdownEditing {
         case .formatTable:
             TableEditing.format(in: text, selection: selection)
         case let .format(command):
-            FormattingEditing.apply(command, to: text, selection: selection)
+            FormattingEditing.apply(command, to: text, selection: selection, fileKind: fileKind)
         }
+    }
+
+    /// Eligibility for the two math insertion commands at `selection`. Runs one
+    /// shared zone scan; callers that only need a boolean should prefer this
+    /// over invoking `apply` twice.
+    public static func mathCommandAvailability(
+        in text: String,
+        selection: NSRange,
+        fileKind: FileKind = .markdown
+    ) -> MarkdownMathCommandAvailability {
+        MathEditing.commandAvailability(in: text, selection: selection, fileKind: fileKind)
     }
 }

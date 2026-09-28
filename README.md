@@ -67,6 +67,13 @@ cd preview-src && npm run typecheck
 
 Requires Xcode 16+ and macOS 14+.
 
+## Math (KaTeX)
+
+Inline `$…$` and display `$$` blocks (opening/closing `$$` on their own lines) render
+with bundled KaTeX in both `.md` and `.mdx` previews; ` ```math ` fenced blocks render
+the same way. Format ▸ **Insert Inline Math** / **Insert Display Math** insert the
+delimiters (no default shortcuts). Use `\$` for literal dollar signs; `\(…\)` and `\[…\]` delimiters are not supported. Live fixture coverage: `Fixtures/math.md`.
+
 ## Known limitations (alpha)
 
 - **Single-file mode and sibling images:** the sandbox grants access only to the file you

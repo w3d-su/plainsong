@@ -35,7 +35,8 @@ extension MarkdownTextViewCoordinator {
         guard let proposal = EditingBehaviorsSupport.proposedCommand(
             command,
             in: textView,
-            editingGuard: editingBehaviorGuard
+            editingGuard: editingBehaviorGuard,
+            fileKind: commandProxy?.currentFileKind() ?? .markdown
         ) else {
             return
         }

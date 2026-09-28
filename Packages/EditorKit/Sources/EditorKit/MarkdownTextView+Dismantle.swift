@@ -6,6 +6,7 @@ extension MarkdownTextView {
         coordinator.detachFocusHandler(from: textView)
         coordinator.detachPasteAndDragHandlers(from: textView)
         coordinator.detachCommandProxy(from: textView)
+        coordinator.detachMathCommandEligibility(from: textView)
         coordinator.detachScrollProxy()
         coordinator.detachVisibleRangeReporter()
         coordinator.cancelCompletionRequest()

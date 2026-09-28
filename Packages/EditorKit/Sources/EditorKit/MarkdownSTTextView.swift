@@ -7,6 +7,9 @@ final class MarkdownSTTextView: STTextView {
     var pasteHandler: ((MarkdownSTTextView, NSPasteboard) -> Bool)?
     var imageFileDropHandler: ((MarkdownSTTextView, [URL]) -> Bool)?
     var windowAttachmentHandler: ((MarkdownSTTextView) -> Void)?
+    var firstResponderChangeHandler: ((MarkdownSTTextView, Bool) -> Void)?
+    /// Called on every window move, including removal (`window == nil`).
+    var windowChangeHandler: ((MarkdownSTTextView) -> Void)?
     private(set) var isSuppressingIntermediateMarkedTextRemoval = false
     private var markedTextReplacementRange: NSRange?
     private var isMarkedTextReplacementRangeConfirmed = false
@@ -117,6 +120,23 @@ final class MarkdownSTTextView: STTextView {
         if window != nil {
             windowAttachmentHandler?(self)
         }
+        windowChangeHandler?(self)
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let didBecome = super.becomeFirstResponder()
+        if didBecome {
+            firstResponderChangeHandler?(self, true)
+        }
+        return didBecome
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let didResign = super.resignFirstResponder()
+        if didResign {
+            firstResponderChangeHandler?(self, false)
+        }
+        return didResign
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {

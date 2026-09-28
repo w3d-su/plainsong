@@ -12,6 +12,9 @@ import SwiftUI
 struct PlainsongCommands: Commands {
     let appState: AppState
     @ObservedObject var menuBarState: MenuBarState
+    /// Focused-editor math eligibility, published by EditorKit. Drives Format
+    /// menu enablement only — execution re-validates through MarkdownCore.
+    @ObservedObject private var mathEligibility = EditorMathCommandEligibility.shared
 
     private var snapshot: MenuBarSnapshot {
         menuBarState.snapshot
@@ -117,6 +120,16 @@ struct PlainsongCommands: Commands {
             // Use Selection for Find adopts the macOS ⌘E convention (Decision Log).
             formatButtonWithoutShortcut("Inline Code", .format(.inlineCode))
             formatButton("Link", .format(.link), key: "k", modifiers: .command)
+            formatButtonWithoutShortcut(
+                "Insert Inline Math",
+                .format(.insertInlineMath),
+                isEligible: mathEligibility.availability.canInsertInlineMath
+            )
+            formatButtonWithoutShortcut(
+                "Insert Display Math",
+                .format(.insertDisplayMath),
+                isEligible: mathEligibility.availability.canInsertDisplayMath
+            )
 
             Divider()
 
@@ -152,11 +165,12 @@ struct PlainsongCommands: Commands {
 
     private func formatButtonWithoutShortcut(
         _ title: String,
-        _ command: MarkdownEditCommand
+        _ command: MarkdownEditCommand,
+        isEligible: Bool = true
     ) -> some View {
         Button(title) {
             EditorCommandDispatcher.perform(command)
         }
-        .disabled(!snapshot.hasOpenDocument)
+        .disabled(!snapshot.hasOpenDocument || !isEligible)
     }
 }

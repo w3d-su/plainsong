@@ -9,7 +9,9 @@ final class EditingBehaviorGuard {
 enum EditingBehaviorProposal {
     case allowNativeInput
     case selectionOnly(MarkdownEditResult)
-    case textMutation(MarkdownEditResult)
+    /// `restoresSelectionOnRedo` is set only for the Format-menu math
+    /// commands, whose inner selection differs from STTextView's redo selection.
+    case textMutation(MarkdownEditResult, restoresSelectionOnRedo: Bool = false)
 }
 
 @MainActor
@@ -91,6 +93,10 @@ public enum EditorCommandDispatcher {
             #selector(STTextView.plainsongFormatQuote(_:))
         case .format(.codeFence):
             #selector(STTextView.plainsongFormatCodeFence(_:))
+        case .format(.insertInlineMath):
+            #selector(STTextView.plainsongFormatInsertInlineMath(_:))
+        case .format(.insertDisplayMath):
+            #selector(STTextView.plainsongFormatInsertDisplayMath(_:))
         case .toggleCheckbox:
             #selector(STTextView.plainsongToggleCheckbox(_:))
         case .formatTable:
@@ -187,6 +193,14 @@ extension STTextView {
         plainsongPerform(.format(.codeFence), sender: sender)
     }
 
+    @objc func plainsongFormatInsertInlineMath(_ sender: Any?) {
+        plainsongPerform(.format(.insertInlineMath), sender: sender)
+    }
+
+    @objc func plainsongFormatInsertDisplayMath(_ sender: Any?) {
+        plainsongPerform(.format(.insertDisplayMath), sender: sender)
+    }
+
     @objc func plainsongToggleCheckbox(_ sender: Any?) {
         plainsongPerform(.toggleCheckbox, sender: sender)
     }
@@ -240,7 +254,7 @@ enum EditingBehaviorsSupport {
             return .allowNativeInput
         }
 
-        guard let edit = edit(for: command, textView: textView, selection: selection) else {
+        guard let edit = edit(for: command, textView: textView, selection: selection, fileKind: fileKind) else {
             return .allowNativeInput
         }
 
@@ -258,8 +272,13 @@ enum EditingBehaviorsSupport {
         case let .selectionOnly(edit):
             textView.textSelection = edit.newSelection
             return false
-        case let .textMutation(edit):
-            apply(edit, to: textView, editingGuard: editingGuard)
+        case let .textMutation(edit, restoresSelectionOnRedo):
+            apply(
+                edit,
+                to: textView,
+                editingGuard: editingGuard,
+                restoresSelectionOnRedo: restoresSelectionOnRedo
+            )
             return false
         }
     }
@@ -267,12 +286,14 @@ enum EditingBehaviorsSupport {
     static func applyCommand(
         _ command: MarkdownEditCommand,
         to textView: STTextView,
-        editingGuard: EditingBehaviorGuard
+        editingGuard: EditingBehaviorGuard,
+        fileKind: FileKind = .markdown
     ) {
         guard let proposal = proposedCommand(
             command,
             in: textView,
-            editingGuard: editingGuard
+            editingGuard: editingGuard,
+            fileKind: fileKind
         ) else {
             return
         }
@@ -283,14 +304,16 @@ enum EditingBehaviorsSupport {
     static func proposedCommand(
         _ command: MarkdownEditCommand,
         in textView: STTextView,
-        editingGuard: EditingBehaviorGuard
+        editingGuard: EditingBehaviorGuard,
+        fileKind: FileKind = .markdown
     ) -> EditingBehaviorProposal? {
         guard !editingGuard.isApplying else { return nil }
         guard MarkdownEditing.shouldHandleBehavior(hasMarkedText: textView.hasMarkedText()) else { return nil }
         let selection = textView.selectedRange()
-        guard let edit = edit(for: command, textView: textView, selection: selection) else { return nil }
+        guard let edit = edit(for: command, textView: textView, selection: selection, fileKind: fileKind)
+        else { return nil }
 
-        return proposal(for: edit)
+        return proposal(for: edit, restoresSelectionOnRedo: restoresSelectionOnRedo(command))
     }
 
     static func applyReplacement(
@@ -305,7 +328,7 @@ enum EditingBehaviorsSupport {
             replacementString: replacementString,
             newSelection: newSelection
         )
-        apply(edit, to: textView, editingGuard: editingGuard)
+        apply(edit, to: textView, editingGuard: editingGuard, restoresSelectionOnRedo: false)
     }
 
     static func needsMarkdownEvaluation(for replacementString: String, fileKind: FileKind) -> Bool {
@@ -339,23 +362,28 @@ enum EditingBehaviorsSupport {
     private static func edit(
         for command: MarkdownEditCommand,
         textView: STTextView,
-        selection: NSRange
+        selection: NSRange,
+        fileKind: FileKind
     ) -> MarkdownEditResult? {
         let text = MarkdownTextView.textStorage(of: textView)?.string ?? textView.text ?? ""
-        return MarkdownEditing.apply(command, to: text, selection: selection)
+        return MarkdownEditing.apply(command, to: text, selection: selection, fileKind: fileKind)
     }
 
-    private static func proposal(for edit: MarkdownEditResult) -> EditingBehaviorProposal {
+    private static func proposal(
+        for edit: MarkdownEditResult,
+        restoresSelectionOnRedo: Bool = false
+    ) -> EditingBehaviorProposal {
         if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
             return .selectionOnly(edit)
         }
-        return .textMutation(edit)
+        return .textMutation(edit, restoresSelectionOnRedo: restoresSelectionOnRedo)
     }
 
     private static func apply(
         _ edit: MarkdownEditResult,
         to textView: STTextView,
-        editingGuard: EditingBehaviorGuard
+        editingGuard: EditingBehaviorGuard,
+        restoresSelectionOnRedo: Bool
     ) {
         if edit.replacementRange.length == 0, edit.replacementString.isEmpty {
             textView.textSelection = edit.newSelection
@@ -366,7 +394,28 @@ enum EditingBehaviorsSupport {
         // re-enters shouldChangeText during insertText, so an inout guard here traps.
         editingGuard.isApplying = true
         defer { editingGuard.isApplying = false }
+        // STTextView's undo closure reselects the entire replacement on redo.
+        // For the math commands only, group a second action that runs after
+        // that redo and puts the caret back on the inner selection
+        // (`$[[formula]]$`, not `$formula$`). Other behaviors keep STTextView's
+        // native undo registration and typing coalescing untouched.
+        let undoManager = textView.undoManager
+        let groupsSelectionRedo = restoresSelectionOnRedo && undoManager?.isUndoRegistrationEnabled == true
+        // Skip the selection action when the text view refused the edit, or
+        // the group would be an undo step that changes nothing. Compare the
+        // text, not its length: display math replacing a blank line of spaces
+        // can keep the length. Menu-only path, so the copy is off the keystroke path.
+        let textBefore = groupsSelectionRedo ? currentText(of: textView) : nil
+        if groupsSelectionRedo {
+            undoManager?.beginUndoGrouping()
+        }
         textView.insertText(edit.replacementString, replacementRange: edit.replacementRange)
+        if groupsSelectionRedo {
+            if currentText(of: textView) != textBefore {
+                registerMathCommandSelectionRedo(edit.newSelection, on: textView)
+            }
+            undoManager?.endUndoGrouping()
+        }
         textView.textSelection = edit.newSelection
     }
 

@@ -57,12 +57,20 @@ extension MarkdownTextViewCoordinator {
             commandProxy = proxy
         }
 
+        let fileKind = proxy?.currentFileKind() ?? .markdown
         proxy?.attach(
             to: textView,
-            fileKind: proxy?.currentFileKind() ?? .markdown
+            fileKind: fileKind
         ) { [weak self, weak textView] command in
             guard let self, let textView else { return }
             performCommand(command, in: textView)
+        }
+
+        // Runs on every representable update; only a file-kind change can
+        // alter math eligibility here (text/selection changes refresh on their own).
+        if mathEligibilityFileKind != fileKind {
+            mathEligibilityFileKind = fileKind
+            refreshMathCommandEligibility(for: textView)
         }
     }
 
