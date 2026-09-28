@@ -299,9 +299,9 @@ extension AppState {
     }
 
     #if DEBUG
-        /// Opens the app-container-owned XCUITest fixture through production workspace setup
+        /// Opens an app-container-owned XCUITest fixture through production workspace setup
         /// without leaking its temporary URL into user last-opened or recent-item stores.
-        func openDebugWorkspaceSearchFixture(_ url: URL) {
+        func openDebugUITestWorkspaceFixture(_ url: URL) {
             do {
                 try open(url: url, rememberAsLastOpened: false, preserveWorkspace: false)
             } catch {

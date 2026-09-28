@@ -1,22 +1,24 @@
 # In-Document Replace — Gate Specification
 
 > **Status: spec is on `main`; this file now tracks implementation evidence.**
-> The successor to in-document Find (PR #95/#96/#97). R0 remains the hosted
-> writer-undo spike on `phase3-editor-replace-r0` (PR #112) and is **not**
-> claimed here. **PR C (`phase3-editor-replace-model`) is the pure MarkdownCore
+> The successor to in-document Find (PR #95/#96/#97). **R0 is GO on Candidate B1
+> (minimal enclosing range)** per the hosted writer-undo spike on
+> `phase3-editor-replace-r0` (PR #112): Candidate A is one native undo group but
+> publishes once per match, so it is NO-GO for Replace All; Candidate B2 works as a
+> fallback and is not chosen while B1 preserves source, undo, dirty, and presentation.
+> The spike does not ship user-facing Replace. **PR C (`phase3-editor-replace-model`) is the pure MarkdownCore
 > planner:** it closes R1 and the R3 *model* bullets with named tests, adds
 > `EditorFindSession.withUnresolvedCurrent` for post-replace `0 / total`, and
 > binds every continuation rescan to the originating session query. Cancellation
 > cadence remains independent from the at-most-100 visible progress milestones,
 > and malformed public UTF-16 ranges fail closed without end overflow. The pure
 > B1 slice builder validates and rebases absolute ranges; mapped batch caret,
-> session anchor, and collapsed selection share one post-write clamp. This PR
+> session anchor, and collapsed selection share one post-write clamp. PR C
 > introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
 > R2, R3 publication/writer bullets, and R4–R10 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
-> implementation commit. In particular, **R0 is a blocking mechanism spike at
-> the start of implementation, not late Replace All verification.**
+> implementation commit.
 
 Created 2026-07-29 as the current-document Replace gate set. See `agent.md`
 §6.1 (STTextView abstraction), §6.4 (shortcuts), §12 (performance), §13
@@ -587,8 +589,10 @@ ordered, non-overlapping range list and enclosing source bounds before rebasing;
 untouched gaps remain literal, and an empty list returns the unchanged slice.
 `EditorReplaceSourceConstructionTests` covers Unicode, deletion, adjacent edits,
 padding, empty ranges, malformed/overflowing lists, and ranges escaping the slice.
-The #112 executor should consume this helper when integrated; no EditorKit or
-R0 mechanism change is claimed by this model-only work.
+The R0 spike (#112) consumes it: `EditorReplaceBatchSpike.plan` takes B1's slice
+and range validation from this type and B2's whole-document text from
+`replacedSource`, keeping no EditorKit construction copy. This model-only work
+claims no R0 mechanism change.
 
 ### 6.2 EditorKit — installed editor executor
 
@@ -657,43 +661,80 @@ Before declaring an implementation PR done: relevant package/hosted tests,
 ## 8. Gates
 
 Boxes stay unchecked until a later PR supplies named-test or owner-recorded
-evidence. R1 and the R3 model bullets are checked in PR C; R0 remains on the
-separate spike PR.
+evidence. R1 and the R3 model bullets are checked in PR C; R0 is checked by the
+hosted spike PR #112.
 
 ### R0 — Batch writer activation + one undo (blocking mechanism spike)
 
-- [ ] Build a hosted coordinator fixture with a real App source contract,
+- [x] Build a hosted coordinator fixture with a real App source contract,
   writer activation, native undo manager, source publication observation, and
   Experimental WYSIWYG path.
-- [ ] Candidate A: one activation, `breakUndoCoalescing()` before an explicit
+  Evidence: `EditorReplaceBatchSpikeSupport` + `EditorReplaceBatchSpikeAppTests`
+  (`DocumentSession` / `AppState.editorDocumentBinding`).
+- [x] Candidate A: one activation, `breakUndoCoalescing()` before an explicit
   outer undo group, reverse-ordered replacements through the authorized native
   edit helper.
-- [ ] Candidate B1: exact final source built before activation, then one native
+  Evidence: `EditorReplaceBatchSpikeTests.testCandidateAPublishesOncePerMatch`
+  and `EditorReplaceBatchSpikeUndoTests.testReverseOrderedEditsShareOneOuterUndoGroup`.
+  **NO-GO for Replace All:** one undo group, but N source publications.
+- [x] Candidate B1: exact final source built before activation, then one native
   edit of the minimal enclosing raw range.
-- [ ] Candidate B2 is measured separately, and only if B1 fails: one
+  Evidence: `EditorReplaceBatchSpike.plan` (text from MarkdownCore's
+  `EditorReplaceSourceConstruction.replacedSlice`) +
+  `testCandidateB1PublishesOnceForTheEnclosingRange` — 1 writer activation, 1
+  authorized native edit, 1 publication.
+  `testInvalidRangesOpenNoWriterOrUndo` refuses overlapping ranges before
+  writer activation or undo grouping.
+- [x] Candidate B2 is measured separately, and only if B1 fails: one
   full-document native replacement.
-- [ ] One Undo restores literal UTF-16-code-unit-exact source, selection, dirty
-  baseline, and presentation for the entire batch; no second Undo is needed
-  for another match.
-- [ ] One Redo reapplies the exact whole batch.
-- [ ] Seed prior typed/coalesced input first: Replace All must not merge with
+  Evidence: `testCandidateB2PublishesOnceForTheFullDocument`. B1 did not fail;
+  B2 remains an unused fallback.
+- [x] One Undo restores literal UTF-16-code-unit-exact source, selection, and
+  dirty baseline for the entire batch; no second Undo is needed for another
+  match. Fold-delimiter attributes are reasserted by the existing highlight
+  presentation pass after the undo publication, not by the batch helper.
+  Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo` (source/selection/dirty);
+  `EditorReplaceBatchSpikeWYSIWYGTests.testMinimalEnclosingRangeUndoRestoresFoldPresentation`
+  (live `foldedDelimiterAttribute` on the `**` ranges of `**one**` after apply
+  and again after undo + presentation reapply).
+- [x] One Redo reapplies the exact whole batch, including the planned
+  post-batch caret.
+  Evidence: `testMinimalEnclosingRangeIsOneUndoAndRedo`.
+- [x] Seed prior typed/coalesced input first: Replace All must not merge with
   it; the next Undo after undoing Replace All reaches the prior input.
-- [ ] Record activation, native edit, source publication, revision, and
-  presentation-apply counts. One undo with N intermediate publications is not
-  sufficient evidence.
-- [ ] Cover unequal lengths, deletion, Unicode/canonical-equivalent match
+  Evidence: `testReplaceAllDoesNotMergeWithPriorTyping`.
+- [x] Record activation, native edit, source publication, and revision.
+  One undo with N intermediate publications is not sufficient evidence.
+  Evidence: A = N edits / N publications (NO-GO); B1 = 1/1 (GO); B2 = 1/1
+  (fallback). Presentation stays outside the mutation; the WYSIWYG test
+  asserts live folded-delimiter attributes after apply and after undo.
+- [x] Cover unequal lengths, deletion, Unicode/canonical-equivalent match
   lengths, replacement containing the query, 256-code-unit replacement, and a
   near-10,000 exact set.
-- [ ] App authorization refusal opens no writer/undo work. Stale writer
+  Evidence: `testDeletionAndUnequalLengths`,
+  `testCanonicalEquivalentMatchLengthComesFromTheEngineRange`,
+  `testReplacementContainingTheQueryIsNotRescannedInTheBatch`,
+  `testTwoHundredFiftySixCodeUnitReplacement`,
+  `EditorReplaceBatchSpikeLargeDocumentTests` (`an` × 8,921 on `large-1mb.md`).
+- [x] App authorization refusal opens no writer/undo work. Stale writer
   preflight may perform only its existing authoritative convergence; it applies
   no replacement, opens no replacement undo group, and requires counter-only
   recompute.
-- [ ] Run the combined worst v1 shape: `Fixtures/large-1mb.md`, an exact
+  Evidence: `testAuthorizationRefusalOpensNoWriterOrUndo`,
+  `testStaleWriterPreflightDoesNotOpenAReplacementUndoGroup`.
+- [x] Run the combined worst v1 shape: `Fixtures/large-1mb.md`, an exact
   near-10,000 non-truncated set, and a 256-code-unit replacement; record
-  construction, main-thread, allocation, and typing impact.
-- [ ] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
+  construction, main-thread, and typing impact.
+  Evidence: asserted `an` × 8,921 and planned UTF-16 length 3,314,896;
+  printed (not wall-clock-gated) construction ≈ 4.5 ms; B1 commit ≈ 42 ms;
+  post-batch `insertText` ≈ 0.5 ms. Allocation is not measured. These numbers
+  predate the switch to MarkdownCore's builder; the 2026-09-21 Decision Log row
+  records the same-machine before/after comparison.
+- [x] Record GO candidate or NO-GO. If no allowed candidate passes, Replace All
   remains deferred and this design changes before any product UI claims it.
-- Evidence: _open — mandatory first implementation PR_
+- Evidence: **GO — Candidate B1.** No user-facing Replace. B1 and B2 text come
+  from PR C's `EditorReplaceSourceConstruction`; product mutation stays behind
+  later PRs.
 
 ### R1 — One literal match semantics
 
