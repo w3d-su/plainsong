@@ -60,7 +60,8 @@ public enum ExportArtifactOwnershipDecision: Sendable, Equatable {
 public typealias ExportArtifactOwnershipCheck =
     (WorkspaceNoFollowFileTargetInspection) -> ExportArtifactOwnershipDecision
 
-/// Why an operation proved that nothing was published and no staging entry remains.
+/// Why an operation ended with the selected leaf proven in (or restored to) its pre-operation
+/// state and no operation entry remaining. A rollback may have briefly published writer bytes.
 public enum ExportArtifactFailure: Error, Sendable, Equatable {
     case invalidDestinationURL
     case unsupportedExtension
@@ -86,19 +87,29 @@ public enum ExportArtifactFailure: Error, Sendable, Equatable {
     case writeFailed(WorkspaceAnchoredFileSystemError)
 }
 
+/// Whose bytes a retained entry held when the writer re-observed it.
+public enum ExportArtifactResidueContents: Sendable, Equatable {
+    /// The owner-approved identity that a replacement displaced: the user's original file.
+    case displacedOriginal
+    /// The writer's staged artifact bytes.
+    case writerBytes
+    /// The entry matched neither identity when re-observed.
+    case unknown
+}
+
 /// An exact path that may still hold an operation identity after an uncertain outcome.
 public enum ExportArtifactResidue: Sendable, Equatable {
     /// Every tracked name was proven not to hold the operation identity.
     case none
-    /// The expected identity was observed at this exact path.
-    case retained(URL)
+    /// The expected identity was observed at this exact path, holding these contents.
+    case retained(URL, holding: ExportArtifactResidueContents)
     /// Removal could not be proven; this exact path must be inspected before reuse.
     case removalIndeterminate(URL)
 
     public var url: URL? {
         switch self {
         case .none: nil
-        case let .retained(url), let .removalIndeterminate(url): url
+        case let .retained(url, _), let .removalIndeterminate(url): url
         }
     }
 }
@@ -128,15 +139,17 @@ public struct ExportArtifactIndeterminateWrite: Sendable, Equatable {
     public let selectedURL: URL
     public let destinationState: ExportArtifactDestinationState
     public let residue: ExportArtifactResidue
-    /// The exact operation-scoped staging (or cleanup) sibling that may still hold an identity;
-    /// `nil` when no staging name remains uncertain or the residue is the selected leaf itself.
+    /// The exact operation-scoped staging (or cleanup) sibling that may still hold an identity.
+    /// When the residue is the selected leaf itself this is the unproven staging name; `nil`
+    /// only when no staging or cleanup name remains uncertain.
     public let stagingURL: URL?
 }
 
 public enum ExportArtifactWriteOutcome: Sendable, Equatable {
     /// Writer bytes are durable at the selected leaf and the staging name is proven absent.
     case committed(ExportArtifactCommit)
-    /// Nothing was published and no operation entry remains.
+    /// The destination is proven in (or restored to) its pre-operation state and no operation
+    /// entry remains.
     case notCommitted(ExportArtifactFailure)
     case indeterminate(ExportArtifactIndeterminateWrite)
 }

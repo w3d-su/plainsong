@@ -3,7 +3,8 @@
 > **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
 > 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
 > PR C lands protocol v6 + static-document semantics. PR E lands the headless one-shot
-> WorkspaceKit artifact writer (writer-level E6 bullets and the E9 dependency bullet).
+> WorkspaceKit artifact writer (writer-level E6 bullets except the sibling bullet, and the E9
+> dependency bullet).
 > E1–E9 remain open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
@@ -654,7 +655,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
   case/canonical aliases are rejected.
-- [x] The only allowed sibling is one randomized no-follow operation-scoped staging
+- [ ] The only allowed sibling is one randomized no-follow operation-scoped staging
   file in the approved parent; success proves it absent. No delivered sibling,
   intermediate directory, persistent recovery journal, bookmark, retry/fallback
   destination, or second artifact is created.
@@ -666,8 +667,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   audited `WorkspaceAnchoredFileSystem` staging/`RENAME_EXCL`/`RENAME_SWAP`/postflight/
   reverse-swap/cleanup primitives and returns `.committed` only when the writer bytes are
   durable and the staging name is re-proven empty; every other result is `.notCommitted`
-  (proven unchanged, no staging left) or `.indeterminate` (exact selected URL, typed
-  destination state, exact residue/staging URL). Publication:
+  (destination proven in or restored to its pre-operation state, no operation entry left;
+  a rollback may have briefly published writer bytes) or `.indeterminate` (exact selected
+  URL, typed destination state, exact residue/staging URL, and whether a retained entry
+  holds the user's displaced original or the writer's bytes). Publication:
   `testNewLeafPublishesWithExclusiveRenameAndProvesStagingAbsent`,
   `testConfirmedReplacementSwapsExactIdentityWithoutTruncatingDisplacedInode` (an outside
   hard link keeps the displaced bytes), `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`.
@@ -695,21 +698,38 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `testReverseSwapSyncFailureReportsRestoredDestinationAndRetainedWriterStaging`,
   `testCreatedDestinationRollbackFailureIsIndeterminateAndKeepsWriterBytes`,
   `testDisplacedCleanupFailuresAreIndeterminateEvenThoughWriterBytesArePublished`,
-  `testUnexpectedDisplacedEntryPreventsReverseSwapAndPreservesBothIdentities`. Sibling
-  and lifetime: `testAtMostOneOperationSiblingExistsAtEveryObservedBoundary` (the audited
-  cleanup may rename that same staging inode to a random `.plainsong-cleanup-*` name before
-  unlink; at most one operation sibling exists at every observed boundary),
+  `testUnexpectedDisplacedEntryPreventsReverseSwapAndPreservesBothIdentities`. Lifetime:
   `testCommittedNewLeafRequiresStagingNameProvenAbsent`,
   `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`. Ownership (hosted
   `ExportDestinationOwnershipAppTests`, App adapter
   `App/AppState+ExportDestinationOwnership.swift` over the Save Copy and mutation
-  inventories): `testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten`,
-  `testHardLinkToEveryUnanchoredManagedOwnerIsRefused`,
-  `testCaseAliasOfMissingDetachedSessionIsRefused`,
-  `testQuarantinedIndeterminateSaveCopyDestinationIsRefused`,
-  `testRecoveryStoreLoadFailureRefusesEveryExportDestination`,
-  `testUnownedDestinationCommitsAndOnlyAFileLessSourceIsExempt`,
-  `testDisagreeingWriterInspectionIsRefused`.
+  inventories; every refusal test first proves an unowned control is permitted):
+  current/cached anchored and hard link `testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten`;
+  cached/retired/editor-bound unanchored hard links `testHardLinkToEveryUnanchoredManagedOwnerIsRefused`;
+  detached case alias `testCaseAliasOfMissingDetachedSessionIsRefused`; quarantined
+  indeterminate Save Copy `testQuarantinedIndeterminateSaveCopyDestinationIsRefused`; live
+  `workspaceMutationRecoveries` candidate and its case alias
+  `testLiveWorkspaceMutationRecoveryCandidateAndItsCaseAliasAreRefused`; pending text-recovery
+  `originalURL` plus context-only URL owners (`lastKnownDiskHashes`, `detachedSessionURLs`)
+  `testTextRecoveryOriginalAndContextOnlyOwnersAreRefused`; export into a workspace subfolder,
+  whose parent is a different root authority, colliding by hard link
+  `testSubfolderExportCollidingByHardLinkIsRefusedAcrossRootAuthorities` and by case alias
+  through the Save Copy full-path comparison
+  `testSubfolderCaseAliasOfOwnedMissingFileIsRefusedByFullPathComparison`; recovery-store
+  load failure `testRecoveryStoreLoadFailureRefusesEveryExportDestination`; source exemption
+  only for a file-less source `testUnownedDestinationCommitsAndOnlyAFileLessSourceIsExempt`;
+  writer/App inspection disagreement `testDisagreeingWriterInspectionIsRefused`. Not
+  separately exercised: a restored (promoted) text-recovery session, whose unavailable proof
+  makes the inventory refuse every export destination, as it refuses Save Copy.
+- Sibling bullet left unchecked for owner reading:
+  `testAtMostOneOperationSiblingExistsAtEveryObservedBoundary` proves at most one operation
+  sibling at every observed boundary of a successful replacement or new leaf, and success
+  proves both names clear. The audited cleanup, however, renames the displaced inode from
+  the staging name to a second random `.plainsong-cleanup-*` name before unlinking it, and
+  an uncertain cleanup can leave that second name holding the user's original (reported
+  exactly, `testDisplacedCleanupFailuresAreIndeterminateEvenThoughWriterBytesArePublished`).
+  Checking this bullet requires the owner to accept that the cleanup name is the same
+  staging file under a second randomized name.
 - Still open for PR F: the fresh-panel-URL/cancel/stale bullet and the leaf-grant/Powerbox
   bullet. SwiftPM tests are not sandboxed and hosted tests cannot drive a real panel. The
   writer detects missing parent/staging authority (`parentAuthorityUnavailable`,

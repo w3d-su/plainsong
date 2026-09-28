@@ -6,8 +6,9 @@ struct ExportArtifactVolumeCapabilities: Equatable {
     let exchangeRename: Bool
 }
 
-/// Test seams. Production uses the audited filesystem hooks unchanged and probes the real
-/// volume; tests inject syscall-boundary failures, races, and unsupported volume semantics.
+/// Test seams. Production passes `.production` filesystem hooks (the writer still installs its
+/// own production `temporaryArtifactObserver`) and probes the real volume; tests inject
+/// syscall-boundary failures, races, and unsupported volume semantics.
 struct ExportArtifactWriterHooks {
     static let production = ExportArtifactWriterHooks()
 

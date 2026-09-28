@@ -233,7 +233,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
 
 // MARK: - Fixtures
 
-private extension ExportDestinationOwnershipAppTests {
+extension ExportDestinationOwnershipAppTests {
     /// Proves a refusal is attributable to the owner under test, not to an unrelated
     /// fail-closed inventory member.
     func assertUnownedControlIsPermitted(
@@ -265,6 +265,10 @@ private extension ExportDestinationOwnershipAppTests {
     func makeWorkspaceFixture(ownedName: String = "owned.md") throws -> WorkspaceFixture {
         let root = try makeTemporaryDirectory()
         let ownedURL = root.appendingPathComponent(ownedName)
+        try FileManager.default.createDirectory(
+            at: ownedURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         try writeText("owned sentinel", to: ownedURL)
         let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
         let ownedLocation = try authority.location(relativePath: ownedName)

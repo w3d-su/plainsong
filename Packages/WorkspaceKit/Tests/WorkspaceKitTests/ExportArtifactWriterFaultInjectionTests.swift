@@ -107,8 +107,8 @@ extension ExportArtifactWriterTests {
             XCTAssertEqual(result.destinationState, .unknown)
             XCTAssertEqual(result.residue.url?.path(percentEncoded: false), staging.path(percentEncoded: false))
             XCTAssertEqual(result.stagingURL?.path(percentEncoded: false), staging.path(percentEncoded: false))
-            guard case .retained = result.residue else {
-                return XCTFail("displaced identity must be observed at the staging path: \(result)")
+            guard case .retained(_, holding: .displacedOriginal) = result.residue else {
+                return XCTFail("the user's original must be reported at the staging path: \(result)")
             }
             XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
             XCTAssertEqual(try text(at: staging), "original")
@@ -136,8 +136,8 @@ extension ExportArtifactWriterTests {
         let staging = try XCTUnwrap(stagingURL(probe.stagingName, in: fixture))
         XCTAssertEqual(result.reason, .durabilityFailed)
         XCTAssertEqual(result.destinationState, .unknown)
-        guard case let .retained(retained) = result.residue else {
-            return XCTFail("writer identity must be observed at the staging path: \(result)")
+        guard case let .retained(retained, holding: .writerBytes) = result.residue else {
+            return XCTFail("the writer's bytes must be reported at the staging path: \(result)")
         }
         XCTAssertEqual(retained.path(percentEncoded: false), staging.path(percentEncoded: false))
         XCTAssertEqual(result.stagingURL, retained)
@@ -161,6 +161,9 @@ extension ExportArtifactWriterTests {
             result.residue.url?.path(percentEncoded: false),
             fixture.destination.path(percentEncoded: false)
         )
+        guard case .retained(_, holding: .writerBytes) = result.residue else {
+            return XCTFail("the selected leaf must be reported as holding the writer's bytes: \(result)")
+        }
         XCTAssertEqual(
             result.stagingURL?.path(percentEncoded: false),
             stagingURL(probe.stagingName, in: fixture)?.path(percentEncoded: false),
@@ -197,7 +200,8 @@ extension ExportArtifactWriterTests {
             XCTAssertTrue(stagingPath.lastPathComponent.hasPrefix(".plainsong-"), "\(call)")
             let siblings = try operationSiblings(in: fixture.directory)
             switch result.residue {
-            case .retained:
+            case let .retained(_, holding):
+                XCTAssertEqual(holding, .displacedOriginal, "PR F can tell the user where the original is")
                 XCTAssertEqual(siblings, [stagingPath.lastPathComponent], "\(call)")
                 XCTAssertEqual(try text(at: stagingPath), "original", "\(call)")
                 XCTAssertEqual(try identity(at: stagingPath), original, "\(call)")

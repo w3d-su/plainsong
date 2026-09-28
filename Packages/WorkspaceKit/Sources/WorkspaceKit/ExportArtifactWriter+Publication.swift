@@ -79,29 +79,50 @@ extension ExportArtifactWriter {
         return exportOutcome(
             outcome,
             selection: selection,
-            destination: preflight.location,
+            context: indeterminateContext(
+                selection: selection,
+                preflight: preflight,
+                expectation: expectation,
+                recorder: recorder
+            ),
             recorder: recorder
+        )
+    }
+
+    private static func indeterminateContext(
+        selection: ExportArtifactSelection,
+        preflight: ExportArtifactPreflight,
+        expectation: WorkspaceNoFollowFileWriteExpectation,
+        recorder: ExportArtifactStagingRecorder
+    ) -> IndeterminateContext {
+        let approvedIdentity: WorkspaceFileSystemIdentity? = if case let .existing(identity) = expectation {
+            identity
+        } else {
+            nil
+        }
+        return IndeterminateContext(
+            selectedURL: selection.destinationURL,
+            destination: preflight.location,
+            stagingLocation: recorder.stagingName.flatMap { preflight.location.sibling(named: $0) },
+            approvedIdentity: approvedIdentity
         )
     }
 
     private static func exportOutcome(
         _ outcome: WorkspaceFileWriteOutcome,
         selection: ExportArtifactSelection,
-        destination: WorkspaceFileSystemLocation,
+        context: IndeterminateContext,
         recorder: ExportArtifactStagingRecorder
     ) -> ExportArtifactWriteOutcome {
-        let context = IndeterminateContext(
-            selectedURL: selection.destinationURL,
-            destination: destination,
-            stagingLocation: recorder.stagingName.flatMap { destination.sibling(named: $0) }
-        )
+        let destination = context.destination
         switch outcome {
         case let .committedAndDurable(result):
             guard result.cleanupState == .none else {
                 return context.indeterminate(
                     reason: .cleanupFailed,
                     destinationState: .holdsWriterBytes,
-                    artifactState: result.cleanupState
+                    artifactState: result.cleanupState,
+                    writerIdentity: result.metadata.identity
                 )
             }
             guard proveCommittedNamespace(
@@ -112,7 +133,8 @@ extension ExportArtifactWriter {
                 return context.indeterminate(
                     reason: .namespaceChanged,
                     destinationState: .unknown,
-                    artifactState: context.stagingLocation.map { .removalIndeterminate($0) } ?? .none
+                    artifactState: context.stagingLocation.map { .removalIndeterminate($0) } ?? .none,
+                    writerIdentity: result.metadata.identity
                 )
             }
             return .committed(ExportArtifactCommit(
@@ -124,7 +146,8 @@ extension ExportArtifactWriter {
                 return context.indeterminate(
                     reason: result.reason,
                     destinationState: .provenUnchanged,
-                    artifactState: result.artifactState
+                    artifactState: result.artifactState,
+                    writerIdentity: result.retainedArtifactIdentity
                 )
             }
             if let code = recorder.creationFailureCode {
@@ -137,7 +160,8 @@ extension ExportArtifactWriter {
             return context.indeterminate(
                 reason: result.reason,
                 destinationState: .unknown,
-                artifactState: result.recoveryArtifact
+                artifactState: result.recoveryArtifact,
+                writerIdentity: result.preparedMetadata?.identity
             )
         }
     }
@@ -195,13 +219,16 @@ private struct IndeterminateContext {
     let selectedURL: URL
     let destination: WorkspaceFileSystemLocation
     let stagingLocation: WorkspaceFileSystemLocation?
+    /// The panel-approved identity a replacement may displace; `nil` for a new leaf.
+    let approvedIdentity: WorkspaceFileSystemIdentity?
 
     /// Converts the primitive's retained location into plain URLs, so the outcome retains no
     /// descriptor-backed authority after the operation.
     func indeterminate(
         reason: WorkspaceAnchoredFileSystemError,
         destinationState: ExportArtifactDestinationState,
-        artifactState: WorkspaceFileWriteArtifactState
+        artifactState: WorkspaceFileWriteArtifactState,
+        writerIdentity: WorkspaceFileSystemIdentity?
     ) -> ExportArtifactWriteOutcome {
         let residue: ExportArtifactResidue
         let residueLocation: WorkspaceFileSystemLocation?
@@ -210,7 +237,7 @@ private struct IndeterminateContext {
             residue = .none
             residueLocation = nil
         case let .retained(location):
-            residue = .retained(location.fileURL)
+            residue = .retained(location.fileURL, holding: contents(at: location, writerIdentity: writerIdentity))
             residueLocation = location
         case let .removalIndeterminate(location):
             residue = .removalIndeterminate(location.fileURL)
@@ -232,5 +259,31 @@ private struct IndeterminateContext {
             residue: residue,
             stagingURL: stagingURL
         ))
+    }
+
+    /// Tells PR F where the user's original file is: one anchored no-follow re-observation of
+    /// the retained entry compared with the approved and writer identities.
+    private func contents(
+        at location: WorkspaceFileSystemLocation,
+        writerIdentity: WorkspaceFileSystemIdentity?
+    ) -> ExportArtifactResidueContents {
+        let observed: WorkspaceFileSystemIdentity? = WorkspaceAnchoredFileSystem
+            .$ignoresInheritedTaskCancellation.withValue(true) {
+                try? WorkspaceAnchoredFileSystem.withAnchoredParent(
+                    at: location,
+                    hooks: .production
+                ) { chain, parentDescriptor, leaf in
+                    let entry = try WorkspaceAnchoredFileSystem.directoryEntryIdentity(
+                        parentDescriptor: parentDescriptor,
+                        component: leaf
+                    )
+                    try chain.validateNamespace()
+                    return entry.isRegularFile ? entry.identity : nil
+                }
+            }
+        guard let observed else { return .unknown }
+        if observed == approvedIdentity { return .displacedOriginal }
+        if observed == writerIdentity { return .writerBytes }
+        return .unknown
     }
 }
