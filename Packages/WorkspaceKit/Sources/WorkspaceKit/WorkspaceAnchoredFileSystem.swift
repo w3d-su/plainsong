@@ -351,6 +351,11 @@ enum WorkspaceAnchoredFileSystem {
     }
 
     enum InjectedCall: Hashable {
+        /// Immediately before the exclusive staging `openat`, and before its first write and
+        /// `fsync`. Failures at these points prove the destination untouched.
+        case createTemporary
+        case writeTemporary
+        case syncTemporary
         case renameSwap
         case renameExclusive
         case afterRenameSwap
@@ -370,18 +375,29 @@ enum WorkspaceAnchoredFileSystem {
         case unlinkQuarantinedArtifactAfterValidation
     }
 
+    enum TemporaryArtifactObservation: Equatable {
+        case created(name: String)
+        case creationFailed(code: Int32)
+    }
+
     struct Hooks {
         static let production = Hooks()
 
         let eventHandler: (@Sendable (Event) -> Void)?
         let injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)?
+        /// Observes the exclusive staging create: its exact random name, or the `errno` of a
+        /// failed create. Public outcomes are unchanged; a one-shot caller uses this to prove
+        /// the staging name absent and to distinguish missing parent authority (`EPERM`/`EACCES`).
+        let temporaryArtifactObserver: (@Sendable (TemporaryArtifactObservation) -> Void)?
 
         init(
             eventHandler: (@Sendable (Event) -> Void)? = nil,
-            injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil
+            injectedFailure: (@Sendable (InjectedCall) -> WorkspaceAnchoredFileSystemError?)? = nil,
+            temporaryArtifactObserver: (@Sendable (TemporaryArtifactObservation) -> Void)? = nil
         ) {
             self.eventHandler = eventHandler
             self.injectedFailure = injectedFailure
+            self.temporaryArtifactObserver = temporaryArtifactObserver
         }
 
         func emit(_ event: Event) {

@@ -369,10 +369,17 @@ private extension AppState {
             securityScopedAuthorityOwners: retirement.securityScopedAuthorityOwners
         )
     }
+}
 
+/// The authoritative Save Copy ownership inventory, shared with one-shot export
+/// (`AppState+ExportDestinationOwnership.swift`).
+@MainActor
+extension AppState {
+    /// `sourceSession` is the only session allowed an unavailable proof or exact missing-source
+    /// recovery. `nil` grants no exception, so every inventory owner is checked (one-shot export).
     func validateWorkspaceSaveCopyDestinationOwnership(
         at location: WorkspaceFileSystemLocation,
-        excluding sourceSession: DocumentSession
+        excluding sourceSession: DocumentSession?
     ) throws -> WorkspaceNoFollowFileTargetInspection {
         let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
         guard inspection.canonicalLocation == location else {

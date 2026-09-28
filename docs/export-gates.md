@@ -2,7 +2,9 @@
 
 > **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
 > 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
-> PR C lands protocol v6 + static-document semantics. E1–E9 remain open.** Precedent:
+> PR C lands protocol v6 + static-document semantics. PR E lands the headless one-shot
+> WorkspaceKit artifact writer (writer-level E6 bullets and the E9 dependency bullet).
+> E1–E9 remain open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -641,26 +643,80 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [ ] A leaf-only grant is never widened implicitly. The Powerbox grant or coordinated
   safe-save mechanism must authorize exact parent/staging work; otherwise the operation
   fails without direct-write or alternate-directory fallback.
-- [ ] New-file publication uses `RENAME_EXCL`; owner-confirmed exact-regular-file
+- [x] New-file publication uses `RENAME_EXCL`; owner-confirmed exact-regular-file
   replacement uses `RENAME_SWAP`. Ordinary rename-overwrite and truncating direct write
   are absent. Symlink, directory, device/non-regular, observed identity/type race, and
   unsupported extension fail closed.
-- [ ] Overwrite postflight proves the selected writer bytes and exact displaced
+- [x] Overwrite postflight proves the selected writer bytes and exact displaced
   panel-approved identity before cleanup. A mismatch reverses only after exact two-name
   proof; otherwise both identities remain, exact paths are reported, and success is
   impossible.
-- [ ] Source collisions reuse the authoritative App ownership inventory from Save Copy
+- [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
   case/canonical aliases are rejected.
-- [ ] The only allowed sibling is one randomized no-follow operation-scoped staging
+- [x] The only allowed sibling is one randomized no-follow operation-scoped staging
   file in the approved parent; success proves it absent. No delivered sibling,
   intermediate directory, persistent recovery journal, bookmark, retry/fallback
   destination, or second artifact is created.
-- [ ] Namespace/cleanup uncertainty is reported with exact selected/staging paths and is
+- [x] Namespace/cleanup uncertainty is reported with exact selected/staging paths and is
   never called an identity-atomic non-commit or a clean success.
-- [ ] Write failure/uncertainty is reported as failure and cannot be presented as a
+- [x] Write failure/uncertainty is reported as failure and cannot be presented as a
   complete artifact.
-- Evidence: _open — PR E–G one-shot write and integration tests_
+- PR E evidence (writer level, headless): `ExportArtifactWriter` in WorkspaceKit reuses the
+  audited `WorkspaceAnchoredFileSystem` staging/`RENAME_EXCL`/`RENAME_SWAP`/postflight/
+  reverse-swap/cleanup primitives and returns `.committed` only when the writer bytes are
+  durable and the staging name is re-proven empty; every other result is `.notCommitted`
+  (proven unchanged, no staging left) or `.indeterminate` (exact selected URL, typed
+  destination state, exact residue/staging URL). Publication:
+  `testNewLeafPublishesWithExclusiveRenameAndProvesStagingAbsent`,
+  `testConfirmedReplacementSwapsExactIdentityWithoutTruncatingDisplacedInode` (an outside
+  hard link keeps the displaced bytes), `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`.
+  Refusal matrix: `testSymbolicLinkDestinationIsRefusedForBothDispositions`,
+  `testSymbolicLinkInParentPathIsRefused` (`O_NOFOLLOW_ANY` on the literal parent),
+  `testDirectoryAndFIFODestinationsAreRefusedAsNonRegular` (device nodes cannot be created
+  unprivileged; the FIFO exercises the same non-regular refusal),
+  `testUnsupportedExtensionsAndInvalidURLsWriteNothing`,
+  `testDispositionMismatchesAreRefusedBeforeStaging`,
+  `testCaseAndNormalizationAliasOfExistingLeafIsRefused`,
+  `testMissingParentAuthorityFailsBeforeAnyWrite`,
+  `testDeniedStagingCreateIsNotCommittedWithoutAnyFallbackWrite` (real `EACCES` and
+  `EPERM` staging denials),
+  `testUnsupportedVolumeSemanticsFailClosedBeforeStaging`,
+  `testProbedVolumeCapabilitiesReportExclusiveAndExchangeRenameOnTestVolume`,
+  `testIdentityAndTypeRacesAfterInspectionFailClosedWithoutTouchingRacer`,
+  `testRaceAtFinalPublishBoundaryNeverOverwritesRacerOrClaimsSuccess`,
+  `testOwnershipRefusalWritesNothingAndReceivesTheWritersInspection`,
+  `testCancelledOperationWritesNothing`. Fault injection at staging create/write/fsync,
+  publish, postflight read, parent sync, reverse swap, and cleanup:
+  `testStagingCreateWriteAndSyncFailuresProveDestinationUntouched`,
+  `testPublishFailuresRemoveStagingAndLeaveDestinationUnchanged`,
+  `testPostflightReadAndParentSyncFailuresRollBackToProvenNonCommit`,
+  `testReverseSwapFailurePreservesBothIdentitiesAndReportsExactPaths`,
+  `testReverseSwapSyncFailureReportsRestoredDestinationAndRetainedWriterStaging`,
+  `testCreatedDestinationRollbackFailureIsIndeterminateAndKeepsWriterBytes`,
+  `testDisplacedCleanupFailuresAreIndeterminateEvenThoughWriterBytesArePublished`,
+  `testUnexpectedDisplacedEntryPreventsReverseSwapAndPreservesBothIdentities`. Sibling
+  and lifetime: `testAtMostOneOperationSiblingExistsAtEveryObservedBoundary` (the audited
+  cleanup may rename that same staging inode to a random `.plainsong-cleanup-*` name before
+  unlink; at most one operation sibling exists at every observed boundary),
+  `testCommittedNewLeafRequiresStagingNameProvenAbsent`,
+  `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`. Ownership (hosted
+  `ExportDestinationOwnershipAppTests`, App adapter
+  `App/AppState+ExportDestinationOwnership.swift` over the Save Copy and mutation
+  inventories): `testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten`,
+  `testHardLinkToEveryUnanchoredManagedOwnerIsRefused`,
+  `testCaseAliasOfMissingDetachedSessionIsRefused`,
+  `testQuarantinedIndeterminateSaveCopyDestinationIsRefused`,
+  `testRecoveryStoreLoadFailureRefusesEveryExportDestination`,
+  `testUnownedDestinationCommitsAndOnlyAFileLessSourceIsExempt`,
+  `testDisagreeingWriterInspectionIsRefused`.
+- Still open for PR F: the fresh-panel-URL/cancel/stale bullet and the leaf-grant/Powerbox
+  bullet. SwiftPM tests are not sandboxed and hosted tests cannot drive a real panel. The
+  writer detects missing parent/staging authority (`parentAuthorityUnavailable`,
+  `stagingNotPermitted`) and never widens scope or falls back, but whether a real
+  save-panel leaf grant authorizes the sibling staging create is unproven and likely denied
+  (leaf grants already cannot read siblings, `agent.md` M2). PR F's owner smoke must record
+  it; a coordinated safe-save alternative needs a docs PR and Decision Log row (§7).
 
 ### E7 — App / File-menu UX and side-effect isolation
 
@@ -700,8 +756,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   budget remains green while export is active.
 - [ ] Existing preview protocol, asset containment, MDX sanitizer, theme, render,
   scroll-sync, Save/Save Copy, and workspace mutation/recovery suites remain green.
-- [ ] Dependency manifests are unchanged.
-- Evidence: _open — PR G measured evidence + full regression suite_
+- [x] Dependency manifests are unchanged.
+- PR E evidence: `git diff origin/main -- '*Package.swift' '*Package.resolved'
+  'preview-src/package*.json' project.yml` is empty for the writer PR. The full
+  WorkspaceKit suite (Save/Save Copy/mutation/recovery write primitives) and the hosted
+  App Save Copy/mutation suites stay green with the writer and adapter; the remaining
+  preview/render/scroll suites and measured evidence stay open for PR G.
 
 ## 9. Performance and Security Acceptance
 
