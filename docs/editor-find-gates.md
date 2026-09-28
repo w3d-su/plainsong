@@ -6,7 +6,8 @@
 > controller half + F5 WYSIWYG/source identity closed in PR B; F5 source+preview closed in
 > #108; F8 closed in #106; F9 and the repeated-⌘F sub-gate of F7 closed in #109. **This
 > hosted follow-up (`phase3-editor-find-hosted-gates`, test-only) closes F4b and every F7
-> bullet whose evidence is a hosted first-responder assertion.** F6 IME and F7's Full
+> bullet whose evidence is a hosted first-responder assertion** (F7 bullets 1–4 use a
+> designated key window and depend on maintainer sign-off of the 2026-09-28 Decision Log row). F6 IME and F7's Full
 > Keyboard Access bullet stay open until the owner runs the §8 F6 smoke checklist, so F6 and
 > F7 as a whole stay open. Shared navigation ID domain is wired via App
 > `navigationIDProvider`. **F2's named query-completion and production-hosted state-receipt
@@ -341,7 +342,7 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | **F8 highlight follow-up** (merged as #106) | Viewport-bounded highlight-all apply/clear with edit and representable regressions. | **Closes:** F8. |
 | **Hosted follow-up** (merged as #108) | Hosted `WorkspaceWindow` evidence for lifecycle, source+preview, marked-text reservation, and focus handoff. Forced navigation is a typed scroll intent that bypasses typewriter preference and an active preview-owner token while preserving echo suppression. | **Closes:** F5 source+preview. **Partial only:** F4b Reload + missing-file close visibility, F6 programmatic AppKit marked text, F7 ineligible-host supersession + real Search first responder. |
 | **F9 follow-up** (merged as #109) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | **Closes:** F9 and the repeated-⌘F sub-gate of F7 with a successful strengthened 3× launched-app execution. Does not claim physical-keyboard/IME evidence. |
-| **Hosted F4b/F7 follow-up** (`phase3-editor-find-hosted-gates`) | Test-only. Production `WorkspaceWindow` cases for Keep Mine, sidebar rename, detached and indeterminate-quarantine Save Copy, an in-flight generation across Reload, and missing-file close, each with shared-channel cancellation; designated-key hosted windows for eligible-after-handoff, receipt independence, and dual-window / remounted-bar replay; F6 + Full Keyboard Access owner smoke checklist. | **Closes:** F4b; F7 bullets 1–4 (hosted first-responder evidence). **Does not close:** F6; F7's Full Keyboard Access bullet (owner smoke), hence F7 overall. |
+| **Hosted F4b/F7 follow-up** (`phase3-editor-find-hosted-gates`) | Test-only. Production `WorkspaceWindow` cases for Keep Mine, sidebar rename, detached and indeterminate-quarantine Save Copy, an in-flight generation across Reload, and missing-file close, each with shared-channel cancellation; designated-key hosted windows for eligible-after-handoff, receipt independence, and dual-window / remounted-bar replay; F6 + Full Keyboard Access owner smoke checklist. | **Closes:** F4b; F7 bullets 1–4 (hosted first-responder evidence on designated key windows, pending maintainer sign-off of the 2026-09-28 Decision Log row). **Does not close:** F6; F7's Full Keyboard Access bullet (owner smoke), hence F7 overall; real dual-window key activation stays unverified. |
 
 `EditorFindQueryField.Coordinator` is `@MainActor` on `main` via #108; this restack does not re-introduce that hunk.
 
@@ -591,13 +592,16 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   - `EditorFindHostedGateTests.testHostedKeepMineKeepsTheFindBarOnTheLocalSourceWithoutNavigation`
     — dirty local source, disk conflict banner, `keepMineForExternallyChangedFile` resolved
     through the hosted editor installation. The counter stays on the local source (`2 / 2`,
-    not the disk's three), Keep Mine publishes no newer navigation, and a ⌘G that landed
-    before the conflict does not re-land after the user moved the caret. Keep Mine keeps
-    identity and revision, so by the table above it has nothing to invalidate and publishes
-    no cancel; that absence is the asserted contract.
+    not the disk's three), and a ⌘G that landed before the conflict does not re-land after
+    the user moved the caret. Keep Mine keeps identity and revision, so by the table above it
+    has nothing to invalidate: the test captures `editorNavigationCommand` immediately before
+    `keepMineForExternallyChangedFile()` and asserts it is **equal** afterwards, so Keep Mine
+    publishes neither a navigation nor a cancel on the shared channel. The FSEvents watcher is
+    stopped before the disk write so its duplicate refresh cannot interleave.
   - `...testHostedRenameRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation` — sidebar
-    `renameWorkspaceItem(id:to:)`. App, Find, and the hosted editor all rekey to the new URL
-    and the counter recounts without an auto-jump.
+    `renameWorkspaceItem(id:to:)`, issued only after the workspace capture has installed
+    (that entry point silently no-ops otherwise). App, Find, and the hosted editor all rekey
+    to the new URL and the counter recounts without an auto-jump.
   - `...testHostedDetachedSaveCopyRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation`
     and `...testHostedIndeterminateSaveCopyQuarantineRekeysFindAndCancelsAPublishedNavigation`
     — file deleted on disk, missing-file banner, then `saveDetachedCurrentDocument(to:)`
@@ -703,55 +707,78 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 
 #### Owner smoke checklist (F6 IME + F7 Full Keyboard Access)
 
-Run on a Debug build from `main` with a physical keyboard, then record the date, macOS
-version, build SHA, and pass/fail per step here. **Do not check F6 or the F7 Full Keyboard
-Access bullet from this list until the owner has recorded a passing run.** In-process tests
-cannot produce a real input method or a real SwiftUI Full Keyboard Access focus transition
-(see the Decision Log row for 2026-09-28).
+Run on a Debug build of `main` with a physical keyboard. Record the date, macOS version,
+Plainsong build SHA, input methods used, and pass/fail for every step (A1–A7, B0–B4) here.
+**Do not check F6 or the F7 Full Keyboard Access bullet until the owner has recorded a
+passing run.** In-process tests cannot produce a real input method or a real SwiftUI Full
+Keyboard Access focus transition (Decision Log row for 2026-09-28).
 
 Setup (once):
 
-1. Enable **Chinese, Traditional – Zhuyin** and **Chinese, Simplified – Pinyin** in
-   System Settings › Keyboard › Text Input. Keep **ABC** as well.
-2. Open a folder workspace and a Markdown file containing `測試 test 測試` and several
-   ordinary lines. Note the file's exact text so any stray insertion is visible.
+- S1. In System Settings › Keyboard › Text Input › Edit…, add **Chinese, Traditional –
+  Zhuyin** and **Chinese, Simplified – Pinyin**; keep **ABC**.
+- S2. Open a folder workspace containing a Markdown file with exactly these three lines,
+  and open that file:
 
-Repeat steps 3–9 once with **Zhuyin** and once with **Pinyin** selected in the find field:
+  ```text
+  測試 test 測試
+  first test line
+  second test line
+  ```
 
-3. ⌘F. Type a syllable that leaves underlined marked text in the find field
-   (Zhuyin `ㄘㄜ`, Pinyin `ce`). **Pass:** nothing appears in the document, and the
-   document's dirty dot does not light.
-4. While the marked text is still underlined, press **Return**. **Pass:** the input method
-   commits or selects the candidate inside the find field; Find does **not** jump to the
-   next match, and the document is unchanged.
-5. Type another syllable, then press **Escape** while it is still marked. **Pass:** the
-   input method cancels the composition; the find bar stays open.
-6. With the composition finished (no underline), press **Escape** in the find field.
-   **Pass:** the bar closes and focus returns to the editor.
-7. ⌘F again, click into the editor, press Escape. **Pass:** the bar closes (editor route).
-8. ⌘F, Tab to a bar control (Aa or Done), press Escape. **Pass:** the bar closes (chrome
-   route).
-9. With the bar open, click into the editor and type `:sm` so the completion list opens.
-   Press Escape. **Pass:** the first Escape dismisses only the completion list; a second
-   Escape closes the bar. Reopen the list, press ⌘F, and repeat steps 3–5 in the find
-   field. **Pass:** composition still stays in the find field and never reaches the
-   document.
+**Part A — IME in the find field (F6).** Leave Full Keyboard Access **off** for Part A.
+Run A1–A7 once with **Zhuyin** and once with **Pinyin** selected while the find field has
+focus. Before each round, click at the very start of the first line so the caret is at
+offset 0.
 
-Full Keyboard Access (F7):
+- A1. Press ⌘F. Type a syllable that stays underlined as marked text in the find field
+  (Zhuyin: keys `h` `k` for ㄘㄜ; Pinyin: `ce`). **Pass:** nothing appears in the document,
+  and the document's edited dot does not appear.
+- A2. While the text is still underlined, press **Return**. **Pass:** the input method
+  consumes Return: the underline disappears and the committed text stays in the find field;
+  the document text is unchanged. The editor selection may move to the first match of the
+  committed query, because a query change navigates (§5.1); the counter then shows
+  `No results` or `1 / N`, never `2 / N` (Return did not also act as Find Next).
+- A3. Type another syllable and press **Escape** while it is still underlined. **Pass:** the
+  input method cancels the composition (underline gone, nothing committed) and the find bar
+  stays open.
+- A4. With no underline left, press **Escape** in the find field. **Pass:** the bar closes and
+  the editor shows its insertion point again.
+- A5. Press ⌘F, click anywhere in the editor text, press **Escape**. **Pass:** the bar closes
+  (editor route).
+- A6. Switch the input source to **ABC**. Press ⌘F, click at the end of the third line, press
+  Return, and type `:sm` so the completion list opens. Press **Escape** once. **Pass:** only
+  the completion list closes and the find bar stays open. Press **Escape** again. **Pass:**
+  the bar closes.
+- A7. Still in ABC, delete the `:sm` you typed and type `:sm` again so the completion list
+  reopens. Press ⌘F, switch the input source back to this round's method, and repeat A1 and
+  A3 in the find field. **Pass:** the find field receives the composition and nothing from it
+  reaches the document (the document still ends with your `:sm`). Afterwards switch to ABC
+  and delete the added line (or ⌘Z) to restore the three lines.
 
-10. Enable System Settings › Keyboard › **Keyboard navigation** (and, if testing the
-    stronger case, Accessibility › Keyboard › **Full Keyboard Access**).
-11. ⌘F, type `test`. Press **Tab** repeatedly through **Aa → whole-word → Previous → Next →
-    Done**. **Pass:** each control shows the focus ring in turn, and Space toggles or
-    activates the focused one.
-12. With focus on **each** of those five controls in turn, press **⌘G** and **⇧⌘G**.
-    **Pass:** the counter and the editor selection move every time; neither is dead. Then
-    select a different word in the editor, Tab back to a bar control, and press **⌘E**.
-    **Pass:** the query field changes to that word without the bar closing.
-13. Open a second window (File › New Window), give it focus, then return to the first
-    window with focus still on its Aa toggle. **Pass:** ⌘G works immediately in the first
-    window without re-focusing anything, and does not act in the second window while the
-    second window is key.
+**Part B — Full Keyboard Access (F7 bullet; B4 also covers F6's bar-chrome Escape route).**
+
+- B0. Turn on System Settings › Accessibility › Keyboard › **Full Keyboard Access**.
+  "Keyboard navigation" alone does not satisfy this part.
+- B1. Press ⌘F and type `test` (select **ABC** first). Press **Tab** from the find field until
+  **Aa** shows the focus indicator, then keep pressing Tab through **whole-word → Previous →
+  Next → Done**. **Pass:** each control shows the indicator in that order, and Space toggles
+  or activates the focused one. Leave **Aa** and whole-word off at the end.
+- B2. Put focus on each of those five controls in turn (Tab or Shift-Tab) and press **⌘G**,
+  then **⇧⌘G**. **Pass:** the counter ordinal and the editor selection change each time
+  (`test` has three matches); neither shortcut is ever dead.
+- B3. Double-click the word `second` in the editor, click into the find field, press Tab until
+  **Aa** shows the indicator, then press **⌘E**. **Pass:** the find field changes to
+  `second` and the bar stays open.
+- B4. With the indicator on **Done** (or any other bar control), press **Escape**. **Pass:**
+  the bar closes (bar-chrome route).
+
+Not covered by this checklist: **real dual-window key activation.** The shipped File menu
+replaces the standard New Window item (`PlainsongCommands` uses
+`CommandGroup(replacing: .newItem)`), and this follow-up found no documented, deterministic
+way to open a second `WindowGroup` window in the shipped app. Dual-window behavior under
+real AppKit activation therefore stays unverified by both this smoke and the hosted tests,
+which designate key status (F7 bullet 4).
 
 ### F7 — Focus arbitration with ⇧⌘F
 
@@ -763,17 +790,23 @@ Full Keyboard Access (F7):
   proves the older Find request is superseded and Search owns its real hosted field editor
   while the utility host remains ineligible. It does not exercise Find becoming eligible
   after the handoff.
-  Closing hosted evidence (2026-09-28):
+  Closing hosted evidence (2026-09-28, **designated key window** — see bullet 4):
   `EditorFindHostedGateTests.testHostedFindEligibleAfterSearchHandoffOnlyTheNewerFindRequestTakesFocus`
-  issues ⌘F while the host is not key (the owned field mounts and its retry loop waits),
-  then ⇧⌘F and makes the host key in the same main-actor turn, so the older Find retry is
-  eligible on both key status and mount. Search's field editor becomes the window's real
-  first responder and stays it across ~30 retry-cadence samples while Find's receipt never
-  records the older request; a re-issued ⌘F then puts the Find field's field editor in
-  first-responder position and Search's spent request does not take it back.
+  issues ⌘F while **no** window is key and asserts over ~0.5 s of retry-loop samples that
+  the owned field does not take first responder. It then asserts the older request is still
+  live — unresolved App-side and issued < 2 s ago, inside its field's ≥ 2.9 s retry budget —
+  before ⇧⌘F supersedes it and the host becomes key in the same main-actor turn, so the older
+  retry is eligible on both key status and mount. Search's field editor becomes the window's
+  real first responder and stays it while Find's receipt never records the older request; a
+  re-issued ⌘F then puts the Find field's field editor in first-responder position and
+  Search's spent request does not take it back. This supersedes the comment in #108's
+  `testHostedFindToWorkspaceSearchHandoffSupersedesOlderFindFocusWhileHostIsIneligible`
+  that the eligible-after-handoff race stays open for an out-of-process gate; that existing
+  test file is left unchanged.
 - [x] Neither feature's focus receipt is consumed by the other (token independence is
   necessary but not sufficient — first-responder proof required).
-  Evidence: `EditorFindHostedGateTests.testHostedFindAndSearchFocusReceiptsStayIndependentOnRealFirstResponders`
+  Evidence (**designated key window** — see bullet 4):
+  `EditorFindHostedGateTests.testHostedFindAndSearchFocusReceiptsStayIndependentOnRealFirstResponders`
   alternates ⇧⌘F and ⌘F for two rounds so each feature's request carries the very integer
   the other just consumed (Search 1 → Find 1 → Search 2 → Find 2). Each step asserts the
   requested field's field editor is the real first responder and stays so, and that the
@@ -803,19 +836,28 @@ Full Keyboard Access (F7):
   caret in B's field, B's fresh coordinator does not replay A's spent select-all.
   `...testHostedRemountedBarCannotReplayASpentRequestAndANewOneLandsOnlyInTheKeyWindow` —
   a window mounted **after** the request was spent (a fresh bar and coordinator) becomes key
-  and replays neither focus nor select-all; a new ⌘F then lands only on the key window's
-  field editor while the background window's bar stays off first responder.
-  **Key status is designated, first responders are real.** The app-hosted XCTest process is
-  never the active application (a probe showed `NSApp.isActive == false` after
-  `NSApp.activate(ignoringOtherApps:)` and `NSRunningApplication.activate`), so no hosted
-  window can become key through AppKit. The tests use a test-only `NSWindow` subclass whose
-  `isKeyWindow` the test designates, and post the `didBecomeKey` / `didResignKey`
-  notifications `WindowKeyStateTracker` observes. Production reads that property live in
-  `EditorFindQueryField`'s retry loop and in `AppState.isWorkspaceSearchFocusKeyWindow`;
-  nothing else is stubbed. The WS3C precedent routes the same eligibility through
-  `workspaceSearchFocusKeyWindowCheck` instead. Real activation remains covered only by the
-  launched-app F9 run. Menu-command eligibility still uses the existing
-  `commandContextOverride`, because `NSApp.keyWindow` is `nil` in this process.
+  and replays neither focus nor select-all. A new ⌘F issued while **no** window is key is
+  held by both bars' live retry loops for ~0.5 s of samples; once the new window becomes key
+  it lands only on that window's field editor while the background window's bar stays off
+  first responder.
+  **Key status is designated, first responders are real; real key-window activation is not
+  covered.** In the recorded environment (macOS 27.0 26A428, Xcode 27.0 27A5194q,
+  `xcodebuild test-without-building` from a non-interactive agent shell in the owner's
+  logged-in session) the app-hosted XCTest process never became the active application: a
+  probe showed `NSApp.isActive == false` after `NSApp.activate(ignoringOtherApps:)` and
+  `NSRunningApplication.activate(options:)`, so no hosted window became key through AppKit.
+  The tests use a test-only `NSWindow` subclass whose `isKeyWindow` the test designates, and
+  post the `didBecomeKey` / `didResignKey` notifications `WindowKeyStateTracker` observes.
+  Production reads that property live in `EditorFindQueryField`'s retry loop and in
+  `AppState.isWorkspaceSearchFocusKeyWindow`. The tests do **not** call
+  `refreshWorkspaceSearchFocusKeyRouting()` (production never calls it on a key change), so
+  Search re-arms only through the tracker's notification observers. Menu-command eligibility
+  still uses the existing `commandContextOverride`, because `NSApp.keyWindow` is `nil` in this
+  process. The WS3C precedent routes the same eligibility through
+  `workspaceSearchFocusKeyWindowCheck` instead. Real activation is exercised only by the
+  single-window launched-app F9 run, and the owner smoke cannot open a second window (see the
+  F6 checklist note). **This box, like bullets 1–2, depends on maintainer sign-off of the
+  2026-09-28 Decision Log row accepting designated key status as hosted evidence.**
 - [ ] Find commands stay eligible while Full Keyboard Access focuses a bar control (Aa,
   whole-word, Next, Previous, Done). The bar's own controls act unconditionally; menu
   eligibility comes from SwiftUI-reported `EditorFindChromeFocus`, **tagged with the
@@ -842,9 +884,9 @@ Full Keyboard Access (F7):
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
   SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all, nor that
   the bridge receives a window in the shipped view tree. An FKA XCUITest was not attempted:
-  it needs the system Keyboard navigation setting changed on the runner and a foreground,
+  it needs the system Full Keyboard Access setting changed on the runner and a foreground,
   UI-automation-authorised session, so it could not be deterministic from this session.
-  This bullet is closed only by the owner smoke checklist under F6 (steps 10–13).
+  This bullet is closed only by the owner smoke checklist under F6 (Part B, B0–B4).
 - [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.
@@ -861,10 +903,11 @@ Full Keyboard Access (F7):
   with `q` without test-side select-all, kept the bar open, and completed the nonce-bound
   app-side cleanup handshake. PR #108 still supplies ineligible-host supersession plus a real
   Search first responder.
-- Evidence (2026-09-28): **bullets 1–4 closed by the hosted follow-up** named above; they
-  passed three consecutive iterations of `EditorFindHostedGateTests` and the full
-  `EditorFind*` AppTests run. **F7 stays open overall** until the owner records the Full
-  Keyboard Access smoke (F6 checklist steps 10–13).
+- Evidence (2026-09-28): **bullets 1–4 closed by the hosted follow-up** named above, pending
+  maintainer sign-off of the designated-key Decision Log row; they passed three consecutive
+  iterations of `EditorFindHostedGateTests` and the full `EditorFind*` AppTests run. **F7
+  stays open overall** until the owner records the Full Keyboard Access smoke (F6 checklist
+  Part B).
 
 ### F8 — Highlight-all survives highlight re-application
 

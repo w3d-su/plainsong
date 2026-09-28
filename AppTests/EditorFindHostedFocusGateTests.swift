@@ -18,19 +18,38 @@ extension EditorFindHostedGateTests {
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
 
-        // ⌘F while the host is not key: the owned field mounts and its real retry loop waits.
+        // ⌘F while no window is key: the owned field mounts and its real retry loop polls but
+        // must not apply. That loop sleeps at least 180 × 16 ms ≈ 2.9 s before it gives up.
+        let olderFindIssuedAt = Date()
         openFindBar(appState, query: "")
         _ = try await waitForFindQueryField(in: window)
         let olderFind = appState.editorFindHost.ui.focusRequestID
         XCTAssertGreaterThan(olderFind, 0)
-        XCTAssertNotEqual(appState.editorFindHost.ui.focusAppliedID, olderFind)
-        XCTAssertFalse(isFindFieldFirstResponder(in: window))
+        try await assertFocusRemains(
+            "with no key window the older Find request stays pending",
+            windows: [window],
+            appState: appState
+        ) {
+            !self.isFindFieldFirstResponder(in: window)
+                && appState.editorFindHost.ui.focusAppliedID != olderFind
+        }
+        // The supersession below must hit a *live* older request: still unresolved App-side,
+        // and issued well inside its field's retry budget, so its loop is still polling.
+        XCTAssertTrue(EditorFindFocusArbitration.shouldKeepRetrying(
+            requestID: olderFind,
+            snapshot: appState.editorFindHost.ui.focusSnapshot
+        ))
+        XCTAssertLessThan(
+            Date().timeIntervalSince(olderFindIssuedAt),
+            2.0,
+            "⇧⌘F must arrive while the older Find retry loop is still running"
+        )
 
         // ⇧⌘F, and the host becomes key in the same main-actor turn: the older Find retry is
         // now eligible on key status and mount, and only the newer intent may take focus.
         appState.focusWorkspaceSearch()
         let searchRequest = appState.workspaceSearchUI.focusRequestID
-        designateKeyWindow(window, in: group, appState: appState)
+        designateKeyWindow(window, in: group)
 
         try await waitUntil("Search owns the real field editor in the key host") {
             appState.workspaceSearchUI.focusAppliedID == searchRequest
@@ -76,7 +95,7 @@ extension EditorFindHostedGateTests {
         try await waitUntil("workspace document opens") { appState.hasOpenDocument }
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
-        designateKeyWindow(window, in: group, appState: appState)
+        designateKeyWindow(window, in: group)
 
         // Alternate ⇧⌘F and ⌘F so each feature's request carries the very integer the other
         // feature just consumed. A shared or aliased receipt would treat it as already spent
@@ -142,7 +161,7 @@ extension EditorFindHostedGateTests {
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let windowA = mountDesignatedKeyWorkspace(in: group, appState: appState)
         let windowB = mountDesignatedKeyWorkspace(in: group, appState: appState, originX: 1040)
-        designateKeyWindow(windowA, in: group, appState: appState)
+        designateKeyWindow(windowA, in: group)
 
         // "zzz" never matches, so no find navigation touches either editor's focus.
         openFindBar(appState, query: "zzz")
@@ -157,7 +176,7 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(isFindFieldFirstResponder(in: windowB))
 
         // Window B becomes key with the request already spent in A.
-        designateKeyWindow(windowB, in: group, appState: appState)
+        designateKeyWindow(windowB, in: group)
         republishFindChrome(appState)
         try await assertFocusRemains(
             "window B never replays A's spent focus request",
@@ -191,7 +210,7 @@ extension EditorFindHostedGateTests {
         try await waitUntil("workspace document opens") { appState.hasOpenDocument }
         let group = makeHostedWorkspaceGroup(fixture: fixture)
         let windowA = mountDesignatedKeyWorkspace(in: group, appState: appState)
-        designateKeyWindow(windowA, in: group, appState: appState)
+        designateKeyWindow(windowA, in: group)
 
         openFindBar(appState, query: "zzz")
         let requested = appState.editorFindHost.ui.focusSnapshot
@@ -206,7 +225,7 @@ extension EditorFindHostedGateTests {
         // against the shared, already-spent receipts, and becomes key.
         let windowC = mountDesignatedKeyWorkspace(in: group, appState: appState, originX: 1040)
         _ = try await waitForFindQueryField(in: windowC)
-        designateKeyWindow(windowC, in: group, appState: appState)
+        designateKeyWindow(windowC, in: group)
         republishFindChrome(appState)
         try await assertFocusRemains(
             "the remounted bar never replays the spent focus request",
@@ -227,15 +246,27 @@ extension EditorFindHostedGateTests {
                 && appState.editorFindHost.ui.focusSnapshot == spent
         }
 
-        // Park both fields on their editors, then issue a new ⌘F with C key: only C's field
-        // may take it, and A's must not steal it while A is in the background.
+        // Park both fields on their editors and issue a new ⌘F with **no** key window: every
+        // bar's live retry loop must hold it. Then C becomes key: only C's field may take it,
+        // and A's must not steal it while A is in the background.
         for window in [windowA, windowC] {
             let editor = try XCTUnwrap(editorTextView(in: window))
             XCTAssertTrue(window.makeFirstResponder(editor))
         }
+        designateKeyWindow(nil, in: group)
         appState.showOrRefocusEditorFind()
         let fresh = appState.editorFindHost.ui.focusSnapshot
         XCTAssertGreaterThan(fresh.requestID, spent.requestID)
+        try await assertFocusRemains(
+            "with no key window neither bar takes the new request",
+            windows: [windowA, windowC],
+            appState: appState
+        ) {
+            !self.isFindFieldFirstResponder(in: windowA)
+                && !self.isFindFieldFirstResponder(in: windowC)
+                && appState.editorFindHost.ui.focusAppliedID == spent.requestID
+        }
+        designateKeyWindow(windowC, in: group)
         try await waitUntil("the new request lands on the key window's real field editor") {
             appState.editorFindHost.ui.focusAppliedID == fresh.requestID
                 && appState.editorFindHost.ui.selectAllAppliedID == fresh.selectAllRequestID

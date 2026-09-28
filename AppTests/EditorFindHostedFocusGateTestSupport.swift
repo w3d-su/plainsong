@@ -8,13 +8,16 @@ import XCTest
 
 /// Hosted window whose **key status** the test designates.
 ///
-/// The app-hosted XCTest process is never the active application: `NSApp.isActive` stays
-/// `false` even after `NSApp.activate(ignoringOtherApps:)` and
-/// `NSRunningApplication.current.activate(options:)`, so `makeKeyAndOrderFront` never produces
-/// a real key window here. Only `isKeyWindow` is designated. Production code reads it live
+/// In the recorded environment below, the app-hosted XCTest process never became the active
+/// application: `NSApp.isActive` stayed `false` even after `NSApp.activate(ignoringOtherApps:)`
+/// and `NSRunningApplication.current.activate(options:)`, so `makeKeyAndOrderFront` produced
+/// no real key window. Only `isKeyWindow` is designated. Production code reads it live
 /// (`EditorFindQueryField`'s retry loop, `AppState.isWorkspaceSearchFocusKeyWindow`), and the
-/// AppKit key notifications `WindowKeyStateTracker` observes are posted on every change.
-/// First responders, field editors, retry loops, and receipts are all real production state.
+/// AppKit key notifications `WindowKeyStateTracker` observes are posted on every change; no
+/// AppState key-routing hook is called. First responders, field editors, retry loops, and
+/// receipts are all real production state. The probe ran on macOS 27.0 (26A428) with
+/// Xcode 27.0 (27A5194q), from `xcodebuild test-without-building` launched by a
+/// non-interactive agent shell in the owner's logged-in session; other runners may differ.
 @MainActor
 final class DesignatedKeyWindow: NSWindow {
     fileprivate(set) var isDesignatedKey = false
@@ -88,9 +91,13 @@ extension EditorFindHostedGateTests {
         return window
     }
 
-    /// Makes `key` the only designated key window in `group` and posts the AppKit
-    /// resign/become notifications a real key change would, then re-arms Search's key routing.
-    func designateKeyWindow(_ key: DesignatedKeyWindow?, in group: HostedWorkspaceGroup, appState: AppState) {
+    /// Makes `key` the only designated key window in `group` (`nil` designates none) and posts
+    /// the AppKit resign/become notifications a real key change would.
+    ///
+    /// Deliberately does **not** call `AppState.refreshWorkspaceSearchFocusKeyRouting()`:
+    /// production never calls it on a key change, so Search must re-arm through
+    /// `WindowKeyStateTracker`'s own notification observers, exactly as it would in the app.
+    func designateKeyWindow(_ key: DesignatedKeyWindow?, in group: HostedWorkspaceGroup) {
         for window in group.windows where window !== key && window.isDesignatedKey {
             window.isDesignatedKey = false
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
@@ -99,7 +106,6 @@ extension EditorFindHostedGateTests {
             key.isDesignatedKey = true
             NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: key)
         }
-        appState.refreshWorkspaceSearchFocusKeyRouting()
     }
 
     /// Whether `window`'s real first responder is its production find query field (or that

@@ -9,8 +9,11 @@ import XCTest
 /// F4b UI-visibility half on the production `WorkspaceWindow`: each document-lifecycle
 /// transition is driven through its real App entry point while the find bar is mounted.
 ///
-/// Every case also proves the shared navigation channel: a find navigation published (or
-/// still computing) before the transition cannot land in the hosted editor afterwards.
+/// Every invalidating transition (Reload, rename, both Save Copy variants, missing-file close)
+/// also proves the shared navigation channel: a find navigation published (or still computing)
+/// before it cannot land in the hosted editor afterwards. Keep Mine keeps identity and
+/// revision, so it invalidates nothing: its case proves Keep Mine publishes nothing at all on
+/// the channel and an earlier find navigation does not land again.
 @MainActor
 extension EditorFindHostedGateTests {
     func testHostedKeepMineKeepsTheFindBarOnTheLocalSourceWithoutNavigation() async throws {
@@ -38,7 +41,7 @@ extension EditorFindHostedGateTests {
         let field = try XCTUnwrap(findQueryField(in: window))
 
         // A find navigation lands before the conflict; the user then moves the caret away.
-        let landed = try publishFindStep(appState, expecting: ranges[1])
+        _ = try publishFindStep(appState, expecting: ranges[1])
         try await waitUntil("⌘G lands on the second local match") {
             self.appliedRange(in: window) == ranges[1]
         }
@@ -48,6 +51,9 @@ extension EditorFindHostedGateTests {
             self.appliedRange(in: window) == caret
         }
 
+        // The test drives the refresh the FSEvents watcher would drive; its debounced duplicate
+        // must not restart conflict resolution while the channel is being observed.
+        appState.workspaceWatcher?.stop()
         let post = fixture.root.appendingPathComponent("post.md")
         try "hit disk hit disk hit disk".write(to: post, atomically: true, encoding: .utf8)
         appState.refreshWorkspaceAfterFileSystemChange()
@@ -55,6 +61,8 @@ extension EditorFindHostedGateTests {
             appState.externalChangePrompt?.fileURL.lastPathComponent == "post.md"
         }
         XCTAssertTrue(findQueryField(in: window) === field)
+        let channelBeforeKeepMine = appState.editorNavigationCommand
+        XCTAssertNotNil(channelBeforeKeepMine, "precondition: the channel already carries find commands")
 
         appState.keepMineForExternallyChangedFile()
         try await waitUntil("Keep Mine resolves through the hosted editor installation") {
@@ -76,13 +84,11 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(appState.editorFindHost.controller.documentBinding.text, local)
         XCTAssertEqual(appState.editorFindHost.controller.session?.total, 2)
         XCTAssertEqual(appState.editorFindHost.ui.matchCounterText, "2 / 2")
-        if case let .navigate(request)? = appState.editorNavigationCommand {
-            XCTAssertLessThanOrEqual(
-                request.id,
-                landed.id,
-                "Keep Mine must not publish a newer navigation on the shared channel"
-            )
-        }
+        XCTAssertEqual(
+            appState.editorNavigationCommand,
+            channelBeforeKeepMine,
+            "Keep Mine must publish nothing on the shared channel: no navigation and no cancel"
+        )
         XCTAssertNil(try XCTUnwrap(editorCoordinator(in: window)).navigationState.pendingRequest)
     }
 
@@ -107,6 +113,10 @@ extension EditorFindHostedGateTests {
         }
         let field = try XCTUnwrap(findQueryField(in: window))
         let originalIdentity = try XCTUnwrap(appState.activeEditorDocumentIdentity)
+        // `renameWorkspaceItem(id:to:)` silently no-ops until the workspace capture installed.
+        try await waitUntil("workspace capture settles before the sidebar rename") {
+            appState.workspaceInstalledCaptureGeneration == appState.workspaceGeneration
+        }
         let nodeID = try XCTUnwrap(
             appState.workspaceTree?.root.children.first { $0.relativePath == "post.md" }?.id
         )
