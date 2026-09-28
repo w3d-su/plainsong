@@ -1,11 +1,14 @@
 # In-Document Find (⌘F) — Gate Specification
 
 > **Status: PR B (#96), PR C (#97), the F2 proxy follow-up (#105), the F8 highlight
-> follow-up (#106), and hosted source-preview evidence (#108) are merged.** §2 is
-> resolved **(b)**; F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4 controller half +
-> F5 WYSIWYG/source identity closed in PR B; F5 source+preview closed in #108; F8 closed in
-> #106. **This F9 follow-up closes F9 and the repeated-⌘F sub-gate of F7.** F4b UI, F6 IME,
-> and the remaining F7 focus matrix stay open. Shared navigation ID domain is wired via App
+> follow-up (#106), hosted source-preview evidence (#108), and the F9 follow-up (#109) are
+> merged.** §2 is resolved **(b)**; F0 closed with owner physical ABC+Zhuyin in PR B. F1–F4
+> controller half + F5 WYSIWYG/source identity closed in PR B; F5 source+preview closed in
+> #108; F8 closed in #106; F9 and the repeated-⌘F sub-gate of F7 closed in #109. **This
+> hosted follow-up (`phase3-editor-find-hosted-gates`, test-only) closes F4b and every F7
+> bullet whose evidence is a hosted first-responder assertion.** F6 IME and F7's Full
+> Keyboard Access bullet stay open until the owner runs the §8 F6 smoke checklist, so F6 and
+> F7 as a whole stay open. Shared navigation ID domain is wired via App
 > `navigationIDProvider`. **F2's named query-completion and production-hosted state-receipt
 > proxies have frozen budgets, but F2 remains open overall: complete artifacts exist only in
 > owner-local storage, the historical monitor did not distinguish an unrelated same-path host
@@ -337,7 +340,8 @@ One review-sized PR each. Branch naming: `phase3-editor-find-<slug>`. PRs agains
 | **F2 proxy follow-up** (merged as #105) | Query-completion and production-hosted state-receipt proxies with frozen budgets and authenticated retained evidence. | **Freezes the named F2 proxy budgets only. F2 overall, historical-uncorrelated-target-process, durable complete-artifact retention, and full screen latency remain open.** |
 | **F8 highlight follow-up** (merged as #106) | Viewport-bounded highlight-all apply/clear with edit and representable regressions. | **Closes:** F8. |
 | **Hosted follow-up** (merged as #108) | Hosted `WorkspaceWindow` evidence for lifecycle, source+preview, marked-text reservation, and focus handoff. Forced navigation is a typed scroll intent that bypasses typewriter preference and an active preview-owner token while preserving echo suppression. | **Closes:** F5 source+preview. **Partial only:** F4b Reload + missing-file close visibility, F6 programmatic AppKit marked text, F7 ineligible-host supersession + real Search first responder. |
-| **F9 follow-up** (`phase3-editor-find-f9-ui-acceptance`) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | **Closes:** F9 and the repeated-⌘F sub-gate of F7 with a successful strengthened 3× launched-app execution. Does not claim physical-keyboard/IME evidence. |
+| **F9 follow-up** (merged as #109) | App-container Debug fixture, launched-app stable AX surfaces, first/repeated synthetic `⌘F`, exact/truncated state, observable chrome actions, lease-protected app-owned cleanup, and ownership-safe runner restoration. | **Closes:** F9 and the repeated-⌘F sub-gate of F7 with a successful strengthened 3× launched-app execution. Does not claim physical-keyboard/IME evidence. |
+| **Hosted F4b/F7 follow-up** (`phase3-editor-find-hosted-gates`) | Test-only. Production `WorkspaceWindow` cases for Keep Mine, sidebar rename, detached and indeterminate-quarantine Save Copy, an in-flight generation across Reload, and missing-file close, each with shared-channel cancellation; designated-key hosted windows for eligible-after-handoff, receipt independence, and dual-window / remounted-bar replay; F6 + Full Keyboard Access owner smoke checklist. | **Closes:** F4b; F7 bullets 1–4 (hosted first-responder evidence). **Does not close:** F6; F7's Full Keyboard Access bullet (owner smoke), hence F7 overall. |
 
 `EditorFindQueryField.Coordinator` is `@MainActor` on `main` via #108; this restack does not re-introduce that hunk.
 
@@ -553,7 +557,7 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   Evidence: `EditorFindControllerLifecycleTests.testRebindRerunsQueryWithoutEmittingNavigation`,
   `...testEditRecomputesMatchesWithoutMovingSelectionOrEmittingNavigation`,
   `...testClearForNoDocumentCancelsAndClearsSession`
-- [ ] Hosted **production-path** tests cover the remaining **UI-visibility half** with
+- [x] Hosted **production-path** tests cover the remaining **UI-visibility half** with
   real Reload / Keep Mine / rename / Save Copy rekey / missing-file close, and cancel on
   the shared navigation channel. Merged #97's App-state and production-lifecycle tests are
   not hosted bar-visibility evidence (see review: External Reload and identity rekey paths
@@ -577,8 +581,44 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `EditorFindHostedGateTests.testHostedFindBarSurvivesExternalReloadAndUnmountsAfterMissingFileClose`
   mounts the production `WorkspaceWindow`, proves a clean Reload keeps the field mounted and
   recounts without navigation, then proves closing the missing file unmounts the field and
-  clears the session. Keep Mine, rename, and Save Copy still lack hosted UI-visibility
-  coverage, so this gate remains unchecked.
+  clears the session.
+  Hosted closing evidence (2026-09-28, `phase3-editor-find-hosted-gates`, test-only). Each
+  case mounts the production `WorkspaceWindow`, drives the transition through its real App
+  entry point with the bar open, and asserts on the hosted editor's applied selection and
+  EditorKit navigation state machine, not only on controller state. "Stays mounted" means the
+  **same** `NSTextField` instance, still showing the query, across the banner insertion and
+  the transition:
+  - `EditorFindHostedGateTests.testHostedKeepMineKeepsTheFindBarOnTheLocalSourceWithoutNavigation`
+    — dirty local source, disk conflict banner, `keepMineForExternallyChangedFile` resolved
+    through the hosted editor installation. The counter stays on the local source (`2 / 2`,
+    not the disk's three), Keep Mine publishes no newer navigation, and a ⌘G that landed
+    before the conflict does not re-land after the user moved the caret. Keep Mine keeps
+    identity and revision, so by the table above it has nothing to invalidate and publishes
+    no cancel; that absence is the asserted contract.
+  - `...testHostedRenameRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation` — sidebar
+    `renameWorkspaceItem(id:to:)`. App, Find, and the hosted editor all rekey to the new URL
+    and the counter recounts without an auto-jump.
+  - `...testHostedDetachedSaveCopyRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation`
+    and `...testHostedIndeterminateSaveCopyQuarantineRekeysFindAndCancelsAPublishedNavigation`
+    — file deleted on disk, missing-file banner, then `saveDetachedCurrentDocument(to:)`
+    (committed, and committed-but-indeterminate through `anchoredFileSaveOverride`). Identity
+    follows the destination or the quarantined destination.
+  - `...testHostedExternalReloadDropsAFindNavigationStillComputingBeforeIt` — a re-typed
+    query and a ⌘G are held in flight (`EditorFindMatchHold`) when a clean Reload lands.
+    Reload publishes a newer cancel, the pre-Reload generation is fence-dropped
+    (`droppedStaleMatchCount`), and neither navigation lands after Reload.
+  - `...testHostedMissingFileCloseCancelsAPublishedNavigationAndUnmountsTheBar`.
+  Shared-channel proof: for rename, both Save Copy variants, and missing-file close, a ⌘G is
+  published on `editorNavigationCommand` and the transition runs in the same main-actor turn,
+  before SwiftUI hands the command to the editor. The channel then carries a newer `.cancel`.
+  For the three rekeys, the hosted editor's state machine has observed it with nothing
+  pending, the selection never reaches the stepped match, and re-publishing the
+  pre-transition ID retargeted at the post-transition identity still does not land; for
+  close, the editor and bar unmount and the controller holds no query, session, or command. Rename and detached Save Copy then prove the
+  channel is live again with a fresh query navigation.
+  These six cases and the #108 case passed three consecutive iterations of the whole class
+  (`-only-testing:PlainsongTests/EditorFindHostedGateTests -test-iterations 3`: 15 tests × 3,
+  45 passed, 0 failed, 0 skipped) and the full `EditorFind*` AppTests run (69 passed).
 - Also covered: a workspace-search activation on the **already-current** document fences an
   in-flight find generation before the search navigation takes an ID
   (`EditorFindReviewFixTests.testWorkspaceSearchHandOffStopsAnInFlightFindFromNavigatingAfterwards`),
@@ -586,9 +626,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   (`...testClosingTheBarFencesAQueryStillInsideTheDebounceWindow`) **without** resetting a
   resolved ordinal (`...testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances`,
   `EditorFindControllerSuspendTests`).
-- Evidence: **partial** — PR B controller half closed; PR C production-path lifecycle +
-  fencing covered in-process; PR #108 adds hosted Reload + missing-file close visibility.
-  Keep Mine, rename, and Save Copy hosted UI visibility remain open.
+- Evidence: **closed 2026-09-28** — PR B controller half; PR C production-path lifecycle +
+  fencing in-process; PR #108 hosted Reload + missing-file close visibility; the hosted
+  follow-up adds Keep Mine, rename, both Save Copy variants, and shared-channel cancellation
+  for every transition.
 
 ### F5 — Reveal without source mutation
 
@@ -660,9 +701,61 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
 - Evidence: _open — delegate-level reservation covered; owner physical IME still required
   for commit-into-document and the Escape-during-composition path_
 
+#### Owner smoke checklist (F6 IME + F7 Full Keyboard Access)
+
+Run on a Debug build from `main` with a physical keyboard, then record the date, macOS
+version, build SHA, and pass/fail per step here. **Do not check F6 or the F7 Full Keyboard
+Access bullet from this list until the owner has recorded a passing run.** In-process tests
+cannot produce a real input method or a real SwiftUI Full Keyboard Access focus transition
+(see the Decision Log row for 2026-09-28).
+
+Setup (once):
+
+1. Enable **Chinese, Traditional – Zhuyin** and **Chinese, Simplified – Pinyin** in
+   System Settings › Keyboard › Text Input. Keep **ABC** as well.
+2. Open a folder workspace and a Markdown file containing `測試 test 測試` and several
+   ordinary lines. Note the file's exact text so any stray insertion is visible.
+
+Repeat steps 3–9 once with **Zhuyin** and once with **Pinyin** selected in the find field:
+
+3. ⌘F. Type a syllable that leaves underlined marked text in the find field
+   (Zhuyin `ㄘㄜ`, Pinyin `ce`). **Pass:** nothing appears in the document, and the
+   document's dirty dot does not light.
+4. While the marked text is still underlined, press **Return**. **Pass:** the input method
+   commits or selects the candidate inside the find field; Find does **not** jump to the
+   next match, and the document is unchanged.
+5. Type another syllable, then press **Escape** while it is still marked. **Pass:** the
+   input method cancels the composition; the find bar stays open.
+6. With the composition finished (no underline), press **Escape** in the find field.
+   **Pass:** the bar closes and focus returns to the editor.
+7. ⌘F again, click into the editor, press Escape. **Pass:** the bar closes (editor route).
+8. ⌘F, Tab to a bar control (Aa or Done), press Escape. **Pass:** the bar closes (chrome
+   route).
+9. With the bar open, click into the editor and type `:sm` so the completion list opens.
+   Press Escape. **Pass:** the first Escape dismisses only the completion list; a second
+   Escape closes the bar. Reopen the list, press ⌘F, and repeat steps 3–5 in the find
+   field. **Pass:** composition still stays in the find field and never reaches the
+   document.
+
+Full Keyboard Access (F7):
+
+10. Enable System Settings › Keyboard › **Keyboard navigation** (and, if testing the
+    stronger case, Accessibility › Keyboard › **Full Keyboard Access**).
+11. ⌘F, type `test`. Press **Tab** repeatedly through **Aa → whole-word → Previous → Next →
+    Done**. **Pass:** each control shows the focus ring in turn, and Space toggles or
+    activates the focused one.
+12. With focus on **each** of those five controls in turn, press **⌘G** and **⇧⌘G**.
+    **Pass:** the counter and the editor selection move every time; neither is dead. Then
+    select a different word in the editor, Tab back to a bar control, and press **⌘E**.
+    **Pass:** the query field changes to that word without the bar closing.
+13. Open a second window (File › New Window), give it focus, then return to the first
+    window with focus still on its Aa toggle. **Pass:** ⌘G works immediately in the first
+    window without re-focusing anything, and does not act in the second window while the
+    second window is key.
+
 ### F7 — Focus arbitration with ⇧⌘F
 
-- [ ] Sequence `⌘F` → `⇧⌘F` leaves focus somewhere sane every time (find field,
+- [x] Sequence `⌘F` → `⇧⌘F` leaves focus somewhere sane every time (find field,
   workspace-search field, or editor — never a dead control); older Find focus closures
   must not steal after a newer intent (key-window only, request-token ordered).
   Partial hosted evidence in PR #108:
@@ -670,11 +763,27 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   proves the older Find request is superseded and Search owns its real hosted field editor
   while the utility host remains ineligible. It does not exercise Find becoming eligible
   after the handoff.
-- [ ] Neither feature's focus receipt is consumed by the other (token independence is
+  Closing hosted evidence (2026-09-28):
+  `EditorFindHostedGateTests.testHostedFindEligibleAfterSearchHandoffOnlyTheNewerFindRequestTakesFocus`
+  issues ⌘F while the host is not key (the owned field mounts and its retry loop waits),
+  then ⇧⌘F and makes the host key in the same main-actor turn, so the older Find retry is
+  eligible on both key status and mount. Search's field editor becomes the window's real
+  first responder and stays it across ~30 retry-cadence samples while Find's receipt never
+  records the older request; a re-issued ⌘F then puts the Find field's field editor in
+  first-responder position and Search's spent request does not take it back.
+- [x] Neither feature's focus receipt is consumed by the other (token independence is
   necessary but not sufficient — first-responder proof required).
-- [ ] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
+  Evidence: `EditorFindHostedGateTests.testHostedFindAndSearchFocusReceiptsStayIndependentOnRealFirstResponders`
+  alternates ⇧⌘F and ⌘F for two rounds so each feature's request carries the very integer
+  the other just consumed (Search 1 → Find 1 → Search 2 → Find 2). Each step asserts the
+  requested field's field editor is the real first responder and stays so, and that the
+  other feature's receipt is unchanged; a shared or aliased receipt would treat the
+  colliding ID as spent and leave focus on the wrong field.
+- [x] Find focus tokens are independent of `WorkspaceSearchUIState` request/applied IDs.
   Partial: `EditorFindUITests` token integer tests.
-- [ ] A focus request consumed by one `WindowGroup` window is not replayable by another
+  Evidence: the same hosted receipt test — the colliding IDs are consumed independently, and
+  consuming a Find receipt leaves the whole `WorkspaceSearchUIState` value unchanged.
+- [x] A focus request consumed by one `WindowGroup` window is not replayable by another
   window or by a remounted bar. Partial (2026-07-27 review): `EditorFindUIState` now carries
   an App-owned `focusAppliedID` alongside `focusSupersededID`, arbitration is pure
   (`EditorFindFocusArbitration`), and the owned field's attempt is a bounded key-window retry
@@ -686,8 +795,27 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   (`...testSelectAllReceiptIsSharedSoASecondWindowCannotReplayIt`): a coordinator-local one
   starts at zero in a new window, so a spent select-all would replay and the next keystroke
   would replace the whole query.
-  Still open: hosted dual-window first-responder proof (the WS3C `WindowKeyStateTracker`
-  equivalent), which is what actually closes this gate.
+  Closing hosted evidence (2026-09-28), two production `WorkspaceWindow`s sharing one
+  `AppState`:
+  `EditorFindHostedGateTests.testHostedSpentFocusAndSelectAllCannotReplayInAnotherWindow` —
+  window A consumes ⌘F's focus and select-all on its real field editor (selection `{0, 3}`);
+  window B then becomes key and never takes first responder, and after a user click leaves a
+  caret in B's field, B's fresh coordinator does not replay A's spent select-all.
+  `...testHostedRemountedBarCannotReplayASpentRequestAndANewOneLandsOnlyInTheKeyWindow` —
+  a window mounted **after** the request was spent (a fresh bar and coordinator) becomes key
+  and replays neither focus nor select-all; a new ⌘F then lands only on the key window's
+  field editor while the background window's bar stays off first responder.
+  **Key status is designated, first responders are real.** The app-hosted XCTest process is
+  never the active application (a probe showed `NSApp.isActive == false` after
+  `NSApp.activate(ignoringOtherApps:)` and `NSRunningApplication.activate`), so no hosted
+  window can become key through AppKit. The tests use a test-only `NSWindow` subclass whose
+  `isKeyWindow` the test designates, and post the `didBecomeKey` / `didResignKey`
+  notifications `WindowKeyStateTracker` observes. Production reads that property live in
+  `EditorFindQueryField`'s retry loop and in `AppState.isWorkspaceSearchFocusKeyWindow`;
+  nothing else is stubbed. The WS3C precedent routes the same eligibility through
+  `workspaceSearchFocusKeyWindowCheck` instead. Real activation remains covered only by the
+  launched-app F9 run. Menu-command eligibility still uses the existing
+  `commandContextOverride`, because `NSApp.keyWindow` is `nil` in this process.
 - [ ] Find commands stay eligible while Full Keyboard Access focuses a bar control (Aa,
   whole-word, Next, Previous, Done). The bar's own controls act unconditionally; menu
   eligibility comes from SwiftUI-reported `EditorFindChromeFocus`, **tagged with the
@@ -713,7 +841,10 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   `...testWindowBridgeDismantleDetachesTheProbe`).
   Still open: hosted Full-Keyboard-Access run — in-process tests cannot produce the real
   SwiftUI focus transition, so nothing here proves SwiftUI reports the focus at all, nor that
-  the bridge receives a window in the shipped view tree.
+  the bridge receives a window in the shipped view tree. An FKA XCUITest was not attempted:
+  it needs the system Keyboard navigation setting changed on the runner and a foreground,
+  UI-automation-authorised session, so it could not be deterministic from this session.
+  This bullet is closed only by the owner smoke checklist under F6 (steps 10–13).
 - [x] `⌘F` while the find bar is **already open** re-focuses the owned query field,
   selects all existing query text, and **never closes** the bar — proven on a real
   first responder, not only focusRequestID counters.
@@ -729,8 +860,11 @@ document explicitly. **Defined v1 behaviors** (bar open unless noted):
   passed all three. Every iteration retained `needle` across the refocus boundary, replaced it
   with `q` without test-side select-all, kept the bar open, and completed the nonce-bound
   app-side cleanup handshake. PR #108 still supplies ineligible-host supersession plus a real
-  Search first responder. The remaining cross-feature, dual-window, eligible-after-handoff,
-  and Full Keyboard Access hosted matrix stays open, so the other F7 boxes stay unchecked.
+  Search first responder.
+- Evidence (2026-09-28): **bullets 1–4 closed by the hosted follow-up** named above; they
+  passed three consecutive iterations of `EditorFindHostedGateTests` and the full
+  `EditorFind*` AppTests run. **F7 stays open overall** until the owner records the Full
+  Keyboard Access smoke (F6 checklist steps 10–13).
 
 ### F8 — Highlight-all survives highlight re-application
 
