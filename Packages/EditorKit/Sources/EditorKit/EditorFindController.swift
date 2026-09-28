@@ -55,7 +55,7 @@ final class EditorFindMatchHold: @unchecked Sendable {
 }
 
 /// Fence token for an in-flight match computation.
-private struct EditorFindMatchFence: Equatable {
+struct EditorFindMatchFence: Equatable {
     let documentIdentity: EditorDocumentIdentity?
     let sourceRevision: UInt64
     let queryGeneration: UInt64
@@ -72,10 +72,12 @@ enum EditorFindScheduleReason: Equatable {
     case patternOnly
     case edit
     case rebind
+    /// One post-write rescan. `resumeUTF16` is the continuation anchor.
+    case replacement(resumeUTF16: Int)
 
     var emitsNavigationOnCompletion: Bool {
         switch self {
-        case .query: true
+        case .query, .replacement: true
         case .patternOnly, .edit, .rebind: false
         }
     }
@@ -94,17 +96,25 @@ enum EditorFindScheduleReason: Equatable {
 /// the `editorNavigationCommand` channel.
 @MainActor
 public final class EditorFindController {
-    public private(set) var session: EditorFindSession?
-    public private(set) var pendingNavigationCommand: EditorNavigationCommand?
-    public private(set) var documentBinding: EditorFindDocumentBinding
+    public internal(set) var session: EditorFindSession?
+    public internal(set) var pendingNavigationCommand: EditorNavigationCommand?
+    public internal(set) var documentBinding: EditorFindDocumentBinding
     public private(set) var query: TextSearchQuery?
-    public private(set) var caretAnchorUTF16: Int = 0
-    public private(set) var queryGeneration: UInt64 = 0
+    public internal(set) var caretAnchorUTF16: Int = 0
+    public internal(set) var queryGeneration: UInt64 = 0
     /// True when the last applied match observed `!Thread.isMainThread` inside the worker.
-    public private(set) var lastMatchRanOffMain = false
-    public private(set) var completedMatchCount = 0
+    public internal(set) var lastMatchRanOffMain = false
+    public internal(set) var completedMatchCount = 0
     public private(set) var cancelledMatchCount = 0
-    public private(set) var droppedStaleMatchCount = 0
+    public internal(set) var droppedStaleMatchCount = 0
+    /// Ordinary `.edit` schedules. A replacement revision must not increment this.
+    var editScheduleCount = 0
+    /// `EditorFindSession.search` calls made for a replacement revision.
+    var replacementEngineInvocationCount = 0
+    /// Replacement publications admitted. One revision admits one.
+    var replacementScheduleCount = 0
+    var lastScheduleReason: EditorFindScheduleReason?
+    var armedReplacementPublication: EditorFindReplacementArm?
 
     /// Debounce before match admission. Tests may set to 0.
     public var debounceNanoseconds: UInt64 = 150_000_000
@@ -127,11 +137,11 @@ public final class EditorFindController {
     var testMatchHold: EditorFindMatchHold?
 
     private var navigationSequence: UInt64 = 0
-    private var matchTask: Task<Void, Never>?
-    private var debounceTask: Task<Void, Never>?
+    var matchTask: Task<Void, Never>?
+    var debounceTask: Task<Void, Never>?
     /// After non-navigating recompute (edit/rebind), first next/previous activates the
     /// current ordinal instead of stepping past it.
-    private var shouldActivateCurrentOnNextStep = false
+    var shouldActivateCurrentOnNextStep = false
     /// Next/previous pressed while `session == nil` (debounce / in-flight). Applied once
     /// when *that same* generation completes — does **not** re-push the query (avoids
     /// restarting debounce and losing reverse intent).
@@ -139,9 +149,9 @@ public final class EditorFindController {
     /// Bound to `queryGeneration` so a later query/edit/rebind can never consume a step
     /// recorded against superseded results, and carries a net signed count so repeated
     /// presses during one debounce are not compressed into a single step.
-    private var pendingStepIntent: PendingStepIntent?
+    var pendingStepIntent: PendingStepIntent?
 
-    private struct PendingStepIntent: Equatable {
+    struct PendingStepIntent: Equatable {
         let generation: UInt64
         /// Direction of the **first** press (`+1` next, `-1` previous).
         ///
@@ -167,6 +177,7 @@ public final class EditorFindController {
 
     /// Rebinds to a new document: cancel, clear, re-run. Does **not** auto-navigate.
     public func rebindDocument(_ binding: EditorFindDocumentBinding) {
+        armedReplacementPublication = nil
         let identityChanged = binding.identity != documentBinding.identity
         documentBinding = binding
         if identityChanged {
@@ -175,8 +186,24 @@ public final class EditorFindController {
         scheduleMatch(reason: .rebind)
     }
 
+    /// Routes one source publication. An armed replacement revision is consumed
+    /// once as `.replacement`; every other change stays an ordinary `.edit`.
+    public func consumeDocumentPublication(text: String, revision: UInt64) {
+        documentTextDidChange(text: text, revision: revision)
+    }
+
     /// Edit invalidation: recompute matches/counter; does **not** move selection.
     public func documentTextDidChange(text: String, revision: UInt64) {
+        if let armed = armedReplacementPublication,
+           revision == armed.preWriteRevision &+ 1
+        {
+            armedReplacementPublication = nil
+            scheduleReplacement(plan: armed.plan, text: text, revision: revision)
+            return
+        }
+        if let armed = armedReplacementPublication, revision != armed.preWriteRevision {
+            armedReplacementPublication = nil
+        }
         guard revision != documentBinding.revision || text != documentBinding.text else {
             return
         }
@@ -191,6 +218,7 @@ public final class EditorFindController {
     /// No document remains: cancel and clear session **and** query (F4b controller half).
     /// Leaving `query` set would re-run a background match on the next document bind.
     public func clearForNoDocument() {
+        armedReplacementPublication = nil
         cancelInFlightWork()
         documentBinding = .empty
         query = nil
@@ -331,6 +359,14 @@ public final class EditorFindController {
     }
 
     private func scheduleMatch(reason: EditorFindScheduleReason) {
+        if case .replacement = reason {
+            assertionFailure("Replacement publications use scheduleReplacement")
+            return
+        }
+        if reason == .edit {
+            editScheduleCount &+= 1
+        }
+        lastScheduleReason = reason
         cancelInFlightWork()
         queryGeneration &+= 1
         let generation = queryGeneration
@@ -494,12 +530,13 @@ public final class EditorFindController {
         emitNavigation(for: session.currentMatch)
     }
 
-    private func emitNavigation(for match: TextSearchMatch?) {
-        guard let match,
-              let identity = documentBinding.identity
-        else {
-            return
-        }
+    func emitNavigation(for match: TextSearchMatch?) {
+        guard let match else { return }
+        emitNavigation(to: match.range)
+    }
+
+    func emitNavigation(to selection: NSRange) {
+        guard let identity = documentBinding.identity else { return }
         let id: UInt64
         if let navigationIDProvider {
             id = navigationIDProvider()
@@ -510,20 +547,20 @@ public final class EditorFindController {
         let request = EditorNavigationRequest(
             id: id,
             documentIdentity: identity,
-            selection: match.range,
+            selection: selection,
             shouldFocusEditor: false
         )
         pendingNavigationCommand = .navigate(request)
     }
 
-    private func notifySessionDidChange() {
+    func notifySessionDidChange() {
         onSessionDidChange?()
     }
 
     /// Synchronous, nonisolated probe: true when the calling thread is not the main thread.
     /// Uses `pthread_main_np` so it is valid from async/detached contexts (unlike
     /// `Thread.isMainThread` under Swift 6 async unavailability).
-    private nonisolated static func currentlyOffMainThread() -> Bool {
+    nonisolated static func currentlyOffMainThread() -> Bool {
         pthread_main_np() == 0
     }
 }

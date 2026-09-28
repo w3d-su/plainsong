@@ -22,7 +22,10 @@ extension AppState {
         if editorFindHost.controller.documentBinding.identity != binding.identity {
             editorFindHost.controller.rebindDocument(binding)
         } else {
-            editorFindHost.controller.documentTextDidChange(text: binding.text, revision: binding.revision)
+            editorFindHost.controller.consumeDocumentPublication(
+                text: binding.text,
+                revision: binding.revision
+            )
         }
         // Counter refresh arrives via onSessionDidChange when the recompute finishes.
     }
