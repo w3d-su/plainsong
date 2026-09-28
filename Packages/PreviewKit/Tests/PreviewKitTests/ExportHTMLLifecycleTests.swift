@@ -45,6 +45,30 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         XCTAssertNil(controller.pendingHTMLExport)
     }
 
+    func testResourceResolutionTaskIsCancelledWhenExportFinishes() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let resolution = Task<Void, Never> {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+        }
+        let result: PreviewHTMLExportResult = await withCheckedContinuation { continuation in
+            controller.pendingHTMLExport = PendingHTMLExport(
+                exportID: 4,
+                renderID: 4,
+                continuation: continuation
+            )
+            controller.pendingHTMLExport?.resolutionTask = resolution
+            controller.failPendingHTMLExport(reason: "cancelled")
+        }
+        guard case let .failed(reason, exportID, _) = result else {
+            return XCTFail("Expected cancellation, got \(result)")
+        }
+        XCTAssertEqual(reason, "cancelled")
+        XCTAssertEqual(exportID, 4)
+        XCTAssertTrue(resolution.isCancelled)
+        XCTAssertNil(controller.pendingHTMLExport)
+    }
+
     func testAlreadyCancelledTaskNeverStartsExport() async throws {
         let controller = try support.makeController()
         defer { controller.invalidate() }

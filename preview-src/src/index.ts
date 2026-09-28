@@ -21,6 +21,7 @@ import {
   collectPreviewStyleText,
   handleExportHTML,
   resetExportHTMLSession,
+  waitForRetainedImages,
 } from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
 import { scrollPreviewAnchor } from "./heading-anchors";
@@ -149,12 +150,14 @@ async function receive(message: BridgeMessage): Promise<void> {
         previewRoot,
         latestRenderID,
         documentTheme: document.documentElement.dataset.theme ?? "system",
+        bundledStyleText: __PLAINSONG_BUNDLED_CSS__,
         collectStyleText: () => collectPreviewStyleText(document, __PLAINSONG_BUNDLED_CSS__),
         waitForFonts: async () => {
           if (document.fonts?.ready) {
             await document.fonts.ready;
           }
         },
+        waitForImages: waitForRetainedImages,
         postResult: (payload) => {
           postBridgeMessage({ name: "exportHTMLResult", payload });
         },

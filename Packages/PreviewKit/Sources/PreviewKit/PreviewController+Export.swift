@@ -79,7 +79,18 @@ extension PreviewController {
                 return
             }
             pendingHTMLExport?.phase = .finalization
-            sendExportRequest(pending, phase: .finalization, outcomes: resources.map { .omit($0) })
+            let exportID = pending.exportID
+            let assetRoot = exportAssetRootURL
+            let previewDirectory = previewIndexURL?.deletingLastPathComponent()
+            pendingHTMLExport?.resolutionTask = Task.detached { [weak self] in
+                let outcomes = ExportResourceResolver.resolve(
+                    resources,
+                    assetRoot: assetRoot,
+                    previewDirectory: previewDirectory
+                )
+                guard !Task.isCancelled else { return }
+                await self?.completeResourceResolution(exportID: exportID, outcomes: outcomes)
+            }
         case let .ready(html):
             guard pending.phase == .finalization else {
                 failPendingHTMLExport(reason: "invalid-export-phase")
@@ -98,11 +109,20 @@ extension PreviewController {
         finishHTMLExport(.failed(reason: reason, exportID: pending.exportID, renderID: pending.renderID))
     }
 
+    private func completeResourceResolution(exportID: Int, outcomes: [ExportResourceOutcome]) {
+        guard let pending = pendingHTMLExport,
+              pending.exportID == exportID,
+              pending.phase == .finalization
+        else { return }
+        sendExportRequest(pending, phase: .finalization, outcomes: outcomes)
+    }
+
     private func finishHTMLExport(_ result: PreviewHTMLExportResult) {
         guard let pending = pendingHTMLExport else { return }
         pendingHTMLExport = nil
         pending.timeoutTask?.cancel()
         pending.preparationTask?.cancel()
+        pending.resolutionTask?.cancel()
         pending.continuation.resume(returning: result)
     }
 }
@@ -115,4 +135,5 @@ struct PendingHTMLExport {
     var documentTitle: String?
     var timeoutTask: Task<Void, Never>?
     var preparationTask: Task<Void, Never>?
+    var resolutionTask: Task<Void, Never>?
 }

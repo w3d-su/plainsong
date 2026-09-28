@@ -62,8 +62,11 @@ describe("export review regressions", () => {
   it.each(["png", "jpeg", "gif", "webp"])("preserves inline %s images and stable resource indexes", async (mime) => {
     const src = `data:image/${mime};base64,AAAA`;
     const { root, host, results, payload } = fixture(`<img src="${src}"><img src="asset://x.png"><img src="https://example.com/x.png">`);
-    expect(collectImageResources(root).map((r) => r.resourceID)).toEqual(["image-1", "image-2"]);
-    const before = root.innerHTML;
+    expect(collectImageResources(root).map((r) => r.resourceID)).toEqual([
+      "image-0",
+      "image-1",
+      "image-2",
+    ]);
     await handleExportHTML(payload, host);
     await handleExportHTML({ ...payload, phase: "finalization" }, host);
     const state = results.at(-1)!.state;
@@ -72,7 +75,8 @@ describe("export review regressions", () => {
     expect(doc.querySelector("img")!.getAttribute("src")).toBe(src);
     expect(doc.querySelectorAll("img")).toHaveLength(1);
     expect(doc.querySelectorAll(".export-image-placeholder")).toHaveLength(2);
-    expect(root.innerHTML).toBe(before);
+    expect(root.querySelector("img")!.getAttribute("src")).toBe(src);
+    expect(root.querySelectorAll(".export-image-placeholder")).toHaveLength(2);
   });
 
   it.each(["data:image/jpg;base64,AA==", "data:image/svg+xml,<svg/>", "data:image/png;base64"])("shares the live image allowlist for %s", (src) => {
@@ -99,14 +103,14 @@ describe("export review regressions", () => {
 
   it("superseded discovery leaves no live attributes and late finalization cannot clear its successor", async () => {
     const { root, host, results, payload } = fixture('<img src="asset://x.png">');
-    const before = root.innerHTML;
     await handleExportHTML(payload, host);
     const newer = { ...payload, exportID: 2 };
     await handleExportHTML(newer, host);
     await handleExportHTML({ ...payload, phase: "finalization" }, host);
     await handleExportHTML({ ...newer, phase: "finalization" }, host);
     expect(results.map((r) => r.state.kind)).toEqual(["resourcesNeeded", "resourcesNeeded", "failed", "ready"]);
-    expect(root.innerHTML).toBe(before);
+    expect(root.querySelector("img")).toBeNull();
+    expect(root.querySelector(".export-image-placeholder")).not.toBeNull();
     expect(root.querySelector("[data-export-resource-id]")).toBeNull();
   });
 

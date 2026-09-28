@@ -1202,3 +1202,27 @@ not WebKit IPC/string construction, complete offscreen export, image/font readin
 physical keystroke-to-screen, concurrent typing, or Debug/Release end-to-end evidence.
 **E9 remains open** for PR G. The full export payload limit and resource-policy gates
 remain separately owned by PR D/G.
+
+## Export PR D cap fixtures — 2026-09-28
+
+Debug `swift test --package-path Packages/PreviewKit --filter ExportResourceResolverTests`
+on this worktree. The 32 MiB case is
+`testDistinctRasterBytesStopAtThirtyTwoMebibytesAndOneExtraByteOmits`. Fixture bytes are
+generated in the test and are not committed. The timed interval is only
+`ExportResourceResolver.resolve` after the files exist.
+
+| Measurement | Value |
+|---|---|
+| Resolve elapsed | 0.053862 s |
+| Host RSS before resolve | 70,090,752 bytes (70.1 MB) |
+| Host RSS after both resolves | 179,912,704 bytes (179.9 MB) |
+| 10 MiB boundary test, including PNG padding and disk write | 9.551 s, passed |
+| Repeated-reference test, including disk write | 22.138 s on the rerun, passed |
+
+The RSS delta covers two in-memory results: one exact 32 MiB embed set and one 30 MiB
+embed set whose next image is omitted. Base64 expansion of those rasters accounts for
+most of the growth. A later full PreviewKit suite run on the same machine measured the
+same resolver interval at 0.061 s, with host RSS 101.2 MB before and 221.6 MB after,
+because earlier tests had already allocated. No export wall-clock budget is frozen.
+Typing latency is unchanged because export runs only from `PreviewController.exportHTML`,
+off the editor keystroke path. E9's broader Debug/Release matrix remains open.

@@ -203,7 +203,8 @@ describe("export style URL sinks", () => {
       .icon { background: url(#paint0); }
       .remote { background: url("https://evil.example/x.png"); }
     `;
-    const sanitized = sanitizeStyleText(css);
+    const allowed = new Set(["data:font/woff2;base64,AA=="]);
+    const sanitized = sanitizeStyleText(css, allowed);
     expect(sanitized).toContain("data:font/woff2;base64,AA==");
     expect(sanitized).toContain("url(#paint0)");
     expect(sanitized).not.toContain("https://evil.example/x.png");
