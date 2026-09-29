@@ -53,7 +53,7 @@ WYSIWYG implementation.
 | `MarkdownTextViewCoordinator` | marked text, selection, completion, command routing | Preserve Phase 1 typing hot path and IME guards |
 | `MarkdownSyntaxParser` / tree-sitter ranges | fold/reveal node range mapping | Keep parser work off-main and scoped to visible/dirty ranges |
 | `docs/wysiwyg-design.md` | Phase 2 scope and spike gates | Update with actual spike results before implementation |
-| `agent.md` | Decision Log and milestone status | Update in the same PR when architectural decisions change |
+| `agent.md`, `docs/decision-log.md` | Rules and milestone status; Decision Log rows | Update in the same PR when architectural decisions change |
 
 ## Risk notes
 
