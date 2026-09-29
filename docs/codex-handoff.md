@@ -373,7 +373,7 @@ Acceptance (checklist §A + §B):
 - New layout-geometry test (B13): folded-line fragment height ≈ unfolded-line height; multi-line fold does
   not displace the viewport.
 - Rerun B1–B12 against the new mechanism (IME harness opt-in). Record large-doc perf in docs/perf-log.md.
-- Record the chosen mechanism in the agent.md Decision Log; update R18 (close only when A + B13 are green).
+- Record the chosen mechanism in the Decision Log (`docs/decision-log.md`); update R18 (close only when A + B13 are green).
 
 Verification:
 - make format
