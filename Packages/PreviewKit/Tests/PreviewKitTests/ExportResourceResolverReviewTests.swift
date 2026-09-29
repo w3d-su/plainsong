@@ -79,6 +79,40 @@ final class ExportResourceResolverReviewTests: XCTestCase {
         XCTAssertEqual(valid.first?.action, .embed)
     }
 
+    /// Repeated authored `data:` images are answered from the first decision before any
+    /// base64 or ImageIO work; only a distinct normalizer input is decoded.
+    func testRepeatedAuthoredDataImagesAreLookedUpBeforeDecoding() throws {
+        let base64 = try ExportRasterFixture.encoded(.png).base64EncodedString()
+        let spellings = ["data:image/png;base64,\(base64)", "  DATA:Image/PNG ; Base64,\(base64)  "]
+        var resources = (0 ..< 100).map {
+            ExportResourceDescriptor(resourceID: "image-\($0)", kind: .image, src: spellings[$0 % 2])
+        }
+        resources += (0 ..< 10).map {
+            ExportResourceDescriptor(resourceID: "broken-\($0)", kind: .image, src: "data:image/png;base64,@@@")
+        }
+        // Inner whitespace changes what the MIME check sees, so it must not share a key.
+        resources.append(ExportResourceDescriptor(
+            resourceID: "spaced-mime",
+            kind: .image,
+            src: "data:image/ png;base64,\(base64)"
+        ))
+
+        var decodes = 0
+        let outcomes = ExportResourceResolver.resolve(resources, assetRoot: nil, previewDirectory: nil) { source in
+            decodes += 1
+            return ExportRasterDataURI.normalized(from: source)
+        }
+
+        XCTAssertEqual(decodes, 3)
+        XCTAssertNotNil(outcomes[0].dataURI)
+        XCTAssertTrue(outcomes[1 ..< 100].allSatisfy {
+            $0.action == .embed && $0.dataURI == nil && $0.dataURIFrom == "image-0"
+        })
+        XCTAssertTrue(outcomes[100 ..< 110].allSatisfy { $0.action == .omit && $0.reason == "malformed-data" })
+        XCTAssertEqual(outcomes.last?.action, .omit)
+        XCTAssertEqual(outcomes.last?.reason, "malformed-data")
+    }
+
     private struct UndecodableRaster {
         let name: String
         let data: Data

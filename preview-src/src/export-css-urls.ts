@@ -220,12 +220,18 @@ function skipBadURL(css: string, start: number): number {
   let index = start;
   while (index < css.length) {
     if (css[index] === ")") return index + 1;
+    // Keep the enclosing block's `}` so later rules survive; the rest is still scanned.
+    if (css[index] === "}") return index;
     index = isValidEscape(css, index) ? consumeEscape(css, index + 1).end : index + 1;
   }
   return css.length;
 }
 
-/** Skips to just past the `)` that closes an already-open function, or to the end. */
+/**
+ * Skips to just past the `)` that closes an already-open function, or to the end. An
+ * unmatched `}` or `]` stops the skip before it, so the enclosing block and later rules
+ * survive; everything after the stop is still scanned.
+ */
 function skipBlock(css: string, start: number): number {
   let depth = 1;
   let index = start;
@@ -236,6 +242,7 @@ function skipBlock(css: string, start: number): number {
       continue;
     }
     const character = css[index];
+    if (depth === 1 && (character === "}" || character === "]")) return index;
     if (character === "(" || character === "[" || character === "{") depth += 1;
     if (character === ")" || character === "]" || character === "}") depth -= 1;
     index += 1;

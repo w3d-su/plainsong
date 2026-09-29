@@ -90,6 +90,24 @@ enum ExportRasterDataURI {
         return Normalized(mimeType: mimeType, data: data, uri: uri)
     }
 
+    /// A cheap repeat key built from exactly the inputs `normalized(from:)` reads: the
+    /// `data:` prefix, the trimmed and lowercased metadata parameters, and the untouched
+    /// payload. Equal keys therefore normalize identically, so a repeat is answered before
+    /// any base64 or ImageIO work; differently encoded payloads still meet at `uri`.
+    static func lookupKey(from source: String) -> String {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let comma = trimmed.firstIndex(of: ","),
+              trimmed[..<comma].lowercased().hasPrefix("data:")
+        else {
+            return trimmed
+        }
+        let metadata = trimmed[trimmed.index(trimmed.startIndex, offsetBy: 5) ..< comma]
+        let parameters = metadata.split(separator: ";", omittingEmptySubsequences: false).map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        return "data:\(parameters.joined(separator: ";"))\(trimmed[comma...])"
+    }
+
     private static var maximumBase64Characters: Int {
         ((Int(ExportRasterSniffer.maximumRasterBytes) + 2) / 3) * 4 + 4
     }

@@ -1242,8 +1242,11 @@ the file.
 | Encoded finalization payload, 100 references to one 1 MiB PNG, PR head (v7) | 139,820,261 bytes |
 | Same payload after protocol v8 `dataURIFrom` | below the asserted 1,423,726-byte bound (one 1,398,126-byte data URI plus at most 256 bytes per reference) |
 
-The decode proof did not measurably change the cap-fixture interval (0.054 s recorded on
-2026-09-28). The payload rows come from
+The cap fixture's rasters are 1×1 PNGs padded to their exact byte size with a `tEXt`
+chunk (`ExportRasterFixture.png(exactByteCount:)`), so the decode proof there decodes a
+single pixel. Its unchanged interval (0.054 s recorded on 2026-09-28) therefore says
+nothing about the decode proof's cost on a real 10 MiB photographic PNG or JPEG. That cost
+is unmeasured and belongs to E9's large-document pass. The payload rows come from
 `ExportResourceResolverReviewTests.testHundredReferencesToOneImageSerializeItsDataURIOnce`
 run against the PR head sources and then against this change. No export wall-clock
 budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the

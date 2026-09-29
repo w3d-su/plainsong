@@ -581,7 +581,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `export-html-assets.test.ts` (`does not emit ready before image decode resolves`).
   An image WebKit cannot decode becomes its placeholder and export continues; `ready`
   still requires every retained image to be a decoded candidate
-  (`export-html-hardening.test.ts`, finding 4 cases).
+  (`export-html-hardening.test.ts`, finding 4 cases). That proof decodes each distinct
+  data URI once in the export WebContent process. The finalized live-DOM `<img>` nodes
+  are inserted synchronously right before `ready` and are not decoded in place, so
+  **PR G must await `decode()` on those live nodes before PDF or Print capture** (D2
+  barrier item 3).
   The static document is built by `buildStaticExportHTML`; production export does not
   read `document.documentElement.outerHTML`. The regenerated preview bundle is in this
   commit. E2 is closed.
@@ -616,7 +620,17 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   expression with a CSS-syntax scanner: `export-html-hardening.test.ts` drops `@import`
   (including escaped `@\69mport`), neutralizes `image-set()`, escaped `u\72l(`, and
   url values containing `)` or quotes, fails closed on unterminated url(), and sanitizes
-  generated-SVG `style` and presentation attributes. `ExportHTMLHostedTests` covers the static
+  generated-SVG `style` and presentation attributes. `<` is escaped before the scan, so
+  nothing transforms the scanner's output: escaping afterwards had turned `\<url(` into
+  `\\3c url(`, a live url() token. `export-css-urls.test.ts` covers that vector in head
+  CSS, an SVG `<style>`, and a `style` attribute, and re-scans the sanitized output of
+  25,745 generated escape, comment, backslash-newline, custom-property, and `var()`
+  inputs to find only `url()`, fragments, or manifest fonts. A malformed url() keeps the
+  enclosing `}` so later rules survive.
+  `ExportHTMLOfflineTests.testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument`
+  reopens the export in WebKit and checks its CSSOM and computed styles: with the
+  previous sanitizer, `list-style-image` resolved to the remote URL.
+  `ExportHTMLHostedTests` covers the static
   document, disabled checkboxes, MDX placeholders, and MDX failure;
   `export-html.test.ts` freezes dark styling; `ExportHTMLOfflineTests` resolves `system`
   to light or dark. The full `Fixtures/kitchen-sink.md` matrix stays open for E8, so
@@ -648,9 +662,13 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   32 MiB distinct bytes, repeated references, traversal/symlink/SVG/remote/data-URI
   rejection, manifest woff2), `ExportResourceResolverReviewTests` (100 references to one
   image carry its data URI once across the bridge; header-only and corrupt PNG/JPEG
-  that still type-sniff are omitted because acceptance now requires an ImageIO decode),
+  that still type-sniff are omitted because acceptance now requires an ImageIO decode;
+  repeated authored `data:` images are answered before any decode),
   `export-html-assets.test.ts` (exact 64 MiB HTML, per-image serialized cap measured
-  on the sanitized document, URL sinks, user SVG removal), `export-html-hardening.test.ts`
+  on the sanitized document, URL sinks, user SVG removal), `export-css-urls.test.ts`
+  and `ExportHTMLOfflineTests.testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument`
+  (CSS URL sinks, including the escaped-`<` vector, stay neutral in WebKit),
+  `export-html-hardening.test.ts`
   (an image without a validated outcome fails closed to its placeholder, font IDs never
   collide, and the budget agrees with the final length check), and
   `ExportHTMLOfflineTests.testOfflineReopenRendersEmbeddedResourcesWithoutNetwork`

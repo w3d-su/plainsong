@@ -4,10 +4,12 @@ enum ExportResourceResolver {
     static let maximumDistinctDecodedRasterBytes: Int64 = 32 * 1024 * 1024
     static let exportImageSizeLimitReason = "Export image size limit"
 
+    /// `normalizeDataURI` is a test seam for counting authored `data:` decodes.
     static func resolve(
         _ resources: [ExportResourceDescriptor],
         assetRoot: URL?,
-        previewDirectory: URL?
+        previewDirectory: URL?,
+        normalizeDataURI: (String) -> ExportRasterDataURI.Normalized? = ExportRasterDataURI.normalized(from:)
     ) -> [ExportResourceOutcome] {
         let manifest = ExportFontManifest.woff2FileNames(in: previewDirectory)
         let fontDirectory = previewDirectory?.appendingPathComponent("fonts", isDirectory: true)
@@ -20,7 +22,12 @@ enum ExportResourceResolver {
             case .font:
                 return resolveFont(resource, fontDirectory: fontDirectory, manifest: manifest)
             case .image:
-                return resolveImage(resource, assetRoot: assetRoot, state: &state)
+                return resolveImage(
+                    resource,
+                    assetRoot: assetRoot,
+                    normalizeDataURI: normalizeDataURI,
+                    state: &state
+                )
             }
         }
     }
@@ -62,6 +69,7 @@ enum ExportResourceResolver {
     private static func resolveImage(
         _ resource: ExportResourceDescriptor,
         assetRoot: URL?,
+        normalizeDataURI: (String) -> ExportRasterDataURI.Normalized?,
         state: inout RasterBudget
     ) -> ExportResourceOutcome {
         let source = resource.src.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,7 +77,7 @@ enum ExportResourceResolver {
             return ExportResourceOutcome.omit(resource, reason: "missing")
         }
         if source.lowercased().hasPrefix("data:") {
-            return resolveDataImage(resource, source: source, state: &state)
+            return resolveDataImage(resource, source: source, normalize: normalizeDataURI, state: &state)
         }
         guard source.lowercased().hasPrefix("asset:") else {
             return ExportResourceOutcome.omit(resource, reason: "rejected-scheme")
@@ -80,21 +88,27 @@ enum ExportResourceResolver {
     private static func resolveDataImage(
         _ resource: ExportResourceDescriptor,
         source: String,
+        normalize: (String) -> ExportRasterDataURI.Normalized?,
         state: inout RasterBudget
     ) -> ExportResourceOutcome {
-        guard let normalized = ExportRasterDataURI.normalized(from: source) else {
-            return ExportResourceOutcome.omit(resource, reason: "malformed-data")
-        }
-        if let repeated = repeatedOutcome(resource, identity: normalized.uri, state: state) {
+        // A repeated authored image reuses the first decision before any base64 or ImageIO work.
+        let sourceKey = ExportRasterDataURI.lookupKey(from: source)
+        if let repeated = repeatedOutcome(resource, identity: sourceKey, state: state) {
             return repeated
         }
-        return accept(
+        guard let normalized = normalize(source) else {
+            state.decisionsByIdentity[sourceKey] = .omitted(reason: "malformed-data")
+            return ExportResourceOutcome.omit(resource, reason: "malformed-data")
+        }
+        let outcome = repeatedOutcome(resource, identity: normalized.uri, state: state) ?? accept(
             resource,
             identity: normalized.uri,
             byteCount: Int64(normalized.data.count),
             dataURI: normalized.uri,
             state: &state
         )
+        state.decisionsByIdentity[sourceKey] = state.decisionsByIdentity[normalized.uri]
+        return outcome
     }
 
     private static func resolveAssetImage(

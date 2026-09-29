@@ -83,6 +83,18 @@ describe("export review fixes", () => {
       .toEqual(["c", "d", "e"]);
   });
 
+  it("uses the placeholder when dataURIFrom names a resource that does not exist", async () => {
+    const { doc } = await exportWith(
+      '<img alt="kept" src="asset://a.png"><img alt="orphan" src="asset://a.png">',
+      [
+        embed("image-0", pngA),
+        { resourceID: "image-1", kind: "image", action: "embed", dataURIFrom: "image-99" },
+      ],
+    );
+    expect(Array.from(doc!.querySelectorAll("img"), (image) => image.getAttribute("src"))).toEqual([pngA]);
+    expect(doc!.querySelector(".export-image-placeholder")!.textContent).toBe("orphan");
+  });
+
   it("fails closed when finalization sees a different image DOM than discovery (finding 3)", async () => {
     for (const mutate of [
       (root: HTMLElement) => root.querySelector("img")!.setAttribute("src", "asset://b.png"),

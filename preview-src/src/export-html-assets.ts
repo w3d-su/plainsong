@@ -84,8 +84,11 @@ export function embedFontSources(
 }
 
 export function sanitizeStyleText(css: string, allowedFontDataURIs: ReadonlySet<string>): string {
-  // A style element is HTML raw text: CSS strings do not protect closing tags.
-  return sanitizeCSSURLs(css, allowedFontDataURIs).replace(/</gu, "\\3c ");
+  // A style element is HTML raw text: CSS strings do not protect closing tags. Escape `<`
+  // before the URL scan so the scanner sees the final text; escaping afterwards turned
+  // `\<url(` into `\\3c url(`, an ident followed by a live url() token. Nothing may
+  // transform the scanner's output.
+  return sanitizeCSSURLs(css.replace(/</gu, "\\3c "), allowedFontDataURIs);
 }
 
 export function sanitizeStaticClone(
