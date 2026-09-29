@@ -1087,7 +1087,7 @@ Before editing:
 Scope this change strictly to:
 - `Packages/MarkdownCore/Sources/MarkdownCore`
 - `Packages/MarkdownCore/Tests/MarkdownCoreTests`
-- one concise `agent.md` Decision Log entry if needed to record the adopted architecture
+- one concise `docs/decision-log.md` entry if needed to record the adopted architecture
 
 Do not modify WorkspaceKit, App, EditorKit, the sidebar, or CI in this change.
 
