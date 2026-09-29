@@ -78,6 +78,11 @@ extension PreviewController {
                 failPendingHTMLExport(reason: "invalid-export-phase")
                 return
             }
+            // Outcomes and v8 `dataURIFrom` references pair by ID, so IDs must be unique.
+            guard Set(resources.map(\.resourceID)).count == resources.count else {
+                failPendingHTMLExport(reason: "invalid-export-resources")
+                return
+            }
             pendingHTMLExport?.phase = .finalization
             let exportID = pending.exportID
             let assetRoot = exportAssetRootURL

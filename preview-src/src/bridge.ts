@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 export const MESSAGE_NAMES = [
   "ready",
@@ -80,6 +80,8 @@ export interface ExportResourceOutcome {
   kind: ExportResourceKind;
   action: ExportResourceAction;
   dataURI?: string | null;
+  // v8: a repeated accepted resource names the earlier outcome that carries its bytes.
+  dataURIFrom?: string | null;
   reason?: string | null;
 }
 

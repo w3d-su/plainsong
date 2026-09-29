@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ExportResourceOutcome } from "../src/bridge";
 import {
   EXPORT_IMAGE_SIZE_LIMIT_REASON,
-  applySerializedImageBudget,
   collectFontResources,
   embedFontSources,
   utf8ByteLength,
@@ -14,6 +14,19 @@ import {
   resetExportHTMLSession,
   sanitizeStaticClone,
 } from "../src/export-html";
+import {
+  applySerializedImageBudget,
+  collectImageResources,
+  decodeImageCandidates,
+  detachExportImages,
+} from "../src/export-html-images";
+import { resolveResourceOutcomes } from "../src/export-html-outcomes";
+
+function detachedSlots(root: HTMLElement, outcomes: ExportResourceOutcome[]) {
+  const images = Array.from(root.querySelectorAll("img"));
+  const resolved = resolveResourceOutcomes(collectImageResources(root), outcomes);
+  return detachExportImages(images, resolved, new Set());
+}
 
 describe("export URL sinks", () => {
   it("keeps manifest font data and generated fragments, and drops other URL sinks", () => {
@@ -65,12 +78,12 @@ describe("export URL sinks", () => {
       "https://evil.example/font.woff2",
     ]);
     const known = descriptors.filter((resource) => resource.src.endsWith(".woff2") && resource.src.startsWith("fonts/"));
-    const embedded = embedFontSources(css, descriptors, known.map((resource) => ({
+    const embedded = embedFontSources(css, descriptors, resolveResourceOutcomes(descriptors, known.map((resource) => ({
       resourceID: resource.resourceID,
       kind: "font" as const,
       action: "embed" as const,
       dataURI: "data:font/woff2;base64,AA==",
-    })));
+    }))));
     const root = document.createElement("main");
     const style = document.createElement("style");
     style.textContent = embedded.css;
@@ -110,62 +123,54 @@ describe("export serialized image budget", () => {
     expect(over).toEqual({ failed: "html-too-large" });
   });
 
-  it("omits the image that crosses the serialized cap and still keeps a later smaller one", () => {
-    const placeholder = (label: string) => {
-      const span = document.createElement("span");
-      span.className = "export-image-placeholder";
-      span.setAttribute("role", "img");
-      span.setAttribute("aria-label", label);
-      span.textContent = label;
-      return span.outerHTML;
-    };
-    const large = `data:image/png;base64,${"A".repeat(80)}`;
-    const small = "data:image/png;base64,AAAA";
-    const largeImage = document.createElement("img");
-    largeImage.alt = "big";
-    largeImage.src = large;
-    const smallImage = document.createElement("img");
-    smallImage.alt = "small";
-    smallImage.src = small;
-    const base = utf8ByteLength(placeholder("big") + placeholder("small"));
-    const smallDelta = utf8ByteLength(smallImage.outerHTML) - utf8ByteLength(placeholder("small"));
-    const largeDelta = utf8ByteLength(largeImage.outerHTML) - utf8ByteLength(placeholder("big"));
-    const limit = base + Math.max(smallDelta, 0);
-    expect(largeDelta).toBeGreaterThan(Math.max(smallDelta, 0));
+  it("omits the image that crosses the serialized cap and still keeps a later smaller one", async () => {
+    const large = `data:image/png;base64,${"A".repeat(400)}`;
+    const small = `data:image/png;base64,${"A".repeat(200)}`;
     const root = document.createElement("main");
-    root.innerHTML = `<img alt="big"><img alt="small">`;
+    root.innerHTML = `<img alt="big" src="asset://big.png"><img alt="small" src="asset://small.png">`;
+    const slots = detachedSlots(root, [
+      { resourceID: "image-0", kind: "image", action: "embed", dataURI: large },
+      { resourceID: "image-1", kind: "image", action: "embed", dataURI: small },
+    ]);
+    await decodeImageCandidates(slots, async () => true);
+    const base = utf8ByteLength(root.innerHTML);
+    const smallImage = document.createElement("img");
+    smallImage.setAttribute("alt", "small");
+    smallImage.setAttribute("src", small);
+    const smallDelta = utf8ByteLength(smallImage.outerHTML) - utf8ByteLength(slots[1]!.placeholder.outerHTML);
+    const limit = base + smallDelta;
+
     const budget = applySerializedImageBudget({
       clone: root,
-      outcomes: [
-        { resourceID: "image-0", kind: "image", action: "embed", dataURI: large },
-        { resourceID: "image-1", kind: "image", action: "embed", dataURI: small },
-      ],
+      slots,
       measure: (bodyHTML) => utf8ByteLength(bodyHTML),
       limit,
     });
 
-    expect(budget.status).toBe("ok");
-    expect(budget.byteLength).toBeLessThanOrEqual(limit);
+    expect(budget).toEqual({ status: "ok", byteLength: limit });
+    expect(utf8ByteLength(root.innerHTML)).toBe(budget.byteLength);
     expect(root.querySelector("img")?.getAttribute("src")).toBe(small);
     expect(root.querySelector(".export-image-placeholder")?.textContent).toBe(
       EXPORT_IMAGE_SIZE_LIMIT_REASON,
     );
     expect(root.innerHTML).not.toContain(large);
-    expect(utf8ByteLength(largeImage.outerHTML)).toBeGreaterThan(utf8ByteLength(smallImage.outerHTML));
   });
 
-  it("fails closed when the document without images does not fit", () => {
+  it("fails closed when the document without images does not fit", async () => {
     const root = document.createElement("main");
     root.innerHTML = `<p>body</p><img alt="" src="asset://a.png">`;
+    const slots = detachedSlots(root, [{
+      resourceID: "image-0",
+      kind: "image",
+      action: "embed",
+      dataURI: "data:image/png;base64,AAAA",
+    }]);
+    await decodeImageCandidates(slots, async () => true);
     const budget = applySerializedImageBudget({
       clone: root,
-      outcomes: [{
-        resourceID: "image-0",
-        kind: "image",
-        action: "embed",
-        dataURI: "data:image/png;base64,AAAA",
-      }],
+      slots,
       measure: () => null,
+      limit: MAXIMUM_EXPORT_HTML_UTF8_BYTES,
     });
     expect(budget.status).toBe("base-too-large");
     expect(root.querySelector("img")).toBeNull();
@@ -178,17 +183,15 @@ describe("export readiness barrier", () => {
     const root = document.createElement("main");
     root.innerHTML = `<img alt="pixel" src="asset://pixel.png">`;
     const results: string[] = [];
-    let decoded = false;
+    let resolveDecode!: (decoded: boolean) => void;
+    const decoding = new Promise<boolean>((resolve) => { resolveDecode = resolve; });
     const host = {
       previewRoot: root,
       latestRenderID: 3,
       documentTheme: "light",
       collectStyleText: () => "",
       waitForFonts: async () => {},
-      waitForImages: async () => {
-        decoded = true;
-        throw new Error("image-undecoded");
-      },
+      decodeImage: () => decoding,
       postResult: (payload: { state: { kind: string } }) => {
         results.push(payload.state.kind);
       },
@@ -197,7 +200,7 @@ describe("export readiness barrier", () => {
       { exportID: 1, renderID: 3, phase: "discovery", resourceOutcomes: [], documentTitle: null },
       host,
     );
-    await handleExportHTML(
+    const finalization = handleExportHTML(
       {
         exportID: 1,
         renderID: 3,
@@ -212,8 +215,14 @@ describe("export readiness barrier", () => {
       },
       host,
     );
-    expect(decoded).toBe(true);
-    expect(results).toEqual(["resourcesNeeded", "failed"]);
+    for (let tick = 0; tick < 20; tick += 1) await Promise.resolve();
+    expect(results).toEqual(["resourcesNeeded"]);
+    expect(root.querySelector("img")?.getAttribute("src")).toBe("asset://pixel.png");
+    resolveDecode(false);
+    await finalization;
+    expect(results).toEqual(["resourcesNeeded", "ready"]);
+    expect(root.querySelector("img")).toBeNull();
+    expect(root.querySelector(".export-image-placeholder")?.textContent).toBe("pixel");
     expect(root.innerHTML).not.toContain("<script");
   });
 

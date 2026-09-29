@@ -2,44 +2,58 @@ import type {
   ExportHTMLPayload,
   ExportHTMLResultPayload,
   ExportResourceDescriptor,
-  ExportResourceOutcome,
 } from "./bridge";
 import {
-  applySerializedImageBudget,
+  EXPORT_IMAGE_SIZE_LIMIT_REASON,
   collectFontResources,
   embedFontSources,
-  enforceExportURLSinks,
-  placeholderElement,
-  placeholderLabel,
+  sanitizeStaticClone,
   sanitizeStyleText,
 } from "./export-html-assets";
+import {
+  type ExportImageDecoder,
+  applySerializedImageBudget,
+  collectImageResources,
+  decodeImageCandidates,
+  detachExportImages,
+  everyRetainedImageDecoded,
+  matchesDiscoveredImages,
+} from "./export-html-images";
 import {
   EXPORT_CSP,
   EXPORT_IMAGE_PLACEHOLDER_LABEL,
   MAXIMUM_EXPORT_HTML_UTF8_BYTES,
 } from "./export-html-limits";
-import { isAllowedDataImageSource } from "./image-policy";
+import { isStrictImageDataURI, resolveResourceOutcomes } from "./export-html-outcomes";
 import { escapeHtml } from "./mdx-error";
 
 export {
   EXPORT_CSP,
   EXPORT_IMAGE_PLACEHOLDER_LABEL,
+  EXPORT_IMAGE_SIZE_LIMIT_REASON,
   MAXIMUM_EXPORT_HTML_UTF8_BYTES,
 };
-export { sanitizeStyleText };
-
-export const EXPORT_IMAGE_SIZE_LIMIT_REASON = "Export image size limit";
+export { collectImageResources, sanitizeStaticClone, sanitizeStyleText };
 
 export type FrozenExportTheme = "light" | "dark";
 
 export interface ExportHTMLHost {
+  /**
+   * The dedicated offscreen export controller's preview root (D1); never the visible
+   * pane's. Only a successful finalization mutates it, replacing its children with the
+   * finalized static nodes synchronously before `ready` is posted. Failed or superseded
+   * exports leave it untouched.
+   */
   previewRoot: HTMLElement;
   latestRenderID: number;
   documentTheme: string;
   bundledStyleText?: string;
   collectStyleText: () => string | Promise<string>;
   waitForFonts: () => Promise<void>;
-  waitForImages?: (root: ParentNode) => Promise<void>;
+  /** Defaults to accepting every strict data URI, for hosts without an image decoder. */
+  decodeImage?: ExportImageDecoder;
+  /** Test seam: can only tighten the D3 64 MiB limit. */
+  maximumHTMLUTF8Bytes?: number;
   postResult: (payload: ExportHTMLResultPayload) => void;
 }
 
@@ -73,66 +87,6 @@ export function freezeExportTheme(theme: string): FrozenExportTheme {
   return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches === true ? "dark" : "light";
 }
 
-export function collectImageResources(root: ParentNode): ExportResourceDescriptor[] {
-  return Array.from(root.querySelectorAll("img")).map((image, index) => ({
-    resourceID: `image-${index}`,
-    kind: "image" as const,
-    src:
-      image.getAttribute("src") ??
-      image.dataset.plainsongBlockedSrc ??
-      image.dataset.plainsongOriginalSrc ??
-      "",
-  }));
-}
-
-export function applyResourceOutcomes(
-  root: ParentNode,
-  outcomes: readonly ExportResourceOutcome[],
-): void {
-  const byID = new Map(outcomes.map((outcome) => [outcome.resourceID, outcome]));
-  for (const [index, image] of Array.from(root.querySelectorAll("img")).entries()) {
-    const outcome = byID.get(`image-${index}`);
-    if (outcome?.action === "embed" && isAllowedDataImageSource(outcome.dataURI ?? "")) {
-      image.setAttribute("src", outcome.dataURI ?? "");
-      continue;
-    }
-    if (!outcome && isAllowedDataImageSource(image.getAttribute("src") ?? "")) continue;
-    image.replaceWith(placeholderElement(image, placeholderLabel(image, outcome?.reason)));
-  }
-}
-
-export function sanitizeStaticClone(
-  root: HTMLElement,
-  allowedFontDataURIs: ReadonlySet<string> = new Set(),
-): void {
-  root.querySelectorAll("script, iframe, object, embed, form, link[rel='stylesheet'], base").forEach((node) => {
-    node.remove();
-  });
-
-  for (const node of Array.from(root.querySelectorAll("*"))) {
-    for (const attribute of Array.from(node.attributes)) {
-      if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
-    }
-  }
-
-  for (const style of root.querySelectorAll("style")) {
-    style.textContent = sanitizeStyleText(style.textContent ?? "", allowedFontDataURIs);
-  }
-
-  for (const checkbox of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
-    checkbox.disabled = true;
-    checkbox.removeAttribute("data-task-checkbox");
-  }
-
-  enforceExportURLSinks(root, allowedFontDataURIs);
-
-  for (const image of Array.from(root.querySelectorAll("img"))) {
-    if (!isAllowedDataImageSource(image.getAttribute("src") ?? "")) {
-      image.replaceWith(placeholderElement(image, placeholderLabel(image, null)));
-    }
-  }
-}
-
 export function collectLoadedStyles(styleSheets: StyleSheetList | ArrayLike<CSSStyleSheet>): string {
   const parts: string[] = [];
   for (const sheet of Array.from(styleSheets)) {
@@ -155,6 +109,7 @@ export function buildStaticExportHTML(options: {
   styleText: string;
   title: string;
   allowedFontDataURIs?: ReadonlySet<string>;
+  maximumUTF8Bytes?: number;
 }): { html: string } | { failed: string } {
   const title = options.title.trim() || "Untitled";
   const html = [
@@ -173,16 +128,23 @@ export function buildStaticExportHTML(options: {
     "",
   ].join("\n");
 
-  if (new TextEncoder().encode(html).length > MAXIMUM_EXPORT_HTML_UTF8_BYTES) {
+  const limit = Math.min(options.maximumUTF8Bytes ?? MAXIMUM_EXPORT_HTML_UTF8_BYTES, MAXIMUM_EXPORT_HTML_UTF8_BYTES);
+  if (new TextEncoder().encode(html).length > limit) {
     return { failed: "html-too-large" };
   }
   return { html };
 }
 
-export async function waitForRetainedImages(root: ParentNode): Promise<void> {
-  await Promise.all(Array.from(root.querySelectorAll("img")).map((image) => (
-    decodeRetainedImage(image.getAttribute("src") ?? "")
-  )));
+/** Production decoder: WebKit must decode the exact data URI the static file embeds. */
+export async function decodeExportImageDataURI(dataURI: string): Promise<boolean> {
+  const image = new Image();
+  image.src = dataURI;
+  try {
+    await image.decode();
+  } catch {
+    return false;
+  }
+  return image.naturalWidth > 0 && image.naturalHeight > 0;
 }
 
 export async function handleExportHTML(
@@ -221,13 +183,10 @@ export async function handleExportHTML(
 }
 
 function discoverExportResources(payload: ExportHTMLPayload, host: ExportHTMLHost): void {
-  const inlineCSS = Array.from(host.previewRoot.querySelectorAll("style"))
-    .map((style) => style.textContent ?? "")
-    .join("\n");
+  const inlineCSS = Array.from(host.previewRoot.querySelectorAll("style"), (style) => style.textContent ?? "");
   const resources = [
     ...collectImageResources(host.previewRoot),
-    ...collectFontResources(host.bundledStyleText ?? ""),
-    ...collectFontResources(inlineCSS),
+    ...collectFontResources(host.bundledStyleText ?? "", ...inlineCSS),
   ];
   pendingExport = {
     exportID: payload.exportID,
@@ -248,36 +207,56 @@ async function finalizeExportHTML(
   host: ExportHTMLHost,
   fail: (reason: string) => void,
 ): Promise<void> {
-  if (!canFinalize(payload)) {
-    fail("invalid-finalization");
-    return;
-  }
   const session = pendingExport;
-  if (!session) {
+  if (!session || !canFinalize(payload, session)) {
     fail("invalid-finalization");
     return;
   }
   session.finalizing = true;
-  const clone = host.previewRoot.cloneNode(true) as HTMLElement;
-  const fonts = embedFontSources(await host.collectStyleText(), session.resources, payload.resourceOutcomes);
-  if (pendingExport !== session) {
+  const superseded = (): boolean => pendingExport !== session;
+
+  // Work in an inert document: nothing loads while the static clone is rewritten.
+  const inert = host.previewRoot.ownerDocument.implementation.createHTMLDocument("");
+  const clone = inert.importNode(host.previewRoot, true);
+  const images = Array.from(clone.querySelectorAll("img"));
+  if (!matchesDiscoveredImages(images, session.resources)) {
+    fail("resources-changed");
+    return;
+  }
+  const outcomes = resolveResourceOutcomes(session.resources, payload.resourceOutcomes);
+  const fonts = embedFontSources(await host.collectStyleText(), session.resources, outcomes);
+  if (superseded()) {
     fail("superseded");
     return;
   }
 
   const title = session.documentTitle?.trim() || firstHeadingText(clone);
   const frozenTheme = freezeExportTheme(host.documentTheme);
+  const limit = Math.min(host.maximumHTMLUTF8Bytes ?? MAXIMUM_EXPORT_HTML_UTF8_BYTES, MAXIMUM_EXPORT_HTML_UTF8_BYTES);
+  const build = (bodyHTML: string) => buildStaticExportHTML({
+    bodyHTML,
+    frozenTheme,
+    styleText: fonts.css,
+    title,
+    allowedFontDataURIs: fonts.allowedFontDataURIs,
+    maximumUTF8Bytes: limit,
+  });
+
+  const slots = detachExportImages(images, outcomes, fonts.allowedFontDataURIs);
+  sanitizeStaticClone(clone, fonts.allowedFontDataURIs);
+  await decodeImageCandidates(slots, host.decodeImage ?? acceptStrictDataURI);
+  if (superseded()) {
+    fail("superseded");
+    return;
+  }
+
+  // Measure the already-sanitized document so the budget and the final check agree.
   const budget = applySerializedImageBudget({
     clone,
-    outcomes: payload.resourceOutcomes,
+    slots,
+    limit,
     measure: (bodyHTML) => {
-      const built = buildStaticExportHTML({
-        bodyHTML,
-        frozenTheme,
-        styleText: fonts.css,
-        title,
-        allowedFontDataURIs: fonts.allowedFontDataURIs,
-      });
+      const built = build(bodyHTML);
       return "failed" in built ? null : new TextEncoder().encode(built.html).length;
     },
   });
@@ -286,34 +265,25 @@ async function finalizeExportHTML(
     return;
   }
 
-  host.previewRoot.innerHTML = clone.innerHTML;
   await host.waitForFonts();
-  if (pendingExport !== session || isExportBlocked(host.previewRoot)) {
-    fail(pendingExport !== session ? "superseded" : "became-unready");
+  if (superseded() || isExportBlocked(host.previewRoot)) {
+    fail(superseded() ? "superseded" : "became-unready");
     return;
   }
-  try {
-    await (host.waitForImages ?? assertImageSources)(clone);
-  } catch (error) {
-    if (error instanceof Error && error.message === "image-undecoded") {
-      fail("image-undecoded");
-      return;
-    }
-    throw error;
+  if (!everyRetainedImageDecoded(clone, slots)) {
+    fail("image-undecoded");
+    return;
   }
-
-  sanitizeStaticClone(clone, fonts.allowedFontDataURIs);
-  const built = buildStaticExportHTML({
-    bodyHTML: clone.innerHTML,
-    frozenTheme,
-    styleText: fonts.css,
-    title,
-    allowedFontDataURIs: fonts.allowedFontDataURIs,
-  });
+  const built = build(clone.innerHTML);
   if ("failed" in built) {
     fail(built.failed);
     return;
   }
+
+  // D2: the finalized live export DOM. No await follows, so nothing can supersede it.
+  const finalized = inert.createDocumentFragment();
+  while (clone.firstChild) finalized.appendChild(clone.firstChild);
+  host.previewRoot.replaceChildren(finalized);
   pendingExport = null;
   host.postResult({
     exportID: payload.exportID,
@@ -322,29 +292,15 @@ async function finalizeExportHTML(
   });
 }
 
-function canFinalize(payload: ExportHTMLPayload): boolean {
+function canFinalize(payload: ExportHTMLPayload, session: PendingExport): boolean {
   return payload.phase === "finalization" &&
-    pendingExport !== null &&
-    pendingExport.exportID === payload.exportID &&
-    pendingExport.renderID === payload.renderID &&
-    !pendingExport.finalizing;
+    session.exportID === payload.exportID &&
+    session.renderID === payload.renderID &&
+    !session.finalizing;
 }
 
-function assertImageSources(root: ParentNode): Promise<void> {
-  for (const image of Array.from(root.querySelectorAll("img"))) {
-    if (!isAllowedDataImageSource(image.getAttribute("src") ?? "")) {
-      return Promise.reject(new Error("image-undecoded"));
-    }
-  }
-  return Promise.resolve();
-}
-
-async function decodeRetainedImage(src: string): Promise<void> {
-  if (!isAllowedDataImageSource(src)) throw new Error("image-undecoded");
-  const image = new Image();
-  image.src = src;
-  if (typeof image.decode === "function") await image.decode();
-  if ((image.naturalWidth ?? 0) <= 0) throw new Error("image-undecoded");
+async function acceptStrictDataURI(dataURI: string): Promise<boolean> {
+  return isStrictImageDataURI(dataURI);
 }
 
 function firstHeadingText(root: ParentNode): string {

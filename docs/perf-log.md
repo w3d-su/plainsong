@@ -1226,3 +1226,25 @@ same resolver interval at 0.061 s, with host RSS 101.2 MB before and 221.6 MB af
 because earlier tests had already allocated. No export wall-clock budget is frozen.
 Typing latency is unchanged because export runs only from `PreviewController.exportHTML`,
 off the editor keystroke path. E9's broader Debug/Release matrix remains open.
+
+## Export PR D review fixes — 2026-09-29
+
+Debug `swift test --package-path Packages/PreviewKit` on this worktree. Resolver
+acceptance now requires an ImageIO thumbnail decode (at most 16 px) in addition to the
+type sniff, and a repeated reference reuses the first decision instead of re-reading
+the file.
+
+| Measurement | Value |
+|---|---|
+| 32 MiB cap fixture, `ExportResourceResolver.resolve` only, isolated filter | 0.061 s |
+| Host RSS before / after both resolves (same run) | 67,059,712 / 178,700,288 bytes (67.1 / 178.7 MB) |
+| Same interval inside the locked `ExportHTML\|ExportResourceResolver` filter | 0.053 s (RSS 141.7 → 221.8 MB after earlier tests) |
+| Encoded finalization payload, 100 references to one 1 MiB PNG, PR head (v7) | 139,820,261 bytes |
+| Same payload after protocol v8 `dataURIFrom` | below the asserted 1,423,726-byte bound (one 1,398,126-byte data URI plus at most 256 bytes per reference) |
+
+The decode proof did not measurably change the cap-fixture interval (0.054 s recorded on
+2026-09-28). The payload rows come from
+`ExportResourceResolverReviewTests.testHundredReferencesToOneImageSerializeItsDataURIOnce`
+run against the PR head sources and then against this change. No export wall-clock
+budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
+editor keystroke path.

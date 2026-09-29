@@ -133,6 +133,25 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         await assertFailure(task.value, reason: "invalid-export-phase")
     }
 
+    func testDuplicateDiscoveredResourceIDsFailBeforeResolution() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let renderID = try await support.render(controller, text: "# IDs", fileKind: .markdown, version: 1)
+        controller.exportTimeoutNanoseconds = 2_000_000_000
+        try await suspendExports(controller)
+        let task = Task { await controller.exportHTML(matchingRenderID: renderID) }
+        try await support.waitUntil("pending") { controller.pendingHTMLExport != nil }
+        let pending = try XCTUnwrap(controller.pendingHTMLExport)
+        let duplicate = ExportResourceDescriptor(resourceID: "font-0", kind: .font, src: "fonts/A.woff2")
+        controller.handleExportHTMLResult(.init(
+            exportID: pending.exportID,
+            renderID: renderID,
+            state: .resourcesNeeded(resources: [duplicate, duplicate])
+        ))
+        await assertFailure(task.value, reason: "invalid-export-resources")
+        XCTAssertNil(controller.pendingHTMLExport)
+    }
+
     private func assertTerminal(
         reason: String,
         timeout: UInt64 = 15_000_000_000,

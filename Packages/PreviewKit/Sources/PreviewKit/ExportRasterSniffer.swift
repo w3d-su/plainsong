@@ -6,25 +6,50 @@ import UniformTypeIdentifiers
 enum ExportRasterSniffer {
     static let maximumRasterBytes = MarkdownImageAssetPolicy.maximumFileSizeBytes
 
-    static func mimeType(of data: Data) -> String? {
+    /// Returns an allowlisted raster MIME type only after ImageIO actually decodes the
+    /// first frame. `CGImageSourceGetType` alone reads the signature, so a header-only or
+    /// corrupt-body PNG would pass it. A small thumbnail forces the full decode while
+    /// bounding the decoded bitmap, which a full-size image would not.
+    static func decodedMIMEType(of data: Data) -> String? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
-              let identifier = CGImageSourceGetType(source) as String?
+              let identifier = CGImageSourceGetType(source) as String?,
+              let mimeType = allowlistedMIMEType(identifier),
+              CGImageSourceGetStatus(source) == .statusComplete,
+              CGImageSourceGetCount(source) > 0,
+              CGImageSourceGetStatusAtIndex(source, 0) == .statusComplete
         else {
             return nil
         }
+        let decodeOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: decodeProofMaximumPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceShouldCache: false,
+        ] as CFDictionary
+        guard let decoded = CGImageSourceCreateThumbnailAtIndex(source, 0, decodeOptions),
+              decoded.width > 0,
+              decoded.height > 0
+        else {
+            return nil
+        }
+        return mimeType
+    }
 
+    private static let decodeProofMaximumPixelSize = 16
+
+    private static func allowlistedMIMEType(_ identifier: String) -> String? {
         switch identifier {
         case UTType.png.identifier:
-            return "image/png"
+            "image/png"
         case UTType.jpeg.identifier:
-            return "image/jpeg"
+            "image/jpeg"
         case UTType.gif.identifier:
-            return "image/gif"
+            "image/gif"
         case UTType.webP.identifier:
-            return "image/webp"
+            "image/webp"
         default:
-            return nil
+            nil
         }
     }
 }
@@ -56,7 +81,7 @@ enum ExportRasterDataURI {
             return nil
         }
         guard data.count <= ExportRasterSniffer.maximumRasterBytes,
-              ExportRasterSniffer.mimeType(of: data) == mimeType
+              ExportRasterSniffer.decodedMIMEType(of: data) == mimeType
         else {
             return nil
         }

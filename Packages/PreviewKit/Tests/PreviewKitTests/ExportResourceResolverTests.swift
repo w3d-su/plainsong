@@ -119,8 +119,11 @@ final class ExportResourceResolverTests: XCTestCase {
         )
 
         XCTAssertEqual(outcomes.map(\.action), [.embed, .embed, .embed, .embed, .omit])
-        XCTAssertEqual(outcomes[0].dataURI, outcomes[1].dataURI)
+        XCTAssertNotNil(outcomes[0].dataURI)
+        XCTAssertNil(outcomes[1].dataURI)
+        XCTAssertEqual(outcomes[1].dataURIFrom, "shared-a")
         XCTAssertEqual(outcomes[2].action, .embed)
+        XCTAssertNil(outcomes[2].dataURIFrom, "Equal bytes at another path are a distinct asset")
         XCTAssertEqual(outcomes[4].reason, ExportResourceResolver.exportImageSizeLimitReason)
     }
 
@@ -185,8 +188,9 @@ final class ExportResourceResolverTests: XCTestCase {
 
         XCTAssertEqual(outcomes[0].action, .embed)
         XCTAssertEqual(outcomes[1].action, .embed)
-        XCTAssertEqual(outcomes[0].dataURI, outcomes[1].dataURI)
         XCTAssertEqual(outcomes[0].dataURI, uri)
+        XCTAssertNil(outcomes[1].dataURI)
+        XCTAssertEqual(outcomes[1].dataURIFrom, "png")
         XCTAssertEqual(outcomes[2].action, .omit)
         XCTAssertEqual(outcomes[3].action, .omit)
         XCTAssertEqual(outcomes[4].reason, "malformed-data")

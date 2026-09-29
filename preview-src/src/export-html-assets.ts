@@ -1,27 +1,64 @@
-import type { ExportResourceDescriptor, ExportResourceOutcome } from "./bridge";
-import { isAllowedDataImageSource } from "./image-policy";
+import type { ExportResourceDescriptor } from "./bridge";
+import { rewriteCSSURLs, sanitizeCSSURLs } from "./export-css-urls";
+import { EXPORT_IMAGE_PLACEHOLDER_LABEL } from "./export-html-limits";
 import {
-  EXPORT_IMAGE_PLACEHOLDER_LABEL,
-  MAXIMUM_EXPORT_HTML_UTF8_BYTES,
-} from "./export-html-limits";
+  isStrictFontDataURI,
+  isStrictImageDataURI,
+  type ResolvedResourceOutcome,
+} from "./export-html-outcomes";
 
 export const EXPORT_IMAGE_SIZE_LIMIT_REASON = "Export image size limit";
 
-const urlPattern = /url\(\s*(['"]?)([^'")]+)\1\s*\)/giu;
 const generatedSVGSelector = ".katex, .mermaid-rendered";
+const svgNamespace = "http://www.w3.org/2000/svg";
+const removedURLAttributes = new Set([
+  "action",
+  "archive",
+  "background",
+  "cite",
+  "codebase",
+  "dynsrc",
+  "formaction",
+  "icon",
+  "longdesc",
+  "lowsrc",
+  "manifest",
+  "ping",
+  "poster",
+  "srcset",
+  "usemap",
+  "xml:base",
+]);
+// SVG presentation attributes parse as CSS values, so url() in them is a CSS URL sink.
+const cssValuedSVGAttributes = new Set([
+  "clip-path",
+  "cursor",
+  "fill",
+  "filter",
+  "marker-end",
+  "marker-mid",
+  "marker-start",
+  "mask",
+  "stroke",
+]);
 
 export function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).length;
 }
 
-export function collectFontResources(css: string): ExportResourceDescriptor[] {
+/** Numbers font descriptors once across every CSS source so resource IDs never collide. */
+export function collectFontResources(...cssTexts: string[]): ExportResourceDescriptor[] {
   const seen = new Set<string>();
   const resources: ExportResourceDescriptor[] = [];
-  for (const match of css.matchAll(urlPattern)) {
-    const src = match[2]?.trim() ?? "";
-    if (!src || src.startsWith("#") || /^data:/iu.test(src) || seen.has(src)) continue;
-    seen.add(src);
-    resources.push({ resourceID: `font-${resources.length}`, kind: "font", src });
+  for (const css of cssTexts) {
+    rewriteCSSURLs(css, (value, raw) => {
+      const src = value?.trim() ?? "";
+      if (src && !src.startsWith("#") && !/^data:/iu.test(src) && !seen.has(src)) {
+        seen.add(src);
+        resources.push({ resourceID: `font-${resources.length}`, kind: "font", src });
+      }
+      return raw;
+    });
   }
   return resources;
 }
@@ -29,34 +66,58 @@ export function collectFontResources(css: string): ExportResourceDescriptor[] {
 export function embedFontSources(
   css: string,
   descriptors: readonly ExportResourceDescriptor[],
-  outcomes: readonly ExportResourceOutcome[],
+  outcomes: ReadonlyMap<string, ResolvedResourceOutcome>,
 ): { css: string; allowedFontDataURIs: Set<string> } {
-  const byID = new Map(outcomes.map((outcome) => [outcome.resourceID, outcome]));
   const embedded = new Map<string, string>();
   for (const descriptor of descriptors) {
     if (descriptor.kind !== "font") continue;
-    const outcome = byID.get(descriptor.resourceID);
-    if (outcome?.action === "embed" && outcome.dataURI) {
-      embedded.set(descriptor.src.trim(), outcome.dataURI);
+    const outcome = outcomes.get(descriptor.resourceID);
+    if (outcome?.kind === "font" && outcome.dataURI && isStrictFontDataURI(outcome.dataURI)) {
+      embedded.set(descriptor.src, outcome.dataURI);
     }
   }
-  const allowedFontDataURIs = new Set(embedded.values());
-  const rewritten = css.replace(urlPattern, (match, _quote: string, value: string) => {
-    const dataURI = embedded.get(value.trim());
-    return dataURI ? `url("${dataURI}")` : match;
+  const rewritten = rewriteCSSURLs(css, (value, raw) => {
+    const dataURI = value === null ? undefined : embedded.get(value.trim());
+    return dataURI ? `url("${dataURI}")` : raw;
   });
-  return { css: rewritten, allowedFontDataURIs };
+  return { css: rewritten, allowedFontDataURIs: new Set(embedded.values()) };
 }
 
 export function sanitizeStyleText(css: string, allowedFontDataURIs: ReadonlySet<string>): string {
-  return css
-    .replace(/</gu, "\\3c ")
-    .replace(urlPattern, (match, _quote: string, value: string) => {
-      const trimmed = value.trim();
-      if (trimmed.startsWith("#")) return match;
-      if (allowedFontDataURIs.has(trimmed) && /^data:font\//iu.test(trimmed)) return match;
-      return "url()";
-    });
+  // A style element is HTML raw text: CSS strings do not protect closing tags.
+  return sanitizeCSSURLs(css, allowedFontDataURIs).replace(/</gu, "\\3c ");
+}
+
+export function sanitizeStaticClone(
+  root: HTMLElement,
+  allowedFontDataURIs: ReadonlySet<string> = new Set(),
+): void {
+  root.querySelectorAll("script, iframe, frame, object, embed, applet, form, link, meta, base").forEach((node) => {
+    node.remove();
+  });
+
+  for (const node of Array.from(root.querySelectorAll("*"))) {
+    for (const attribute of Array.from(node.attributes)) {
+      if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
+    }
+  }
+
+  for (const style of root.querySelectorAll("style")) {
+    style.textContent = sanitizeStyleText(style.textContent ?? "", allowedFontDataURIs);
+  }
+
+  for (const checkbox of root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+    checkbox.disabled = true;
+    checkbox.removeAttribute("data-task-checkbox");
+  }
+
+  enforceExportURLSinks(root, allowedFontDataURIs);
+
+  for (const image of Array.from(root.querySelectorAll("img"))) {
+    if (!isStrictImageDataURI(image.getAttribute("src") ?? "")) {
+      image.replaceWith(placeholderElement(image, placeholderLabel(image, null)));
+    }
+  }
 }
 
 export function enforceExportURLSinks(
@@ -68,62 +129,11 @@ export function enforceExportURLSinks(
   }
 
   for (const node of Array.from(root.querySelectorAll("*"))) {
-    if (node instanceof HTMLElement && node.hasAttribute("style")) {
+    if (node.hasAttribute("style")) {
       node.setAttribute("style", sanitizeStyleText(node.getAttribute("style") ?? "", allowedFontDataURIs));
     }
-    sanitizeURLAttributes(node);
+    sanitizeURLAttributes(node, allowedFontDataURIs);
   }
-}
-
-export function imageOutcomeReason(
-  outcomes: readonly ExportResourceOutcome[],
-  resourceID: string,
-): string | null {
-  return outcomes.find((outcome) => outcome.resourceID === resourceID)?.reason ?? null;
-}
-
-export interface SerializedImageBudget {
-  status: "ok" | "base-too-large";
-  byteLength: number;
-}
-
-export function applySerializedImageBudget(options: {
-  clone: HTMLElement;
-  outcomes: readonly ExportResourceOutcome[];
-  measure: (bodyHTML: string) => number | null;
-  limit?: number;
-}): SerializedImageBudget {
-  const limit = options.limit ?? MAXIMUM_EXPORT_HTML_UTF8_BYTES;
-  const images = Array.from(options.clone.querySelectorAll("img"));
-  const slots = images.map((image, index) => {
-    const outcome = options.outcomes.find((candidate) => candidate.resourceID === `image-${index}`);
-    const placeholder = placeholderElement(image, placeholderLabel(image, outcome?.reason));
-    image.replaceWith(placeholder);
-    return { image, outcome, placeholder };
-  });
-
-  const baseLength = options.measure(options.clone.innerHTML);
-  if (baseLength === null || baseLength > limit) {
-    return { status: "base-too-large", byteLength: baseLength ?? Number.POSITIVE_INFINITY };
-  }
-
-  let used = baseLength;
-  for (const slot of slots) {
-    const embedded = slot.outcome?.action === "embed" ? slot.outcome.dataURI ?? "" : "";
-    const original = slot.image.getAttribute("src") ?? "";
-    const kept = embedded || (!slot.outcome && isAllowedDataImageSource(original) ? original : "");
-    if (!isAllowedDataImageSource(kept)) continue;
-    slot.image.setAttribute("src", kept);
-    const delta = utf8ByteLength(slot.image.outerHTML) - utf8ByteLength(slot.placeholder.outerHTML);
-    if (used + delta > limit) {
-      slot.placeholder.replaceWith(placeholderElement(slot.image, EXPORT_IMAGE_SIZE_LIMIT_REASON));
-      continue;
-    }
-    slot.placeholder.replaceWith(slot.image);
-    used += delta;
-  }
-
-  return { status: "ok", byteLength: used };
 }
 
 export function placeholderLabel(image: HTMLImageElement, reason?: string | null): string {
@@ -131,8 +141,8 @@ export function placeholderLabel(image: HTMLImageElement, reason?: string | null
   return image.getAttribute("alt")?.trim() || EXPORT_IMAGE_PLACEHOLDER_LABEL;
 }
 
-export function placeholderElement(image: HTMLImageElement, label: string): HTMLSpanElement {
-  const placeholder = image.ownerDocument.createElement("span");
+export function placeholderElement(owner: Element, label: string): HTMLSpanElement {
+  const placeholder = owner.ownerDocument.createElement("span");
   placeholder.className = "export-image-placeholder";
   placeholder.setAttribute("role", "img");
   placeholder.setAttribute("aria-label", label);
@@ -140,12 +150,17 @@ export function placeholderElement(image: HTMLImageElement, label: string): HTML
   return placeholder;
 }
 
-function sanitizeURLAttributes(node: Element): void {
+function sanitizeURLAttributes(node: Element, allowedFontDataURIs: ReadonlySet<string>): void {
+  const isSVG = node.namespaceURI === svgNamespace;
   for (const attribute of Array.from(node.attributes)) {
     const name = attribute.name.toLowerCase();
-    if (name === "srcset" || name === "poster" || name === "action" || name === "formaction" ||
-      name === "cite" || name === "background" || (name === "data" && node.tagName === "OBJECT")) {
+    if (removedURLAttributes.has(name) || (name === "data" && node.tagName === "OBJECT")) {
       node.removeAttribute(attribute.name);
+      continue;
+    }
+    if (isSVG && cssValuedSVGAttributes.has(name)) {
+      const sanitized = sanitizeCSSURLs(attribute.value, allowedFontDataURIs);
+      if (sanitized !== attribute.value) node.setAttribute(attribute.name, sanitized);
       continue;
     }
     if (name !== "href" && name !== "xlink:href" && name !== "src") continue;
@@ -155,7 +170,7 @@ function sanitizeURLAttributes(node: Element): void {
 
 function isRetainedURL(node: Element, name: string, value: string): boolean {
   const trimmed = value.trim();
-  if (node.tagName === "IMG" && name === "src") return isAllowedDataImageSource(trimmed);
+  if (node.tagName === "IMG" && name === "src") return isStrictImageDataURI(trimmed);
   if (node.closest("svg") && (name === "href" || name === "xlink:href")) {
     return trimmed.startsWith("#") && !trimmed.startsWith("#//") && !trimmed.includes("\\");
   }

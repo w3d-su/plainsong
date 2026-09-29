@@ -3,8 +3,8 @@
 > **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
 > 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
 > PR C landed the static-document skeleton. PR D closes E2–E3 and the HTML portion of
-> E4; E1 stays partial, and E5–E9 remain open. The bridge payload is unchanged, so
-> `PROTOCOL_VERSION` stays 7.** Precedent:
+> E4; E1 stays partial, and E5–E9 remain open. PR D's review fixes add an optional
+> `dataURIFrom` reference to resource outcomes, so `PROTOCOL_VERSION` is 8.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -552,7 +552,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 ### E2 — Protocol-v6 export contract
 
 - [x] Swift and TypeScript list the same 10 ordered message names, including correlated
-  `exportHTML` / `exportHTMLResult`, with `PROTOCOL_VERSION == 7`.
+  `exportHTML` / `exportHTMLResult`, with `PROTOCOL_VERSION == 8`.
 - [x] Discovery/finalization rounds, request/result IDs, and completed `renderID` are
   validated; stale, duplicate, out-of-order, malformed, and failure results cannot
   succeed.
@@ -565,14 +565,23 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   typed protocol.
 - Ordered-name/version evidence: `preview-src/test/protocol.test.ts` and
   `PreviewKitTests.testBridgeProtocolVersionAndMessageOrder` pin the ten ordered names
-  and version 7 (PR D does not change the Codable payload, so the version stays 7).
-  `ExportHTMLProtocolTests` covers the mirrored title payload;
+  and version 8. PR D's review fixes bumped 7 → 8 because a repeated accepted image's
+  outcome now names the first outcome through `dataURIFrom` instead of repeating its
+  data URI (`ExportHTMLProtocolTests.testRepeatedEmbedOutcomeReferencesTheFirstDataURIRoundTrip`;
+  JavaScript rejects forward, dangling, chained, or doubly specified references in
+  `export-html-hardening.test.ts`). `ExportHTMLProtocolTests` covers the mirrored title payload;
   `ExportHTMLBridgeDecodingTests` checks direct dictionary decoding against Codable,
   malformed rejection, and a multi-MB receipt. Early ready, duplicate discovery,
-  and superseded results stay fenced. PR D readiness evidence is
+  and superseded results stay fenced; duplicate discovered resource IDs fail before
+  resolution (`ExportHTMLLifecycleTests.testDuplicateDiscoveredResourceIDsFailBeforeResolution`),
+  and finalization fails with `resources-changed` if the image DOM no longer matches
+  discovery (`export-html-hardening.test.ts`). PR D readiness evidence is
   `export-html.test.ts` (finalization-before-ready and MDX stale/error),
   `export-html-review.test.ts` (fonts and style collection must settle), and
   `export-html-assets.test.ts` (`does not emit ready before image decode resolves`).
+  An image WebKit cannot decode becomes its placeholder and export continues; `ready`
+  still requires every retained image to be a decoded candidate
+  (`export-html-hardening.test.ts`, finding 4 cases).
   The static document is built by `buildStaticExportHTML`; production export does not
   read `document.documentElement.outerHTML`. The regenerated preview bundle is in this
   commit. E2 is closed.
@@ -594,14 +603,20 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   precedence, a non-leading H2, MDX component-card headings before the document heading,
   CSS closing-tag injection, exception-to-failure results, inline raster preservation,
   shared image MIME policy, and superseded discovery without export resource attributes.
-  Finalization now writes the resolved image or placeholder into the offscreen export DOM.
+  Only a successful finalization writes the finalized static nodes into the dedicated
+  offscreen export DOM, synchronously before `ready`; failed or superseded exports leave
+  it untouched (`export-html-hardening.test.ts`, finding 8 case).
   `ExportHTMLHostedTests.testSuccessfulMarkdownExportIsAStaticDocument` requires
   `--preview-bg`, defined in the bundled CSS, instead of accepting the root element.
   WebKit refuses CSSOM reads of linked file-origin stylesheets; `build.mjs` supplies
   the exact same CSS input as `bundle.css`, while readable renderer-injected styles
   still come from CSSOM. No export-time fetch occurs. Inline raster preservation here
   now goes through Swift normalization. PR D evidence: `export-html-assets.test.ts`
-  pins the exact CSP and URL/SVG sinks; `ExportHTMLHostedTests` covers the static
+  pins the exact CSP and URL/SVG sinks. The review fixes replace the CSS `url()` regular
+  expression with a CSS-syntax scanner: `export-html-hardening.test.ts` drops `@import`
+  (including escaped `@\69mport`), neutralizes `image-set()`, escaped `u\72l(`, and
+  url values containing `)` or quotes, fails closed on unterminated url(), and sanitizes
+  generated-SVG `style` and presentation attributes. `ExportHTMLHostedTests` covers the static
   document, disabled checkboxes, MDX placeholders, and MDX failure;
   `export-html.test.ts` freezes dark styling; `ExportHTMLOfflineTests` resolves `system`
   to light or dark. The full `Fixtures/kitchen-sink.md` matrix stays open for E8, so
@@ -631,8 +646,13 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   Print preparation, even when the live-preview remote-image preference is enabled.
 - Evidence: `ExportResourceResolverTests` (10 MiB PNG boundary, JPEG/GIF/WebP MIME,
   32 MiB distinct bytes, repeated references, traversal/symlink/SVG/remote/data-URI
-  rejection, manifest woff2), `export-html-assets.test.ts` (exact 64 MiB HTML,
-  per-image serialized cap, URL sinks, user SVG removal), and
+  rejection, manifest woff2), `ExportResourceResolverReviewTests` (100 references to one
+  image carry its data URI once across the bridge; header-only and corrupt PNG/JPEG
+  that still type-sniff are omitted because acceptance now requires an ImageIO decode),
+  `export-html-assets.test.ts` (exact 64 MiB HTML, per-image serialized cap measured
+  on the sanitized document, URL sinks, user SVG removal), `export-html-hardening.test.ts`
+  (an image without a validated outcome fails closed to its placeholder, font IDs never
+  collide, and the budget agrees with the final length check), and
   `ExportHTMLOfflineTests.testOfflineReopenRendersEmbeddedResourcesWithoutNetwork`
   (custom-scheme reopen; image, KaTeX, highlight, and Mermaid render; one document
   request). The zero-HTTP interceptor across PDF and Print stays with PR G, so E4

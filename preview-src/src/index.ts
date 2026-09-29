@@ -19,9 +19,9 @@ import {
 } from "./bridge";
 import {
   collectPreviewStyleText,
+  decodeExportImageDataURI,
   handleExportHTML,
   resetExportHTMLSession,
-  waitForRetainedImages,
 } from "./export-html";
 import { rewriteImageSources } from "./image-rewrite";
 import { scrollPreviewAnchor } from "./heading-anchors";
@@ -157,7 +157,7 @@ async function receive(message: BridgeMessage): Promise<void> {
             await document.fonts.ready;
           }
         },
-        waitForImages: waitForRetainedImages,
+        decodeImage: decodeExportImageDataURI,
         postResult: (payload) => {
           postBridgeMessage({ name: "exportHTMLResult", payload });
         },

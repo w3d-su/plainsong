@@ -25,9 +25,15 @@ enum ExportResourceResolver {
         }
     }
 
+    /// Distinct accepted rasters, keyed by resolved file path or normalized data URI.
     private struct RasterBudget {
-        var dataURIsByIdentity: [String: String] = [:]
+        var decisionsByIdentity: [String: ImageDecision] = [:]
         var totalBytes: Int64 = 0
+    }
+
+    private enum ImageDecision {
+        case accepted(firstResourceID: String)
+        case omitted(reason: String)
     }
 
     private static func resolveFont(
@@ -79,6 +85,9 @@ enum ExportResourceResolver {
         guard let normalized = ExportRasterDataURI.normalized(from: source) else {
             return ExportResourceOutcome.omit(resource, reason: "malformed-data")
         }
+        if let repeated = repeatedOutcome(resource, identity: normalized.uri, state: state) {
+            return repeated
+        }
         return accept(
             resource,
             identity: normalized.uri,
@@ -99,14 +108,20 @@ enum ExportResourceResolver {
         }
         do {
             let fileURL = try AssetURLResolver(allowedRoot: assetRoot).resolve(url)
+            let identity = fileURL.path(percentEncoded: false)
+            // A repeated reference reuses the first decision instead of re-reading the file.
+            if let repeated = repeatedOutcome(resource, identity: identity, state: state) {
+                return repeated
+            }
             let asset = try AssetURLPolicy.loadAsset(at: fileURL)
-            guard ExportRasterSniffer.mimeType(of: asset.data) == asset.mimeType else {
+            guard ExportRasterSniffer.decodedMIMEType(of: asset.data) == asset.mimeType else {
+                state.decisionsByIdentity[identity] = .omitted(reason: "unsupported")
                 return ExportResourceOutcome.omit(resource, reason: "unsupported")
             }
             let dataURI = "data:\(asset.mimeType);base64,\(asset.data.base64EncodedString())"
             return accept(
                 resource,
-                identity: fileURL.path(percentEncoded: false),
+                identity: identity,
                 byteCount: Int64(asset.data.count),
                 dataURI: dataURI,
                 state: &state
@@ -120,6 +135,27 @@ enum ExportResourceResolver {
         }
     }
 
+    private static func repeatedOutcome(
+        _ resource: ExportResourceDescriptor,
+        identity: String,
+        state: RasterBudget
+    ) -> ExportResourceOutcome? {
+        switch state.decisionsByIdentity[identity] {
+        case let .accepted(firstResourceID):
+            // Protocol v8: name the first outcome instead of re-sending its data URI (R19).
+            ExportResourceOutcome(
+                resourceID: resource.resourceID,
+                kind: .image,
+                action: .embed,
+                dataURIFrom: firstResourceID
+            )
+        case let .omitted(reason):
+            ExportResourceOutcome.omit(resource, reason: reason)
+        case nil:
+            nil
+        }
+    }
+
     private static func accept(
         _ resource: ExportResourceDescriptor,
         identity: String,
@@ -127,21 +163,21 @@ enum ExportResourceResolver {
         dataURI: String,
         state: inout RasterBudget
     ) -> ExportResourceOutcome {
-        if state.dataURIsByIdentity[identity] == nil {
-            let nextTotal = state.totalBytes.addingReportingOverflow(byteCount)
-            guard !nextTotal.overflow,
-                  nextTotal.partialValue <= maximumDistinctDecodedRasterBytes
-            else {
-                return ExportResourceOutcome.omit(resource, reason: exportImageSizeLimitReason)
-            }
-            state.totalBytes = nextTotal.partialValue
-            state.dataURIsByIdentity[identity] = dataURI
+        let nextTotal = state.totalBytes.addingReportingOverflow(byteCount)
+        guard !nextTotal.overflow,
+              nextTotal.partialValue <= maximumDistinctDecodedRasterBytes
+        else {
+            // The total only grows, so a repeated reference can never fit later either.
+            state.decisionsByIdentity[identity] = .omitted(reason: exportImageSizeLimitReason)
+            return ExportResourceOutcome.omit(resource, reason: exportImageSizeLimitReason)
         }
+        state.totalBytes = nextTotal.partialValue
+        state.decisionsByIdentity[identity] = .accepted(firstResourceID: resource.resourceID)
         return ExportResourceOutcome(
             resourceID: resource.resourceID,
             kind: .image,
             action: .embed,
-            dataURI: state.dataURIsByIdentity[identity]
+            dataURI: dataURI
         )
     }
 }
