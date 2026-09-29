@@ -10,6 +10,11 @@ import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { rehypeHeadingAnchors } from "./heading-anchors";
 import {
+  katexRenderOptions,
+  rehypeMathBlocks,
+  rehypeMathDiagnostics,
+} from "./math";
+import {
   mdxSanitizeSchema,
   remarkMdxPlaceholders,
   type TreeNode,
@@ -83,7 +88,11 @@ const markdownProcessor = unified()
   .use(remarkMath)
   .use(remarkRehype)
   .use(rehypeHeadingAnchors)
-  .use(rehypeKatex)
+  // Wrap display math before KaTeX consumes the positioned pre/code nodes;
+  // diagnostics append after KaTeX so VFile messages exist.
+  .use(rehypeMathBlocks)
+  .use(rehypeKatex, katexRenderOptions)
+  .use(rehypeMathDiagnostics)
   .use(rehypeSourceLines)
   .use(rehypeStringify);
 
@@ -101,7 +110,9 @@ const mdxProcessor = unified()
   .use(rehypeSanitize, mdxSanitizeSchema)
   .use(rehypeHeadingAnchors)
   // Sanitize user content before trusted KaTeX adds layout styles and generated SVG.
-  .use(rehypeKatex)
+  .use(rehypeMathBlocks)
+  .use(rehypeKatex, katexRenderOptions)
+  .use(rehypeMathDiagnostics)
   .use(rehypeSourceLines)
   .use(rehypeStringify);
 
