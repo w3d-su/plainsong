@@ -829,7 +829,7 @@ Setup (once):
    `~/plainsong-export-smoke/post.md` containing `# Powerbox smoke` and one paragraph.
 5. Record the macOS version (`sw_vers -productVersion`) and whether Desktop & Documents sync to
    iCloud (System Settings › Apple Account › iCloud › iCloud Drive).
-   - macOS version / iCloud Desktop & Documents:
+   - macOS version / iCloud Desktop & Documents: macOS 27.0 (26A428); `~/Library/Mobile Documents/com~apple~CloudDocs/{Desktop,Documents}` exist, sync state not confirmed.
 
 After each case run `ls -la <destination folder> | grep plainsong-`. Expected: no leftover
 `.plainsong-*` or `.plainsong-cleanup-*` entry. After a successful case the editor text, the
@@ -841,18 +841,18 @@ dirty indicator, the window title, the sidebar selection and File › Open Recen
   3. Go to `~/plainsong-export-smoke/exports`, keep `post.html`, click **Export**.
   4. Expected: alert **Exported as HTML** — "Wrote /Users/…/plainsong-export-smoke/exports/post.html."
      The file opens in Safari with the rendered heading and no leftover `.plainsong-*` entry.
-  - Result:
+  - Result: **Owner run 2026-09-29 (build `7edc45d`, sandboxed Debug):** PASS — alert **Exported as HTML**; `exports/post.html` written (377,755 bytes, mode `0600`); no `.plainsong-*` leftover.
 - **(b) `~/Desktop`, outside any workspace.**
   1. Keep the workspace from (a) open, with `post.md` selected.
   2. File › Export as HTML…, choose **Desktop**, name it `plainsong-smoke-b.html`, click **Export**.
   3. Expected: **Exported as HTML** — "Wrote /Users/…/Desktop/plainsong-smoke-b.html." with no
      leftover `.plainsong-*` entry on the Desktop. On failure, record the alert text and apply
      the decision rule.
-  - Result:
+  - Result: **Owner run 2026-09-29:** FAIL — alert **Could Not Export as HTML**: "The destination was refused: ExportArtifactFailure.parentAuthorityUnavailable. Nothing was written." No file on the Desktop. **Design stop** per the decision rule.
 - **(c) `~/Documents`.**
   1. As (b), but choose **Documents** and name it `plainsong-smoke-c.html`.
   2. Expected: as (b), at `/Users/…/Documents/plainsong-smoke-c.html`.
-  - Result:
+  - Result: **Owner run 2026-09-29:** FAIL — same alert and reason as (b). No file in `~/Documents`. **Design stop.**
 - **(d) Overwrite an existing `.html`, confirmed in the panel.**
   1. In Terminal: `printf '<p>old</p>' > ~/Desktop/plainsong-smoke-d.html`.
   2. Change the heading in `post.md` to `# Overwrite smoke` and press ⌘S.
@@ -881,6 +881,8 @@ dirty indicator, the window title, the sidebar selection and File › Open Recen
      `.plainsong-*` entry. A local image would become an alt-text placeholder here (the M2
      single-file limitation); that is not a failure.
   - Result:
+
+**Outcome (2026-09-29): design stop.** (a) passed; (b) and (c) failed at destination inspection with `parentAuthorityUnavailable`: a leaf-only `NSSavePanel` grant does not let the writer open the chosen parent folder, so no anchored parent descriptor or sibling staging file is possible outside folders the app already holds. (d)–(f) were not run: (d) and (f) target the Desktop and hit the same parent refusal, and (e) cannot change the conclusion. The leaf-grant bullet stays open. Next: a docs PR amending D5 with a `docs/decision-log.md` row, before any further PR F code.
 
 Also record any unexpected permission prompt, then delete the `plainsong-smoke-*` files and
 `~/plainsong-export-smoke`.
