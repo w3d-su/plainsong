@@ -6,7 +6,13 @@
 > E4; E1 stays partial. PR E lands the headless one-shot WorkspaceKit artifact writer
 > (writer-level E6 bullets except the sibling bullet, and the E9 dependency bullet).
 > The rest of E5–E9 remains open. PR D's review fixes add an optional `dataURIFrom`
-> reference to resource outcomes, so `PROTOCOL_VERSION` is 8.** Precedent:
+> reference to resource outcomes, so `PROTOCOL_VERSION` is 8.
+> D5 amended 2026-09-29: PR F Phase A's owner smoke proved that a leaf-only save-panel
+> grant cannot open the chosen folder (`parentAuthorityUnavailable` on `~/Desktop` and
+> `~/Documents`). Staging moves to a same-device item-replacement directory with
+> exact-leaf publication, proven by an owner-run DEBUG probe. The E6 mechanism bullets
+> proven against the retired parent-anchored writer are reopened for PR E2, and PR F
+> waits for E2.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -55,7 +61,7 @@ work.
 | **D2** | Typed protocol-v6 export request/result; no undocumented `evaluateJavaScript` read of `outerHTML`. | No separate product sign-off; this follows `agent.md` §17.5. |
 | **D3** | One self-contained HTML file with bounded raster `data:` URIs and deterministic omission placeholders. | **Required.** |
 | **D4** | Both silent **Export as PDF…** and panel-based **Print…**, using different WebKit APIs. | **Required.** |
-| **D5** | One-shot `NSSavePanel` destination, deliberately outside the retained workspace-file write path. | **Required.** |
+| **D5** | One-shot `NSSavePanel` destination, deliberately outside the retained workspace-file write path. Staging and publication mechanism amended 2026-09-29: same-device item-replacement staging plus exact-leaf publication. | **Required.** The amendment needs owner approval of its docs PR. |
 
 **Owner sign-off 2026-08-13:** D3, D4, and D5 are accepted as specified. D4’s v1 page
 model is the E0-recorded fixed-height pagination, not a continuous page. This unlocks
@@ -293,39 +299,113 @@ by PR #84/#85:
   or recovery authority, so retaining it would expand authority rather than preserve
   correctness.
 
-The one-shot operation may use a sibling staging name only when the Powerbox grant or a
-coordinated safe-save mechanism authorizes the selected parent and staging operation. A
-leaf grant is never treated as blanket parent authority; inability to establish the
-required scope fails before writing, with no direct-write fallback.
+**Amended 2026-09-29: staging and publication mechanism.** A save-panel grant covers
+exactly the chosen leaf path. It is not authority over the leaf's folder. The original
+text of this section staged a random sibling file inside the chosen folder through held
+no-follow parent descriptors. The owner's PR F Phase A smoke (evidence below) proved that
+design unusable outside folders the app already holds: opening the chosen parent is
+refused with `parentAuthorityUnavailable` for `~/Desktop` and `~/Documents`, so nothing
+can be written there. The operation therefore never opens, enumerates, or creates entries
+in the chosen folder, other than publishing the leaf itself:
 
-Within that grant, the operation may hold ephemeral no-follow parent/item descriptors
-and create one OS-random exclusive staging file solely to write and flush the bytes.
-Publication follows the existing safe-write primitives without routing the artifact
-through retained workspace mutation authority:
+1. **Staging location.**
+   - Stage in `FileManager.url(for: .itemReplacementDirectory, in: .userDomainMask,
+     appropriateFor: leaf, create: true)`. This is an operation-private directory that
+     Foundation creates for the destination's volume; on the internal APFS volume it was
+     observed inside the app container.
+   - With `lstat`, prove that it is a directory on the same `st_dev` as the destination.
+     For a confirmed overwrite, compare against the existing leaf. For a new leaf, compare
+     against `lstat` of the leaf's parent path; the grant permits this as metadata only,
+     never as an open or an enumeration.
+   - Fail closed, before writing any byte, when:
+     - the directory is on a different device;
+     - the directory is unavailable;
+     - the destination volume does not advertise both exclusive and swap renaming
+       (`volumeSupportsExclusiveRenaming` / `volumeSupportsSwapRenaming`).
+   - There is no cross-device copy fallback.
+2. **Staged bytes.** Create exactly one staged file there with `open(O_CREAT | O_EXCL |
+   O_NOFOLLOW | O_WRONLY)`, write and `fsync` the complete artifact, and record its
+   `st_dev`/`st_ino` identity.
+3. **Leaf proof.** `lstat` the exact panel URL path, without following links:
+   - absent → the new-leaf disposition;
+   - a regular file whose identity equals the one the panel approved → the
+     confirmed-overwrite disposition;
+   - anything else fails closed: a symlink, a directory, a device or FIFO, or an identity or
+     type change since panel inspection.
 
-- a destination proven missing publishes with `renameatx_np(..., RENAME_EXCL)`;
-- an owner-confirmed existing regular file publishes only with
-  `renameatx_np(..., RENAME_SWAP)`, leaving the displaced destination identity at the
-  staging name; and
-- after publication, postflight must prove the selected leaf contains the writer-owned
-  bytes, the staging leaf contains the exact panel-approved displaced identity, and the
-  held namespace is unchanged before cleanup and success.
+   Repeat this proof immediately before publication.
+4. **Publication by path.**
+   - New leaf: `renameatx_np(AT_FDCWD, staged, AT_FDCWD, leaf, RENAME_EXCL |
+     RENAME_NOFOLLOW_ANY)`.
+   - Confirmed overwrite: the same call with `RENAME_SWAP | RENAME_NOFOLLOW_ANY`. This
+     leaves the displaced original at the staged name inside the item-replacement directory.
+   - Still forbidden: ordinary rename-overwrite, truncating direct write, and destructive
+     fallback.
+5. **Postflight.**
+   - `lstat` proves the leaf holds the staged identity. For a swap, it also proves the staged
+     name holds the exact panel-approved displaced identity.
+   - Only then unlink the displaced original and remove the item-replacement directory.
+     Success requires proving both are absent.
+   - If postflight finds a mismatch, a reverse swap is allowed only after an exact two-name
+     proof.
+   - Otherwise preserve both identities and report committed-but-indeterminate, with the
+     exact leaf path and the exact item-replacement path. The latter may hold the user's
+     original inside the app container, and the report must say so.
+   - There is no automatic retry or cleanup.
+6. **Accepted residual.** The chosen parent is never held, so there is no
+   parent-namespace stability proof. The window between the last `lstat` and `renameatx_np`
+   is name-based. What bounds it:
+   - `RENAME_EXCL` never clobbers an entry that appears in that window;
+   - `RENAME_NOFOLLOW_ANY` refuses a symlinked path component;
+   - swap postflight detects an unexpected displaced identity.
 
-If overwrite postflight finds a mismatch, a reverse swap is allowed only after proving
-both names still hold the exact expected identities. Otherwise both identities remain
-preserved, the result is reported as committed-but-indeterminate with exact
-selected/staging paths, and no automatic retry or cleanup follows. Unsupported exchange,
-exclusive-create, scope, durability, or cleanup semantics fail closed; ordinary
-rename-overwrite, truncating direct write, and destructive fallback are forbidden.
-Success requires the staging name to be proven absent. Descriptors and authority are
-released when the operation ends and are never bookmarked or journaled. These
-name-based operations are not described as identity-atomic.
+   These name-based operations are not described as identity-atomic.
+
+The same mechanism serves every panel destination, including folders inside an open
+workspace, so the parent-anchored export path is retired rather than kept as a second
+mode. Authority lifetime is unchanged:
+- nothing is bookmarked or journaled;
+- the item-replacement directory and the leaf authority are released when the operation
+  ends.
+
+**D5 amendment evidence (owner Mac, 2026-09-29, macOS 27.0 26A428, sandboxed Debug):**
+
+| Run | Destination | Result |
+|---|---|---|
+| PR F Phase A (`phase3-export-html-command` 7edc45d, parent-anchored writer) | (a) folder inside the open workspace | Pass |
+| | (b) `~/Desktop` | Refused at inspection: `ExportArtifactFailure.parentAuthorityUnavailable`; nothing written |
+| | (c) `~/Documents` | Same as (b) |
+| Staging probe (DEBUG-only, `phase3-export-staging-probe` bc6c097, not merged) M1 = the mechanism above | `~/Desktop`, new leaf | `RENAME_EXCL` = 0; leaf holds the staged identity; staged name and item-replacement directory proven absent |
+| | `~/Documents`, new leaf | Same |
+| | `~/Desktop`, panel-confirmed overwrite | `RENAME_SWAP` = 0; leaf holds the staged identity; staged name holds the original inode; displaced original unlinked; directory removed |
+| | iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs`, `isUbiquitousItem(parent) = true`) | Same as the new-leaf rows, uncoordinated |
+| | Folder inside the open workspace (control) | Same |
+
+In every probe run, the item-replacement directory was inside the app container on the
+same `st_dev` as the destination, and `lstat` of the leaf and its parent path succeeded.
+The probe's M2 comparison (`FileManager.replaceItemAt`) also passed everywhere. External
+volumes were not tested.
+
+**Open owner decisions before the leaf-path writer (PR E2) lands:**
+- **Q1 — iCloud.** Should publication be wrapped in
+  `NSFileCoordinator.coordinate(writingItemAt: leaf, options: .forReplacing)` when the
+  destination is ubiquitous? The probe succeeded uncoordinated. The recommended default is
+  to coordinate, because Apple documents coordinated writes for ubiquitous items and the
+  cost is one call. Record the choice in `docs/decision-log.md`.
+- **Q2 — external volumes.** These are untested. PR E2 fails closed on cross-device staging
+  or on missing exclusive/swap-rename support. PR F's owner smoke case (e) records real
+  external-volume evidence.
+- **Q3 — file mode.** The parent-anchored writer creates `0600` (like Save Copy). The probe
+  used `0644`. HTML meant for publishing may want `0644`.
 
 The exception is narrow. The export path must still refuse to:
 
-1. Write without a fresh successful panel result, after cancellation, when the exact
-   operation-scoped leaf/parent/staging authority cannot be established, or by falling
-   back to a direct write or another directory.
+1. Write in any of these cases:
+   - without a fresh successful panel result;
+   - after cancellation;
+   - when the exact panel leaf or a same-device item-replacement directory cannot be
+     established (amended 2026-09-29);
+   - by falling back to a direct write or another directory.
 2. Follow a symlink or replace a directory, device, or other non-regular destination. A
    new leaf must use exclusive publication; a confirmed overwrite may swap only with the
    exact regular-file identity approved by the panel. Every observed identity/type change
@@ -336,20 +416,41 @@ The exception is narrow. The export path must still refuse to:
    context-only, recovery, and indeterminate aliases. Comparison includes hard links and
    the filesystem's case/canonical aliases, not only URL-string equality.
 4. Create a delivered sibling asset/font file, intermediate directory, persistent
-   recovery journal, or second output. The bounded operation-only staging file above is
-   the sole exception and cannot survive a reported success; it may remain only after a
-   truthfully reported indeterminate failure to avoid destroying an identity.
+   recovery journal, or second output. No entry other than the published leaf is ever
+   created in the chosen folder (amended 2026-09-29):
+   - The only temporary entries are the operation-private item-replacement directory
+     (outside the chosen folder) and its single staged file.
+   - Neither may survive a reported success.
+   - Either may remain only after a truthfully reported indeterminate failure, at an exact
+     reported path, so that no identity is destroyed.
 5. Rekey a session, mark source saved/clean, change recents, adopt the export as the
    current document, or enter the workspace mutation/recovery journal.
 6. Retry silently at an old/stale URL or treat a partial/uncertain write as success.
 
-**Rejected:** Routing exports through the retained workspace mutation API. That would
-misclassify a derived one-shot artifact as canonical workspace state and retain authority
-the user did not ask Plainsong to keep. A broad uncoordinated URL write is also rejected;
-the one-shot path remains exact-leaf, fail-closed, and side-effect-free on the document.
+**Rejected:**
+- **The retained workspace mutation API.** Routing exports through it would misclassify a
+  derived one-shot artifact as canonical workspace state, and would retain authority the
+  user did not ask Plainsong to keep.
+- **A broad, uncoordinated URL write.** The one-shot path stays exact-leaf, fail-closed,
+  and side-effect-free on the document.
+
+Also rejected by the 2026-09-29 amendment:
+- **Keeping parent-anchored sibling staging.** The owner smoke shows a leaf grant cannot
+  open the parent.
+- **Asking the user to grant the containing folder**, for example with a second open
+  panel. That is non-standard export UX and wider authority than one artifact needs.
+- **Writing or truncating directly into the leaf.** A failure leaves a partial file, and an
+  overwrite destroys the original before the new bytes are proven.
+- **`FileManager.replaceItemAt` as the production primitive.** It passed the probe, but its
+  internal backup and cleanup cannot provide D5's exact displaced-identity proof or its
+  indeterminate-path reporting.
+- **`NSFileCoordinator` as the authority mechanism.** Coordination grants no sandbox
+  authority. It is considered only as an additional wrapper for ubiquitous destinations
+  (Q1).
 
 **Owner sign-off:** Required because this is an explicit, narrowly bounded exception to
-the repository's strongest filesystem-authority policy.
+the repository's strongest filesystem-authority policy. The 2026-09-29 mechanism amendment
+needs owner approval of its docs PR, plus answers to Q1–Q3 before PR E2 lands.
 
 ## 4. Layering
 
@@ -358,10 +459,10 @@ App
   File commands, exact document snapshot, NSSavePanel / NSPrintOperation orchestration,
   one-shot write result and user-visible errors
     PreviewKit                          WorkspaceKit
-      offscreen PreviewController         one-shot non-retained artifact writer reusing
-      lifecycle, render/result fencing,   the existing anchored no-follow descriptor and
-      asset:// policy, WKWebView          RENAME_EXCL / RENAME_SWAP publication
-      PDF and print APIs                  primitives
+      offscreen PreviewController         one-shot non-retained artifact writer:
+      lifecycle, render/result fencing,   item-replacement staging + exact-leaf
+      asset:// policy, WKWebView          RENAME_EXCL / RENAME_SWAP publication with
+      PDF and print APIs                  lstat identity proofs (D5, amended 2026-09-29)
         preview-src
           completed render, protocol-v6 static HTML serializer, asset/style finalization
 ```
@@ -375,9 +476,10 @@ App
   and returns a typed committed / not-committed / indeterminate outcome. App calls it
   directly; PreviewKit never does, and this adds no PreviewKit → WorkspaceKit edge.
 - **Rejected:** implementing D5's publication primitives in App or PreviewKit.
-  WorkspaceKit already owns the only audited `openat(O_NOFOLLOW)` and `renameatx_np`
-  implementations, and a second copy is exactly the drift that forced
-  `WorkspaceRootContainment` to be extracted in the first place.
+  WorkspaceKit already owns the only audited `renameatx_np` and identity-proof
+  implementations. A second copy is exactly the drift that forced
+  `WorkspaceRootContainment` to be extracted in the first place. The amended D5 leaf-path
+  publication stays in WorkspaceKit beside those primitives.
 - `preview-src` owns static DOM serialization and never gains filesystem authority.
 - MarkdownCore remains canonical source/model only. Export v1 needs no new parser.
 - The one-shot write is not a WorkspaceKit Save/Save Copy operation and does not weaken
@@ -481,7 +583,8 @@ own PR.
 | **C — bridge + static semantics** | Protocol v6 request/result and shared export-ready barrier, mirrored Swift/TS types, regenerated bundle, successful/stale/error fencing, static document skeleton, frontmatter/MDX/theme/runtime-removal snapshots. No asset inlining, App command, or destination write. | Partial E1–E3 |
 | **D — assets + offline fidelity** | PreviewKit resource resolution, deterministic allow/omit outcomes, per-image + aggregate caps, CSS/font embedding, CSP/URL-sink enforcement, finalized live export DOM, and offline hosted reopen. No App File command or destination write. | Closes E2–E3; partial E1/E4 |
 | **E — one-shot artifact writer** | Headless exact-URL grant/descriptor service, exclusive new-leaf publication, non-destructive confirmed-overwrite exchange/postflight, authoritative ownership-inventory collision checks, refusal matrix, and fault-injection tests. No menu, panel presentation, render, or document-state mutation. | Partial E6/E9 |
-| **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
+| **E2 — leaf-path writer (D5 amendment, 2026-09-29)** | Replace PR E's parent-anchored publication with amended D5: same-device item-replacement staging, exact-leaf `lstat` proofs, and `RENAME_EXCL` / `RENAME_SWAP` by path with `RENAME_NOFOLLOW_ANY`. Also: the postflight, reverse-swap, and indeterminate reporting that includes the item-replacement path; fail-closed cross-device or unsupported-volume handling; Q1–Q3 decisions; and fault-injection tests. Keep the App ownership adapter, the typed outcome, and the API shape. No menu or render change. | Re-proves the reopened E6 mechanism bullets; the sibling bullet |
+| **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E2's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
 | **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
 
 D3–D5 owner sign-off was recorded 2026-08-13 (after E0, before PR C). If a later
@@ -700,29 +803,54 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 - [ ] HTML/PDF writes use only the exact URL freshly returned by that operation's
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
-- [ ] A leaf-only grant is never widened implicitly. The Powerbox grant or coordinated
-  safe-save mechanism must authorize exact parent/staging work; otherwise the operation
-  fails without direct-write or alternate-directory fallback.
-- [x] New-file publication uses `RENAME_EXCL`; owner-confirmed exact-regular-file
-  replacement uses `RENAME_SWAP`. Ordinary rename-overwrite and truncating direct write
-  are absent. Symlink, directory, device/non-regular, observed identity/type race, and
-  unsupported extension fail closed.
-- [x] Overwrite postflight proves the selected writer bytes and exact displaced
-  panel-approved identity before cleanup. A mismatch reverses only after exact two-name
-  proof; otherwise both identities remain, exact paths are reported, and success is
-  impossible.
+> **2026-09-29 D5 amendment:** Four mechanism bullets below were checked by PR E's evidence
+> for the now-retired parent-anchored writer: `RENAME_EXCL`/`RENAME_SWAP` publication,
+> overwrite postflight, uncertainty paths, and failure reporting. They are reopened until
+> PR E2 re-proves them on the leaf-path mechanism. The ownership-inventory bullet stays
+> checked: the App adapter and the inventory it reads are mechanism-independent.
+
+- [ ] A leaf-only grant is never widened implicitly:
+  - the operation never opens, enumerates, or creates entries in the chosen folder;
+  - staging lives only in a same-device, operation-private item-replacement directory;
+  - if that directory cannot be established, the operation fails without a direct-write or
+    alternate-directory fallback.
+
+  Mechanism evidence: the D5 amendment probe (owner, 2026-09-29). Production evidence:
+  PR E2 tests plus PR F's owner smoke.
+- [ ] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
+  exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
+  leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
+  closed:
+  - a symlink, directory, device, or other non-regular leaf;
+  - a symlinked path component;
+  - an observed identity or type race;
+  - an unsupported extension;
+  - cross-device staging;
+  - a volume without exclusive or swap renaming.
+
+  *(Reopened 2026-09-29.)*
+- [ ] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
+  the exact displaced panel-approved identity before cleanup. A mismatch reverses only
+  after an exact two-name proof. Otherwise both identities remain, the exact leaf and
+  item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29.)*
 - [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
   case/canonical aliases are rejected.
-- [ ] The only allowed sibling is one randomized no-follow operation-scoped staging
-  file in the approved parent; success proves it absent. No delivered sibling,
-  intermediate directory, persistent recovery journal, bookmark, retry/fallback
-  destination, or second artifact is created.
-- [x] Namespace/cleanup uncertainty is reported with exact selected/staging paths and is
-  never called an identity-atomic non-commit or a clean success.
-- [x] Write failure/uncertainty is reported as failure and cannot be presented as a
-  complete artifact.
-- PR E evidence (writer level, headless): `ExportArtifactWriter` in WorkspaceKit reuses the
+- [ ] No entry other than the published leaf is ever created in the chosen folder. The
+  item-replacement directory and its single staged file are proven absent on success. No
+  delivered sibling, intermediate directory, persistent recovery journal, bookmark,
+  retry/fallback destination, or second artifact is created. *(Rewritten 2026-09-29. The
+  earlier owner-reading question about a second `.plainsong-cleanup-*` sibling is
+  superseded, because no sibling is ever staged in the chosen folder.)*
+- [ ] Namespace/cleanup uncertainty is reported with the exact leaf and item-replacement
+  paths, and is never called an identity-atomic non-commit or a clean success. If the
+  user's displaced original is left inside the app container, the report says so.
+  *(Reopened 2026-09-29.)*
+- [ ] Write failure/uncertainty is reported as failure and cannot be presented as a
+  complete artifact. *(Reopened 2026-09-29.)*
+- PR E evidence (historical: the parent-anchored writer, retired for panel destinations by
+  the 2026-09-29 D5 amendment; its App ownership tests still back the checked inventory
+  bullet). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the
   audited `WorkspaceAnchoredFileSystem` staging/`RENAME_EXCL`/`RENAME_SWAP`/postflight/
   reverse-swap/cleanup primitives and returns `.committed` only when the writer bytes are
   durable and the staging name is re-proven empty; every other result is `.notCommitted`
@@ -780,7 +908,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   writer/App inspection disagreement `testDisagreeingWriterInspectionIsRefused`. Not
   separately exercised: a restored (promoted) text-recovery session, whose unavailable proof
   makes the inventory refuse every export destination, as it refuses Save Copy.
-- Sibling bullet left unchecked for owner reading:
+- Historical, superseded by the 2026-09-29 amendment. Sibling bullet left unchecked for owner reading:
   `testAtMostOneOperationSiblingExistsAtEveryObservedBoundary` proves at most one operation
   sibling at every observed boundary of a successful replacement or new leaf, and success
   proves both names clear. The audited cleanup, however, renames the displaced inode from
@@ -789,13 +917,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   exactly, `testDisplacedCleanupFailuresAreIndeterminateEvenThoughWriterBytesArePublished`).
   Checking this bullet requires the owner to accept that the cleanup name is the same
   staging file under a second randomized name.
-- Still open for PR F: the fresh-panel-URL/cancel/stale bullet and the leaf-grant/Powerbox
-  bullet. SwiftPM tests are not sandboxed and hosted tests cannot drive a real panel. The
-  writer detects missing parent/staging authority (`parentAuthorityUnavailable`,
-  `stagingNotPermitted`) and never widens scope or falls back, but whether a real
-  save-panel leaf grant authorizes the sibling staging create is unproven and likely denied
-  (leaf grants already cannot read siblings, `agent.md` M2). PR F's owner smoke must record
-  it; a coordinated safe-save alternative needs a docs PR and Decision Log row (§7).
+- Resolved 2026-09-29: PR F's owner smoke answered the Powerbox question. A real
+  save-panel leaf grant does **not** authorize parent-anchored sibling staging:
+  `~/Desktop` and `~/Documents` were refused with `parentAuthorityUnavailable` and nothing
+  was written. D5 is amended to item-replacement staging plus exact-leaf publication (see
+  the D5 amendment evidence). The fresh-panel-URL/cancel/stale bullet remains PR F work.
 
 ### E7 — App / File-menu UX and side-effect isolation
 
