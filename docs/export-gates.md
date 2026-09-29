@@ -4,15 +4,16 @@
 > 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
 > PR C landed the static-document skeleton. PR D closes E2–E3 and the HTML portion of
 > E4; E1 stays partial. PR E lands the headless one-shot WorkspaceKit artifact writer
-> (writer-level E6 bullets except the sibling bullet, and the E9 dependency bullet).
+> (writer-level E6 bullets except the sibling bullet, and the E9 dependency bullet; the
+> E6 bullets are reopened below by the D5 amendment).
 > The rest of E5–E9 remains open. PR D's review fixes add an optional `dataURIFrom`
 > reference to resource outcomes, so `PROTOCOL_VERSION` is 8.
 > D5 amended 2026-09-29: PR F Phase A's owner smoke proved that a leaf-only save-panel
 > grant cannot open the chosen folder (`parentAuthorityUnavailable` on `~/Desktop` and
 > `~/Documents`). Staging moves to a same-device item-replacement directory with
 > exact-leaf publication, proven by an owner-run DEBUG probe. The E6 mechanism bullets
-> proven against the retired parent-anchored writer are reopened for PR E2, and PR F
-> waits for E2.** Precedent:
+> proven against the retired parent-anchored writer, including the ownership inspection
+> (which is parent-descriptor-derived), are reopened for PR E2, and PR F waits for E2.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -311,27 +312,35 @@ in the chosen folder, other than publishing the leaf itself:
 1. **Staging location.**
    - Stage in `FileManager.url(for: .itemReplacementDirectory, in: .userDomainMask,
      appropriateFor: leaf, create: true)`. This is an operation-private directory that
-     Foundation creates for the destination's volume; on the internal APFS volume it was
+     Foundation chooses for the destination's volume; on the internal APFS volume it was
      observed inside the app container.
-   - With `lstat`, prove that it is a directory on the same `st_dev` as the destination.
-     For a confirmed overwrite, compare against the existing leaf. For a new leaf, compare
-     against `lstat` of the leaf's parent path; the grant permits this as metadata only,
-     never as an open or an enumeration.
+   - Prove it is a directory on the same `st_dev` as the destination:
+     - for a confirmed overwrite, compare against the existing leaf;
+     - for a new leaf, compare against the metadata of the leaf's parent path. The probe
+       observed this metadata read succeed; it is never an open or an enumeration.
+   - Read the volume-capability keys from the existing leaf for an overwrite, and from the
+     parent URL for a new leaf (querying a missing leaf throws `ENOENT`).
    - Fail closed, before writing any byte, when:
      - the directory is on a different device;
      - the directory is unavailable;
+     - the returned directory is the chosen folder or lies inside it (Foundation has a
+       fallback that creates a "(A Document Being Saved By …)" folder beside the target);
      - the destination volume does not advertise both exclusive and swap renaming
        (`volumeSupportsExclusiveRenaming` / `volumeSupportsSwapRenaming`).
    - There is no cross-device copy fallback.
 2. **Staged bytes.** Create exactly one staged file there with `open(O_CREAT | O_EXCL |
    O_NOFOLLOW | O_WRONLY)`, write and `fsync` the complete artifact, and record its
    `st_dev`/`st_ino` identity.
-3. **Leaf proof.** `lstat` the exact panel URL path, without following links:
+3. **Leaf proof.** Inspect the exact panel URL path with
+   `fstatat(AT_FDCWD, leaf, …, AT_SYMLINK_NOFOLLOW_ANY)`, so no path component may be a
+   symlink; the parent path must be a directory.
    - absent → the new-leaf disposition;
    - a regular file whose identity equals the one the panel approved → the
      confirmed-overwrite disposition;
-   - anything else fails closed: a symlink, a directory, a device or FIFO, or an identity or
-     type change since panel inspection.
+   - anything else fails closed:
+     - a symlink, a directory, a device or FIFO;
+     - a case or normalization alias of an existing entry;
+     - an identity or type change since panel inspection.
 
    Repeat this proof immediately before publication.
 4. **Publication by path.**
@@ -342,28 +351,46 @@ in the chosen folder, other than publishing the leaf itself:
    - Still forbidden: ordinary rename-overwrite, truncating direct write, and destructive
      fallback.
 5. **Postflight.**
-   - `lstat` proves the leaf holds the staged identity. For a swap, it also proves the staged
-     name holds the exact panel-approved displaced identity.
+   - Inspecting without following links proves the leaf holds the staged identity. For a
+     swap, it also proves the staged name holds the exact panel-approved displaced identity.
    - Only then unlink the displaced original and remove the item-replacement directory.
      Success requires proving both are absent.
    - If postflight finds a mismatch, a reverse swap is allowed only after an exact two-name
      proof.
    - Otherwise preserve both identities and report committed-but-indeterminate, with the
-     exact leaf path and the exact item-replacement path. The latter may hold the user's
-     original inside the app container, and the report must say so.
+     exact leaf path and the exact item-replacement path.
+   - When the item-replacement path holds the user's displaced original, the report must say
+     so plainly. It is a hidden temporary location inside the app container, which the OS may
+     purge (not verified), so the user should recover the file promptly. PR E2 must not claim
+     that location is durable.
    - There is no automatic retry or cleanup.
-6. **Accepted residual.** The chosen parent is never held, so there is no
-   parent-namespace stability proof. The window between the last `lstat` and `renameatx_np`
-   is name-based. What bounds it:
-   - `RENAME_EXCL` never clobbers an entry that appears in that window;
-   - `RENAME_NOFOLLOW_ANY` refuses a symlinked path component;
-   - swap postflight detects an unexpected displaced identity.
-
-   These name-based operations are not described as identity-atomic.
+6. **Accepted residual.**
+   - The chosen parent is never held, so there is no parent-namespace stability proof. The
+     window between the last inspection and `renameatx_np` is name-based. It is bounded by:
+     - `RENAME_EXCL`, which never clobbers an entry that appears in that window;
+     - `RENAME_NOFOLLOW_ANY`, which refuses a symlinked path component;
+     - swap postflight, which detects an unexpected displaced identity.
+   - The chosen parent cannot be `fsync`ed. After a crash, the rename's durability relies on
+     the filesystem's metadata ordering rather than an explicit parent sync (the retired
+     writer synced the parent).
+   - Indeterminate residue lives in a temporary, possibly purgeable location (step 5).
+   - These name-based operations are not described as identity-atomic.
 
 The same mechanism serves every panel destination, including folders inside an open
-workspace, so the parent-anchored export path is retired rather than kept as a second
-mode. Authority lifetime is unchanged:
+workspace. The parent-anchored export path is therefore retired, not kept as a second mode.
+
+This also applies to the App ownership inspection. Today it derives the destination's
+identity, canonical spelling, and case sensitivity from parent descriptors:
+`WorkspaceFileSystemLocation(fileURL:)`, `inspectFileTarget`, and `parentIsCaseSensitive`
+all go through `withAnchoredParent`. Under a leaf-only grant it would therefore refuse
+Desktop and Documents too. PR E2 must derive these from leaf-path metadata instead, while
+keeping the same authoritative inventory and outcome types. Candidate sources, to be
+proven in E2:
+- `fstatat` identity;
+- `fcntl(F_GETPATH)` on an opened existing leaf for canonical spelling;
+- the parent URL's `volumeSupportsCaseSensitiveNames`.
+
+Authority lifetime is unchanged:
 - nothing is bookmarked or journaled;
 - the item-replacement directory and the leaf authority are released when the operation
   ends.
@@ -375,28 +402,37 @@ mode. Authority lifetime is unchanged:
 | PR F Phase A (`phase3-export-html-command` 7edc45d, parent-anchored writer) | (a) folder inside the open workspace | Pass |
 | | (b) `~/Desktop` | Refused at inspection: `ExportArtifactFailure.parentAuthorityUnavailable`; nothing written |
 | | (c) `~/Documents` | Same as (b) |
-| Staging probe (DEBUG-only, `phase3-export-staging-probe` bc6c097, not merged) M1 = the mechanism above | `~/Desktop`, new leaf | `RENAME_EXCL` = 0; leaf holds the staged identity; staged name and item-replacement directory proven absent |
+| Staging probe (DEBUG-only, `phase3-export-staging-probe` bc6c097, not merged) M1 = the mechanism above | `~/Desktop`, new leaf | `RENAME_EXCL` = 0; leaf holds the staged identity; staged name absent; directory removed (`rmdir` = 0) |
 | | `~/Documents`, new leaf | Same |
-| | `~/Desktop`, panel-confirmed overwrite | `RENAME_SWAP` = 0; leaf holds the staged identity; staged name holds the original inode; displaced original unlinked; directory removed |
+| | `~/Desktop`, panel-confirmed overwrite | `RENAME_SWAP` = 0; leaf holds the staged identity; staged name holds the original inode; displaced original unlinked; directory removed (`rmdir` = 0) |
 | | iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs`, `isUbiquitousItem(parent) = true`) | Same as the new-leaf rows, uncoordinated |
-| | Folder inside the open workspace (control) | Same |
+| | The PR F (a) folder, `~/plainsong-export-smoke/exports` (control) | Same |
 
-In every probe run, the item-replacement directory was inside the app container on the
-same `st_dev` as the destination, and `lstat` of the leaf and its parent path succeeded.
-The probe's M2 comparison (`FileManager.replaceItemAt`) also passed everywhere. External
-volumes were not tested.
+In every probe run:
+- the item-replacement directory was inside the app container, on the same `st_dev` as
+  the destination;
+- `lstat` of the parent path succeeded;
+- `lstat` of the leaf returned the file, or `ENOENT` for a new leaf, and never `EPERM`.
 
-**Open owner decisions before the leaf-path writer (PR E2) lands:**
-- **Q1 — iCloud.** Should publication be wrapped in
-  `NSFileCoordinator.coordinate(writingItemAt: leaf, options: .forReplacing)` when the
-  destination is ubiquitous? The probe succeeded uncoordinated. The recommended default is
-  to coordinate, because Apple documents coordinated writes for ubiquitous items and the
-  cost is one call. Record the choice in `docs/decision-log.md`.
-- **Q2 — external volumes.** These are untested. PR E2 fails closed on cross-device staging
-  or on missing exclusive/swap-rename support. PR F's owner smoke case (e) records real
-  external-volume evidence.
-- **Q3 — file mode.** The parent-anchored writer creates `0600` (like Save Copy). The probe
-  used `0644`. HTML meant for publishing may want `0644`.
+The probe's M2 comparison (`FileManager.replaceItemAt`) also passed everywhere. The probe
+did not exercise the ownership inspection. External volumes were not tested.
+
+**Owner decisions (2026-09-29):**
+- **Q1 — iCloud: coordinate.** When the destination is ubiquitous, PR E2 wraps
+  publication in `NSFileCoordinator.coordinate(writingItemAt: leaf, options: .forReplacing)`.
+  The probe succeeded uncoordinated, but Apple documents coordinated writes for ubiquitous
+  items. Coordination is an addition; it grants no sandbox authority.
+- **Q2 — external volumes: accepted as untested.** PR E2 fails closed on cross-device
+  staging and on missing exclusive/swap-rename support. PR F's owner smoke case (e) records
+  real external-volume evidence.
+- **Q3 — file mode: pending owner confirmation.** The retired writer created `0600`, like
+  Save Copy; the probe used `0644`. Recommended default:
+  - a new leaf gets the process umask default (`0666 & ~umask`, normally `0644`), matching
+    other macOS apps' saved files;
+  - a confirmed overwrite keeps the displaced file's permission bits, as `NSDocument` does.
+
+  A `0600` HTML file uploaded with permission-preserving tools (`rsync -a`, `scp -p`) is
+  unreadable by a web server.
 
 The exception is narrow. The export path must still refuse to:
 
@@ -583,9 +619,9 @@ own PR.
 | **C — bridge + static semantics** | Protocol v6 request/result and shared export-ready barrier, mirrored Swift/TS types, regenerated bundle, successful/stale/error fencing, static document skeleton, frontmatter/MDX/theme/runtime-removal snapshots. No asset inlining, App command, or destination write. | Partial E1–E3 |
 | **D — assets + offline fidelity** | PreviewKit resource resolution, deterministic allow/omit outcomes, per-image + aggregate caps, CSS/font embedding, CSP/URL-sink enforcement, finalized live export DOM, and offline hosted reopen. No App File command or destination write. | Closes E2–E3; partial E1/E4 |
 | **E — one-shot artifact writer** | Headless exact-URL grant/descriptor service, exclusive new-leaf publication, non-destructive confirmed-overwrite exchange/postflight, authoritative ownership-inventory collision checks, refusal matrix, and fault-injection tests. No menu, panel presentation, render, or document-state mutation. | Partial E6/E9 |
-| **E2 — leaf-path writer (D5 amendment, 2026-09-29)** | Replace PR E's parent-anchored publication with amended D5: same-device item-replacement staging, exact-leaf `lstat` proofs, and `RENAME_EXCL` / `RENAME_SWAP` by path with `RENAME_NOFOLLOW_ANY`. Also: the postflight, reverse-swap, and indeterminate reporting that includes the item-replacement path; fail-closed cross-device or unsupported-volume handling; Q1–Q3 decisions; and fault-injection tests. Keep the App ownership adapter, the typed outcome, and the API shape. No menu or render change. | Re-proves the reopened E6 mechanism bullets; the sibling bullet |
+| **E2 — leaf-path writer (D5 amendment, 2026-09-29)** | Replace PR E's parent-anchored publication with amended D5: same-device item-replacement staging, exact-leaf `lstat` proofs, and `RENAME_EXCL` / `RENAME_SWAP` by path with `RENAME_NOFOLLOW_ANY`. Also: the postflight, reverse-swap, and indeterminate reporting that includes the item-replacement path; fail-closed cross-device or unsupported-volume handling; Q1–Q3 decisions; and fault-injection tests. Rework the ownership inspection so that identity, canonical leaf name, and case sensitivity come from leaf-path metadata; keep the authoritative inventory and the typed outcome. No menu or render change. | Re-proves the reopened E6 bullets, including ownership; the sibling bullet |
 | **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E2's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
-| **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
+| **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E2's writer, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
 
 D3–D5 owner sign-off was recorded 2026-08-13 (after E0, before PR C). If a later
 implementation needs a different fixed choice, update this spec and the Decision Log in
@@ -803,11 +839,13 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 - [ ] HTML/PDF writes use only the exact URL freshly returned by that operation's
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
-> **2026-09-29 D5 amendment:** Four mechanism bullets below were checked by PR E's evidence
-> for the now-retired parent-anchored writer: `RENAME_EXCL`/`RENAME_SWAP` publication,
-> overwrite postflight, uncertainty paths, and failure reporting. They are reopened until
-> PR E2 re-proves them on the leaf-path mechanism. The ownership-inventory bullet stays
-> checked: the App adapter and the inventory it reads are mechanism-independent.
+
+> **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
+> against the now-retired parent-anchored writer, so all five are reopened until PR E2
+> re-proves them on the leaf-path mechanism: `RENAME_EXCL`/`RENAME_SWAP` publication,
+> overwrite postflight, ownership inspection, uncertainty paths, and failure reporting.
+> The ownership inventory itself is reused unchanged, but the adapter's destination
+> inspection, canonical spelling, and case sensitivity are parent-descriptor-derived.
 
 - [ ] A leaf-only grant is never widened implicitly:
   - the operation never opens, enumerates, or creates entries in the chosen folder;
@@ -833,9 +871,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   the exact displaced panel-approved identity before cleanup. A mismatch reverses only
   after an exact two-name proof. Otherwise both identities remain, the exact leaf and
   item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29.)*
-- [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
+- [ ] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
-  case/canonical aliases are rejected.
+  case/canonical aliases are rejected. *(Reopened 2026-09-29: the adapter's inspection,
+  canonical spelling, and case sensitivity are parent-descriptor-derived and must move to
+  leaf-path metadata in PR E2.)*
 - [ ] No entry other than the published leaf is ever created in the chosen folder. The
   item-replacement directory and its single staged file are proven absent on success. No
   delivered sibling, intermediate directory, persistent recovery journal, bookmark,
@@ -849,8 +889,8 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [ ] Write failure/uncertainty is reported as failure and cannot be presented as a
   complete artifact. *(Reopened 2026-09-29.)*
 - PR E evidence (historical: the parent-anchored writer, retired for panel destinations by
-  the 2026-09-29 D5 amendment; its App ownership tests still back the checked inventory
-  bullet). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the
+  the 2026-09-29 D5 amendment; its hosted App ownership tests ran outside the sandbox and
+  used parent-descriptor inspection). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the
   audited `WorkspaceAnchoredFileSystem` staging/`RENAME_EXCL`/`RENAME_SWAP`/postflight/
   reverse-swap/cleanup primitives and returns `.committed` only when the writer bytes are
   durable and the staging name is re-proven empty; every other result is `.notCommitted`
