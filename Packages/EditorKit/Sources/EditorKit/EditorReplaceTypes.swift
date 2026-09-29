@@ -42,7 +42,7 @@ public struct EditorReplaceRequest: Equatable, Sendable {
     }
 }
 
-/// Why a single Replace changed nothing.
+/// Why a single Replace did not change the source.
 public enum EditorReplaceRefusal: Equatable, Sendable, Error {
     case staleIdentity
     case staleRevision
@@ -55,6 +55,10 @@ public enum EditorReplaceRefusal: Equatable, Sendable, Error {
     case wysiwygPresentationInstalled
     case invalidPlan(EditorReplacePlanRefusal)
     case writerPreflightFailed
+    /// Writer preflight passed, but the observed post-write snapshot is still
+    /// the pre-write source at the pre-write revision: native insertion was
+    /// refused or its publication was rejected and restored.
+    case writeNotApplied
 }
 
 /// Result of one single Replace. No STTextView type crosses this boundary.
@@ -62,10 +66,15 @@ public enum EditorReplaceOutcome: Equatable, Sendable {
     /// The current match was not the applied selection. Exact navigation was
     /// emitted and nothing was queued.
     case navigatedToCurrentMatch(NSRange)
-    /// Source changed. The controller consumes that revision once and continues
-    /// with `afterOneReplace`; `plan.resumeUTF16` is the continuation anchor.
+    /// The observed post-write snapshot is exactly the planned source at a newer
+    /// revision. The controller consumes that revision once and continues with
+    /// `afterOneReplace`; `plan.resumeUTF16` is the continuation anchor.
     case replaced(EditorReplaceOneMatchPlan)
     /// UTF-16-identical replacement. No writer, revision, undo, or rescan.
     case advancedIdentical(EditorReplaceContinuation)
+    /// The native write changed the source, but the observed snapshot is not
+    /// exactly the planned text (for example an App reconciliation). No
+    /// continuation runs; Find recomputes the publication as an ordinary edit.
+    case unverifiedWrite
     case refused(EditorReplaceRefusal)
 }

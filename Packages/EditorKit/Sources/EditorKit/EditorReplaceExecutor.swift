@@ -60,7 +60,12 @@ extension MarkdownTextViewCoordinator {
             applyControllerNavigation(controller, in: textView)
             return .advancedIdentical(continuation)
         case let .success(plan):
-            return commitSourceChange(plan, controller: controller, in: textView)
+            return commitSourceChange(
+                plan,
+                preWriteSource: eligible.source,
+                controller: controller,
+                in: textView
+            )
         }
     }
 
@@ -100,42 +105,60 @@ extension MarkdownTextViewCoordinator {
 
     private func commitSourceChange(
         _ plan: EditorReplaceOneMatchPlan,
+        preWriteSource: String,
         controller: EditorFindController,
         in textView: STTextView
     ) -> EditorReplaceOutcome {
-        var didInsert = false
+        guard let planned = EditorReplaceSourceConstruction.replacedSource(
+            preWriteSource,
+            ranges: [plan.match.range],
+            replacement: plan.replacement
+        ) else {
+            return .refused(.invalidPlan(.noCurrentMatch))
+        }
+        var preWriteRevision: Int?
         let opened = performPreflightedTextMutation(in: textView) {
-            guard let preWrite = currentInstalledSourceSnapshot?.revision else { return }
-            controller.armReplacementPublication(
-                plan: plan,
-                preWriteRevision: UInt64(preWrite)
-            )
+            guard let revision = currentInstalledSourceSnapshot?.revision else { return }
+            preWriteRevision = revision
+            controller.armReplacementPublication()
             textView.breakUndoCoalescing()
             editingBehaviorGuard.isApplying = true
             defer { editingBehaviorGuard.isApplying = false }
             textView.insertText(plan.replacement, replacementRange: plan.match.range)
-            didInsert = true
         }
-
-        guard opened, didInsert else {
-            controller.disarmReplacementPublication()
+        // Find observers run only after the writer-authorized closure has returned.
+        guard opened, let preWriteRevision,
+              let observed = currentInstalledSourceSnapshot
+        else {
+            controller.abandonReplacementPublication()
             return .refused(.writerPreflightFailed)
         }
 
-        // App's document publication consumes the arm when it is wired. A host
-        // that does not route Find still gets exactly one replacement rescan.
-        if let published = currentInstalledSourceSnapshot,
-           let preWrite = controller.armedReplacementPreWriteRevision,
-           UInt64(published.revision) == preWrite &+ 1
+        // The outcome is what the authoritative post-write snapshot shows, not the fact
+        // that `insertText` was called: native insertion can be refused and a publication
+        // can be rejected (restored) or reconciled.
+        if observed.revision > preWriteRevision,
+           ExactSourceText.matches(observed.source, planned)
         {
-            controller.consumeDocumentPublication(
-                text: published.source,
-                revision: UInt64(published.revision)
+            controller.admitReplacementPublication(
+                plan: plan,
+                text: observed.source,
+                revision: UInt64(observed.revision)
             )
-        } else if controller.hasArmedReplacementPublication {
-            controller.disarmReplacementPublication()
+            return .replaced(plan)
         }
-        return .replaced(plan)
+        controller.abandonReplacementPublication()
+        if observed.revision == preWriteRevision,
+           ExactSourceText.matches(observed.source, preWriteSource)
+        {
+            return .refused(.writeNotApplied)
+        }
+        // A host that does not route publications to Find still recomputes the change.
+        controller.documentTextDidChange(
+            text: observed.source,
+            revision: UInt64(max(0, observed.revision))
+        )
+        return .unverifiedWrite
     }
 
     private func applyControllerNavigation(

@@ -16,46 +16,8 @@ public struct EditorFindDocumentBinding: Equatable, Sendable {
     public static let empty = EditorFindDocumentBinding(identity: nil, text: "", revision: 0)
 }
 
-/// Test seam: holds off-main match work until `release()` so stale-completion races
-/// can be made deterministic. Internal only (`@testable import`); not shipping API.
-final class EditorFindMatchHold: @unchecked Sendable {
-    private let lock = NSLock()
-    private var isHeld = true
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    var waiterCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return waiters.count
-    }
-
-    func waitIfHeld() async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            lock.lock()
-            if isHeld {
-                waiters.append(continuation)
-                lock.unlock()
-            } else {
-                lock.unlock()
-                continuation.resume()
-            }
-        }
-    }
-
-    func release() {
-        lock.lock()
-        isHeld = false
-        let pending = waiters
-        waiters = []
-        lock.unlock()
-        for waiter in pending {
-            waiter.resume()
-        }
-    }
-}
-
 /// Fence token for an in-flight match computation.
-struct EditorFindMatchFence: Equatable {
+private struct EditorFindMatchFence: Equatable {
     let documentIdentity: EditorDocumentIdentity?
     let sourceRevision: UInt64
     let queryGeneration: UInt64
@@ -96,25 +58,28 @@ enum EditorFindScheduleReason: Equatable {
 /// the `editorNavigationCommand` channel.
 @MainActor
 public final class EditorFindController {
-    public internal(set) var session: EditorFindSession?
-    public internal(set) var pendingNavigationCommand: EditorNavigationCommand?
-    public internal(set) var documentBinding: EditorFindDocumentBinding
+    public private(set) var session: EditorFindSession?
+    public private(set) var pendingNavigationCommand: EditorNavigationCommand?
+    public private(set) var documentBinding: EditorFindDocumentBinding
     public private(set) var query: TextSearchQuery?
-    public internal(set) var caretAnchorUTF16: Int = 0
-    public internal(set) var queryGeneration: UInt64 = 0
+    public private(set) var caretAnchorUTF16: Int = 0
+    public private(set) var queryGeneration: UInt64 = 0
     /// True when the last applied match observed `!Thread.isMainThread` inside the worker.
-    public internal(set) var lastMatchRanOffMain = false
-    public internal(set) var completedMatchCount = 0
+    public private(set) var lastMatchRanOffMain = false
+    public private(set) var completedMatchCount = 0
     public private(set) var cancelledMatchCount = 0
-    public internal(set) var droppedStaleMatchCount = 0
+    public private(set) var droppedStaleMatchCount = 0
     /// Ordinary `.edit` schedules. A replacement revision must not increment this.
-    var editScheduleCount = 0
-    /// `EditorFindSession.search` calls made for a replacement revision.
-    var replacementEngineInvocationCount = 0
+    private(set) var editScheduleCount = 0
+    /// `afterOneReplace` rescans admitted (one full `EditorFindSession.search` each).
+    private(set) var replacementEngineInvocationCount = 0
     /// Replacement publications admitted. One revision admits one.
-    var replacementScheduleCount = 0
-    var lastScheduleReason: EditorFindScheduleReason?
+    private(set) var replacementScheduleCount = 0
+    private(set) var lastScheduleReason: EditorFindScheduleReason?
+    /// Set only while a single Replace's own native write runs (see `+Replacement`).
     var armedReplacementPublication: EditorFindReplacementArm?
+    /// Publications recorded by an armed write instead of scheduling `.edit`.
+    var recordedReplacementPublicationCount = 0
 
     /// Debounce before match admission. Tests may set to 0.
     public var debounceNanoseconds: UInt64 = 150_000_000
@@ -137,11 +102,11 @@ public final class EditorFindController {
     var testMatchHold: EditorFindMatchHold?
 
     private var navigationSequence: UInt64 = 0
-    var matchTask: Task<Void, Never>?
-    var debounceTask: Task<Void, Never>?
+    private var matchTask: Task<Void, Never>?
+    private var debounceTask: Task<Void, Never>?
     /// After non-navigating recompute (edit/rebind), first next/previous activates the
     /// current ordinal instead of stepping past it.
-    var shouldActivateCurrentOnNextStep = false
+    private var shouldActivateCurrentOnNextStep = false
     /// Next/previous pressed while `session == nil` (debounce / in-flight). Applied once
     /// when *that same* generation completes — does **not** re-push the query (avoids
     /// restarting debounce and losing reverse intent).
@@ -149,9 +114,9 @@ public final class EditorFindController {
     /// Bound to `queryGeneration` so a later query/edit/rebind can never consume a step
     /// recorded against superseded results, and carries a net signed count so repeated
     /// presses during one debounce are not compressed into a single step.
-    var pendingStepIntent: PendingStepIntent?
+    private var pendingStepIntent: PendingStepIntent?
 
-    struct PendingStepIntent: Equatable {
+    private struct PendingStepIntent: Equatable {
         let generation: UInt64
         /// Direction of the **first** press (`+1` next, `-1` previous).
         ///
@@ -186,25 +151,17 @@ public final class EditorFindController {
         scheduleMatch(reason: .rebind)
     }
 
-    /// Routes one source publication. An armed replacement revision is consumed
-    /// once as `.replacement`; every other change stays an ordinary `.edit`.
-    public func consumeDocumentPublication(text: String, revision: UInt64) {
-        documentTextDidChange(text: text, revision: revision)
-    }
-
-    /// Edit invalidation: recompute matches/counter; does **not** move selection.
+    /// Source publication: an ordinary `.edit` recomputes matches/counter and does
+    /// **not** move the selection.
+    ///
+    /// While a single Replace's own native write is in progress, the publication is
+    /// only recorded. The executor then admits it as one `.replacement` rescan that
+    /// navigates to the continuation, or hands it back here as an ordinary edit.
     public func documentTextDidChange(text: String, revision: UInt64) {
-        if let armed = armedReplacementPublication,
-           revision == armed.preWriteRevision &+ 1
-        {
-            armedReplacementPublication = nil
-            scheduleReplacement(plan: armed.plan, text: text, revision: revision)
+        guard revision != documentBinding.revision || text != documentBinding.text else {
             return
         }
-        if let armed = armedReplacementPublication, revision != armed.preWriteRevision {
-            armedReplacementPublication = nil
-        }
-        guard revision != documentBinding.revision || text != documentBinding.text else {
+        if recordArmedReplacementPublication(text: text, revision: revision) {
             return
         }
         documentBinding = EditorFindDocumentBinding(
@@ -360,16 +317,13 @@ public final class EditorFindController {
 
     private func scheduleMatch(reason: EditorFindScheduleReason) {
         if case .replacement = reason {
-            assertionFailure("Replacement publications use scheduleReplacement")
+            assertionFailure("Replacement publications use startReplacementGeneration")
             return
         }
         if reason == .edit {
             editScheduleCount &+= 1
         }
         lastScheduleReason = reason
-        cancelInFlightWork()
-        queryGeneration &+= 1
-        let generation = queryGeneration
         let binding = documentBinding
         let query = query
         let anchor = caretAnchorUTF16
@@ -377,16 +331,7 @@ public final class EditorFindController {
         // Capture ordinal before invalidating session (edit preserves it when still valid).
         let preferredOrdinal: Int? = reason == .edit ? session?.currentOrdinal : nil
         let shouldNavigate = reason.emitsNavigationOnCompletion
-
-        // Drop the previous session immediately so next/previous/activate during debounce
-        // cannot navigate ranges from a superseded query or document revision. Steps
-        // recorded against the superseded generation are dropped with it; ⌘G / ⇧⌘G pressed
-        // from here on records against `generation` and applies when *it* completes.
-        session = nil
-        pendingNavigationCommand = nil
-        shouldActivateCurrentOnNextStep = false
-        pendingStepIntent = nil
-        notifySessionDidChange()
+        let generation = beginGeneration()
 
         guard let query, !query.pattern.isEmpty else {
             session = query.map { EditorFindSession.empty(query: $0, caretAnchorUTF16: anchor) }
@@ -430,73 +375,32 @@ public final class EditorFindController {
     }
 
     private func runMatch(_ work: Work) {
-        matchTask?.cancel()
-        let hold = testMatchHold
-        let forceMain = forceMainActorMatchForTesting
-
-        matchTask = Task { @MainActor [weak self] in
-            let result: (session: EditorFindSession, ranOffMain: Bool)
-            if forceMain {
-                if let hold {
-                    await hold.waitIfHeld()
-                }
-                // Negative control path: same computation on the main actor.
-                let session = EditorFindSession.search(
-                    in: work.text,
-                    query: work.query,
-                    caretAnchorUTF16: work.caretAnchor,
-                    preferredOrdinal: work.preferredOrdinal
-                )
-                result = (session, Self.currentlyOffMainThread())
-            } else {
-                result = await Task.detached(priority: .userInitiated) {
-                    // Detached does not inherit Task cancellation; engine has no cancel points.
-                    // Stale results are dropped at apply time via the fence (not by interrupting
-                    // the engine).
-                    if let hold {
-                        await hold.waitIfHeld()
-                    }
-                    let session = EditorFindSession.search(
-                        in: work.text,
-                        query: work.query,
-                        caretAnchorUTF16: work.caretAnchor,
-                        preferredOrdinal: work.preferredOrdinal
-                    )
-                    return (session, EditorFindController.currentlyOffMainThread())
-                }.value
-            }
-
-            // Do not skip apply on Task.isCancelled: a superseded worker still fence-drops
-            // so droppedStaleMatchCount remains a real signal. Only `self` lifetime ends apply.
-            guard let self else { return }
-            lastMatchRanOffMain = result.ranOffMain
-            applyMatchResult(
-                result.session,
-                fence: work.fence,
+        startMatchWork(fence: work.fence) {
+            EditorFindSession.search(
+                in: work.text,
+                query: work.query,
+                caretAnchorUTF16: work.caretAnchor,
+                preferredOrdinal: work.preferredOrdinal
+            )
+        } apply: { controller, session in
+            controller.applyMatchResult(
+                session,
+                generation: work.fence.queryGeneration,
                 shouldNavigate: work.shouldNavigate
             )
         }
     }
 
+    /// Applies a fence-current search result (`startMatchWork` already checked the fence).
     private func applyMatchResult(
         _ newSession: EditorFindSession,
-        fence: EditorFindMatchFence,
+        generation: UInt64,
         shouldNavigate: Bool
     ) {
-        let current = EditorFindMatchFence(
-            documentIdentity: documentBinding.identity,
-            sourceRevision: documentBinding.revision,
-            queryGeneration: queryGeneration
-        )
-        guard current == fence else {
-            droppedStaleMatchCount &+= 1
-            return
-        }
-        completedMatchCount &+= 1
         session = newSession
         // Only a step recorded against *this* generation may be consumed; anything older
-        // belonged to superseded results and was already dropped by `scheduleMatch`.
-        if let intent = pendingStepIntent, intent.generation == fence.queryGeneration {
+        // belonged to superseded results and was already dropped by `beginGeneration`.
+        if let intent = pendingStepIntent, intent.generation == generation {
             pendingStepIntent = nil
             shouldActivateCurrentOnNextStep = false
             applyPendingStepIntent(intent, on: newSession, queryWouldNavigate: shouldNavigate)
@@ -530,12 +434,12 @@ public final class EditorFindController {
         emitNavigation(for: session.currentMatch)
     }
 
-    func emitNavigation(for match: TextSearchMatch?) {
+    private func emitNavigation(for match: TextSearchMatch?) {
         guard let match else { return }
         emitNavigation(to: match.range)
     }
 
-    func emitNavigation(to selection: NSRange) {
+    private func emitNavigation(to selection: NSRange) {
         guard let identity = documentBinding.identity else { return }
         let id: UInt64
         if let navigationIDProvider {
@@ -553,14 +457,132 @@ public final class EditorFindController {
         pendingNavigationCommand = .navigate(request)
     }
 
-    func notifySessionDidChange() {
+    private func notifySessionDidChange() {
         onSessionDidChange?()
     }
 
     /// Synchronous, nonisolated probe: true when the calling thread is not the main thread.
     /// Uses `pthread_main_np` so it is valid from async/detached contexts (unlike
     /// `Thread.isMainThread` under Swift 6 async unavailability).
-    nonisolated static func currentlyOffMainThread() -> Bool {
+    private nonisolated static func currentlyOffMainThread() -> Bool {
         pthread_main_np() == 0
+    }
+}
+
+// MARK: - Generations and match work (shared by Find and single Replace)
+
+extension EditorFindController {
+    /// Starts a generation for the current `documentBinding`: fences in-flight work and drops
+    /// the previous session immediately, so next/previous/activate cannot navigate ranges
+    /// from a superseded query or revision. Steps recorded against the superseded generation
+    /// are dropped with it; ⌘G / ⇧⌘G pressed from here on records against the returned
+    /// generation and applies when *it* completes.
+    private func beginGeneration() -> UInt64 {
+        cancelInFlightWork()
+        queryGeneration &+= 1
+        session = nil
+        pendingNavigationCommand = nil
+        shouldActivateCurrentOnNextStep = false
+        pendingStepIntent = nil
+        notifySessionDidChange()
+        return queryGeneration
+    }
+
+    /// Runs `compute` off the main actor (or on it for the negative-control seam) and applies
+    /// its output only while `fence` is still current.
+    ///
+    /// `Task.detached` does not inherit cancellation and the engine has no cancel points, so a
+    /// superseded worker still finishes and is dropped here; `droppedStaleMatchCount` stays a
+    /// real signal. Only `self` lifetime ends apply.
+    private func startMatchWork<Output: Sendable>(
+        fence: EditorFindMatchFence,
+        compute: @escaping @Sendable () -> Output,
+        apply: @escaping @MainActor (EditorFindController, Output) -> Void
+    ) {
+        matchTask?.cancel()
+        let hold = testMatchHold
+        let forceMain = forceMainActorMatchForTesting
+        matchTask = Task { @MainActor [weak self] in
+            let result: (output: Output, ranOffMain: Bool)
+            if forceMain {
+                if let hold {
+                    await hold.waitIfHeld()
+                }
+                // Negative control path: same computation on the main actor.
+                result = (compute(), Self.currentlyOffMainThread())
+            } else {
+                result = await Task.detached(priority: .userInitiated) {
+                    if let hold {
+                        await hold.waitIfHeld()
+                    }
+                    return (compute(), EditorFindController.currentlyOffMainThread())
+                }.value
+            }
+
+            guard let self else { return }
+            lastMatchRanOffMain = result.ranOffMain
+            let current = EditorFindMatchFence(
+                documentIdentity: documentBinding.identity,
+                sourceRevision: documentBinding.revision,
+                queryGeneration: queryGeneration
+            )
+            guard current == fence else {
+                droppedStaleMatchCount &+= 1
+                return
+            }
+            completedMatchCount &+= 1
+            apply(self, result.output)
+        }
+    }
+
+    /// Admits one verified single-Replace revision: one `afterOneReplace` rescan, run without
+    /// the typing debounce because Replace is one explicit command and the counter is blank
+    /// until it lands. A later edit, query, or rebind supersedes it like any generation.
+    func startReplacementGeneration(
+        plan: EditorReplaceOneMatchPlan,
+        text: String,
+        revision: UInt64
+    ) {
+        lastScheduleReason = .replacement(resumeUTF16: plan.resumeUTF16)
+        replacementScheduleCount &+= 1
+        documentBinding = EditorFindDocumentBinding(
+            identity: documentBinding.identity,
+            text: text,
+            revision: revision
+        )
+        let generation = beginGeneration()
+        let fence = EditorFindMatchFence(
+            documentIdentity: documentBinding.identity,
+            sourceRevision: revision,
+            queryGeneration: generation
+        )
+        replacementEngineInvocationCount &+= 1
+        startMatchWork(fence: fence) {
+            EditorReplaceContinuationPlanning.afterOneReplace(plan: plan, postWriteSource: text)
+        } apply: { controller, continuation in
+            controller.installContinuation(continuation, stepsRecordedFor: generation)
+        }
+    }
+
+    /// Installs a Replace continuation and emits its non-focus-stealing navigation: the new
+    /// current match, or the collapsed selection at `resumeUTF16` when none follows.
+    ///
+    /// ⌘G / ⇧⌘G pressed while `generation` was computing apply on top of the continuation,
+    /// each as one step past it (a navigating result, like `.query`). Pass `nil` when no
+    /// generation was in flight (literal-identical advance).
+    func installContinuation(
+        _ continuation: EditorReplaceContinuation,
+        stepsRecordedFor generation: UInt64?
+    ) {
+        var resolved = continuation.session
+        if let generation, let intent = pendingStepIntent, intent.generation == generation {
+            resolved = resolved.stepped(by: intent.netSteps)
+        }
+        pendingStepIntent = nil
+        shouldActivateCurrentOnNextStep = false
+        session = resolved
+        caretAnchorUTF16 = continuation.resumeUTF16
+        emitNavigation(to: resolved.currentMatch?.range ?? continuation.collapsedSelection)
+        notifySessionDidChange()
     }
 }

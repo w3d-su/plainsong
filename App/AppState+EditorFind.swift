@@ -302,7 +302,7 @@ extension AppState {
         } else if editorFindHost.controller.documentBinding.revision != binding.revision
             || editorFindHost.controller.documentBinding.text != binding.text
         {
-            editorFindHost.controller.consumeDocumentPublication(
+            editorFindHost.controller.documentTextDidChange(
                 text: binding.text,
                 revision: binding.revision
             )

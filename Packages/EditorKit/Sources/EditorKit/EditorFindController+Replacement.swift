@@ -1,147 +1,58 @@
 import Foundation
 import MarkdownCore
 
+/// A single Replace's native write in progress. Any publication that reaches Find
+/// during the write is recorded here instead of scheduling an ordinary `.edit`.
 struct EditorFindReplacementArm: Equatable {
-    let plan: EditorReplaceOneMatchPlan
-    let preWriteRevision: UInt64
+    var publication: EditorFindDocumentBinding?
 }
 
+/// Single-Replace handoff. The executor arms before its native insert and, once the
+/// writer-authorized closure has returned, either admits the observed post-write
+/// snapshot as one `.replacement` rescan or abandons the arm. Nothing here notifies
+/// session observers while the write is still running.
 extension EditorFindController {
-    var hasArmedReplacementPublication: Bool {
-        armedReplacementPublication != nil
+    func armReplacementPublication() {
+        armedReplacementPublication = EditorFindReplacementArm()
     }
 
-    var armedReplacementPreWriteRevision: UInt64? {
-        armedReplacementPublication?.preWriteRevision
-    }
-
-    func armReplacementPublication(
-        plan: EditorReplaceOneMatchPlan,
-        preWriteRevision: UInt64
-    ) {
-        armedReplacementPublication = EditorFindReplacementArm(
-            plan: plan,
-            preWriteRevision: preWriteRevision
-        )
-    }
-
-    func disarmReplacementPublication() {
-        armedReplacementPublication = nil
-    }
-
-    /// Literal-identical continuation. Installs the retained session without a rescan.
-    func installUnchangedContinuation(_ continuation: EditorReplaceContinuation) {
-        session = continuation.session
-        caretAnchorUTF16 = continuation.resumeUTF16
-        shouldActivateCurrentOnNextStep = false
-        pendingStepIntent = nil
-        if let match = continuation.session.currentMatch {
-            emitNavigation(to: match.range)
-        } else {
-            emitNavigation(to: continuation.collapsedSelection)
-        }
-        notifySessionDidChange()
-    }
-
-    func scheduleReplacement(
-        plan: EditorReplaceOneMatchPlan,
-        text: String,
-        revision: UInt64
-    ) {
-        lastScheduleReason = .replacement(resumeUTF16: plan.resumeUTF16)
-        replacementScheduleCount &+= 1
-        cancelInFlightWork()
-        queryGeneration &+= 1
-        let generation = queryGeneration
-        documentBinding = EditorFindDocumentBinding(
+    /// Called by `documentTextDidChange` for a changed binding. Returns `true` when the
+    /// publication belongs to an armed write and was only recorded.
+    func recordArmedReplacementPublication(text: String, revision: UInt64) -> Bool {
+        guard armedReplacementPublication != nil else { return false }
+        recordedReplacementPublicationCount &+= 1
+        armedReplacementPublication?.publication = EditorFindDocumentBinding(
             identity: documentBinding.identity,
             text: text,
             revision: revision
         )
-        let debounce = debounceNanoseconds
-        let fence = EditorFindMatchFence(
-            documentIdentity: documentBinding.identity,
-            sourceRevision: revision,
-            queryGeneration: generation
-        )
-        session = nil
-        pendingNavigationCommand = nil
-        shouldActivateCurrentOnNextStep = false
-        pendingStepIntent = nil
-        notifySessionDidChange()
-
-        debounceTask = Task { @MainActor [weak self] in
-            if debounce > 0 {
-                try? await Task.sleep(nanoseconds: debounce)
-            }
-            guard !Task.isCancelled, let self else { return }
-            runReplacementMatch(plan: plan, text: text, fence: fence)
-        }
+        return true
     }
 
-    private func runReplacementMatch(
+    /// The executor verified that `text` at `revision` is exactly the planned post-write
+    /// source. That revision is consumed once, by one `afterOneReplace` rescan; a recorded
+    /// publication of the same write is superseded by it and never becomes an `.edit`.
+    func admitReplacementPublication(
         plan: EditorReplaceOneMatchPlan,
         text: String,
-        fence: EditorFindMatchFence
+        revision: UInt64
     ) {
-        matchTask?.cancel()
-        let hold = testMatchHold
-        let forceMain = forceMainActorMatchForTesting
-        matchTask = Task { @MainActor [weak self] in
-            let searched: (EditorReplaceContinuation, Bool)
-            if forceMain {
-                if let hold {
-                    await hold.waitIfHeld()
-                }
-                searched = (
-                    EditorReplaceContinuationPlanning.afterOneReplace(
-                        plan: plan,
-                        postWriteSource: text
-                    ),
-                    Self.currentlyOffMainThread()
-                )
-            } else {
-                searched = await Task.detached(priority: .userInitiated) {
-                    if let hold {
-                        await hold.waitIfHeld()
-                    }
-                    return (
-                        EditorReplaceContinuationPlanning.afterOneReplace(
-                            plan: plan,
-                            postWriteSource: text
-                        ),
-                        EditorFindController.currentlyOffMainThread()
-                    )
-                }.value
-            }
+        armedReplacementPublication = nil
+        startReplacementGeneration(plan: plan, text: text, revision: revision)
+    }
 
-            guard let self else { return }
-            replacementEngineInvocationCount &+= 1
-            lastMatchRanOffMain = searched.1
-            let current = EditorFindMatchFence(
-                documentIdentity: documentBinding.identity,
-                sourceRevision: documentBinding.revision,
-                queryGeneration: queryGeneration
-            )
-            guard current == fence else {
-                droppedStaleMatchCount &+= 1
-                return
-            }
-            completedMatchCount &+= 1
-            applyReplacementContinuation(searched.0)
+    /// The write did not produce the planned source. A publication recorded during it is
+    /// handed back as an ordinary edit (counter-only, no navigation).
+    func abandonReplacementPublication() {
+        guard let arm = armedReplacementPublication else { return }
+        armedReplacementPublication = nil
+        if let publication = arm.publication {
+            documentTextDidChange(text: publication.text, revision: publication.revision)
         }
     }
 
-    private func applyReplacementContinuation(_ continuation: EditorReplaceContinuation) {
-        session = continuation.session
-        caretAnchorUTF16 = continuation.resumeUTF16
-        shouldActivateCurrentOnNextStep = false
-        pendingStepIntent = nil
-        if let match = continuation.session.currentMatch {
-            emitNavigation(to: match.range)
-        } else {
-            emitNavigation(to: continuation.collapsedSelection)
-        }
-        notifySessionDidChange()
+    /// Literal-identical continuation. Installs the retained session without a rescan.
+    func installUnchangedContinuation(_ continuation: EditorReplaceContinuation) {
+        installContinuation(continuation, stepsRecordedFor: nil)
     }
 }

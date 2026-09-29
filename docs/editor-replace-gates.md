@@ -17,13 +17,17 @@
 > introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
 > **PR D (`phase3-editor-replace-single`) is the source-only single Replace:** it
 > closes R2 and the R3 publication/writer/literal-identical integration bullets.
-> A revision armed by the executor is consumed once as
-> `EditorFindScheduleReason.replacement`; the ordinary `.edit` schedule for that
-> revision does not run. Experimental WYSIWYG is a typed zero-effect refusal
-> (`wysiwygPresentationInstalled`) while fold or image presentation is installed;
-> PR F lifts it. There is still no product UI, App lifecycle policy, or Replace All.
-> R4–R10 stay open. R6 marked-text coverage here is the deterministic editor
-> refusal only.
+> The executor arms Find for its own native write; a publication that reaches
+> Find during the write is recorded, not scheduled as `.edit`, and no Find
+> observer runs inside the writer-authorized closure. The outcome comes from the
+> observed post-write snapshot: exactly the planned source at a newer revision is
+> admitted once as `EditorFindScheduleReason.replacement`, without the typing
+> debounce; an unchanged snapshot is `writeNotApplied`, and any other change is
+> an `unverifiedWrite` recomputed as an ordinary edit. Experimental WYSIWYG is a
+> typed zero-effect refusal (`wysiwygPresentationInstalled`) while fold or image
+> presentation is installed; PR F lifts it. There is still no product UI, App
+> lifecycle policy, or Replace All. R4–R10 stay open. R6 marked-text coverage
+> here is the deterministic editor refusal only.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -808,7 +812,14 @@ hosted spike PR #112.
   `testCanonicalDifferenceIsARealEdit`);
   `EditorReplaceLayeringTests` (`testAppAndMarkdownCoreDoNotImportSTTextView`,
   `testSingleReplaceDoesNotUseForbiddenMutationAPIs`,
-  `testNoProjectOrPackageDependencyChange`).
+  `testNoProjectOrPackageDependencyChange`); these read checked-in sources and
+  manifests only (no git refs), pinning every `.package` declaration,
+  `project.yml` package/target/dependency entry, and preview-src npm dependency
+  name. `EditorReplaceWriteOutcomeTests` (`testRefusedNativeInsertionIsNotReportedAsReplaced`,
+  `testRejectedPublicationIsNotReportedAsReplaced`) prove a refused insertion or
+  rejected publication is `.refused(.writeNotApplied)` with Find untouched, and
+  `testTypingAfterReplaceIsASeparateUndoStep` proves key-event typing after
+  Replace is its own undo group (one Undo keeps the replacement).
   WYSIWYG presentation installed is refused with zero effect
   (`testWYSIWYGPresentationRefusesWithZeroEffect`); R5 stays open for PR F.
 
@@ -858,12 +869,21 @@ hosted spike PR #112.
   Integration bullets —
   `EditorReplacePublicationTests` (`testReplacementRescansOnceAndSkipsTheInsertedSpan`,
   `testSameRevisionOrdinaryEditCannotWin`,
-  `testNoLaterMatchCollapsesAtResumeWithoutWrap`);
+  `testNoLaterMatchCollapsesAtResumeWithoutWrap`,
+  `testStepPressedDuringReplacementRescanIsApplied`,
+  `testReplacementRescanDoesNotWaitForTypingDebounce`,
+  `testEditDuringReplacementRescanSupersedesContinuation`,
+  `testRoutedPublicationNotifiesFindAfterTheWriterClosure`);
   `EditorReplaceExecutorTests.testLiteralIdenticalAdvancesWithoutWriterRevisionUndoOrRescan`,
   `testLiteralIdenticalAtLastMatchCollapsesWithoutWrap`;
-  `EditorReplaceSingleReplaceAppTests.testSingleReplacePublishesToDocumentConsumersAndRescansOnce`
-  (document text stream, dirty state, and autosave scheduling still run; Find
-  admits one `.replacement` rescan and zero `.edit` schedules for that revision).
+  `EditorReplaceWriteOutcomeTests` (`testNonUnitRevisionAdvanceStillAdmitsOneReplacementRescan`,
+  `testReconciledPublicationIsAnUnverifiedWriteAndAnOrdinaryEdit`);
+  `EditorReplaceSingleReplaceAppTests` (`testSingleReplacePublishesToDocumentConsumersAndRescansOnce`:
+  document text stream, dirty state, and autosave scheduling still run; Find
+  admits one `.replacement` rescan and zero `.edit` schedules for that revision.
+  `testAppRoutedPublicationNotifiesFindObserversAfterTheWrite`: App's
+  publication reaches Find inside the write, is recorded once, and Find's
+  session observer runs only after the writer-authorized closure).
   `EditorReplaceOffsetMappingTests` covers two preceding unequal-length edits,
   adjacent-match start mapping, current-match end ownership at an adjacent
   following edit, and clamping all three batch caret outputs to

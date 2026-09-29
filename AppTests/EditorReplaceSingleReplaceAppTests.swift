@@ -69,6 +69,59 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         collector.cancel()
     }
 
+    /// App routes the post-write publication to Find inside the native write. Find's
+    /// session observer (App presentation and navigation) must still run only after
+    /// the writer-authorized closure returns.
+    func testAppRoutedPublicationNotifiesFindObserversAfterTheWrite() async throws {
+        let source = "a a"
+        let hostedSession = try makeHostedSession(source: source)
+        let appState = hostedSession.appState
+        let hosted = hostedSession.fixture
+        let identity = try XCTUnwrap(appState.activeEditorDocumentIdentity)
+        let controller = appState.editorFindHost.controller
+        let findSession = try await preparedFindSession(
+            appState: appState,
+            controller: controller,
+            identity: identity,
+            source: source,
+            textView: hosted.textView
+        )
+        let appObserver = try XCTUnwrap(controller.onSessionDidChange)
+        let depths = DepthLog()
+        let coordinator = hosted.coordinator
+        controller.onSessionDidChange = {
+            depths.values.append(coordinator.writerAuthorizedTextMutationDepth)
+            appObserver()
+        }
+
+        let outcome = coordinator.performSingleReplace(
+            EditorReplaceRequest(
+                documentIdentity: identity,
+                sourceRevision: controller.documentBinding.revision,
+                queryGeneration: controller.queryGeneration,
+                session: findSession,
+                replacement: "aa"
+            ),
+            authorization: .allowed(),
+            controller: controller,
+            in: hosted.textView
+        )
+        guard case .replaced = outcome else {
+            return XCTFail("Expected a source change, got \(outcome)")
+        }
+        XCTAssertEqual(hostedSession.session.version, 1)
+        XCTAssertEqual(controller.documentBinding.revision, 1)
+        // App's ordinary publication reached Find during the write and was recorded,
+        // not scheduled as `.edit`.
+        XCTAssertEqual(controller.recordedReplacementPublicationCount, 1)
+        try await waitUntil { controller.session?.currentOrdinal == 3 }
+        XCTAssertFalse(depths.values.isEmpty)
+        XCTAssertEqual(Set(depths.values), [0])
+        XCTAssertEqual(controller.replacementScheduleCount, 1)
+        XCTAssertEqual(controller.replacementEngineInvocationCount, 1)
+        XCTAssertEqual(controller.editScheduleCount, 0)
+    }
+
     private func assertPublication(
         session: DocumentSession,
         appState: AppState,
@@ -209,4 +262,8 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
 
 private final class PublishedText: @unchecked Sendable {
     var values: [DocumentTextChange] = []
+}
+
+private final class DepthLog {
+    var values: [Int] = []
 }

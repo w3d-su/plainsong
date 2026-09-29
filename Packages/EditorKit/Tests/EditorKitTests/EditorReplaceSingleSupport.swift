@@ -64,6 +64,18 @@ enum EditorReplaceSingleSupport {
         return controller
     }
 
+    /// Routes every accepted publication to Find inside the native write, the way
+    /// App's `notifyEditorFindDocumentDidChange` does.
+    static func routePublicationsToFind(_ ready: Ready) {
+        let controller = ready.controller
+        ready.fixture.model.onAcceptedPublication = { snapshot in
+            controller.documentTextDidChange(
+                text: snapshot.source,
+                revision: UInt64(snapshot.revision)
+            )
+        }
+    }
+
     static func request(
         controller: EditorFindController,
         session: EditorFindSession,
