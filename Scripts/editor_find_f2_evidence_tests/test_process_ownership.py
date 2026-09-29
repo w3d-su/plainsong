@@ -231,7 +231,10 @@ f2_cleanup_control_directory || exit 24
         command = f"""
 source {shlex.quote(str(capture / 'processes.sh'))}
 source {shlex.quote(str(capture / 'monitor.sh'))}
-/bin/bash --noprofile --norc -c 'while :; do /bin/sleep 1; done' &
+# Like f2_monitor_supervisor, the fixture ignores TERM. Otherwise macOS can
+# deliver f2_stop_monitor's TERM to the stopped fixture and bash reaps it
+# before the ownership check, which is a different case from the one tested.
+/bin/bash --noprofile --norc -c 'trap "" TERM; while :; do /bin/sleep 1; done' &
 F2_ACTIVE_MONITOR_PID=$!
 F2_MONITOR_LIFECYCLE=signalable
 F2_CONTROL_DIRECTORY=$(/usr/bin/mktemp -d /private/tmp/plainsong-f2-monitor.XXXXXX)
