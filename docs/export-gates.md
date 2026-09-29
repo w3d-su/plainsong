@@ -425,8 +425,8 @@ did not exercise the ownership inspection. External volumes were not tested.
 - **Q2 — external volumes: accepted as untested.** PR E2 fails closed on cross-device
   staging and on missing exclusive/swap-rename support. PR F's owner smoke case (e) records
   real external-volume evidence.
-- **Q3 — file mode: pending owner confirmation.** The retired writer created `0600`, like
-  Save Copy; the probe used `0644`. Recommended default:
+- **Q3 — file mode: decided.** The retired writer created `0600`, like Save Copy; the
+  probe used `0644`. PR E2 does this:
   - a new leaf gets the process umask default (`0666 & ~umask`, normally `0644`), matching
     other macOS apps' saved files;
   - a confirmed overwrite keeps the displaced file's permission bits, as `NSDocument` does.
@@ -488,8 +488,7 @@ Also rejected by the 2026-09-29 amendment:
 
 **Owner sign-off:** Required because this is an explicit, narrowly bounded exception to
 the repository's strongest filesystem-authority policy. The 2026-09-29 mechanism amendment
-needs owner approval of its docs PR, plus Q3's answer before PR E2 lands (Q1/Q2 recorded
-2026-09-29).
+needs owner approval of its docs PR. Q1–Q3 were answered 2026-09-29.
 
 ## 4. Layering
 
