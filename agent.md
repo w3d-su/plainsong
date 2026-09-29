@@ -249,6 +249,8 @@ replacement local to EditorKit.
 | Inline code | (Format menu; ⌘E is Use Selection for Find) | `` `…` `` |
 | Use Selection for Find | ⌘E | set find pattern from selection; does not show bar |
 | Link | ⌘K | `[sel](cursor)` |
+| Insert Inline Math | (Format menu) | `$x$` with `x` selected, or wrap a single-line selection as `$sel$`; inside an existing formula selects its content instead; refused (beep, no edit) in frontmatter, code, or next to an unescaped `$` |
+| Insert Display Math | (Format menu) | `$$` block padded to paragraph breaks; inside an existing formula selects its content; refused (beep, no edit) in frontmatter, code, or on list/quote/heading/table lines |
 | Heading 1–6 | ⌘1…⌘6 | replace line prefix |
 | Paragraph | ⌘0 | strip heading prefix |
 | Quote | ⌘⇧Q | toggle `> ` |
