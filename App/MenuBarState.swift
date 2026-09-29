@@ -9,6 +9,7 @@ import Foundation
 struct MenuBarSnapshot: Equatable {
     var hasOpenDocument: Bool
     var canSave: Bool
+    var canExportHTML: Bool
     var canUseWorkspaceSearch: Bool
     var layoutModeCommandTitle: String
     var recentItemURLs: [URL]
@@ -17,6 +18,7 @@ struct MenuBarSnapshot: Equatable {
     init(appState: AppState) {
         hasOpenDocument = appState.hasOpenDocument
         canSave = appState.canSave
+        canExportHTML = appState.canExportCurrentDocumentAsHTML
         canUseWorkspaceSearch = appState.canUseWorkspaceSearch
         layoutModeCommandTitle = appState.layoutModeCommandTitle
         recentItemURLs = appState.recentItemURLs

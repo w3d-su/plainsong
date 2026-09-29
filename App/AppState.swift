@@ -324,6 +324,8 @@ final class AppState: ObservableObject {
     var workspaceMutationTextRecoveryLoadError: Error?
     @Published var workspaceMutationOperationRecoveryLoadFailed = false
     @Published var workspaceMutationTextRecoveryLoadFailed = false
+    /// Export as HTML… operation bookkeeping (`AppState+ExportHTML.swift`).
+    var exportHTMLOperations = ExportHTMLOperationRegistry()
     let preferences: PlainsongPreferences
     private(set) var isWYSIWYGMechanismHealthy = true
 
@@ -879,11 +881,6 @@ final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
             authority.stop()
         }
     }
-}
-
-struct SessionBackgroundTask {
-    let token: UUID
-    let task: Task<Void, Never>
 }
 
 struct ExternalReloadTask {

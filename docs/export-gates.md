@@ -6,7 +6,9 @@
 > E4; E1 stays partial. PR E lands the headless one-shot WorkspaceKit artifact writer
 > (writer-level E6 bullets except the sibling bullet, and the E9 dependency bullet).
 > The rest of E5–E9 remains open. PR D's review fixes add an optional `dataURIFrom`
-> reference to resource outcomes, so `PROTOCOL_VERSION` is 8.** Precedent:
+> reference to resource outcomes, so `PROTOCOL_VERSION` is 8. PR F Phase A wires a minimal
+> File › Export as HTML… path and adds the blocking E6 owner Powerbox smoke; it checks no
+> box until the owner records that smoke.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -796,6 +798,92 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   save-panel leaf grant authorizes the sibling staging create is unproven and likely denied
   (leaf grants already cannot read siblings, `agent.md` M2). PR F's owner smoke must record
   it; a coordinated safe-save alternative needs a docs PR and Decision Log row (§7).
+
+#### E6 owner Powerbox smoke (PR F Phase A, blocking)
+
+Hosted tests cannot show a real `NSSavePanel`; they write only inside the app container
+(`ExportHTMLCommandAppTests`). Only this owner run shows whether a leaf-only panel grant lets
+the writer anchor the chosen folder and create its one random `.plainsong-*` staging sibling.
+Record every `Result:` line in the commit that checks, or leaves unchecked, the leaf-grant
+bullet above. Copy the whole alert text: it names the exact `ExportArtifactFailure.…` case, or
+every exact path for a write that could not be confirmed.
+
+**Decision rule.** If (b) or (c) fails with `ExportArtifactFailure.stagingNotPermitted(…)` or
+`ExportArtifactFailure.parentAuthorityUnavailable` (in either "Nothing was written. Reason: …"
+or "The destination was refused: …"), this is a **design stop**. Do not add a fallback write
+path. The next step is a separate docs PR plus a `docs/decision-log.md` row choosing a
+coordinated safe-save (for example `NSFileCoordinator` / `itemReplacementDirectory`) and
+amending D5. If every case passes, check the leaf-grant bullet with these results and continue
+to PR F Phase B.
+
+Setup (once):
+
+1. In the PR F worktree run `make build`. The app is `Plainsong.app` inside the folder printed by
+   `xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -showBuildSettings | grep -m1 ' BUILT_PRODUCTS_DIR'`.
+   Alternatively, open `Plainsong.xcodeproj` in Xcode and run the **Plainsong** scheme (Debug).
+2. Confirm the sandbox is on: `codesign -d --entitlements - <that folder>/Plainsong.app` lists
+   `com.apple.security.app-sandbox` and `com.apple.security.files.user-selected.read-write`,
+   both `true`.
+3. Quit every other running copy of Plainsong, then launch this build (`open <that folder>/Plainsong.app`).
+4. In Terminal: `mkdir -p ~/plainsong-export-smoke/exports`, then create
+   `~/plainsong-export-smoke/post.md` containing `# Powerbox smoke` and one paragraph.
+5. Record the macOS version (`sw_vers -productVersion`) and whether Desktop & Documents sync to
+   iCloud (System Settings › Apple Account › iCloud › iCloud Drive).
+   - macOS version / iCloud Desktop & Documents:
+
+After each case run `ls -la <destination folder> | grep plainsong-`. Expected: no leftover
+`.plainsong-*` or `.plainsong-cleanup-*` entry. After a successful case the editor text, the
+dirty indicator, the window title, the sidebar selection and File › Open Recent are unchanged.
+
+- **(a) A folder inside the open workspace.**
+  1. File › Open…, choose the folder `~/plainsong-export-smoke`, then select `post.md` in the sidebar.
+  2. File › Export as HTML…. Expected: a save sheet on the window, named `post.html`, allowing only HTML.
+  3. Go to `~/plainsong-export-smoke/exports`, keep `post.html`, click **Export**.
+  4. Expected: alert **Exported as HTML** — "Wrote /Users/…/plainsong-export-smoke/exports/post.html."
+     The file opens in Safari with the rendered heading and no leftover `.plainsong-*` entry.
+  - Result:
+- **(b) `~/Desktop`, outside any workspace.**
+  1. Keep the workspace from (a) open, with `post.md` selected.
+  2. File › Export as HTML…, choose **Desktop**, name it `plainsong-smoke-b.html`, click **Export**.
+  3. Expected: **Exported as HTML** — "Wrote /Users/…/Desktop/plainsong-smoke-b.html." with no
+     leftover `.plainsong-*` entry on the Desktop. On failure, record the alert text and apply
+     the decision rule.
+  - Result:
+- **(c) `~/Documents`.**
+  1. As (b), but choose **Documents** and name it `plainsong-smoke-c.html`.
+  2. Expected: as (b), at `/Users/…/Documents/plainsong-smoke-c.html`.
+  - Result:
+- **(d) Overwrite an existing `.html`, confirmed in the panel.**
+  1. In Terminal: `printf '<p>old</p>' > ~/Desktop/plainsong-smoke-d.html`.
+  2. Change the heading in `post.md` to `# Overwrite smoke` and press ⌘S.
+  3. File › Export as HTML…, choose **Desktop**, name it `plainsong-smoke-d.html`, click
+     **Export**, then click **Replace** in the panel's confirmation.
+  4. Expected: **Exported as HTML**. `head -c 200 ~/Desktop/plainsong-smoke-d.html` starts
+     with `<!DOCTYPE html>`, the file contains `Overwrite smoke` and not `<p>old</p>`, and no
+     `.plainsong-*` or `.plainsong-cleanup-*` entry remains. If the alert is **HTML Export Could
+     Not Be Confirmed**, record its whole text: it names where the original file now is.
+  5. Control: repeat steps 3–4 onto `~/plainsong-export-smoke/exports/post.html` from (a).
+  - Result (Desktop):
+  - Result (workspace control):
+- **(e) iCloud Drive or an external volume, if available.**
+  1. File › Export as HTML…, choose a folder in **iCloud Drive** or on a mounted external
+     volume, name it `plainsong-smoke-e.html`, click **Export**.
+  2. For a volume, record its format: `diskutil info /Volumes/<name> | grep 'File System Personality'`.
+  3. Expected: success, or, on a volume without exclusive/swap rename (for example exFAT or
+     FAT32), `ExportArtifactFailure.unsupportedVolumeSemantics` with nothing written. Never a
+     partial file.
+  - Location and format / Result:
+- **(f) Single-file mode (no workspace).**
+  1. File › Open…, choose the file `~/plainsong-export-smoke/post.md`, not the folder. The
+     sidebar shows no workspace.
+  2. File › Export as HTML…, choose **Desktop**, name it `plainsong-smoke-f.html`, click **Export**.
+  3. Expected: **Exported as HTML** at `/Users/…/Desktop/plainsong-smoke-f.html`, with no leftover
+     `.plainsong-*` entry. A local image would become an alt-text placeholder here (the M2
+     single-file limitation); that is not a failure.
+  - Result:
+
+Also record any unexpected permission prompt, then delete the `plainsong-smoke-*` files and
+`~/plainsong-export-smoke`.
 
 ### E7 — App / File-menu UX and side-effect isolation
 
