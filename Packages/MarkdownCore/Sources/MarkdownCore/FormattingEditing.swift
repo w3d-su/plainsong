@@ -4,7 +4,8 @@ enum FormattingEditing {
     static func apply(
         _ command: MarkdownFormattingCommand,
         to text: String,
-        selection: NSRange
+        selection: NSRange,
+        fileKind: FileKind
     ) -> MarkdownEditResult? {
         switch command {
         case .bold:
@@ -25,6 +26,10 @@ enum FormattingEditing {
             toggleQuote(in: text, selection: selection)
         case .codeFence:
             toggleCodeFence(in: text, selection: selection)
+        case .insertInlineMath:
+            MathEditing.insertInlineMath(in: text, selection: selection, fileKind: fileKind)
+        case .insertDisplayMath:
+            MathEditing.insertDisplayMath(in: text, selection: selection, fileKind: fileKind)
         }
     }
 

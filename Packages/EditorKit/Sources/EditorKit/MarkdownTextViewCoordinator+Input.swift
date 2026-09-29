@@ -35,8 +35,18 @@ extension MarkdownTextViewCoordinator {
         guard let proposal = EditingBehaviorsSupport.proposedCommand(
             command,
             in: textView,
-            editingGuard: editingBehaviorGuard
+            editingGuard: editingBehaviorGuard,
+            fileKind: commandProxy?.currentFileKind() ?? .markdown
         ) else {
+            // A math command that resolves to no edit (unsafe context) beeps; a
+            // nil proposal while IME marked text or a re-entrant edit is active
+            // stays silent like every other command.
+            if EditingBehaviorsSupport.isMathCommand(command),
+               !editingBehaviorGuard.isApplying,
+               !textView.hasMarkedText()
+            {
+                NSSound.beep()
+            }
             return
         }
 
