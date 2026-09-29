@@ -78,13 +78,13 @@ enum MathInsertionContext {
 
     // MARK: - Frontmatter, fences, and `$$` blocks
 
-    private struct OpenRegion {
-        enum Kind {
-            case fence(marker: unichar, length: Int)
-            case dollarBlock
-        }
+    private enum OpenRegionKind {
+        case fence(marker: unichar, length: Int)
+        case dollarBlock
+    }
 
-        let kind: Kind
+    private struct OpenRegion {
+        let kind: OpenRegionKind
         let isFormula: Bool
         let start: Int
         let innerStart: Int
@@ -190,7 +190,6 @@ enum MathInsertionContext {
 
     // MARK: - Inline code and `$…$` spans
 
-    // swiftlint:disable:next cyclomatic_complexity
     private static func inlineVerdict(in line: MarkdownLine, selection: NSRange) -> MathInsertionVerdict? {
         let units = Array(line.text.utf16)
         let base = line.range.location
@@ -259,7 +258,6 @@ enum MathInsertionContext {
         return true
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
     private static func startsBlockConstruct(_ line: String) -> Bool {
         let units = Array(line.utf16)
         let indent = leadingSpaces(units)
@@ -271,7 +269,9 @@ enum MathInsertionContext {
             return next < units.count && (units[next] == 32 || units[next] == 9)
         }
         var digits = 0
-        while indent + digits < units.count, (0x30 ... 0x39).contains(units[indent + digits]) { digits += 1 }
+        while indent + digits < units.count, (0x30 ... 0x39).contains(units[indent + digits]) {
+            digits += 1
+        }
         let after = indent + digits
         guard digits > 0, digits <= 9, after + 1 < units.count else { return false }
         return (units[after] == 0x2E || units[after] == 0x29) && (units[after + 1] == 32 || units[after + 1] == 9)
@@ -281,13 +281,17 @@ enum MathInsertionContext {
 
     private static func leadingSpaces(_ units: [unichar]) -> Int {
         var count = 0
-        while count < units.count, units[count] == 32 { count += 1 }
+        while count < units.count, units[count] == 32 {
+            count += 1
+        }
         return count
     }
 
     private static func runLength(_ units: [unichar], at index: Int, of marker: unichar) -> Int {
         var length = 0
-        while index + length < units.count, units[index + length] == marker { length += 1 }
+        while index + length < units.count, units[index + length] == marker {
+            length += 1
+        }
         return length
     }
 
