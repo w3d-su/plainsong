@@ -48,7 +48,7 @@ Signed + notarized builds arrive when the release plan's P1/P2 resume
 
 Everything an agent or human needs to work on this codebase lives in
 [`agent.md`](agent.md) — architecture, layering rules, milestone roadmap, and the
-Decision Log. Read it before writing code.
+[Decision Log](docs/decision-log.md) (linked from §18). Read `agent.md` before writing code.
 
 Useful planning and handoff docs:
 
