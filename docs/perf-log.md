@@ -1225,5 +1225,5 @@ remain separately owned by PR D/G.
   number is informational, not the WebKit gate. It is roughly 10x the general-document
   median at this formula density; whether KaTeX CPU dominates is an unverified
   hypothesis — a segmented measurement or profile would be required to attribute it.
-  Real WebKit acceptance for math remains a PR C gate; no budget was changed and no
-  caching layer was added (per the math plan: measure first, cache only with evidence).
+  Real WebKit acceptance for math-dense documents remains open; no budget was changed and
+  no caching layer was added (measure first, cache only with evidence).
