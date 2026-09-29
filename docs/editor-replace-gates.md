@@ -15,7 +15,23 @@
 > B1 slice builder validates and rebases absolute ranges; mapped batch caret,
 > session anchor, and collapsed selection share one post-write clamp. PR C
 > introduces no mutation, UI, STTextView type, dependency, or `project.yml` change.
-> R2, R3 publication/writer bullets, and R4–R10 stay open.
+> **PR D (`phase3-editor-replace-single`) is the source-only single Replace:** it
+> closes R2 and the R3 publication/writer/literal-identical integration bullets.
+> The executor arms Find for its own native write; a publication that reaches
+> Find during the write is recorded, not scheduled as `.edit`, and no Find
+> observer runs inside the writer-authorized closure. The outcome comes from the
+> observed post-write snapshot: exactly the planned source at a newer revision is
+> admitted once as `EditorFindScheduleReason.replacement`, without the typing
+> debounce; an unchanged snapshot is `writeNotApplied`, and any other change is
+> an `unverifiedWrite` recomputed as an ordinary edit. Experimental WYSIWYG is a
+> typed zero-effect refusal (`wysiwygPresentationInstalled`) while fold or image
+> presentation is installed; PR F lifts it. There is still no product UI, App
+> lifecycle policy, or Replace All. R4–R10 stay open. R6 marked-text coverage
+> here is the deterministic editor refusal only. Known follow-ups: a publication
+> rejected after writer activation leaves a no-op undo step behind
+> `.refused(.writeNotApplied)` (existing writer-path behavior, tracked under R7);
+> `EditorFindController.swift` is 588 lines with a 287-line class body and should
+> be split without widening its private state.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -647,7 +663,7 @@ latency work or edit its shared surfaces concurrently.
 | **A — this PR** | Spec only: `docs/editor-replace-gates.md` + one concise Decision Log row. No behavior, dependency, code, tests, or checked box. | none |
 | **B — mechanism spike** | **R0 only.** Hosted writer-authority fixture; compare authorized outer-group/reverse edits, one minimal-enclosing-range edit, and full-document fallback separately. Record undo/redo, publication, prior-typing separation, selection, WYSIWYG, Unicode, near-ceiling, bounds, and 1 MiB evidence. No user-facing Replace. | R0 or a recorded NO-GO/design stop |
 | **C — pure model** | MarkdownCore plans, 256-code-unit validation, identical-range filtering, ceiling/output math, continuation/anchor state, full-rescan ordinal behavior, and pattern/boundary cases. No mutation or UI. | R1 and R3 model bullets |
-| **D — source-only single Replace** | EditorKit current-match executor through writer activation, exact applied selection, native undo, replacement-aware publication, one rescan, and ordinal continuation. No App lifecycle policy, visible UI, or WYSIWYG overlap work. | R2 and R3 integration |
+| **D — source-only single Replace** | EditorKit current-match executor through writer activation, exact applied selection, native undo, replacement-aware publication, one rescan, and ordinal continuation. No App lifecycle policy, visible UI, or WYSIWYG overlap work. **Outcome:** R2 and the R3 integration bullets close. WYSIWYG presentation installed refuses with zero effect until PR F. | R2 and R3 integration |
 | **E — App authorization/lifecycle** | Plain App commit authorization, external/reload/quarantine fences, monotonic plan supersession, untitled authority, key-window/install proof, and hosted lifecycle matrix. No new product chrome. | R7 |
 | **F — Experimental WYSIWYG** | Single-Replace raw-source reveal/suspend/reapply for folded delimiter, hidden link destination, and image region; source+preview publication. | R5 single-Replace/source-preview bullets; R5 remains open |
 | **G — Replace All pipeline** | R0-approved executor, bounded off-main cancellable plan/progress, stale-drop, output/ceiling refusal, changed/total reporting, one rescan, mapped anchor, one undo, and one batch WYSIWYG suspend/reapply. | R4, R5 batch bullet, and Replace All portions of R2/R3 |
@@ -773,30 +789,49 @@ hosted spike PR #112.
 
 ### R2 — Exact current-match mutation through writer activation
 
-- [ ] Replace requires exact identity/revision/query generation, current match,
+- [x] Replace requires exact identity/revision/query generation, current match,
   installed state, and applied selection range.
-- [ ] A not-yet-applied match navigates/reveals only; it does not mutate or
+- [x] A not-yet-applied match navigates/reveals only; it does not mutate or
   queue a later mutation.
-- [ ] The successful character edit runs only inside the WS3B
+- [x] The successful character edit runs only inside the WS3B
   writer-authorized synchronous closure and uses native insertion.
-- [ ] `STTextFinderClient.replaceCharacters`, direct `textStorage` character
+- [x] `STTextFinderClient.replaceCharacters`, direct `textStorage` character
   writes, and App binding assignment are absent.
-- [ ] App and MarkdownCore import/name no STTextView type; concrete editor
+- [x] App and MarkdownCore import/name no STTextView type; concrete editor
   mutation remains confined to EditorKit.
-- [ ] No new Swift/npm dependency or project-target change is introduced.
-- [ ] Failed App authorization has zero source/selection/ordinal/progress/undo
+- [x] No new Swift/npm dependency or project-target change is introduced.
+- [x] Failed App authorization has zero source/selection/ordinal/progress/undo
   effect. Failed writer preflight may only synchronize stale native source and
   clamp selection under its existing contract; it performs no replacement,
   opens no replacement undo group, and queues no retry.
-- [ ] One source-changing Replace is one native undo step and preserves prior
+- [x] One source-changing Replace is one native undo step and preserves prior
   undo history; the literal-identical path creates no undo entry.
-- Evidence: _open_
+- Evidence: `EditorReplaceExecutorTests` (`testSourceChangeIsOneUndoAndPreservesPriorTyping`,
+  `testNotAppliedMatchNavigatesWithoutMutationOrQueue`,
+  `testMarkedTextRefusesBeforeAuthorization`,
+  `testAuthorizationRefusalHasZeroEffectBeforeWriterPreflight`,
+  `testStaleWriterPreflightOpensNoReplacementUndo`,
+  `testStaleIdentityAndInvalidReplacementDoNotMutate`,
+  `testLiteralIdenticalAdvancesWithoutWriterRevisionUndoOrRescan`,
+  `testCanonicalDifferenceIsARealEdit`);
+  `EditorReplaceLayeringTests` (`testAppAndMarkdownCoreDoNotImportSTTextView`,
+  `testSingleReplaceDoesNotUseForbiddenMutationAPIs`,
+  `testNoProjectOrPackageDependencyChange`); these read checked-in sources and
+  manifests only (no git refs), pinning every `.package` declaration,
+  `project.yml` package/target/dependency entry, and preview-src npm dependency
+  name. `EditorReplaceWriteOutcomeTests` (`testRefusedNativeInsertionIsNotReportedAsReplaced`,
+  `testRejectedPublicationIsNotReportedAsReplaced`) prove a refused insertion or
+  rejected publication is `.refused(.writeNotApplied)` with Find untouched, and
+  `testTypingAfterReplaceIsASeparateUndoStep` proves key-event typing after
+  Replace is its own undo group (one Undo keeps the replacement).
+  WYSIWYG presentation installed is refused with zero effect
+  (`testWYSIWYGPresentationRefusesWithZeroEffect`); R5 stays open for PR F.
 
 ### R3 — Post-write rescan and ordinal
 
-- [ ] One source-changing Replace publishes authoritative post-write
+- [x] One source-changing Replace publishes authoritative post-write
   text/revision, then performs exactly one full existing-engine rescan.
-- [ ] Replacement-aware publication consumes that revision once, suppressing/
+- [x] Replacement-aware publication consumes that revision once, suppressing/
   coalescing the same revision's ordinary `.edit` Find schedule while all other
   document-text consumers still receive normal publication.
 - [x] `resumeUTF16 = oldStart + replacementUTF16Length`; new current is the
@@ -807,7 +842,7 @@ hosted spike PR #112.
   span are skipped for automatic continuation.
 - [x] Boundary-created/destroyed whole-word and canonical-equivalent matches
   come only from the full rescan, not delta-patched ranges.
-- [ ] A literal-identical single Replace performs no writer/revision/undo/
+- [x] A literal-identical single Replace performs no writer/revision/undo/
   rescan, but advances within the unchanged retained session without implicit
   wrap.
 - [x] A no-later source-changing or literal-identical Replace stores
@@ -835,14 +870,34 @@ hosted spike PR #112.
   `EditorFindSessionUnresolvedCurrentTests`.
   `testNoLaterMatchLeavesCurrentNilUntilExplicitNext` explicitly asserts the
   source-changing resume, session anchor, and collapsed selection before wrap.
+  Integration bullets —
+  `EditorReplacePublicationTests` (`testReplacementRescansOnceAndSkipsTheInsertedSpan`,
+  `testSameRevisionOrdinaryEditCannotWin`,
+  `testNoLaterMatchCollapsesAtResumeWithoutWrap`,
+  `testStepPressedDuringReplacementRescanIsApplied`,
+  `testReplacementRescanDoesNotWaitForTypingDebounce`,
+  `testEditDuringReplacementRescanSupersedesContinuation`,
+  `testRoutedPublicationNotifiesFindAfterTheWriterClosure`);
+  `EditorReplaceExecutorTests.testLiteralIdenticalAdvancesWithoutWriterRevisionUndoOrRescan`,
+  `testLiteralIdenticalAtLastMatchCollapsesWithoutWrap`;
+  `EditorReplaceWriteOutcomeTests` (`testNonUnitRevisionAdvanceStillAdmitsOneReplacementRescan`,
+  `testReconciledPublicationIsAnUnverifiedWriteAndAnOrdinaryEdit`,
+  `testClearForNoDocumentDuringWriteIsNotAdmitted`,
+  `testRebindDuringWriteIsNotAdmitted`,
+  `testUnobservableSnapshotAfterInsertIsUnverified`);
+  `EditorReplaceSingleReplaceAppTests` (`testSingleReplacePublishesToDocumentConsumersAndRescansOnce`:
+  document text stream, dirty state, and autosave scheduling still run; Find
+  admits one `.replacement` rescan and zero `.edit` schedules for that revision.
+  `testAppRoutedPublicationNotifiesFindObserversAfterTheWrite`: App's
+  publication reaches Find inside the write, is recorded once, and Find's
+  session observer runs only after the writer-authorized closure).
   `EditorReplaceOffsetMappingTests` covers two preceding unequal-length edits,
   adjacent-match start mapping, current-match end ownership at an adjacent
   following edit, and clamping all three batch caret outputs to
   the same post-write offset. `EditorReplaceSourceConstructionTests` also proves
   offset mapping rejects malformed suffixes even when the caret precedes them.
-  Publication, writer activation, revision, and undo remain PR D / R2. The
-  literal-identical *model* advance is covered; the no-writer/undo half of that
-  bullet stays open.
+  PR D closes the publication, writer, revision, undo, and literal-identical
+  integration bullets above. Replace All's writer/rescan half remains PR G.
 
 ### R4 — Replace All ceiling, cancellation, and progress
 
@@ -941,6 +996,13 @@ hosted spike PR #112.
 - [ ] Integration coverage includes a pending choice, suspended Reload,
   partial live-editor convergence, readable quarantine, and unavailable
   Check Again quarantine.
+- Known follow-up from PR D: if a publication is rejected after writer
+  activation succeeded, STTextView still registers the insert's undo group
+  after the view is restored, so `.refused(.writeNotApplied)` leaves a no-op
+  undo step (`EditorReplaceWriteOutcomeTests.testRejectedPublicationIsNotReportedAsReplaced`
+  does not assert undo for that reason). Ordinary typing shares this writer path;
+  App activation and publication check the same fences in one synchronous turn,
+  so no App path is known to reach it. Decide the undo contract here.
 - Evidence: _open_
 
 ### R8 — UI, menu, focus, and accessibility

@@ -24,6 +24,13 @@ enum EditorReplaceBatchSpikeSupport {
         var writerActivations = 0
         var publications: [String] = []
         let bindingID = EditorDocumentBindingID()
+        /// PR D publication knobs. Defaults keep the R0 accept-and-advance-by-one model.
+        var rejectsPublications = false
+        var revisionStep = 1
+        /// Accepts a different source than published, as an App reconciliation would.
+        var reconcilesPublication: ((String) -> String)?
+        /// Called after an accepted publication, as App routes it to Find.
+        var onAcceptedPublication: ((EditorDocumentSourceSnapshot) -> Void)?
 
         init(source: String) {
             self.source = source
@@ -59,9 +66,15 @@ enum EditorReplaceBatchSpikeSupport {
                 pendingSource: { _ in },
                 publish: { publication in
                     self.publications.append(publication.source)
-                    self.source = publication.source
-                    self.revision += 1
-                    return .accepted(self.snapshot, sourceWasReconciled: false)
+                    if self.rejectsPublications {
+                        return .rejected(self.snapshot)
+                    }
+                    let reconciled = self.reconcilesPublication?(publication.source)
+                    self.source = reconciled ?? publication.source
+                    self.revision += self.revisionStep
+                    let snapshot = self.snapshot
+                    self.onAcceptedPublication?(snapshot)
+                    return .accepted(snapshot, sourceWasReconciled: reconciled != nil)
                 }
             )
         }
