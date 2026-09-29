@@ -51,6 +51,30 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         XCTAssertNil(controller.pendingHTMLExport)
     }
 
+    func testResourceResolutionTaskIsCancelledWhenExportFinishes() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let resolution = Task<Void, Never> {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+        }
+        let result: PreviewHTMLExportResult = await withCheckedContinuation { continuation in
+            controller.pendingHTMLExport = PendingHTMLExport(
+                exportID: 4,
+                renderID: 4,
+                continuation: continuation
+            )
+            controller.pendingHTMLExport?.resolutionTask = resolution
+            controller.failPendingHTMLExport(reason: "cancelled")
+        }
+        guard case let .failed(reason, exportID, _) = result else {
+            return XCTFail("Expected cancellation, got \(result)")
+        }
+        XCTAssertEqual(reason, "cancelled")
+        XCTAssertEqual(exportID, 4)
+        XCTAssertTrue(resolution.isCancelled)
+        XCTAssertNil(controller.pendingHTMLExport)
+    }
+
     func testAlreadyCancelledTaskNeverStartsExport() async throws {
         let controller = try support.makeController()
         defer { controller.invalidate() }
@@ -113,6 +137,25 @@ final class ExportHTMLLifecycleTests: XCTestCase {
             state: .ready(html: "early")
         ))
         await assertFailure(task.value, reason: "invalid-export-phase")
+    }
+
+    func testDuplicateDiscoveredResourceIDsFailBeforeResolution() async throws {
+        let controller = try support.makeController()
+        defer { controller.invalidate() }
+        let renderID = try await support.render(controller, text: "# IDs", fileKind: .markdown, version: 1)
+        controller.exportTimeoutNanoseconds = 2_000_000_000
+        try await suspendExports(controller)
+        let task = Task { await controller.exportHTML(matchingRenderID: renderID) }
+        try await support.waitUntil("pending") { controller.pendingHTMLExport != nil }
+        let pending = try XCTUnwrap(controller.pendingHTMLExport)
+        let duplicate = ExportResourceDescriptor(resourceID: "font-0", kind: .font, src: "fonts/A.woff2")
+        controller.handleExportHTMLResult(.init(
+            exportID: pending.exportID,
+            renderID: renderID,
+            state: .resourcesNeeded(resources: [duplicate, duplicate])
+        ))
+        await assertFailure(task.value, reason: "invalid-export-resources")
+        XCTAssertNil(controller.pendingHTMLExport)
     }
 
     private func assertTerminal(

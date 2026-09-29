@@ -19,6 +19,7 @@ import {
 } from "./bridge";
 import {
   collectPreviewStyleText,
+  decodeExportImageDataURI,
   handleExportHTML,
   resetExportHTMLSession,
 } from "./export-html";
@@ -149,12 +150,14 @@ async function receive(message: BridgeMessage): Promise<void> {
         previewRoot,
         latestRenderID,
         documentTheme: document.documentElement.dataset.theme ?? "system",
+        bundledStyleText: __PLAINSONG_BUNDLED_CSS__,
         collectStyleText: () => collectPreviewStyleText(document, __PLAINSONG_BUNDLED_CSS__),
         waitForFonts: async () => {
           if (document.fonts?.ready) {
             await document.fonts.ready;
           }
         },
+        decodeImage: decodeExportImageDataURI,
         postResult: (payload) => {
           postBridgeMessage({ name: "exportHTMLResult", payload });
         },

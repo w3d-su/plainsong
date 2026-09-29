@@ -16,7 +16,7 @@ public final class PreviewController: NSObject, ObservableObject {
 
     private let assetSchemeHandler: AssetURLSchemeHandler
     private let scriptMessageProxy: ScriptMessageProxy
-    private let previewIndexURL: URL?
+    let previewIndexURL: URL?
     private let jsonEncoder = JSONEncoder()
     private var queuedRender: RenderPayload?
     var scrollDeliveryState = PreviewScrollDeliveryState()
@@ -33,6 +33,7 @@ public final class PreviewController: NSObject, ObservableObject {
     private var theme = "system"
     private var allowRemoteImages = false
     private var workspaceAssetRootURL: URL?
+    var exportAssetRootURL: URL?
 
     override public convenience init() {
         self.init(previewIndexURL: Self.defaultPreviewIndexURL())
@@ -100,6 +101,7 @@ public final class PreviewController: NSObject, ObservableObject {
             fileURL: change.fileURL,
             workspaceRootURL: workspaceAssetRootURL
         )
+        exportAssetRootURL = assetContext.allowedRoot
         let assetRootID = assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
         failPendingHTMLExport(reason: "render-superseded")
@@ -154,6 +156,7 @@ public final class PreviewController: NSObject, ObservableObject {
         isReady = false
         queuedRender = nil
         exportSourceText = ""
+        exportAssetRootURL = nil
         scrollDeliveryState.failPendingDelivery()
         webView.stopLoading()
         webView.navigationDelegate = nil

@@ -1227,3 +1227,52 @@ remain separately owned by PR D/G.
   hypothesis — a segmented measurement or profile would be required to attribute it.
   Real WebKit acceptance for math-dense documents remains open; no budget was changed and
   no caching layer was added (measure first, cache only with evidence).
+
+## Export PR D cap fixtures — 2026-09-28
+
+Debug `swift test --package-path Packages/PreviewKit --filter ExportResourceResolverTests`
+on this worktree. The 32 MiB case is
+`testDistinctRasterBytesStopAtThirtyTwoMebibytesAndOneExtraByteOmits`. Fixture bytes are
+generated in the test and are not committed. The timed interval is only
+`ExportResourceResolver.resolve` after the files exist.
+
+| Measurement | Value |
+|---|---|
+| Resolve elapsed | 0.053862 s |
+| Host RSS before resolve | 70,090,752 bytes (70.1 MB) |
+| Host RSS after both resolves | 179,912,704 bytes (179.9 MB) |
+| 10 MiB boundary test, including PNG padding and disk write | 9.551 s, passed |
+| Repeated-reference test, including disk write | 22.138 s on the rerun, passed |
+
+The RSS delta covers two in-memory results: one exact 32 MiB embed set and one 30 MiB
+embed set whose next image is omitted. Base64 expansion of those rasters accounts for
+most of the growth. A later full PreviewKit suite run on the same machine measured the
+same resolver interval at 0.061 s, with host RSS 101.2 MB before and 221.6 MB after,
+because earlier tests had already allocated. No export wall-clock budget is frozen.
+Typing latency is unchanged because export runs only from `PreviewController.exportHTML`,
+off the editor keystroke path. E9's broader Debug/Release matrix remains open.
+
+## Export PR D review fixes — 2026-09-29
+
+Debug `swift test --package-path Packages/PreviewKit` on this worktree. Resolver
+acceptance now requires an ImageIO thumbnail decode (at most 16 px) in addition to the
+type sniff, and a repeated reference reuses the first decision instead of re-reading
+the file.
+
+| Measurement | Value |
+|---|---|
+| 32 MiB cap fixture, `ExportResourceResolver.resolve` only, isolated filter | 0.061 s |
+| Host RSS before / after both resolves (same run) | 67,059,712 / 178,700,288 bytes (67.1 / 178.7 MB) |
+| Same interval inside the locked `ExportHTML\|ExportResourceResolver` filter | 0.053 s (RSS 141.7 → 221.8 MB after earlier tests) |
+| Encoded finalization payload, 100 references to one 1 MiB PNG, PR head (v7) | 139,820,261 bytes |
+| Same payload after protocol v8 `dataURIFrom` | below the asserted 1,423,726-byte bound (one 1,398,126-byte data URI plus at most 256 bytes per reference) |
+
+The cap fixture's rasters are 1×1 PNGs padded to their exact byte size with a `tEXt`
+chunk (`ExportRasterFixture.png(exactByteCount:)`), so the decode proof there decodes a
+single pixel. Its unchanged interval (0.054 s recorded on 2026-09-28) therefore says
+nothing about the decode proof's cost on a real 10 MiB photographic PNG or JPEG. That cost
+is unmeasured and belongs to E9's large-document pass. The payload rows come from
+`ExportResourceResolverReviewTests.testHundredReferencesToOneImageSerializeItsDataURIOnce`
+run against the PR head sources and then against this change. No export wall-clock
+budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
+editor keystroke path.

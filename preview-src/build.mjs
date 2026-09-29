@@ -1,7 +1,7 @@
 // Builds the preview bundle into App/Resources/preview/ (agent.md §7.4).
 // The output is COMMITTED so the app builds without Node installed.
 import { build } from "esbuild";
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const outDir = "../App/Resources/preview";
 mkdirSync(outDir, { recursive: true });
@@ -33,4 +33,11 @@ writeFileSync(`${outDir}/index.html`, readFileSync("src/index.html", "utf8"));
 writeFileSync(`${outDir}/bundle.css`, css);
 rmSync(`${outDir}/fonts`, { recursive: true, force: true });
 cpSync("node_modules/katex/dist/fonts", `${outDir}/fonts`, { recursive: true });
+const fontFiles = readdirSync(`${outDir}/fonts`)
+  .filter((name) => name.endsWith(".woff2"))
+  .sort();
+writeFileSync(
+  `${outDir}/font-manifest.json`,
+  `${JSON.stringify({ format: "woff2", files: fontFiles }, null, 2)}\n`,
+);
 console.log(`preview bundle written to ${outDir}/`);

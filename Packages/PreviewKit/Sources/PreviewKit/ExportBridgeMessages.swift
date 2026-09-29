@@ -32,6 +32,9 @@ public struct ExportResourceOutcome: Codable, Equatable, Sendable {
     public let kind: ExportResourceKind
     public let action: ExportResourceAction
     public let dataURI: String?
+    /// Protocol v8: a repeated accepted resource names the earlier outcome that carries its
+    /// `dataURI` instead of repeating the bytes, so the bridge scales with distinct bytes (R19).
+    public let dataURIFrom: String?
     public let reason: String?
 
     public init(
@@ -39,12 +42,14 @@ public struct ExportResourceOutcome: Codable, Equatable, Sendable {
         kind: ExportResourceKind,
         action: ExportResourceAction,
         dataURI: String? = nil,
+        dataURIFrom: String? = nil,
         reason: String? = nil
     ) {
         self.resourceID = resourceID
         self.kind = kind
         self.action = action
         self.dataURI = dataURI
+        self.dataURIFrom = dataURIFrom
         self.reason = reason
     }
 
