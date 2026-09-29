@@ -261,7 +261,7 @@ final class ExportPDFMechanismSpikeTests: XCTestCase {
     }
 
     func testDiagnosticPDFCallStaysTestOnlyInMemoryWithProtocolV5AndNoDestinationWrite() async throws {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 7)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 8)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [

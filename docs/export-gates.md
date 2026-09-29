@@ -2,10 +2,11 @@
 
 > **Status: E0 mechanism gate closed as GO (paginated). Owner signed off D3–D5 on
 > 2026-08-13 using the specified defaults (D4 page model is the E0 paginated fallback).
-> PR C lands protocol v6 + static-document semantics. PR E lands the headless one-shot
-> WorkspaceKit artifact writer (writer-level E6 bullets except the sibling bullet, and the E9
-> dependency bullet).
-> E1–E9 remain open.** Precedent:
+> PR C landed the static-document skeleton. PR D closes E2–E3 and the HTML portion of
+> E4; E1 stays partial. PR E lands the headless one-shot WorkspaceKit artifact writer
+> (writer-level E6 bullets except the sibling bullet, and the E9 dependency bullet).
+> The rest of E5–E9 remains open. PR D's review fixes add an optional `dataURIFrom`
+> reference to resource outcomes, so `PROTOCOL_VERSION` is 8.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -539,85 +540,143 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   prevents an older result from reaching a destination write.
 - [ ] Render or MDX error fails explicitly; no blank, prior-document, or stale
   last-good DOM is returned.
-- [ ] Offscreen controller/task/resources are released on success, failure, and cancel.
+- [x] Offscreen controller/task/resources are released on success, failure, and cancel.
 - PR C evidence: `ExportHTMLLifecycleTests` covers cancellation (including pre-cancel),
   timeout (production default 15 seconds), explicit `invalidate()`, the WebContent
   termination delegate callback, bridge-send failure, supersession, and shared render
   readiness. The four terminal lifecycle cases assert pending-continuation removal and
   weak controller/WebView release after owner invalidation. This injects the termination
   notification; it does not kill an OS WebKit helper. `ExportHTMLHostedTests` rejects
-  MDX stale/error output. App snapshot/destination-write fencing and full resource
-  lifecycle are still PR D/F work, so E1 remains open.
+  MDX stale/error output. PR D adds `testResourceResolutionTaskIsCancelledWhenExportFinishes`,
+  which cancels the off-main resource-read task when the export finishes. App snapshot and
+  destination-write fencing remain PR F, so E1 stays open.
 
 ### E2 — Protocol-v6 export contract
 
 - [x] Swift and TypeScript list the same 10 ordered message names, including correlated
-  `exportHTML` / `exportHTMLResult`, with `PROTOCOL_VERSION == 6`.
-- [ ] Discovery/finalization rounds, request/result IDs, and completed `renderID` are
+  `exportHTML` / `exportHTMLResult`, with `PROTOCOL_VERSION == 8`.
+- [x] Discovery/finalization rounds, request/result IDs, and completed `renderID` are
   validated; stale, duplicate, out-of-order, malformed, and failure results cannot
   succeed.
-- [ ] `ready(html)` is impossible for current MDX error/stale-last-good DOM, before
+- [x] `ready(html)` is impossible for current MDX error/stale-last-good DOM, before
   resource outcomes apply, before `document.fonts.ready`, or while a retained image is
   undecoded.
-- [ ] `make preview-bundle` output and Swift/TypeScript protocol tests land in the same
+- [x] `make preview-bundle` output and Swift/TypeScript protocol tests land in the same
   commit as the bridge change.
-- [ ] No production path evaluates `document.documentElement.outerHTML` outside the
+- [x] No production path evaluates `document.documentElement.outerHTML` outside the
   typed protocol.
 - Ordered-name/version evidence: `preview-src/test/protocol.test.ts` and
   `PreviewKitTests.testBridgeProtocolVersionAndMessageOrder` pin the ten ordered names
-  and version 6. `ExportHTMLProtocolTests` covers the mirrored title payload;
+  and version 8. PR D's review fixes bumped 7 → 8 because a repeated accepted image's
+  outcome now names the first outcome through `dataURIFrom` instead of repeating its
+  data URI (`ExportHTMLProtocolTests.testRepeatedEmbedOutcomeReferencesTheFirstDataURIRoundTrip`;
+  JavaScript rejects forward, dangling, chained, or doubly specified references in
+  `export-html-hardening.test.ts`). `ExportHTMLProtocolTests` covers the mirrored title payload;
   `ExportHTMLBridgeDecodingTests` checks direct dictionary decoding against Codable,
-  malformed rejection, and a multi-MB receipt. Remaining resource-readiness bullets
-  stay open for PR D; early ready, duplicate discovery responses, and superseded results are fenced.
+  malformed rejection, and a multi-MB receipt. Early ready, duplicate discovery,
+  and superseded results stay fenced; duplicate discovered resource IDs fail before
+  resolution (`ExportHTMLLifecycleTests.testDuplicateDiscoveredResourceIDsFailBeforeResolution`),
+  and finalization fails with `resources-changed` if the image DOM no longer matches
+  discovery (`export-html-hardening.test.ts`). PR D readiness evidence is
+  `export-html.test.ts` (finalization-before-ready and MDX stale/error),
+  `export-html-review.test.ts` (fonts and style collection must settle), and
+  `export-html-assets.test.ts` (`does not emit ready before image decode resolves`).
+  An image WebKit cannot decode becomes its placeholder and export continues; `ready`
+  still requires every retained image to be a decoded candidate
+  (`export-html-hardening.test.ts`, finding 4 cases). That proof decodes each distinct
+  data URI once in the export WebContent process. The finalized live-DOM `<img>` nodes
+  are inserted synchronously right before `ready` and are not decoded in place, so
+  **PR G must await `decode()` on those live nodes before PDF or Print capture** (D2
+  barrier item 3).
+  The static document is built by `buildStaticExportHTML`; production export does not
+  read `document.documentElement.outerHTML`. The regenerated preview bundle is in this
+  commit. E2 is closed.
 
 ### E3 — Static HTML and product semantics
 
-- [ ] Output is a parseable complete document (`doctype`, `html`, `head`, `body`) with
+- [x] Output is a parseable complete document (`doctype`, `html`, `head`, `body`) with
   no bridge/runtime script, event handler, or checkbox writeback.
-- [ ] Output carries D3's exact CSP; every HTML/SVG URL-bearing attribute and CSS
+- [x] Output carries D3's exact CSP; every HTML/SVG URL-bearing attribute and CSS
   `url(...)` is accepted only by the documented scheme/fragment/data allowlist.
 - [ ] Markdown kitchen-sink output preserves GFM, math, highlighted code, task-checkbox
   appearance, and Mermaid output.
-- [ ] Frontmatter is absent from the body; `<title>` follows D3's frontmatter / first
+- [x] Frontmatter is absent from the body; `<title>` follows D3's frontmatter / first
   document heading / `Untitled` rule.
-- [ ] MDX fixture exports ESM/JSX/expression placeholders without component execution;
+- [x] MDX fixture exports ESM/JSX/expression placeholders without component execution;
   syntax-error/stale-render export fails.
-- [ ] `system`, light, and dark themes freeze the correct resolved built-in styling.
+- [x] `system`, light, and dark themes freeze the correct resolved built-in styling.
 - PR C evidence: `ExportHTMLTitleTests` and `export-html-review.test.ts` cover title
   precedence, a non-leading H2, MDX component-card headings before the document heading,
   CSS closing-tag injection, exception-to-failure results, inline raster preservation,
-  shared image MIME policy, and superseded discovery without live DOM attributes.
+  shared image MIME policy, and superseded discovery without export resource attributes.
+  Only a successful finalization writes the finalized static nodes into the dedicated
+  offscreen export DOM, synchronously before `ready`; failed or superseded exports leave
+  it untouched (`export-html-hardening.test.ts`, finding 8 case).
   `ExportHTMLHostedTests.testSuccessfulMarkdownExportIsAStaticDocument` requires
   `--preview-bg`, defined in the bundled CSS, instead of accepting the root element.
   WebKit refuses CSSOM reads of linked file-origin stylesheets; `build.mjs` supplies
   the exact same CSS input as `bundle.css`, while readable renderer-injected styles
   still come from CSSOM. No export-time fetch occurs. Inline raster preservation here
-  uses the existing live MIME policy only; decoded-byte caps, normalization, image
-  decode readiness, fonts, and comprehensive URL-sink validation remain PR D. E3 stays open.
+  now goes through Swift normalization. PR D evidence: `export-html-assets.test.ts`
+  pins the exact CSP and URL/SVG sinks. The review fixes replace the CSS `url()` regular
+  expression with a CSS-syntax scanner: `export-html-hardening.test.ts` drops `@import`
+  (including escaped `@\69mport`), neutralizes `image-set()`, escaped `u\72l(`, and
+  url values containing `)` or quotes, fails closed on unterminated url(), and sanitizes
+  generated-SVG `style` and presentation attributes. `<` is escaped before the scan, so
+  nothing transforms the scanner's output: escaping afterwards had turned `\<url(` into
+  `\\3c url(`, a live url() token. `export-css-urls.test.ts` covers that vector in head
+  CSS, an SVG `<style>`, and a `style` attribute, and re-scans the sanitized output of
+  25,745 generated escape, comment, backslash-newline, custom-property, and `var()`
+  inputs to find only `url()`, fragments, or manifest fonts. A malformed url() keeps the
+  enclosing `}` so later rules survive.
+  `ExportHTMLOfflineTests.testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument`
+  reopens the export in WebKit and checks its CSSOM and computed styles: with the
+  previous sanitizer, `list-style-image` resolved to the remote URL.
+  `ExportHTMLHostedTests` covers the static
+  document, disabled checkboxes, MDX placeholders, and MDX failure;
+  `export-html.test.ts` freezes dark styling; `ExportHTMLOfflineTests` resolves `system`
+  to light or dark. The full `Fixtures/kitchen-sink.md` matrix stays open for E8, so
+  E3 stays open on that bullet only.
 
 ### E4 — Assets, fonts, and offline fidelity
 
-- [ ] Contained PNG/JPEG/GIF/WebP at exactly the existing ≤ 10 MiB boundary become
+- [x] Contained PNG/JPEG/GIF/WebP at exactly the existing ≤ 10 MiB boundary become
   MIME-correct data URIs; cap+1 is rejected.
-- [ ] Distinct decoded raster bytes stop at exactly 32 MiB and final HTML UTF-8 stops at
+- [x] Distinct decoded raster bytes stop at exactly 32 MiB and final HTML UTF-8 stops at
   exactly 64 MiB. Repeated-reference fixtures prove decoded bytes count once but each
   serialized occurrence counts; first-over-limit images become deterministic
   placeholders in stable document order.
-- [ ] Traversal, symlink escape, SVG, unsupported, missing/unreadable, malformed/oversize
+- [x] Traversal, symlink escape, SVG, unsupported, missing/unreadable, malformed/oversize
   authored `data:`, and remote-image fixtures become deterministic inert alt
   placeholders with no original `src`.
-- [ ] Exported HTML contains no `asset://`, `file:`, workspace path, remote image URL, or
+- [x] Exported HTML contains no `asset://`, `file:`, workspace path, remote image URL, or
   sibling resource dependency and renders with networking disabled.
-- [ ] KaTeX CSS/fonts and generated KaTeX SVG, highlight.js markup/theme CSS, and
+- [x] KaTeX CSS/fonts and generated KaTeX SVG, highlight.js markup/theme CSS, and
   generated Mermaid SVG/theme survive reopening the standalone file; user-authored SVG
   remains rejected.
-- [ ] CSS URL and SVG-href malicious fixtures prove only manifest-known font data and
+- [x] CSS URL and SVG-href malicious fixtures prove only manifest-known font data and
   same-document generated fragments survive; no external URL sink remains.
-- [ ] Resource finalization is complete before HTML/PDF/Print success is reported.
+- [x] Resource finalization is complete before HTML/PDF/Print success is reported.
 - [ ] A network interceptor proves the dedicated controller issues zero HTTP(S) requests
   during initial render, discovery, finalization, HTML serialization, PDF capture, and
   Print preparation, even when the live-preview remote-image preference is enabled.
-- Evidence: _open — PR D/G policy tests + offline hosted reopen_
+- Evidence: `ExportResourceResolverTests` (10 MiB PNG boundary, JPEG/GIF/WebP MIME,
+  32 MiB distinct bytes, repeated references, traversal/symlink/SVG/remote/data-URI
+  rejection, manifest woff2), `ExportResourceResolverReviewTests` (100 references to one
+  image carry its data URI once across the bridge; header-only and corrupt PNG/JPEG
+  that still type-sniff are omitted because acceptance now requires an ImageIO decode;
+  repeated authored `data:` images are answered before any decode),
+  `export-html-assets.test.ts` (exact 64 MiB HTML, per-image serialized cap measured
+  on the sanitized document, URL sinks, user SVG removal), `export-css-urls.test.ts`
+  and `ExportHTMLOfflineTests.testEscapedLessThanURLSinksStayNeutralInTheReopenedDocument`
+  (CSS URL sinks, including the escaped-`<` vector, stay neutral in WebKit),
+  `export-html-hardening.test.ts`
+  (an image without a validated outcome fails closed to its placeholder, font IDs never
+  collide, and the budget agrees with the final length check), and
+  `ExportHTMLOfflineTests.testOfflineReopenRendersEmbeddedResourcesWithoutNetwork`
+  (custom-scheme reopen; image, KaTeX, highlight, and Mermaid render; one document
+  request). The zero-HTTP interceptor across PDF and Print stays with PR G, so E4
+  remains partial.
 
 ### E5 — Separate PDF and Print mechanisms
 

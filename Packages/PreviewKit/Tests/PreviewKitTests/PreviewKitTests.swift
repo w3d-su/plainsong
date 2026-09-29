@@ -9,7 +9,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     func testBridgeProtocolVersionAndMessageOrder() {
-        XCTAssertEqual(PreviewBridge.protocolVersion, 7)
+        XCTAssertEqual(PreviewBridge.protocolVersion, 8)
         XCTAssertEqual(
             BridgeMessageName.allCases.map(\.rawValue),
             [

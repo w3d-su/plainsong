@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   EXPORT_CSP,
   EXPORT_IMAGE_PLACEHOLDER_LABEL,
-  applyResourceOutcomes,
   buildStaticExportHTML,
   collectImageResources,
   freezeExportTheme,
@@ -72,7 +71,6 @@ describe("export HTML static semantics", () => {
       { resourceID: "image-0", kind: "image", src: "asset://images/photo.png" },
     ]);
 
-    applyResourceOutcomes(root, []);
     sanitizeStaticClone(root);
 
     expect(root.querySelector("img")).toBeNull();
@@ -203,9 +201,10 @@ describe("export style URL sinks", () => {
       .icon { background: url(#paint0); }
       .remote { background: url("https://evil.example/x.png"); }
     `;
-    const sanitized = sanitizeStyleText(css);
+    const allowed = new Set(["data:font/woff2;base64,AA=="]);
+    const sanitized = sanitizeStyleText(css, allowed);
     expect(sanitized).toContain("data:font/woff2;base64,AA==");
-    expect(sanitized).toContain("url(#paint0)");
+    expect(sanitized).toContain('url("#paint0")');
     expect(sanitized).not.toContain("https://evil.example/x.png");
   });
 });

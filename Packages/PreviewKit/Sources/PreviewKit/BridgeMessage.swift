@@ -2,7 +2,7 @@ import Foundation
 import MarkdownCore
 
 public enum PreviewBridge {
-    public static let protocolVersion = 7
+    public static let protocolVersion = 8
 }
 
 public enum BridgeMessageName: String, CaseIterable, Codable, Sendable {

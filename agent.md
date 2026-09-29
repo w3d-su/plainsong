@@ -366,7 +366,7 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 | JS→Swift | `linkClicked` | `{href}` |
 | JS→Swift | `checkboxToggled` | `{renderID, line, checked, version}` → Swift requires the latest submitted render ID and version, its retained originating `DocumentSession` instance, and the current document/version to match (protocol v7). Retained error DOM keeps its original render ID. |
 | Swift→JS | `setTheme` | `{theme}` |
-| Swift→JS | `exportHTML` | `{exportID, renderID, phase, documentTitle, resourceOutcomes}`; `phase` is `discovery` or `finalization`. PreviewKit—not JS—supplies typed embed/omit outcomes in the finalization round. |
+| Swift→JS | `exportHTML` | `{exportID, renderID, phase, documentTitle, resourceOutcomes}`; `phase` is `discovery` or `finalization`. PreviewKit—not JS—supplies typed embed/omit outcomes in the finalization round; a repeated accepted image names its first outcome through `dataURIFrom` instead of repeating the data URI (protocol v8). |
 | JS→Swift | `exportHTMLResult` | `{exportID, renderID, state}` where `state.kind` is `resourcesNeeded`, `ready(html)`, or `failed`. `ready` is the shared export-ready barrier and is illegal for MDX stale/error DOM, before finalization, or before fonts/images settle. |
 
 ### 7.4 Build
