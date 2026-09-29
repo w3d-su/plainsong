@@ -117,6 +117,8 @@ struct PlainsongCommands: Commands {
             // Use Selection for Find adopts the macOS ⌘E convention (Decision Log).
             formatButtonWithoutShortcut("Inline Code", .format(.inlineCode))
             formatButton("Link", .format(.link), key: "k", modifiers: .command)
+            formatButtonWithoutShortcut("Insert Inline Math", .format(.insertInlineMath))
+            formatButtonWithoutShortcut("Insert Display Math", .format(.insertDisplayMath))
 
             Divider()
 

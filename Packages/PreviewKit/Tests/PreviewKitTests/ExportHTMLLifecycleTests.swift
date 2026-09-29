@@ -15,7 +15,13 @@ final class ExportHTMLLifecycleTests: XCTestCase {
     }
 
     func testTimeoutResolvesPendingExportAndReleasesController() async throws {
-        try await assertTerminal(reason: "timeout", timeout: 100_000_000) { _, _ in }
+        // The 100 ms timeout can resolve the export between two 50 ms polls, so
+        // this case awaits the timeout itself instead of first observing it pending.
+        try await assertTerminal(
+            reason: "timeout",
+            timeout: 100_000_000,
+            observesPendingExport: false
+        ) { _, _ in }
     }
 
     func testInvalidationResolvesPendingExportAndReleasesController() async throws {
@@ -155,6 +161,7 @@ final class ExportHTMLLifecycleTests: XCTestCase {
     private func assertTerminal(
         reason: String,
         timeout: UInt64 = 15_000_000_000,
+        observesPendingExport: Bool = true,
         trigger: (PreviewController, Task<PreviewHTMLExportResult, Never>) -> Void
     ) async throws {
         var controller: PreviewController? = try support.makeController()
@@ -166,7 +173,9 @@ final class ExportHTMLLifecycleTests: XCTestCase {
         var task: Task<PreviewHTMLExportResult, Never>? = Task { [controller = controller!] in
             await controller.exportHTML(matchingRenderID: renderID)
         }
-        try await support.waitUntil("pending export") { controller?.pendingHTMLExport != nil }
+        if observesPendingExport {
+            try await support.waitUntil("pending export") { controller?.pendingHTMLExport != nil }
+        }
         trigger(controller!, task!)
         await assertFailure(task!.value, reason: reason)
         XCTAssertNil(controller!.pendingHTMLExport)
