@@ -22,6 +22,8 @@ public enum MarkdownFormattingCommand: Equatable, Sendable {
     case paragraph
     case quote
     case codeFence
+    case insertInlineMath
+    case insertDisplayMath
 }
 
 public enum MarkdownEditCommand: Equatable, Sendable {
@@ -41,7 +43,8 @@ public enum MarkdownEditing {
     public static func apply(
         _ command: MarkdownEditCommand,
         to text: String,
-        selection: NSRange
+        selection: NSRange,
+        fileKind: FileKind = .markdown
     ) -> MarkdownEditResult? {
         switch command {
         case let .insertNewline(fileKind):
@@ -58,7 +61,7 @@ public enum MarkdownEditing {
         case .formatTable:
             TableEditing.format(in: text, selection: selection)
         case let .format(command):
-            FormattingEditing.apply(command, to: text, selection: selection)
+            FormattingEditing.apply(command, to: text, selection: selection, fileKind: fileKind)
         }
     }
 }
