@@ -260,6 +260,37 @@ input[type="checkbox"] {
   overflow: auto;
 }
 
+.plainsong-math-block {
+  margin: 0 0 1em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15em 0;
+}
+
+/* Safe centering: width:max-content + min-width:100% centers a narrow formula
+   via text-align, while an over-wide one becomes left-aligned scrollable
+   content whose leading edge stays reachable. */
+.plainsong-math-block > .katex-display {
+  box-sizing: border-box;
+  margin: 0.6em auto;
+  min-width: 100%;
+  text-align: center;
+  width: max-content;
+}
+
+.math-error-hint {
+  color: var(--preview-muted);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8em;
+  margin-left: 0.35em;
+  white-space: pre-wrap;
+}
+
+.plainsong-math-block > .math-error-hint {
+  display: block;
+  margin: 0.2em 0 0;
+}
+
 .mermaid-error {
   background: #fff8c5;
   border: 1px solid #d4a72c;
