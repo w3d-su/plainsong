@@ -455,7 +455,9 @@ The exception is narrow. The export path must still refuse to:
    recovery journal, or second output. No entry other than the published leaf is ever
    created in the chosen folder (amended 2026-09-29):
    - The only temporary entries are the operation-private item-replacement directory
-     (outside the chosen folder) and its single staged file.
+     and its single staged file. If Foundation places that directory in the chosen folder
+     (its fallback creates it before any check can run), fail closed. Remove the directory
+     only if it is empty and its identity matches; otherwise report its exact path.
    - Neither may survive a reported success.
    - Either may remain only after a truthfully reported indeterminate failure, at an exact
      reported path, so that no identity is destroyed.
@@ -486,7 +488,8 @@ Also rejected by the 2026-09-29 amendment:
 
 **Owner sign-off:** Required because this is an explicit, narrowly bounded exception to
 the repository's strongest filesystem-authority policy. The 2026-09-29 mechanism amendment
-needs owner approval of its docs PR, plus answers to Q1–Q3 before PR E2 lands.
+needs owner approval of its docs PR, plus Q3's answer before PR E2 lands (Q1/Q2 recorded
+2026-09-29).
 
 ## 4. Layering
 
@@ -498,7 +501,7 @@ App
       offscreen PreviewController         one-shot non-retained artifact writer:
       lifecycle, render/result fencing,   item-replacement staging + exact-leaf
       asset:// policy, WKWebView          RENAME_EXCL / RENAME_SWAP publication with
-      PDF and print APIs                  lstat identity proofs (D5, amended 2026-09-29)
+      PDF and print APIs                  no-follow fstatat proofs (D5, amended 2026-09-29)
         preview-src
           completed render, protocol-v6 static HTML serializer, asset/style finalization
 ```
@@ -619,7 +622,7 @@ own PR.
 | **C — bridge + static semantics** | Protocol v6 request/result and shared export-ready barrier, mirrored Swift/TS types, regenerated bundle, successful/stale/error fencing, static document skeleton, frontmatter/MDX/theme/runtime-removal snapshots. No asset inlining, App command, or destination write. | Partial E1–E3 |
 | **D — assets + offline fidelity** | PreviewKit resource resolution, deterministic allow/omit outcomes, per-image + aggregate caps, CSS/font embedding, CSP/URL-sink enforcement, finalized live export DOM, and offline hosted reopen. No App File command or destination write. | Closes E2–E3; partial E1/E4 |
 | **E — one-shot artifact writer** | Headless exact-URL grant/descriptor service, exclusive new-leaf publication, non-destructive confirmed-overwrite exchange/postflight, authoritative ownership-inventory collision checks, refusal matrix, and fault-injection tests. No menu, panel presentation, render, or document-state mutation. | Partial E6/E9 |
-| **E2 — leaf-path writer (D5 amendment, 2026-09-29)** | Replace PR E's parent-anchored publication with amended D5: same-device item-replacement staging, exact-leaf `lstat` proofs, and `RENAME_EXCL` / `RENAME_SWAP` by path with `RENAME_NOFOLLOW_ANY`. Also: the postflight, reverse-swap, and indeterminate reporting that includes the item-replacement path; fail-closed cross-device or unsupported-volume handling; Q1–Q3 decisions; and fault-injection tests. Rework the ownership inspection so that identity, canonical leaf name, and case sensitivity come from leaf-path metadata; keep the authoritative inventory and the typed outcome. No menu or render change. | Re-proves the reopened E6 bullets, including ownership; the sibling bullet |
+| **E2 — leaf-path writer (D5 amendment, 2026-09-29)** | Replace PR E's parent-anchored publication with amended D5: same-device item-replacement staging, exact-leaf no-follow `fstatat` proofs, and `RENAME_EXCL` / `RENAME_SWAP` by path with `RENAME_NOFOLLOW_ANY`. Also: the postflight, reverse-swap, and indeterminate reporting that includes the item-replacement path; fail-closed cross-device or unsupported-volume handling; Q1–Q3 decisions; and fault-injection tests. Rework the ownership inspection so that identity, canonical leaf name, and case sensitivity come from leaf-path metadata; keep the authoritative inventory and the typed outcome. No menu or render change. | Re-proves the reopened E6 bullets, including ownership; the sibling bullet |
 | **F — App HTML export** | Export as HTML… File command, immutable operation snapshot, `NSSavePanel` orchestration through PR E2's writer, cancellation/errors/accessibility, and standalone HTML acceptance. | Closes E1; HTML portions of E4/E6–E9 |
 | **G — PDF / Print acceptance** | Export as PDF… via `createPDF`; Print… via `printOperation`; full-content/paper-page acceptance, PDF one-shot write through PR E2's writer, all-command hosted matrix, performance/security regression, final owner evidence. | Closes E4–E9 remaining work |
 
@@ -864,7 +867,9 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   - an observed identity or type race;
   - an unsupported extension;
   - cross-device staging;
-  - a volume without exclusive or swap renaming.
+  - a volume without exclusive or swap renaming;
+  - a case or normalization alias of an existing entry;
+  - an item-replacement directory that is, or lies inside, the chosen folder.
 
   *(Reopened 2026-09-29.)*
 - [ ] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
