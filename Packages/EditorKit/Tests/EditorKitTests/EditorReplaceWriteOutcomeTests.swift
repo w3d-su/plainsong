@@ -87,6 +87,70 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
         XCTAssertNil(ready.controller.pendingNavigationCommand)
     }
 
+    /// A document close during the write already moved Find on; the verified
+    /// write must not start a rescan or install a session with no query.
+    func testClearForNoDocumentDuringWriteIsNotAdmitted() async throws {
+        let ready = try await EditorReplaceSingleSupport.makeReady(source: "one two", pattern: "one")
+        let controller = ready.controller
+        ready.fixture.model.onAcceptedPublication = { _ in controller.clearForNoDocument() }
+        let outcome = EditorReplaceSingleSupport.perform(ready, replacement: "ONE")
+
+        XCTAssertEqual(outcome, .unverifiedWrite)
+        XCTAssertEqual(ready.fixture.model.source, "ONE two")
+        XCTAssertNil(controller.query)
+        XCTAssertNil(controller.session)
+        XCTAssertEqual(controller.documentBinding, .empty)
+        XCTAssertNil(controller.armedReplacementPublication)
+        XCTAssertEqual(controller.replacementScheduleCount, 0)
+        XCTAssertEqual(controller.replacementEngineInvocationCount, 0)
+        XCTAssertNil(controller.pendingNavigationCommand)
+    }
+
+    func testRebindDuringWriteIsNotAdmitted() async throws {
+        let ready = try await EditorReplaceSingleSupport.makeReady(source: "one two", pattern: "one")
+        let controller = ready.controller
+        let other = EditorDocumentIdentity(rawValue: "other")
+        ready.fixture.model.onAcceptedPublication = { snapshot in
+            controller.rebindDocument(EditorFindDocumentBinding(
+                identity: other,
+                text: snapshot.source,
+                revision: UInt64(snapshot.revision)
+            ))
+        }
+        let outcome = EditorReplaceSingleSupport.perform(ready, replacement: "ONE")
+
+        XCTAssertEqual(outcome, .unverifiedWrite)
+        XCTAssertEqual(controller.documentBinding.identity, other)
+        XCTAssertEqual(controller.lastScheduleReason, .rebind)
+        XCTAssertNil(controller.armedReplacementPublication)
+        XCTAssertEqual(controller.replacementScheduleCount, 0)
+        XCTAssertEqual(controller.replacementEngineInvocationCount, 0)
+    }
+
+    /// The insert ran but the installed snapshot is gone afterwards (binding
+    /// revoked during the write): the result is unverified, not a refusal.
+    func testUnobservableSnapshotAfterInsertIsUnverified() async throws {
+        let ready = try await EditorReplaceSingleSupport.makeReady(source: "one two", pattern: "one")
+        let coordinator = ready.fixture.coordinator
+        let token = NotificationCenter.default.addObserver(
+            forName: STTextView.textDidChangeNotification,
+            object: ready.fixture.textView,
+            queue: nil
+        ) { _ in
+            MainActor.assumeIsolated {
+                _ = coordinator.installedDocument.revokeDocumentBinding()
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        let outcome = EditorReplaceSingleSupport.perform(ready, replacement: "ONE")
+
+        XCTAssertEqual(outcome, .unverifiedWrite)
+        XCTAssertNil(coordinator.currentInstalledSourceSnapshot)
+        XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: ready.fixture.textView), "ONE two")
+        XCTAssertNil(ready.controller.armedReplacementPublication)
+        XCTAssertEqual(ready.controller.replacementScheduleCount, 0)
+    }
+
     /// Typing after Replace starts its own undo group: one Undo removes only the
     /// typed character. STTextView ends coalescing for a non-key-event insert.
     func testTypingAfterReplaceIsASeparateUndoStep() async throws {
@@ -98,8 +162,8 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
         }
         XCTAssertEqual(textView.selectedRange(), NSRange(location: 3, length: 0))
 
-        try typeKey("x", in: textView)
-        try typeKey("y", in: textView)
+        try typeKey("x", keyCode: 7, in: textView)
+        try typeKey("y", keyCode: 16, in: textView)
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: textView), "ONExy two")
 
         textView.undoManager?.undo()
@@ -119,6 +183,7 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
         line: UInt = #line
     ) {
         XCTAssertEqual(ready.controller.session, ready.session, file: file, line: line)
+        XCTAssertNil(ready.controller.armedReplacementPublication, file: file, line: line)
         XCTAssertEqual(ready.controller.documentBinding.revision, 0, file: file, line: line)
         XCTAssertEqual(ready.controller.replacementScheduleCount, 0, file: file, line: line)
         XCTAssertEqual(ready.controller.replacementEngineInvocationCount, 0, file: file, line: line)
@@ -126,7 +191,7 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
     }
 
     /// A real key event, so STTextView treats the insert as typing and coalesces it.
-    private func typeKey(_ character: String, in textView: STTextView) throws {
+    private func typeKey(_ character: String, keyCode: UInt16, in textView: STTextView) throws {
         let event = try XCTUnwrap(NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -137,7 +202,7 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
             characters: character,
             charactersIgnoringModifiers: character,
             isARepeat: false,
-            keyCode: 7
+            keyCode: keyCode
         ))
         textView.keyDown(with: event)
     }

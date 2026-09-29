@@ -125,13 +125,19 @@ extension MarkdownTextViewCoordinator {
             editingBehaviorGuard.isApplying = true
             defer { editingBehaviorGuard.isApplying = false }
             textView.insertText(plan.replacement, replacementRange: plan.match.range)
+            // Close any group the insert joined, even if a caller dispatches Replace while
+            // STTextView is processing a key event, so later typing is its own undo step.
+            textView.breakUndoCoalescing()
         }
         // Find observers run only after the writer-authorized closure has returned.
-        guard opened, let preWriteRevision,
-              let observed = currentInstalledSourceSnapshot
-        else {
+        guard opened, let preWriteRevision else {
             controller.abandonReplacementPublication()
             return .refused(.writerPreflightFailed)
+        }
+        // The insert ran, but its outcome can no longer be observed.
+        guard let observed = currentInstalledSourceSnapshot else {
+            controller.abandonReplacementPublication()
+            return .unverifiedWrite
         }
 
         // The outcome is what the authoritative post-write snapshot shows, not the fact
@@ -140,12 +146,13 @@ extension MarkdownTextViewCoordinator {
         if observed.revision > preWriteRevision,
            ExactSourceText.matches(observed.source, planned)
         {
-            controller.admitReplacementPublication(
+            // A rebind or document close during the write already superseded Find.
+            let admitted = controller.admitReplacementPublication(
                 plan: plan,
                 text: observed.source,
                 revision: UInt64(observed.revision)
             )
-            return .replaced(plan)
+            return admitted ? .replaced(plan) : .unverifiedWrite
         }
         controller.abandonReplacementPublication()
         if observed.revision == preWriteRevision,

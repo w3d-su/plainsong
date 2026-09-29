@@ -72,9 +72,11 @@ public enum EditorReplaceOutcome: Equatable, Sendable {
     case replaced(EditorReplaceOneMatchPlan)
     /// UTF-16-identical replacement. No writer, revision, undo, or rescan.
     case advancedIdentical(EditorReplaceContinuation)
-    /// The native write changed the source, but the observed snapshot is not
-    /// exactly the planned text (for example an App reconciliation). No
-    /// continuation runs; Find recomputes the publication as an ordinary edit.
+    /// The native insert ran, but its result cannot be credited to this Replace:
+    /// the observed snapshot is not exactly the planned text (for example an App
+    /// reconciliation), is no longer observable, or a rebind / document close
+    /// superseded Find during the write. No continuation runs; a changed
+    /// publication is recomputed as an ordinary edit.
     case unverifiedWrite
     case refused(EditorReplaceRefusal)
 }

@@ -27,7 +27,11 @@
 > typed zero-effect refusal (`wysiwygPresentationInstalled`) while fold or image
 > presentation is installed; PR F lifts it. There is still no product UI, App
 > lifecycle policy, or Replace All. R4–R10 stay open. R6 marked-text coverage
-> here is the deterministic editor refusal only.
+> here is the deterministic editor refusal only. Known follow-ups: a publication
+> rejected after writer activation leaves a no-op undo step behind
+> `.refused(.writeNotApplied)` (existing writer-path behavior, tracked under R7);
+> `EditorFindController.swift` is 588 lines with a 287-line class body and should
+> be split without widening its private state.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -877,7 +881,10 @@ hosted spike PR #112.
   `EditorReplaceExecutorTests.testLiteralIdenticalAdvancesWithoutWriterRevisionUndoOrRescan`,
   `testLiteralIdenticalAtLastMatchCollapsesWithoutWrap`;
   `EditorReplaceWriteOutcomeTests` (`testNonUnitRevisionAdvanceStillAdmitsOneReplacementRescan`,
-  `testReconciledPublicationIsAnUnverifiedWriteAndAnOrdinaryEdit`);
+  `testReconciledPublicationIsAnUnverifiedWriteAndAnOrdinaryEdit`,
+  `testClearForNoDocumentDuringWriteIsNotAdmitted`,
+  `testRebindDuringWriteIsNotAdmitted`,
+  `testUnobservableSnapshotAfterInsertIsUnverified`);
   `EditorReplaceSingleReplaceAppTests` (`testSingleReplacePublishesToDocumentConsumersAndRescansOnce`:
   document text stream, dirty state, and autosave scheduling still run; Find
   admits one `.replacement` rescan and zero `.edit` schedules for that revision.
@@ -989,6 +996,13 @@ hosted spike PR #112.
 - [ ] Integration coverage includes a pending choice, suspended Reload,
   partial live-editor convergence, readable quarantine, and unavailable
   Check Again quarantine.
+- Known follow-up from PR D: if a publication is rejected after writer
+  activation succeeded, STTextView still registers the insert's undo group
+  after the view is restored, so `.refused(.writeNotApplied)` leaves a no-op
+  undo step (`EditorReplaceWriteOutcomeTests.testRejectedPublicationIsNotReportedAsReplaced`
+  does not assert undo for that reason). Ordinary typing shares this writer path;
+  App activation and publication check the same fences in one synchronous turn,
+  so no App path is known to reach it. Decide the undo contract here.
 - Evidence: _open_
 
 ### R8 — UI, menu, focus, and accessibility

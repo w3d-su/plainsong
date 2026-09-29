@@ -32,13 +32,18 @@ extension EditorFindController {
     /// The executor verified that `text` at `revision` is exactly the planned post-write
     /// source. That revision is consumed once, by one `afterOneReplace` rescan; a recorded
     /// publication of the same write is superseded by it and never becomes an `.edit`.
+    ///
+    /// Returns `false` without effect when the arm did not survive the write: a rebind or
+    /// `clearForNoDocument` during it already moved Find to newer document state.
     func admitReplacementPublication(
         plan: EditorReplaceOneMatchPlan,
         text: String,
         revision: UInt64
-    ) {
+    ) -> Bool {
+        guard armedReplacementPublication != nil else { return false }
         armedReplacementPublication = nil
         startReplacementGeneration(plan: plan, text: text, revision: revision)
+        return true
     }
 
     /// The write did not produce the planned source. A publication recorded during it is
