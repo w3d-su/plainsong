@@ -38,7 +38,58 @@ final class EditorReplaceWriteOutcomeTests: XCTestCase {
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: ready.fixture.textView), "one two")
         XCTAssertEqual(ready.fixture.model.source, "one two")
         XCTAssertEqual(ready.fixture.model.revision, 0)
+        // PR E undo contract: a write that was not applied leaves no undo step.
+        XCTAssertFalse(ready.fixture.textView.undoManager?.canUndo == true)
+        XCTAssertFalse(ready.fixture.textView.undoManager?.canRedo == true)
         assertFindUntouched(ready)
+    }
+
+    /// PR E undo contract (Decision Log): `.refused(.writeNotApplied)` after a rejected
+    /// publication registers no undo group, so the user's next Undo reaches the input that
+    /// preceded the Replace instead of a no-op step, and undo registration stays balanced.
+    func testRejectedPublicationLeavesNoUndoStepAndKeepsPriorHistory() async throws {
+        let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
+            source: "one two",
+            selection: NSRange(location: 7, length: 0)
+        )
+        let textView = fixture.textView
+        let undoManager = try XCTUnwrap(textView.undoManager)
+        try typeKey("x", keyCode: 7, in: textView)
+        textView.breakUndoCoalescing()
+        XCTAssertEqual(fixture.model.source, "one twox")
+        XCTAssertEqual(fixture.model.revision, 1)
+        XCTAssertTrue(undoManager.canUndo)
+        let controller = try await EditorReplaceSingleSupport.installController(
+            on: fixture,
+            source: "one twox",
+            pattern: "one"
+        )
+        let ready = try EditorReplaceSingleSupport.Ready(
+            fixture: fixture,
+            controller: controller,
+            session: XCTUnwrap(controller.session)
+        )
+        EditorReplaceSingleSupport.routePublicationsToFind(ready)
+        fixture.model.rejectsPublications = true
+
+        let outcome = EditorReplaceSingleSupport.perform(ready, replacement: "ONE")
+
+        XCTAssertEqual(outcome, .refused(.writeNotApplied))
+        XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: textView), "one twox")
+        XCTAssertEqual(fixture.model.revision, 1)
+        XCTAssertTrue(undoManager.isUndoRegistrationEnabled)
+        XCTAssertTrue(undoManager.canUndo, "the prior typing is still undoable")
+        XCTAssertFalse(undoManager.canRedo)
+
+        fixture.model.rejectsPublications = false
+        undoManager.undo()
+        XCTAssertEqual(
+            EditorReplaceBatchSpikeSupport.viewText(in: textView),
+            "one two",
+            "the first Undo after the refused Replace reverts the prior typing"
+        )
+        XCTAssertEqual(fixture.model.source, "one two")
+        XCTAssertFalse(undoManager.canUndo)
     }
 
     /// App advances one revision per accepted publication, but success is the

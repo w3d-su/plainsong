@@ -30,12 +30,14 @@ extension AppState {
     /// Text/revision changed for the same session identity without going through
     /// `applyDocumentText` (External Reload, Keep Mine, clean auto-adoption).
     func notifyEditorFindExternalContentDidReplace() {
+        advanceEditorReplaceAuthorityGeneration()
         notifyEditorFindDocumentDidChange()
     }
 
     /// URL / retained identity rekey (rename, move, Save Copy adoption) without a full
     /// document switch — rebind so Find identity tracks the new URL.
     func notifyEditorFindDocumentIdentityDidRekey() {
+        advanceEditorReplaceAuthorityGeneration()
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else {
             // Still drop any published nav under the old identity.
             cancelPublishedFindNavigationOnSharedChannel()
@@ -61,6 +63,7 @@ extension AppState {
     /// navigation ID from the shared generation, and drags the selection back to the find
     /// hit. Must run before the search navigation is issued so its cancel carries the older ID.
     func notifyEditorFindWorkspaceSearchWillNavigate(to selection: NSRange) {
+        advanceEditorReplaceAuthorityGeneration()
         editorFindHost.latestKnownEditorSelection = nil
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else {
             return
@@ -90,6 +93,7 @@ extension AppState {
     }
 
     func notifyEditorFindDocumentDidSwitch() {
+        advanceEditorReplaceAuthorityGeneration()
         // Drop selection cache — ranges are document-scoped.
         editorFindHost.latestKnownEditorSelection = nil
         cancelPublishedFindNavigationOnSharedChannel()
@@ -121,6 +125,7 @@ extension AppState {
     }
 
     func notifyEditorFindWorkspaceDidClose() {
+        advanceEditorReplaceAuthorityGeneration()
         // clearForNoDocument clears controller query + session so the next open does not
         // re-run a background find against a new document.
         cancelPublishedFindNavigationOnSharedChannel()

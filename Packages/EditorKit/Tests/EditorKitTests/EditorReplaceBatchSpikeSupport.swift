@@ -90,7 +90,8 @@ enum EditorReplaceBatchSpikeSupport {
     static func makeFixture(
         source: String,
         selection: NSRange = NSRange(location: 0, length: 0),
-        enableWYSIWYG: Bool = false
+        enableWYSIWYG: Bool = false,
+        makeWindow: ((NSRect) -> NSWindow)? = nil
     ) throws -> Fixture {
         let model = Model(source: source)
         let contract = model.makeContract()
@@ -123,7 +124,7 @@ enum EditorReplaceBatchSpikeSupport {
         let coordinator = representable.makeCoordinator()
         textView.textDelegate = coordinator
         let window = EditorFindControllerTestSupport.registerWindowForTeardown(
-            NSWindow(
+            makeWindow?(frame) ?? NSWindow(
                 contentRect: frame,
                 styleMask: [.titled, .closable],
                 backing: .buffered,

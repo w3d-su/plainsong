@@ -1,8 +1,9 @@
 import Foundation
 import MarkdownCore
 
-/// Injected commit decision for one single Replace. PR E supplies the real App
-/// policy; this PR only requires the answer before writer preflight.
+/// Injected commit decision for one single Replace. App supplies its
+/// session-bound authorization here; the executor asks once, after validation and
+/// before writer preflight, in the same synchronous turn as the native insert.
 public struct EditorReplaceAuthorization: Sendable {
     public var allowsCommit: @Sendable () -> Bool
 
