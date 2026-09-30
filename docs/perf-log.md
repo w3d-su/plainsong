@@ -1276,3 +1276,61 @@ is unmeasured and belongs to E9's large-document pass. The payload rows come fro
 run against the PR head sources and then against this change. No export wall-clock
 budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
 editor keystroke path.
+
+## Replace PR F WYSIWYG single Replace — 2026-09-30
+
+Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug.
+The exact reveal proof runs only on explicit Replace; recording the applied model
+retains existing output in constant time. Native writer/input, caret snapping,
+selection-driven reveal, the marked-text guard and the native-edit styling guard
+are unchanged. Presentation scheduling now cancels/restarts the existing 20 ms
+background parse directly, reading authoritative source, instead of relying on
+SwiftUI `.task(id:)` to start the final request after closely spaced changes.
+
+`EditorReplaceWYSIWYGPerformanceTests.testLargeFixtureWYSIWYGTypingWithAppliedReplaceSnapshotStaysUnderBudget`
+passed in the complete EditorKit suite: 30 native insertions on `large-1mb.md`,
+maximum **0.398583 ms**. This model-backed fixture does not run the production
+SwiftUI/Find pipeline and is not App typing proof.
+
+`EditorFindHostedGateTests.testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget`
+mounts the production `WorkspaceWindow`, Experimental WYSIWYG and an open Find
+session (`ordinary prose`), waits for initial styling/authorization, then inserts
+30 characters with 20 ms between calls. Timing includes synchronous native
+insertion, App publication and debounce scheduling; it excludes the async parse,
+settled rendering and hardware event delivery. The functional fixture removes
+Find's debounce, so this probe restores its **production 150 ms** default before
+timing. Local `< 16 ms` assertions remain hard; hosted CI wall clocks are
+informational under risk R15. The shared `lockf` prevents overlapping Mac tests.
+
+Controlled comparison: exact #131 product `a0213857c69300931385b337369c0e7197cd8f3f`
+(only the identical hosted test/helper added), three iterations first; then this
+branch's final production code with the unchanged native-edit guard, three
+iterations. [Retained raw samples](evidence/editor-replace-r5-20260930-typing.json)
+come from keep-always XCTest attachments.
+
+| Product | Iteration 1 maximum | Iteration 2 maximum | Iteration 3 maximum | Hard-budget result |
+|---|---:|---:|---:|---|
+| #131 baseline | 23.599500 ms | 15.162750 ms | 15.375958 ms | 1 failure, 2 passes |
+| PR F, native-edit guard unchanged | 24.359250 ms | 14.850583 ms | 15.258833 ms | 1 failure, 2 passes |
+
+**The first iteration exceeds budget in both products; the budget is not relaxed.**
+Later iterations pass in both. This ordered, low-sample comparison shows similar
+steady measurements but does not establish a speedup or exclude smaller regressions;
+first-iteration latency still needs profiling. It is not full keystroke-to-screen,
+physical-keyboard or real-IME evidence and does not close R9.
+
+Diagnostic history: with the helper's zero Find debounce, baseline maxima were
+30.008916 / 26.148167 / 23.394708 ms and an intermediate PR F tree measured
+21.157208 / 17.900292 / 16.685042 ms, all failed. A trial allowing fresh WYSIWYG
+styling while native editing was active measured 18.658417 / 18.299334 /
+18.608375 ms with production debounce (all failed), while restoring the existing
+guard returned the normal slow samples to about 14.6 ms. That trial was removed;
+no presentation-apply or typing-budget exception ships. Functional post-write,
+Undo and Redo reparse is verified through the real App dispatcher, without manual
+reparse in tests, in 18/18 repeated hosted executions.
+
+Final complete EditorFind/EditorReplace hosted regression run: **104/104 passed**,
+including the same hard local typing probe (maximum **15.009834 ms**;
+raw samples retained in the linked JSON). This later passing run does not erase
+the isolated first-iteration failures above. Full MarkdownCore: 303/303; full
+EditorKit: 399 tests, seven real-IME opt-in skips, zero failures.

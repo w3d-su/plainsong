@@ -111,11 +111,19 @@ extension EditorFindHostedGateTests {
     func makeHostedReplaceWorkspace(
         source: String,
         query: String,
-        localEdit: String? = nil
+        localEdit: String? = nil,
+        assets: [String: Data] = [:],
+        layoutMode: EditorLayoutMode = .sourceOnly
     ) async throws -> HostedReplaceWorkspace {
         let fixture = try makeWorkspaceFixture(files: ["post.md": source])
+        for (name, data) in assets {
+            try data.write(to: fixture.root.appendingPathComponent(name))
+        }
         let appState = fixture.appState
-        appState.setLayoutMode(.sourceOnly)
+        if layoutMode == .wysiwyg {
+            appState.preferences.setExperimentalWYSIWYGEnabled(true)
+        }
+        appState.setLayoutMode(layoutMode)
         // A local edit must stay dirty when the disk changes, or Reload is silent.
         appState.preferences.setAutosaveIntervalSeconds(30)
         appState.openExternalFile(fixture.root)

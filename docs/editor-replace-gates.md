@@ -49,6 +49,20 @@
 > UI or Replace All; R4–R6 and R8–R10 stay open. Known follow-up:
 > `EditorFindController.swift` is 588 lines with a 287-line class body and should
 > be split without widening its private state.
+> **PR F (`phase3-editor-replace-wysiwyg`) implements Experimental WYSIWYG
+> single Replace:** it closes R5 bullets 1–4 and 6. The first explicit action
+> navigates to the raw match and reveals its owning source; a later action can
+> commit only with an applied model at the current installation/revision, an
+> exact raw slice, fully revealed overlapping owners (including the whole link),
+> and no folded attributes or image markers. An already selected hidden or stale
+> match refuses with `wysiwygRangeNotRevealed`, without revealing or writing.
+> Image navigation uses the existing whole-marker removal. Post-write and native
+> Undo/Redo reparse the authoritative source through the existing off-main
+> highlighter; the debounce now restarts directly so its final request cannot be
+> lost between closely spaced source, selection, and viewport updates. Native
+> input, the editing/marked-text apply guards, and selection-driven reveal remain
+> unchanged. App authorization, writer activation, and replacement publication
+> retain PR D/E's path. R5 stays open for Replace All; R6 and R9 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -956,19 +970,56 @@ hosted spike PR #112.
 
 ### R5 — Experimental WYSIWYG raw-source replacement
 
-- [ ] Folded delimiter overlap reveals the owning region, replaces the exact
+- [x] Folded delimiter overlap reveals the owning region, replaces the exact
   raw-source UTF-16 span, and performs no Markdown repair.
-- [ ] Folded link-destination overlap reveals the whole link, replaces only
+- [x] Folded link-destination overlap reveals the whole link, replaces only
   the raw match, and performs no URL normalization.
-- [ ] Image overlap removes/suspends projection, replaces exact raw image
+- [x] Image overlap removes/suspends projection, replaces exact raw image
   source, and never mutates projected U+FFFC/U+200B text.
-- [ ] Valid post-write constructs may fold/thumbnail again only after reparse;
+- [x] Valid post-write constructs may fold/thumbnail again only after reparse;
   invalid constructs remain raw and editable.
 - [ ] Replace All suspends/reapplies presentation once per batch, not once per
   match; backing source, copy, selection, and accessibility remain canonical.
-- [ ] Source-only and source+preview publish through the normal document/
+- [x] Source-only and source+preview publish through the normal document/
   preview path; no preview DOM mutation.
-- Evidence: _open_
+- Evidence (PR F; R5 remains **open overall**, Replace All belongs to PR G):
+  `EditorReplaceWYSIWYGTests.testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo`
+  covers emphasis/strong/heading/strike/code, literal malformed results and CJK/emoji
+  UTF-16 spans. `testLinkDestinationRevealsWholeSourceWithoutURLNormalization`
+  proves whole-link raw reveal and unchanged parentheses/percent-escape spelling
+  outside the exact match. `testImageProjectionNavigatesRevealsAndRebuildsAfterUndoRedo`
+  removes the owning marker on navigation and edits backing source only;
+  `testInvalidImageAfterReplaceStaysRawAndEditable` proves invalid syntax stays raw.
+  `testAdjacentMatchNeitherRevealsFoldNorRefuses` proves strict overlap;
+  `testRefoldedPresentationAtStillValidOffsetRefusesWithZeroEffect`,
+  `testWholeLinkProofRejectsHiddenChromeOutsideTheMatch`, and
+  `testImageProjectionReinstalledAtExactSelectionRefusesWithoutReveal` cover stale
+  or partially hidden presentation with no writer/publication/undo effects.
+  `testMarkedTextWithWYSIWYGRefusesBeforeAuthorizationOrReveal` extends deterministic
+  editor coverage only, with no R6 checkbox change.
+- Production App evidence is in `EditorFindHostedGateTests`:
+  `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`,
+  `testHostedReplaceLinkDestinationThroughDispatcherWithoutURLNormalization`,
+  `testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`,
+  `testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse`, and
+  `testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair` drive #131's
+  dispatcher and both App authorization checkpoints. The first action only
+  navigates; the next commits exactly one raw range. Fresh applied model revisions
+  and original Undo source ranges prove **automatic** post-write/Undo/Redo reparse,
+  without a test-side reparse or presentation repair. Valid constructs refold or
+  thumbnail after selection leaves; invalid ones remain raw/editable. Exact source,
+  raw selection/copy/accessibility and one Undo/Redo step are asserted.
+  `testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally` asserts one
+  replacement publication and reads the normal live preview; it does not mutate
+  the DOM. All six hosted methods passed three consecutive executions (18/18).
+- Typing measurement and its baseline comparison are recorded in
+  [perf-log.md](perf-log.md#replace-pr-f-wysiwyg-single-replace--2026-09-30).
+  Full MarkdownCore passed 303 tests; full EditorKit passed 399 tests (seven
+  actual-IME opt-in skips); all EditorFind/EditorReplace App tests passed 104/104,
+  and the five existing App WYSIWYG policy/configuration tests passed. Pinned
+  SwiftFormat 0.62.1 format/lint, `make build`, and `git diff --check` passed.
+  The reveal proof runs only on explicit Replace; the applied snapshot is recorded
+  in constant time. These synthetic native-input probes do not close R9 or real IME.
 
 ### R6 — Marked text + real Zhuyin/Pinyin boundaries
 

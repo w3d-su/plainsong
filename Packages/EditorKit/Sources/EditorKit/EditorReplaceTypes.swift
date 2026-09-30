@@ -52,8 +52,10 @@ public enum EditorReplaceRefusal: Equatable, Sendable, Error {
     case noCurrentMatch
     case markedText
     case unauthorized
-    /// Experimental WYSIWYG fold/image presentation is installed. PR F lifts this.
+    /// Retained for compatibility with the earlier blanket presentation refusal.
     case wysiwygPresentationInstalled
+    /// The exact raw selection lacks a current, fully revealed presentation proof.
+    case wysiwygRangeNotRevealed
     case invalidPlan(EditorReplacePlanRefusal)
     case writerPreflightFailed
     /// Writer preflight passed, but the observed post-write snapshot is still

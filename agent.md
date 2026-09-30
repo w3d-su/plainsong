@@ -497,6 +497,11 @@ editor *folds* markdown tokens via rendering, not text mutation:
 - Undo, IME composition (Chinese input!), and selection across folded tokens are the risk
   areas — write exploratory tests early. **IME correctness is non-negotiable: test with
   Traditional Chinese (Zhuyin/Pinyin) marked text at every change.**
+- Experimental single Replace uses raw UTF-16 matches. Its first action navigates
+  and reveals folded owners or the whole image source; a later action commits only
+  with a current applied presentation proof. Hidden/stale presentation refuses with
+  `wysiwygRangeNotRevealed`. Normal off-main reparse restores presentation after
+  the write and native Undo/Redo; Replace All remains deferred (R5 partial).
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
   / source only / WYSIWYG once it ships).
 

@@ -12,6 +12,7 @@ public struct MarkdownEditorView: View {
     @Binding private var text: String
     @State private var styledText: HighlightedText?
     @State private var highlightRevision = 0
+    @State private var highlightTask: Task<Void, Never>?
     @State private var selection: NSRange?
     @State private var visibleTextRange: NSRange?
     #if DEBUG
@@ -133,9 +134,6 @@ public struct MarkdownEditorView: View {
                 updateVisibleRange(range)
             }
         }
-        .task(id: highlightRevision) {
-            await applyScheduledVisibleHighlight(for: highlightRevision)
-        }
         .onChange(of: text) { _, _ in
             scheduleHighlight()
         }
@@ -153,6 +151,10 @@ public struct MarkdownEditorView: View {
         .onAppear {
             activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
+        }
+        .onDisappear {
+            highlightTask?.cancel()
+            highlightTask = nil
         }
         #if DEBUG
         .overlay(alignment: .topLeading) {
@@ -178,12 +180,17 @@ public struct MarkdownEditorView: View {
         }
     #endif
 
-    /// Every text, file-kind, or viewport change bumps the revision; `.task(id:)`
-    /// restarts after a short debounce so rapid typing cancels stale visible-range
+    /// Every text, file-kind, or viewport change bumps the revision and directly
+    /// restarts the debounce so rapid typing cancels stale visible-range
     /// work before it reaches the parser. Scheduling during IME composition is safe
     /// because `MarkdownTextView` blocks the apply while marked text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
+        let revision = highlightRevision
+        highlightTask?.cancel()
+        highlightTask = Task { @MainActor in
+            await applyScheduledVisibleHighlight(for: revision)
+        }
     }
 
     private func updateVisibleRange(_ range: NSRange) {
@@ -224,7 +231,7 @@ public struct MarkdownEditorView: View {
             return
         }
 
-        let source = text
+        let source = documentSourceContract?.snapshot().source ?? text
         let kind = fileKind
         let requestedRange = Self.highlightRequestRange(
             visibleRange: visibleTextRange,

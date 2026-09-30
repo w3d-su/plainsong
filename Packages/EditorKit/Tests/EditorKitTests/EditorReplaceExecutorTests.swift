@@ -129,7 +129,7 @@ final class EditorReplaceExecutorTests: XCTestCase {
         XCTAssertEqual(ready.controller.editScheduleCount, 0)
     }
 
-    func testWYSIWYGPresentationRefusesWithZeroEffect() async throws {
+    func testWYSIWYGWithoutAppliedModelRefusesWithZeroEffect() async throws {
         let ready = try await EditorReplaceSingleSupport.makeReady(
             source: "**one** two",
             pattern: "one",
@@ -138,7 +138,7 @@ final class EditorReplaceExecutorTests: XCTestCase {
         XCTAssertNotNil(ready.fixture.textView.wysiwygZeroWidthContentStorageDelegate)
         let outcome = EditorReplaceSingleSupport.perform(ready, replacement: "ONE")
 
-        XCTAssertEqual(outcome, .refused(.wysiwygPresentationInstalled))
+        XCTAssertEqual(outcome, .refused(.wysiwygRangeNotRevealed))
         XCTAssertEqual(
             EditorReplaceBatchSpikeSupport.viewText(in: ready.fixture.textView),
             "**one** two"
