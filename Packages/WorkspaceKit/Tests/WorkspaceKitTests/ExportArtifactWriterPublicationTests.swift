@@ -4,63 +4,74 @@ import Foundation
 import XCTest
 
 extension ExportArtifactWriterTests {
-    func testNewLeafPublishesWithExclusiveRenameAndProvesStagingAbsent() throws {
+    func testNewLeafPublishesWithExclusiveRenameAndRemovesStaging() throws {
         let fixture = try makeExportFixture()
-        let probe = ExportBoundaryProbe(snapshotDirectory: fixture.directory)
+        let probe = ExportBoundaryProbe()
 
-        let outcome = export(
-            "new artifact",
-            to: fixture.destination,
-            disposition: .createNew,
-            hooks: probe.hooks()
-        )
+        let outcome = export("new artifact", to: fixture.destination, disposition: .createNew, probe: probe)
 
         let commit = try XCTUnwrap(requireCommitted(outcome))
         XCTAssertEqual(commit.selectedURL, fixture.destination)
         XCTAssertEqual(try text(at: fixture.destination), "new artifact")
         XCTAssertEqual(commit.metadata.identity, try identity(at: fixture.destination))
         XCTAssertEqual(commit.metadata.byteCount, Int64("new artifact".utf8.count))
-        XCTAssertTrue(probe.events.contains(.willCommit(.exclusiveCreate)))
-        XCTAssertFalse(probe.events.contains(.willCommit(.swap)))
-        let stagingName = try XCTUnwrap(probe.stagingName)
-        XCTAssertTrue(stagingName.hasPrefix(".plainsong-write-"))
-        XCTAssertEqual(
-            try entries(in: fixture.directory),
-            ["export.html", Self.sentinelName].sorted()
-        )
+        XCTAssertEqual(probe.calls(at: .publish).map(\.operation), [.rename])
+        XCTAssertEqual(probe.calls(at: .publish).map(\.path), [fixture.destinationPath])
+        XCTAssertTrue(probe.calls(at: .reverseSwap).isEmpty)
+        XCTAssertTrue(probe.calls(at: .unlinkDisplaced).isEmpty, "RENAME_EXCL displaces nothing")
+        let staging = try XCTUnwrap(probe.stagingDirectoryPath)
+        XCTAssertFalse(exists(probe.stagedPath), "the staged name is proven absent")
+        XCTAssertFalse(exists(staging), "the item-replacement directory is removed")
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+        XCTAssertEqual(try entries(in: fixture.base), ["selected"])
         XCTAssertEqual(try text(at: fixture.sentinel), "sentinel")
+        assertTouchedOnlyLeafParentAndStaging(probe, fixture: fixture)
     }
 
-    func testConfirmedReplacementSwapsExactIdentityWithoutTruncatingDisplacedInode() throws {
+    func testConfirmedOverwriteSwapsExactIdentityAndKeepsTheDisplacedMode() throws {
         let fixture = try makeExportFixture(originalText: "panel-approved original")
         let approved = try XCTUnwrap(fixture.originalIdentity)
-        // A second name for the displaced inode outside the selected parent proves the swap
+        XCTAssertEqual(Darwin.chmod(fixture.destinationPath, 0o640), 0)
+        // A second name for the displaced inode outside the chosen folder proves the swap
         // replaced a directory entry and never truncated or rewrote the displaced file.
         let outsideLink = fixture.base.appendingPathComponent("outside-link.html")
         try FileManager.default.linkItem(at: fixture.destination, to: outsideLink)
-        let probe = ExportBoundaryProbe(snapshotDirectory: fixture.directory)
+        let probe = ExportBoundaryProbe()
 
         let outcome = export(
             "replacement artifact",
             to: fixture.destination,
             disposition: .replaceConfirmed(approved),
-            hooks: probe.hooks()
+            probe: probe
         )
 
         let commit = try XCTUnwrap(requireCommitted(outcome))
         XCTAssertEqual(try text(at: fixture.destination), "replacement artifact")
         XCTAssertNotEqual(commit.metadata.identity, approved)
         XCTAssertEqual(commit.metadata.identity, try identity(at: fixture.destination))
-        XCTAssertTrue(probe.events.contains(.willCommit(.swap)))
-        XCTAssertTrue(probe.events.contains(.displacedEntryCaptured))
-        XCTAssertFalse(probe.events.contains(.willCommit(.exclusiveCreate)))
+        XCTAssertEqual(try permissionBits(at: fixture.destination), 0o640, "Q3: the displaced mode is kept")
+        XCTAssertEqual(probe.calls(at: .chmodStaged).count, 1)
+        XCTAssertEqual(probe.calls(at: .publish).count, 1)
+        XCTAssertEqual(probe.calls(at: .unlinkDisplaced).map(\.path), [probe.stagedPath].compactMap { $0 })
+        XCTAssertTrue(probe.calls(at: .reverseSwap).isEmpty)
         XCTAssertEqual(try text(at: outsideLink), "panel-approved original")
         XCTAssertEqual(try identity(at: outsideLink), approved)
-        XCTAssertEqual(try linkCount(at: outsideLink), 1)
-        XCTAssertEqual(
-            try entries(in: fixture.directory),
-            ["export.html", Self.sentinelName].sorted()
-        )
+        XCTAssertEqual(try linkCount(at: outsideLink), 1, "the displaced name was unlinked")
+        XCTAssertFalse(exists(probe.stagingDirectoryPath))
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+        assertTouchedOnlyLeafParentAndStaging(probe, fixture: fixture)
+    }
+
+    func testNewLeafModeIsTheUmaskDefault() throws {
+        for mask: mode_t in [0o022, 0o027, 0o077] {
+            let fixture = try makeExportFixture()
+            let previous = Darwin.umask(mask)
+            let outcome = export(to: fixture.destination, disposition: .createNew)
+            Darwin.umask(previous)
+
+            XCTAssertNotNil(requireCommitted(outcome))
+            XCTAssertEqual(try permissionBits(at: fixture.destination), 0o666 & ~mask, "umask \(mask)")
+        }
     }
 
     func testInspectDestinationReportsNewLeafAndPanelApprovedIdentity() throws {
@@ -84,106 +95,142 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(try text(at: fixture.destination), "approved replacement")
     }
 
-    func testAtMostOneOperationSiblingExistsAtEveryObservedBoundary() throws {
+    func testLeafInspectionComesFromLeafPathMetadata() throws {
+        let fixture = try makeExportFixture()
+        let parentIdentity = try identity(at: fixture.directory)
+        let caseSensitive = try XCTUnwrap(
+            fixture.directory.resourceValues(forKeys: [.volumeSupportsCaseSensitiveNamesKey])
+                .volumeSupportsCaseSensitiveNames
+        )
+
+        let missing = try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get()
+
+        XCTAssertEqual(missing.state, .missing)
+        XCTAssertEqual(missing.leafURL.path(percentEncoded: false), fixture.destinationPath)
+        XCTAssertEqual(missing.parentIdentity, parentIdentity)
+        XCTAssertEqual(missing.volumeIsCaseSensitive, caseSensitive)
+        try Data("existing".utf8).write(to: fixture.destination)
+        let existing = try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get()
+        XCTAssertEqual(existing.state, try .regular(identity(at: fixture.destination)))
+        XCTAssertEqual(existing.leafURL, missing.leafURL)
+        // A hard link is a different name for the same identity, not an alias: F_GETPATH keeps
+        // the name the leaf was opened by.
+        let link = fixture.directory.appendingPathComponent("link.md")
+        try FileManager.default.linkItem(at: fixture.destination, to: link)
+        let linked = try ExportArtifactWriter.inspectLeaf(at: link).get()
+        XCTAssertEqual(linked.state, existing.state)
+        XCTAssertEqual(linked.leafURL.path(percentEncoded: false), link.path(percentEncoded: false))
+    }
+
+    /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes
+    /// `open(parent, O_RDONLY)` fail while `fstatat` and `renameatx_np` into it still work, so the
+    /// writer must publish without ever holding a parent descriptor.
+    func testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder() throws {
         for replaces in [false, true] {
             let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
-            let probe = ExportBoundaryProbe(snapshotDirectory: fixture.directory)
+            let parent = fixture.directoryPath
+            XCTAssertEqual(Darwin.chmod(parent, 0o300), 0)
+            defer { _ = Darwin.chmod(parent, 0o700) }
+            let parentOpen = parent.withCString { Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC) }
+            XCTAssertEqual(parentOpen, -1)
+            XCTAssertEqual(errno, EACCES, "the simulated leaf-only grant cannot open the chosen folder")
+            let inspection = ExportArtifactWriter.inspectDestination(at: fixture.destination, kind: .html)
+            let disposition: ExportArtifactDisposition = try replaces
+                ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
+                : .createNew
+            XCTAssertEqual(
+                inspection,
+                try replaces ? .existingRegularFile(XCTUnwrap(fixture.originalIdentity)) : .newLeaf
+            )
+            let probe = ExportBoundaryProbe(watchedDirectory: parent)
+            let counts = DescriptorCounts()
+
+            let outcome = export(
+                "leaf-only grant",
+                to: fixture.destination,
+                disposition: disposition,
+                probe: probe,
+                hooks: probe.hooks(afterPreflight: { counts.append(exportOpenDescriptorCount(exactly: parent)) })
+            )
+
+            XCTAssertNotNil(requireCommitted(outcome), "replaces: \(replaces)")
+            XCTAssertEqual(Darwin.chmod(parent, 0o700), 0)
+            XCTAssertEqual(try text(at: fixture.destination), "leaf-only grant")
+            XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+            XCTAssertEqual(counts.values, [0])
+            XCTAssertFalse(probe.watchedDescriptorCounts.isEmpty)
+            XCTAssertTrue(probe.watchedDescriptorCounts.allSatisfy { $0 == 0 }, "no boundary holds the parent")
+            XCTAssertFalse(probe.calls.contains { $0.path == parent && $0.operation != .fstatat })
+            assertTouchedOnlyLeafParentAndStaging(probe, fixture: fixture)
+        }
+    }
+
+    /// At every observed boundary of a successful new leaf or replacement, the chosen folder
+    /// holds only its pre-existing entries and (after publication) the leaf. The single staged
+    /// file lives only in the item-replacement directory, and both are gone on success.
+    func testNoEntryOtherThanTheLeafIsEverCreatedInTheChosenFolder() throws {
+        for replaces in [false, true] {
+            let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
+            let probe = ExportBoundaryProbe(watchedDirectory: fixture.directoryPath)
             let disposition: ExportArtifactDisposition = try replaces
                 ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
                 : .createNew
 
-            XCTAssertNotNil(requireCommitted(export(
-                to: fixture.destination,
-                disposition: disposition,
-                hooks: probe.hooks()
-            )))
+            XCTAssertNotNil(requireCommitted(export(to: fixture.destination, disposition: disposition, probe: probe)))
 
             let snapshots = probe.snapshots
-            XCTAssertGreaterThan(snapshots.count, 5, "replaces: \(replaces)")
+            XCTAssertGreaterThan(snapshots.count, 8, "replaces: \(replaces)")
             for snapshot in snapshots {
-                let siblings = snapshot.filter { $0.hasPrefix(".plainsong-") }
-                XCTAssertLessThanOrEqual(siblings.count, 1, "replaces: \(replaces) \(snapshot)")
                 XCTAssertTrue(
-                    Set(snapshot).isSubset(of: Set(siblings + ["export.html", Self.sentinelName])),
+                    Set(snapshot).isSubset(of: ["export.html", Self.sentinelName]),
                     "replaces: \(replaces) \(snapshot)"
                 )
             }
-            XCTAssertTrue(
-                snapshots.contains { $0.contains { $0.hasPrefix(".plainsong-write-") } },
-                "the staging file must be observed in the approved parent"
+            let staged = try XCTUnwrap(probe.stagedPath)
+            XCTAssertFalse(
+                ExportArtifactWriter.pathLies(staged, inside: fixture.directoryPath, caseSensitive: false)
             )
-            XCTAssertEqual(try operationSiblings(in: fixture.directory), [])
+            XCTAssertEqual(probe.calls(at: .createStaged).count, 1, "exactly one staged file")
+            XCTAssertFalse(exists(staged))
+            XCTAssertFalse(exists(probe.stagingDirectoryPath))
+            XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
             XCTAssertEqual(try entries(in: fixture.base), ["selected"])
         }
     }
 
     func testWriterReleasesEveryDescriptorAfterEachOutcomeKind() throws {
         let fixture = try makeExportFixture(originalText: "original")
-        let approved = try XCTUnwrap(fixture.originalIdentity)
-        let counts = DescriptorCounts()
-        let measuring = ExportArtifactWriterHooks(afterPreflight: {
-            counts.append(exportOpenDescriptorCount(under: fixture.base))
-        })
-        XCTAssertEqual(exportOpenDescriptorCount(under: fixture.base), 0)
+        let temporary = try WorkspaceFileSystemRootAuthority(rootURL: FileManager.default.temporaryDirectory)
+            .canonicalRootURL.path(percentEncoded: false)
+        let baseline = exportOpenDescriptorCount(under: temporary)
 
-        XCTAssertNotNil(requireCommitted(export(
-            to: fixture.destination,
-            disposition: .replaceConfirmed(approved),
-            hooks: measuring
-        )))
-        XCTAssertEqual(exportOpenDescriptorCount(under: fixture.base), 0)
-        XCTAssertGreaterThan(counts.values.first ?? 0, 0, "preflight holds the parent descriptor")
+        let current = try XCTUnwrap(fixture.originalIdentity)
+        XCTAssertNotNil(requireCommitted(export(to: fixture.destination, disposition: .replaceConfirmed(current))))
+        XCTAssertEqual(exportOpenDescriptorCount(under: temporary), baseline)
 
-        let refused = export(
-            to: fixture.destination,
-            disposition: .createNew
-        )
-        XCTAssertEqual(refused, .notCommitted(.destinationAlreadyExists))
-        XCTAssertEqual(exportOpenDescriptorCount(under: fixture.base), 0)
-
-        let current = try identity(at: fixture.destination)
-        let failing = ExportBoundaryProbe(failures: [.renameSwap: .unreadable])
         XCTAssertEqual(
-            export(to: fixture.destination, disposition: .replaceConfirmed(current), hooks: failing.hooks()),
-            .notCommitted(.writeFailed(.unreadable))
+            export(to: fixture.destination, disposition: .createNew),
+            .notCommitted(.destinationAlreadyExists)
         )
-        XCTAssertEqual(exportOpenDescriptorCount(under: fixture.base), 0)
+        XCTAssertEqual(exportOpenDescriptorCount(under: temporary), baseline)
 
-        let uncertain = ExportBoundaryProbe(
-            failures: [.validateCommittedLeaf: .unreadable, .renameRollback: .unreadable]
+        let replaced = try identity(at: fixture.destination)
+        XCTAssertEqual(
+            export(
+                to: fixture.destination,
+                disposition: .replaceConfirmed(replaced),
+                probe: ExportBoundaryProbe(failures: [.syncStaged: EIO])
+            ),
+            .notCommitted(.writeFailed(.durabilityFailed))
         )
+        XCTAssertEqual(exportOpenDescriptorCount(under: temporary), baseline)
+
         XCTAssertNotNil(requireIndeterminate(export(
             to: fixture.destination,
-            disposition: .replaceConfirmed(current),
-            hooks: uncertain.hooks()
+            disposition: .replaceConfirmed(replaced),
+            probe: ExportBoundaryProbe(failures: [.postflight: EIO, .reverseSwap: EIO])
         )))
-        XCTAssertEqual(exportOpenDescriptorCount(under: fixture.base), 0)
-    }
-
-    func testCommittedNewLeafRequiresStagingNameProvenAbsent() throws {
-        let fixture = try makeExportFixture()
-        let probe = ExportBoundaryProbe()
-        let occupant = OccupantBox()
-        let hooks = probe.hooks(afterPublication: { [probe] in
-            guard let name = probe.stagingName else { return }
-            let url = fixture.directory.appendingPathComponent(name, isDirectory: false)
-            try? Data("unrelated occupant".utf8).write(to: url)
-            occupant.url = url
-        })
-
-        let outcome = export("artifact", to: fixture.destination, disposition: .createNew, hooks: hooks)
-
-        let result = try XCTUnwrap(requireIndeterminate(outcome))
-        let occupantURL = try XCTUnwrap(occupant.url)
-        XCTAssertEqual(result.reason, .namespaceChanged)
-        XCTAssertEqual(result.selectedURL, fixture.destination)
-        XCTAssertEqual(result.destinationState, .unknown)
-        XCTAssertEqual(
-            result.stagingURL?.path(percentEncoded: false),
-            occupantURL.path(percentEncoded: false)
-        )
-        XCTAssertEqual(try text(at: fixture.destination), "artifact")
-        XCTAssertEqual(try text(at: occupantURL), "unrelated occupant")
+        XCTAssertEqual(exportOpenDescriptorCount(under: temporary), baseline)
     }
 
     func testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific() throws {
@@ -218,28 +265,5 @@ extension ExportArtifactWriterTests {
 
         XCTAssertEqual(outcome, .notCommitted(.cancelled))
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
-    }
-}
-
-final class DescriptorCounts: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: [Int] = []
-
-    var values: [Int] {
-        lock.withLock { stored }
-    }
-
-    func append(_ value: Int) {
-        lock.withLock { stored.append(value) }
-    }
-}
-
-final class OccupantBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var stored: URL?
-
-    var url: URL? {
-        get { lock.withLock { stored } }
-        set { lock.withLock { stored = newValue } }
     }
 }

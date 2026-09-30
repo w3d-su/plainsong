@@ -13,7 +13,11 @@
 > `~/Documents`). Staging moves to a same-device item-replacement directory with
 > exact-leaf publication, proven by an owner-run DEBUG probe. The E6 mechanism bullets
 > proven against the retired parent-anchored writer, including the ownership inspection
-> (which is parent-descriptor-derived), are reopened for PR E2, and PR F waits for E2.** Precedent:
+> (which is parent-descriptor-derived), were reopened for PR E2, and PR F waits for E2.
+> PR E2 (2026-09-30) replaces the writer with the amended-D5 leaf-path writer and moves the
+> ownership inspection to leaf-path metadata; it re-proves every reopened E6 bullet and the
+> rewritten sibling bullet. The leaf-grant bullet (PR F's owner smoke) and the
+> fresh-panel-URL bullet (PR F) stay open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -843,11 +847,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
-> against the now-retired parent-anchored writer, so all five are reopened until PR E2
-> re-proves them on the leaf-path mechanism: `RENAME_EXCL`/`RENAME_SWAP` publication,
+> against the now-retired parent-anchored writer, so all five were reopened until PR E2
+> re-proved them on the leaf-path mechanism: `RENAME_EXCL`/`RENAME_SWAP` publication,
 > overwrite postflight, ownership inspection, uncertainty paths, and failure reporting.
-> The ownership inventory itself is reused unchanged, but the adapter's destination
-> inspection, canonical spelling, and case sensitivity are parent-descriptor-derived.
+> **PR E2 (2026-09-30)** re-proves them, and the rewritten sibling bullet, with the named
+> tests in the PR E2 evidence below. The leaf-grant bullet stays open for PR F's owner smoke.
 
 - [ ] A leaf-only grant is never widened implicitly:
   - the operation never opens, enumerates, or creates entries in the chosen folder;
@@ -856,8 +860,14 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     alternate-directory fallback.
 
   Mechanism evidence: the D5 amendment probe (owner, 2026-09-29). Production evidence:
-  PR E2 tests plus PR F's owner smoke.
-- [ ] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
+  PR E2 tests plus PR F's owner smoke. PR E2 supporting evidence (a simulation, not a
+  Powerbox grant): `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder` and the
+  hosted `testWriteOnlyParentNeedsNoParentHandleForOwnership` (mode `0300` parent: its
+  `open(O_RDONLY)` fails with `EACCES`; every writer call on the chosen folder is an
+  `fstatat`, and no descriptor names it at any boundary),
+  `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback`. Open until PR F's
+  owner smoke records a real save-panel grant.
+- [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
   closed:
@@ -870,28 +880,107 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   - a case or normalization alias of an existing entry;
   - an item-replacement directory that is, or lies inside, the chosen folder.
 
-  *(Reopened 2026-09-29.)*
-- [ ] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
+  *(Reopened 2026-09-29; re-proven by PR E2.)*
+- [x] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
   the exact displaced panel-approved identity before cleanup. A mismatch reverses only
   after an exact two-name proof. Otherwise both identities remain, the exact leaf and
-  item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29.)*
-- [ ] Source collisions reuse the authoritative App ownership inventory from Save Copy
+  item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29;
+  re-proven by PR E2.)*
+- [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
-  case/canonical aliases are rejected. *(Reopened 2026-09-29: the adapter's inspection,
-  canonical spelling, and case sensitivity are parent-descriptor-derived and must move to
-  leaf-path metadata in PR E2.)*
-- [ ] No entry other than the published leaf is ever created in the chosen folder. The
+  case/canonical aliases are rejected. *(Reopened 2026-09-29; PR E2 moved the adapter's
+  identity, canonical spelling, and case sensitivity to leaf-path metadata. The hosted
+  tests run outside the sandbox, as PR E's did.)*
+- [x] No entry other than the published leaf is ever created in the chosen folder. The
   item-replacement directory and its single staged file are proven absent on success. No
   delivered sibling, intermediate directory, persistent recovery journal, bookmark,
   retry/fallback destination, or second artifact is created. *(Rewritten 2026-09-29. The
   earlier owner-reading question about a second `.plainsong-cleanup-*` sibling is
   superseded, because no sibling is ever staged in the chosen folder.)*
-- [ ] Namespace/cleanup uncertainty is reported with the exact leaf and item-replacement
+- [x] Namespace/cleanup uncertainty is reported with the exact leaf and item-replacement
   paths, and is never called an identity-atomic non-commit or a clean success. If the
   user's displaced original is left inside the app container, the report says so.
-  *(Reopened 2026-09-29.)*
-- [ ] Write failure/uncertainty is reported as failure and cannot be presented as a
-  complete artifact. *(Reopened 2026-09-29.)*
+  *(Reopened 2026-09-29; re-proven by PR E2 at the writer level. PR F owns the
+  user-visible wording.)*
+- [x] Write failure/uncertainty is reported as failure and cannot be presented as a
+  complete artifact. *(Reopened 2026-09-29; re-proven by PR E2 at the writer level.)*
+- PR E2 evidence (leaf-path writer, 2026-09-30; `swift test --package-path
+  Packages/WorkspaceKit` and the hosted `ExportDestinationOwnershipAppTests`). The writer
+  (`ExportArtifactWriter` in WorkspaceKit) proves the leaf with
+  `fstatat(AT_FDCWD, …, AT_SYMLINK_NOFOLLOW_ANY)` of the parent path and the exact leaf path,
+  opens an existing leaf with `O_NOFOLLOW_ANY` only to require its `F_GETPATH` spelling to
+  equal the selected spelling, stages one file in Foundation's item-replacement directory
+  (canonical symlink-free spelling, same `st_dev`, not in the chosen folder), and publishes
+  with `renameatx_np(AT_FDCWD, staged, AT_FDCWD, leaf, …)`. It returns `.committed` only
+  when the leaf holds the staged identity and byte count, any displaced original was unlinked,
+  and the staged name and the directory are proven absent; `.notCommitted` only when nothing
+  was published (or a swap was provably reversed) and no operation entry remains; otherwise
+  `.indeterminate` with the exact selected URL, staged-file URL, item-replacement directory
+  URL, residue contents (displaced original, writer bytes, or unknown), and
+  `residueIsInPurgeableTemporaryFolder`.
+  - Publication: `testNewLeafPublishesWithExclusiveRenameAndRemovesStaging`,
+    `testConfirmedOverwriteSwapsExactIdentityAndKeepsTheDisplacedMode` (an outside hard link
+    keeps the displaced bytes; Q3 mode kept), `testNewLeafModeIsTheUmaskDefault` (Q3),
+    `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`,
+    `testLeafInspectionComesFromLeafPathMetadata`,
+    `testUbiquitousDestinationPublishesInsideFileCoordination` (Q1, injectable ubiquity; a
+    coordination failure publishes nothing).
+  - Refusal matrix: `testSymbolicLinkLeafIsRefusedForBothDispositions`,
+    `testSymbolicLinkPathComponentIsRefused` (final and intermediate component),
+    `testSymlinkedComponentAtThePublishBoundaryIsRefusedByRenameNoFollowAny` (the kernel
+    flag itself, after the re-proof passed), `testDirectoryAndFIFOLeavesAreRefusedAsNonRegular`
+    (device nodes cannot be created unprivileged; the FIFO exercises the same refusal),
+    `testUnsupportedExtensionsAndInvalidURLsWriteNothing`,
+    `testDispositionMismatchesAreRefusedBeforeStaging`,
+    `testCaseAndNormalizationAliasOfExistingLeafIsRefused`,
+    `testMissingOrUnsearchableParentFailsBeforeAnyWrite`,
+    `testUnsupportedVolumeCapabilitiesFailClosedBeforeStaging` (keys read from the parent URL
+    for a new leaf, the leaf for an overwrite), `testRealVolumeKeysReportBothRenameSemanticsOnTheTestVolume`,
+    `testCrossDeviceItemReplacementDirectoryIsRefusedWithoutCopyFallback` (a real devfs/data
+    volume pair), `testItemReplacementDirectoryInsideTheChosenFolderIsRefusedAndRemoved`
+    (Foundation's sibling fallback, a deeper directory, and the chosen folder itself, which is
+    never removed), `testIdentityAndTypeRacesBeforePublicationFailClosedWithoutTouchingRacer`
+    (including a replaced parent directory),
+    `testRaceAtTheFinalPublishBoundaryNeverOverwritesTheRacerOrClaimsSuccess`,
+    `testOwnershipRefusalWritesNothingAndReceivesTheLeafInspection`,
+    `testCancelledOperationWritesNothing`.
+  - Fault injection (staging create/write/chmod/fsync, publish, postflight, two-name proof,
+    reverse swap, reversal proof, displaced unlink, staged unlink, removal proof, `rmdir`):
+    `testStagingCreateWriteChmodAndSyncFailuresLeaveTheDestinationUntouched`,
+    `testRealStagingCreateDenialIsNotPermittedWithoutFallback` (real `EACCES`),
+    `testPublishFailuresRemoveStagingAndLeaveTheDestinationUnchanged`,
+    `testPostflightMismatchReversesTheSwapOnlyAfterAnExactTwoNameProof`,
+    `testNewLeafPostflightMismatchIsIndeterminateAndNeverUnlinksTheLeafByPath`,
+    `testReverseSwapFailurePreservesBothIdentitiesAndReportsExactPaths`,
+    `testDisplacedUnlinkFailureReportsTheOriginalInThePurgeableTemporaryFolder`,
+    `testStagingDirectoryRemovalFailureIsNeverSuccessOrACleanNonCommit`,
+    `testUnpublishedStagedFileThatCannotBeRemovedIsReportedExactly`,
+    `testCommittedNewLeafRequiresTheStagedNameProvenAbsent`.
+  - Namespace and lifetime: `testNoEntryOtherThanTheLeafIsEverCreatedInTheChosenFolder`
+    (directory snapshots at every boundary; exactly one staged file, outside the chosen
+    folder), `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder`,
+    `testFoundationItemReplacementDirectoryIsOperationPrivateOnTheDestinationDevice`,
+    `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`.
+  - Ownership (hosted `ExportDestinationOwnershipAppTests`; the App adapter
+    `App/AppState+ExportDestinationOwnership.swift` re-derives the writer's
+    `ExportArtifactLeafInspection` and requires equality, then walks the Save Copy owner
+    inventory (hard links by `st_dev`/`st_ino`, locations by full-path alias keys under the
+    volume case flag) and the mutation owner URLs; every refusal test first proves an
+    unowned control is permitted): all PR E cases, now driven by the leaf inspection —
+    `testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten`,
+    `testHardLinkToEveryUnanchoredManagedOwnerIsRefused`,
+    `testCaseAliasOfMissingDetachedSessionIsRefused`,
+    `testQuarantinedIndeterminateSaveCopyDestinationIsRefused`,
+    `testLiveWorkspaceMutationRecoveryCandidateAndItsCaseAliasAreRefused`,
+    `testTextRecoveryOriginalAndContextOnlyOwnersAreRefused`,
+    `testSubfolderExportCollidingByHardLinkIsRefusedAcrossRootAuthorities`,
+    `testSubfolderCaseAliasOfOwnedMissingFileIsRefusedByFullPathComparison`,
+    `testRecoveryStoreLoadFailureRefusesEveryExportDestination`,
+    `testUnownedDestinationCommitsAndOnlyAFileLessSourceIsExempt`,
+    `testDisagreeingWriterInspectionIsRefused` — plus
+    `testWriteOnlyParentNeedsNoParentHandleForOwnership` (the retired parent-anchored
+    inspection throws there; the leaf-path adapter refuses the hard link and commits the
+    control).
 - PR E evidence (historical: the parent-anchored writer, retired for panel destinations by
   the 2026-09-29 D5 amendment; its hosted App ownership tests ran outside the sandbox and
   used parent-descriptor inspection). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the
@@ -1011,6 +1100,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   WorkspaceKit suite (Save/Save Copy/mutation/recovery write primitives) and the hosted
   App Save Copy/mutation suites stay green with the writer and adapter; the remaining
   preview/render/scroll suites and measured evidence stay open for PR G.
+- PR E2 evidence: `git diff 1c3a4d7 -- '*Package.swift' '*Package.resolved'
+  'preview-src/package*.json' project.yml` is empty. The full WorkspaceKit suite and the
+  hosted `ExportDestinationOwnershipAppTests`, `AppStateTests`,
+  `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`, and
+  `WorkspaceMutation{Operation,Text}RecoveryStoreTests` stay green with the leaf-path writer,
+  the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
 
 ## 9. Performance and Security Acceptance
 

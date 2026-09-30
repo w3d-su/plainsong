@@ -1,44 +1,29 @@
 import Darwin
 import Foundation
 
-struct ExportArtifactVolumeCapabilities: Equatable {
-    let exclusiveRename: Bool
-    let exchangeRename: Bool
-}
-
-/// Test seams. Production passes `.production` filesystem hooks (the writer still installs its
-/// own production `temporaryArtifactObserver`) and probes the real volume; tests inject
-/// syscall-boundary failures, races, and unsupported volume semantics.
-struct ExportArtifactWriterHooks {
-    static let production = ExportArtifactWriterHooks()
-
-    let fileSystem: WorkspaceAnchoredFileSystem.Hooks
-    let volumeCapabilities: (@Sendable (Int32) -> ExportArtifactVolumeCapabilities)?
-    let afterPreflight: (@Sendable () -> Void)?
-    let afterPublication: (@Sendable () -> Void)?
-
-    init(
-        fileSystem: WorkspaceAnchoredFileSystem.Hooks = .production,
-        volumeCapabilities: (@Sendable (Int32) -> ExportArtifactVolumeCapabilities)? = nil,
-        afterPreflight: (@Sendable () -> Void)? = nil,
-        afterPublication: (@Sendable () -> Void)? = nil
-    ) {
-        self.fileSystem = fileSystem
-        self.volumeCapabilities = volumeCapabilities
-        self.afterPreflight = afterPreflight
-        self.afterPublication = afterPublication
-    }
-}
-
 /// The literal panel URL split without Foundation path normalization.
 struct ExportArtifactSelection {
     let destinationURL: URL
     let parentPath: String
     let leaf: String
 
+    /// The exact selected path: the literal parent spelling joined with the literal leaf.
+    var leafPath: String {
+        parentPath == "/" ? "/\(leaf)" : "\(parentPath)/\(leaf)"
+    }
+
+    var leafURL: URL {
+        WorkspaceLiteralFileURL.fileURL(path: leafPath, isDirectory: false)
+    }
+
+    var parentURL: URL {
+        WorkspaceLiteralFileURL.fileURL(path: parentPath, isDirectory: true)
+    }
+
+    /// `kind == nil` parses a destination for ownership inspection without an extension policy.
     static func parse(
         _ url: URL,
-        kind: ExportArtifactKind
+        kind: ExportArtifactKind?
     ) -> Result<ExportArtifactSelection, ExportArtifactFailure> {
         guard url.isFileURL, !url.hasDirectoryPath,
               let path = try? WorkspaceLiteralFileURL.absolutePath(of: url)
@@ -51,7 +36,7 @@ struct ExportArtifactSelection {
         else {
             return .failure(.invalidDestinationURL)
         }
-        guard hasAllowedExtension(String(leaf), kind: kind) else {
+        if let kind, !hasAllowedExtension(String(leaf), kind: kind) {
             return .failure(.unsupportedExtension)
         }
         let parentPath = "/" + components.dropLast().joined(separator: "/")
@@ -80,124 +65,207 @@ struct ExportArtifactSelection {
     }
 }
 
+/// One no-follow proof of the selected leaf and its parent path, taken by path only.
+struct ExportArtifactLeafProof {
+    let state: WorkspaceNoFollowFileTargetState
+    let parentIdentity: WorkspaceFileSystemIdentity
+    /// The existing leaf's `fstatat` result (mode, size, device); `nil` for a new leaf.
+    let leafStatus: stat?
+}
+
 struct ExportArtifactPreflight {
-    let location: WorkspaceFileSystemLocation
-    let inspection: WorkspaceNoFollowFileTargetInspection
+    let proof: ExportArtifactLeafProof
+    let inspection: ExportArtifactLeafInspection
 }
 
 extension ExportArtifactWriter {
-    /// Establishes the exact parent authority and inspects the selected leaf. Runs inside the
-    /// caller's security scope for the exact panel URL; never starts access on the parent.
-    static func preflight(
+    /// Proves the leaf and derives the ownership inspection value. Runs inside the caller's
+    /// security scope for the exact panel URL; never starts access on, opens, or enumerates the
+    /// parent directory.
+    static func inspect(
         _ selection: ExportArtifactSelection,
         hooks: ExportArtifactWriterHooks
     ) -> Result<ExportArtifactPreflight, ExportArtifactFailure> {
-        let location: WorkspaceFileSystemLocation
-        do {
-            location = try WorkspaceFileSystemLocation(fileURL: selection.destinationURL)
-            try validateParentPathHasNoSymbolicLink(selection, location: location)
-        } catch let failure as ExportArtifactFailure {
-            return .failure(failure)
-        } catch {
-            return .failure(parentAuthorityFailure(error))
+        proveLeaf(selection, hooks: hooks).flatMap { proof in
+            // A missing volume key fails closed rather than guessing a case policy.
+            guard let values = try? selection.parentURL.resourceValues(
+                forKeys: [.volumeSupportsCaseSensitiveNamesKey]
+            ), let caseSensitive = values.volumeSupportsCaseSensitiveNames else {
+                return .failure(.parentAuthorityUnavailable)
+            }
+            return .success(ExportArtifactPreflight(
+                proof: proof,
+                inspection: ExportArtifactLeafInspection(
+                    state: proof.state,
+                    leafURL: selection.leafURL,
+                    parentIdentity: proof.parentIdentity,
+                    volumeIsCaseSensitive: caseSensitive
+                )
+            ))
         }
-
-        let inspection: WorkspaceNoFollowFileTargetInspection
-        do {
-            inspection = try WorkspaceAnchoredFileSystem.inspectFileTarget(
-                location,
-                hooks: hooks.fileSystem
-            )
-        } catch {
-            return .failure(destinationFailure(error))
-        }
-        guard inspection.canonicalLocation == location else {
-            return .failure(.destinationAlias)
-        }
-
-        let capabilities = location.rootAuthority.withRetainedRootDescriptor { descriptor in
-            hooks.volumeCapabilities?(descriptor) ?? probeVolumeCapabilities(descriptor)
-        }
-        let requiresExchange = inspection.state != .missing
-        guard capabilities.exclusiveRename, !requiresExchange || capabilities.exchangeRename else {
-            return .failure(.unsupportedVolumeSemantics)
-        }
-        return .success(ExportArtifactPreflight(location: location, inspection: inspection))
     }
 
-    /// Root capture follows aliases once to find the physical parent. The export contract
-    /// forbids following a symlink anywhere in the selected path, so the literal parent
-    /// spelling must name that same directory with `O_NOFOLLOW_ANY`.
-    private static func validateParentPathHasNoSymbolicLink(
+    /// D5 step 3: `fstatat(AT_FDCWD, …, AT_SYMLINK_NOFOLLOW_ANY)` of the parent path (must be a
+    /// directory) and of the exact leaf path. Absent → new leaf; a regular file whose opened
+    /// `F_GETPATH` spelling equals the selected spelling → existing; anything else fails closed.
+    static func proveLeaf(
         _ selection: ExportArtifactSelection,
-        location: WorkspaceFileSystemLocation
-    ) throws {
-        let descriptor = selection.parentPath.withCString {
-            Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
+        hooks: ExportArtifactWriterHooks
+    ) -> Result<ExportArtifactLeafProof, ExportArtifactFailure> {
+        proveParent(selection, hooks: hooks).flatMap { parentIdentity in
+            let leafStatus: stat
+            switch hooks.noFollowStatus(selection.leafPath, step: .inspectLeaf) {
+            case let .failure(failure):
+                return switch failure.code {
+                case ENOENT:
+                    .success(ExportArtifactLeafProof(state: .missing, parentIdentity: parentIdentity, leafStatus: nil))
+                case ELOOP: .failure(.symbolicLinkInParentPath)
+                case ENOTDIR: .failure(.namespaceChanged)
+                default: .failure(.parentAuthorityUnavailable)
+                }
+            case let .success(status):
+                leafStatus = status
+            }
+            switch leafStatus.exportFileType {
+            case S_IFREG: break
+            case S_IFLNK: return .failure(.symbolicLinkDestination)
+            default: return .failure(.nonRegularDestination)
+            }
+            let identity = WorkspaceFileSystemIdentity(exportStatus: leafStatus)
+            if let failure = proveCanonicalSpelling(selection, identity: identity, hooks: hooks) {
+                return .failure(failure)
+            }
+            return .success(ExportArtifactLeafProof(
+                state: .regular(identity),
+                parentIdentity: parentIdentity,
+                leafStatus: leafStatus
+            ))
         }
-        guard descriptor >= 0 else {
-            throw switch errno {
-            case ELOOP: ExportArtifactFailure.symbolicLinkInParentPath
-            case ENOENT, ENOTDIR: ExportArtifactFailure.namespaceChanged
-            default: ExportArtifactFailure.parentAuthorityUnavailable
+    }
+
+    /// The parent path must be a directory reached without any symlink. Metadata only: the
+    /// chosen folder is never opened.
+    private static func proveParent(
+        _ selection: ExportArtifactSelection,
+        hooks: ExportArtifactWriterHooks
+    ) -> Result<WorkspaceFileSystemIdentity, ExportArtifactFailure> {
+        switch hooks.noFollowStatus(selection.parentPath, step: .inspectParent) {
+        case let .failure(failure):
+            .failure(failure.code == ELOOP ? .symbolicLinkInParentPath : .parentAuthorityUnavailable)
+        case let .success(status):
+            switch status.exportFileType {
+            case S_IFDIR: .success(WorkspaceFileSystemIdentity(exportStatus: status))
+            case S_IFLNK: .failure(.symbolicLinkInParentPath)
+            default: .failure(.parentAuthorityUnavailable)
             }
         }
+    }
+
+    /// Opens the existing leaf with `O_NOFOLLOW_ANY` (which subsumes `O_NOFOLLOW`; the kernel
+    /// rejects the two together with `EINVAL`) and requires the kernel's `F_GETPATH` spelling of that
+    /// exact identity to equal the selected spelling byte for byte. On a case- or
+    /// normalization-insensitive volume `fstatat` resolves an alias to the existing entry; the
+    /// kernel path names the on-disk spelling (a hard link keeps the name it was opened by), so
+    /// an alias fails closed without enumerating the parent.
+    private static func proveCanonicalSpelling(
+        _ selection: ExportArtifactSelection,
+        identity: WorkspaceFileSystemIdentity,
+        hooks: ExportArtifactWriterHooks
+    ) -> ExportArtifactFailure? {
+        let leafPath = selection.leafPath
+        let descriptor: Int32
+        switch hooks.perform(.openLeaf, .open, path: leafPath, {
+            leafPath.withCString {
+                Darwin.open($0, O_RDONLY | O_NOFOLLOW_ANY | O_NONBLOCK | O_CLOEXEC)
+            }
+        }) {
+        case let .failure(failure):
+            return switch failure.code {
+            case ELOOP, ENOENT, ENOTDIR: .namespaceChanged
+            default: .destinationUnreadable(code: failure.code)
+            }
+        case let .success(value):
+            descriptor = value
+        }
         defer { Darwin.close(descriptor) }
-        guard let identity = try? WorkspaceAnchoredFileSystem.directoryDescriptorIdentity(descriptor),
-              identity == location.rootAuthority.physicalIdentity
+
+        var opened = stat()
+        guard Darwin.fstat(descriptor, &opened) == 0,
+              opened.exportFileType == S_IFREG,
+              WorkspaceFileSystemIdentity(exportStatus: opened) == identity
         else {
-            throw ExportArtifactFailure.namespaceChanged
+            return .namespaceChanged
         }
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        switch hooks.perform(.openLeaf, .getPath, path: leafPath, {
+            Darwin.fcntl(descriptor, F_GETPATH, &buffer)
+        }) {
+        case let .failure(failure):
+            return .destinationUnreadable(code: failure.code)
+        case .success:
+            break
+        }
+        let kernelPath = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        guard kernelPath.elementsEqual(leafPath.utf8) else {
+            return .destinationAlias
+        }
+        return nil
     }
 
-    private static func parentAuthorityFailure(_ error: Error) -> ExportArtifactFailure {
-        switch error {
-        case WorkspaceAnchoredFileSystemError.cancelled: .cancelled
-        case WorkspaceAnchoredFileSystemError.namespaceChanged: .namespaceChanged
-        case is WorkspaceAnchoredFileSystemError: .parentAuthorityUnavailable
-        default: .invalidDestinationURL
-        }
-    }
-
-    private static func destinationFailure(_ error: Error) -> ExportArtifactFailure {
-        switch WorkspaceAnchoredFileSystem.normalizedError(error) {
-        case .symbolicLink: .symbolicLinkDestination
-        case .notRegularFile: .nonRegularDestination
-        case .missing, .unreadable: .parentAuthorityUnavailable
-        case .cancelled: .cancelled
-        case .changedIdentity, .changedContent, .namespaceChanged, .unstable: .namespaceChanged
-        case .durabilityFailed, .cleanupFailed: .parentAuthorityUnavailable
-        }
-    }
-
-    /// Reads `VOL_CAP_INT_RENAME_EXCL` / `VOL_CAP_INT_RENAME_SWAP` from the anchored parent.
-    /// A volume that does not report a capability as valid is treated as unsupported.
-    static func probeVolumeCapabilities(_ descriptor: Int32) -> ExportArtifactVolumeCapabilities {
-        struct Buffer {
-            var length: UInt32 = 0
-            var attributes = vol_capabilities_attr_t()
-        }
-        var request = attrlist()
-        request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
-        request.volattr = attrgroup_t(ATTR_VOL_INFO) | attrgroup_t(ATTR_VOL_CAPABILITIES)
-        var buffer = Buffer()
-        let result = withUnsafeMutableBytes(of: &buffer) { bytes in
-            Darwin.fgetattrlist(descriptor, &request, bytes.baseAddress, bytes.count, 0)
-        }
-        guard result == 0,
-              Int(buffer.length) >= MemoryLayout<UInt32>.size + MemoryLayout<vol_capabilities_attr_t>.size
+    /// D5 step 1: the destination volume must advertise both exclusive and swap renaming, read
+    /// from the existing leaf for an overwrite and from the parent URL for a new leaf.
+    static func volumeCapabilityFailure(
+        _ selection: ExportArtifactSelection,
+        proof: ExportArtifactLeafProof,
+        hooks: ExportArtifactWriterHooks
+    ) -> ExportArtifactFailure? {
+        let url = proof.state == .missing ? selection.parentURL : selection.leafURL
+        guard let capabilities = hooks.capabilities(at: url),
+              capabilities.exclusiveRename,
+              capabilities.exchangeRename
         else {
-            return ExportArtifactVolumeCapabilities(exclusiveRename: false, exchangeRename: false)
+            return .unsupportedVolumeSemantics
         }
-        let valid = buffer.attributes.valid.1
-        let interfaces = buffer.attributes.capabilities.1
-        func supports(_ flag: some BinaryInteger) -> Bool {
-            let bit = UInt32(flag)
-            return valid & bit != 0 && interfaces & bit != 0
+        return nil
+    }
+
+    /// Matches the owner's disposition with the observed leaf at panel-inspection time.
+    static func approvedState(
+        for disposition: ExportArtifactDisposition,
+        observed: WorkspaceNoFollowFileTargetState
+    ) -> Result<WorkspaceNoFollowFileTargetState, ExportArtifactFailure> {
+        switch (disposition, observed) {
+        case (.createNew, .missing):
+            .success(.missing)
+        case (.createNew, .regular):
+            .failure(.destinationAlreadyExists)
+        case let (.replaceConfirmed(approved), .regular(current)) where approved == current:
+            .success(.regular(approved))
+        case (.replaceConfirmed, .regular):
+            .failure(.destinationIdentityChanged)
+        case (.replaceConfirmed, .missing):
+            .failure(.destinationMissing)
         }
-        return ExportArtifactVolumeCapabilities(
-            exclusiveRename: supports(VOL_CAP_INT_RENAME_EXCL),
-            exchangeRename: supports(VOL_CAP_INT_RENAME_SWAP)
-        )
+    }
+
+    /// Repeats the full leaf proof immediately before publication: the parent path must still
+    /// name the same directory and the leaf must still hold the approved state.
+    static func reproveLeaf(
+        _ selection: ExportArtifactSelection,
+        approved: WorkspaceNoFollowFileTargetState,
+        parentIdentity: WorkspaceFileSystemIdentity,
+        hooks: ExportArtifactWriterHooks
+    ) -> ExportArtifactFailure? {
+        hooks.beforeStep?(.reproveLeaf)
+        if hooks.injectedFailure?(.reproveLeaf) != nil {
+            return .namespaceChanged
+        }
+        switch proveLeaf(selection, hooks: hooks) {
+        case let .failure(failure):
+            return failure
+        case let .success(proof):
+            guard proof.parentIdentity == parentIdentity else { return .namespaceChanged }
+            return proof.state == approved ? nil : .destinationIdentityChanged
+        }
     }
 }

@@ -1,27 +1,41 @@
 import Darwin
 import Foundation
 
-/// Records the primitive's exact staging name, or the `errno` of a failed staging create.
-final class ExportArtifactStagingRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var createdName: String?
-    private var failureCode: Int32?
+/// What one publication attempt proved about the two names it may have exchanged.
+enum ExportArtifactPublication {
+    /// `renameatx_np` did not run or failed atomically; the leaf was never changed.
+    case notPublished(ExportArtifactFailure)
+    /// Postflight proved the leaf holds the writer identity and bytes count, and the staged name
+    /// holds the approved displaced identity (swap) or no entry (exclusive).
+    case verified(stat)
+    /// A postflight mismatch was reversed after an exact two-name proof, and the reversal was
+    /// proven: the leaf holds the approved identity and the staged name the writer's bytes.
+    case reversed
+    /// Neither verified nor provably reversed; both identities are preserved where they are.
+    case unverified
+}
 
-    var stagingName: String? {
-        lock.withLock { createdName }
-    }
+/// One operation's fixed facts after staging, used to publish, clean up, and report.
+struct ExportArtifactOperation {
+    let selection: ExportArtifactSelection
+    let directory: ExportArtifactStagingDirectory
+    let approved: WorkspaceNoFollowFileTargetState
+    let parentIdentity: WorkspaceFileSystemIdentity
+    let hooks: ExportArtifactWriterHooks
 
-    var creationFailureCode: Int32? {
-        lock.withLock { failureCode }
-    }
-
-    func record(_ observation: WorkspaceAnchoredFileSystem.TemporaryArtifactObservation) {
-        lock.withLock {
-            switch observation {
-            case let .created(name): createdName = name
-            case let .creationFailed(code): failureCode = code
-            }
+    var approvedIdentity: WorkspaceFileSystemIdentity? {
+        if case let .regular(identity) = approved {
+            return identity
         }
+        return nil
+    }
+
+    var isExclusive: Bool {
+        approved == .missing
+    }
+
+    func classifier(writer: WorkspaceFileSystemIdentity?) -> ExportArtifactResidueClassifier {
+        ExportArtifactResidueClassifier(approvedIdentity: approvedIdentity, writerIdentity: writer)
     }
 }
 
@@ -33,257 +47,218 @@ extension ExportArtifactWriter {
         ownership: ExportArtifactOwnershipCheck,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
+        guard !Task.isCancelled else { return .notCommitted(.cancelled) }
         let preflight: ExportArtifactPreflight
-        switch self.preflight(selection, hooks: hooks) {
-        case let .success(value): preflight = value
+        let approved: WorkspaceNoFollowFileTargetState
+        switch approvedPreflight(selection, disposition: disposition, ownership: ownership, hooks: hooks) {
+        case let .success(value): (preflight, approved) = value
         case let .failure(failure): return .notCommitted(failure)
-        }
-
-        let expectation: WorkspaceNoFollowFileWriteExpectation
-        switch (disposition, preflight.inspection.state) {
-        case (.createNew, .missing):
-            expectation = .missing
-        case (.createNew, .regular):
-            return .notCommitted(.destinationAlreadyExists)
-        case let (.replaceConfirmed(approved), .regular(observed)):
-            guard approved == observed else { return .notCommitted(.destinationIdentityChanged) }
-            expectation = .existing(approved)
-        case (.replaceConfirmed, .missing):
-            return .notCommitted(.destinationMissing)
-        }
-
-        // The App inventory answers synchronously on the caller's thread, so no App state change
-        // can interleave before publication; filesystem identity is re-proven by the primitive.
-        guard ownership(preflight.inspection) == .permitted else {
-            return .notCommitted(.ownedDestination)
         }
         hooks.afterPreflight?()
 
-        let recorder = ExportArtifactStagingRecorder()
-        let base = hooks.fileSystem
-        let fileSystemHooks = WorkspaceAnchoredFileSystem.Hooks(
-            eventHandler: base.eventHandler,
-            injectedFailure: base.injectedFailure,
-            temporaryArtifactObserver: { observation in
-                recorder.record(observation)
-                base.temporaryArtifactObserver?(observation)
-            }
-        )
-        let outcome = WorkspaceAnchoredFileSystem.write(
-            bytes,
-            to: preflight.location,
-            expecting: expectation,
-            hooks: fileSystemHooks
-        )
-        hooks.afterPublication?()
-        return exportOutcome(
-            outcome,
+        let directory: ExportArtifactStagingDirectory
+        switch establishStagingDirectory(selection, preflight: preflight, hooks: hooks) {
+        case let .success(value): directory = value
+        case let .failure(refusal): return refusalOutcome(refusal, selection: selection, hooks: hooks)
+        }
+        let operation = ExportArtifactOperation(
             selection: selection,
-            context: indeterminateContext(
-                selection: selection,
-                preflight: preflight,
-                expectation: expectation,
-                recorder: recorder
-            ),
-            recorder: recorder
+            directory: directory,
+            approved: approved,
+            parentIdentity: preflight.proof.parentIdentity,
+            hooks: hooks
         )
-    }
-
-    private static func indeterminateContext(
-        selection: ExportArtifactSelection,
-        preflight: ExportArtifactPreflight,
-        expectation: WorkspaceNoFollowFileWriteExpectation,
-        recorder: ExportArtifactStagingRecorder
-    ) -> IndeterminateContext {
-        let approvedIdentity: WorkspaceFileSystemIdentity? = if case let .existing(identity) = expectation {
-            identity
-        } else {
-            nil
+        // Q3: a confirmed overwrite keeps the displaced file's mode bits, as the retained Save
+        // path does; a new leaf keeps the `0666 & ~umask` create mode.
+        let displacedMode = preflight.proof.leafStatus.map { $0.st_mode & mode_t(0o7777) }
+        let staged: ExportArtifactStagedFile
+        switch createStagedFile(bytes, in: directory, displacedMode: displacedMode, hooks: hooks) {
+        case let .success(value): staged = value
+        case let .failure(failure): return abandon(operation, failure: failure.failure, entry: failure.entry)
         }
-        return IndeterminateContext(
-            selectedURL: selection.destinationURL,
-            destination: preflight.location,
-            stagingLocation: recorder.stagingName.flatMap { preflight.location.sibling(named: $0) },
-            approvedIdentity: approvedIdentity
-        )
-    }
-
-    private static func exportOutcome(
-        _ outcome: WorkspaceFileWriteOutcome,
-        selection: ExportArtifactSelection,
-        context: IndeterminateContext,
-        recorder: ExportArtifactStagingRecorder
-    ) -> ExportArtifactWriteOutcome {
-        let destination = context.destination
-        switch outcome {
-        case let .committedAndDurable(result):
-            guard result.cleanupState == .none else {
-                return context.indeterminate(
-                    reason: .cleanupFailed,
-                    destinationState: .holdsWriterBytes,
-                    artifactState: result.cleanupState,
-                    writerIdentity: result.metadata.identity
-                )
-            }
-            guard proveCommittedNamespace(
-                destination: destination,
-                committedIdentity: result.metadata.identity,
-                stagingName: recorder.stagingName
-            ) else {
-                return context.indeterminate(
-                    reason: .namespaceChanged,
-                    destinationState: .unknown,
-                    artifactState: context.stagingLocation.map { .removalIndeterminate($0) } ?? .none,
-                    writerIdentity: result.metadata.identity
-                )
-            }
-            return .committed(ExportArtifactCommit(
-                selectedURL: selection.destinationURL,
-                metadata: result.metadata
-            ))
-        case let .notCommitted(result):
-            guard result.artifactState == .none else {
-                return context.indeterminate(
-                    reason: result.reason,
-                    destinationState: .provenUnchanged,
-                    artifactState: result.artifactState,
-                    writerIdentity: result.retainedArtifactIdentity
-                )
-            }
-            if let code = recorder.creationFailureCode {
-                return .notCommitted(code == EPERM || code == EACCES
-                    ? .stagingNotPermitted(code: code)
-                    : .stagingUnavailable(code: code))
-            }
-            return .notCommitted(failure(forNonCommit: result.reason))
-        case let .committedButIndeterminate(result):
-            return context.indeterminate(
-                reason: result.reason,
-                destinationState: .unknown,
-                artifactState: result.recoveryArtifact,
-                writerIdentity: result.preparedMetadata?.identity
-            )
+        guard !Task.isCancelled else {
+            return abandon(operation, failure: .cancelled, entry: .file(staged))
         }
+        let publication = coordinatedIfUbiquitous(operation) {
+            publish(operation, staged: staged)
+        }
+        hooks.afterPublication?()
+        return finish(operation, publication: publication, staged: staged)
     }
 
-    /// Success requires the staging name proven absent. `RENAME_SWAP` cleanup proves the
-    /// displaced identity absent from its tracked names; `RENAME_EXCL` moves the staging name,
-    /// so both paths re-prove here that the name holds no entry while the selected leaf still
-    /// names the published identity under the same held namespace.
-    private static func proveCommittedNamespace(
-        destination: WorkspaceFileSystemLocation,
-        committedIdentity: WorkspaceFileSystemIdentity,
-        stagingName: String?
-    ) -> Bool {
-        guard let stagingName else { return false }
-        return WorkspaceAnchoredFileSystem.$ignoresInheritedTaskCancellation.withValue(true) {
-            do {
-                return try WorkspaceAnchoredFileSystem.withAnchoredParent(
-                    at: destination,
-                    hooks: .production
-                ) { chain, parentDescriptor, leaf in
-                    let entry = try WorkspaceAnchoredFileSystem.directoryEntryIdentity(
-                        parentDescriptor: parentDescriptor,
-                        component: leaf
-                    )
-                    try WorkspaceAnchoredFileSystem.validateMissingName(
-                        parentDescriptor: parentDescriptor,
-                        leaf: stagingName
-                    )
-                    try chain.validateNamespace()
-                    return entry.isRegularFile && entry.identity == committedIdentity
+    /// Leaf proof, disposition match, volume capabilities, then the injected ownership answer.
+    /// The App inventory answers synchronously on the caller's thread, so no App state change
+    /// can interleave before publication; the leaf itself is re-proven before publishing.
+    private static func approvedPreflight(
+        _ selection: ExportArtifactSelection,
+        disposition: ExportArtifactDisposition,
+        ownership: ExportArtifactOwnershipCheck,
+        hooks: ExportArtifactWriterHooks
+    ) -> Result<(ExportArtifactPreflight, WorkspaceNoFollowFileTargetState), ExportArtifactFailure> {
+        inspect(selection, hooks: hooks).flatMap { preflight in
+            approvedState(for: disposition, observed: preflight.proof.state).flatMap { approved in
+                if let failure = volumeCapabilityFailure(selection, proof: preflight.proof, hooks: hooks) {
+                    return .failure(failure)
                 }
-            } catch {
-                return false
+                guard ownership(preflight.inspection) == .permitted else {
+                    return .failure(.ownedDestination)
+                }
+                return .success((preflight, approved))
             }
         }
     }
 
-    private static func failure(
-        forNonCommit reason: WorkspaceAnchoredFileSystemError
-    ) -> ExportArtifactFailure {
-        switch reason {
-        case .changedIdentity: .destinationIdentityChanged
-        case .missing: .destinationMissing
-        case .symbolicLink: .symbolicLinkDestination
-        case .notRegularFile: .nonRegularDestination
-        case .namespaceChanged: .namespaceChanged
-        case .cancelled: .cancelled
-        case .unreadable, .changedContent, .unstable, .durabilityFailed, .cleanupFailed:
-            .writeFailed(reason)
-        }
-    }
-}
-
-private struct IndeterminateContext {
-    let selectedURL: URL
-    let destination: WorkspaceFileSystemLocation
-    let stagingLocation: WorkspaceFileSystemLocation?
-    /// The panel-approved identity a replacement may displace; `nil` for a new leaf.
-    let approvedIdentity: WorkspaceFileSystemIdentity?
-
-    /// Converts the primitive's retained location into plain URLs, so the outcome retains no
-    /// descriptor-backed authority after the operation.
-    func indeterminate(
-        reason: WorkspaceAnchoredFileSystemError,
-        destinationState: ExportArtifactDestinationState,
-        artifactState: WorkspaceFileWriteArtifactState,
-        writerIdentity: WorkspaceFileSystemIdentity?
+    /// A refused staging directory is removed (only while empty and identity-matched) or
+    /// reported by exact path.
+    private static func refusalOutcome(
+        _ refusal: ExportArtifactStagingRefusal,
+        selection: ExportArtifactSelection,
+        hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
-        let residue: ExportArtifactResidue
-        let residueLocation: WorkspaceFileSystemLocation?
-        switch artifactState {
-        case .none:
-            residue = .none
-            residueLocation = nil
-        case let .retained(location):
-            residue = .retained(location.fileURL, holding: contents(at: location, writerIdentity: writerIdentity))
-            residueLocation = location
-        case let .removalIndeterminate(location):
-            residue = .removalIndeterminate(location.fileURL)
-            residueLocation = location
-        }
-        // A sibling residue is the exact staging/cleanup path. A residue at the selected leaf
-        // leaves the staging name unproven, so report the operation's exact staging path.
-        let stagingURL: URL? = if let residueLocation, residueLocation != destination {
-            residueLocation.fileURL
-        } else if residueLocation == destination {
-            stagingLocation?.fileURL
-        } else {
-            nil
+        guard let removable = refusal.removableDirectory,
+              !removeStagingDirectory(removable, hooks: hooks)
+        else {
+            return .notCommitted(refusal.failure)
         }
         return .indeterminate(ExportArtifactIndeterminateWrite(
-            reason: reason,
-            selectedURL: selectedURL,
-            destinationState: destinationState,
-            residue: residue,
-            stagingURL: stagingURL
+            reason: .cleanupFailed,
+            selectedURL: selection.destinationURL,
+            destinationState: .provenUnchanged,
+            residue: .none,
+            stagingURL: nil,
+            itemReplacementDirectoryURL: removable.url,
+            residueIsInPurgeableTemporaryFolder: false
         ))
     }
 
-    /// Tells PR F where the user's original file is: one anchored no-follow re-observation of
-    /// the retained entry compared with the approved and writer identities.
-    private func contents(
-        at location: WorkspaceFileSystemLocation,
-        writerIdentity: WorkspaceFileSystemIdentity?
-    ) -> ExportArtifactResidueContents {
-        let observed: WorkspaceFileSystemIdentity? = WorkspaceAnchoredFileSystem
-            .$ignoresInheritedTaskCancellation.withValue(true) {
-                try? WorkspaceAnchoredFileSystem.withAnchoredParent(
-                    at: location,
-                    hooks: .production
-                ) { chain, parentDescriptor, leaf in
-                    let entry = try WorkspaceAnchoredFileSystem.directoryEntryIdentity(
-                        parentDescriptor: parentDescriptor,
-                        component: leaf
-                    )
-                    try chain.validateNamespace()
-                    return entry.isRegularFile ? entry.identity : nil
-                }
+    /// Q1: a ubiquitous destination (the leaf or its parent URL) publishes inside
+    /// `NSFileCoordinator.coordinate(writingItemAt:options: .forReplacing)`. Coordination is an
+    /// addition only: it grants no authority, and the accessor must receive the same leaf.
+    static func coordinatedIfUbiquitous(
+        _ operation: ExportArtifactOperation,
+        _ publish: () -> ExportArtifactPublication
+    ) -> ExportArtifactPublication {
+        let selection = operation.selection
+        let hooks = operation.hooks
+        guard hooks.ubiquitous(selection.leafURL) || hooks.ubiquitous(selection.parentURL) else {
+            return publish()
+        }
+        guard case .success = hooks.perform(.coordinate, .coordinate, path: selection.leafPath, { 0 }) else {
+            return .notPublished(.coordinationFailed)
+        }
+        var publication: ExportArtifactPublication?
+        var coordinationError: NSError?
+        NSFileCoordinator(filePresenter: nil).coordinate(
+            writingItemAt: selection.destinationURL,
+            options: .forReplacing,
+            error: &coordinationError
+        ) { coordinatedURL in
+            let coordinatedPath = coordinatedURL.path(percentEncoded: false).precomposedStringWithCanonicalMapping
+            guard coordinatedPath == selection.leafPath.precomposedStringWithCanonicalMapping else {
+                publication = .notPublished(.namespaceChanged)
+                return
             }
-        guard let observed else { return .unknown }
-        if observed == approvedIdentity { return .displacedOriginal }
-        if observed == writerIdentity { return .writerBytes }
-        return .unknown
+            publication = publish()
+        }
+        return publication ?? .notPublished(.coordinationFailed)
+    }
+
+    /// D5 steps 3–5: re-prove the leaf, publish by exact path, then postflight.
+    static func publish(
+        _ operation: ExportArtifactOperation,
+        staged: ExportArtifactStagedFile
+    ) -> ExportArtifactPublication {
+        let selection = operation.selection
+        let hooks = operation.hooks
+        if let failure = reproveLeaf(
+            selection,
+            approved: operation.approved,
+            parentIdentity: operation.parentIdentity,
+            hooks: hooks
+        ) {
+            return .notPublished(failure)
+        }
+        let leafPath = selection.leafPath
+        let flags = UInt32((operation.isExclusive ? RENAME_EXCL : RENAME_SWAP) | RENAME_NOFOLLOW_ANY)
+        switch hooks.perform(.publish, .rename, path: leafPath, {
+            Darwin.renameatx_np(AT_FDCWD, staged.path, AT_FDCWD, leafPath, flags)
+        }) {
+        case let .failure(failure):
+            return .notPublished(publicationFailure(failure.code, exclusive: operation.isExclusive))
+        case .success:
+            return postflight(operation, staged: staged)
+        }
+    }
+
+    private static func publicationFailure(_ code: Int32, exclusive: Bool) -> ExportArtifactFailure {
+        switch code {
+        case EEXIST: .destinationAlreadyExists
+        case ENOENT: exclusive ? .namespaceChanged : .destinationMissing
+        case ELOOP: .symbolicLinkInParentPath
+        case ENOTSUP: .unsupportedVolumeSemantics
+        case EXDEV: .stagingDirectoryOnDifferentDevice
+        case EPERM, EACCES: .publicationNotPermitted(code: code)
+        default: .writeFailed(.unreadable)
+        }
+    }
+
+    /// The leaf must hold the staged identity and byte count. After `RENAME_EXCL` the staged
+    /// name must hold no entry; after `RENAME_SWAP` it must hold the exact approved displaced
+    /// identity. A swap mismatch reverses only after an exact two-name proof.
+    private static func postflight(
+        _ operation: ExportArtifactOperation,
+        staged: ExportArtifactStagedFile
+    ) -> ExportArtifactPublication {
+        let hooks = operation.hooks
+        let leaf = hooks.noFollowStatus(operation.selection.leafPath, step: .postflight)
+        let displaced = hooks.noFollowStatus(staged.path, step: .postflight)
+        let stagedNameProven: Bool = if operation.isExclusive {
+            if case let .failure(failure) = displaced {
+                failure.code == ENOENT
+            } else {
+                false
+            }
+        } else {
+            holds(displaced, operation.approvedIdentity)
+        }
+        if case let .success(status) = leaf, holds(leaf, staged.identity),
+           Int64(status.st_size) == staged.byteCount, stagedNameProven
+        {
+            return .verified(status)
+        }
+        return operation.isExclusive ? .unverified : reverseAfterMismatch(operation, staged: staged)
+    }
+
+    private static func reverseAfterMismatch(
+        _ operation: ExportArtifactOperation,
+        staged: ExportArtifactStagedFile
+    ) -> ExportArtifactPublication {
+        let hooks = operation.hooks
+        let leafPath = operation.selection.leafPath
+        guard holds(hooks.noFollowStatus(leafPath, step: .twoNameProof), staged.identity),
+              holds(hooks.noFollowStatus(staged.path, step: .twoNameProof), operation.approvedIdentity)
+        else {
+            return .unverified
+        }
+        let flags = UInt32(RENAME_SWAP | RENAME_NOFOLLOW_ANY)
+        guard case .success = hooks.perform(.reverseSwap, .rename, path: leafPath, {
+            Darwin.renameatx_np(AT_FDCWD, staged.path, AT_FDCWD, leafPath, flags)
+        }) else {
+            return .unverified
+        }
+        guard holds(hooks.noFollowStatus(leafPath, step: .reversalProof), operation.approvedIdentity),
+              holds(hooks.noFollowStatus(staged.path, step: .reversalProof), staged.identity)
+        else {
+            return .unverified
+        }
+        return .reversed
+    }
+
+    private static func holds(
+        _ observation: Result<stat, ExportArtifactSyscallFailure>,
+        _ identity: WorkspaceFileSystemIdentity?
+    ) -> Bool {
+        guard let identity, case let .success(status) = observation else { return false }
+        return status.exportFileType == S_IFREG && WorkspaceFileSystemIdentity(exportStatus: status) == identity
     }
 }
