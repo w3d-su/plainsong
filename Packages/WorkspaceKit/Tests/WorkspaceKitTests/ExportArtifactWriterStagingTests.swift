@@ -88,6 +88,10 @@ extension ExportArtifactWriterTests {
             )
             XCTAssertFalse(probe.createdStaging)
             XCTAssertFalse(exists(directory.path(percentEncoded: false)), "the refused directory is removed")
+            XCTAssertFalse(
+                probe.calls.contains { $0.operation == .open },
+                "nothing is opened, the chosen folder least of all"
+            )
         }
         XCTAssertEqual(try entries(in: fixture.directory), ["nested", Self.sentinelName].sorted())
         XCTAssertEqual(try entries(in: nestedParent), [])
@@ -105,6 +109,12 @@ extension ExportArtifactWriterTests {
             .notCommitted(.stagingDirectoryInsideDestinationFolder)
         )
         XCTAssertTrue(exists(empty.path(percentEncoded: false)), "the chosen folder itself is never removed")
+        XCTAssertFalse(probe.calls.contains { $0.operation == .open || $0.operation == .rmdir })
+        XCTAssertEqual(
+            probe.calls(at: .inspectStagingDirectory).map(\.operation),
+            [.fstatat],
+            "the returned directory is compared with the chosen folder by metadata before anything else"
+        )
         XCTAssertEqual(try entries(in: empty), [])
     }
 

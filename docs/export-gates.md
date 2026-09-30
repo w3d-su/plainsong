@@ -332,6 +332,29 @@ in the chosen folder, other than publishing the leaf itself:
      - the destination volume does not advertise both exclusive and swap renaming
        (`volumeSupportsExclusiveRenaming` / `volumeSupportsSwapRenaming`).
    - There is no cross-device copy fallback.
+   - **Owner decision 2026-09-30 (E2 review): containment.** In the sandbox, the
+     item-replacement directory lives under `~/Library/Containers/<id>/Data`, so the rule
+     above refused exports to the home-folder root (`~/x.html`). It is replaced by this rule.
+     Staging is accepted only when either:
+     - (a) the returned directory is not inside the chosen folder at all; or
+     - (b) all of the following hold:
+       - it lies strictly inside an injected app-private root (the sandbox container's data
+         directory, supplied by App only when running sandboxed; otherwise there is none);
+       - the chosen folder is a proper ancestor of that root;
+       - it is neither the chosen folder nor a direct child of it.
+
+     Everything else stays refused, including:
+     - a chosen folder equal to or inside the app-private root;
+     - a direct child of the chosen folder;
+     - a directory inside the chosen folder but outside the root.
+
+     Spellings are compared canonically:
+     - the staging directory and the root via `getattrlist(ATTR_CMN_FULLPATH)`;
+     - the chosen folder as proven by the leaf proof;
+     - component by component.
+
+     The chosen folder therefore never gains a new visible entry: anything created lies below
+     pre-existing `Library/Containers/…` directories.
 2. **Staged bytes.** Create exactly one staged file there with `open(O_CREAT | O_EXCL |
    O_NOFOLLOW | O_WRONLY)`, write and `fsync` the complete artifact, and record its
    `st_dev`/`st_ino` identity.
@@ -461,7 +484,9 @@ The exception is narrow. The export path must still refuse to:
    - The only temporary entries are the operation-private item-replacement directory
      and its single staged file. If Foundation places that directory in the chosen folder
      (its fallback creates it before any check can run), fail closed. Remove the directory
-     only if it is empty and its identity matches; otherwise report its exact path.
+     only if it is empty and its identity matches; otherwise report its exact path. The one
+     exception is a directory below the app-private root under step 1's owner decision of
+     2026-09-30: it adds no entry to the chosen folder itself.
    - Neither may survive a reported success.
    - Either may remain only after a truthfully reported indeterminate failure, at an exact
      reported path, so that no identity is destroyed.
@@ -854,7 +879,9 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 > tests in the PR E2 evidence below. The leaf-grant bullet stays open for PR F's owner smoke.
 
 - [ ] A leaf-only grant is never widened implicitly:
-  - the operation never opens, enumerates, or creates entries in the chosen folder;
+  - the operation never opens or enumerates the chosen folder, and never gives it a new entry
+    other than the leaf (a staging directory may lie below it only inside the app-private
+    root, per D5 step 1's owner decision of 2026-09-30);
   - staging lives only in a same-device, operation-private item-replacement directory;
   - if that directory cannot be established, the operation fails without a direct-write or
     alternate-directory fallback.
@@ -864,9 +891,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   Powerbox grant): `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder` and the
   hosted `testWriteOnlyParentNeedsNoParentHandleForOwnership` (mode `0300` parent: its
   `open(O_RDONLY)` fails with `EACCES`; every writer call on the chosen folder is an
-  `fstatat`, and no descriptor names it at any boundary),
-  `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback`. Open until PR F's
-  owner smoke records a real save-panel grant.
+  `fstatat` or `getattrlist` metadata read, and no descriptor names it at any boundary),
+  `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback`,
+  `testStagingInsideTheAppPrivateRootIsAcceptedWhenTheChosenFolderIsItsAncestor` (a fake
+  home and container layout). Open until PR F's owner smoke records a real save-panel grant,
+  including **an export to the home-folder root (`~/x.html`) under the real sandbox**, which
+  exercises containment rule (b).
 - [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
@@ -877,8 +907,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   - an unsupported extension;
   - cross-device staging;
   - a volume without exclusive or swap renaming;
-  - a case or normalization alias of an existing entry;
-  - an item-replacement directory that is, or lies inside, the chosen folder.
+  - a case, normalization, or firmlink alias of an existing leaf or of the parent folder;
+  - an item-replacement directory that is the chosen folder or its direct child, or that lies
+    inside the chosen folder outside the app-private root (D5 step 1, owner decision
+    2026-09-30).
 
   *(Reopened 2026-09-29; re-proven by PR E2.)*
 - [x] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
@@ -890,8 +922,19 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   and mutations, including detached/recovery/indeterminate aliases; hard links and
   case/canonical aliases are rejected. *(Reopened 2026-09-29; PR E2 moved the adapter's
   identity, canonical spelling, and case sensitivity to leaf-path metadata. The hosted
-  tests run outside the sandbox, as PR E's did.)*
-- [x] No entry other than the published leaf is ever created in the chosen folder. The
+  tests run outside the sandbox, as PR E's did.)* Precisely:
+  - the destination spelling is proven kernel-canonical before ownership runs (`F_GETPATH`
+    of an existing leaf; `getattrlist(ATTR_CMN_FULLPATH)` of a new leaf's parent), so any
+    case, normalization, or firmlink alias of the selected path is refused as
+    `destinationAlias`;
+  - the inventory then matches hard links by `st_dev`/`st_ino` and locations by full-path
+    alias keys (NFC, plus case folding on a case-insensitive volume) against that canonical
+    spelling;
+  - owned URLs are compared in the spelling the App retained: descriptor-derived for
+    anchored locations, and as stored for context-only URLs.
+- [x] No entry other than the published leaf is ever created in the chosen folder (under
+  containment rule (b), the staging directory lies below pre-existing app-private
+  directories and adds no entry to the chosen folder itself). The
   item-replacement directory and its single staged file are proven absent on success. No
   delivered sibling, intermediate directory, persistent recovery journal, bookmark,
   retry/fallback destination, or second artifact is created. *(Rewritten 2026-09-29. The
@@ -909,9 +952,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   (`ExportArtifactWriter` in WorkspaceKit) proves the leaf with
   `fstatat(AT_FDCWD, …, AT_SYMLINK_NOFOLLOW_ANY)` of the parent path and the exact leaf path,
   opens an existing leaf with `O_NOFOLLOW_ANY` only to require its `F_GETPATH` spelling to
-  equal the selected spelling, stages one file in Foundation's item-replacement directory
-  (canonical symlink-free spelling, same `st_dev`, not in the chosen folder), and publishes
-  with `renameatx_np(AT_FDCWD, staged, AT_FDCWD, leaf, …)`. It returns `.committed` only
+  equal the selected spelling (for a new leaf, the parent's `getattrlist(ATTR_CMN_FULLPATH)`
+  spelling must equal the selected parent spelling), stages one file in Foundation's
+  item-replacement directory (compared with the chosen folder by identity before any other
+  use, never opened, canonical `getattrlist` spelling, same `st_dev`, containment per D5
+  step 1), and publishes with `renameatx_np(AT_FDCWD, staged, AT_FDCWD, leaf, …)`. Removals
+  use `unlinkat(…, AT_SYMLINK_NOFOLLOW_ANY)`. It returns `.committed` only
   when the leaf holds the staged identity and byte count, any displaced original was unlinked,
   and the staged name and the directory are proven absent; `.notCommitted` only when nothing
   was published (or a swap was provably reversed) and no operation entry remains; otherwise
@@ -921,10 +967,16 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   - Publication: `testNewLeafPublishesWithExclusiveRenameAndRemovesStaging`,
     `testConfirmedOverwriteSwapsExactIdentityAndKeepsTheDisplacedMode` (an outside hard link
     keeps the displaced bytes; Q3 mode kept), `testNewLeafModeIsTheUmaskDefault` (Q3),
+    `testOverwriteKeepsPermissionBitsButNeverSpecialBits` (Q3 hardening: `04755` becomes
+    `0755`, `0640` stays `0640`),
     `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`,
     `testLeafInspectionComesFromLeafPathMetadata`,
     `testUbiquitousDestinationPublishesInsideFileCoordination` (Q1, injectable ubiquity; a
-    coordination failure publishes nothing).
+    coordination failure publishes nothing). Q1's real `NSFileCoordinator` branches, driven
+    by a second real coordinated writer and not mocked:
+    `testCancelledCoordinationPublishesNothing` (the coordination error branch, via a
+    cancelled coordinator) and `testCoordinatedMoveWhileWaitingIsRefusedByTheAccessorURL` (a
+    byte-exact accessor-URL mismatch).
   - Refusal matrix: `testSymbolicLinkLeafIsRefusedForBothDispositions`,
     `testSymbolicLinkPathComponentIsRefused` (final and intermediate component),
     `testSymlinkedComponentAtThePublishBoundaryIsRefusedByRenameNoFollowAny` (the kernel
@@ -933,13 +985,20 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testUnsupportedExtensionsAndInvalidURLsWriteNothing`,
     `testDispositionMismatchesAreRefusedBeforeStaging`,
     `testCaseAndNormalizationAliasOfExistingLeafIsRefused`,
+    `testFirmlinkCaseOrNormalizationSpellingOfTheParentIsRefused` (a new leaf's parent,
+    proven by `getattrlist` without an open),
     `testMissingOrUnsearchableParentFailsBeforeAnyWrite`,
     `testUnsupportedVolumeCapabilitiesFailClosedBeforeStaging` (keys read from the parent URL
     for a new leaf, the leaf for an overwrite), `testRealVolumeKeysReportBothRenameSemanticsOnTheTestVolume`,
     `testCrossDeviceItemReplacementDirectoryIsRefusedWithoutCopyFallback` (a real devfs/data
     volume pair), `testItemReplacementDirectoryInsideTheChosenFolderIsRefusedAndRemoved`
     (Foundation's sibling fallback, a deeper directory, and the chosen folder itself, which is
-    never removed), `testIdentityAndTypeRacesBeforePublicationFailClosedWithoutTouchingRacer`
+    never removed, opened, or read except by metadata),
+    `testStagingInsideTheChosenFolderOutsideRuleBIsRefused` (a chosen folder equal to or inside
+    the private root, a root reachable only through a symlink, a directory outside the root),
+    `testDirectChildAndTheChosenFolderItselfAreRefusedWithoutOpeningIt`,
+    `testNilPrivateRootKeepsRefusingStagingInsideTheChosenFolder`,
+    `testIdentityAndTypeRacesBeforePublicationFailClosedWithoutTouchingRacer`
     (including a replaced parent directory),
     `testRaceAtTheFinalPublishBoundaryNeverOverwritesTheRacerOrClaimsSuccess`,
     `testOwnershipRefusalWritesNothingAndReceivesTheLeafInspection`,
@@ -955,12 +1014,17 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testDisplacedUnlinkFailureReportsTheOriginalInThePurgeableTemporaryFolder`,
     `testStagingDirectoryRemovalFailureIsNeverSuccessOrACleanNonCommit`,
     `testUnpublishedStagedFileThatCannotBeRemovedIsReportedExactly`,
-    `testCommittedNewLeafRequiresTheStagedNameProvenAbsent`.
+    `testCommittedNewLeafRequiresTheStagedNameProvenAbsent`,
+    `testRemovalNeverFollowsASymlinkedStagingComponent` (the staged unlink and the `rmdir`),
+    `testStagingDirectoryThatCannotBeCanonicalizedIsRemovedOrReported`,
+    `testRefusedStagingDirectoryThatCannotBeRemovedIsReportedExactly`.
   - Namespace and lifetime: `testNoEntryOtherThanTheLeafIsEverCreatedInTheChosenFolder`
     (directory snapshots at every boundary; exactly one staged file, outside the chosen
     folder), `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder`,
     `testFoundationItemReplacementDirectoryIsOperationPrivateOnTheDestinationDevice`,
-    `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`.
+    `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`,
+    `testStagingInsideTheAppPrivateRootIsAcceptedWhenTheChosenFolderIsItsAncestor` (at every
+    boundary the fake home folder holds only its prior entries and the leaf).
   - Ownership (hosted `ExportDestinationOwnershipAppTests`; the App adapter
     `App/AppState+ExportDestinationOwnership.swift` re-derives the writer's
     `ExportArtifactLeafInspection` and requires equality, then walks the Save Copy owner
@@ -980,7 +1044,9 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testDisagreeingWriterInspectionIsRefused` — plus
     `testWriteOnlyParentNeedsNoParentHandleForOwnership` (the retired parent-anchored
     inspection throws there; the leaf-path adapter refuses the hard link and commits the
-    control).
+    control), `testFirmlinkSpellingOfAnOwnedMissingDestinationIsRefused` (refused as an alias
+    before ownership; the canonical spelling is refused by the inventory), and
+    `testExportAppPrivateRootIsTheSandboxContainerOnlyWhenSandboxed`.
 - PR E evidence (historical: the parent-anchored writer, retired for panel destinations by
   the 2026-09-29 D5 amendment; its hosted App ownership tests ran outside the sandbox and
   used parent-descriptor inspection). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the

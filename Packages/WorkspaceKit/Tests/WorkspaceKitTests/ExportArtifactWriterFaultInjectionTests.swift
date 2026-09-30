@@ -300,6 +300,59 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(try text(at: staged), "writer bytes")
     }
 
+    /// Removal uses `unlinkat(…, AT_SYMLINK_NOFOLLOW_ANY)`: when the staging directory's path is
+    /// swapped for a symlink to a moved copy between the proof and the removal, neither the
+    /// staged-file unlink nor the directory `rmdir` follows it, and the outcome names the path.
+    func testRemovalNeverFollowsASymlinkedStagingComponent() throws {
+        for step in [ExportArtifactWriterStep.unlinkStaged, .removeStagingDirectory] {
+            let fixture = try makeExportFixture()
+            // The swapped component is intermediate: a plain `unlink`/`rmdir` would follow it.
+            let outer = fixture.base.appendingPathComponent("outer", isDirectory: true)
+            let staging = outer.appendingPathComponent("staging", isDirectory: true)
+            let movedOuter = fixture.base.appendingPathComponent("outer-moved", isDirectory: true)
+            let moved = movedOuter.appendingPathComponent("staging", isDirectory: true)
+            // The staged-file case fails publication first, so the writer removes its own bytes.
+            var failures: [ExportArtifactWriterStep: Int32] = [:]
+            if step == .unlinkStaged {
+                failures[.publish] = EIO
+            }
+            let probe = ExportBoundaryProbe(failures: failures, races: [step: {
+                try? FileManager.default.moveItem(at: outer, to: movedOuter)
+                try? FileManager.default.createSymbolicLink(at: outer, withDestinationURL: movedOuter)
+            }])
+            let hooks = probe.hooks(stagingDirectory: { _ in
+                try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+                return staging
+            })
+
+            let outcome = export(
+                "writer bytes",
+                to: fixture.destination,
+                disposition: .createNew,
+                probe: probe,
+                hooks: hooks
+            )
+
+            let result = try XCTUnwrap(requireIndeterminate(outcome), "\(step)")
+            let stagedName = try XCTUnwrap(probe.stagedURL?.lastPathComponent)
+            XCTAssertEqual(result.reason, .cleanupFailed, "\(step)")
+            XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL, "\(step)")
+            XCTAssertEqual(probe.calls(at: step).count, 1, "no retry: \(step)")
+            if step == .unlinkStaged {
+                XCTAssertEqual(result.destinationState, .provenUnchanged)
+                XCTAssertEqual(result.residue, try .retained(XCTUnwrap(probe.stagedURL), holding: .writerBytes))
+                XCTAssertEqual(try text(at: moved.appendingPathComponent(stagedName)), "writer bytes")
+                XCTAssertFalse(exists(fixture.destinationPath))
+            } else {
+                XCTAssertEqual(result.destinationState, .holdsWriterBytes)
+                XCTAssertEqual(result.residue, .none)
+                XCTAssertTrue(exists(moved.path(percentEncoded: false)), "not removed through the link")
+                XCTAssertEqual(try entries(in: moved), [])
+                XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
+            }
+        }
+    }
+
     /// Success requires the staged name proven absent after `RENAME_EXCL`; an occupant that
     /// appears there is preserved and reported, never removed.
     func testCommittedNewLeafRequiresTheStagedNameProvenAbsent() throws {

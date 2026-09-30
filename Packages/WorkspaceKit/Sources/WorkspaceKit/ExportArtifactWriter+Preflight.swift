@@ -97,7 +97,7 @@ extension ExportArtifactWriter {
                 proof: proof,
                 inspection: ExportArtifactLeafInspection(
                     state: proof.state,
-                    leafURL: selection.leafURL,
+                    canonicalLeafURL: selection.leafURL,
                     parentIdentity: proof.parentIdentity,
                     volumeIsCaseSensitive: caseSensitive
                 )
@@ -106,8 +106,9 @@ extension ExportArtifactWriter {
     }
 
     /// D5 step 3: `fstatat(AT_FDCWD, …, AT_SYMLINK_NOFOLLOW_ANY)` of the parent path (must be a
-    /// directory) and of the exact leaf path. Absent → new leaf; a regular file whose opened
-    /// `F_GETPATH` spelling equals the selected spelling → existing; anything else fails closed.
+    /// directory) and of the exact leaf path. Absent with a canonical parent spelling → new leaf;
+    /// a regular file whose opened `F_GETPATH` spelling equals the selected spelling → existing;
+    /// anything else fails closed. Either way the selected spelling is proven canonical.
     static func proveLeaf(
         _ selection: ExportArtifactSelection,
         hooks: ExportArtifactWriterHooks
@@ -118,7 +119,9 @@ extension ExportArtifactWriter {
             case let .failure(failure):
                 return switch failure.code {
                 case ENOENT:
-                    .success(ExportArtifactLeafProof(state: .missing, parentIdentity: parentIdentity, leafStatus: nil))
+                    proveCanonicalParentSpelling(selection, hooks: hooks).map {
+                        ExportArtifactLeafProof(state: .missing, parentIdentity: parentIdentity, leafStatus: nil)
+                    }
                 case ELOOP: .failure(.symbolicLinkInParentPath)
                 case ENOTDIR: .failure(.namespaceChanged)
                 default: .failure(.parentAuthorityUnavailable)
@@ -158,6 +161,25 @@ extension ExportArtifactWriter {
             case S_IFLNK: .failure(.symbolicLinkInParentPath)
             default: .failure(.parentAuthorityUnavailable)
             }
+        }
+    }
+
+    /// A new leaf has no `F_GETPATH`, so the parent's kernel spelling comes from
+    /// `getattrlist(ATTR_CMN_FULLPATH, FSOPT_NOFOLLOW_ANY)`, a metadata read that never opens the
+    /// chosen folder. It must equal the selected parent spelling byte for byte: a firmlink
+    /// (`/System/Volumes/Data/…`), case, or normalization spelling of an existing folder fails
+    /// closed, so the ownership inventory only ever compares canonical full paths.
+    private static func proveCanonicalParentSpelling(
+        _ selection: ExportArtifactSelection,
+        hooks: ExportArtifactWriterHooks
+    ) -> Result<Void, ExportArtifactFailure> {
+        switch hooks.fullPath(selection.parentPath, step: .inspectParent, options: FSOPT_NOFOLLOW_ANY) {
+        case let .failure(failure):
+            .failure(failure.code == ELOOP ? .symbolicLinkInParentPath : .parentAuthorityUnavailable)
+        case let .success(kernelPath) where kernelPath.elementsEqual(selection.parentPath.utf8):
+            .success(())
+        case .success:
+            .failure(.destinationAlias)
         }
     }
 

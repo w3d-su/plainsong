@@ -62,6 +62,24 @@ extension ExportArtifactWriterTests {
         assertTouchedOnlyLeafParentAndStaging(probe, fixture: fixture)
     }
 
+    /// Q3, hardened in the E2 review: an overwrite keeps the displaced file's `rwx` bits but
+    /// never carries setuid, setgid, or sticky bits onto the exported artifact.
+    func testOverwriteKeepsPermissionBitsButNeverSpecialBits() throws {
+        for requested: mode_t in [0o4755, 0o2750, 0o640] {
+            let fixture = try makeExportFixture(originalText: "original")
+            XCTAssertEqual(Darwin.chmod(fixture.destinationPath, requested), 0)
+            let displaced = try permissionBits(at: fixture.destination)
+            if requested & 0o7000 != 0 {
+                XCTAssertNotEqual(displaced & 0o7000, 0, "the fixture must carry a special bit")
+            }
+            let approved = try identity(at: fixture.destination)
+
+            XCTAssertNotNil(requireCommitted(export(to: fixture.destination, disposition: .replaceConfirmed(approved))))
+
+            XCTAssertEqual(try permissionBits(at: fixture.destination), displaced & 0o777, "mode \(requested)")
+        }
+    }
+
     func testNewLeafModeIsTheUmaskDefault() throws {
         for mask: mode_t in [0o022, 0o027, 0o077] {
             let fixture = try makeExportFixture()
@@ -106,20 +124,20 @@ extension ExportArtifactWriterTests {
         let missing = try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get()
 
         XCTAssertEqual(missing.state, .missing)
-        XCTAssertEqual(missing.leafURL.path(percentEncoded: false), fixture.destinationPath)
+        XCTAssertEqual(missing.canonicalLeafURL.path(percentEncoded: false), fixture.destinationPath)
         XCTAssertEqual(missing.parentIdentity, parentIdentity)
         XCTAssertEqual(missing.volumeIsCaseSensitive, caseSensitive)
         try Data("existing".utf8).write(to: fixture.destination)
         let existing = try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get()
         XCTAssertEqual(existing.state, try .regular(identity(at: fixture.destination)))
-        XCTAssertEqual(existing.leafURL, missing.leafURL)
+        XCTAssertEqual(existing.canonicalLeafURL, missing.canonicalLeafURL)
         // A hard link is a different name for the same identity, not an alias: F_GETPATH keeps
         // the name the leaf was opened by.
         let link = fixture.directory.appendingPathComponent("link.md")
         try FileManager.default.linkItem(at: fixture.destination, to: link)
         let linked = try ExportArtifactWriter.inspectLeaf(at: link).get()
         XCTAssertEqual(linked.state, existing.state)
-        XCTAssertEqual(linked.leafURL.path(percentEncoded: false), link.path(percentEncoded: false))
+        XCTAssertEqual(linked.canonicalLeafURL.path(percentEncoded: false), link.path(percentEncoded: false))
     }
 
     /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes
@@ -160,7 +178,12 @@ extension ExportArtifactWriterTests {
             XCTAssertEqual(counts.values, [0])
             XCTAssertFalse(probe.watchedDescriptorCounts.isEmpty)
             XCTAssertTrue(probe.watchedDescriptorCounts.allSatisfy { $0 == 0 }, "no boundary holds the parent")
-            XCTAssertFalse(probe.calls.contains { $0.path == parent && $0.operation != .fstatat })
+            XCTAssertFalse(probe.calls.contains { $0.path == parent && ![.fstatat, .fullPath].contains($0.operation) })
+            XCTAssertEqual(
+                probe.calls.contains { $0.path == parent && $0.operation == .fullPath },
+                !replaces,
+                "a new leaf proves its parent's canonical spelling by getattrlist, not by an open"
+            )
             assertTouchedOnlyLeafParentAndStaging(probe, fixture: fixture)
         }
     }

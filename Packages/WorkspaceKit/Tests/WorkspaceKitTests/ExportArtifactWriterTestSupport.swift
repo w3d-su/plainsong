@@ -89,6 +89,7 @@ final class ExportBoundaryProbe: @unchecked Sendable {
         stagingDirectory: (@Sendable (URL) throws -> URL)? = nil,
         volumeCapabilities: (@Sendable (URL) -> ExportArtifactVolumeCapabilities?)? = nil,
         isUbiquitous: (@Sendable (URL) -> Bool)? = nil,
+        fileCoordinator: (@Sendable () -> NSFileCoordinator)? = nil,
         afterPreflight: (@Sendable () -> Void)? = nil,
         afterPublication: (@Sendable () -> Void)? = nil
     ) -> ExportArtifactWriterHooks {
@@ -96,6 +97,7 @@ final class ExportBoundaryProbe: @unchecked Sendable {
             itemReplacementDirectory: stagingDirectory,
             volumeCapabilities: volumeCapabilities,
             isUbiquitous: isUbiquitous,
+            fileCoordinator: fileCoordinator,
             observer: { [self] call in
                 lock.withLock { storedCalls.append(call) }
             },
@@ -169,6 +171,7 @@ extension ExportArtifactWriterTests {
         disposition: ExportArtifactDisposition,
         probe: ExportBoundaryProbe = ExportBoundaryProbe(),
         hooks: ExportArtifactWriterHooks? = nil,
+        appPrivateRoot: URL? = nil,
         ownership: ExportArtifactOwnershipCheck = { _ in .permitted }
     ) -> ExportArtifactWriteOutcome {
         let outcome = ExportArtifactWriter.write(
@@ -178,6 +181,7 @@ extension ExportArtifactWriterTests {
                 disposition: disposition,
                 bytes: Data(text.utf8)
             ),
+            appPrivateRoot: appPrivateRoot,
             ownership: ownership,
             hooks: hooks ?? probe.hooks()
         )
@@ -249,8 +253,10 @@ extension ExportArtifactWriterTests {
         return result
     }
 
-    /// The writer touched the chosen folder only through `fstatat` of its own path and calls on
-    /// the exact leaf; every other path lies in the item-replacement directory, outside it.
+    /// The writer touched the chosen folder only through metadata reads of its own path
+    /// (`fstatat`, `getattrlist`) and calls on the exact leaf; every other path lies in the
+    /// item-replacement directory, outside it. The only descriptors ever opened are the existing
+    /// leaf (to read its kernel spelling) and the staged file.
     func assertTouchedOnlyLeafParentAndStaging(
         _ probe: ExportBoundaryProbe,
         fixture: ExportWriterFixture,
@@ -259,8 +265,21 @@ extension ExportArtifactWriterTests {
     ) {
         let staging = probe.stagingDirectoryPath
         for call in probe.calls {
+            if call.operation == .open {
+                XCTAssertTrue(
+                    call.path == fixture.destinationPath || call.path == probe.stagedPath,
+                    "only the leaf and the staged file are opened: \(call)",
+                    file: file,
+                    line: line
+                )
+            }
             if call.path == fixture.directoryPath {
-                XCTAssertEqual(call.operation, .fstatat, "the chosen folder is never opened", file: file, line: line)
+                XCTAssertTrue(
+                    [.fstatat, .fullPath].contains(call.operation),
+                    "the chosen folder is only ever read by metadata: \(call)",
+                    file: file,
+                    line: line
+                )
             } else if call.path != fixture.destinationPath {
                 XCTAssertFalse(
                     ExportArtifactWriter.pathLies(call.path, inside: fixture.directoryPath, caseSensitive: false),
@@ -269,12 +288,12 @@ extension ExportArtifactWriterTests {
                     line: line
                 )
                 if let staging {
-                    // Foundation's returned spelling (for example through `/var`) is opened once to
-                    // read its canonical path; every later call uses that canonical spelling.
-                    let names = call.step == .inspectStagingDirectory && call.operation == .open
-                        ? (call.path as NSString).lastPathComponent == (staging as NSString).lastPathComponent
-                        : call.path.hasPrefix(staging)
-                    XCTAssertTrue(names, "\(call)", file: file, line: line)
+                    // Foundation's returned spelling (for example through `/var`) is read once by
+                    // metadata to find its canonical spelling; every later call uses that spelling.
+                    let returnedSpelling = [.inspectStagingDirectory, .canonicalizeStagingDirectory]
+                        .contains(call.step)
+                        && (call.path as NSString).lastPathComponent == (staging as NSString).lastPathComponent
+                    XCTAssertTrue(returnedSpelling || call.path.hasPrefix(staging), "\(call)", file: file, line: line)
                 }
             }
         }

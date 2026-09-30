@@ -174,6 +174,52 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(try identity(at: fixture.destination), existing)
     }
 
+    /// A new leaf has no `F_GETPATH`, so the parent's `getattrlist(ATTR_CMN_FULLPATH)` spelling
+    /// must equal the selected one: a firmlink, case, or normalization spelling of the chosen
+    /// folder fails closed before ownership, and the folder is still never opened.
+    func testFirmlinkCaseOrNormalizationSpellingOfTheParentIsRefused() throws {
+        let fixture = try makeExportFixture()
+        let nfcFolder = "\(fixture.base.path(percentEncoded: false))caf\u{E9}"
+        XCTAssertEqual(nfcFolder.withCString { Darwin.mkdir($0, 0o700) }, 0)
+        var parents = ["/System/Volumes/Data\(fixture.directoryPath)"]
+        parents.append(((fixture.directoryPath as NSString).deletingLastPathComponent as NSString)
+            .appendingPathComponent("SELECTED"))
+        parents.append("\(fixture.base.path(percentEncoded: false))cafe\u{301}")
+        let reachable = parents.filter { exists($0) }
+        guard !reachable.isEmpty else {
+            throw XCTSkip("No firmlink, case, or normalization alias spelling reaches the test folder")
+        }
+        for parent in reachable {
+            let url = WorkspaceLiteralFileURL.fileURL(path: "\(parent)/export.html", isDirectory: false)
+            let probe = ExportBoundaryProbe()
+
+            XCTAssertEqual(
+                export(to: url, disposition: .createNew, probe: probe),
+                .notCommitted(.destinationAlias),
+                parent
+            )
+
+            XCTAssertEqual(ExportArtifactWriter.inspectLeaf(at: url), .failure(.destinationAlias), parent)
+            XCTAssertEqual(
+                ExportArtifactWriter.inspectDestination(at: url, kind: .html),
+                .refused(.destinationAlias),
+                parent
+            )
+            XCTAssertFalse(probe.createdStaging, parent)
+            XCTAssertFalse(probe.calls.contains { $0.operation == .open }, "the parent is never opened: \(parent)")
+            XCTAssertTrue(probe.calls.contains { $0.path == parent && $0.operation == .fullPath }, parent)
+        }
+        // An existing leaf reached through the firmlink fails by its F_GETPATH spelling.
+        try Data("original".utf8).write(to: fixture.destination)
+        let existing = try identity(at: fixture.destination)
+        if exists(reachable.first) {
+            let url = WorkspaceLiteralFileURL.fileURL(path: "\(reachable[0])/export.html", isDirectory: false)
+            XCTAssertEqual(export(to: url, disposition: .replaceConfirmed(existing)), .notCommitted(.destinationAlias))
+        }
+        XCTAssertEqual(try text(at: fixture.destination), "original")
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+    }
+
     func testMissingOrUnsearchableParentFailsBeforeAnyWrite() throws {
         let fixture = try makeExportFixture()
         let missingParent = fixture.base.appendingPathComponent("absent/export.html", isDirectory: false)

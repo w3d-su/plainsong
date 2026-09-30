@@ -107,7 +107,7 @@ extension ExportDestinationOwnershipAppTests {
         // The export inspection carries no root authority, so ownership compares full paths
         // against the workspace authority's retained locations.
         XCTAssertEqual(
-            try fixture.authority.relativePath(forFileURL: inspection(of: exportURL).leafURL),
+            try fixture.authority.relativePath(forFileURL: inspection(of: exportURL).canonicalLeafURL),
             "posts/export.html"
         )
         XCTAssertEqual(

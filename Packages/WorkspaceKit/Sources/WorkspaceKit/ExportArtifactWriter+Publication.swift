@@ -15,6 +15,13 @@ enum ExportArtifactPublication {
     case unverified
 }
 
+/// The consumed request's values plus the caller's app-private staging root.
+struct ExportArtifactWritePlan {
+    let bytes: Data
+    let disposition: ExportArtifactDisposition
+    let appPrivateRoot: URL?
+}
+
 /// One operation's fixed facts after staging, used to publish, clean up, and report.
 struct ExportArtifactOperation {
     let selection: ExportArtifactSelection
@@ -41,23 +48,27 @@ struct ExportArtifactOperation {
 
 extension ExportArtifactWriter {
     static func performWrite(
-        _ bytes: Data,
+        _ plan: ExportArtifactWritePlan,
         selection: ExportArtifactSelection,
-        disposition: ExportArtifactDisposition,
         ownership: ExportArtifactOwnershipCheck,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
         guard !Task.isCancelled else { return .notCommitted(.cancelled) }
         let preflight: ExportArtifactPreflight
         let approved: WorkspaceNoFollowFileTargetState
-        switch approvedPreflight(selection, disposition: disposition, ownership: ownership, hooks: hooks) {
+        switch approvedPreflight(selection, disposition: plan.disposition, ownership: ownership, hooks: hooks) {
         case let .success(value): (preflight, approved) = value
         case let .failure(failure): return .notCommitted(failure)
         }
         hooks.afterPreflight?()
 
         let directory: ExportArtifactStagingDirectory
-        switch establishStagingDirectory(selection, preflight: preflight, hooks: hooks) {
+        switch establishStagingDirectory(
+            selection,
+            preflight: preflight,
+            appPrivateRoot: plan.appPrivateRoot,
+            hooks: hooks
+        ) {
         case let .success(value): directory = value
         case let .failure(refusal): return refusalOutcome(refusal, selection: selection, hooks: hooks)
         }
@@ -68,11 +79,12 @@ extension ExportArtifactWriter {
             parentIdentity: preflight.proof.parentIdentity,
             hooks: hooks
         )
-        // Q3: a confirmed overwrite keeps the displaced file's mode bits, as the retained Save
-        // path does; a new leaf keeps the `0666 & ~umask` create mode.
-        let displacedMode = preflight.proof.leafStatus.map { $0.st_mode & mode_t(0o7777) }
+        // Q3: a confirmed overwrite keeps the displaced file's permission bits; a new leaf keeps
+        // the `0666 & ~umask` create mode. Setuid, setgid, and sticky bits are never carried onto
+        // an exported artifact (hardening refinement of Q3, E2 review).
+        let displacedMode = preflight.proof.leafStatus.map { $0.st_mode & mode_t(0o777) }
         let staged: ExportArtifactStagedFile
-        switch createStagedFile(bytes, in: directory, displacedMode: displacedMode, hooks: hooks) {
+        switch createStagedFile(plan.bytes, in: directory, displacedMode: displacedMode, hooks: hooks) {
         case let .success(value): staged = value
         case let .failure(failure): return abandon(operation, failure: failure.failure, entry: failure.entry)
         }
@@ -133,7 +145,9 @@ extension ExportArtifactWriter {
 
     /// Q1: a ubiquitous destination (the leaf or its parent URL) publishes inside
     /// `NSFileCoordinator.coordinate(writingItemAt:options: .forReplacing)`. Coordination is an
-    /// addition only: it grants no authority, and the accessor must receive the same leaf.
+    /// addition only: it grants no authority, and the accessor must receive exactly the URL that
+    /// was coordinated (byte-exact): a presenter or another coordinated writer that moved the
+    /// item fails closed.
     static func coordinatedIfUbiquitous(
         _ operation: ExportArtifactOperation,
         _ publish: () -> ExportArtifactPublication
@@ -148,13 +162,15 @@ extension ExportArtifactWriter {
         }
         var publication: ExportArtifactPublication?
         var coordinationError: NSError?
-        NSFileCoordinator(filePresenter: nil).coordinate(
+        let requestedPath = selection.destinationURL.path(percentEncoded: false)
+        hooks.makeFileCoordinator().coordinate(
             writingItemAt: selection.destinationURL,
             options: .forReplacing,
             error: &coordinationError
         ) { coordinatedURL in
-            let coordinatedPath = coordinatedURL.path(percentEncoded: false).precomposedStringWithCanonicalMapping
-            guard coordinatedPath == selection.leafPath.precomposedStringWithCanonicalMapping else {
+            guard coordinatedURL.isFileURL,
+                  coordinatedURL.path(percentEncoded: false).utf8.elementsEqual(requestedPath.utf8)
+            else {
                 publication = .notPublished(.namespaceChanged)
                 return
             }

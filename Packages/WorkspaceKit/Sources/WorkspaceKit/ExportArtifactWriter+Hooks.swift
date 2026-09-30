@@ -13,6 +13,10 @@ enum ExportArtifactWriterStep: Hashable, Sendable {
     case inspectLeaf
     case openLeaf
     case inspectStagingDirectory
+    /// `getattrlist(ATTR_CMN_FULLPATH)` of the returned item-replacement directory.
+    case canonicalizeStagingDirectory
+    /// `getattrlist(ATTR_CMN_FULLPATH)` of the injected app-private root.
+    case canonicalizePrivateRoot
     case createStaged
     case writeStaged
     case chmodStaged
@@ -37,6 +41,8 @@ enum ExportArtifactWriterStep: Hashable, Sendable {
 struct ExportArtifactWriterCall: Equatable, Sendable {
     enum Operation: Equatable, Sendable {
         case fstatat
+        /// `getattrlist(ATTR_CMN_FULLPATH)`: metadata only, never an open.
+        case fullPath
         case open
         case getPath
         case write
@@ -66,6 +72,8 @@ struct ExportArtifactWriterHooks: Sendable {
     let itemReplacementDirectory: (@Sendable (URL) throws -> URL)?
     let volumeCapabilities: (@Sendable (URL) -> ExportArtifactVolumeCapabilities?)?
     let isUbiquitous: (@Sendable (URL) -> Bool)?
+    /// Supplies the coordinator for a ubiquitous destination, so a test can cancel a real one.
+    let fileCoordinator: (@Sendable () -> NSFileCoordinator)?
     let observer: (@Sendable (ExportArtifactWriterCall) -> Void)?
     let beforeStep: (@Sendable (ExportArtifactWriterStep) -> Void)?
     let injectedFailure: (@Sendable (ExportArtifactWriterStep) -> Int32?)?
@@ -76,6 +84,7 @@ struct ExportArtifactWriterHooks: Sendable {
         itemReplacementDirectory: (@Sendable (URL) throws -> URL)? = nil,
         volumeCapabilities: (@Sendable (URL) -> ExportArtifactVolumeCapabilities?)? = nil,
         isUbiquitous: (@Sendable (URL) -> Bool)? = nil,
+        fileCoordinator: (@Sendable () -> NSFileCoordinator)? = nil,
         observer: (@Sendable (ExportArtifactWriterCall) -> Void)? = nil,
         beforeStep: (@Sendable (ExportArtifactWriterStep) -> Void)? = nil,
         injectedFailure: (@Sendable (ExportArtifactWriterStep) -> Int32?)? = nil,
@@ -85,6 +94,7 @@ struct ExportArtifactWriterHooks: Sendable {
         self.itemReplacementDirectory = itemReplacementDirectory
         self.volumeCapabilities = volumeCapabilities
         self.isUbiquitous = isUbiquitous
+        self.fileCoordinator = fileCoordinator
         self.observer = observer
         self.beforeStep = beforeStep
         self.injectedFailure = injectedFailure
@@ -115,15 +125,46 @@ struct ExportArtifactWriterHooks: Sendable {
     }
 
     /// `fstatat(AT_FDCWD, path, …, AT_SYMLINK_NOFOLLOW_ANY)`: no component may be a symlink,
-    /// and a symlink leaf is reported as itself.
+    /// and a symlink leaf is reported as itself. `AT_SYMLINK_NOFOLLOW` is used only for the
+    /// item-replacement directory spelling Foundation returned.
     func noFollowStatus(
         _ path: String,
-        step: ExportArtifactWriterStep
+        step: ExportArtifactWriterStep,
+        flags: Int32 = AT_SYMLINK_NOFOLLOW_ANY
     ) -> Result<stat, ExportArtifactSyscallFailure> {
         var status = stat()
         return perform(step, .fstatat, path: path) {
-            path.withCString { Darwin.fstatat(AT_FDCWD, $0, &status, AT_SYMLINK_NOFOLLOW_ANY) }
+            path.withCString { Darwin.fstatat(AT_FDCWD, $0, &status, flags) }
         }.map { _ in status }
+    }
+
+    /// The kernel's canonical spelling of an existing entry from `getattrlist(ATTR_CMN_FULLPATH)`.
+    /// This is a metadata read: it never opens the entry, so it works on a directory the
+    /// process may search but not read (a leaf-only grant's parent).
+    func fullPath(
+        _ path: String,
+        step: ExportArtifactWriterStep,
+        options: Int32
+    ) -> Result<[UInt8], ExportArtifactSyscallFailure> {
+        var request = attrlist()
+        request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+        request.commonattr = attrgroup_t(ATTR_CMN_FULLPATH)
+        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) + 16)
+        return perform(step, .fullPath, path: path) {
+            buffer.withUnsafeMutableBytes { raw in
+                path.withCString { Darwin.getattrlist($0, &request, raw.baseAddress, raw.count, UInt32(options)) }
+            }
+        }.flatMap { _ in
+            buffer.withUnsafeBytes { raw -> Result<[UInt8], ExportArtifactSyscallFailure> in
+                let reference = raw.load(fromByteOffset: MemoryLayout<UInt32>.size, as: attrreference_t.self)
+                let start = MemoryLayout<UInt32>.size + Int(reference.attr_dataoffset)
+                let end = start + Int(reference.attr_length)
+                guard reference.attr_length > 0, start >= 0, end <= raw.count else {
+                    return .failure(ExportArtifactSyscallFailure(code: EIO))
+                }
+                return .success(Array(raw[start ..< end].prefix { $0 != 0 }))
+            }
+        }
     }
 
     func stagingDirectory(for destinationURL: URL) throws -> URL {
@@ -153,6 +194,10 @@ struct ExportArtifactWriterHooks: Sendable {
             exclusiveRename: values.volumeSupportsExclusiveRenaming == true,
             exchangeRename: values.volumeSupportsSwapRenaming == true
         )
+    }
+
+    func makeFileCoordinator() -> NSFileCoordinator {
+        fileCoordinator?() ?? NSFileCoordinator(filePresenter: nil)
     }
 
     func ubiquitous(_ url: URL) -> Bool {

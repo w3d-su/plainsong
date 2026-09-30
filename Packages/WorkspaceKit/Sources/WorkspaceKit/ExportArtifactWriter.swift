@@ -59,24 +59,27 @@ public enum ExportArtifactOwnershipDecision: Sendable, Equatable {
 /// - `state` comes from `fstatat(AT_FDCWD, leaf, …, AT_SYMLINK_NOFOLLOW_ANY)`, so no path
 ///   component may be a symbolic link;
 /// - an existing leaf is opened no-follow and its `fcntl(F_GETPATH)` spelling must equal the
-///   selected spelling byte for byte, so a case or normalization alias never inspects;
+///   selected spelling byte for byte; for a new leaf the parent's
+///   `getattrlist(ATTR_CMN_FULLPATH)` spelling must equal the selected parent spelling. A
+///   firmlink, case, or normalization alias therefore never inspects;
 /// - `parentIdentity` is the parent path's no-follow `fstatat` identity (metadata only);
 /// - `volumeIsCaseSensitive` is the parent URL's `volumeSupportsCaseSensitiveNames`.
 public struct ExportArtifactLeafInspection: Sendable, Equatable {
     public let state: WorkspaceNoFollowFileTargetState
-    /// The exact selected leaf spelling as a literal file URL (no Foundation normalization).
-    public let leafURL: URL
+    /// The selected leaf spelling, proven equal to the kernel's canonical spelling, as a literal
+    /// file URL (no Foundation normalization).
+    public let canonicalLeafURL: URL
     public let parentIdentity: WorkspaceFileSystemIdentity
     public let volumeIsCaseSensitive: Bool
 
     public init(
         state: WorkspaceNoFollowFileTargetState,
-        leafURL: URL,
+        canonicalLeafURL: URL,
         parentIdentity: WorkspaceFileSystemIdentity,
         volumeIsCaseSensitive: Bool
     ) {
         self.state = state
-        self.leafURL = leafURL
+        self.canonicalLeafURL = canonicalLeafURL
         self.parentIdentity = parentIdentity
         self.volumeIsCaseSensitive = volumeIsCaseSensitive
     }
@@ -98,8 +101,8 @@ public enum ExportArtifactFailure: Error, Sendable, Equatable {
     case symbolicLinkInParentPath
     case symbolicLinkDestination
     case nonRegularDestination
-    /// The selected spelling reaches an existing entry spelled differently on disk
-    /// (case or Unicode-normalization alias).
+    /// The selected spelling reaches an existing leaf or parent folder spelled differently on
+    /// disk (a case, Unicode-normalization, or firmlink alias).
     case destinationAlias
     /// The existing leaf could not be opened to prove its canonical spelling.
     case destinationUnreadable(code: Int32)
@@ -113,7 +116,8 @@ public enum ExportArtifactFailure: Error, Sendable, Equatable {
     case stagingDirectoryUnavailable
     /// The item-replacement directory is on a different device; there is no copy fallback.
     case stagingDirectoryOnDifferentDevice
-    /// The item-replacement directory is the chosen folder or lies inside it.
+    /// The item-replacement directory is the chosen folder, its direct child, or lies inside it
+    /// outside the app-private root (owner decision 2026-09-30).
     case stagingDirectoryInsideDestinationFolder
     /// The exclusive staged-file create was denied (`EPERM`/`EACCES`).
     case stagingNotPermitted(code: Int32)
@@ -213,11 +217,12 @@ public enum ExportArtifactDestinationInspection: Sendable, Equatable {
 
 /// One-shot, non-retained artifact writer (`docs/export-gates.md` D5, amended 2026-09-29).
 ///
-/// A save-panel grant covers exactly the chosen leaf, so the writer never opens, enumerates,
-/// or creates entries in the chosen folder other than publishing that leaf. It stages one file
-/// in a same-device `FileManager` item-replacement directory, proves the leaf by path with
-/// `AT_SYMLINK_NOFOLLOW_ANY`, and publishes by exact path with `renameatx_np` `RENAME_EXCL` or
-/// `RENAME_SWAP` plus `RENAME_NOFOLLOW_ANY`. It holds no bookmark, journal, session, or recovery
+/// A save-panel grant covers exactly the chosen leaf, so the writer never opens or enumerates
+/// the chosen folder and never gives it a new entry other than the published leaf. It stages
+/// one file in a same-device `FileManager` item-replacement directory (below the chosen folder
+/// only inside the app-private root), proves the leaf by path with `AT_SYMLINK_NOFOLLOW_ANY`
+/// and kernel-canonical spellings, and publishes by exact path with `renameatx_np`
+/// `RENAME_EXCL` or `RENAME_SWAP` plus `RENAME_NOFOLLOW_ANY`. It holds no bookmark, journal, session, or recovery
 /// authority, never falls back to a direct, copying, or alternate-directory write, and releases
 /// every descriptor before returning.
 public enum ExportArtifactWriter {
@@ -245,11 +250,15 @@ public enum ExportArtifactWriter {
         }
     }
 
+    /// - Parameter appPrivateRoot: the app's own private directory (the sandbox container's data
+    ///   directory when sandboxed), or `nil`. Staging below it is accepted even when the chosen
+    ///   folder is one of its ancestors; `nil` refuses any staging inside the chosen folder.
     public static func write(
         _ request: consuming ExportArtifactWriteRequest,
+        appPrivateRoot: URL?,
         ownership: ExportArtifactOwnershipCheck
     ) -> ExportArtifactWriteOutcome {
-        write(request, ownership: ownership, hooks: .production)
+        write(request, appPrivateRoot: appPrivateRoot, ownership: ownership, hooks: .production)
     }
 
     static func inspectDestination(
@@ -280,6 +289,7 @@ public enum ExportArtifactWriter {
 
     static func write(
         _ request: consuming ExportArtifactWriteRequest,
+        appPrivateRoot: URL?,
         ownership: ExportArtifactOwnershipCheck,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
@@ -293,9 +303,8 @@ public enum ExportArtifactWriter {
         }
         return SecurityScopedAccess.withAccess(to: destinationURL) {
             performWrite(
-                bytes,
+                ExportArtifactWritePlan(bytes: bytes, disposition: disposition, appPrivateRoot: appPrivateRoot),
                 selection: selection,
-                disposition: disposition,
                 ownership: ownership,
                 hooks: hooks
             )

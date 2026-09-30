@@ -6,11 +6,13 @@ import WorkspaceKit
 ///
 /// It reuses the authoritative inventory that Save Copy and workspace mutations already
 /// consult (current, warm/cached, retired, editor-bound, quarantined/detached, context-only,
-/// recovery, and indeterminate owners; hard links, case/canonical aliases, and component
-/// overlap) instead of building an export-specific URL list. The destination is known only by
-/// the writer's leaf-path inspection (D5, amended 2026-09-29): its identity, exact spelling, and
-/// volume case sensitivity come from leaf-path metadata, so a leaf-only save-panel grant never
-/// needs a parent descriptor here. It adds no command or UI and mutates no App state.
+/// recovery, and indeterminate owners) instead of building an export-specific URL list.
+/// The destination is known only by the writer's leaf-path inspection (D5, amended
+/// 2026-09-29): its identity, kernel-canonical spelling, and volume case sensitivity come from
+/// leaf-path metadata, so a leaf-only save-panel grant never needs a parent descriptor here.
+/// Owners match by identity (hard links) or by full-path alias keys against the canonical
+/// destination spelling, with component overlap; owned URLs are compared in the spelling the
+/// App retained. It adds no command or UI and mutates no App state.
 @MainActor
 extension AppState {
     /// Answers the writer's synchronous ownership query for one inspected destination.
@@ -36,7 +38,7 @@ extension AppState {
         _ inspection: ExportArtifactLeafInspection,
         exportSource: DocumentSession?
     ) throws {
-        let leafURL = inspection.leafURL
+        let leafURL = inspection.canonicalLeafURL
         try validateWorkspaceMutationRecoveryStoresLoaded(at: leafURL)
         // The App's own leaf-path inspection must agree with the writer's; any identity, type,
         // spelling, parent, or case-policy change between the two fails closed.
@@ -58,14 +60,14 @@ extension AppState {
         _ inspection: ExportArtifactLeafInspection,
         exportSource: DocumentSession?
     ) throws {
-        let leafPath = inspection.leafURL.path(percentEncoded: false)
+        let leafPath = inspection.canonicalLeafURL.path(percentEncoded: false)
         let destinationIdentity: WorkspaceFileSystemIdentity? = switch inspection.state {
         case let .regular(identity): identity
         case .missing: nil
         }
         try validateWorkspaceSaveCopyInventoryOwnership(
             destinationIdentity: destinationIdentity,
-            refusalURL: inspection.leafURL,
+            refusalURL: inspection.canonicalLeafURL,
             excluding: exportSource.flatMap(exportSourceOwningNoFile),
             // A file-less source retains no location, so no exact-missing-source exemption applies.
             isExactDestination: { _ in false },
@@ -82,7 +84,7 @@ extension AppState {
     /// The workspace-mutation owner inventory: every managed session's state URL and every owned
     /// state URL, compared by full-path alias keys with the same symmetric component overlap.
     func validateExportArtifactMutationInventory(_ inspection: ExportArtifactLeafInspection) throws {
-        let leafPath = inspection.leafURL.path(percentEncoded: false)
+        let leafPath = inspection.canonicalLeafURL.path(percentEncoded: false)
         var ownedURLs = workspaceMutationManagedSessions().compactMap { sessionStateURL(for: $0) }
         ownedURLs.append(contentsOf: workspaceMutationOwnedStateURLs())
         for ownedURL in ownedURLs where workspaceSaveCopyPathsOverlap(
@@ -90,7 +92,7 @@ extension AppState {
             leafPath,
             parentIsCaseSensitive: inspection.volumeIsCaseSensitive
         ) {
-            throw WorkspaceMutationError.sessionDestinationConflict(inspection.leafURL)
+            throw WorkspaceMutationError.sessionDestinationConflict(inspection.canonicalLeafURL)
         }
     }
 
@@ -101,9 +103,21 @@ extension AppState {
         _ request: consuming ExportArtifactWriteRequest,
         exportSource: DocumentSession?
     ) -> ExportArtifactWriteOutcome {
-        ExportArtifactWriter.write(request) { inspection in
+        ExportArtifactWriter.write(request, appPrivateRoot: Self.exportAppPrivateRoot()) { inspection in
             exportArtifactDestinationOwnership(for: inspection, exportSource: exportSource)
         }
+    }
+
+    /// The app-private staging root for one-shot export (owner decision 2026-09-30, E2 review):
+    /// the sandbox container's data directory, which is `NSHomeDirectory()` only when the
+    /// process runs sandboxed. Unsandboxed, it is `nil`, so staging inside the chosen folder is
+    /// always refused.
+    nonisolated static func exportAppPrivateRoot(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: String = NSHomeDirectory()
+    ) -> URL? {
+        guard environment["APP_SANDBOX_CONTAINER_ID"] != nil else { return nil }
+        return URL(fileURLWithPath: homeDirectory, isDirectory: true)
     }
 
     private func exportSourceOwningNoFile(_ session: DocumentSession) -> DocumentSession? {
