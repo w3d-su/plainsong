@@ -31,10 +31,16 @@
 > lifecycle fences:** it closes R7. App owns `EditorReplaceAuthorizationDecision`,
 > one refusal per §5.6 state (never `canSave`; an installed untitled session is
 > allowed), checked at command validation and again by EditorKit at commit, in the
-> writer's synchronous turn. Plans carry a monotonic App authority generation
-> (advanced by every decision input set or cleared, rebind, reload, rekey, focus,
-> key-window, installation, and bar transition) plus the session revision, and an
-> EditorKit editor stamp (key window, installation, source revision, selection).
+> writer's synchronous turn. It is stricter than §5.6 in one place: an in-flight
+> disk inspection refuses (`externalObservationPending`), so each autosave's own
+> file event opens a brief refusal window. Plans carry a monotonic App authority
+> generation plus the session revision. The generation advances when a fence or
+> prompt map the decision reads, or an editor installation, is set or cleared, and
+> on rebind, reload, rekey, focus, key-window, and bar transitions.
+> `sessionStateURL`'s inputs and `externalResolutionIntentCaptures` are not
+> hooked; the rekey notification, the write-fence `didSet`, and the live
+> evaluation at commit cover them. An EditorKit editor stamp adds key window,
+> installation, source revision, and selection, compared by value.
 > `EditorReplaceCommandDispatcher` routes a plain command only to the installed
 > editor of the key window: its responder chain, or App's find-chrome/query-field
 > fallback exactly where Find uses it. Reload / Keep Mine completion supersedes
@@ -1050,7 +1056,17 @@ hosted spike PR #112.
     `testHostedReplaceRefusesWhileEditorSourceIsPending`,
     `testHostedReplaceRefusesARecoveryFencedDetachedSession`,
     `testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload` (partial
-    convergence with two live installations).
+    convergence with two live installations). The in-flight inspection reason
+    (`externalObservationPending`) is covered by
+    `testEverySection56StateRefusesWithItsReasonAndAdvancesTheGeneration`.
+  - Stricter than §5.6: an in-flight disk inspection (`externalDiskInspectionTasks`)
+    refuses as `externalObservationPending`, before any conflict is known. A
+    self-written save is recognized only inside that inspection, so every
+    autosave's own file-system event opens a brief refusal window that ends when
+    the inspection adopts the saved bytes. **Note for PR H / R10:** Replace UI and
+    XCUITests must expect this transient refusal right after an autosave (present
+    it as a momentary blocked state and retry on a fresh explicit action, or wait
+    for the inspection to settle) rather than treat it as a failure.
   - Writer refusal after authorization:
     `testHostedWriterRefusalAfterAuthorizationOnlyConverges` (the stale view
     converges to App's source, no replacement or undo group, Find recounts
@@ -1065,20 +1081,48 @@ hosted spike PR #112.
     and `testTypingSupersedesAStampWithoutTouchingTheGeneration` (edits
     supersede through the monotonic session revision, with no keystroke-path
     work); `EditorReplaceCommandDispatcherTests.testSelectionChangeAfterPlanningDropsTheCommand`.
+    Hooks cover the fence and prompt maps the decision reads and editor
+    installations; `sessionStateURL`'s inputs (`anchoredSessionFileBindings`,
+    `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`)
+    and `externalResolutionIntentCaptures` are not hooked and are covered by the
+    rekey notification, the write-fence `didSet`, and the live evaluation at
+    commit. **Note for PR G:** the editor stamp compares selection and in-window
+    focus by value, not by a monotonic generation, so an A→B→A change between
+    planning and commit passes; that is harmless for single Replace (planned and
+    committed in one turn, and the executor re-proves the applied selection), and
+    PR G must decide whether it matters for off-main Replace All planning.
   - Resolution: `testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace`,
     `testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace` (Keep Mine
     keeps identity, revision, and source, so the retained session is the recount:
-    no second scan and no shared-channel publication, as F4b requires), and
-    `testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload`.
+    no second scan and no shared-channel publication, as F4b requires),
+    `testHostedKeepMineCompletionHookRecountsAStaleFindBinding`, and
+    `testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload`. The hook's
+    generation advance cannot be isolated in a hosted test: choosing Keep Mine or
+    Reload already sets `deferredExternalChangeResolutions`, and finalization
+    clears the resolution maps, and both advance the generation. Its counter-only
+    revalidation is isolated by `testHostedKeepMineCompletionHookRecountsAStaleFindBinding`,
+    which leaves Find bound to an older source (a synthetic desync, since nothing
+    on the Keep Mine path notifies Find) and fails with
+    `editorReplaceExternalResolutionDidComplete` disabled. For Reload the
+    apply-time `notifyEditorFindExternalContentDidReplace` already recounts, so the
+    hook's recount is a no-op there.
   - Delivery and key-window/installation proof:
-    `testHostedReplaceFromTheQueryFieldUsesTheFindFallback`,
+    `testHostedReplaceFromTheQueryFieldUsesTheFindFallback` (drives both
+    fallback branches through Find's `commandContextOverride` seam, so it does not
+    exercise the production eligibility check),
+    `testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck` (no override:
+    Find's real `isEditorFindCommandContextActive()` chrome-focus branch, with
+    only the key-window number stubbed through `keyWindowNumberOverride`; the
+    `NSApp.keyWindow` query-field branch stays unexercised because a test process
+    has no real key window),
     `testHostedReplaceReachesOnlyTheKeyWindowsInstallation`,
     `EditorReplaceCommandDispatcherTests` (responder chain, no main-window
     fallthrough, background and unregistered installations, stamp capture), and
     PR D's `EditorReplaceSingleReplaceAppTests` now driven through
     `AppState.performEditorReplace` instead of `performSingleReplace`.
-  - Negative control: with the authority-input hook disabled, the two fence
-    supersession tests fail and stale plans commit.
+  - Negative controls: with the authority-input hook disabled, the two fence
+    supersession tests fail and stale plans commit; with the completion hook
+    disabled, `testHostedKeepMineCompletionHookRecountsAStaleFindBinding` fails.
 
 ### R8 — UI, menu, focus, and accessibility
 

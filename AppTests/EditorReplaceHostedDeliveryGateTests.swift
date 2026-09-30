@@ -126,6 +126,39 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(isFindFieldFirstResponder(in: hosted.window), "Replace does not steal focus")
     }
 
+    /// The production fallback check itself, with no `commandContextOverride`: SwiftUI chrome
+    /// focus reported for the key window makes Find's `isEditorFindCommandContextActive()`
+    /// eligible, and Replace reaches that window's editor. Only which window is key is
+    /// stubbed (`keyWindowNumberOverride`, Find's existing seam); the report-versus-key
+    /// comparison runs for real. The `NSApp.keyWindow` query-field branch stays unexercised
+    /// here because a test process has no real key window.
+    func testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck() async throws {
+        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let appState = hosted.appState
+        let editor = try hostedEditor(hosted)
+        appState.editorFindHost.commandContextOverride = nil
+        appState.editorFindHost.keyWindowNumberOverride = hosted.window.windowNumber
+        XCTAssertTrue(hosted.window.makeFirstResponder(nil), "focus off the editor, as on bar chrome")
+
+        appState.setEditorFindChromeFocus(.next, inWindowNumber: hosted.window.windowNumber + 1)
+        if NSApp.keyWindow == nil {
+            let before = EditorReplaceEffectSnapshot(appState, textView: editor)
+            XCTAssertEqual(
+                appState.performEditorReplace(replacement: "HIT"),
+                .notDelivered(.noEditorOnResponderChain),
+                "another window's chrome focus grants nothing"
+            )
+            XCTAssertEqual(EditorReplaceEffectSnapshot(appState, textView: editor), before)
+        }
+
+        appState.setEditorFindChromeFocus(.next, inWindowNumber: hosted.window.windowNumber)
+        XCTAssertTrue(appState.isEditorFindCommandContextActive())
+        guard case .delivered(.replaced) = appState.performEditorReplace(replacement: "HIT") else {
+            return XCTFail("Chrome focus in the key window must reach its installed editor")
+        }
+        XCTAssertEqual(appState.currentDocument.text, "HIT one hit two")
+    }
+
     /// Two windows share one `AppState`. Only the key window's installation is reached; with no
     /// key window nothing is; and a key-window change supersedes an outstanding plan.
     func testHostedReplaceReachesOnlyTheKeyWindowsInstallation() async throws {

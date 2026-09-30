@@ -78,8 +78,12 @@ extension AppState {
         editorFindHost.replaceAuthority.generation
     }
 
-    /// Called from `didSet` on every stored input of `editorReplaceAuthorizationDecision`
-    /// and of the installation proof: any fence set **or cleared** advances the generation.
+    /// Called from `didSet` on the fence and prompt maps `editorReplaceAuthorizationDecision`
+    /// reads directly and on editor installations: any of them set **or cleared** advances
+    /// the generation. Not hooked: `sessionStateURL`'s inputs (`anchoredSessionFileBindings`,
+    /// `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`) and
+    /// `externalResolutionIntentCaptures`. They are covered by the rekey notification, the
+    /// write-fence `didSet`, and the live evaluation at commit.
     func noteEditorReplaceAuthorityInputDidChange() {
         advanceEditorReplaceAuthorityGeneration()
     }

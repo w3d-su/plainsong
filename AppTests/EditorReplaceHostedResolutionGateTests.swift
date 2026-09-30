@@ -103,6 +103,39 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(session.text, "HIT local hit local")
     }
 
+    /// Isolates `editorReplaceExternalResolutionDidComplete`: Find is left bound to an older
+    /// source (a synthetic desync standing in for a missed publication), and nothing on the
+    /// Keep Mine path notifies Find. Only the completion hook's counter-only revalidation
+    /// brings Find back to the accepted local source; with the hook disabled this test fails.
+    func testHostedKeepMineCompletionHookRecountsAStaleFindBinding() async throws {
+        let local = "hit local hit local"
+        let hosted = try await makeHostedReplaceWorkspace(
+            source: "hit one",
+            query: "hit",
+            localEdit: local
+        )
+        let appState = hosted.appState
+        let session = appState.currentDocument
+        let controller = appState.editorFindHost.controller
+        try await recordExternalConflict(hosted, disk: "hit disk")
+        controller.documentTextDidChange(text: "hit one", revision: 0)
+        try await waitUntil("Find is bound to the older source") {
+            controller.session?.total == 1
+        }
+        let editSchedulesBefore = controller.editScheduleCount
+
+        appState.keepMineForExternallyChangedFile()
+        try await waitUntil("Keep Mine converges and completes") {
+            appState.externalChangePrompt == nil
+                && appState.externalReloadTasks.isEmpty
+                && appState.pendingExternalReloadApplications.isEmpty
+        }
+
+        XCTAssertEqual(session.text, local)
+        XCTAssertEqual(controller.editScheduleCount, editSchedulesBefore + 1, "one counter-only recount")
+        try await assertCounterOnlyRecount(appState, source: local, total: 2)
+    }
+
     /// Reload completion without a second window: the counter comes from the accepted disk
     /// source, no navigation is emitted, and a plan made before the conflict cannot commit.
     func testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace() async throws {
