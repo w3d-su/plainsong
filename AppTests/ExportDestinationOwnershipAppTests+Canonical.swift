@@ -47,7 +47,7 @@ extension ExportDestinationOwnershipAppTests {
         XCTAssertEqual(try operationSiblings(in: fixture.root), [])
     }
 
-    func testExportAppPrivateRootIsTheSandboxContainerOnlyWhenSandboxed() {
+    func testExportAppPrivateRootValidatesInjectedContainerIDAndHomeSuffix() {
         let identifier = "app.plainsong.editor"
         let home = "/Users/example/Library/Containers/\(identifier)/Data"
         let sandboxed = ["APP_SANDBOX_CONTAINER_ID": identifier]

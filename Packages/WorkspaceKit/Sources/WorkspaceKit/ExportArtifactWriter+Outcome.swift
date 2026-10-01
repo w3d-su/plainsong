@@ -128,6 +128,7 @@ extension ExportArtifactWriter {
             residue: cleanup.residue,
             stagingURL: cleanup.stagingURL,
             itemReplacementDirectoryURL: cleanup.directoryURL,
+            unprovenDirectoryURLs: [],
             residueIsInPurgeableTemporaryFolder: cleanup.residue != .none
         ))
     }

@@ -164,7 +164,7 @@ extension ExportArtifactWriter {
             return nil
         }
         let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(literalPath)
-        guard case let .success(status) = hooks.noFollowStatus(rootPath, step: .canonicalizePrivateRoot),
+        guard case let .success(status) = hooks.noFollowStatus(rootPath, step: .inspectPrivateRoot),
               status.exportFileType == S_IFDIR,
               case let .success(attributes) = hooks.pathAttributes(
                   rootPath,

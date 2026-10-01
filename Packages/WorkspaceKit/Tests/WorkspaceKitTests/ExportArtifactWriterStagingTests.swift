@@ -5,7 +5,7 @@ import XCTest
 
 /// Item-replacement staging (D5 step 1), Q1 coordination, and leaf races around staging.
 extension ExportArtifactWriterTests {
-    func testFoundationItemReplacementDirectoryIsOperationPrivateOnTheDestinationDevice() throws {
+    func testFoundationReturnsDistinctStagingDirectoriesOutsideSelectedTemporaryFolderOnSameDevice() throws {
         let fixture = try makeExportFixture()
         let probe = ExportBoundaryProbe()
         let observed = DescriptorCounts()

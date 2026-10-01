@@ -62,15 +62,26 @@ extension ExportArtifactWriter {
         }
         hooks.afterPreflight?()
 
-        let directory: ExportArtifactStagingDirectory
-        switch establishStagingDirectory(
+        let scaffolding = observeFoundationScaffolding(selection, appPrivateRoot: plan.appPrivateRoot, hooks: hooks)
+        let stagingResult = establishStagingDirectory(
             selection,
             preflight: preflight,
             appPrivateRoot: plan.appPrivateRoot,
             hooks: hooks
-        ) {
-        case let .success(value): directory = value
-        case let .failure(refusal): return refusalOutcome(refusal, selection: selection, hooks: hooks)
+        )
+        let unprovenDirectories = unprovenFoundationScaffolding(scaffolding, result: stagingResult, hooks: hooks)
+        let directory: ExportArtifactStagingDirectory
+        switch stagingResult {
+        case let .success(value) where unprovenDirectories.isEmpty:
+            directory = value
+        case let .success(value):
+            return refusalOutcome(
+                ExportArtifactStagingRefusal(failure: .stagingDirectoryInsideDestinationFolder,
+                                             removableDirectory: value, reportedURL: nil),
+                selection: selection, unprovenDirectories: unprovenDirectories, hooks: hooks
+            )
+        case let .failure(refusal):
+            return refusalOutcome(refusal, selection: selection, unprovenDirectories: unprovenDirectories, hooks: hooks)
         }
         let operation = ExportArtifactOperation(
             selection: selection,
@@ -125,14 +136,17 @@ extension ExportArtifactWriter {
     private static func refusalOutcome(
         _ refusal: ExportArtifactStagingRefusal,
         selection: ExportArtifactSelection,
+        unprovenDirectories: [URL],
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
-        let unprovenURL: URL
-        if let reportedURL = refusal.reportedURL {
-            unprovenURL = reportedURL
+        let unprovenURL: URL? = if let reportedURL = refusal.reportedURL {
+            reportedURL
         } else if let removable = refusal.removableDirectory, !removeStagingDirectory(removable, hooks: hooks) {
-            unprovenURL = removable.url
+            removable.url
         } else {
+            nil
+        }
+        guard unprovenURL != nil || !unprovenDirectories.isEmpty else {
             return .notCommitted(refusal.failure)
         }
         return .indeterminate(ExportArtifactIndeterminateWrite(
@@ -142,6 +156,7 @@ extension ExportArtifactWriter {
             residue: .none,
             stagingURL: nil,
             itemReplacementDirectoryURL: unprovenURL,
+            unprovenDirectoryURLs: unprovenDirectories,
             residueIsInPurgeableTemporaryFolder: false
         ))
     }

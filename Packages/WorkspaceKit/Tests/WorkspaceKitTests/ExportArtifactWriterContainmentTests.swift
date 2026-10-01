@@ -135,7 +135,7 @@ extension ExportArtifactWriterTests {
             "root only reachable through a symlink"
         )
         XCTAssertEqual(
-            linkedProbe.calls(at: .canonicalizePrivateRoot).map(\.operation),
+            linkedProbe.calls(at: .inspectPrivateRoot).map(\.operation),
             [.fstatat],
             "the symlinked root fails its no-follow type check before any getattrlist"
         )
@@ -196,9 +196,21 @@ extension ExportArtifactWriterTests {
             appPrivateRoot: privateRoot
         )
 
-        XCTAssertEqual(outcome, .notCommitted(.stagingDirectoryInsideDestinationFolder))
+        let report = try XCTUnwrap(requireIndeterminate(outcome))
+        XCTAssertEqual(report.destinationState, .provenUnchanged)
+        XCTAssertNil(report.itemReplacementDirectoryURL)
+        XCTAssertEqual(
+            report.unprovenDirectoryURLs
+                .map { WorkspaceRootContainment.normalizedDirectoryPath($0.path(percentEncoded: false)) },
+            [
+                home.appendingPathComponent("Library"),
+                home.appendingPathComponent("Library/Containers"),
+                home.appendingPathComponent("Library/Containers/app.plainsong.editor"),
+                privateRoot,
+            ].map { WorkspaceRootContainment.normalizedDirectoryPath($0.path(percentEncoded: false)) }
+        )
         let steps = probe.calls.map(\.step)
-        let rootProof = try XCTUnwrap(steps.firstIndex(of: .canonicalizePrivateRoot))
+        let rootProof = try XCTUnwrap(steps.firstIndex(of: .inspectPrivateRoot))
         let staged = try XCTUnwrap(steps.firstIndex(of: .inspectStagingDirectory))
         XCTAssertLessThan(rootProof, staged, "the root is proven before the staging directory exists")
         XCTAssertFalse(probe.createdStaging)

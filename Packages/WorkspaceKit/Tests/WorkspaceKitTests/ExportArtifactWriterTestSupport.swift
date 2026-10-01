@@ -294,6 +294,11 @@ extension ExportArtifactWriterTests {
                     file: file,
                     line: line
                 )
+            } else if call.step == .inspectFoundationScaffolding {
+                XCTAssertEqual(call.operation, .fstatat, "shared ancestors are metadata-only", file: file, line: line)
+                let temporary = "\(fixture.directoryPath)/.TemporaryItems"
+                XCTAssertTrue([temporary, "\(temporary)/folders.\(getuid())"].contains(call.path),
+                              "only Foundation scaffolding is observed: \(call)", file: file, line: line)
             } else if call.path != fixture.destinationPath {
                 XCTAssertFalse(
                     ExportArtifactWriter.pathLies(call.path, inside: fixture.directoryPath, caseSensitive: false),

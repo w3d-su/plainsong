@@ -56,7 +56,7 @@ extension ExportArtifactWriterTests {
         let fixture = try makeExportFixture()
         let sandbox = try makeFakeSandbox(fixture)
         let before = try entries(in: sandbox.home)
-        let probe = ExportBoundaryProbe(failures: [.canonicalizePrivateRoot: EIO])
+        let probe = ExportBoundaryProbe(failures: [.inspectPrivateRoot: EIO])
 
         let outcome = export(
             to: sandbox.home.appendingPathComponent("export.html", isDirectory: false),
@@ -67,7 +67,7 @@ extension ExportArtifactWriterTests {
         )
 
         XCTAssertEqual(outcome, .notCommitted(.stagingDirectoryInsideDestinationFolder))
-        XCTAssertEqual(probe.calls(at: .canonicalizePrivateRoot).count, 1)
+        XCTAssertEqual(probe.calls(at: .inspectPrivateRoot).count, 1)
         XCTAssertFalse(probe.createdStaging)
         XCTAssertEqual(try entries(in: sandbox.temporaryItems), [])
         XCTAssertEqual(try entries(in: sandbox.home), before)

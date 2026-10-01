@@ -17,6 +17,10 @@ enum ExportArtifactWriterStep: Hashable, Sendable {
     case canonicalizeStagingDirectory
     /// The combined `getattrlist` observation of a new leaf's parent (spelling, identity, type).
     case canonicalizeParent
+    /// No-follow type/identity observation before private-root canonicalization.
+    case inspectPrivateRoot
+    /// Metadata-only observation of Foundation's possible volume-root scaffolding.
+    case inspectFoundationScaffolding
     /// `getattrlist(ATTR_CMN_FULLPATH)` of the injected app-private root.
     case canonicalizePrivateRoot
     case createStaged

@@ -145,8 +145,8 @@ public enum ExportArtifactResidueContents: Sendable, Equatable {
 }
 
 /// An exact path inside the item-replacement directory that may still hold an identity after
-/// an uncertain outcome. The writer never leaves an entry in the chosen folder other than the
-/// selected leaf itself.
+/// an uncertain outcome. Writer-owned export outputs are limited to the selected leaf;
+/// Foundation shared-ancestor uncertainty is reported separately in `unprovenDirectoryURLs`.
 public enum ExportArtifactResidue: Sendable, Equatable {
     /// Every tracked name was proven not to hold the operation identity.
     case none
@@ -194,6 +194,9 @@ public struct ExportArtifactIndeterminateWrite: Sendable, Equatable {
     public let stagingURL: URL?
     /// The operation's exact item-replacement directory, or `nil` when it was proven removed.
     public let itemReplacementDirectoryURL: URL?
+    /// Exact Foundation scaffolding paths whose pre-operation identity or absence could not be
+    /// preserved. These ancestors are not operation-owned and are never removed by the writer.
+    public let unprovenDirectoryURLs: [URL]
     /// True when `residue` lies inside the item-replacement directory: a hidden temporary
     /// folder (inside the app container on the internal volume) that the OS may purge. When the
     /// residue holds `.displacedOriginal`, the user must be told to recover it promptly; the
