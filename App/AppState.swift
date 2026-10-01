@@ -145,7 +145,10 @@ final class AppState: ObservableObject {
         let fileURL: URL
     }
 
-    @Published var currentDocument: DocumentSession
+    @Published var currentDocument: DocumentSession {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     @Published var isSaving = false
     @Published private(set) var layoutMode: EditorLayoutMode
     @Published var workspaceRootURL: URL?
@@ -172,8 +175,14 @@ final class AppState: ObservableObject {
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
     @Published var presentedError: UserVisibleError?
-    @Published var externalChangePrompt: ExternalChangePrompt?
-    @Published var missingFilePrompt: MissingFilePrompt?
+    @Published var externalChangePrompt: ExternalChangePrompt? {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
+    @Published var missingFilePrompt: MissingFilePrompt? {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     @Published var indeterminateFileWriteReconciliationPrompt:
         IndeterminateFileWriteReconciliationPrompt?
     @Published var workspaceMutationReconciliationPrompt:
@@ -181,7 +190,10 @@ final class AppState: ObservableObject {
     @Published var fileWriteArtifactNotices: [FileWriteArtifactNotice] = []
     @Published var workspaceTrashCleanupNotices: [WorkspaceTrashCleanupNotice] = []
     @Published private(set) var wysiwygFallbackMessage: String?
-    @Published private(set) var editorFocusRequestID = 0
+    @Published private(set) var editorFocusRequestID = 0 {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     let fileStore: MarkdownFileStore
     let coherentFileReader: any WorkspaceCoherentFileReading
     let externalReloadApplicationPreparer: any ExternalReloadApplicationPreparing
@@ -225,18 +237,36 @@ final class AppState: ObservableObject {
     var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]
     var editorBindingInstallations: [
         EditorDocumentBindingInstallation: DocumentSession
-    ] = [:]
+    ] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     var editorWriterInstallations: [ObjectIdentifier: EditorDocumentBindingInstallation] = [:]
     var pendingEditorSourceInstallations: [
         EditorDocumentBindingInstallation: DocumentSession
-    ] = [:]
-    var deferredExternalChangeResolutions: [URL: DeferredExternalChangeResolution] = [:]
+    ] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
+    var deferredExternalChangeResolutions: [URL: DeferredExternalChangeResolution] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     var externalResolutionIntentCaptures: [URL: ExternalResolutionIntentCapture] = [:]
-    var externalReloadTasks: [ObjectIdentifier: ExternalReloadTask] = [:]
-    var externalDiskInspectionTasks: [ObjectIdentifier: ExternalDiskInspectionTask] = [:]
+    var externalReloadTasks: [ObjectIdentifier: ExternalReloadTask] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
+    var externalDiskInspectionTasks: [ObjectIdentifier: ExternalDiskInspectionTask] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     var pendingExternalReloadApplications: [
         ObjectIdentifier: PendingExternalReloadApplication
-    ] = [:]
+    ] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     var nextExternalReloadGeneration: UInt64 = 0
     var externalDiskEventGenerations: [ObjectIdentifier: UInt64] = [:]
     var retiredEditorDocumentSessions: [URL: RetiredEditorDocumentSession] = [:]
@@ -259,13 +289,22 @@ final class AppState: ObservableObject {
     var sessionPolicy = WorkspaceSessionLRUPolicy(limit: 8)
     var lastKnownDiskHashes: [URL: String] = [:]
     var lastKnownDiskModificationDates: [URL: Date] = [:]
-    var pendingExternalTexts: [URL: String] = [:]
+    var pendingExternalTexts: [URL: String] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     /// Coherent descriptor-bound observations that back pending external-change text. The
     /// legacy text map remains the session-scoped save/autosave fence, while this companion
     /// prevents Reload or Keep Mine from pairing one observed text version with a later,
     /// unrelated identity/SHA proof.
-    var pendingExternalFileVersions: [URL: ObservedRetainedFileVersion] = [:]
-    var detachedSessionURLs: Set<URL> = []
+    var pendingExternalFileVersions: [URL: ObservedRetainedFileVersion] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
+    var detachedSessionURLs: Set<URL> = [] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     /// Exact authority, identity, and content installed for each anchored workspace session.
     /// Saves use this proof instead of recapturing the session's mutable URL.
     var anchoredSessionFileBindings: [ObjectIdentifier: AnchoredWorkspaceSessionFileBinding] = [:]
@@ -279,12 +318,18 @@ final class AppState: ObservableObject {
     var editorImageAssetDocumentAuthorities:
         [ObjectIdentifier: RetainedEditorImageAssetDocumentAuthority] = [:]
     /// A typed indeterminate commit must be reconciled before this session can write again.
-    var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:]
+    var indeterminateSessionWrites: [ObjectIdentifier: WorkspaceIndeterminateFileWrite] = [:] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     /// Retains the exact authority location and prepared-byte digest for safe reconciliation.
     var indeterminateSessionWriteContexts: [ObjectIdentifier: IndeterminateSessionWriteContext] = [:]
     /// Sessions whose retained namespace is being mutated. Save/autosave must not enter while
     /// their authority is between the old and new lexical locations.
-    var workspaceMutationWriteFences: Set<ObjectIdentifier> = []
+    var workspaceMutationWriteFences: Set<ObjectIdentifier> = [] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     /// A namespace mutation fences image placement across the workspace, including mutations
     /// whose selected item is not itself an open document (for example an asset directory).
     var workspaceMutationNamespaceDepth = 0
@@ -305,7 +350,10 @@ final class AppState: ObservableObject {
     /// An indeterminate rename/move/Trash result cannot authorize either spelling. Keep the
     /// affected sessions quarantined until operation-level recovery proves one exact outcome
     /// or the user explicitly promotes the editor source to detached recovery.
-    var indeterminateWorkspaceMutationSessions: Set<ObjectIdentifier> = []
+    var indeterminateWorkspaceMutationSessions: Set<ObjectIdentifier> = [] {
+        didSet { noteEditorReplaceAuthorityInputDidChange() }
+    }
+
     var workspaceMutationRecoveries: [UUID: WorkspaceMutationRecoveryContext] = [:]
     var workspaceMutationOperationRecoveryRecords:
         [UUID: WorkspaceMutationOperationRecoveryRecord] = [:]
@@ -884,76 +932,6 @@ final class RetiredWorkspaceAuthorityOwner: @unchecked Sendable {
 struct SessionBackgroundTask {
     let token: UUID
     let task: Task<Void, Never>
-}
-
-struct ExternalReloadTask {
-    let token: UUID
-    let generation: UInt64
-    let session: DocumentSession
-    let canonicalURL: URL
-    let location: WorkspaceFileSystemLocation
-    let lifecycleGeneration: UInt64
-    let sourceSnapshot: EditorDocumentSourceSnapshot
-    let diskEventGeneration: UInt64
-    let intent: DeferredExternalChangeResolution
-    let task: Task<Void, Never>
-}
-
-struct ExternalDiskInspectionTask {
-    let token: UUID
-    let session: DocumentSession
-    let canonicalURL: URL
-    let location: WorkspaceFileSystemLocation
-    let lifecycleGeneration: UInt64
-    let diskEventGeneration: UInt64
-    let sourceSnapshot: EditorDocumentSourceSnapshot
-    let task: Task<Void, Never>
-}
-
-struct PendingExternalReloadApplication {
-    let token: UUID
-    let generation: UInt64
-    let session: DocumentSession
-    let canonicalURL: URL
-    let payload: ExternalReloadApplicationPayload
-    let preparedImageAssetAuthority: PreparedEditorImageAssetDocumentAuthority?
-    let acceptedSourceSnapshot: EditorDocumentSourceSnapshot
-    let intent: DeferredExternalChangeResolution
-    var synchronizedInstallations: Set<EditorDocumentBindingInstallation>
-}
-
-struct ExternalReloadApplicationPayload {
-    let snapshot: WorkspaceCoherentFileSnapshot
-    let contentHash: String
-    let textTransition: DocumentSessionTextTransition
-
-    private nonisolated init(
-        snapshot: WorkspaceCoherentFileSnapshot,
-        contentHash: String,
-        textTransition: DocumentSessionTextTransition
-    ) {
-        self.snapshot = snapshot
-        self.contentHash = contentHash
-        self.textTransition = textTransition
-    }
-
-    nonisolated static func preparingIfNotCancelled(
-        snapshot: WorkspaceCoherentFileSnapshot,
-        sourceSnapshot: EditorDocumentSourceSnapshot
-    ) -> Self? {
-        guard !Task.isCancelled else { return nil }
-        let textTransition = DocumentSessionTextTransition(
-            sourceText: sourceSnapshot.source,
-            sourceRevision: sourceSnapshot.revision,
-            destinationText: snapshot.text
-        )
-        guard !Task.isCancelled else { return nil }
-        return Self(
-            snapshot: snapshot,
-            contentHash: snapshot.sha256Digest,
-            textTransition: textTransition
-        )
-    }
 }
 
 enum AppStateError: LocalizedError {

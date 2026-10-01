@@ -15,12 +15,14 @@ enum EditorReplaceSingleSupport {
         source: String,
         pattern: String,
         selection: NSRange? = nil,
-        enableWYSIWYG: Bool = false
+        enableWYSIWYG: Bool = false,
+        makeWindow: ((NSRect) -> NSWindow)? = nil
     ) async throws -> Ready {
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
             source: source,
             selection: NSRange(location: 0, length: 0),
-            enableWYSIWYG: enableWYSIWYG
+            enableWYSIWYG: enableWYSIWYG,
+            makeWindow: makeWindow
         )
         let controller = try await installController(
             on: fixture,

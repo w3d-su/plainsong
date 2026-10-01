@@ -7,6 +7,7 @@ import MarkdownCore
 extension AppState {
     /// Publishes find chrome so SwiftUI sees `@Published`-style updates for the host box.
     func setEditorFindUI(_ ui: EditorFindUIState) {
+        noteEditorReplaceFindChromeTransition(from: editorFindHost.ui, to: ui)
         editorFindHost.ui = ui
         objectWillChange.send()
     }
