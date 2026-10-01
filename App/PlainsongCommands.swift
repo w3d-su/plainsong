@@ -59,6 +59,8 @@ struct PlainsongCommands: Commands {
                 appState.exportCurrentDocumentAsHTML()
             }
             .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportHTMLAccessibility.command)
+            .accessibilityLabel("Export as HTML")
         }
 
         // In-document find (PR C). Claimed in the system Edit menu — not a separate

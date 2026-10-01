@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import MarkdownCore
 import PreviewKit
@@ -40,6 +41,8 @@ struct ExportHTMLOperationSnapshot {
     let workspaceRootURL: URL?
     private(set) weak var workspaceAccess: SecurityScopedResourceAccess?
     let theme: ExportHTMLTheme
+    private(set) weak var window: NSWindow?
+    let requiresWindow: Bool
     let defaultFileName: String
     let defaultDirectoryURL: URL?
 
@@ -50,7 +53,8 @@ struct ExportHTMLOperationSnapshot {
         stateURL: URL?,
         workspaceRootURL: URL?,
         workspaceAccess: SecurityScopedResourceAccess?,
-        theme: ExportHTMLTheme
+        theme: ExportHTMLTheme,
+        window: NSWindow? = nil
     ) {
         self.operationID = operationID
         self.session = session
@@ -59,18 +63,34 @@ struct ExportHTMLOperationSnapshot {
         self.workspaceRootURL = workspaceRootURL
         self.workspaceAccess = workspaceAccess
         self.theme = theme
+        self.window = window
+        requiresWindow = window != nil
         defaultFileName = Self.defaultFileName(for: session.fileURL)
         defaultDirectoryURL = session.fileURL?.deletingLastPathComponent()
     }
 
-    /// Phase A default: the document's base name plus `.html`, with path separators removed.
-    static func defaultFileName(for documentURL: URL?) -> String {
-        let baseName = documentURL?.deletingPathExtension().lastPathComponent ?? ""
-        let sanitized = baseName
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return "\(sanitized.isEmpty ? "Untitled" : sanitized).html"
+    /// A valid nonempty string title wins; malformed frontmatter and non-string titles fall
+    /// back to the source basename. Control characters and path separators cannot enter a leaf.
+    static func defaultFileName(for documentURL: URL?, source: String = "") -> String {
+        let parsed = Frontmatter.parse(source)
+        let title: String? = if !parsed.isMalformed,
+                                case let .string(value)? = parsed.block?.fieldValues["title"]
+        {
+            value
+        } else {
+            nil
+        }
+        func sanitize(_ value: String) -> String {
+            String(value.unicodeScalars.map { scalar in
+                CharacterSet.controlCharacters.contains(scalar) || scalar == "/" || scalar == ":"
+                    ? "-" : String(scalar)
+            }.joined()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let sanitizedTitle = title.map(sanitize) ?? ""
+        let base = sanitizedTitle.isEmpty
+            ? sanitize(documentURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
+            : sanitizedTitle
+        return "\(base.isEmpty ? "Untitled" : base).html"
     }
 }
 
@@ -78,6 +98,13 @@ struct ExportHTMLOperationSnapshot {
 struct ExportHTMLDestinationRequest: Equatable {
     let defaultFileName: String
     let directoryURL: URL?
+    var allowedExtension: String {
+        "html"
+    }
+
+    var accessibilityLabel: String {
+        "Export as HTML. Choose a destination for \(defaultFileName)."
+    }
 }
 
 /// Why an operation ended before its bytes reached the one-shot writer. Nothing was written.
@@ -92,6 +119,8 @@ enum ExportHTMLStopReason: Error, Equatable {
     case workspaceChanged
     /// No file-backed Markdown/MDX document was current at invocation.
     case untitledDocument
+    case unprovenDocumentOwnership
+    case recoveryStoresUnavailable
     /// The editor still had input waiting to synchronize into the document.
     case pendingEditorSource
     /// The offscreen render or the D2 export barrier failed (for example `mdx-stale-or-error`).
@@ -104,6 +133,7 @@ enum ExportHTMLOperationResult: Equatable {
     case stopped(ExportHTMLStopReason)
     /// The writer ran; its typed committed / not-committed / indeterminate outcome.
     case written(ExportArtifactWriteOutcome)
+    case exported(ExportArtifactCommit, omittedImageCount: Int)
 }
 
 /// App-owned bookkeeping for Export as HTML…: the monotonic operation counter, the one
@@ -111,88 +141,21 @@ enum ExportHTMLOperationResult: Equatable {
 struct ExportHTMLOperationRegistry {
     var lastOperationID: UInt64 = 0
     var activeOperationID: UInt64?
+    var contextStopReason: ExportHTMLStopReason?
     var activeTask: Task<Void, Never>?
     weak var presentedPanel: NSSavePanel?
+    var panelOperationID: UInt64?
+    var windowCloseObserver: AnyCancellable?
+    var panelWindowProvider: (@MainActor () -> NSWindow?)?
     /// The current operation's dedicated offscreen controller (diagnostics and tests only).
     weak var offscreenController: PreviewController?
     /// Test seam: replaces the `NSSavePanel` sheet. Return `nil` to cancel.
     var destinationChooser: (@MainActor (ExportHTMLDestinationRequest) async -> URL?)?
     /// Test seam: observes every finished operation's typed result.
+    /// Test seam: injects a typed writer outcome without touching a destination.
+    var injectedWriteOutcome: ExportArtifactWriteOutcome?
+    /// Test seam: pause after the panel-approved identity is captured, before rendering.
+    var didInspectDestination: (@MainActor () async -> Void)?
+    var didPrepareArtifact: (@MainActor () async -> Void)?
     var didFinishOperation: (@MainActor (UInt64, ExportHTMLOperationResult) -> Void)?
-}
-
-/// Phase A result text. Deliberately literal: it names the exact `ExportArtifactFailure`
-/// and every exact path an indeterminate write reports, so the owner smoke can record them.
-enum ExportHTMLResultMessage {
-    static func notice(for result: ExportHTMLOperationResult) -> (title: String, message: String)? {
-        switch result {
-        case .stopped(.cancelled), .stopped(.superseded):
-            nil
-        case let .stopped(reason):
-            ("Could Not Export as HTML", "\(stopDescription(reason)) Nothing was written.")
-        case let .written(.committed(commit)):
-            ("Exported as HTML", "Wrote \(commit.selectedURL.path(percentEncoded: false)).")
-        case let .written(.notCommitted(failure)):
-            ("Could Not Export as HTML", "Nothing was written. Reason: \(failureDescription(failure)).")
-        case let .written(.indeterminate(write)):
-            ("HTML Export Could Not Be Confirmed", indeterminateDescription(write))
-        }
-    }
-
-    static func failureDescription(_ failure: ExportArtifactFailure) -> String {
-        "ExportArtifactFailure.\(failure)"
-    }
-
-    private static func stopDescription(_ reason: ExportHTMLStopReason) -> String {
-        switch reason {
-        case .cancelled, .superseded:
-            "The export was cancelled."
-        case .documentChanged:
-            "The document changed while it was being exported."
-        case .workspaceChanged:
-            "The workspace changed while the document was being exported."
-        case .untitledDocument:
-            "Save the document before exporting it as HTML."
-        case .pendingEditorSource:
-            "The editor still has input waiting to synchronize. Try again."
-        case let .renderFailed(reason):
-            "The document could not be rendered for export (\(reason))."
-        case let .destinationRefused(failure):
-            "The destination was refused: \(failureDescription(failure))."
-        }
-    }
-
-    private static func indeterminateDescription(_ write: ExportArtifactIndeterminateWrite) -> String {
-        func path(_ url: URL) -> String {
-            url.path(percentEncoded: false)
-        }
-        var lines = [
-            "The export to \(path(write.selectedURL)) could not be confirmed " +
-                "(WorkspaceAnchoredFileSystemError.\(write.reason)).",
-        ]
-        switch write.destinationState {
-        case .holdsWriterBytes:
-            lines.append("The selected file holds the exported HTML, but cleanup was not proven.")
-        case .provenUnchanged:
-            lines.append("The selected file was proven unchanged.")
-        case .unknown:
-            lines.append("The selected file's state could not be proven.")
-        }
-        switch write.residue {
-        case .none:
-            break
-        case let .retained(url, .displacedOriginal):
-            lines.append("Your original file is now at \(path(url)).")
-        case let .retained(url, .writerBytes):
-            lines.append("The exported bytes remain at \(path(url)).")
-        case let .retained(url, .unknown):
-            lines.append("An unexpected entry remains at \(path(url)); inspect it before reuse.")
-        case let .removalIndeterminate(url):
-            lines.append("Removal of \(path(url)) could not be confirmed; inspect it before reuse.")
-        }
-        if let stagingURL = write.stagingURL {
-            lines.append("Operation entry to inspect: \(path(stagingURL)).")
-        }
-        return lines.joined(separator: " ")
-    }
 }

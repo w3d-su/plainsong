@@ -40,7 +40,11 @@ public final class PreviewController: NSObject, ObservableObject {
         self.init(previewIndexURL: Self.defaultPreviewIndexURL())
     }
 
-    init(previewIndexURL: URL?) {
+    init(
+        previewIndexURL: URL?,
+        contentRuleList: WKContentRuleList? = nil,
+        websiteDataStore: WKWebsiteDataStore? = nil
+    ) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
         let assetSchemeHandler = AssetURLSchemeHandler()
@@ -48,6 +52,8 @@ public final class PreviewController: NSObject, ObservableObject {
         let previewIndexURL = previewIndexURL?.standardizedFileURL
 
         userContentController.add(scriptMessageProxy, name: "bridge")
+        if let contentRuleList { userContentController.add(contentRuleList) }
+        if let websiteDataStore { configuration.websiteDataStore = websiteDataStore }
         configuration.userContentController = userContentController
         configuration.setURLSchemeHandler(assetSchemeHandler, forURLScheme: "asset")
         configuration.preferences.isElementFullscreenEnabled = false
@@ -296,7 +302,7 @@ extension PreviewController: WKNavigationDelegate {
 }
 
 extension PreviewController {
-    private nonisolated static func defaultPreviewIndexURL() -> URL? {
+    nonisolated static func defaultPreviewIndexURL() -> URL? {
         Bundle.main.url(
             forResource: "index",
             withExtension: "html",

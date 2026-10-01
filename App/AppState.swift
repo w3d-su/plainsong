@@ -146,12 +146,20 @@ final class AppState: ObservableObject {
     }
 
     @Published var currentDocument: DocumentSession {
-        didSet { noteEditorReplaceAuthorityInputDidChange() }
+        didSet {
+            noteEditorReplaceAuthorityInputDidChange()
+            if oldValue !== currentDocument { noteExportHTMLContextChange(.documentChanged) }
+        }
     }
 
     @Published var isSaving = false
     @Published private(set) var layoutMode: EditorLayoutMode
-    @Published var workspaceRootURL: URL?
+    @Published var workspaceRootURL: URL? {
+        didSet {
+            if oldValue != workspaceRootURL { noteExportHTMLContextChange(.workspaceChanged) }
+        }
+    }
+
     @Published var workspaceTree: WorkspaceFileTree?
     var workspaceSnapshot: WorkspaceFileSnapshot?
     var workspaceSearchRootAuthority: WorkspaceFileSystemRootAuthority?
@@ -175,6 +183,7 @@ final class AppState: ObservableObject {
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
     @Published var presentedError: UserVisibleError?
+    @Published var exportHTMLStatus: ExportHTMLStatus?
     @Published var externalChangePrompt: ExternalChangePrompt? {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }
@@ -282,7 +291,12 @@ final class AppState: ObservableObject {
     var documentChangeCancellable: AnyCancellable?
     let shouldRestoreLastOpenedFile: Bool
     var didAttemptRestore = false
-    var workspaceAccess: SecurityScopedResourceAccess?
+    var workspaceAccess: SecurityScopedResourceAccess? {
+        didSet {
+            if oldValue !== workspaceAccess { noteExportHTMLContextChange(.workspaceChanged) }
+        }
+    }
+
     var workspaceWatcher: WorkspaceEventWatcher?
     var sessionCache: [URL: DocumentSession] = [:]
     var sessionLifecycleGenerations: [ObjectIdentifier: UInt64] = [:]

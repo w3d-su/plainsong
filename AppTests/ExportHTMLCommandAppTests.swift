@@ -5,7 +5,7 @@ import MarkdownCore
 @testable import WorkspaceKit
 import XCTest
 
-/// Export PR F Phase A: the production File › Export as HTML… path, with the save panel
+/// Export PR F Phase B: the production File › Export as HTML… path, with the save panel
 /// replaced by the injected destination seam. Each test runs the real snapshot, dedicated
 /// offscreen `PreviewController`, `exportHTML`, and one-shot writer inside the hosted app.
 @MainActor
@@ -19,7 +19,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
 
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
 
-        guard case let .written(.committed(commit)) = try XCTUnwrap(recorder.results.first?.result) else {
+        guard case let .exported(commit, _) = try XCTUnwrap(recorder.results.first?.result) else {
             return XCTFail("Expected a committed export, got \(recorder.results)")
         }
         XCTAssertEqual(recorder.results.count, 1)
@@ -36,7 +36,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
         XCTAssertEqual(DocumentState(fixture.session), documentBefore)
         XCTAssertTrue(fixture.appState.currentDocument === fixture.session)
         XCTAssertEqual(fixture.appState.recentItemURLs, recentsBefore)
-        XCTAssertEqual(fixture.appState.presentedError?.title, "Exported as HTML")
+        XCTAssertEqual(fixture.appState.exportHTMLNotice?.title, "Exported as HTML")
         XCTAssertNil(fixture.appState.exportHTMLOperations.activeOperationID)
         XCTAssertEqual(recorder.controllers.count, 1)
         XCTAssertTrue(try XCTUnwrap(recorder.controllers.first).isInvalidated)
@@ -50,7 +50,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
 
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
 
-        guard case .written(.committed) = try XCTUnwrap(recorder.results.first?.result) else {
+        guard case .exported = try XCTUnwrap(recorder.results.first?.result) else {
             return XCTFail("Expected a committed overwrite, got \(recorder.results)")
         }
         let html = try String(contentsOf: destination, encoding: .utf8)
@@ -93,7 +93,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
         XCTAssertEqual(recorder.results.count, 2)
         let results = Dictionary(uniqueKeysWithValues: recorder.results.map { ($0.operationID, $0.result) })
         XCTAssertEqual(results[1], .stopped(.superseded))
-        guard case let .written(.committed(commit)) = results[2] else {
+        guard case let .exported(commit, _) = results[2] else {
             return XCTFail("Expected the newer export to commit, got \(recorder.results)")
         }
         XCTAssertEqual(commit.selectedURL, newerDestination)
@@ -125,45 +125,7 @@ final class ExportHTMLCommandAppTests: XCTestCase {
 
         XCTAssertEqual(recorder.results.map(\.result), [.stopped(.renderFailed(reason: "mdx-stale-or-error"))])
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)))
-        XCTAssertEqual(fixture.appState.presentedError?.title, "Could Not Export as HTML")
-    }
-
-    func testResultTextNamesTheExactFailureAndEveryIndeterminatePath() throws {
-        let selected = URL(fileURLWithPath: "/Volumes/Smoke/Desktop/post.html")
-        let staging = URL(fileURLWithPath: "/Volumes/Smoke/Desktop/.plainsong-tmp-1")
-        let cleanup = URL(fileURLWithPath: "/Volumes/Smoke/Desktop/.plainsong-cleanup-2")
-
-        XCTAssertEqual(
-            ExportHTMLResultMessage.notice(for: .written(.notCommitted(.stagingNotPermitted(code: 1))))?.message,
-            "Nothing was written. Reason: ExportArtifactFailure.stagingNotPermitted(code: 1)."
-        )
-        XCTAssertEqual(
-            ExportHTMLResultMessage.notice(for: .stopped(.destinationRefused(.parentAuthorityUnavailable)))?.message,
-            "The destination was refused: ExportArtifactFailure.parentAuthorityUnavailable. Nothing was written."
-        )
-        let indeterminate = try XCTUnwrap(ExportHTMLResultMessage.notice(for: .written(.indeterminate(
-            ExportArtifactIndeterminateWrite(
-                reason: .cleanupFailed,
-                selectedURL: selected,
-                destinationState: .holdsWriterBytes,
-                residue: .retained(cleanup, holding: .displacedOriginal),
-                stagingURL: staging,
-                itemReplacementDirectoryURL: nil,
-                unprovenDirectoryURLs: [],
-                residueIsInPurgeableTemporaryFolder: false
-            )
-        ))))
-        XCTAssertEqual(indeterminate.title, "HTML Export Could Not Be Confirmed")
-        XCTAssertEqual(
-            indeterminate.message,
-            "The export to /Volumes/Smoke/Desktop/post.html could not be confirmed " +
-                "(WorkspaceAnchoredFileSystemError.cleanupFailed). " +
-                "The selected file holds the exported HTML, but cleanup was not proven. " +
-                "Your original file is now at /Volumes/Smoke/Desktop/.plainsong-cleanup-2. " +
-                "Operation entry to inspect: /Volumes/Smoke/Desktop/.plainsong-tmp-1."
-        )
-        XCTAssertNil(ExportHTMLResultMessage.notice(for: .stopped(.cancelled)))
-        XCTAssertNil(ExportHTMLResultMessage.notice(for: .stopped(.superseded)))
+        XCTAssertEqual(fixture.appState.exportHTMLNotice?.title, "Could Not Export as HTML")
     }
 
     func testUntitledDocumentIsRefusedBeforeAnyPanel() {
@@ -178,8 +140,9 @@ final class ExportHTMLCommandAppTests: XCTestCase {
         XCTAssertNil(appState.exportCurrentDocumentAsHTML())
         XCTAssertEqual(chooserCalls, 0)
         XCTAssertEqual(
-            appState.presentedError?.message,
-            "Save the document before exporting it as HTML. Nothing was written."
+            appState.exportHTMLNotice?.message,
+            "Nothing was written. Save the document first, then export it as HTML. Plainsong can’t check an export " +
+                "destination against an unsaved or recovered document."
         )
     }
 }
@@ -218,7 +181,7 @@ extension ExportHTMLCommandAppTests {
         /// Answers each panel request with the next URL, after running `whilePanelIsOpen`.
         @MainActor
         func record(
-            returning destinations: [URL],
+            returning destinations: [URL?],
             whilePanelIsOpen: @escaping @MainActor () -> Void = {}
         ) -> Recorder {
             let recorder = Recorder()
@@ -266,7 +229,9 @@ extension ExportHTMLCommandAppTests {
         let location = try authority.location(relativePath: name)
         let read = try MarkdownFileStore().loadResult(at: location)
         let session = DocumentSession(text: text, url: documentURL)
-        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ExportHTMLTests-\(UUID().uuidString)"))
+        let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+        appState.preferences.setAutosaveIntervalSeconds(30)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority
         appState.workspaceGeneration = 1
@@ -319,5 +284,13 @@ extension ExportHTMLCommandAppTests {
     func operationSiblings(in directory: URL) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
             .filter { $0.hasPrefix(".plainsong-") }
+    }
+}
+
+@MainActor
+extension AppState {
+    var exportHTMLNotice: ExportHTMLNotice? {
+        guard case let .notice(notice) = exportHTMLStatus else { return nil }
+        return notice
     }
 }

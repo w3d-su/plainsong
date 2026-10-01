@@ -10,6 +10,7 @@ struct WorkspaceWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ExportHTMLStatusBanner()
             if appState.workspaceMutationRecoveryBannerPlacement == .global {
                 WorkspaceMutationRecoveryBanner()
             }
@@ -79,9 +80,12 @@ struct WorkspaceWindow: View {
         .task {
             await Task.yield()
             appState.restoreLastOpenedFileIfNeeded()
+            #if DEBUG
+                appState.showExportHTMLFeedbackSmokeIfRequested()
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
-            appState.flushAutosaveIfNeeded()
+            appState.flushAutosaveAfterWindowResignedKey()
         }
     }
 

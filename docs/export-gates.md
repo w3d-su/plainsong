@@ -17,7 +17,11 @@
 > PR E2 (2026-09-30) replaces the writer with the amended-D5 leaf-path writer and moves the
 > ownership inspection to leaf-path metadata; it re-proves every reopened E6 bullet and the
 > rewritten sibling bullet. The leaf-grant bullet (PR F's owner smoke) and the
-> fresh-panel-URL bullet (PR F) stay open.** Precedent:
+> fresh-panel-URL bullet (PR F) stay open.
+> PR F Phase B (2026-10-01) closes E1 and the automated HTML portions of E4/E7/E8.
+> E6's real-panel/leaf-grant owner smoke, keyboard-only acceptance, PDF/Print portions,
+> and E9 performance remain open. Owner checklist and exact test/measurement commands:
+> `docs/export-html-phase-b-checklist.md`.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -715,11 +719,11 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 ### E1 — Immutable snapshot and lifecycle fencing
 
-- [ ] One operation captures exact source, file kind, source identity/revision,
+- [x] One operation captures exact source, file kind, source identity/revision,
   base-directory/root, resolved theme, and monotonic operation ID.
-- [ ] A newer export, document switch/edit, workspace switch/close, or task cancellation
+- [x] A newer export, document switch/edit, workspace switch/close, or task cancellation
   prevents an older result from reaching a destination write.
-- [ ] Render or MDX error fails explicitly; no blank, prior-document, or stale
+- [x] Render or MDX error fails explicitly; no blank, prior-document, or stale
   last-good DOM is returned.
 - [x] Offscreen controller/task/resources are released on success, failure, and cancel.
 - PR C evidence: `ExportHTMLLifecycleTests` covers cancellation (including pre-cancel),
@@ -730,7 +734,22 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   notification; it does not kill an OS WebKit helper. `ExportHTMLHostedTests` rejects
   MDX stale/error output. PR D adds `testResourceResolutionTaskIsCancelledWhenExportFinishes`,
   which cancels the off-main resource-read task when the export finishes. App snapshot and
-  destination-write fencing remain PR F, so E1 stays open.
+  destination-write fencing remained PR F at that stage; the Phase B evidence below closes them.
+
+- PR F Phase B evidence: `ExportHTMLCommandAppTests` closes snapshot/lifecycle
+  integration with `testSnapshotCapturesExactSourceRevisionAssetsThemeAndMonotonicIdentity`,
+  `testDocumentEditWhileThePanelIsOpenPreventsTheWrite`,
+  `testSupersedingExportPreventsTheOlderWrite`,
+  `testDocumentSwitchAndCloseFenceBothPanelAndPreparedArtifact`,
+  `testWorkspaceCloseAndEditFenceThePreparedArtifact`,
+  `testSwitchAwayAndBackStillFencesTheExport`,
+  `testClosingTheOriginWindowFencesThePreparedArtifact`,
+  `testPanelCancelAndProgressCancelAreSilentAndReleaseTheController`, and
+  `testWeakControllerAndWebViewAreReleasedAfterSuccessFailureAndCancel`.
+  `testMDXSyntaxErrorFailsWithoutWriting` plus PreviewKit's
+  `testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM` close the error bullet.
+  Title/default-name parsing is off-main against captured source; every await is fenced,
+  and only the final synchronous `writeExportArtifact` call may publish.
 
 ### E2 — Protocol-v6 export contract
 
@@ -838,9 +857,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [x] CSS URL and SVG-href malicious fixtures prove only manifest-known font data and
   same-document generated fragments survive; no external URL sink remains.
 - [x] Resource finalization is complete before HTML/PDF/Print success is reported.
-- [ ] A network interceptor proves the dedicated controller issues zero HTTP(S) requests
-  during initial render, discovery, finalization, HTML serialization, PDF capture, and
-  Print preparation, even when the live-preview remote-image preference is enabled.
+- [x] HTML: a network interceptor proves zero HTTP(S) requests across initial render,
+  discovery, finalization, serialization, and standalone reopen, even with the live
+  remote-image preference enabled.
+- [ ] PDF capture and Print preparation issue zero HTTP(S) requests under an interceptor.
 - Evidence: `ExportResourceResolverTests` (10 MiB PNG boundary, JPEG/GIF/WebP MIME,
   32 MiB distinct bytes, repeated references, traversal/symlink/SVG/remote/data-URI
   rejection, manifest woff2), `ExportResourceResolverReviewTests` (100 references to one
@@ -858,6 +878,16 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   (custom-scheme reopen; image, KaTeX, highlight, and Mermaid render; one document
   request). The zero-HTTP interceptor across PDF and Print stays with PR G, so E4
   remains partial.
+
+- PR F HTML interceptor evidence:
+  `ExportNetworkInterceptorTests.testExportIssuesNoHTTPRequestsEvenWhenTheLivePreviewAllowsRemoteImages`
+  (Markdown and MDX) and the sandboxed App's
+  `ExportHTMLOfflineTests.testProductCommandAndWrittenHTMLIssueZeroHTTPRequestsWithLiveRemotePreferenceOn`.
+  Both refuse loopback proxy tunnels and then prove the live-preview positive control
+  reaches that recorder. The App test reopens the actual written file without the
+  export content blocker and verifies embedded image, math, code, and Mermaid.
+  `PreviewController.makeHTMLExportController` installs its HTTP(S) content rule before
+  the bundled page loads: detached images can initiate a load before JS rewrites them.
 
 ### E5 — Separate PDF and Print mechanisms
 
@@ -881,6 +911,13 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 - [ ] HTML/PDF writes use only the exact URL freshly returned by that operation's
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
+
+PR F supporting automation (not Powerbox evidence):
+`testEveryInvocationRequiresAFreshPanelResultAndNeverReusesACancelledDestination`,
+`testPanelCancelAndProgressCancelAreSilentAndReleaseTheController`,
+`testDestinationIdentityCapturedAtPanelReturnCannotReplaceARacedLeaf`, and the E1
+stale-operation tests. Both owner-dependent boxes below stay open. The eight real-panel
+cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
 > against the now-retired parent-anchored writer, so all five were reopened until PR E2
@@ -1160,35 +1197,64 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 ### E7 — App / File-menu UX and side-effect isolation
 
-- [ ] File commands expose Export as HTML…, Export as PDF…, and Print… only when a
-  current exportable document exists, using the existing system File-menu command
-  groups without duplicate top-level menus.
-- [ ] Save panels have deterministic allowed extensions/default names and never change
-  the document URL or Save/Save Copy behavior.
-- [ ] Progress, cancellation, render/resource failure, rejected image placeholders, PDF
-  failure, and write failure have accessible, non-color-only user feedback.
-- [ ] Success/cancel/failure leaves text, selection, scroll, dirty/saved baseline,
-  document identity, recents, tree state, and recovery state unchanged.
-- Evidence: _open — PR F/G App tests + hosted command/panel smoke_
+- [x] HTML: File › Export as HTML… uses the system `.importExport` group without a
+  new top-level menu or global shortcut, enabled only for a file-backed `.md`/`.mdx`.
+- [ ] PDF/Print command availability and menu smoke (PR G).
+- [x] HTML: a fresh `.html` window sheet has sanitized frontmatter-title/basename defaults
+  and never rekeys the document or changes Save/Save Copy behavior.
+- [ ] PDF panel defaults (PR G), and owner verification of the real HTML panel (E6).
+- [x] HTML: progress/Cancel, render/MDX/resource errors, placeholder counts, every writer
+  failure group, and indeterminate paths have accessible word/symbol feedback.
+- [ ] PDF failure/Print cancellation feedback (PR G); keyboard/VoiceOver owner smoke.
+- [x] HTML success/cancel/failure/indeterminate leaves text, selection, editor/visible-preview
+  scroll/DOM/theme, dirty/saved baseline, identity, recents, tree and recovery state unchanged.
+- [ ] PDF/Print side-effect isolation (PR G).
+- Evidence: `ExportHTMLCommandAppTests.testUntitledDocumentIsRefusedBeforeAnyPanel`,
+  `testPanelDefaultsSanitizeTitlesAndFallBackForInvalidOrEmptyFrontmatter`,
+  `testEveryInvocationRequiresAFreshPanelResultAndNeverReusesACancelledDestination`,
+  `testUnavailableOwnershipAndRecoveryLoadFailureRefuseBeforeThePanel`,
+  `testInjectedWriterOutcomesTravelThroughTheCommandWithoutPublishing`, and
+  `testSuccessCancelFailureAndIndeterminateLeaveEditorPreviewAndDocumentStateUnchanged`.
+  `testExportPanelFocusChangesDoNotFlushTheDirtySavedBaseline` proves the export sheet
+  does not trigger a focus-loss Save and normal focus autosave still runs afterwards.
+  `ExportHTMLFeedbackAppTests` covers every writer failure group and its accessibility
+  label, cancellation/supersession, every destination/residue state combination with exact
+  paths, purgeable displaced-original recovery text, and the safe DEBUG preview.
+  `ExportHTMLOmissionCountTests` proves authored lookalikes cannot inflate the count.
+  The Phase A `AppState+Autosave.swift` change only moved `SessionBackgroundTask`; it is
+  no longer in the main diff after merging E2. Phase B does not suspend timer/explicit/
+  termination autosave. Its focus-notification guard applies only while choosing an
+  export destination.
 
 ### E8 — Format, content, theme, and layout matrix
 
-- [ ] Named `.md` and `.mdx` fixtures cover frontmatter, GFM, KaTeX, highlighted fences,
-  Mermaid, task checkboxes, allowlisted/ineligible images, and MDX placeholders.
-- [ ] Source-only, source+preview, and Experimental WYSIWYG produce content-equivalent
-  static HTML for the same deterministic snapshot/resources and content/theme-equivalent
-  PDF/Print output; the E0-recorded PDF page model versus paper-Print pagination is
-  intentionally different.
-- [ ] Light, dark, and resolved-system themes match the current preview theme without
+- [x] HTML: named `export-f-markdown.md`, `export-f-mdx.mdx`, and `math.md` cover
+  frontmatter, GFM, KaTeX, highlighted code, Mermaid, task checkboxes, eligible/missing/
+  remote images, and MDX placeholders.
+- [x] HTML: Source-only, source+preview and Experimental WYSIWYG have content-equivalent
+  static HTML for each deterministic snapshot/resource/theme combination.
+- [ ] PDF/Print content/theme matrix and the distinct D4 pagination contracts (PR G).
+- [x] HTML: light, dark and resolved-system themes are frozen at invocation without
   mutating the visible preview.
-- [ ] A current-render error and an MDX stale-last-good state fail rather than exporting
-  prior content.
-- Evidence: _open — PR C–G hosted format/layout matrix_
+- [ ] PDF/Print theme matrix (PR G).
+- [x] HTML: render errors and MDX stale-last-good DOM fail rather than exporting old content.
+- Evidence: `testNamedMarkdownAndMDXFixturesAreEquivalentAcrossLayoutsAndFreezeAllThemes`
+  runs 18 product-command cases (two formats × three layouts × three themes), comparing
+  content with only generated Mermaid numeric IDs normalized; it asserts placeholders,
+  embedded images, task inputs, tables, highlighted fences, math/fonts and SVG.
+  `testMathFixtureExportsThroughTheProductCommand` uses the real `Fixtures/math.md`.
+  `testThemeChangesWhilePanelIsOpenDoNotChangeTheInvocationTheme` proves the frozen theme.
+  `testMDXSyntaxErrorFailsWithoutWriting` and PreviewKit's
+  `testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM` prove failure, never prior content.
 
 ### E9 — Accessibility, performance, security, and regression
 
-- [ ] Stable accessibility identifiers/labels cover all three commands, save panels,
-  progress/cancel, omission notice, and errors; keyboard-only HTML/PDF/Print flows pass.
+- [x] HTML: stable identifiers and full spoken labels cover the command, save panel,
+  progress/Cancel, omission notice, and every error group. Named evidence:
+  `testStopReasonsHaveDistinctAccessibleMessagesAndStableControls`,
+  `testEveryWriterFailureMapsToAnActionableAccessibleGroup`, and
+  `testIndeterminateStatesAndEveryResidueReportRecoveryPathsWithoutClaimingSuccess`.
+- [ ] Keyboard-only HTML acceptance; PDF/Print accessibility and keyboard flows (owner/PR G).
 - [ ] Measure the production offscreen path with a large document, code-heavy/KaTeX/
   Mermaid fixture, and many bounded raster assets in Debug and Release before freezing
   any export-specific wall-clock or memory budget.
@@ -1208,6 +1274,34 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`, and
   `WorkspaceMutation{Operation,Text}RecoveryStoreTests` stay green with the leaf-path writer,
   the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
+
+### PR F Phase B verification — 2026-10-01
+
+- PreviewKit: 71 tests, zero failures, including the new interceptor and two omission tests.
+- WorkspaceKit: 351 tests, zero failures; writer execution/authority are unchanged.
+  The only WorkspaceKit addition is public construction of the immutable uncertainty
+  result for the DEBUG wording preview; it grants no filesystem authority.
+- Hosted App slices after formatting: 410 tests, one expected skip, zero failures.
+  `ExportHTMLCommandAppTests` 24; `ExportHTMLFeedbackAppTests` 5;
+  App `ExportHTMLOfflineTests` 1; `ExportDestinationOwnershipAppTests` 14;
+  `AppStateTests` 176 (one case-sensitive-volume skip on this case-insensitive volume);
+  `AppStateWorkspaceDataIntegrityTests` 129; `AppStateSessionStateCleanupTests` 6;
+  `WorkspaceMutationOperationRecoveryStoreTests` 46;
+  `WorkspaceMutationTextRecoveryStoreTests` 9.
+- `Scripts/check-export-sandbox-root.sh` passes with the production default root, nil-root
+  refusal, no unauthorized outside write, and no surviving operation paths.
+- Preview JS: `npm run typecheck` passes; `npm test` passes 127 tests in 16 files.
+- Pinned `make lint`: exit 0, 310 warnings, zero serious violations.
+- Locked `make build` passes; `git diff --check` passes.
+- No production dependency or bridge change; preview source and committed bundle remain
+  byte-unchanged. `project.yml` only adds test fixture resources.
+- The three E9 probes compile and skip without opt-in (three skips, zero failures).
+  Final locked idle checks found load 35.84 (Debug) and 35.21 (Release); both exited 75
+  without measuring. Exact commands and pending items are recorded in `docs/perf-log.md`.
+- E9 probes are opt-in and run last under the common lock and idle check. Debug/Release
+  export/RSS, active-export typing and 64 MiB synchronous writer are pending an idle
+  machine. Real iCloud evicted-leaf/coordination timing, physical-input evidence,
+  keyboard-only acceptance and the E6 Powerbox cases remain owner work. No budget is frozen.
 
 ## 9. Performance and Security Acceptance
 
