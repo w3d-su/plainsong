@@ -148,6 +148,11 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   handles this; do not block it).
 - Preview render requests are coalesced: only the latest version may be in flight; stale
   `renderComplete` responses are ignored.
+- Editor highlight requests restart through `EditorHighlightScheduler`: each request cancels
+  the executing request and replaces the pending revision in the caller's turn. One runner
+  waits for cancelled work to return before starting the latest request, so at most one
+  highlight task executes, with bounded pending work. Do not drive them with SwiftUI `.task(id:)`, which was observed to drop the final
+  request of a burst (Decision Log 2026-10-01).
 - No `DispatchQueue.global` ad-hoc usage in new code; use structured concurrency (`Task`,
   actors) except where AppKit delegates force otherwise.
 
