@@ -147,7 +147,10 @@ final class ExportHTMLCommandAppTests: XCTestCase {
                 selectedURL: selected,
                 destinationState: .holdsWriterBytes,
                 residue: .retained(cleanup, holding: .displacedOriginal),
-                stagingURL: staging
+                stagingURL: staging,
+                itemReplacementDirectoryURL: nil,
+                unprovenDirectoryURLs: [],
+                residueIsInPurgeableTemporaryFolder: false
             )
         ))))
         XCTAssertEqual(indeterminate.title, "HTML Export Could Not Be Confirmed")

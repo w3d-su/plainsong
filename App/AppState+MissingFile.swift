@@ -376,10 +376,10 @@ private extension AppState {
 @MainActor
 extension AppState {
     /// `sourceSession` is the only session allowed an unavailable proof or exact missing-source
-    /// recovery. `nil` grants no exception, so every inventory owner is checked (one-shot export).
+    /// recovery.
     func validateWorkspaceSaveCopyDestinationOwnership(
         at location: WorkspaceFileSystemLocation,
-        excluding sourceSession: DocumentSession?
+        excluding sourceSession: DocumentSession
     ) throws -> WorkspaceNoFollowFileTargetInspection {
         let inspection = try WorkspaceNoFollowFileInspector.inspectFileTarget(at: location)
         guard inspection.canonicalLocation == location else {
@@ -395,6 +395,33 @@ extension AppState {
         if isWorkspaceMutationRecoveryCandidate(location) {
             throw AppStateError.invalidSessionIdentity(location.fileURL)
         }
+        try validateWorkspaceSaveCopyInventoryOwnership(
+            destinationIdentity: destinationIdentity,
+            refusalURL: location.fileURL,
+            excluding: sourceSession,
+            isExactDestination: { $0 == location },
+            overlapsDestination: { retainedLocation in
+                workspaceSaveCopyLocationsOverlap(
+                    retainedLocation,
+                    location,
+                    parentIsCaseSensitive: inspection.parentIsCaseSensitive
+                )
+            }
+        )
+        return inspection
+    }
+
+    /// The Save Copy owner walk, independent of how the destination was inspected: Save Copy
+    /// passes its anchored location, one-shot export its leaf-path inspection. `sourceSession`
+    /// alone may hold an unavailable proof or recover its exact missing location; `nil` grants
+    /// no exception.
+    func validateWorkspaceSaveCopyInventoryOwnership(
+        destinationIdentity: WorkspaceFileSystemIdentity?,
+        refusalURL: URL,
+        excluding sourceSession: DocumentSession?,
+        isExactDestination: (WorkspaceFileSystemLocation) -> Bool,
+        overlapsDestination: (WorkspaceFileSystemLocation) -> Bool
+    ) throws {
         var inspectedSessions: Set<ObjectIdentifier> = []
         for candidate in workspaceSaveCopyOwnershipCandidates() {
             let sessionIdentity = ObjectIdentifier(candidate)
@@ -415,12 +442,12 @@ extension AppState {
                 unanchoredProofValue = proof
             case .unavailable:
                 guard candidate === sourceSession else {
-                    throw AppStateError.invalidSessionIdentity(location.fileURL)
+                    throw AppStateError.invalidSessionIdentity(refusalURL)
                 }
                 unanchoredProofValue = nil
             case .none:
                 guard binding != nil || context != nil else {
-                    throw AppStateError.invalidSessionIdentity(location.fileURL)
+                    throw AppStateError.invalidSessionIdentity(refusalURL)
                 }
                 unanchoredProofValue = nil
             }
@@ -437,16 +464,10 @@ extension AppState {
             }
             let isExactMissingSourceRecovery = candidate === sourceSession &&
                 destinationIdentity == nil &&
-                retainedLocations.contains(location)
+                retainedLocations.contains(where: isExactDestination)
             guard !isExactMissingSourceRecovery else { continue }
 
-            let ownsDestinationByLocation = retainedLocations.contains { retainedLocation in
-                workspaceSaveCopyLocationsOverlap(
-                    retainedLocation,
-                    location,
-                    parentIsCaseSensitive: inspection.parentIsCaseSensitive
-                )
-            }
+            let ownsDestinationByLocation = retainedLocations.contains(where: overlapsDestination)
             let ownsDestinationByIdentity = destinationIdentity.map { destinationIdentity in
                 binding?.identity == destinationIdentity ||
                     indeterminateSessionWrites[sessionIdentity]?.preparedMetadata?.identity ==
@@ -454,10 +475,9 @@ extension AppState {
                     unanchoredProofValue?.identity == destinationIdentity
             } == true
             if ownsDestinationByLocation || ownsDestinationByIdentity {
-                throw AppStateError.invalidSessionIdentity(location.fileURL)
+                throw AppStateError.invalidSessionIdentity(refusalURL)
             }
         }
-        return inspection
     }
 
     func workspaceSaveCopyOwnershipCandidates() -> [DocumentSession] {
@@ -504,15 +524,27 @@ extension AppState {
         _ rhs: WorkspaceFileSystemLocation,
         parentIsCaseSensitive: Bool
     ) -> Bool {
-        let lhsPath: String
-        let rhsPath: String
         if lhs.rootAuthority == rhs.rootAuthority {
-            lhsPath = lhs.relativePath
-            rhsPath = rhs.relativePath
-        } else {
-            lhsPath = lhs.fileURL.path(percentEncoded: false)
-            rhsPath = rhs.fileURL.path(percentEncoded: false)
+            return workspaceSaveCopyPathsOverlap(
+                lhs.relativePath,
+                rhs.relativePath,
+                parentIsCaseSensitive: parentIsCaseSensitive
+            )
         }
+        return workspaceSaveCopyPathsOverlap(
+            lhs.fileURL.path(percentEncoded: false),
+            rhs.fileURL.path(percentEncoded: false),
+            parentIsCaseSensitive: parentIsCaseSensitive
+        )
+    }
+
+    /// The component-bounded symmetric reservation on alias keys: two relative paths under one
+    /// root authority, or two full paths when there is no common authority.
+    func workspaceSaveCopyPathsOverlap(
+        _ lhsPath: String,
+        _ rhsPath: String,
+        parentIsCaseSensitive: Bool
+    ) -> Bool {
         let lhsKey = workspaceSaveCopyAliasKey(
             lhsPath,
             parentIsCaseSensitive: parentIsCaseSensitive

@@ -155,9 +155,3 @@ extension AppState {
             missingFilePrompt.map { !exactFileURLSpellingMatches($0.fileURL, url) } != false
     }
 }
-
-/// One per-session background task (autosave or statistics) and the token that fences it.
-struct SessionBackgroundTask {
-    let token: UUID
-    let task: Task<Void, Never>
-}

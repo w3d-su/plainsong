@@ -651,6 +651,7 @@ private extension AppState {
             restartActiveWorkspaceSearchWithFreshOverlays()
         }
         finishRetiredEditorDocumentSessionIfPossible(for: session)
+        editorReplaceExternalResolutionDidComplete(for: session)
     }
 
     func prepareKeepMineResolution(
@@ -717,6 +718,7 @@ private extension AppState {
         )
         scheduleAutosave(for: session)
         finishRetiredEditorDocumentSessionIfPossible(for: session)
+        editorReplaceExternalResolutionDidComplete(for: session)
     }
 
     func clearAcceptedExternalResolution(
