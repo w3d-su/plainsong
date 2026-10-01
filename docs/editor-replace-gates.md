@@ -1216,9 +1216,14 @@ hosted spike PR #112.
     `testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck` (no override:
     Find's real `isEditorFindCommandContextActive()` chrome-focus branch, with
     only the key-window number stubbed through `keyWindowNumberOverride`; the
-    `NSApp.keyWindow` query-field branch stays unexercised because a test process
-    has no real key window),
-    `testHostedReplaceReachesOnlyTheKeyWindowsInstallation`,
+    `NSApp.keyWindow` query-field branch stays unexercised because only designated
+    key status is controlled, not the host's real key window),
+    `testHostedReplaceReachesOnlyTheKeyWindowsInstallation` (no-key refusal preserves
+    both installations' zero-effect snapshots; an installed key-window test override
+    is authoritative even when it returns nil, so the XCTest host's real key window
+    cannot enter the fixture),
+    `EditorReplaceCommandDispatcherTests.testNilKeyWindowOverrideRefusesBeforeAuthorization`
+    (stamp capture, responder delivery, and fallback refuse before authorization),
     `EditorReplaceCommandDispatcherTests` (responder chain, no main-window
     fallthrough, background and unregistered installations, stamp capture), and
     PR D's `EditorReplaceSingleReplaceAppTests` now driven through

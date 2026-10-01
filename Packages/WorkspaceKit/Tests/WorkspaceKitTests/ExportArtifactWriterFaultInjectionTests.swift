@@ -4,327 +4,377 @@ import Foundation
 import XCTest
 
 extension ExportArtifactWriterTests {
-    func testStagingCreateWriteAndSyncFailuresProveDestinationUntouched() throws {
-        let steps: [(WorkspaceAnchoredFileSystem.InjectedCall, WorkspaceAnchoredFileSystemError)] = [
-            (.createTemporary, .unreadable),
-            (.writeTemporary, .unreadable),
-            (.syncTemporary, .durabilityFailed),
+    func testStagingCreateWriteChmodAndSyncFailuresLeaveTheDestinationUntouched() throws {
+        struct Fault {
+            let step: ExportArtifactWriterStep
+            let code: Int32
+            let expected: ExportArtifactFailure
+            /// Only a confirmed overwrite copies the displaced mode.
+            var replacesOnly: Bool {
+                step == .chmodStaged
+            }
+        }
+        let faults = [
+            Fault(step: .createStaged, code: EACCES, expected: .stagingNotPermitted(code: EACCES)),
+            Fault(step: .createStaged, code: EPERM, expected: .stagingNotPermitted(code: EPERM)),
+            Fault(step: .createStaged, code: ENOSPC, expected: .stagingUnavailable(code: ENOSPC)),
+            Fault(step: .writeStaged, code: EIO, expected: .writeFailed(.unreadable)),
+            Fault(step: .chmodStaged, code: EPERM, expected: .writeFailed(.unreadable)),
+            Fault(step: .syncStaged, code: EIO, expected: .writeFailed(.durabilityFailed)),
         ]
-        for (call, error) in steps {
-            for replaces in [false, true] {
+        for fault in faults {
+            let step = fault.step
+            let code = fault.code
+            let expected = fault.expected
+            for replaces in fault.replacesOnly ? [true] : [false, true] {
                 let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
                 let disposition: ExportArtifactDisposition = try replaces
                     ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
                     : .createNew
-                let probe = ExportBoundaryProbe(failures: [call: error])
+                let probe = ExportBoundaryProbe(failures: [step: code])
 
-                let outcome = export(to: fixture.destination, disposition: disposition, hooks: probe.hooks())
+                let outcome = export(to: fixture.destination, disposition: disposition, probe: probe)
 
-                XCTAssertEqual(outcome, .notCommitted(.writeFailed(error)), "\(call) replaces: \(replaces)")
-                XCTAssertEqual(probe.createdStaging, call != .createTemporary, "\(call)")
-                XCTAssertFalse(probe.calls.contains(.renameExclusive), "\(call)")
-                XCTAssertFalse(probe.calls.contains(.renameSwap), "\(call)")
-                XCTAssertEqual(try operationSiblings(in: fixture.directory), [], "\(call)")
+                let label = "\(step) \(code) replaces: \(replaces)"
+                XCTAssertEqual(outcome, .notCommitted(expected), label)
+                XCTAssertTrue(probe.calls(at: .publish).isEmpty, label)
+                XCTAssertEqual(
+                    probe.calls(at: .chmodStaged).isEmpty,
+                    !replaces || step == .createStaged || step == .writeStaged,
+                    label
+                )
+                XCTAssertFalse(exists(probe.stagedPath), label)
+                XCTAssertFalse(exists(probe.stagingDirectoryPath), label)
                 if replaces {
-                    XCTAssertEqual(try text(at: fixture.destination), "original")
-                    XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity)
+                    XCTAssertEqual(try text(at: fixture.destination), "original", label)
+                    XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity, label)
                 } else {
-                    XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
+                    XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName], label)
                 }
             }
         }
     }
 
-    func testPublishFailuresRemoveStagingAndLeaveDestinationUnchanged() throws {
-        for replaces in [false, true] {
-            let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
-            let call: WorkspaceAnchoredFileSystem.InjectedCall = replaces ? .renameSwap : .renameExclusive
-            let disposition: ExportArtifactDisposition = try replaces
-                ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
-                : .createNew
-            let probe = ExportBoundaryProbe(failures: [call: .unreadable])
+    /// Real `EACCES`: a read-only item-replacement directory denies the exclusive create, and the
+    /// writer reports it without any direct-write or alternate-directory fallback.
+    func testRealStagingCreateDenialIsNotPermittedWithoutFallback() throws {
+        let fixture = try makeExportFixture(originalText: "original")
+        let staging = fixture.base.appendingPathComponent("read-only-staging", isDirectory: true)
+        let probe = ExportBoundaryProbe()
+        let hooks = probe.hooks(stagingDirectory: { _ in
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+            _ = Darwin.chmod(staging.path(percentEncoded: false), 0o500)
+            return staging
+        })
+        defer { _ = Darwin.chmod(staging.path(percentEncoded: false), 0o700) }
 
-            let outcome = export(to: fixture.destination, disposition: disposition, hooks: probe.hooks())
+        let outcome = try export(
+            to: fixture.destination,
+            disposition: .replaceConfirmed(XCTUnwrap(fixture.originalIdentity)),
+            probe: probe,
+            hooks: hooks
+        )
 
-            XCTAssertEqual(outcome, .notCommitted(.writeFailed(.unreadable)), "replaces: \(replaces)")
-            XCTAssertEqual(probe.calls.filter { $0 == call }.count, 1, "no retry")
-            XCTAssertFalse(probe.events.contains(.didCommit(replaces ? .swap : .exclusiveCreate)))
-            XCTAssertEqual(try operationSiblings(in: fixture.directory), [])
-            if replaces {
-                XCTAssertEqual(try text(at: fixture.destination), "original")
-                XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity)
-            } else {
-                XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
-            }
-        }
+        XCTAssertEqual(outcome, .notCommitted(.stagingNotPermitted(code: EACCES)))
+        XCTAssertFalse(exists(staging.path(percentEncoded: false)), "the empty directory is removed")
+        XCTAssertEqual(try text(at: fixture.destination), "original")
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
     }
 
-    func testPostflightReadAndParentSyncFailuresRollBackToProvenNonCommit() throws {
-        let steps: [WorkspaceAnchoredFileSystem.InjectedCall] = [
-            .validateCommittedLeaf,
-            .syncCommittedDirectory,
+    func testPublishFailuresRemoveStagingAndLeaveTheDestinationUnchanged() throws {
+        struct Mapping {
+            let code: Int32
+            let exclusive: ExportArtifactFailure
+            let swap: ExportArtifactFailure
+        }
+        let mappings = [
+            Mapping(
+                code: EACCES,
+                exclusive: .publicationNotPermitted(code: EACCES),
+                swap: .publicationNotPermitted(code: EACCES)
+            ),
+            Mapping(code: EEXIST, exclusive: .destinationAlreadyExists, swap: .destinationAlreadyExists),
+            Mapping(code: ENOENT, exclusive: .namespaceChanged, swap: .destinationMissing),
+            Mapping(code: ENOTSUP, exclusive: .unsupportedVolumeSemantics, swap: .unsupportedVolumeSemantics),
+            Mapping(
+                code: EXDEV,
+                exclusive: .stagingDirectoryOnDifferentDevice,
+                swap: .stagingDirectoryOnDifferentDevice
+            ),
+            Mapping(code: EIO, exclusive: .writeFailed(.unreadable), swap: .writeFailed(.unreadable)),
         ]
-        for call in steps {
+        for mapping in mappings {
+            let code = mapping.code
+            let exclusiveFailure = mapping.exclusive
+            let swapFailure = mapping.swap
             for replaces in [false, true] {
                 let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
                 let disposition: ExportArtifactDisposition = try replaces
                     ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
                     : .createNew
-                let probe = ExportBoundaryProbe(failures: [call: .unreadable])
+                let probe = ExportBoundaryProbe(failures: [.publish: code])
 
-                let outcome = export(to: fixture.destination, disposition: disposition, hooks: probe.hooks())
+                let outcome = export(to: fixture.destination, disposition: disposition, probe: probe)
 
-                XCTAssertEqual(outcome, .notCommitted(.writeFailed(.unreadable)), "\(call) replaces: \(replaces)")
-                XCTAssertTrue(probe.events.contains(.didRollback), "\(call) replaces: \(replaces)")
-                XCTAssertEqual(try operationSiblings(in: fixture.directory), [])
+                let label = "errno \(code) replaces: \(replaces)"
+                XCTAssertEqual(outcome, .notCommitted(replaces ? swapFailure : exclusiveFailure), label)
+                XCTAssertEqual(probe.calls(at: .publish).count, 1, "no retry: \(label)")
+                XCTAssertEqual(probe.calls(at: .unlinkStaged).count, 1, label)
+                XCTAssertFalse(exists(probe.stagingDirectoryPath), label)
                 if replaces {
-                    XCTAssertEqual(probe.calls.filter { $0 == .renameRollback }.count, 1)
-                    XCTAssertEqual(try text(at: fixture.destination), "original")
-                    XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity)
+                    XCTAssertEqual(try text(at: fixture.destination), "original", label)
+                    XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity, label)
                 } else {
-                    XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
+                    XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName], label)
                 }
             }
         }
+    }
+
+    func testPostflightMismatchReversesTheSwapOnlyAfterAnExactTwoNameProof() throws {
+        let fixture = try makeExportFixture(originalText: "original")
+        let original = try XCTUnwrap(fixture.originalIdentity)
+        XCTAssertEqual(Darwin.chmod(fixture.destinationPath, 0o604), 0)
+        let probe = ExportBoundaryProbe(failures: [.postflight: EIO])
+
+        let outcome = export(
+            "writer bytes",
+            to: fixture.destination,
+            disposition: .replaceConfirmed(original),
+            probe: probe
+        )
+
+        XCTAssertEqual(outcome, .notCommitted(.namespaceChanged))
+        XCTAssertEqual(probe.calls(at: .twoNameProof).count, 2)
+        XCTAssertEqual(probe.calls(at: .reverseSwap).count, 1)
+        XCTAssertEqual(try text(at: fixture.destination), "original")
+        XCTAssertEqual(try identity(at: fixture.destination), original)
+        XCTAssertEqual(try permissionBits(at: fixture.destination), 0o604)
+        XCTAssertFalse(exists(probe.stagedPath), "the reversed writer bytes are removed")
+        XCTAssertFalse(exists(probe.stagingDirectoryPath))
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+    }
+
+    func testNewLeafPostflightMismatchIsIndeterminateAndNeverUnlinksTheLeafByPath() throws {
+        let fixture = try makeExportFixture()
+        let probe = ExportBoundaryProbe(failures: [.postflight: EIO])
+
+        let outcome = export("writer bytes", to: fixture.destination, disposition: .createNew, probe: probe)
+
+        let result = try XCTUnwrap(requireIndeterminate(outcome))
+        XCTAssertEqual(result.reason, .namespaceChanged)
+        XCTAssertEqual(result.selectedURL, fixture.destination)
+        XCTAssertEqual(result.destinationState, .unknown)
+        XCTAssertEqual(result.residue, .none)
+        XCTAssertNil(result.stagingURL)
+        XCTAssertNil(result.itemReplacementDirectoryURL, "the empty directory was proven removed")
+        XCTAssertFalse(result.residueIsInPurgeableTemporaryFolder)
+        XCTAssertTrue(probe.calls(at: .reverseSwap).isEmpty)
+        XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
     }
 
     func testReverseSwapFailurePreservesBothIdentitiesAndReportsExactPaths() throws {
-        for call in [WorkspaceAnchoredFileSystem.InjectedCall.renameRollback, .renameRollbackAfterValidation] {
+        for failing in [ExportArtifactWriterStep.twoNameProof, .reverseSwap, .reversalProof] {
             let fixture = try makeExportFixture(originalText: "original")
             let original = try XCTUnwrap(fixture.originalIdentity)
-            let probe = ExportBoundaryProbe(failures: [.validateCommittedLeaf: .unreadable, call: .unreadable])
+            let probe = ExportBoundaryProbe(failures: [.postflight: EIO, failing: EIO])
 
             let outcome = export(
                 "writer bytes",
                 to: fixture.destination,
                 disposition: .replaceConfirmed(original),
-                hooks: probe.hooks()
+                probe: probe
             )
 
-            let result = try XCTUnwrap(requireIndeterminate(outcome))
-            let staging = try XCTUnwrap(stagingURL(probe.stagingName, in: fixture))
-            XCTAssertEqual(result.selectedURL, fixture.destination)
-            XCTAssertEqual(result.destinationState, .unknown)
-            XCTAssertEqual(result.residue.url?.path(percentEncoded: false), staging.path(percentEncoded: false))
-            XCTAssertEqual(result.stagingURL?.path(percentEncoded: false), staging.path(percentEncoded: false))
-            guard case .retained(_, holding: .displacedOriginal) = result.residue else {
-                return XCTFail("the user's original must be reported at the staging path: \(result)")
+            let result = try XCTUnwrap(requireIndeterminate(outcome), "\(failing)")
+            let staged = try XCTUnwrap(probe.stagedURL)
+            XCTAssertEqual(result.reason, .namespaceChanged, "\(failing)")
+            XCTAssertEqual(result.destinationState, .unknown, "\(failing)")
+            XCTAssertEqual(result.stagingURL, staged, "\(failing)")
+            XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL, "\(failing)")
+            XCTAssertTrue(result.residueIsInPurgeableTemporaryFolder, "\(failing)")
+            XCTAssertLessThanOrEqual(probe.calls(at: .reverseSwap).count, 1, "no automatic retry")
+            if failing == .reversalProof {
+                // The reversal ran but could not be proven: the original is back at the leaf.
+                XCTAssertEqual(result.residue, .retained(staged, holding: .writerBytes))
+                XCTAssertEqual(try identity(at: fixture.destination), original)
+                XCTAssertEqual(try text(at: staged), "writer bytes")
+            } else {
+                XCTAssertEqual(result.residue, .retained(staged, holding: .displacedOriginal), "\(failing)")
+                XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
+                XCTAssertEqual(try text(at: staged), "original")
+                XCTAssertEqual(try identity(at: staged), original)
             }
+            XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+        }
+    }
+
+    func testDisplacedUnlinkFailureReportsTheOriginalInThePurgeableTemporaryFolder() throws {
+        for failing in [ExportArtifactWriterStep.unlinkDisplaced, .proveRemoved] {
+            let fixture = try makeExportFixture(originalText: "original")
+            let original = try XCTUnwrap(fixture.originalIdentity)
+            let probe = ExportBoundaryProbe(failures: [failing: EIO])
+
+            let outcome = export(
+                "writer bytes",
+                to: fixture.destination,
+                disposition: .replaceConfirmed(original),
+                probe: probe
+            )
+
+            let result = try XCTUnwrap(requireIndeterminate(outcome), "\(failing)")
+            let staged = try XCTUnwrap(probe.stagedURL)
+            XCTAssertEqual(result.reason, .cleanupFailed)
+            XCTAssertEqual(result.destinationState, .holdsWriterBytes, "postflight proved the publication")
+            XCTAssertEqual(
+                result.residue,
+                failing == .unlinkDisplaced ? .retained(staged, holding: .displacedOriginal) :
+                    .removalIndeterminate(staged)
+            )
+            XCTAssertEqual(result.stagingURL, staged)
+            XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL)
+            XCTAssertTrue(result.residueIsInPurgeableTemporaryFolder)
             XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
-            XCTAssertEqual(try text(at: staging), "original")
-            XCTAssertEqual(try identity(at: staging), original)
-            XCTAssertEqual(probe.calls.filter { $0 == call }.count, 1, "no automatic retry")
-            XCTAssertFalse(probe.events.contains(.didRollback))
+            XCTAssertEqual(try text(at: staged), "original")
+            XCTAssertEqual(try identity(at: staged), original)
         }
     }
 
-    func testReverseSwapSyncFailureReportsRestoredDestinationAndRetainedWriterStaging() throws {
-        let fixture = try makeExportFixture(originalText: "original")
-        let original = try XCTUnwrap(fixture.originalIdentity)
-        let probe = ExportBoundaryProbe(
-            failures: [.validateCommittedLeaf: .unreadable, .syncRollbackDirectory: .durabilityFailed]
-        )
-
-        let outcome = export(
-            "writer bytes",
-            to: fixture.destination,
-            disposition: .replaceConfirmed(original),
-            hooks: probe.hooks()
-        )
-
-        let result = try XCTUnwrap(requireIndeterminate(outcome))
-        let staging = try XCTUnwrap(stagingURL(probe.stagingName, in: fixture))
-        XCTAssertEqual(result.reason, .durabilityFailed)
-        XCTAssertEqual(result.destinationState, .unknown)
-        guard case let .retained(retained, holding: .writerBytes) = result.residue else {
-            return XCTFail("the writer's bytes must be reported at the staging path: \(result)")
-        }
-        XCTAssertEqual(retained.path(percentEncoded: false), staging.path(percentEncoded: false))
-        XCTAssertEqual(result.stagingURL, retained)
-        XCTAssertEqual(try text(at: fixture.destination), "original")
-        XCTAssertEqual(try identity(at: fixture.destination), original)
-        XCTAssertEqual(try text(at: staging), "writer bytes")
-    }
-
-    func testCreatedDestinationRollbackFailureIsIndeterminateAndKeepsWriterBytes() throws {
-        let fixture = try makeExportFixture()
-        let probe = ExportBoundaryProbe(
-            failures: [.validateCommittedLeaf: .unreadable, .unlinkCreatedDestination: .cleanupFailed]
-        )
-
-        let outcome = export("writer bytes", to: fixture.destination, disposition: .createNew, hooks: probe.hooks())
-
-        let result = try XCTUnwrap(requireIndeterminate(outcome))
-        XCTAssertEqual(result.selectedURL, fixture.destination)
-        XCTAssertEqual(result.destinationState, .unknown)
-        XCTAssertEqual(
-            result.residue.url?.path(percentEncoded: false),
-            fixture.destination.path(percentEncoded: false)
-        )
-        guard case .retained(_, holding: .writerBytes) = result.residue else {
-            return XCTFail("the selected leaf must be reported as holding the writer's bytes: \(result)")
-        }
-        XCTAssertEqual(
-            result.stagingURL?.path(percentEncoded: false),
-            stagingURL(probe.stagingName, in: fixture)?.path(percentEncoded: false),
-            "a residue at the selected leaf leaves the exact staging path reported as unproven"
-        )
-        XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
-        XCTAssertEqual(try operationSiblings(in: fixture.directory), [])
-    }
-
-    func testDisplacedCleanupFailuresAreIndeterminateEvenThoughWriterBytesArePublished() throws {
-        let steps: [(WorkspaceAnchoredFileSystem.InjectedCall, WorkspaceAnchoredFileSystemError)] = [
-            (.unlinkRollbackArtifact, .cleanupFailed),
-            (.unlinkQuarantinedArtifact, .cleanupFailed),
-            (.syncCleanupDirectory, .durabilityFailed),
-        ]
-        for (call, error) in steps {
-            let fixture = try makeExportFixture(originalText: "original")
-            let original = try XCTUnwrap(fixture.originalIdentity)
-            let probe = ExportBoundaryProbe(failures: [call: error])
-
-            let outcome = export(
-                "writer bytes",
-                to: fixture.destination,
-                disposition: .replaceConfirmed(original),
-                hooks: probe.hooks()
-            )
-
-            let result = try XCTUnwrap(requireIndeterminate(outcome), "\(call)")
-            XCTAssertEqual(result.reason, .cleanupFailed, "\(call)")
-            XCTAssertEqual(result.destinationState, .holdsWriterBytes, "\(call)")
-            XCTAssertEqual(try text(at: fixture.destination), "writer bytes", "\(call)")
-            let stagingPath = try XCTUnwrap(result.stagingURL, "\(call)")
-            XCTAssertEqual(result.residue.url, stagingPath, "\(call)")
-            XCTAssertTrue(stagingPath.lastPathComponent.hasPrefix(".plainsong-"), "\(call)")
-            let siblings = try operationSiblings(in: fixture.directory)
-            switch result.residue {
-            case let .retained(_, holding):
-                XCTAssertEqual(holding, .displacedOriginal, "PR F can tell the user where the original is")
-                XCTAssertEqual(siblings, [stagingPath.lastPathComponent], "\(call)")
-                XCTAssertEqual(try text(at: stagingPath), "original", "\(call)")
-                XCTAssertEqual(try identity(at: stagingPath), original, "\(call)")
-            case .removalIndeterminate:
-                XCTAssertEqual(call, .syncCleanupDirectory)
-                XCTAssertEqual(siblings, [], "the unlink completed but its directory sync did not")
-            case .none:
-                XCTFail("cleanup uncertainty must name an exact path: \(call)")
-            }
-        }
-    }
-
-    func testUnexpectedDisplacedEntryPreventsReverseSwapAndPreservesBothIdentities() throws {
-        let fixture = try makeExportFixture(originalText: "original")
-        let original = try XCTUnwrap(fixture.originalIdentity)
-        let movedOriginal = fixture.base.appendingPathComponent("moved-original.html")
-        let probeBox = ProbeBox()
-        let probe = ExportBoundaryProbe(races: [
-            .afterRenameSwap: {
-                guard let name = probeBox.probe?.stagingName else { return }
-                let staging = fixture.directory.appendingPathComponent(name, isDirectory: false)
-                try? FileManager.default.moveItem(at: staging, to: movedOriginal)
-                try? Data("racer".utf8).write(to: staging)
-            },
-        ])
-        probeBox.probe = probe
-
-        let outcome = export(
-            "writer bytes",
-            to: fixture.destination,
-            disposition: .replaceConfirmed(original),
-            hooks: probe.hooks()
-        )
-
-        let result = try XCTUnwrap(requireIndeterminate(outcome))
-        let staging = try XCTUnwrap(stagingURL(probe.stagingName, in: fixture))
-        XCTAssertEqual(result.destinationState, .unknown)
-        guard case let .removalIndeterminate(uncertain) = result.residue else {
-            return XCTFail("an unexpected displaced entry must stay removal-indeterminate: \(result)")
-        }
-        XCTAssertEqual(uncertain.path(percentEncoded: false), staging.path(percentEncoded: false))
-        XCTAssertEqual(result.stagingURL, uncertain)
-        XCTAssertFalse(probe.calls.contains(.renameRollback), "no reverse swap without two-name proof")
-        XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
-        XCTAssertEqual(try text(at: staging), "racer")
-        XCTAssertEqual(try text(at: movedOriginal), "original")
-        XCTAssertEqual(try identity(at: movedOriginal), original)
-    }
-
-    func testIdentityAndTypeRacesAfterInspectionFailClosedWithoutTouchingRacer() throws {
-        enum Race: CaseIterable {
-            case replacedFile, directory, symbolicLink, createdRacer
-        }
-        for race in Race.allCases {
-            let fixture = try makeExportFixture(originalText: race == .createdRacer ? nil : "original")
-            let disposition: ExportArtifactDisposition = try race == .createdRacer
-                ? .createNew
-                : .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
-            let destination = fixture.destination
-            let outside = fixture.base.appendingPathComponent("outside.html")
-            try Data("outside".utf8).write(to: outside)
-            let hooks = ExportArtifactWriterHooks(afterPreflight: {
-                switch race {
-                case .replacedFile:
-                    try? FileManager.default.removeItem(at: destination)
-                    try? Data("racer".utf8).write(to: destination)
-                case .directory:
-                    try? FileManager.default.removeItem(at: destination)
-                    try? FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
-                case .symbolicLink:
-                    try? FileManager.default.removeItem(at: destination)
-                    try? FileManager.default.createSymbolicLink(at: destination, withDestinationURL: outside)
-                case .createdRacer:
-                    try? Data("racer".utf8).write(to: destination)
-                }
-            })
-
-            let outcome = export(to: destination, disposition: disposition, hooks: hooks)
-
-            let expected: ExportArtifactFailure = switch race {
-            case .replacedFile, .createdRacer: .destinationIdentityChanged
-            case .directory: .nonRegularDestination
-            case .symbolicLink: .symbolicLinkDestination
-            }
-            XCTAssertEqual(outcome, .notCommitted(expected), "\(race)")
-            XCTAssertEqual(try operationSiblings(in: fixture.directory), [], "\(race)")
-            XCTAssertEqual(try text(at: outside), "outside", "\(race)")
-            if race == .replacedFile || race == .createdRacer {
-                XCTAssertEqual(try text(at: destination), "racer", "\(race)")
-            }
-        }
-    }
-
-    /// A racer that replaces the selected leaf at the last instrumented boundary is never
-    /// overwritten. Because the pre-operation destination can no longer be re-proven after
-    /// staging cleanup, the audited primitive reports uncertainty rather than a clean non-commit.
-    func testRaceAtFinalPublishBoundaryNeverOverwritesRacerOrClaimsSuccess() throws {
+    func testStagingDirectoryRemovalFailureIsNeverSuccessOrACleanNonCommit() throws {
         for replaces in [false, true] {
             let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
-            let destination = fixture.destination
-            let call: WorkspaceAnchoredFileSystem.InjectedCall = replaces ? .renameSwap : .renameExclusive
             let disposition: ExportArtifactDisposition = try replaces
                 ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
                 : .createNew
-            let probe = ExportBoundaryProbe(races: [
-                call: {
-                    try? FileManager.default.removeItem(at: destination)
-                    try? Data("final racer".utf8).write(to: destination)
-                },
-            ])
+            let probe = ExportBoundaryProbe(failures: [.removeStagingDirectory: EBUSY])
 
-            let outcome = export(to: destination, disposition: disposition, hooks: probe.hooks())
+            let result = try XCTUnwrap(requireIndeterminate(export(
+                "writer bytes",
+                to: fixture.destination,
+                disposition: disposition,
+                probe: probe
+            )))
 
-            let result = try XCTUnwrap(requireIndeterminate(outcome), "replaces: \(replaces)")
-            XCTAssertEqual(result.reason, .changedIdentity, "replaces: \(replaces)")
-            XCTAssertEqual(result.destinationState, .unknown, "replaces: \(replaces)")
-            XCTAssertEqual(result.residue, .none, "staging was removed under identity proof")
-            XCTAssertNil(result.stagingURL)
-            XCTAssertEqual(probe.calls.filter { $0 == call }.count, 1, "no retry")
-            XCTAssertFalse(probe.events.contains(.didCommit(replaces ? .swap : .exclusiveCreate)))
-            XCTAssertEqual(try text(at: destination), "final racer", "replaces: \(replaces)")
-            XCTAssertEqual(try operationSiblings(in: fixture.directory), [], "replaces: \(replaces)")
+            XCTAssertEqual(result.reason, .cleanupFailed)
+            XCTAssertEqual(result.destinationState, .holdsWriterBytes)
+            XCTAssertEqual(result.residue, .none)
+            XCTAssertNil(result.stagingURL, "the staged name was proven empty")
+            XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL)
+            XCTAssertFalse(result.residueIsInPurgeableTemporaryFolder)
+            XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
+            XCTAssertEqual(try entries(in: XCTUnwrap(probe.stagingDirectoryURL)), [])
         }
+
+        let fixture = try makeExportFixture()
+        let probe = ExportBoundaryProbe(failures: [.syncStaged: EIO, .removeStagingDirectory: EBUSY])
+        let result = try XCTUnwrap(requireIndeterminate(export(
+            to: fixture.destination,
+            disposition: .createNew,
+            probe: probe
+        )))
+        XCTAssertEqual(result.destinationState, .provenUnchanged)
+        XCTAssertEqual(result.residue, .none)
+        XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL)
+        XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
+    }
+
+    func testUnpublishedStagedFileThatCannotBeRemovedIsReportedExactly() throws {
+        let fixture = try makeExportFixture(originalText: "original")
+        let probe = ExportBoundaryProbe(failures: [.publish: EIO, .unlinkStaged: EIO])
+
+        let outcome = try export(
+            "writer bytes",
+            to: fixture.destination,
+            disposition: .replaceConfirmed(XCTUnwrap(fixture.originalIdentity)),
+            probe: probe
+        )
+
+        let result = try XCTUnwrap(requireIndeterminate(outcome))
+        let staged = try XCTUnwrap(probe.stagedURL)
+        XCTAssertEqual(result.reason, .cleanupFailed)
+        XCTAssertEqual(result.destinationState, .provenUnchanged)
+        XCTAssertEqual(result.residue, .retained(staged, holding: .writerBytes))
+        XCTAssertEqual(result.stagingURL, staged)
+        XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL)
+        XCTAssertEqual(try text(at: fixture.destination), "original")
+        XCTAssertEqual(try text(at: staged), "writer bytes")
+    }
+
+    /// Removal uses `unlinkat(…, AT_SYMLINK_NOFOLLOW_ANY)`: when the staging directory's path is
+    /// swapped for a symlink to a moved copy between the proof and the removal, neither the
+    /// staged-file unlink nor the directory `rmdir` follows it, and the outcome names the path.
+    func testRemovalNeverFollowsASymlinkedStagingComponent() throws {
+        for step in [ExportArtifactWriterStep.unlinkStaged, .removeStagingDirectory] {
+            let fixture = try makeExportFixture()
+            // The swapped component is intermediate: a plain `unlink`/`rmdir` would follow it.
+            let outer = fixture.base.appendingPathComponent("outer", isDirectory: true)
+            let staging = outer.appendingPathComponent("staging", isDirectory: true)
+            let movedOuter = fixture.base.appendingPathComponent("outer-moved", isDirectory: true)
+            let moved = movedOuter.appendingPathComponent("staging", isDirectory: true)
+            // The staged-file case fails publication first, so the writer removes its own bytes.
+            var failures: [ExportArtifactWriterStep: Int32] = [:]
+            if step == .unlinkStaged {
+                failures[.publish] = EIO
+            }
+            let probe = ExportBoundaryProbe(failures: failures, races: [step: {
+                try? FileManager.default.moveItem(at: outer, to: movedOuter)
+                try? FileManager.default.createSymbolicLink(at: outer, withDestinationURL: movedOuter)
+            }])
+            let hooks = probe.hooks(stagingDirectory: { _ in
+                try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+                return staging
+            })
+
+            let outcome = export(
+                "writer bytes",
+                to: fixture.destination,
+                disposition: .createNew,
+                probe: probe,
+                hooks: hooks
+            )
+
+            let result = try XCTUnwrap(requireIndeterminate(outcome), "\(step)")
+            let stagedName = try XCTUnwrap(probe.stagedURL?.lastPathComponent)
+            XCTAssertEqual(result.reason, .cleanupFailed, "\(step)")
+            XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL, "\(step)")
+            XCTAssertEqual(probe.calls(at: step).count, 1, "no retry: \(step)")
+            if step == .unlinkStaged {
+                XCTAssertEqual(result.destinationState, .provenUnchanged)
+                XCTAssertEqual(result.residue, try .retained(XCTUnwrap(probe.stagedURL), holding: .writerBytes))
+                XCTAssertEqual(try text(at: moved.appendingPathComponent(stagedName)), "writer bytes")
+                XCTAssertFalse(exists(fixture.destinationPath))
+            } else {
+                XCTAssertEqual(result.destinationState, .holdsWriterBytes)
+                XCTAssertEqual(result.residue, .none)
+                XCTAssertTrue(exists(moved.path(percentEncoded: false)), "not removed through the link")
+                XCTAssertEqual(try entries(in: moved), [])
+                XCTAssertEqual(try text(at: fixture.destination), "writer bytes")
+            }
+        }
+    }
+
+    /// Success requires the staged name proven absent after `RENAME_EXCL`; an occupant that
+    /// appears there is preserved and reported, never removed.
+    func testCommittedNewLeafRequiresTheStagedNameProvenAbsent() throws {
+        let fixture = try makeExportFixture()
+        let probeBox = ProbeBox()
+        let probe = ExportBoundaryProbe(races: [.postflight: {
+            guard let staged = probeBox.probe?.stagedPath else { return }
+            FileManager.default.createFile(atPath: staged, contents: Data("unrelated occupant".utf8))
+        }])
+        probeBox.probe = probe
+
+        let outcome = export("artifact", to: fixture.destination, disposition: .createNew, probe: probe)
+
+        let result = try XCTUnwrap(requireIndeterminate(outcome))
+        let staged = try XCTUnwrap(probe.stagedURL)
+        XCTAssertEqual(result.reason, .namespaceChanged)
+        XCTAssertEqual(result.destinationState, .unknown)
+        XCTAssertEqual(result.residue, .retained(staged, holding: .unknown))
+        XCTAssertEqual(result.stagingURL, staged)
+        XCTAssertEqual(result.itemReplacementDirectoryURL, probe.stagingDirectoryURL)
+        XCTAssertEqual(try text(at: fixture.destination), "artifact")
+        XCTAssertEqual(try text(at: staged), "unrelated occupant")
     }
 }
 
