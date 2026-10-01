@@ -103,7 +103,9 @@ extension ExportArtifactWriterTests {
     func testStagingInsideTheChosenFolderOutsideRuleBIsRefused() throws {
         let fixture = try makeExportFixture()
         let sandbox = try makeFakeSandbox(fixture)
-        let linkedRoot = fixture.base.appendingPathComponent("linked-root", isDirectory: true)
+        // The link lives inside the chosen folder, so the chosen folder is a proper ancestor of
+        // its spelling: only the root proof (a directory under `AT_SYMLINK_NOFOLLOW_ANY`) refuses.
+        let linkedRoot = sandbox.home.appendingPathComponent("linked-root", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: linkedRoot, withDestinationURL: sandbox.privateRoot)
         let other = sandbox.home.appendingPathComponent("Other", isDirectory: true)
         try FileManager.default.createDirectory(at: other, withIntermediateDirectories: false)
@@ -126,11 +128,16 @@ extension ExportArtifactWriterTests {
             root: root,
             "chosen inside the root"
         )
-        assertStagingRefusedInsideChosenFolder(
+        let linkedProbe = assertStagingRefusedInsideChosenFolder(
             chosen: sandbox.home,
             provider: sandbox.provider,
             root: linkedRoot,
             "root only reachable through a symlink"
+        )
+        XCTAssertEqual(
+            linkedProbe.calls(at: .canonicalizePrivateRoot).map(\.operation),
+            [.fstatat],
+            "the symlinked root fails its no-follow type check before any getattrlist"
         )
         assertStagingRefusedInsideChosenFolder(
             chosen: sandbox.home,
@@ -142,12 +149,13 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(try entries(in: other), [])
     }
 
+    @discardableResult
     private func assertStagingRefusedInsideChosenFolder(
         chosen: URL,
         provider: @escaping @Sendable (URL) throws -> URL,
         root: URL?,
         _ label: String
-    ) {
+    ) -> ExportBoundaryProbe {
         let probe = ExportBoundaryProbe()
         let destination = chosen.appendingPathComponent("export.html", isDirectory: false)
 
@@ -162,6 +170,70 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(outcome, .notCommitted(.stagingDirectoryInsideDestinationFolder), label)
         XCTAssertFalse(probe.createdStaging, label)
         XCTAssertFalse(exists(destination.path(percentEncoded: false)), label)
+        return probe
+    }
+
+    /// The root is proven before Foundation is asked for a directory. A root that does not exist
+    /// yet (here created by Foundation's `create: true` along with the staging directory) can
+    /// never admit staging under rule (b).
+    func testPrivateRootMustExistBeforeStagingBegins() throws {
+        let fixture = try makeExportFixture()
+        let home = fixture.base.appendingPathComponent("home", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: false)
+        let privateRoot = home.appendingPathComponent("Library/Containers/app.plainsong.editor/Data", isDirectory: true)
+        let staging = privateRoot.appendingPathComponent("tmp/TemporaryItems/NSIRD_Plainsong_late", isDirectory: true)
+        let probe = ExportBoundaryProbe()
+        let hooks = probe.hooks(stagingDirectory: { _ in
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            return staging
+        })
+
+        let outcome = export(
+            to: home.appendingPathComponent("export.html", isDirectory: false),
+            disposition: .createNew,
+            probe: probe,
+            hooks: hooks,
+            appPrivateRoot: privateRoot
+        )
+
+        XCTAssertEqual(outcome, .notCommitted(.stagingDirectoryInsideDestinationFolder))
+        let steps = probe.calls.map(\.step)
+        let rootProof = try XCTUnwrap(steps.firstIndex(of: .canonicalizePrivateRoot))
+        let staged = try XCTUnwrap(steps.firstIndex(of: .inspectStagingDirectory))
+        XCTAssertLessThan(rootProof, staged, "the root is proven before the staging directory exists")
+        XCTAssertFalse(probe.createdStaging)
+        XCTAssertFalse(exists(staging.path(percentEncoded: false)), "the writer removes its refused directory")
+        XCTAssertFalse(exists(home.appendingPathComponent("export.html").path(percentEncoded: false)))
+    }
+
+    /// The first identity observation of the returned directory fails with something other than
+    /// `ENOENT`: its absence is unproven, so the outcome reports its exact path and is never a
+    /// clean non-commit.
+    func testUnobservableReturnedDirectoryIsReportedNotCalledAbsent() throws {
+        let fixture = try makeExportFixture()
+        let staging = fixture.base.appendingPathComponent("staging", isDirectory: true)
+        let probe = ExportBoundaryProbe(failures: [.inspectStagingDirectory: EACCES])
+        let hooks = probe.hooks(stagingDirectory: { _ in
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+            return staging
+        })
+
+        let outcome = export(to: fixture.destination, disposition: .createNew, probe: probe, hooks: hooks)
+
+        let result = try XCTUnwrap(requireIndeterminate(outcome))
+        XCTAssertEqual(result.reason, .cleanupFailed)
+        XCTAssertEqual(result.destinationState, .provenUnchanged)
+        XCTAssertEqual(result.residue, .none)
+        XCTAssertNil(result.stagingURL)
+        XCTAssertEqual(
+            result.itemReplacementDirectoryURL?.path(percentEncoded: false),
+            staging.path(percentEncoded: false)
+        )
+        XCTAssertFalse(result.residueIsInPurgeableTemporaryFolder)
+        XCTAssertEqual(probe.calls(at: .inspectStagingDirectory).count, 1)
+        XCTAssertFalse(probe.calls.contains { $0.operation == .rmdir }, "nothing unobserved is removed")
+        XCTAssertTrue(exists(staging.path(percentEncoded: false)))
+        XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
     }
 
     /// Foundation's fallback directory beside the target is refused even with a private root;

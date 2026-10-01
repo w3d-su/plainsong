@@ -40,6 +40,9 @@ extension ExportArtifactWriterTests {
         XCTAssertFalse(exists(second.stagingDirectoryPath))
     }
 
+    /// Only proven absence is a clean non-commit: a provider error or a missing directory writes
+    /// nothing, while a returned path that is not a directory, or that cannot be observed, is
+    /// reported by exact path. In every case nothing is staged and nothing falls back.
     func testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback() throws {
         let fixture = try makeExportFixture()
         let notADirectory = fixture.base.appendingPathComponent("plain-file")
@@ -47,7 +50,6 @@ extension ExportArtifactWriterTests {
         let providers: [@Sendable (URL) throws -> URL] = [
             { _ in throw CocoaError(.fileWriteNoPermission) },
             { _ in fixture.base.appendingPathComponent("missing", isDirectory: true) },
-            { _ in notADirectory },
         ]
         for provider in providers {
             let probe = ExportBoundaryProbe()
@@ -63,6 +65,24 @@ extension ExportArtifactWriterTests {
             XCTAssertFalse(probe.createdStaging)
             XCTAssertTrue(probe.calls(at: .publish).isEmpty)
         }
+        let probe = ExportBoundaryProbe()
+        let result = try XCTUnwrap(requireIndeterminate(export(
+            to: fixture.destination,
+            disposition: .createNew,
+            probe: probe,
+            hooks: probe.hooks(stagingDirectory: { _ in notADirectory })
+        )))
+        XCTAssertEqual(result.reason, .cleanupFailed)
+        XCTAssertEqual(result.destinationState, .provenUnchanged)
+        XCTAssertEqual(result.residue, .none)
+        XCTAssertNil(result.stagingURL)
+        XCTAssertEqual(
+            result.itemReplacementDirectoryURL
+                .map { WorkspaceRootContainment.normalizedDirectoryPath($0.path(percentEncoded: false)) },
+            notADirectory.path(percentEncoded: false)
+        )
+        XCTAssertFalse(probe.createdStaging)
+        XCTAssertEqual(try text(at: notADirectory), "file", "a non-directory is never removed")
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
         XCTAssertEqual(try entries(in: fixture.base), ["plain-file", "selected"])
     }

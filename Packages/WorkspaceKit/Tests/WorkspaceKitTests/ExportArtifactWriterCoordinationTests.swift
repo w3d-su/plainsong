@@ -11,32 +11,19 @@ final class CoordinatorBox: @unchecked Sendable {
     let release = DispatchSemaphore(value: 0)
 }
 
-/// Q1's real `NSFileCoordinator` branches, driven by a second, real coordinated writer that
-/// holds the leaf while the export waits. Nothing about the coordinator is mocked; the only
+/// Q1's real `NSFileCoordinator` branches. Nothing about the coordinator is mocked; the only
 /// seam supplies the export's own coordinator instance so that it can be cancelled.
 extension ExportArtifactWriterTests {
-    /// The export's coordinator is cancelled while it waits behind another writer: the real
-    /// coordinator returns `NSUserCancelledError` without running the accessor, so nothing is
-    /// published and staging is cleaned up.
+    /// The export's coordinator is already cancelled: the real coordinator returns
+    /// `NSUserCancelledError` without running the accessor (observed on macOS 27.0), so nothing is
+    /// published and staging is cleaned up. Deterministic, with no competing writer or timing.
     func testCancelledCoordinationPublishesNothing() throws {
         let fixture = try makeExportFixture(originalText: "original")
         let approved = try XCTUnwrap(fixture.originalIdentity)
         let destination = fixture.destination
         let box = CoordinatorBox()
-        let probe = ExportBoundaryProbe(races: [.coordinate: {
-            Thread.detachNewThread {
-                var error: NSError?
-                box.other.coordinate(writingItemAt: destination, options: .forReplacing, error: &error) { _ in
-                    box.held.signal()
-                    box.release.wait()
-                }
-            }
-            box.held.wait()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
-                box.writer.cancel()
-                box.release.signal()
-            }
-        }])
+        box.writer.cancel()
+        let probe = ExportBoundaryProbe()
         let hooks = probe.hooks(isUbiquitous: { _ in true }, fileCoordinator: { box.writer })
 
         let outcome = export(
@@ -82,7 +69,12 @@ extension ExportArtifactWriterTests {
                 }
             }
             box.held.wait()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { box.release.signal() }
+            // There is no observable "the export is now waiting" signal: a file presenter is
+            // messaged for the waiting writer only after the holder releases (measured), so the
+            // mover releases after a margin. Released too early, the move lands before the export
+            // coordinates and the re-proof (not the accessor URL) refuses; the assertions below
+            // would then fail visibly rather than pass vacuously.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { box.release.signal() }
         }])
         let hooks = probe.hooks(isUbiquitous: { _ in true })
 

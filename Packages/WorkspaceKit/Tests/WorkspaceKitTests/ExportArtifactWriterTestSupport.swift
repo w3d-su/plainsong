@@ -33,6 +33,11 @@ final class ExportBoundaryProbe: @unchecked Sendable {
     private let failures: [Step: Int32]
     private var races: [Step: @Sendable () -> Void]
     private let watchedDirectory: String?
+    /// Failures that become active only once `armingStep` is reached, for example to fail a
+    /// boundary at the pre-publication re-proof but not at preflight.
+    private let armedFailures: [Step: Int32]
+    private let armingStep: Step?
+    private var isArmed = false
     private var storedCalls: [ExportArtifactWriterCall] = []
     private var storedSnapshots: [[String]] = []
     private var storedDescriptorCounts: [Int] = []
@@ -40,11 +45,15 @@ final class ExportBoundaryProbe: @unchecked Sendable {
     init(
         failures: [Step: Int32] = [:],
         races: [Step: @Sendable () -> Void] = [:],
-        watchedDirectory: String? = nil
+        watchedDirectory: String? = nil,
+        armedFailures: [Step: Int32] = [:],
+        armingStep: Step? = nil
     ) {
         self.failures = failures
         self.races = races
         self.watchedDirectory = watchedDirectory
+        self.armedFailures = armedFailures
+        self.armingStep = armingStep
     }
 
     var calls: [ExportArtifactWriterCall] {
@@ -103,11 +112,16 @@ final class ExportBoundaryProbe: @unchecked Sendable {
             },
             beforeStep: { [self] step in
                 sample()
-                let race = lock.withLock { races.removeValue(forKey: step) }
+                let race = lock.withLock { () -> (@Sendable () -> Void)? in
+                    if step == armingStep {
+                        isArmed = true
+                    }
+                    return races.removeValue(forKey: step)
+                }
                 race?()
             },
             injectedFailure: { [self] step in
-                lock.withLock { failures[step] }
+                lock.withLock { failures[step] ?? (isArmed ? armedFailures[step] : nil) }
             },
             afterPreflight: afterPreflight,
             afterPublication: afterPublication

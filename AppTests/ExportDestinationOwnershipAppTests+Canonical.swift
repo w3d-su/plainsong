@@ -48,14 +48,25 @@ extension ExportDestinationOwnershipAppTests {
     }
 
     func testExportAppPrivateRootIsTheSandboxContainerOnlyWhenSandboxed() {
-        let home = "/Users/example/Library/Containers/app.plainsong.editor/Data"
+        let identifier = "app.plainsong.editor"
+        let home = "/Users/example/Library/Containers/\(identifier)/Data"
+        let sandboxed = ["APP_SANDBOX_CONTAINER_ID": identifier]
         XCTAssertNil(AppState.exportAppPrivateRoot(environment: [:], homeDirectory: home))
         XCTAssertEqual(
-            AppState.exportAppPrivateRoot(
-                environment: ["APP_SANDBOX_CONTAINER_ID": "app.plainsong.editor"],
-                homeDirectory: home
-            )?.path(percentEncoded: false),
+            AppState.exportAppPrivateRoot(environment: sandboxed, homeDirectory: home)?.path(percentEncoded: false),
             home + "/"
         )
+        for unexpected in [
+            "/Users/example",
+            "/Users/example/Library/Containers/other.app/Data",
+            "/Users/example/Library/Containers/\(identifier)",
+            "Library/Containers/\(identifier)/Data",
+        ] {
+            XCTAssertNil(
+                AppState.exportAppPrivateRoot(environment: sandboxed, homeDirectory: unexpected),
+                unexpected
+            )
+        }
+        XCTAssertNil(AppState.exportAppPrivateRoot(environment: ["APP_SANDBOX_CONTAINER_ID": ""], homeDirectory: home))
     }
 }

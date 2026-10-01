@@ -24,9 +24,12 @@ struct ExportArtifactStagedFile {
 
 /// Staging could not be established. `removableDirectory` is an item-replacement directory the
 /// writer must still remove (only while empty and identity-matched) or report by exact path.
+/// `reportedURL` is a returned path whose absence could not be proven and that the writer may not
+/// remove: it is always reported, never called a clean non-commit.
 struct ExportArtifactStagingRefusal: Error {
     let failure: ExportArtifactFailure
     let removableDirectory: ExportArtifactStagingDirectory?
+    let reportedURL: URL?
 }
 
 /// What a failed staged-file preparation left behind.

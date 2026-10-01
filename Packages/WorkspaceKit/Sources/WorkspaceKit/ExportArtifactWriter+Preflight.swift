@@ -119,7 +119,7 @@ extension ExportArtifactWriter {
             case let .failure(failure):
                 return switch failure.code {
                 case ENOENT:
-                    proveCanonicalParentSpelling(selection, hooks: hooks).map {
+                    proveCanonicalParentSpelling(selection, parentIdentity: parentIdentity, hooks: hooks).map {
                         ExportArtifactLeafProof(state: .missing, parentIdentity: parentIdentity, leafStatus: nil)
                     }
                 case ELOOP: .failure(.symbolicLinkInParentPath)
@@ -164,19 +164,25 @@ extension ExportArtifactWriter {
         }
     }
 
-    /// A new leaf has no `F_GETPATH`, so the parent's kernel spelling comes from
-    /// `getattrlist(ATTR_CMN_FULLPATH, FSOPT_NOFOLLOW_ANY)`, a metadata read that never opens the
-    /// chosen folder. It must equal the selected parent spelling byte for byte: a firmlink
-    /// (`/System/Volumes/Data/…`), case, or normalization spelling of an existing folder fails
-    /// closed, so the ownership inventory only ever compares canonical full paths.
+    /// A new leaf has no `F_GETPATH`, so the parent's kernel spelling comes from one
+    /// `getattrlist(ATTR_CMN_FULLPATH | DEVID | FILEID | OBJTYPE, FSOPT_NOFOLLOW_ANY)` observation,
+    /// a metadata read that never opens the chosen folder. That same observation must be a
+    /// directory with the identity the earlier `fstatat` proved, so a symlink swapped in between
+    /// the two calls (which `FSOPT_NOFOLLOW_ANY` reports as itself) cannot pass. Its spelling must
+    /// equal the selected parent spelling byte for byte: a firmlink (`/System/Volumes/Data/…`),
+    /// case, or normalization spelling of an existing folder fails closed, so the ownership
+    /// inventory only ever compares canonical full paths.
     private static func proveCanonicalParentSpelling(
         _ selection: ExportArtifactSelection,
+        parentIdentity: WorkspaceFileSystemIdentity,
         hooks: ExportArtifactWriterHooks
     ) -> Result<Void, ExportArtifactFailure> {
-        switch hooks.fullPath(selection.parentPath, step: .inspectParent, options: FSOPT_NOFOLLOW_ANY) {
+        switch hooks.pathAttributes(selection.parentPath, step: .canonicalizeParent, options: FSOPT_NOFOLLOW_ANY) {
         case let .failure(failure):
             .failure(failure.code == ELOOP ? .symbolicLinkInParentPath : .parentAuthorityUnavailable)
-        case let .success(kernelPath) where kernelPath.elementsEqual(selection.parentPath.utf8):
+        case let .success(attributes) where !attributes.isDirectory || attributes.identity != parentIdentity:
+            .failure(.namespaceChanged)
+        case let .success(attributes) where attributes.path.elementsEqual(selection.parentPath.utf8):
             .success(())
         case .success:
             .failure(.destinationAlias)

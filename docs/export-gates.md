@@ -344,9 +344,15 @@ in the chosen folder, other than publishing the leaf itself:
        - it is neither the chosen folder nor a direct child of it.
 
      Everything else stays refused, including:
-     - a chosen folder equal to or inside the app-private root;
+     - staging inside a chosen folder that is equal to or inside the app-private root (a
+       chosen folder there is fine when the staging directory lies outside it, under rule (a));
      - a direct child of the chosen folder;
      - a directory inside the chosen folder but outside the root.
+
+     The root must already exist before staging begins: it is proven to be a directory with no
+     symlink anywhere (`AT_SYMLINK_NOFOLLOW_ANY`, final component included) before Foundation is
+     asked for a directory, so Foundation's `create: true` cannot have created it. If it cannot be
+     proven, only rule (a) applies.
 
      Spellings are compared canonically:
      - the staging directory and the root via `getattrlist(ATTR_CMN_FULLPATH)`;
@@ -895,8 +901,15 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback`,
   `testStagingInsideTheAppPrivateRootIsAcceptedWhenTheChosenFolderIsItsAncestor` (a fake
   home and container layout). Open until PR F's owner smoke records a real save-panel grant,
-  including **an export to the home-folder root (`~/x.html`) under the real sandbox**, which
-  exercises containment rule (b).
+  covering these cases under the real sandbox (record each outcome):
+  - **The home-folder root (`~/x.html`)**, which exercises containment rule (b).
+  - **An accented folder created with Terminal (`mkdir café`)**: export a new file into it, and
+    an overwrite. Foundation can rebuild path-string URLs in NFD, so an NFC on-disk name may be
+    falsely refused as `destinationAlias` by the byte-exact rule. The record decides whether
+    NFC/NFD adoption is relaxed; that is an owner decision, not part of PR E2.
+  - **An external volume's root**: unsandboxed, Foundation may create
+    `.TemporaryItems/folders.<uid>/` at the volume root before the writer refuses. Record
+    whether that happens under the sandbox.
 - [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
@@ -972,11 +985,14 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`,
     `testLeafInspectionComesFromLeafPathMetadata`,
     `testUbiquitousDestinationPublishesInsideFileCoordination` (Q1, injectable ubiquity; a
-    coordination failure publishes nothing). Q1's real `NSFileCoordinator` branches, driven
-    by a second real coordinated writer and not mocked:
-    `testCancelledCoordinationPublishesNothing` (the coordination error branch, via a
-    cancelled coordinator) and `testCoordinatedMoveWhileWaitingIsRefusedByTheAccessorURL` (a
-    byte-exact accessor-URL mismatch).
+    coordination failure publishes nothing). Q1's real `NSFileCoordinator` branches, not
+    mocked:
+    - `testCancelledCoordinationPublishesNothing`: the coordination error branch, via a
+      cancelled coordinator; deterministic.
+    - `testCoordinatedMoveWhileWaitingIsRefusedByTheAccessorURL`: a byte-exact accessor-URL
+      mismatch from a second real coordinated writer that moves the leaf. It releases that
+      writer after a timed margin, because no signal is observable that shows the export is
+      waiting.
   - Refusal matrix: `testSymbolicLinkLeafIsRefusedForBothDispositions`,
     `testSymbolicLinkPathComponentIsRefused` (final and intermediate component),
     `testSymlinkedComponentAtThePublishBoundaryIsRefusedByRenameNoFollowAny` (the kernel
@@ -987,6 +1003,8 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testCaseAndNormalizationAliasOfExistingLeafIsRefused`,
     `testFirmlinkCaseOrNormalizationSpellingOfTheParentIsRefused` (a new leaf's parent,
     proven by `getattrlist` without an open),
+    `testSymlinkSwappedInBeforeTheParentSpellingObservationIsRefused` (spelling, identity, and
+    type come from one observation), `testPathAttributeReplyParsingIsStrict`,
     `testMissingOrUnsearchableParentFailsBeforeAnyWrite`,
     `testUnsupportedVolumeCapabilitiesFailClosedBeforeStaging` (keys read from the parent URL
     for a new leaf, the leaf for an overwrite), `testRealVolumeKeysReportBothRenameSemanticsOnTheTestVolume`,
@@ -998,6 +1016,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     the private root, a root reachable only through a symlink, a directory outside the root),
     `testDirectChildAndTheChosenFolderItselfAreRefusedWithoutOpeningIt`,
     `testNilPrivateRootKeepsRefusingStagingInsideTheChosenFolder`,
+    `testPrivateRootMustExistBeforeStagingBegins` (proven before Foundation is asked),
     `testIdentityAndTypeRacesBeforePublicationFailClosedWithoutTouchingRacer`
     (including a replaced parent directory),
     `testRaceAtTheFinalPublishBoundaryNeverOverwritesTheRacerOrClaimsSuccess`,
@@ -1017,7 +1036,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
     `testCommittedNewLeafRequiresTheStagedNameProvenAbsent`,
     `testRemovalNeverFollowsASymlinkedStagingComponent` (the staged unlink and the `rmdir`),
     `testStagingDirectoryThatCannotBeCanonicalizedIsRemovedOrReported`,
-    `testRefusedStagingDirectoryThatCannotBeRemovedIsReportedExactly`.
+    `testRefusedStagingDirectoryThatCannotBeRemovedIsReportedExactly`,
+    `testUnobservableReturnedDirectoryIsReportedNotCalledAbsent`,
+    `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback` (only proven absence is
+    a clean non-commit), `testParentSpellingObservationFailureAtPreflightWritesNothing`,
+    `testParentSpellingObservationFailureAtTheReproofPublishesNothing`,
+    `testPrivateRootObservationFailureLeavesOnlyRuleA`.
   - Namespace and lifetime: `testNoEntryOtherThanTheLeafIsEverCreatedInTheChosenFolder`
     (directory snapshots at every boundary; exactly one staged file, outside the chosen
     folder), `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder`,

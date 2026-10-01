@@ -15,6 +15,8 @@ enum ExportArtifactWriterStep: Hashable, Sendable {
     case inspectStagingDirectory
     /// `getattrlist(ATTR_CMN_FULLPATH)` of the returned item-replacement directory.
     case canonicalizeStagingDirectory
+    /// The combined `getattrlist` observation of a new leaf's parent (spelling, identity, type).
+    case canonicalizeParent
     /// `getattrlist(ATTR_CMN_FULLPATH)` of the injected app-private root.
     case canonicalizePrivateRoot
     case createStaged
@@ -61,6 +63,57 @@ struct ExportArtifactWriterCall: Equatable, Sendable {
 
 struct ExportArtifactSyscallFailure: Error, Equatable {
     let code: Int32
+}
+
+/// A validated `getattrlist` reply for `ATTR_CMN_DEVID | ATTR_CMN_OBJTYPE | ATTR_CMN_FILEID |
+/// ATTR_CMN_FULLPATH`, the same validation `descriptorReportedPath` applies to a path reply.
+struct ExportArtifactPathAttributes: Equatable {
+    /// The kernel spelling, without its terminating NUL.
+    let path: [UInt8]
+    let identity: WorkspaceFileSystemIdentity
+    let isDirectory: Bool
+
+    /// Attributes come back in bit order after the returned-length word: `dev_t` device,
+    /// `fsobj_type_t` type, `u_int64_t` file ID, then the path's `attrreference_t`, whose data
+    /// offset is relative to the reference itself. Loads are unaligned; every offset and length is
+    /// checked against the returned length, and the path must start with `/` and end with its
+    /// only NUL.
+    static func parse(_ reply: UnsafeRawBufferPointer) -> ExportArtifactPathAttributes? {
+        let deviceOffset = MemoryLayout<UInt32>.size
+        let typeOffset = deviceOffset + MemoryLayout<dev_t>.size
+        let fileIDOffset = typeOffset + MemoryLayout<fsobj_type_t>.size
+        let referenceOffset = fileIDOffset + MemoryLayout<UInt64>.size
+        let headerSize = referenceOffset + MemoryLayout<attrreference_t>.size
+        guard reply.count >= headerSize else { return nil }
+        let returnedLength = Int(reply.loadUnaligned(fromByteOffset: 0, as: UInt32.self))
+        guard returnedLength >= headerSize, returnedLength <= reply.count else { return nil }
+        let device = reply.loadUnaligned(fromByteOffset: deviceOffset, as: dev_t.self)
+        let type = reply.loadUnaligned(fromByteOffset: typeOffset, as: fsobj_type_t.self)
+        let fileID = reply.loadUnaligned(fromByteOffset: fileIDOffset, as: UInt64.self)
+        let dataOffset = Int(reply.loadUnaligned(fromByteOffset: referenceOffset, as: Int32.self))
+        let dataLength = Int(reply.loadUnaligned(
+            fromByteOffset: referenceOffset + MemoryLayout<Int32>.size,
+            as: UInt32.self
+        ))
+        let start = referenceOffset + dataOffset
+        guard device >= 0,
+              dataLength > 1,
+              start >= headerSize,
+              start <= returnedLength,
+              dataLength <= returnedLength - start
+        else {
+            return nil
+        }
+        let bytes = reply[start ..< start + dataLength]
+        guard bytes.first == UInt8(ascii: "/"), bytes.last == 0, !bytes.dropLast().contains(0) else {
+            return nil
+        }
+        return ExportArtifactPathAttributes(
+            path: Array(bytes.dropLast()),
+            identity: WorkspaceFileSystemIdentity(device: UInt64(device), inode: fileID),
+            isDirectory: type == fsobj_type_t(VDIR.rawValue)
+        )
+    }
 }
 
 /// Test seams. Production uses Foundation's item-replacement directory, the real volume keys and
@@ -138,32 +191,28 @@ struct ExportArtifactWriterHooks: Sendable {
         }.map { _ in status }
     }
 
-    /// The kernel's canonical spelling of an existing entry from `getattrlist(ATTR_CMN_FULLPATH)`.
-    /// This is a metadata read: it never opens the entry, so it works on a directory the
-    /// process may search but not read (a leaf-only grant's parent).
-    func fullPath(
+    /// One `getattrlist` observation of an existing entry: its kernel-canonical spelling
+    /// (`ATTR_CMN_FULLPATH`) together with its identity (`ATTR_CMN_DEVID`, `ATTR_CMN_FILEID`) and
+    /// type (`ATTR_CMN_OBJTYPE`), so the spelling can never belong to a different object than the
+    /// identity checked beside it. This is a metadata read: it never opens the entry, so it works
+    /// on a directory the process may search but not read (a leaf-only grant's parent).
+    func pathAttributes(
         _ path: String,
         step: ExportArtifactWriterStep,
         options: Int32
-    ) -> Result<[UInt8], ExportArtifactSyscallFailure> {
+    ) -> Result<ExportArtifactPathAttributes, ExportArtifactSyscallFailure> {
         var request = attrlist()
         request.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
-        request.commonattr = attrgroup_t(ATTR_CMN_FULLPATH)
-        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) + 16)
+        request.commonattr = attrgroup_t(ATTR_CMN_DEVID) | attrgroup_t(ATTR_CMN_OBJTYPE)
+            | attrgroup_t(ATTR_CMN_FILEID) | attrgroup_t(ATTR_CMN_FULLPATH)
+        var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN) + 64)
         return perform(step, .fullPath, path: path) {
             buffer.withUnsafeMutableBytes { raw in
                 path.withCString { Darwin.getattrlist($0, &request, raw.baseAddress, raw.count, UInt32(options)) }
             }
         }.flatMap { _ in
-            buffer.withUnsafeBytes { raw -> Result<[UInt8], ExportArtifactSyscallFailure> in
-                let reference = raw.load(fromByteOffset: MemoryLayout<UInt32>.size, as: attrreference_t.self)
-                let start = MemoryLayout<UInt32>.size + Int(reference.attr_dataoffset)
-                let end = start + Int(reference.attr_length)
-                guard reference.attr_length > 0, start >= 0, end <= raw.count else {
-                    return .failure(ExportArtifactSyscallFailure(code: EIO))
-                }
-                return .success(Array(raw[start ..< end].prefix { $0 != 0 }))
-            }
+            buffer.withUnsafeBytes(ExportArtifactPathAttributes.parse)
+                .map { .success($0) } ?? .failure(ExportArtifactSyscallFailure(code: EIO))
         }
     }
 

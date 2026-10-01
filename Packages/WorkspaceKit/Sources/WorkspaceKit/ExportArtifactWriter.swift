@@ -59,15 +59,18 @@ public enum ExportArtifactOwnershipDecision: Sendable, Equatable {
 /// - `state` comes from `fstatat(AT_FDCWD, leaf, …, AT_SYMLINK_NOFOLLOW_ANY)`, so no path
 ///   component may be a symbolic link;
 /// - an existing leaf is opened no-follow and its `fcntl(F_GETPATH)` spelling must equal the
-///   selected spelling byte for byte; for a new leaf the parent's
-///   `getattrlist(ATTR_CMN_FULLPATH)` spelling must equal the selected parent spelling. A
-///   firmlink, case, or normalization alias therefore never inspects;
+///   selected spelling byte for byte, so its whole path is proven canonical. A new leaf does not
+///   exist yet, so only its parent is proven: one `getattrlist` observation must report the
+///   parent's identity, a directory, and the selected parent spelling byte for byte. The new
+///   leaf's own name is the literal selected name. A firmlink, case, or normalization alias of
+///   an existing leaf or of the parent therefore never inspects;
 /// - `parentIdentity` is the parent path's no-follow `fstatat` identity (metadata only);
 /// - `volumeIsCaseSensitive` is the parent URL's `volumeSupportsCaseSensitiveNames`.
 public struct ExportArtifactLeafInspection: Sendable, Equatable {
     public let state: WorkspaceNoFollowFileTargetState
-    /// The selected leaf spelling, proven equal to the kernel's canonical spelling, as a literal
-    /// file URL (no Foundation normalization).
+    /// The selected leaf spelling as a literal file URL (no Foundation normalization). It is
+    /// proven equal to the kernel's spelling in full for an existing leaf, and up to the parent
+    /// for a new leaf, whose name is the literal selected name.
     public let canonicalLeafURL: URL
     public let parentIdentity: WorkspaceFileSystemIdentity
     public let volumeIsCaseSensitive: Bool

@@ -121,15 +121,18 @@ extension ExportArtifactWriter {
     }
 
     /// A refused staging directory is removed (only while empty and identity-matched) or
-    /// reported by exact path.
+    /// reported by exact path; a returned path whose absence was never proven is always reported.
     private static func refusalOutcome(
         _ refusal: ExportArtifactStagingRefusal,
         selection: ExportArtifactSelection,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
-        guard let removable = refusal.removableDirectory,
-              !removeStagingDirectory(removable, hooks: hooks)
-        else {
+        let unprovenURL: URL
+        if let reportedURL = refusal.reportedURL {
+            unprovenURL = reportedURL
+        } else if let removable = refusal.removableDirectory, !removeStagingDirectory(removable, hooks: hooks) {
+            unprovenURL = removable.url
+        } else {
             return .notCommitted(refusal.failure)
         }
         return .indeterminate(ExportArtifactIndeterminateWrite(
@@ -138,7 +141,7 @@ extension ExportArtifactWriter {
             destinationState: .provenUnchanged,
             residue: .none,
             stagingURL: nil,
-            itemReplacementDirectoryURL: removable.url,
+            itemReplacementDirectoryURL: unprovenURL,
             residueIsInPurgeableTemporaryFolder: false
         ))
     }

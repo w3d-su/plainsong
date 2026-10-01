@@ -20,68 +20,87 @@ extension ExportArtifactWriter {
         appPrivateRoot: URL?,
         hooks: ExportArtifactWriterHooks
     ) -> Result<ExportArtifactStagingDirectory, ExportArtifactStagingRefusal> {
-        func refuse(
-            _ failure: ExportArtifactFailure,
-            removing directory: ExportArtifactStagingDirectory? = nil
-        ) -> Result<ExportArtifactStagingDirectory, ExportArtifactStagingRefusal> {
-            .failure(ExportArtifactStagingRefusal(failure: failure, removableDirectory: directory))
-        }
+        // The app-private root is proven before Foundation is asked for a directory, so its
+        // `create: true` cannot have created the root or any of its parents.
+        let privateRoot = provenPrivateRoot(appPrivateRoot, hooks: hooks)
         guard let returnedURL = try? hooks.stagingDirectory(for: selection.destinationURL),
               let literalPath = try? WorkspaceLiteralFileURL.absolutePath(of: returnedURL)
         else {
-            return refuse(.stagingDirectoryUnavailable)
+            return .refused(.stagingDirectoryUnavailable)
         }
-        let returnedPath = WorkspaceRootContainment.normalizedDirectoryPath(literalPath)
-        let parentIdentity = preflight.proof.parentIdentity
-        // Identity first, by metadata alone, before anything else touches the returned directory.
-        // Foundation's spelling may cross a symlink (`/var`), so only its last component is
-        // not followed here.
-        guard case let .success(status) = hooks.noFollowStatus(
-            returnedPath,
-            step: .inspectStagingDirectory,
-            flags: AT_SYMLINK_NOFOLLOW
-        ), status.exportFileType == S_IFDIR else {
-            // Absent, or not a directory: nothing here that the writer may remove.
-            return refuse(.stagingDirectoryUnavailable)
+        let returned: ExportArtifactStagingDirectory
+        switch observeReturnedDirectory(
+            WorkspaceRootContainment.normalizedDirectoryPath(literalPath),
+            parentIdentity: preflight.proof.parentIdentity,
+            hooks: hooks
+        ) {
+        case let .success(value): returned = value
+        case let .failure(refusal): return .failure(refusal)
         }
-        let identity = WorkspaceFileSystemIdentity(exportStatus: status)
-        guard identity != parentIdentity else {
-            // Never remove the user's chosen folder.
-            return refuse(.stagingDirectoryInsideDestinationFolder)
-        }
-        let returned = ExportArtifactStagingDirectory(path: returnedPath, identity: identity)
         guard let directory = canonicalStagingDirectory(returned, hooks: hooks) else {
             // Foundation created it: remove it (identity-checked) or report its exact path.
-            return refuse(.stagingDirectoryUnavailable, removing: returned)
+            return .refused(.stagingDirectoryUnavailable, removing: returned)
         }
         if let failure = containmentFailure(
             directory,
             selection: selection,
             preflight: preflight,
-            appPrivateRoot: appPrivateRoot,
+            privateRoot: privateRoot,
             hooks: hooks
         ) {
-            return refuse(failure, removing: directory)
+            return .refused(failure, removing: directory)
         }
-        let destinationDevice = preflight.proof.leafStatus.map { UInt64($0.st_dev) } ?? parentIdentity.device
+        let destinationDevice = preflight.proof.leafStatus.map { UInt64($0.st_dev) }
+            ?? preflight.proof.parentIdentity.device
         guard directory.identity.device == destinationDevice else {
-            return refuse(.stagingDirectoryOnDifferentDevice, removing: directory)
+            return .refused(.stagingDirectoryOnDifferentDevice, removing: directory)
         }
         return .success(directory)
     }
 
-    /// The kernel's spelling from `getattrlist(ATTR_CMN_FULLPATH)` (never an open), which must
-    /// name the same directory under `AT_SYMLINK_NOFOLLOW_ANY`, so every later staged-path call
-    /// may refuse symlinks.
+    /// Identity first, by metadata alone, before anything else touches the returned directory.
+    /// Foundation's spelling may cross a symlink (`/var`), so only its last component is not
+    /// followed here. Only proven absence (`ENOENT`) is a clean refusal; an unobservable path or
+    /// a non-directory is reported by exact path, and the chosen folder itself is never removed.
+    private static func observeReturnedDirectory(
+        _ returnedPath: String,
+        parentIdentity: WorkspaceFileSystemIdentity,
+        hooks: ExportArtifactWriterHooks
+    ) -> Result<ExportArtifactStagingDirectory, ExportArtifactStagingRefusal> {
+        let returnedURL = WorkspaceLiteralFileURL.fileURL(path: returnedPath, isDirectory: true)
+        switch hooks.noFollowStatus(returnedPath, step: .inspectStagingDirectory, flags: AT_SYMLINK_NOFOLLOW) {
+        case let .failure(failure) where failure.code == ENOENT:
+            return .refused(.stagingDirectoryUnavailable)
+        case .failure:
+            return .refused(.stagingDirectoryUnavailable, reporting: returnedURL)
+        case let .success(status) where status.exportFileType != S_IFDIR:
+            return .refused(.stagingDirectoryUnavailable, reporting: returnedURL)
+        case let .success(status) where WorkspaceFileSystemIdentity(exportStatus: status) == parentIdentity:
+            return .refused(.stagingDirectoryInsideDestinationFolder)
+        case let .success(status):
+            return .success(ExportArtifactStagingDirectory(
+                path: returnedPath,
+                identity: WorkspaceFileSystemIdentity(exportStatus: status)
+            ))
+        }
+    }
+
+    /// The kernel's spelling from one `getattrlist` observation (never an open) that must report
+    /// the same directory identity; that spelling must then name the same directory under
+    /// `AT_SYMLINK_NOFOLLOW_ANY`, so every later staged-path call may refuse symlinks.
     private static func canonicalStagingDirectory(
         _ returned: ExportArtifactStagingDirectory,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactStagingDirectory? {
-        guard case let .success(bytes) = hooks.fullPath(
+        guard case let .success(attributes) = hooks.pathAttributes(
             returned.path,
             step: .canonicalizeStagingDirectory,
             options: FSOPT_NOFOLLOW
-        ), let spelling = String(bytes: bytes, encoding: .utf8), spelling.hasPrefix("/") else {
+        ),
+            attributes.isDirectory,
+            attributes.identity == returned.identity,
+            let spelling = String(bytes: attributes.path, encoding: .utf8)
+        else {
             return nil
         }
         let canonicalPath = WorkspaceRootContainment.normalizedDirectoryPath(spelling)
@@ -96,14 +115,14 @@ extension ExportArtifactWriter {
 
     /// A direct child of the chosen folder (Foundation's "(A Document Being Saved By …)"
     /// fallback) is always refused. A directory elsewhere under the chosen folder is accepted
-    /// only below pre-existing app-private directories, so the chosen folder never gains a new
-    /// visible entry. Every spelling compared here is canonical: the parent path is proven
-    /// canonical by the leaf proof.
+    /// only below the app-private root, which was proven to exist before staging began, so the
+    /// chosen folder never gains a new visible entry. Every spelling compared here is canonical:
+    /// the parent path by the leaf proof, the staging directory and the root by `getattrlist`.
     private static func containmentFailure(
         _ directory: ExportArtifactStagingDirectory,
         selection: ExportArtifactSelection,
         preflight: ExportArtifactPreflight,
-        appPrivateRoot: URL?,
+        privateRoot: String?,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactFailure? {
         switch hooks.noFollowStatus("\(directory.path)/..", step: .inspectStagingDirectory) {
@@ -122,7 +141,7 @@ extension ExportArtifactWriter {
         ) else {
             return nil
         }
-        guard let root = canonicalPrivateRoot(appPrivateRoot, hooks: hooks),
+        guard let root = privateRoot,
               pathLiesStrictly(directory.path, inside: root),
               pathLiesStrictly(root, inside: selection.parentPath)
         else {
@@ -131,21 +150,30 @@ extension ExportArtifactWriter {
         return nil
     }
 
-    /// The app-private root's kernel spelling (`getattrlist(ATTR_CMN_FULLPATH)` with
-    /// `FSOPT_NOFOLLOW_ANY`). Any failure leaves only rule (a).
-    private static func canonicalPrivateRoot(
+    /// The app-private root's canonical spelling, proven before any staging directory exists.
+    /// The root must already be a directory reached with no symlink anywhere, the final
+    /// component included (`AT_SYMLINK_NOFOLLOW_ANY`; `FSOPT_NOFOLLOW_ANY` alone reports a
+    /// final-component symlink as itself), and one `getattrlist` observation must report that
+    /// same directory identity with its kernel spelling. If the root is missing, is not a
+    /// directory, or cannot be proven, there is no root and only rule (a) applies.
+    private static func provenPrivateRoot(
         _ root: URL?,
         hooks: ExportArtifactWriterHooks
     ) -> String? {
-        guard let root,
-              let literalPath = try? WorkspaceLiteralFileURL.absolutePath(of: root),
-              case let .success(bytes) = hooks.fullPath(
-                  WorkspaceRootContainment.normalizedDirectoryPath(literalPath),
+        guard let root, let literalPath = try? WorkspaceLiteralFileURL.absolutePath(of: root) else {
+            return nil
+        }
+        let rootPath = WorkspaceRootContainment.normalizedDirectoryPath(literalPath)
+        guard case let .success(status) = hooks.noFollowStatus(rootPath, step: .canonicalizePrivateRoot),
+              status.exportFileType == S_IFDIR,
+              case let .success(attributes) = hooks.pathAttributes(
+                  rootPath,
                   step: .canonicalizePrivateRoot,
                   options: FSOPT_NOFOLLOW_ANY
               ),
-              let spelling = String(bytes: bytes, encoding: .utf8),
-              spelling.hasPrefix("/")
+              attributes.isDirectory,
+              attributes.identity == WorkspaceFileSystemIdentity(exportStatus: status),
+              let spelling = String(bytes: attributes.path, encoding: .utf8)
         else {
             return nil
         }
@@ -205,5 +233,19 @@ extension ExportArtifactWriter {
             return failure.code == ENOENT
         }
         return false
+    }
+}
+
+extension Result where Success == ExportArtifactStagingDirectory, Failure == ExportArtifactStagingRefusal {
+    static func refused(
+        _ failure: ExportArtifactFailure,
+        removing directory: ExportArtifactStagingDirectory? = nil,
+        reporting reportedURL: URL? = nil
+    ) -> Self {
+        .failure(ExportArtifactStagingRefusal(
+            failure: failure,
+            removableDirectory: directory,
+            reportedURL: reportedURL
+        ))
     }
 }
