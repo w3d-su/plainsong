@@ -50,19 +50,27 @@
 > `EditorFindController.swift` is 588 lines with a 287-line class body and should
 > be split without widening its private state.
 > **PR F (`phase3-editor-replace-wysiwyg`) implements Experimental WYSIWYG
-> single Replace:** it closes R5 bullets 1–4 and 6. The first explicit action
-> navigates to the raw match and reveals its owning source; a later action can
-> commit only with an applied model at the current installation/revision, an
-> exact raw slice, fully revealed overlapping owners (including the whole link),
-> and no folded attributes or image markers. An already selected hidden or stale
-> match refuses with `wysiwygRangeNotRevealed`, without revealing or writing.
-> Image navigation uses the existing whole-marker removal. Post-write and native
-> Undo/Redo reparse the authoritative source through the existing off-main
-> highlighter; the debounce now restarts directly so its final request cannot be
-> lost between closely spaced source, selection, and viewport updates. Native
-> input, the editing/marked-text apply guards, and selection-driven reveal remain
-> unchanged. App authorization, writer activation, and replacement publication
-> retain PR D/E's path. R5 stays open for Replace All; R6 and R9 stay open.
+> single Replace:** it closes R5 bullets 1–4 and 6. When the current match is not
+> the selection, the action only selects the raw match and synchronously removes
+> any image marker over it; folded owners reveal later through the existing
+> debounced selection-driven reparse. An action whose selection already is the
+> match (even the first, e.g. after Find selected it) commits only with an applied
+> model at the current installation/revision, an exact raw slice, every overlapping
+> owner revealed, no folded attribute over the match or those owners' own fold
+> chrome (for a link, `[` plus the whole `](url "title")`), and no image marker
+> over the match or an overlapping image source. A construct nested in a revealed
+> owner but untouched by the match keeps its fold (review fix: requiring the
+> owner's whole range unfolded refused such matches forever). Otherwise the action
+> refuses with `wysiwygRangeNotRevealed`, without revealing or writing; the unused
+> `wysiwygPresentationInstalled` case is removed. Post-write and native Undo/Redo
+> reparse the authoritative source through the existing off-main highlighter and
+> the unchanged `.task(id:)` debounce. Under load, that scheduler was observed to
+> drop the final request (unproven, not deterministic; see the R5 evidence and
+> Decision Log). Native input, the editing/marked-text apply guards, and
+> selection-driven reveal are unchanged; the only edit-path addition is an O(1)
+> record of each applied highlight. App authorization, writer activation, and
+> replacement publication retain PR D/E's path. R5 stays open for Replace All;
+> R6 and R9 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -984,8 +992,10 @@ hosted spike PR #112.
   preview path; no preview DOM mutation.
 - Evidence (PR F; R5 remains **open overall**, Replace All belongs to PR G):
   `EditorReplaceWYSIWYGTests.testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo`
-  covers emphasis/strong/heading/strike/code, literal malformed results and CJK/emoji
-  UTF-16 spans. `testLinkDestinationRevealsWholeSourceWithoutURLNormalization`
+  covers emphasis/strong/heading/strike/code, CJK/emoji UTF-16 spans, the literal
+  post-write source, and the fold kinds the parser derives from it (`*字🦊**` is
+  emphasis plus a literal `*`; the other malformed results have none).
+  `testLinkDestinationRevealsWholeSourceWithoutURLNormalization`
   proves whole-link raw reveal and unchanged parentheses/percent-escape spelling
   outside the exact match. `testImageProjectionNavigatesRevealsAndRebuildsAfterUndoRedo`
   removes the owning marker on navigation and edits backing source only;
@@ -997,29 +1007,71 @@ hosted spike PR #112.
   or partially hidden presentation with no writer/publication/undo effects.
   `testMarkedTextWithWYSIWYGRefusesBeforeAuthorizationOrReveal` extends deterministic
   editor coverage only, with no R6 checkbox change.
+- Nested-fold review fix (bullets 1–3): an owner the match touches is revealed,
+  while a construct nested in it but untouched stays folded. The proof checks the
+  match plus each owner's own fold ranges, not the owner's whole source. Each of
+  these failed before the fix (`wysiwygRangeNotRevealed` on every attempt) and now
+  commits on the action after navigation, with the nested fold still hidden:
+  `testHeadingOwnerWithUntouchedFoldedStrongCommits` (`# Title **bold** word`),
+  `testHeadingOwnerWithUntouchedFoldedLinkCommits`
+  (`## See [Astro](https://astro.build) docs`),
+  `testLinkDestinationWithUntouchedFoldedCodeInLinkTextCommits`
+  (`` Intro [`code` docs](https://host/a) tail ``, query `host`),
+  `testStrongOwnerWithUntouchedFoldedEmphasisCommits` (`Intro **very *it* note** tail`),
+  and `testHeadingOwnerWithUntouchedImageProjectionCommits` (the untouched image
+  keeps its marker). After the selection leaves, owner and nested construct both
+  refold. `testWholeLinkProofRejectsHiddenChromeOutsideTheMatch` still refuses a
+  hidden `[`.
+  `testRejectedPublicationWithWYSIWYGLeavesNoUndoStepRawSourceAndRederivablePresentation`
+  covers `.refused(.writeNotApplied)` under WYSIWYG: no undo/redo step, unchanged
+  source/copy/accessibility, no newly hidden range, and an unadvanced applied model.
+  PR D's rejection restore (`applyReconciledSource` → `textView.text =`, shared with
+  source mode) resets storage attributes, so the untouched fold returns only on the
+  next reparse; the test asserts that reparse re-derives the identical folded set.
 - Production App evidence is in `EditorFindHostedGateTests`:
   `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`,
   `testHostedReplaceLinkDestinationThroughDispatcherWithoutURLNormalization`,
   `testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`,
-  `testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse`, and
-  `testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair` drive #131's
+  `testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse`,
+  `testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair`, and
+  `testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits` drive #131's
   dispatcher and both App authorization checkpoints. The first action only
   navigates; the next commits exactly one raw range. Fresh applied model revisions
-  and original Undo source ranges prove **automatic** post-write/Undo/Redo reparse,
+  and original Undo source ranges check **automatic** post-write/Undo/Redo reparse,
   without a test-side reparse or presentation repair. Valid constructs refold or
   thumbnail after selection leaves; invalid ones remain raw/editable. Exact source,
   raw selection/copy/accessibility and one Undo/Redo step are asserted.
   `testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally` asserts one
   replacement publication and reads the normal live preview; it does not mutate
-  the DOM. All six hosted methods passed three consecutive executions (18/18).
-- Typing measurement and its baseline comparison are recorded in
-  [perf-log.md](perf-log.md#replace-pr-f-wysiwyg-single-replace--2026-09-30).
-  Full MarkdownCore passed 303 tests; full EditorKit passed 399 tests (seven
-  actual-IME opt-in skips); all EditorFind/EditorReplace App tests passed 104/104,
-  and the five existing App WYSIWYG policy/configuration tests passed. Pinned
-  SwiftFormat 0.62.1 format/lint, `make build`, and `git diff --check` passed.
-  The reveal proof runs only on explicit Replace; the applied snapshot is recorded
-  in constant time. These synthetic native-input probes do not close R9 or real IME.
+  the DOM. Review-fix runs, with the unchanged `.task(id:)` scheduler: the nested
+  heading method passed three consecutive executions (3/3); in one complete hosted
+  run the folded-delimiter and image methods timed out waiting for automatic
+  reparse (see the next item), and the other five passed.
+- Scheduler observation (unproven, not deterministic): with the unchanged
+  `.task(id:)` debounce, the automatic-reparse hosted methods can time out under
+  load. An in-memory trace showed SwiftUI evaluating `body` with the final
+  `highlightRevision` at least five times without cancelling the in-flight task or
+  starting the new one; the in-flight task then dropped at its revision guard and
+  nothing re-requested the parse. At load averages of about 12–19,
+  `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`
+  failed 8/15 with `.task(id:)` and passed 15/15 with a directly restarted `Task`.
+  The reviewer saw no failure on a quieter machine, and the interleaving could not
+  be forced, so this PR keeps `.task(id:)` (Decision Log) and these hosted methods
+  can fail intermittently on a loaded host. Bullet 4's deterministic evidence is
+  the EditorKit post-write/Undo/Redo reparse assertions above.
+- Typing: `MarkdownEditorView`, the keystroke path, and the selection path are
+  unchanged from #131. The only edit-path addition is an O(1) record made once per
+  *applied* debounced highlight (never per keystroke); see
+  [perf-log.md](perf-log.md#replace-pr-f-wysiwyg-single-replace--2026-09-30). The
+  hosted `large-1mb.md` typing probe is opt-in
+  (`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`). Review-fix verification:
+  full MarkdownCore 303/303; full EditorKit 405 tests (seven actual-IME opt-in
+  skips, zero failures); hosted EditorFind/EditorReplace classes plus the nine App
+  WYSIWYG policy tests: 114 executed, 111 passed, the typing probe skipped, and the
+  two automatic-reparse timeouts above. Pinned SwiftFormat 0.62.1 format/lint,
+  `make build`, and `git diff --check` passed.
+  The reveal proof runs only on explicit Replace. These synthetic native-input
+  probes do not close R9 or real IME.
 
 ### R6 — Marked text + real Zhuyin/Pinyin boundaries
 

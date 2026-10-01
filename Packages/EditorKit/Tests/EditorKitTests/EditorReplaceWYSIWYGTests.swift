@@ -3,6 +3,22 @@ import AppKit
 import MarkdownCore
 import XCTest
 
+private struct DelimiterCase {
+    let source: String
+    let pattern: String
+    let replacement: String
+    let post: String
+    let kinds: [WYSIWYGFoldRegion.Kind]
+
+    init(_ source: String, _ pattern: String, _ replacement: String, post: String, kinds: [WYSIWYGFoldRegion.Kind]) {
+        self.source = source
+        self.pattern = pattern
+        self.replacement = replacement
+        self.post = post
+        self.kinds = kinds
+    }
+}
+
 @MainActor
 final class EditorReplaceWYSIWYGTests: XCTestCase {
     override func tearDown() {
@@ -11,20 +27,22 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
     }
 
     func testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo() async throws {
-        for (source, pattern, replacement) in [
-            ("Intro **文字😀** tail", "**文字😀", "*字🦊"),
-            ("Intro *one* tail", "*one", "one"),
-            ("# Heading\nTail", "# ", ""),
-            ("Intro ~~one~~ tail", "~~one", "one"),
-            ("Intro `one` tail", "`one", "one"),
+        // Each post-write source is the literal splice; the expected fold kinds are what the
+        // parser derives from that unrepaired text. `*字🦊**` reads as emphasis plus a
+        // literal `*`, and every other malformed result has no fold region at all.
+        for item in [
+            DelimiterCase("Intro **文字😀** tail", "**文字😀", "*字🦊", post: "Intro *字🦊** tail", kinds: [.emphasis]),
+            DelimiterCase("Intro *one* tail", "*one", "one", post: "Intro one* tail", kinds: []),
+            DelimiterCase("# Heading\nTail", "# ", "", post: "Heading\nTail", kinds: []),
+            DelimiterCase("Intro ~~one~~ tail", "~~one", "one", post: "Intro one~~ tail", kinds: []),
+            DelimiterCase("Intro `one` tail", "`one", "one", post: "Intro one` tail", kinds: []),
         ] {
-            let ready = try await foldedReady(source: source, pattern: pattern)
-            try navigateAndReveal(ready, replacement: replacement)
-            try replaceAndUndoRedo(ready, replacement: replacement)
-            let post = ready.fixture.model.source
-            let parsed = linkPresentation(post, selection: NSRange(location: 0, length: 0))
-            XCTAssertFalse(parsed.foldPlan?.regions.contains { $0.kind == .strong } == true,
-                           "malformed delimiters are never repaired")
+            let ready = try await foldedReady(source: item.source, pattern: item.pattern)
+            try navigateAndReveal(ready, replacement: item.replacement)
+            try replaceAndUndoRedo(ready, replacement: item.replacement)
+            XCTAssertEqual(ready.fixture.model.source, item.post, "no Markdown repair")
+            let parsed = linkPresentation(item.post, selection: NSRange(location: 0, length: 0))
+            XCTAssertEqual(parsed.foldPlan?.regions.map(\.kind), item.kinds, "post-write fold kinds: \(item.post)")
         }
     }
 
@@ -154,7 +172,7 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         XCTAssertEqual(ready.controller.session, ready.session)
     }
 
-    private func foldedReady(source: String, pattern: String) async throws -> EditorReplaceSingleSupport.Ready {
+    func foldedReady(source: String, pattern: String) async throws -> EditorReplaceSingleSupport.Ready {
         let ready = try await EditorReplaceSingleSupport.makeReady(source: source, pattern: pattern,
                                                                    selection: NSRange(location: 0, length: 0),
                                                                    enableWYSIWYG: true)
@@ -163,7 +181,7 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         return ready
     }
 
-    private func navigateAndReveal(_ ready: EditorReplaceSingleSupport.Ready, replacement: String) throws {
+    func navigateAndReveal(_ ready: EditorReplaceSingleSupport.Ready, replacement: String) throws {
         let source = ready.fixture.model.source
         let match = try XCTUnwrap(ready.session.currentMatch?.range)
         XCTAssertEqual(
@@ -178,8 +196,8 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         XCTAssertTrue(ready.fixture.coordinator.isReplaceRangeRevealed(match, in: ready.fixture.textView))
     }
 
-    private func replaceAndUndoRedo(_ ready: EditorReplaceSingleSupport.Ready, replacement: String,
-                                    imageConfiguration: EditorImageThumbnailConfiguration? = nil) throws
+    func replaceAndUndoRedo(_ ready: EditorReplaceSingleSupport.Ready, replacement: String,
+                            imageConfiguration: EditorImageThumbnailConfiguration? = nil) throws
     {
         let source = ready.fixture.model.source
         let match = try XCTUnwrap(ready.session.currentMatch?.range)
@@ -207,7 +225,7 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
     }
 
     @discardableResult
-    private func reparse(_ ready: EditorReplaceSingleSupport.Ready, selection: NSRange) -> HighlightedText {
+    func reparse(_ ready: EditorReplaceSingleSupport.Ready, selection: NSRange) -> HighlightedText {
         let source = ready.fixture.model.source
         ready.fixture.textView.textSelection = selection
         let highlighted = linkPresentation(source, selection: selection,
@@ -219,13 +237,13 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         return highlighted
     }
 
-    private func imageConfiguration() -> EditorImageThumbnailConfiguration {
+    func imageConfiguration() -> EditorImageThumbnailConfiguration {
         EditorImageThumbnailConfiguration(loader: TestEditorImageThumbnailLoader(outcomes: [:]),
                                           rootURL: URL(fileURLWithPath: "/tmp/PlainsongReplaceImageTests"),
                                           documentDirectoryRelativePath: "")
     }
 
-    private func configureImages(
+    func configureImages(
         _ ready: EditorReplaceSingleSupport.Ready,
         _ config: EditorImageThumbnailConfiguration
     ) {
@@ -238,7 +256,7 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         _ = reparse(ready, selection: ready.fixture.textView.selectedRange())
     }
 
-    private func hasHiddenAttributes(_ ready: EditorReplaceSingleSupport.Ready) -> Bool {
+    func hasHiddenAttributes(_ ready: EditorReplaceSingleSupport.Ready) -> Bool {
         guard let storage = MarkdownTextView.textStorage(of: ready.fixture.textView) else { return false }
         var hidden = false
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attrs, _, _ in
@@ -251,7 +269,7 @@ final class EditorReplaceWYSIWYGTests: XCTestCase {
         return hidden
     }
 
-    private func assertCanonical(_ ready: EditorReplaceSingleSupport.Ready, source: String) {
+    func assertCanonical(_ ready: EditorReplaceSingleSupport.Ready, source: String) {
         let view = ready.fixture.textView
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: view), source)
         XCTAssertEqual(view.accessibilityValue() as? String, source)

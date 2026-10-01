@@ -281,5 +281,49 @@
     "maximum_ms": 15.009834,
     "median_ms": 13.985375,
     "budget_pass": true
+  },
+  "review_fix_2026_10_01": {
+    "note": "The 'phase3-editor-replace-wysiwyg working tree' rows above measured the pre-review PR F tree, which restarted the highlight debounce with a directly created Task. The review fix reverted MarkdownEditorView to #131's .task(id:) debounce, so those rows do not measure the final tree. The hosted probe is now opt-in via TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1.",
+    "plumbing_check": {
+      "product": "final review-fix working tree (MarkdownEditorView identical to #131)",
+      "iterations": 1,
+      "load_average_1m": "21-27 (other agents on the shared Mac)",
+      "samples_ms": [
+        0.949041,
+        15.034584,
+        18.061375,
+        16.544791,
+        17.409542,
+        15.83225,
+        16.280291,
+        19.044584,
+        16.008625,
+        16.552125,
+        16.153625,
+        14.860333,
+        0.990209,
+        15.775375,
+        15.103709,
+        0.7845,
+        15.062458,
+        0.932625,
+        14.951208,
+        15.171125,
+        0.782667,
+        15.333583,
+        0.772208,
+        15.471417,
+        14.950916,
+        0.809875,
+        14.933417,
+        14.768459,
+        0.773375,
+        17.026584
+      ],
+      "maximum_ms": 19.044584,
+      "median_ms": 15.0830835,
+      "budget_pass": false,
+      "evidence": "Not typing evidence: contention invalidates it and no baseline was rerun beside it; it only confirms the opt-in variable reaches the hosted test in local-hard mode."
+    }
   }
 }

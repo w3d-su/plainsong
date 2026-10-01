@@ -101,6 +101,47 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(hosted.appState.currentDocument.text, "Intro one** tail")
     }
 
+    /// PR F review: the heading owner is revealed by the selection, while the strong it
+    /// contains is untouched by the match and stays folded. Replace must still commit.
+    func testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits() async throws {
+        let hosted = try await makeHostedReplaceWorkspace(source: "# Title **bold** word", query: "word",
+                                                          layoutMode: .wysiwyg)
+        try await waitForHostedReplaceWYSIWYG(hosted)
+        try await waitForHostedReplaceAuthorization(hosted)
+        let editor = try hostedEditor(hosted)
+        let source = hosted.appState.currentDocument.text
+        editor.textSelection = NSRange(location: (source as NSString).length, length: 0)
+        try await waitUntil("heading and nested strong fold through production presentation") {
+            let regions = editor.replacePresentationSnapshot?.styledText.foldPlan?.regions ?? []
+            return regions.count == 2 && regions.allSatisfy { !$0.isRevealed }
+        }
+        let match = try XCTUnwrap(hosted.appState.editorFindHost.controller.session?.currentMatch?.range)
+        XCTAssertEqual(
+            hosted.appState.performEditorReplace(replacement: "WORD"),
+            .delivered(.navigatedToCurrentMatch(match))
+        )
+        XCTAssertEqual(hosted.appState.currentDocument.text, source)
+        try await waitForHostedReveal(hosted, match: match)
+        let regions = try XCTUnwrap(editor.replacePresentationSnapshot?.styledText.foldPlan?.regions)
+        XCTAssertEqual(regions.first { $0.kind == .heading(level: 1) }?.isRevealed, true)
+        let strong = try XCTUnwrap(regions.first { $0.kind == .strong })
+        XCTAssertFalse(strong.isRevealed, "the untouched nested strong stays folded at commit")
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
+        for range in strong.foldRanges {
+            XCTAssertTrue(WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(
+                storage.attributes(at: range.location, effectiveRange: nil)
+            ))
+        }
+        try await commitHostedReplaceAndUndoRedo(hosted, replacement: "WORD")
+        XCTAssertEqual(hosted.appState.currentDocument.text, "# Title **bold** WORD")
+        editor.textSelection = NSRange(location: (hosted.appState.currentDocument.text as NSString).length, length: 0)
+        try await waitUntil("heading and nested strong refold from post-write source") {
+            let regions = editor.replacePresentationSnapshot?.styledText.foldPlan?.regions ?? []
+            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+                && regions.count == 2 && regions.allSatisfy { !$0.isRevealed }
+        }
+    }
+
     func testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally() async throws {
         for mode in [EditorLayoutMode.sourceOnly, .sourcePreview] {
             let hosted = try await makeHostedReplaceWorkspace(

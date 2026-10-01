@@ -1280,17 +1280,18 @@ editor keystroke path.
 ## Replace PR F WYSIWYG single Replace — 2026-09-30
 
 Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug.
-The exact reveal proof runs only on explicit Replace; recording the applied model
-retains existing output in constant time. Native writer/input, caret snapping,
-selection-driven reveal, the marked-text guard and the native-edit styling guard
-are unchanged. Presentation scheduling now cancels/restarts the existing 20 ms
-background parse directly, reading authoritative source, instead of relying on
-SwiftUI `.task(id:)` to start the final request after closely spaced changes.
+The exact reveal proof runs only on explicit Replace. After the 2026-10-01 review
+fix, the keystroke and selection paths are those of #131: `MarkdownEditorView` is
+byte-identical to #131 (the `.task(id:)` debounce, reading `text`), and native
+writer/input, caret snapping, selection-driven reveal, the marked-text guard and the
+native-edit styling guard are unchanged. The only edit-path addition is an O(1)
+record of the applied model, made once per *applied* debounced highlight in
+`MarkdownTextView+HighlightApply.swift`, never per keystroke; the reveal proof reads it.
 
 `EditorReplaceWYSIWYGPerformanceTests.testLargeFixtureWYSIWYGTypingWithAppliedReplaceSnapshotStaysUnderBudget`
 passed in the complete EditorKit suite: 30 native insertions on `large-1mb.md`,
-maximum **0.398583 ms**. This model-backed fixture does not run the production
-SwiftUI/Find pipeline and is not App typing proof.
+maximum **0.398583 ms** (review-fix rerun: **0.453542 ms**). This model-backed fixture
+does not run the production SwiftUI/Find pipeline and is not App typing proof.
 
 `EditorFindHostedGateTests.testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget`
 mounts the production `WorkspaceWindow`, Experimental WYSIWYG and an open Find
@@ -1300,18 +1301,35 @@ insertion, App publication and debounce scheduling; it excludes the async parse,
 settled rendering and hardware event delivery. The functional fixture removes
 Find's debounce, so this probe restores its **production 150 ms** default before
 timing. Local `< 16 ms` assertions remain hard; hosted CI wall clocks are
-informational under risk R15. The shared `lockf` prevents overlapping Mac tests.
+informational under risk R15.
 
-Controlled comparison: exact #131 product `a0213857c69300931385b337369c0e7197cd8f3f`
-(only the identical hosted test/helper added), three iterations first; then this
-branch's final production code with the unchanged native-edit guard, three
-iterations. [Retained raw samples](evidence/editor-replace-r5-20260930-typing.json)
+**The probe is opt-in** because its first-iteration maximum exceeded 16 ms in both
+#131 and PR F (below), so a plain `make test` would flake; the budget is unchanged.
+Without the variable it reports an `XCTSkip`. Run it on an idle machine, serialized
+with any other Mac test run (`lockf` on the shared lock file if agents share the Mac):
+
+```sh
+TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug test \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget
+```
+
+xcodebuild forwards only `TEST_RUNNER_`-prefixed variables into the hosted test
+process, where the prefix is stripped (the same mechanism as `make test`'s
+`TEST_RUNNER_CI`). Raw samples are in the keep-always XCTest attachment and stdout.
+
+Controlled comparison (2026-09-30): exact #131 product
+`a0213857c69300931385b337369c0e7197cd8f3f` (only the identical hosted test/helper
+added), three iterations first; then the PR F tree as it stood before review, three
+iterations. **That PR F tree also restarted the highlight debounce with a directly
+created `Task`; the review fix reverted it, so the row below does not measure the
+final tree.** [Retained raw samples](evidence/editor-replace-r5-20260930-typing.json)
 come from keep-always XCTest attachments.
 
 | Product | Iteration 1 maximum | Iteration 2 maximum | Iteration 3 maximum | Hard-budget result |
 |---|---:|---:|---:|---|
 | #131 baseline | 23.599500 ms | 15.162750 ms | 15.375958 ms | 1 failure, 2 passes |
-| PR F, native-edit guard unchanged | 24.359250 ms | 14.850583 ms | 15.258833 ms | 1 failure, 2 passes |
+| PR F before review (`Task` scheduler, native-edit guard unchanged) | 24.359250 ms | 14.850583 ms | 15.258833 ms | 1 failure, 2 passes |
 
 **The first iteration exceeds budget in both products; the budget is not relaxed.**
 Later iterations pass in both. This ordered, low-sample comparison shows similar
@@ -1319,18 +1337,30 @@ steady measurements but does not establish a speedup or exclude smaller regressi
 first-iteration latency still needs profiling. It is not full keystroke-to-screen,
 physical-keyboard or real-IME evidence and does not close R9.
 
+Review-fix opt-in run (2026-10-01, final tree, one iteration): a plumbing check only,
+taken at load averages of 21–27 from other agents' work on the shared Mac. Maximum
+**19.044584 ms** (median 15.083 ms; the same bimodal ~0.8 ms / ~15 ms samples as
+above), so it **failed** the hard budget. Contention makes this unusable as
+evidence, and no baseline was rerun beside it. The final tree's typing path has not
+been re-measured on an idle machine; the owner should run the command above before R9.
+
 Diagnostic history: with the helper's zero Find debounce, baseline maxima were
 30.008916 / 26.148167 / 23.394708 ms and an intermediate PR F tree measured
 21.157208 / 17.900292 / 16.685042 ms, all failed. A trial allowing fresh WYSIWYG
 styling while native editing was active measured 18.658417 / 18.299334 /
 18.608375 ms with production debounce (all failed), while restoring the existing
 guard returned the normal slow samples to about 14.6 ms. That trial was removed;
-no presentation-apply or typing-budget exception ships. Functional post-write,
-Undo and Redo reparse is verified through the real App dispatcher, without manual
-reparse in tests, in 18/18 repeated hosted executions.
+no presentation-apply or typing-budget exception ships. The 18/18 hosted
+post-write/Undo/Redo reparse executions reported before review used the `Task`
+scheduler. With `.task(id:)` restored, those automatic-reparse methods can time out
+under load (see the R5 scheduler observation and the Decision Log).
 
-Final complete EditorFind/EditorReplace hosted regression run: **104/104 passed**,
-including the same hard local typing probe (maximum **15.009834 ms**;
-raw samples retained in the linked JSON). This later passing run does not erase
-the isolated first-iteration failures above. Full MarkdownCore: 303/303; full
-EditorKit: 399 tests, seven real-IME opt-in skips, zero failures.
+Earlier complete EditorFind/EditorReplace hosted run (pre-review tree): **104/104
+passed**, including the hard local typing probe (maximum **15.009834 ms**; raw
+samples in the linked JSON). Review-fix runs (2026-10-01): full MarkdownCore
+303/303; full EditorKit 405 tests, seven real-IME opt-in skips, zero failures;
+hosted EditorFind/EditorReplace classes plus the nine App WYSIWYG policy tests: 114
+executed, 111 passed, the typing probe skipped (opt-in), and two failed
+(`testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo` and
+`testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`, both
+automatic-reparse timeouts at load averages of about 14–16).

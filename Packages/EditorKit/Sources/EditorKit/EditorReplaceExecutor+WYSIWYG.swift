@@ -38,31 +38,36 @@ extension MarkdownTextViewCoordinator {
         guard ExactSourceText.matches(rawSlice, NSAttributedString(installed.styledText.text).string) else {
             return false
         }
-        var owningRanges = [match]
+        // Selection-driven reveal opens only the owners the match touches. A construct
+        // nested in an owner but untouched by the match keeps its own fold, so prove the
+        // match plus each owner's own chrome, never the owner's whole source range.
+        var foldProofRanges = [match]
         for region in plan.regions where overlaps(region.sourceRange, match)
             && WYSIWYGInlineFoldPresentation.includes(region.kind, linkFoldingEnabled: plan.linkFoldingEnabled)
         {
             guard region.isRevealed, contains(installed.styledText.range, region.sourceRange) else {
                 return false
             }
-            // In particular, prove the *whole* link, including its opening chrome and URL.
-            owningRanges.append(region.sourceRange)
+            // A link's fold ranges are `[` and the whole `](url "title")`, so this still
+            // proves the complete link chrome, including its destination, is revealed.
+            for range in region.foldRanges where range.length > 0 {
+                guard contains(region.sourceRange, range) else { return false }
+                foldProofRanges.append(range)
+            }
         }
+        var imageProofRanges = [match]
         for image in plan.imageRegions where overlaps(image.sourceRange, match) {
             guard contains(installed.styledText.range, image.sourceRange) else { return false }
-            owningRanges.append(image.sourceRange)
+            imageProofRanges.append(image.sourceRange)
         }
-        return owningRanges.allSatisfy { range in
-            var hidden = false
-            storage.enumerateAttributes(in: range) { attributes, _, stop in
-                if WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes)
-                    || attributes[WYSIWYGImagePresentationMarker.attribute] != nil
-                {
-                    hidden = true
-                    stop.pointee = true
-                }
+        return !foldProofRanges.contains { range in
+            storage.containsAttribute(in: range) { attributes in
+                WYSIWYGInlineFoldPresentation.containsFoldedDelimiterAttributes(attributes)
             }
-            return !hidden
+        } && !imageProofRanges.contains { range in
+            storage.containsAttribute(in: range) { attributes in
+                attributes[WYSIWYGImagePresentationMarker.attribute] != nil
+            }
         }
     }
 
@@ -95,5 +100,18 @@ extension MarkdownTextViewCoordinator {
             && outer.location >= 0 && inner.location >= outer.location
             && inner.length > 0 && outer.length >= inner.length
             && inner.location - outer.location <= outer.length - inner.length
+    }
+}
+
+private extension NSAttributedString {
+    func containsAttribute(in range: NSRange, where predicate: ([NSAttributedString.Key: Any]) -> Bool) -> Bool {
+        var found = false
+        enumerateAttributes(in: range) { attributes, _, stop in
+            if predicate(attributes) {
+                found = true
+                stop.pointee = true
+            }
+        }
+        return found
     }
 }
