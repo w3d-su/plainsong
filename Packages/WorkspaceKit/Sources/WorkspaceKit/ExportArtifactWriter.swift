@@ -54,34 +54,81 @@ public enum ExportArtifactOwnershipDecision: Sendable, Equatable {
     case refused
 }
 
-/// Synchronous, non-escaping ownership capability. It receives the writer's own no-follow
-/// inspection of the selected leaf (canonical location, observed state/identity, and parent
-/// case sensitivity). The inspection's location is valid only for the duration of the call.
-public typealias ExportArtifactOwnershipCheck =
-    (WorkspaceNoFollowFileTargetInspection) -> ExportArtifactOwnershipDecision
+/// Leaf-path metadata for one selected destination (`docs/export-gates.md` D5, amended
+/// 2026-09-29). It is derived without opening, enumerating, or anchoring the chosen folder:
+/// - `state` comes from `fstatat(AT_FDCWD, leaf, …, AT_SYMLINK_NOFOLLOW_ANY)`, so no path
+///   component may be a symbolic link;
+/// - an existing leaf is opened no-follow and its `fcntl(F_GETPATH)` spelling must equal the
+///   selected spelling byte for byte, so its whole path is proven canonical. A new leaf does not
+///   exist yet, so only its parent is proven: one `getattrlist` observation must report the
+///   parent's identity, a directory, and the selected parent spelling byte for byte. The new
+///   leaf's own name is the literal selected name. A firmlink, case, or normalization alias of
+///   an existing leaf or of the parent therefore never inspects;
+/// - `parentIdentity` is the parent path's no-follow `fstatat` identity (metadata only);
+/// - `volumeIsCaseSensitive` is the parent URL's `volumeSupportsCaseSensitiveNames`.
+public struct ExportArtifactLeafInspection: Sendable, Equatable {
+    public let state: WorkspaceNoFollowFileTargetState
+    /// The selected leaf spelling as a literal file URL (no Foundation normalization). It is
+    /// proven equal to the kernel's spelling in full for an existing leaf, and up to the parent
+    /// for a new leaf, whose name is the literal selected name.
+    public let canonicalLeafURL: URL
+    public let parentIdentity: WorkspaceFileSystemIdentity
+    public let volumeIsCaseSensitive: Bool
 
-/// Why an operation ended with the selected leaf proven in (or restored to) its pre-operation
-/// state and no operation entry remaining. A rollback may have briefly published writer bytes.
+    public init(
+        state: WorkspaceNoFollowFileTargetState,
+        canonicalLeafURL: URL,
+        parentIdentity: WorkspaceFileSystemIdentity,
+        volumeIsCaseSensitive: Bool
+    ) {
+        self.state = state
+        self.canonicalLeafURL = canonicalLeafURL
+        self.parentIdentity = parentIdentity
+        self.volumeIsCaseSensitive = volumeIsCaseSensitive
+    }
+}
+
+/// Synchronous, non-escaping ownership capability. It receives the writer's own leaf-path
+/// inspection of the selected destination.
+public typealias ExportArtifactOwnershipCheck =
+    (ExportArtifactLeafInspection) -> ExportArtifactOwnershipDecision
+
+/// Why an operation ended without publishing (or after provably reversing its publication)
+/// with no operation entry remaining: the staged file and the item-replacement directory
+/// were proven absent.
 public enum ExportArtifactFailure: Error, Sendable, Equatable {
     case invalidDestinationURL
     case unsupportedExtension
-    /// The exact grant could not open or anchor the selected parent directory.
+    /// The parent path's metadata could not be read, or it is not a directory.
     case parentAuthorityUnavailable
     case symbolicLinkInParentPath
     case symbolicLinkDestination
     case nonRegularDestination
-    /// The selected spelling reaches an existing entry spelled differently on disk
-    /// (case or Unicode-normalization alias).
+    /// The selected spelling reaches an existing leaf or parent folder spelled differently on
+    /// disk (a case, Unicode-normalization, or firmlink alias).
     case destinationAlias
+    /// The existing leaf could not be opened to prove its canonical spelling.
+    case destinationUnreadable(code: Int32)
     case destinationAlreadyExists
     case destinationMissing
     case destinationIdentityChanged
     case ownedDestination
-    /// The volume does not report `RENAME_EXCL` (and, for replacement, `RENAME_SWAP`).
+    /// The destination volume does not advertise both `RENAME_EXCL` and `RENAME_SWAP`.
     case unsupportedVolumeSemantics
-    /// The exclusive staging create was denied (`EPERM`/`EACCES`): no parent/staging authority.
+    /// Foundation could not establish an item-replacement directory, or it is not a directory.
+    case stagingDirectoryUnavailable
+    /// The item-replacement directory is on a different device; there is no copy fallback.
+    case stagingDirectoryOnDifferentDevice
+    /// The item-replacement directory is the chosen folder, its direct child, or lies inside it
+    /// outside the app-private root (owner decision 2026-09-30).
+    case stagingDirectoryInsideDestinationFolder
+    /// The exclusive staged-file create was denied (`EPERM`/`EACCES`).
     case stagingNotPermitted(code: Int32)
     case stagingUnavailable(code: Int32)
+    /// `renameatx_np` onto the exact leaf was denied (`EPERM`/`EACCES`).
+    case publicationNotPermitted(code: Int32)
+    /// `NSFileCoordinator` did not run the publication for a ubiquitous destination.
+    case coordinationFailed
     case namespaceChanged
     case cancelled
     case writeFailed(WorkspaceAnchoredFileSystemError)
@@ -97,7 +144,9 @@ public enum ExportArtifactResidueContents: Sendable, Equatable {
     case unknown
 }
 
-/// An exact path that may still hold an operation identity after an uncertain outcome.
+/// An exact path inside the item-replacement directory that may still hold an identity after
+/// an uncertain outcome. Writer-owned export outputs are limited to the selected leaf;
+/// Foundation shared-ancestor uncertainty is reported separately in `unprovenDirectoryURLs`.
 public enum ExportArtifactResidue: Sendable, Equatable {
     /// Every tracked name was proven not to hold the operation identity.
     case none
@@ -116,18 +165,19 @@ public enum ExportArtifactResidue: Sendable, Equatable {
 
 /// What the writer could prove about the selected leaf when it could not report success.
 public enum ExportArtifactDestinationState: Sendable, Equatable {
-    /// The writer bytes are durably published at the selected leaf, but cleanup was not proven.
+    /// The writer bytes were proven published at the selected leaf, but cleanup was not proven.
     case holdsWriterBytes
-    /// The selected leaf was proven to hold its pre-operation state.
+    /// The operation never changed the selected leaf, or proved it restored the pre-operation
+    /// identity there.
     case provenUnchanged
-    /// Publication or rollback continuity could not be proven.
+    /// Publication or its reversal could not be proven.
     case unknown
 }
 
 public struct ExportArtifactCommit: Sendable, Equatable {
     /// The exact panel URL spelling.
     public let selectedURL: URL
-    /// Final metadata sampled from the published descriptor.
+    /// Final metadata sampled from the published leaf by no-follow `fstatat`.
     public let metadata: WorkspaceCoherentFileMetadata
 }
 
@@ -139,17 +189,27 @@ public struct ExportArtifactIndeterminateWrite: Sendable, Equatable {
     public let selectedURL: URL
     public let destinationState: ExportArtifactDestinationState
     public let residue: ExportArtifactResidue
-    /// The exact operation-scoped staging (or cleanup) sibling that may still hold an identity.
-    /// When the residue is the selected leaf itself this is the unproven staging name; `nil`
-    /// only when no staging or cleanup name remains uncertain.
+    /// The exact staged-file path inside the item-replacement directory, or `nil` when that
+    /// name was proven to hold no entry.
     public let stagingURL: URL?
+    /// The operation's exact item-replacement directory, or `nil` when it was proven removed.
+    public let itemReplacementDirectoryURL: URL?
+    /// Exact Foundation scaffolding paths whose pre-operation identity or absence could not be
+    /// preserved. These ancestors are not operation-owned and are never removed by the writer.
+    public let unprovenDirectoryURLs: [URL]
+    /// True when `residue` lies inside the item-replacement directory: a hidden temporary
+    /// folder (inside the app container on the internal volume) that the OS may purge. When the
+    /// residue holds `.displacedOriginal`, the user must be told to recover it promptly; the
+    /// location is not durable.
+    public let residueIsInPurgeableTemporaryFolder: Bool
 }
 
 public enum ExportArtifactWriteOutcome: Sendable, Equatable {
-    /// Writer bytes are durable at the selected leaf and the staging name is proven absent.
+    /// Writer bytes are at the selected leaf, and the staged name, any displaced original, and
+    /// the item-replacement directory are proven absent.
     case committed(ExportArtifactCommit)
-    /// The destination is proven in (or restored to) its pre-operation state and no operation
-    /// entry remains.
+    /// Nothing was published (or a publication was provably reversed) and no operation entry
+    /// remains.
     case notCommitted(ExportArtifactFailure)
     case indeterminate(ExportArtifactIndeterminateWrite)
 }
@@ -161,14 +221,16 @@ public enum ExportArtifactDestinationInspection: Sendable, Equatable {
     case refused(ExportArtifactFailure)
 }
 
-/// One-shot, non-retained artifact writer (`docs/export-gates.md` D5, PR E).
+/// One-shot, non-retained artifact writer (`docs/export-gates.md` D5, amended 2026-09-29).
 ///
-/// It consumes one panel URL plus bytes, anchors the selected parent through ephemeral no-follow
-/// descriptors under that exact URL's security scope, and publishes through the existing
-/// `WorkspaceAnchoredFileSystem` staging/`RENAME_EXCL`/`RENAME_SWAP`/postflight/rollback
-/// primitives. It holds no bookmark, journal, session, or recovery authority, never widens a
-/// leaf grant to its parent, never falls back to a direct or alternate-directory write, and
-/// releases every descriptor before returning.
+/// A save-panel grant covers exactly the chosen leaf, so the writer never opens or enumerates
+/// the chosen folder and never gives it a new entry other than the published leaf. It stages
+/// one file in a same-device `FileManager` item-replacement directory (below the chosen folder
+/// only inside the app-private root), proves the leaf by path with `AT_SYMLINK_NOFOLLOW_ANY`
+/// and kernel-canonical spellings, and publishes by exact path with `renameatx_np`
+/// `RENAME_EXCL` or `RENAME_SWAP` plus `RENAME_NOFOLLOW_ANY`. It holds no bookmark, journal, session, or recovery
+/// authority, never falls back to a direct, copying, or alternate-directory write, and releases
+/// every descriptor before returning.
 public enum ExportArtifactWriter {
     /// Inspects the selected leaf without writing, for choosing `createNew` or
     /// `replaceConfirmed(identity)` right after the panel returns.
@@ -179,11 +241,30 @@ public enum ExportArtifactWriter {
         inspectDestination(at: destinationURL, kind: kind, hooks: .production)
     }
 
+    /// The leaf-path inspection the writer hands its ownership capability, for callers that
+    /// must derive the same value independently (the App ownership adapter).
+    public static func inspectLeaf(
+        at destinationURL: URL
+    ) -> Result<ExportArtifactLeafInspection, ExportArtifactFailure> {
+        let selection: ExportArtifactSelection
+        switch ExportArtifactSelection.parse(destinationURL, kind: nil) {
+        case let .success(parsed): selection = parsed
+        case let .failure(failure): return .failure(failure)
+        }
+        return SecurityScopedAccess.withAccess(to: destinationURL) {
+            inspect(selection, hooks: .production).map(\.inspection)
+        }
+    }
+
+    /// - Parameter appPrivateRoot: the app's own private directory (the sandbox container's data
+    ///   directory when sandboxed), or `nil`. Staging below it is accepted even when the chosen
+    ///   folder is one of its ancestors; `nil` refuses any staging inside the chosen folder.
     public static func write(
         _ request: consuming ExportArtifactWriteRequest,
+        appPrivateRoot: URL?,
         ownership: ExportArtifactOwnershipCheck
     ) -> ExportArtifactWriteOutcome {
-        write(request, ownership: ownership, hooks: .production)
+        write(request, appPrivateRoot: appPrivateRoot, ownership: ownership, hooks: .production)
     }
 
     static func inspectDestination(
@@ -197,22 +278,24 @@ public enum ExportArtifactWriter {
         case let .failure(failure): return .refused(failure)
         }
         return SecurityScopedAccess.withAccess(to: destinationURL) {
-            switch preflight(selection, hooks: hooks) {
-            case let .failure(failure):
-                .refused(failure)
-            case let .success(preflight):
-                switch preflight.inspection.state {
-                case .missing:
-                    .newLeaf
-                case let .regular(identity):
-                    .existingRegularFile(identity)
-                }
+            let proof: ExportArtifactLeafProof
+            switch inspect(selection, hooks: hooks) {
+            case let .success(value): proof = value.proof
+            case let .failure(failure): return .refused(failure)
+            }
+            if let failure = volumeCapabilityFailure(selection, proof: proof, hooks: hooks) {
+                return .refused(failure)
+            }
+            return switch proof.state {
+            case .missing: .newLeaf
+            case let .regular(identity): .existingRegularFile(identity)
             }
         }
     }
 
     static func write(
         _ request: consuming ExportArtifactWriteRequest,
+        appPrivateRoot: URL?,
         ownership: ExportArtifactOwnershipCheck,
         hooks: ExportArtifactWriterHooks
     ) -> ExportArtifactWriteOutcome {
@@ -226,9 +309,8 @@ public enum ExportArtifactWriter {
         }
         return SecurityScopedAccess.withAccess(to: destinationURL) {
             performWrite(
-                bytes,
+                ExportArtifactWritePlan(bytes: bytes, disposition: disposition, appPrivateRoot: appPrivateRoot),
                 selection: selection,
-                disposition: disposition,
                 ownership: ownership,
                 hooks: hooks
             )

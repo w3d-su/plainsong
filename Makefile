@@ -36,6 +36,7 @@ test: generate
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+	Scripts/check-export-sandbox-root.sh
 # TEST_RUNNER_ vars are forwarded by xcodebuild into the xctest process env,
 # which does not inherit the shell env; without this, PerformanceTests'
 # isContinuousIntegration check never sees CI and hosted-runner WebKit timing

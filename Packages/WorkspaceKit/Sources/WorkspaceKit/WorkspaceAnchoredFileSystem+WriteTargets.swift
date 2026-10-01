@@ -206,7 +206,6 @@ extension WorkspaceAnchoredFileSystem {
         hooks: Hooks
     ) throws -> PreparedWrite {
         let name = ".plainsong-write-\(UUID().uuidString).tmp"
-        try hooks.check(.createTemporary)
         let descriptor = name.withCString {
             Darwin.openat(
                 parentDescriptor,
@@ -215,13 +214,10 @@ extension WorkspaceAnchoredFileSystem {
                 mode_t(S_IRUSR | S_IWUSR)
             )
         }
-        guard descriptor >= 0 else {
-            hooks.temporaryArtifactObserver?(.creationFailed(code: errno))
-            throw WorkspaceAnchoredFileSystemError.unreadable
-        }
-        hooks.temporaryArtifactObserver?(.created(name: name))
-        guard let artifactLocation = location.sibling(named: name) else {
-            Darwin.close(descriptor)
+        guard descriptor >= 0,
+              let artifactLocation = location.sibling(named: name)
+        else {
+            if descriptor >= 0 { Darwin.close(descriptor) }
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
         let expectedByteCount = Int64(data.count)
@@ -246,9 +242,7 @@ extension WorkspaceAnchoredFileSystem {
             guard Darwin.ftruncate(descriptor, 0) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
-            try hooks.check(.writeTemporary)
             try writeAllBytes(data, descriptor: descriptor)
-            try hooks.check(.syncTemporary)
             guard Darwin.fsync(descriptor) == 0 else {
                 throw WorkspaceAnchoredFileSystemError.durabilityFailed
             }

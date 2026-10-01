@@ -1425,6 +1425,18 @@ extension AppState {
         _ location: WorkspaceFileSystemLocation,
         excludingRecoveryID: UUID? = nil
     ) -> Bool {
+        isWorkspaceMutationRecoveryCandidate(
+            fileURL: location.fileURL,
+            excludingRecoveryID: excludingRecoveryID
+        )
+    }
+
+    /// The same check for a destination known only by its file URL (one-shot export's
+    /// leaf-path inspection has no root authority).
+    func isWorkspaceMutationRecoveryCandidate(
+        fileURL: URL,
+        excludingRecoveryID: UUID? = nil
+    ) -> Bool {
         workspaceMutationRecoveries.values.contains { recovery in
             guard recovery.id != excludingRecoveryID else { return false }
             if case .unavailable = recovery {
@@ -1433,7 +1445,7 @@ extension AppState {
             return recovery.retainedCandidateLocations.contains { candidate in
                 guard let candidateRelativePath = try?
                     candidate.rootAuthority.relativePath(
-                        forFileURL: location.fileURL
+                        forFileURL: fileURL
                     )
                 else {
                     return false

@@ -4,7 +4,7 @@ import Foundation
 import XCTest
 
 extension ExportArtifactWriterTests {
-    func testSymbolicLinkDestinationIsRefusedForBothDispositions() throws {
+    func testSymbolicLinkLeafIsRefusedForBothDispositions() throws {
         let fixture = try makeExportFixture()
         let target = fixture.base.appendingPathComponent("target.html")
         try Data("symlink target".utf8).write(to: target)
@@ -14,7 +14,7 @@ extension ExportArtifactWriterTests {
         for disposition in [ExportArtifactDisposition.createNew, .replaceConfirmed(linkIdentity)] {
             let probe = ExportBoundaryProbe()
             XCTAssertEqual(
-                export(to: fixture.destination, disposition: disposition, hooks: probe.hooks()),
+                export(to: fixture.destination, disposition: disposition, probe: probe),
                 .notCommitted(.symbolicLinkDestination),
                 "\(disposition)"
             )
@@ -29,37 +29,46 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
     }
 
-    func testSymbolicLinkInParentPathIsRefused() throws {
+    /// `AT_SYMLINK_NOFOLLOW_ANY` refuses a symlink anywhere in the selected path: the final
+    /// parent component and an intermediate component alike.
+    func testSymbolicLinkPathComponentIsRefused() throws {
         let fixture = try makeExportFixture()
         let linkedParent = fixture.base.appendingPathComponent("linked", isDirectory: true)
         try FileManager.default.createSymbolicLink(at: linkedParent, withDestinationURL: fixture.directory)
-        let throughLink = linkedParent.appendingPathComponent("export.html", isDirectory: false)
-        let probe = ExportBoundaryProbe()
+        let linkedBase = fixture.base.appendingPathComponent("linked-base", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: linkedBase, withDestinationURL: fixture.base)
+        let throughFinalComponent = linkedParent.appendingPathComponent("export.html", isDirectory: false)
+        let throughIntermediate = linkedBase.appendingPathComponent("selected/export.html", isDirectory: false)
 
-        XCTAssertEqual(
-            export(to: throughLink, disposition: .createNew, hooks: probe.hooks()),
-            .notCommitted(.symbolicLinkInParentPath)
-        )
-        XCTAssertEqual(
-            ExportArtifactWriter.inspectDestination(at: throughLink, kind: .html),
-            .refused(.symbolicLinkInParentPath)
-        )
-        XCTAssertFalse(probe.createdStaging)
+        for url in [throughFinalComponent, throughIntermediate] {
+            let probe = ExportBoundaryProbe()
+            XCTAssertEqual(
+                export(to: url, disposition: .createNew, probe: probe),
+                .notCommitted(.symbolicLinkInParentPath),
+                url.path(percentEncoded: false)
+            )
+            XCTAssertEqual(
+                ExportArtifactWriter.inspectDestination(at: url, kind: .html),
+                .refused(.symbolicLinkInParentPath)
+            )
+            XCTAssertFalse(probe.createdStaging)
+        }
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
     }
 
-    func testDirectoryAndFIFODestinationsAreRefusedAsNonRegular() throws {
+    func testDirectoryAndFIFOLeavesAreRefusedAsNonRegular() throws {
         let fixture = try makeExportFixture()
         try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: false)
         let fifo = fixture.directory.appendingPathComponent("pipe.html", isDirectory: false)
         XCTAssertEqual(fifo.path(percentEncoded: false).withCString { Darwin.mkfifo($0, 0o600) }, 0)
 
+        // Device nodes cannot be created unprivileged; the FIFO exercises the same refusal.
         for destination in [fixture.destination, fifo] {
             let existing = try identity(at: destination)
             for disposition in [ExportArtifactDisposition.createNew, .replaceConfirmed(existing)] {
                 let probe = ExportBoundaryProbe()
                 XCTAssertEqual(
-                    export(to: destination, disposition: disposition, hooks: probe.hooks()),
+                    export(to: destination, disposition: disposition, probe: probe),
                     .notCommitted(.nonRegularDestination),
                     "\(destination.lastPathComponent) \(disposition)"
                 )
@@ -79,11 +88,7 @@ extension ExportArtifactWriterTests {
         let unsupported = ["export.md", "export", ".html", "export.html.tmp", "export.pdf", "export.htm l"]
         for leaf in unsupported {
             let url = fixture.directory.appendingPathComponent(leaf, isDirectory: false)
-            XCTAssertEqual(
-                export(to: url, disposition: .createNew),
-                .notCommitted(.unsupportedExtension),
-                leaf
-            )
+            XCTAssertEqual(export(to: url, disposition: .createNew), .notCommitted(.unsupportedExtension), leaf)
         }
         let invalid = try [
             XCTUnwrap(URL(string: "https://example.com/export.html")),
@@ -107,7 +112,7 @@ extension ExportArtifactWriterTests {
         let probe = ExportBoundaryProbe()
         let stale = WorkspaceFileSystemIdentity(device: 1, inode: 1)
         XCTAssertEqual(
-            export(to: fixture.destination, disposition: .replaceConfirmed(stale), hooks: probe.hooks()),
+            export(to: fixture.destination, disposition: .replaceConfirmed(stale), probe: probe),
             .notCommitted(.destinationMissing)
         )
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
@@ -115,11 +120,11 @@ extension ExportArtifactWriterTests {
         try Data("existing".utf8).write(to: fixture.destination)
         let existing = try identity(at: fixture.destination)
         XCTAssertEqual(
-            export(to: fixture.destination, disposition: .createNew, hooks: probe.hooks()),
+            export(to: fixture.destination, disposition: .createNew, probe: probe),
             .notCommitted(.destinationAlreadyExists)
         )
         XCTAssertEqual(
-            export(to: fixture.destination, disposition: .replaceConfirmed(stale), hooks: probe.hooks()),
+            export(to: fixture.destination, disposition: .replaceConfirmed(stale), probe: probe),
             .notCommitted(.destinationIdentityChanged)
         )
         XCTAssertFalse(probe.createdStaging)
@@ -138,51 +143,101 @@ extension ExportArtifactWriterTests {
 
         for disposition in [ExportArtifactDisposition.createNew, .replaceConfirmed(existing)] {
             XCTAssertEqual(
-                export(to: caseAlias, disposition: disposition, hooks: probe.hooks()),
+                export(to: caseAlias, disposition: disposition, probe: probe),
                 .notCommitted(.destinationAlias)
             )
         }
+        XCTAssertEqual(
+            ExportArtifactWriter.inspectDestination(at: caseAlias, kind: .html),
+            .refused(.destinationAlias)
+        )
+        XCTAssertEqual(ExportArtifactWriter.inspectLeaf(at: caseAlias), .failure(.destinationAlias))
         // Foundation path helpers may decompose Unicode, so both spellings are built from
         // literal bytes and the NFC entry is created with a raw `open(2)`.
-        let directoryPath = fixture.directory.path(percentEncoded: false)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let nfcPath = "/\(directoryPath)/caf\u{E9}.html"
-        let nfdPath = "/\(directoryPath)/cafe\u{301}.html"
+        let nfcPath = "\(fixture.directoryPath)/caf\u{E9}.html"
+        let nfdPath = "\(fixture.directoryPath)/cafe\u{301}.html"
         let descriptor = nfcPath.withCString { Darwin.open($0, O_WRONLY | O_CREAT | O_EXCL, 0o600) }
         XCTAssertGreaterThanOrEqual(descriptor, 0)
         Darwin.close(descriptor)
         if nfdPath.withCString({ Darwin.access($0, F_OK) }) == 0 {
-            let nfcIdentity = try identity(at: WorkspaceLiteralFileURL.fileURL(path: nfcPath, isDirectory: false))
+            let nfcURL = WorkspaceLiteralFileURL.fileURL(path: nfcPath, isDirectory: false)
+            let nfcIdentity = try identity(at: nfcURL)
             let nfdURL = WorkspaceLiteralFileURL.fileURL(path: nfdPath, isDirectory: false)
             XCTAssertEqual(
-                export(to: nfdURL, disposition: .replaceConfirmed(nfcIdentity), hooks: probe.hooks()),
+                export(to: nfdURL, disposition: .replaceConfirmed(nfcIdentity), probe: probe),
                 .notCommitted(.destinationAlias)
             )
-            XCTAssertEqual(
-                try identity(at: WorkspaceLiteralFileURL.fileURL(path: nfcPath, isDirectory: false)),
-                nfcIdentity
-            )
+            XCTAssertEqual(try identity(at: nfcURL), nfcIdentity)
         }
         XCTAssertFalse(probe.createdStaging)
         XCTAssertEqual(try text(at: fixture.destination), "owned spelling")
         XCTAssertEqual(try identity(at: fixture.destination), existing)
     }
 
-    func testMissingParentAuthorityFailsBeforeAnyWrite() throws {
+    /// A new leaf has no `F_GETPATH`, so the parent's `getattrlist(ATTR_CMN_FULLPATH)` spelling
+    /// must equal the selected one: a firmlink, case, or normalization spelling of the chosen
+    /// folder fails closed before ownership, and the folder is still never opened.
+    func testFirmlinkCaseOrNormalizationSpellingOfTheParentIsRefused() throws {
         let fixture = try makeExportFixture()
-        let missingParent = fixture.base.appendingPathComponent("absent", isDirectory: true)
-            .appendingPathComponent("export.html", isDirectory: false)
-        XCTAssertEqual(
-            export(to: missingParent, disposition: .createNew),
-            .notCommitted(.parentAuthorityUnavailable)
-        )
-        let directoryPath = fixture.directory.path(percentEncoded: false)
-        XCTAssertEqual(Darwin.chmod(directoryPath, 0o300), 0)
-        defer { _ = Darwin.chmod(directoryPath, 0o700) }
+        let nfcFolder = "\(fixture.base.path(percentEncoded: false))caf\u{E9}"
+        XCTAssertEqual(nfcFolder.withCString { Darwin.mkdir($0, 0o700) }, 0)
+        var parents = ["/System/Volumes/Data\(fixture.directoryPath)"]
+        parents.append(((fixture.directoryPath as NSString).deletingLastPathComponent as NSString)
+            .appendingPathComponent("SELECTED"))
+        parents.append("\(fixture.base.path(percentEncoded: false))cafe\u{301}")
+        let reachable = parents.filter { exists($0) }
+        guard !reachable.isEmpty else {
+            throw XCTSkip("No firmlink, case, or normalization alias spelling reaches the test folder")
+        }
+        for parent in reachable {
+            let url = WorkspaceLiteralFileURL.fileURL(path: "\(parent)/export.html", isDirectory: false)
+            let probe = ExportBoundaryProbe()
+
+            XCTAssertEqual(
+                export(to: url, disposition: .createNew, probe: probe),
+                .notCommitted(.destinationAlias),
+                parent
+            )
+
+            XCTAssertEqual(ExportArtifactWriter.inspectLeaf(at: url), .failure(.destinationAlias), parent)
+            XCTAssertEqual(
+                ExportArtifactWriter.inspectDestination(at: url, kind: .html),
+                .refused(.destinationAlias),
+                parent
+            )
+            XCTAssertFalse(probe.createdStaging, parent)
+            XCTAssertFalse(probe.calls.contains { $0.operation == .open }, "the parent is never opened: \(parent)")
+            XCTAssertTrue(probe.calls.contains { $0.path == parent && $0.operation == .fullPath }, parent)
+        }
+        // An existing leaf reached through the firmlink fails by its F_GETPATH spelling.
+        try Data("original".utf8).write(to: fixture.destination)
+        let existing = try identity(at: fixture.destination)
+        if exists(reachable.first) {
+            let url = WorkspaceLiteralFileURL.fileURL(path: "\(reachable[0])/export.html", isDirectory: false)
+            XCTAssertEqual(export(to: url, disposition: .replaceConfirmed(existing)), .notCommitted(.destinationAlias))
+        }
+        XCTAssertEqual(try text(at: fixture.destination), "original")
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", Self.sentinelName].sorted())
+    }
+
+    func testMissingOrUnsearchableParentFailsBeforeAnyWrite() throws {
+        let fixture = try makeExportFixture()
+        let missingParent = fixture.base.appendingPathComponent("absent/export.html", isDirectory: false)
+        let fileParent = fixture.sentinel.appendingPathComponent("export.html", isDirectory: false)
+        for url in [missingParent, fileParent] {
+            XCTAssertEqual(
+                export(to: url, disposition: .createNew),
+                .notCommitted(.parentAuthorityUnavailable),
+                url.path(percentEncoded: false)
+            )
+        }
+        // Mode 0600 removes search permission, so even the leaf's metadata is unreadable.
+        XCTAssertEqual(Darwin.chmod(fixture.directoryPath, 0o600), 0)
+        defer { _ = Darwin.chmod(fixture.directoryPath, 0o700) }
         let probe = ExportBoundaryProbe()
 
         XCTAssertEqual(
-            export(to: fixture.destination, disposition: .createNew, hooks: probe.hooks()),
+            export(to: fixture.destination, disposition: .createNew, probe: probe),
             .notCommitted(.parentAuthorityUnavailable)
         )
         XCTAssertEqual(
@@ -190,138 +245,95 @@ extension ExportArtifactWriterTests {
             .refused(.parentAuthorityUnavailable)
         )
         XCTAssertFalse(probe.createdStaging)
-        XCTAssertEqual(Darwin.chmod(directoryPath, 0o700), 0)
+        XCTAssertEqual(Darwin.chmod(fixture.directoryPath, 0o700), 0)
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
         XCTAssertEqual(try entries(in: fixture.base), ["selected"])
     }
 
-    func testDeniedStagingCreateIsNotCommittedWithoutAnyFallbackWrite() throws {
-        struct Denial {
-            let name: String
-            let apply: (String) -> Int32
-            let undo: (String) -> Int32
-            let code: Int32
-        }
-        let denials = [
-            Denial(
-                name: "mode 0500 (EACCES)",
-                apply: { Darwin.chmod($0, 0o500) },
-                undo: { Darwin.chmod($0, 0o700) },
-                code: EACCES
-            ),
-            Denial(
-                name: "UF_IMMUTABLE (EPERM)",
-                apply: { Darwin.chflags($0, UInt32(UF_IMMUTABLE)) },
-                undo: { Darwin.chflags($0, 0) },
-                code: EPERM
-            ),
-        ]
-        for denial in denials {
-            for replaces in [false, true] {
-                let fixture = try makeExportFixture(originalText: replaces ? "original" : nil)
-                let disposition: ExportArtifactDisposition = try replaces
-                    ? .replaceConfirmed(XCTUnwrap(fixture.originalIdentity))
-                    : .createNew
-                let directoryPath = fixture.directory.path(percentEncoded: false)
-                let before = try entries(in: fixture.directory)
-                XCTAssertEqual(denial.apply(directoryPath), 0, denial.name)
-
-                let outcome = export(to: fixture.destination, disposition: disposition)
-
-                XCTAssertEqual(denial.undo(directoryPath), 0, denial.name)
-                XCTAssertEqual(
-                    outcome,
-                    .notCommitted(.stagingNotPermitted(code: denial.code)),
-                    "\(denial.name) replaces: \(replaces)"
-                )
-                XCTAssertEqual(try entries(in: fixture.directory), before, denial.name)
-                XCTAssertEqual(try entries(in: fixture.base), ["selected"], denial.name)
-                if replaces {
-                    XCTAssertEqual(try text(at: fixture.destination), "original")
-                    XCTAssertEqual(try identity(at: fixture.destination), fixture.originalIdentity)
-                }
-            }
-        }
-    }
-
-    func testUnsupportedVolumeSemanticsFailClosedBeforeStaging() throws {
+    func testUnsupportedVolumeCapabilitiesFailClosedBeforeStaging() throws {
         let fixture = try makeExportFixture()
-        let noExclusive = ExportArtifactVolumeCapabilities(exclusiveRename: false, exchangeRename: true)
-        let noExchange = ExportArtifactVolumeCapabilities(exclusiveRename: true, exchangeRename: false)
-        let probe = ExportBoundaryProbe()
-
-        XCTAssertEqual(
-            export(
-                to: fixture.destination,
-                disposition: .createNew,
-                hooks: probe.hooks(volumeCapabilities: { _ in noExclusive })
-            ),
-            .notCommitted(.unsupportedVolumeSemantics)
+        try assertUnsupportedCapabilitiesRefuse(
+            fixture,
+            disposition: .createNew,
+            queriedPath: fixture.directory.path(percentEncoded: false),
+            "a new leaf reads the parent URL's volume keys"
         )
-        XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
         try Data("original".utf8).write(to: fixture.destination)
         let existing = try identity(at: fixture.destination)
-        for capabilities in [noExclusive, noExchange] {
-            XCTAssertEqual(
-                export(
-                    to: fixture.destination,
-                    disposition: .replaceConfirmed(existing),
-                    hooks: probe.hooks(volumeCapabilities: { _ in capabilities })
-                ),
-                .notCommitted(.unsupportedVolumeSemantics)
-            )
-        }
-        XCTAssertFalse(probe.createdStaging)
+        try assertUnsupportedCapabilitiesRefuse(
+            fixture,
+            disposition: .replaceConfirmed(existing),
+            queriedPath: fixture.destinationPath,
+            "an overwrite reads the existing leaf's volume keys"
+        )
         XCTAssertEqual(try text(at: fixture.destination), "original")
         XCTAssertEqual(try identity(at: fixture.destination), existing)
     }
 
-    func testProbedVolumeCapabilitiesReportExclusiveAndExchangeRenameOnTestVolume() throws {
-        let fixture = try makeExportFixture()
-        let descriptor = fixture.directory.path(percentEncoded: false).withCString {
-            Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        }
-        XCTAssertGreaterThanOrEqual(descriptor, 0)
-        defer { Darwin.close(descriptor) }
-        let devfs = "/dev".withCString { Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC) }
-        defer { if devfs >= 0 { Darwin.close(devfs) } }
-
-        XCTAssertEqual(
-            ExportArtifactWriter.probeVolumeCapabilities(descriptor),
-            ExportArtifactVolumeCapabilities(exclusiveRename: true, exchangeRename: true),
-            "the APFS test volume reports both rename semantics"
-        )
-        if devfs >= 0 {
+    private func assertUnsupportedCapabilitiesRefuse(
+        _ fixture: ExportWriterFixture,
+        disposition: ExportArtifactDisposition,
+        queriedPath: String,
+        _ message: String
+    ) throws {
+        let unsupported: [ExportArtifactVolumeCapabilities?] = [
+            ExportArtifactVolumeCapabilities(exclusiveRename: false, exchangeRename: true),
+            ExportArtifactVolumeCapabilities(exclusiveRename: true, exchangeRename: false),
+            nil,
+        ]
+        let queried = URLRecorder()
+        for capabilities in unsupported {
+            let probe = ExportBoundaryProbe()
+            let hooks = probe.hooks(volumeCapabilities: { url in
+                queried.append(url)
+                return capabilities
+            })
             XCTAssertEqual(
-                ExportArtifactWriter.probeVolumeCapabilities(devfs),
-                ExportArtifactVolumeCapabilities(exclusiveRename: false, exchangeRename: false),
-                "devfs does not report either semantic and is treated as unsupported"
+                export(to: fixture.destination, disposition: disposition, probe: probe, hooks: hooks),
+                .notCommitted(.unsupportedVolumeSemantics),
+                message
             )
+            XCTAssertEqual(
+                ExportArtifactWriter.inspectDestination(at: fixture.destination, kind: .html, hooks: hooks),
+                .refused(.unsupportedVolumeSemantics),
+                message
+            )
+            XCTAssertFalse(probe.createdStaging, message)
         }
+        XCTAssertFalse(queried.values.isEmpty, message)
+        XCTAssertTrue(queried.values.allSatisfy { $0.path(percentEncoded: false) == queriedPath }, message)
     }
 
-    func testOwnershipRefusalWritesNothingAndReceivesTheWritersInspection() throws {
+    func testRealVolumeKeysReportBothRenameSemanticsOnTheTestVolume() throws {
+        let fixture = try makeExportFixture()
+        let hooks = ExportArtifactWriterHooks.production
+        XCTAssertEqual(
+            hooks.capabilities(at: fixture.directory),
+            ExportArtifactVolumeCapabilities(exclusiveRename: true, exchangeRename: true),
+            "the APFS test volume advertises both rename semantics"
+        )
+        XCTAssertEqual(
+            hooks.capabilities(at: URL(fileURLWithPath: "/dev", isDirectory: true)),
+            ExportArtifactVolumeCapabilities(exclusiveRename: false, exchangeRename: false),
+            "devfs advertises neither and is treated as unsupported"
+        )
+    }
+
+    func testOwnershipRefusalWritesNothingAndReceivesTheLeafInspection() throws {
         let fixture = try makeExportFixture(originalText: "owned elsewhere")
         let existing = try XCTUnwrap(fixture.originalIdentity)
-        var received: [WorkspaceNoFollowFileTargetInspection] = []
+        var received: [ExportArtifactLeafInspection] = []
         let probe = ExportBoundaryProbe()
 
-        let outcome = export(
-            to: fixture.destination,
-            disposition: .replaceConfirmed(existing),
-            hooks: probe.hooks()
-        ) { inspection in
-            received.append(inspection)
+        let outcome = export(to: fixture.destination, disposition: .replaceConfirmed(existing), probe: probe) {
+            received.append($0)
             return .refused
         }
 
         XCTAssertEqual(outcome, .notCommitted(.ownedDestination))
         XCTAssertEqual(received.count, 1)
         XCTAssertEqual(received.first?.state, .regular(existing))
-        XCTAssertEqual(
-            received.first?.canonicalLocation.fileURL.path(percentEncoded: false),
-            fixture.destination.path(percentEncoded: false)
-        )
+        XCTAssertEqual(received.first, try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get())
         XCTAssertFalse(probe.createdStaging)
         XCTAssertEqual(try text(at: fixture.destination), "owned elsewhere")
         XCTAssertEqual(try identity(at: fixture.destination), existing)

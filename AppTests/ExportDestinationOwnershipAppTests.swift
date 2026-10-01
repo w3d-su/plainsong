@@ -5,9 +5,10 @@ import MarkdownCore
 import WorkspaceKit
 import XCTest
 
-/// Export PR E: the writer's injected ownership capability reuses the Save Copy / mutation
-/// inventory. Fixtures mirror the Save Copy collision shapes (hard link, case alias,
-/// detached/quarantined session, recovery-store failure).
+/// Export PR E/E2: the writer's injected ownership capability reuses the Save Copy / mutation
+/// inventory, driven only by the writer's leaf-path inspection (D5, amended 2026-09-29).
+/// Fixtures mirror the Save Copy collision shapes (hard link, case alias, detached/quarantined
+/// session, recovery-store failure).
 @MainActor
 final class ExportDestinationOwnershipAppTests: XCTestCase {
     func testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten() throws {
@@ -92,7 +93,7 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
         )
         let aliasURL = fixture.root.appendingPathComponent("draft.md")
         let aliasInspection = try inspection(of: aliasURL)
-        guard !aliasInspection.parentIsCaseSensitive else {
+        guard !aliasInspection.volumeIsCaseSensitive else {
             throw XCTSkip("Case aliases require a case-insensitive test volume")
         }
 
@@ -229,6 +230,49 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
         )
         XCTAssertEqual(try text(at: exportURL), "appeared after the writer's inspection")
     }
+
+    /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes a
+    /// parent descriptor impossible; the adapter still answers from leaf-path metadata alone.
+    func testWriteOnlyParentNeedsNoParentHandleForOwnership() throws {
+        let fixture = try makeWorkspaceFixture(ownedName: "posts/owned.md")
+        let subfolder = fixture.ownedURL.deletingLastPathComponent()
+        let linkURL = subfolder.appendingPathComponent("linked.html")
+        try FileManager.default.linkItem(at: fixture.ownedURL, to: linkURL)
+        let controlURL = subfolder.appendingPathComponent("control.html")
+        let subfolderPath = subfolder.path(percentEncoded: false)
+        XCTAssertEqual(Darwin.chmod(subfolderPath, 0o300), 0)
+        defer { _ = Darwin.chmod(subfolderPath, 0o700) }
+        XCTAssertThrowsError(
+            try WorkspaceNoFollowFileInspector.inspectFileTarget(at: WorkspaceFileSystemLocation(fileURL: controlURL)),
+            "the retired parent-anchored inspection cannot run under a leaf-only grant"
+        )
+
+        XCTAssertEqual(
+            try fixture.appState.exportArtifactDestinationOwnership(
+                for: inspection(of: linkURL),
+                exportSource: fixture.ownedSession
+            ),
+            .refused,
+            "a hard link to the owned file is refused by identity"
+        )
+        let outcome = fixture.appState.writeExportArtifact(
+            ExportArtifactWriteRequest(
+                destinationURL: controlURL,
+                kind: .html,
+                disposition: .createNew,
+                bytes: Data("<p>leaf-only</p>".utf8)
+            ),
+            exportSource: fixture.ownedSession
+        )
+
+        guard case .committed = outcome else {
+            return XCTFail("an unowned leaf under a write-only parent must commit: \(outcome)")
+        }
+        XCTAssertEqual(Darwin.chmod(subfolderPath, 0o700), 0)
+        XCTAssertEqual(try text(at: controlURL), "<p>leaf-only</p>")
+        XCTAssertEqual(try text(at: fixture.ownedURL), "owned sentinel")
+        XCTAssertEqual(try linkCount(at: fixture.ownedURL), 2)
+    }
 }
 
 // MARK: - Fixtures
@@ -300,7 +344,7 @@ extension ExportDestinationOwnershipAppTests {
         )
     }
 
-    /// Canonical container-temporary directory: the writer refuses symlinked parent paths.
+    /// Canonical container-temporary directory: the writer refuses symlinked path components.
     func makeTemporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ExportDestinationOwnershipAppTests")
@@ -312,11 +356,9 @@ extension ExportDestinationOwnershipAppTests {
         return try WorkspaceFileSystemRootAuthority(rootURL: url).canonicalRootURL
     }
 
-    /// The same no-follow inspection the writer passes to its ownership capability.
-    func inspection(of url: URL) throws -> WorkspaceNoFollowFileTargetInspection {
-        try WorkspaceNoFollowFileInspector.inspectFileTarget(
-            at: WorkspaceFileSystemLocation(fileURL: url)
-        )
+    /// The same leaf-path inspection the writer passes to its ownership capability.
+    func inspection(of url: URL) throws -> ExportArtifactLeafInspection {
+        try ExportArtifactWriter.inspectLeaf(at: url).get()
     }
 
     func writeText(_ text: String, to url: URL) throws {
