@@ -121,13 +121,12 @@ extension MarkdownTextViewCoordinator {
             guard let revision = currentInstalledSourceSnapshot?.revision else { return }
             preWriteRevision = revision
             controller.armReplacementPublication()
-            textView.breakUndoCoalescing()
-            editingBehaviorGuard.isApplying = true
-            defer { editingBehaviorGuard.isApplying = false }
-            textView.insertText(plan.replacement, replacementRange: plan.match.range)
-            // Close any group the insert joined, even if a caller dispatches Replace while
-            // STTextView is processing a key event, so later typing is its own undo step.
-            textView.breakUndoCoalescing()
+            insertAuthorizedReplacement(
+                plan,
+                preWriteSource: preWriteSource,
+                preWriteRevision: revision,
+                in: textView
+            )
         }
         // Find observers run only after the writer-authorized closure has returned.
         guard opened, let preWriteRevision else {
@@ -166,6 +165,30 @@ extension MarkdownTextViewCoordinator {
             revision: UInt64(max(0, observed.revision))
         )
         return .unverifiedWrite
+    }
+
+    /// The one native edit, inside the writer-authorized closure.
+    private func insertAuthorizedReplacement(
+        _ plan: EditorReplaceOneMatchPlan,
+        preWriteSource: String,
+        preWriteRevision: Int,
+        in textView: STTextView
+    ) {
+        textView.breakUndoCoalescing()
+        editingBehaviorGuard.isApplying = true
+        defer { editingBehaviorGuard.isApplying = false }
+        // A write whose publication is rejected leaves no undo step (Decision Log).
+        EditorReplaceRejectedWriteUndo(
+            textView: textView,
+            coordinator: self,
+            preWriteSource: preWriteSource,
+            preWriteRevision: preWriteRevision
+        ).guarding {
+            textView.insertText(plan.replacement, replacementRange: plan.match.range)
+        }
+        // Close any group the insert joined, even if a caller dispatches Replace while
+        // STTextView is processing a key event, so later typing is its own undo step.
+        textView.breakUndoCoalescing()
     }
 
     private func applyControllerNavigation(

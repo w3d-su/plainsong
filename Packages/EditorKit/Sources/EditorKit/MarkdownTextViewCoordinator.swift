@@ -42,6 +42,11 @@ struct EditorInstalledDocumentState {
         documentBinding?.sourceContract != nil
     }
 
+    /// App model binding the installed candidate carries (Replace installation proof).
+    var installedBindingID: EditorDocumentBindingID? {
+        documentBinding?.id
+    }
+
     mutating func prepare(
         text: Binding<String>,
         selection: Binding<NSRange?>,

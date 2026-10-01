@@ -38,6 +38,25 @@ final class EditorReplaceLayeringTests: XCTestCase {
         }
     }
 
+    /// R7: EditorKit consumes App's plain authorization closure without importing App or
+    /// WorkspaceKit; the App decision never reaches EditorKit as a type.
+    func testEditorKitImportsNeitherAppNorWorkspaceKit() throws {
+        let root = repoRoot.appendingPathComponent("Packages/EditorKit/Sources")
+        for file in try swiftFiles(under: root) {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                let code = Self.strippingLineComment(String(line))
+                    .trimmingCharacters(in: .whitespaces)
+                XCTAssertFalse(code.hasPrefix("import Plainsong"), "\(file.lastPathComponent): \(code)")
+                XCTAssertFalse(code.hasPrefix("import WorkspaceKit"), "\(file.lastPathComponent): \(code)")
+                XCTAssertFalse(
+                    code.contains("EditorReplaceAuthorizationDecision"),
+                    "\(file.lastPathComponent): \(code)"
+                )
+            }
+        }
+    }
+
     func testSingleReplaceDoesNotUseForbiddenMutationAPIs() throws {
         let executor = try source("Packages/EditorKit/Sources/EditorKit/EditorReplaceExecutor.swift")
         XCTAssertTrue(executor.contains("performPreflightedTextMutation"))
@@ -45,6 +64,8 @@ final class EditorReplaceLayeringTests: XCTestCase {
         let replacementSources = try [
             executor,
             source("Packages/EditorKit/Sources/EditorKit/EditorFindController+Replacement.swift"),
+            source("Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift"),
+            source("Packages/EditorKit/Sources/EditorKit/EditorReplaceRejectedWriteUndo.swift"),
         ]
         for text in replacementSources {
             for forbidden in [

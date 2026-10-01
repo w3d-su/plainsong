@@ -25,11 +25,28 @@
 > debounce; an unchanged snapshot is `writeNotApplied`, and any other change is
 > an `unverifiedWrite` recomputed as an ordinary edit. Experimental WYSIWYG is a
 > typed zero-effect refusal (`wysiwygPresentationInstalled`) while fold or image
-> presentation is installed; PR F lifts it. There is still no product UI, App
-> lifecycle policy, or Replace All. R4–R10 stay open. R6 marked-text coverage
-> here is the deterministic editor refusal only. Known follow-ups: a publication
-> rejected after writer activation leaves a no-op undo step behind
-> `.refused(.writeNotApplied)` (existing writer-path behavior, tracked under R7);
+> presentation is installed; PR F lifts it. R6 marked-text coverage here is the
+> deterministic editor refusal only.
+> **PR E (`phase3-editor-replace-authorization`) is App authorization and
+> lifecycle fences:** it closes R7. App owns `EditorReplaceAuthorizationDecision`,
+> one refusal per §5.6 state (never `canSave`; an installed untitled session is
+> allowed), checked at command validation and again by EditorKit at commit, in the
+> writer's synchronous turn. It is stricter than §5.6 in one place: an in-flight
+> disk inspection refuses (`externalObservationPending`), so each autosave's own
+> file event opens a brief refusal window. Plans carry a monotonic App authority
+> generation plus the session revision. The generation advances when a fence or
+> prompt map the decision reads, or an editor installation, is set or cleared, and
+> on rebind, reload, rekey, focus, key-window, and bar transitions.
+> `sessionStateURL`'s inputs and `externalResolutionIntentCaptures` are not
+> hooked; the rekey notification, the write-fence `didSet`, and the live
+> evaluation at commit cover them. An EditorKit editor stamp adds key window,
+> installation, source revision, and selection, compared by value.
+> `EditorReplaceCommandDispatcher` routes a plain command only to the installed
+> editor of the key window: its responder chain, or App's find-chrome/query-field
+> fallback exactly where Find uses it. Reload / Keep Mine completion supersedes
+> every plan and recounts Find counter-only. A write that is not applied
+> (`.refused(.writeNotApplied)`) now leaves no undo step. There is still no product
+> UI or Replace All; R4–R6 and R8–R10 stay open. Known follow-up:
 > `EditorFindController.swift` is 588 lines with a 287-line class body and should
 > be split without widening its private state.
 >
@@ -974,36 +991,143 @@ hosted spike PR #112.
 
 ### R7 — External reconciliation and indeterminate-write fencing
 
-- [ ] App owns a plain STTextView-free replacement authorization decision for
+- [x] App owns a plain STTextView-free replacement authorization decision for
   the exact focused session; EditorKit consumes it without importing App or
   WorkspaceKit.
-- [ ] Command execution and pre-commit both check authorization; the final
+- [x] Command execution and pre-commit both check authorization; the final
   check, writer activation, and mutation have no suspension between them.
-- [ ] Pending external observation/prompt, deferred/active Reload or Keep Mine,
+- [x] Pending external observation/prompt, deferred/active Reload or Keep Mine,
   partial coordinator convergence, workspace write fence, pending editor
   source, recovery-fenced missing/detached formerly-backed authority, and every
   indeterminate quarantine refuse replacement.
-- [ ] App authorization refusal leaves source, selection, ordinal, fields,
+- [x] App authorization refusal leaves source, selection, ordinal, fields,
   undo, progress, navigation, and recovery authority unchanged. Later writer
   refusal may only perform documented authoritative convergence; it applies no
   replacement or queued intent.
-- [ ] A valid installed untitled/in-memory document is not blocked solely
+- [x] A valid installed untitled/in-memory document is not blocked solely
   because it has no URL.
-- [ ] A fence appearing after planning drops the exact plan before any undo
+- [x] A fence appearing after planning drops the exact plan before any undo
   group starts.
-- [ ] Reload/Keep Mine completion triggers counter-only recomputation from the
+- [x] Reload/Keep Mine completion triggers counter-only recomputation from the
   accepted source and requires a fresh explicit Replace.
-- [ ] Integration coverage includes a pending choice, suspended Reload,
+- [x] Integration coverage includes a pending choice, suspended Reload,
   partial live-editor convergence, readable quarantine, and unavailable
   Check Again quarantine.
-- Known follow-up from PR D: if a publication is rejected after writer
-  activation succeeded, STTextView still registers the insert's undo group
-  after the view is restored, so `.refused(.writeNotApplied)` leaves a no-op
-  undo step (`EditorReplaceWriteOutcomeTests.testRejectedPublicationIsNotReportedAsReplaced`
-  does not assert undo for that reason). Ordinary typing shares this writer path;
-  App activation and publication check the same fences in one synchronous turn,
-  so no App path is known to reach it. Decide the undo contract here.
-- Evidence: _open_
+- PR D follow-up, decided in PR E: a write that is not applied leaves **no** undo
+  step. STTextView registers an insert's undo group after it notifies the
+  delegate; `EditorReplaceRejectedWriteUndo` observes the executor's own write
+  and, only when the text-did-change notification shows the exact pre-write
+  source at the pre-write revision in both the App snapshot and the native view
+  (a rejected, restored publication), disables undo registration until the insert
+  returns. No undo action is written or removed by hand; applied, reconciled, and
+  unobservable writes register their native group as before. Ordinary typing is
+  unchanged. Evidence:
+  `EditorReplaceWriteOutcomeTests.testRejectedPublicationLeavesNoUndoStepAndKeepsPriorHistory`
+  (the next Undo reverts the typing that preceded the refused Replace; undo
+  registration stays balanced) and the undo assertions added to
+  `testRejectedPublicationIsNotReportedAsReplaced`; with the guard disabled both
+  fail.
+- Evidence (hosted tests are in the app-hosted `PlainsongTests` bundle; the
+  `EditorReplaceHosted*GateTests` files extend `EditorFindHostedGateTests` and
+  mount production `WorkspaceWindow`s in designated key windows):
+  - Decision and layering: `EditorReplaceAuthorizationAppTests`
+    (`testEverySection56StateRefusesWithItsReasonAndAdvancesTheGeneration`: one
+    reason per §5.6 state, including the in-flight read, indeterminate
+    mutation, and missing-file prompt; `testDecisionIsBoundToTheExactSessionAndIsNotCanSave`;
+    `testRestoredTextRecoverySessionIsRecoveryFenced`;
+    `testCommitAuthorizationReEvaluatesLiveStateAndRecordsItsReason`);
+    `EditorReplaceLayeringTests.testEditorKitImportsNeitherAppNorWorkspaceKit`
+    and `testAppAndMarkdownCoreDoNotImportSTTextView`.
+  - Two checks, one synchronous commit turn:
+    `testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit`
+    (checkpoints `[.validation, .commit]`; the call returns with the mutation
+    applied) and `testHostedFenceAppearingBeforeCommitRefusesAtTheCommitCheck`
+    (a fence injected between validation and EditorKit's commit call, or set and
+    cleared there, refuses with no undo group).
+  - §5.6 matrix, each refused through the production path with the zero-effect
+    snapshot (`EditorReplaceEffectSnapshot`: App and native source, revision,
+    dirty, selection, Find session and query generation, find chrome, undo/redo,
+    shared and pending navigation, and every recovery/quarantine/fence map):
+    `testHostedReplaceRefusesWhileAnExternalChangeAwaitsAChoice`,
+    `testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource`,
+    `testHostedReplaceRefusesAReadableIndeterminateWriteQuarantine`,
+    `testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine`,
+    `testHostedReplaceRefusesDuringAWorkspaceMutationWriteFence`,
+    `testHostedReplaceRefusesWhileEditorSourceIsPending`,
+    `testHostedReplaceRefusesARecoveryFencedDetachedSession`,
+    `testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload` (partial
+    convergence with two live installations). The in-flight inspection reason
+    (`externalObservationPending`) is covered by
+    `testEverySection56StateRefusesWithItsReasonAndAdvancesTheGeneration`.
+  - Stricter than §5.6: an in-flight disk inspection (`externalDiskInspectionTasks`)
+    refuses as `externalObservationPending`, before any conflict is known. A
+    self-written save is recognized only inside that inspection, so every
+    autosave's own file-system event opens a brief refusal window that ends when
+    the inspection adopts the saved bytes. **Note for PR H / R10:** Replace UI and
+    XCUITests must expect this transient refusal right after an autosave (present
+    it as a momentary blocked state and retry on a fresh explicit action, or wait
+    for the inspection to settle) rather than treat it as a failure.
+  - Writer refusal after authorization:
+    `testHostedWriterRefusalAfterAuthorizationOnlyConverges` (the stale view
+    converges to App's source, no replacement or undo group, Find recounts
+    counter-only, then a fresh Replace succeeds).
+  - Untitled: `EditorReplaceAuthorizationAppTests.testInstalledUntitledDocumentIsAllowedThroughTheProductionPath`
+    (no URL, no identity, `canSave == false`, replaced through App → EditorKit;
+    only an explicit fence refuses it).
+  - Supersession: `testHostedFenceAppearingAfterPlanningDropsThePlanBeforeAnyUndoGroup`
+    (a write fence set and cleared after planning: the decision is `.allowed`
+    again, yet the plan fails with no undo group);
+    `EditorReplaceAuthorizationAppTests.testAuthorityGenerationAdvancesOnLifecycleFocusAndBarTransitions`
+    and `testTypingSupersedesAStampWithoutTouchingTheGeneration` (edits
+    supersede through the monotonic session revision, with no keystroke-path
+    work); `EditorReplaceCommandDispatcherTests.testSelectionChangeAfterPlanningDropsTheCommand`.
+    Hooks cover the fence and prompt maps the decision reads and editor
+    installations; `sessionStateURL`'s inputs (`anchoredSessionFileBindings`,
+    `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`)
+    and `externalResolutionIntentCaptures` are not hooked and are covered by the
+    rekey notification, the write-fence `didSet`, and the live evaluation at
+    commit. **Note for PR G:** the editor stamp compares selection and in-window
+    focus by value, not by a monotonic generation, so an A→B→A change between
+    planning and commit passes; that is harmless for single Replace (planned and
+    committed in one turn, and the executor re-proves the applied selection), and
+    PR G must decide whether it matters for off-main Replace All planning.
+  - Resolution: `testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace`,
+    `testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace` (Keep Mine
+    keeps identity, revision, and source, so the retained session is the recount:
+    no second scan and no shared-channel publication, as F4b requires),
+    `testHostedKeepMineCompletionHookRecountsAStaleFindBinding`, and
+    `testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload`. The hook's
+    generation advance cannot be isolated in a hosted test: choosing Keep Mine or
+    Reload already sets `deferredExternalChangeResolutions`, and finalization
+    clears the resolution maps, and both advance the generation. Its counter-only
+    revalidation is isolated by `testHostedKeepMineCompletionHookRecountsAStaleFindBinding`,
+    which leaves Find bound to an older source (a synthetic desync, since nothing
+    on the Keep Mine path notifies Find) and fails with
+    `editorReplaceExternalResolutionDidComplete` disabled. For Reload the
+    apply-time `notifyEditorFindExternalContentDidReplace` already recounts, so the
+    hook's recount is a no-op there.
+  - Delivery and key-window/installation proof:
+    `testHostedReplaceFromTheQueryFieldUsesTheFindFallback` (drives both
+    fallback branches through Find's `commandContextOverride` seam, so it does not
+    exercise the production eligibility check),
+    `testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck` (no override:
+    Find's real `isEditorFindCommandContextActive()` chrome-focus branch, with
+    only the key-window number stubbed through `keyWindowNumberOverride`; the
+    `NSApp.keyWindow` query-field branch stays unexercised because only designated
+    key status is controlled, not the host's real key window),
+    `testHostedReplaceReachesOnlyTheKeyWindowsInstallation` (no-key refusal preserves
+    both installations' zero-effect snapshots; an installed key-window test override
+    is authoritative even when it returns nil, so the XCTest host's real key window
+    cannot enter the fixture),
+    `EditorReplaceCommandDispatcherTests.testNilKeyWindowOverrideRefusesBeforeAuthorization`
+    (stamp capture, responder delivery, and fallback refuse before authorization),
+    `EditorReplaceCommandDispatcherTests` (responder chain, no main-window
+    fallthrough, background and unregistered installations, stamp capture), and
+    PR D's `EditorReplaceSingleReplaceAppTests` now driven through
+    `AppState.performEditorReplace` instead of `performSingleReplace`.
+  - Negative controls: with the authority-input hook disabled, the two fence
+    supersession tests fail and stale plans commit; with the completion hook
+    disabled, `testHostedKeepMineCompletionHookRecountsAStaleFindBinding` fails.
 
 ### R8 — UI, menu, focus, and accessibility
 

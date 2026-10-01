@@ -35,6 +35,7 @@ extension AppState {
         guard let windowNumber else { return }
         guard editorFindHost.chromeFocusByWindow[windowNumber] != focus else { return }
         editorFindHost.chromeFocusByWindow[windowNumber] = focus
+        advanceEditorReplaceAuthorityGeneration()
         objectWillChange.send()
     }
 
@@ -48,6 +49,7 @@ extension AppState {
     func clearEditorFindChromeFocus() {
         guard !editorFindHost.chromeFocusByWindow.isEmpty else { return }
         editorFindHost.chromeFocusByWindow.removeAll()
+        advanceEditorReplaceAuthorityGeneration()
         objectWillChange.send()
     }
 }

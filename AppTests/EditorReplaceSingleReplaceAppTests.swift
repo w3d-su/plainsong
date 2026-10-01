@@ -11,6 +11,7 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
     private var windows: [NSWindow] = []
 
     override func tearDown() {
+        EditorSelectionProbe.keyWindowOverrideForTesting = nil
         for window in windows {
             window.isReleasedWhenClosed = false
             window.orderOut(nil)
@@ -44,21 +45,13 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         }
         await Task.yield()
 
-        let outcome = hosted.coordinator.performSingleReplace(
-            EditorReplaceRequest(
-                documentIdentity: identity,
-                sourceRevision: controller.documentBinding.revision,
-                queryGeneration: controller.queryGeneration,
-                session: findSession,
-                replacement: "aa"
-            ),
-            authorization: .allowed(),
-            controller: controller,
-            in: hosted.textView
-        )
-        guard case .replaced = outcome else {
+        // PR E: through App validation, the plain EditorKit command path, key-window and
+        // installation proof, and App's commit-time authorization.
+        let outcome = appState.performEditorReplace(replacement: "aa")
+        guard case .delivered(.replaced) = outcome else {
             return XCTFail("Expected a source change, got \(outcome)")
         }
+        XCTAssertEqual(findSession.currentMatch?.range, NSRange(location: 0, length: 1))
 
         try await assertPublication(
             session: session,
@@ -94,21 +87,11 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
             appObserver()
         }
 
-        let outcome = coordinator.performSingleReplace(
-            EditorReplaceRequest(
-                documentIdentity: identity,
-                sourceRevision: controller.documentBinding.revision,
-                queryGeneration: controller.queryGeneration,
-                session: findSession,
-                replacement: "aa"
-            ),
-            authorization: .allowed(),
-            controller: controller,
-            in: hosted.textView
-        )
-        guard case .replaced = outcome else {
+        let outcome = appState.performEditorReplace(replacement: "aa")
+        guard case .delivered(.replaced) = outcome else {
             return XCTFail("Expected a source change, got \(outcome)")
         }
+        XCTAssertEqual(findSession.currentMatch?.range, NSRange(location: 0, length: 1))
         XCTAssertEqual(hostedSession.session.version, 1)
         XCTAssertEqual(controller.documentBinding.revision, 1)
         // App's ordinary publication reached Find during the write and was recorded,
@@ -187,6 +170,9 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         textView: MarkdownSTTextView
     ) async throws -> EditorFindSession {
         appState.ensureEditorFindSessionObserverInstalled()
+        var ui = appState.editorFindHost.ui
+        ui.isBarVisible = true
+        appState.setEditorFindUI(ui)
         controller.debounceNanoseconds = 0
         controller.rebindDocument(
             EditorFindDocumentBinding(
@@ -218,6 +204,8 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         let textView = try XCTUnwrap(scrollView.documentView as? MarkdownSTTextView)
         textView.text = session.text
         textView.textSelection = NSRange(location: 0, length: 0)
+        // `MarkdownTextView.makeNSView` stamps every production editor with this identifier.
+        textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
         let representable = MarkdownTextView(
             text: Binding(get: { session.text }, set: { _ in }),
             styledText: nil,
@@ -230,7 +218,7 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         )
         let coordinator = representable.makeCoordinator()
         textView.textDelegate = coordinator
-        let window = NSWindow(
+        let window = EditorReplaceKeyWindow(
             contentRect: frame,
             styleMask: [.titled, .closable],
             backing: .buffered,
@@ -238,9 +226,12 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         )
         window.isReleasedWhenClosed = false
         window.contentView = scrollView
-        window.makeKeyAndOrderFront(nil)
+        window.orderFront(nil)
         windows.append(window)
         representable.updateRepresentedTextView(scrollView, coordinator: coordinator)
+        window.isDesignatedKey = true
+        EditorSelectionProbe.keyWindowOverrideForTesting = { window }
+        XCTAssertTrue(window.makeFirstResponder(textView))
         textView.undoManager?.removeAllActions()
         return AppFixture(textView: textView, coordinator: coordinator)
     }
