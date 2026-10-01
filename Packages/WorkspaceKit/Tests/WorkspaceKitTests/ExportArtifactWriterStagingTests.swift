@@ -157,6 +157,7 @@ extension ExportArtifactWriterTests {
         let outcome = export(to: destination, disposition: .createNew, probe: probe, hooks: hooks)
 
         XCTAssertEqual(outcome, .notCommitted(.stagingDirectoryOnDifferentDevice))
+        XCTAssertTrue(probe.calls(at: .publish).isEmpty, "no rename or cross-device fallback")
         XCTAssertFalse(probe.createdStaging)
         XCTAssertFalse(exists(staging.path(percentEncoded: false)))
         XCTAssertFalse(exists(destination.path(percentEncoded: false)))

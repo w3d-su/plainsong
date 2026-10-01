@@ -96,8 +96,7 @@ struct ExportArtifactPathAttributes: Equatable {
             as: UInt32.self
         ))
         let start = referenceOffset + dataOffset
-        guard device >= 0,
-              dataLength > 1,
+        guard dataLength > 1,
               start >= headerSize,
               start <= returnedLength,
               dataLength <= returnedLength - start
@@ -110,7 +109,10 @@ struct ExportArtifactPathAttributes: Equatable {
         }
         return ExportArtifactPathAttributes(
             path: Array(bytes.dropLast()),
-            identity: WorkspaceFileSystemIdentity(device: UInt64(device), inode: fileID),
+            identity: WorkspaceFileSystemIdentity(
+                device: WorkspaceFileSystemIdentity.exportDeviceID(device),
+                inode: fileID
+            ),
             isDirectory: type == fsobj_type_t(VDIR.rawValue)
         )
     }
@@ -258,8 +260,15 @@ struct ExportArtifactWriterHooks: Sendable {
 }
 
 extension WorkspaceFileSystemIdentity {
+    /// Darwin's signed `dev_t` is an opaque 32-bit ID. A set high bit is valid, not a
+    /// negative numeric identity: preserve its bits and zero-extend them for every export
+    /// observation (`stat` and `getattrlist`) and same-device comparison.
+    static func exportDeviceID(_ device: dev_t) -> UInt64 {
+        UInt64(UInt32(bitPattern: device))
+    }
+
     init(exportStatus status: stat) {
-        self.init(device: UInt64(status.st_dev), inode: UInt64(status.st_ino))
+        self.init(device: Self.exportDeviceID(status.st_dev), inode: UInt64(status.st_ino))
     }
 }
 

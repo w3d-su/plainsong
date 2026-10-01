@@ -50,7 +50,7 @@ extension ExportArtifactWriter {
         ) {
             return .refused(failure, removing: directory)
         }
-        let destinationDevice = preflight.proof.leafStatus.map { UInt64($0.st_dev) }
+        let destinationDevice = preflight.proof.leafStatus.map { WorkspaceFileSystemIdentity.exportDeviceID($0.st_dev) }
             ?? preflight.proof.parentIdentity.device
         guard directory.identity.device == destinationDevice else {
             return .refused(.stagingDirectoryOnDifferentDevice, removing: directory)

@@ -111,12 +111,38 @@ extension ExportArtifactWriterTests {
             ("interior NUL", ExportPathReply(path: Array("/a\u{0}b".utf8))),
             ("relative path", ExportPathReply(path: Array("Users/example".utf8))),
             ("empty path", ExportPathReply(path: [])),
-            ("negative device", ExportPathReply(path: path, device: -1)),
         ]
         for (label, reply) in malformed {
             let bytes = reply?.bytes ?? Array(repeating: 0, count: 12)
             XCTAssertNil(parse(bytes, unaligned: false), label)
             XCTAssertNil(parse(bytes, unaligned: true), label)
+        }
+    }
+
+    /// The sign bit in Darwin's `dev_t` is part of the device ID, including on real devfs
+    /// volumes. Both metadata sources must preserve all 32 bits with the same zero extension.
+    func testDeviceIdentityPreservesSignedDeviceBitsAcrossStatAndPathAttributes() throws {
+        let path = Array("/dev".utf8)
+        let devices: [(dev_t, UInt64)] = [
+            (0, 0),
+            (7, 7),
+            (.max, 0x7FFF_FFFF),
+            (.min, 0x8000_0000),
+            (-1, 0xFFFF_FFFF),
+        ]
+        for (device, expected) in devices {
+            var status = stat()
+            status.st_dev = device
+            status.st_ino = 0x1_0000_0001
+            let identity = WorkspaceFileSystemIdentity(exportStatus: status)
+            XCTAssertEqual(identity, WorkspaceFileSystemIdentity(device: expected, inode: 0x1_0000_0001))
+            let bytes = ExportPathReply(path: path, device: device).bytes
+            for unaligned in [false, true] {
+                let attributes = try XCTUnwrap(parse(bytes, unaligned: unaligned))
+                XCTAssertEqual(attributes.identity, identity)
+                XCTAssertEqual(attributes.path, path)
+                XCTAssertTrue(attributes.isDirectory)
+            }
         }
     }
 
