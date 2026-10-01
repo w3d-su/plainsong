@@ -1281,10 +1281,10 @@ editor keystroke path.
 
 Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug.
 The exact reveal proof runs only on explicit Replace. After the 2026-10-01 review
-fix, the keystroke and selection paths are those of #131: `MarkdownEditorView` is
-byte-identical to #131 (the `.task(id:)` debounce, reading `text`), and native
-writer/input, caret snapping, selection-driven reveal, the marked-text guard and the
-native-edit styling guard are unchanged. The only edit-path addition is an O(1)
+fix and subsequent restack, `MarkdownEditorView` inherits the separate scheduling
+bug-fix PR (`phase3-editor-highlight-schedule-fix`, `8257250421af4f848760fb060c684a411057fe43`), which bounds executing
+highlight work and pending requests. Native writer/input, caret snapping,
+selection-driven reveal, marked-text and native-edit styling guards remain unchanged. The only edit-path addition is an O(1)
 record of the applied model, made once per *applied* debounced highlight in
 `MarkdownTextView+HighlightApply.swift`, never per keystroke; the reveal proof reads it.
 
@@ -1309,7 +1309,7 @@ Without the variable it reports an `XCTSkip`. Run it on an idle machine, seriali
 with any other Mac test run (`lockf` on the shared lock file if agents share the Mac):
 
 ```sh
-TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild -project Plainsong.xcodeproj \
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" env TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild -project Plainsong.xcodeproj \
   -scheme Plainsong -configuration Debug test \
   -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget
 ```
@@ -1352,8 +1352,9 @@ styling while native editing was active measured 18.658417 / 18.299334 /
 guard returned the normal slow samples to about 14.6 ms. That trial was removed;
 no presentation-apply or typing-budget exception ships. The 18/18 hosted
 post-write/Undo/Redo reparse executions reported before review used the `Task`
-scheduler. With `.task(id:)` restored, those automatic-reparse methods can time out
-under load (see the R5 scheduler observation and the Decision Log).
+scheduler. Before restack, restoring `.task(id:)` allowed those automatic-reparse
+methods to time out under load. The dropped final request explains the two recorded
+timeouts; the separate scheduling bug-fix PR now supplies the fix (see its entry below).
 
 Earlier complete EditorFind/EditorReplace hosted run (pre-review tree): **104/104
 passed**, including the hard local typing probe (maximum **15.009834 ms**; raw
@@ -1364,3 +1365,117 @@ executed, 111 passed, the typing probe skipped (opt-in), and two failed
 (`testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo` and
 `testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`, both
 automatic-reparse timeouts at load averages of about 14–16).
+
+## Editor highlight scheduling fix — 2026-10-01
+
+Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug, on a Mac shared
+with other agents' builds and tests (load averages recorded per run). `MarkdownEditorView`
+now restarts its 20 ms debounced visible-range highlight through `EditorHighlightScheduler`
+instead of SwiftUI `.task(id:)` (Decision Log 2026-10-01). Per keystroke the view still
+bumps `@State highlightRevision` and `body` still reads it, so the SwiftUI update cadence
+is unchanged. Each schedule replaces one pending operation and cancels the executing
+request; a single runner waits for it to return before creating the latest highlight task.
+The debounce, parser, apply guards and IME behavior are unchanged.
+
+**Dropped-request reproduction (opt-in, not deterministic).**
+`EditorFindHostedGateTests.testHostedHighlightScheduleStressAppliesAfterEveryEdit` opens
+`Intro **文字😀** tail` in Experimental WYSIWYG, then runs 15 cycles of edit / Undo / Redo
+/ Undo. It counts an edit as dropped when no highlight applies within 3 s. Set
+`PLAINSONG_XCODEBUILD_LOCK` to the shared lock used by the other agents, then run:
+
+```sh
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" env TEST_RUNNER_PLAINSONG_RUN_HIGHLIGHT_SCHEDULE_STRESS=1 xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug test \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit
+```
+
+| Run order | Product | Load average (1 min, start → end) | Edits without an applied highlight |
+|---:|---|---|---:|
+| 1 | d2f739a, `.task(id:)` (untracked copy of the probe) | 52.68 → 22.64 | 10 / 60 |
+| 2 | this branch | 22.64 → 22.03 | 0 / 60 |
+| 3 | this branch | 21.87 → 20.83 | 0 / 60 |
+| 4 | d2f739a, `.task(id:)` | 20.83 → 13.69 | 8 / 60 |
+
+Earlier, on the Replace PR F branch, the hosted folded-delimiter Replace test failed 8/15
+iterations with `.task(id:)` and passed 15/15 with a direct `Task` (load averages
+about 12–19). An in-memory trace of a failing iteration showed SwiftUI evaluating `body`
+with the final `highlightRevision` at least five times without cancelling the in-flight
+task or starting a new one, after which that task stopped at its revision guard. Passing
+iterations show the same traced event order, so **the drop could not be forced
+deterministically**. The rates depend on load, and the Replace PR F reviewer saw no failure
+on a quieter machine. The deterministic contract is pinned instead by
+`EditorHighlightSchedulerTests` (one apply of the final revision per burst; every superseded
+request cancelled, including one already past its debounce).
+
+**Initial typing diagnostic, superseded.** The earlier ABABAB measurements on d2f739a
+used a scheduler that cancelled and immediately spawned each new task, without an open
+Find session. They are retained in
+[evidence/editor-highlight-schedule-20261001-typing-initial.json](evidence/editor-highlight-schedule-20261001-typing-initial.json)
+for provenance only. They do not validate the final bounded scheduler or reproduce the
+supplied Replace F Find-session measurement method.
+
+**Final typing (§12, §17.8, opt-in).** Both trees mount the production `WorkspaceWindow`
+on `Fixtures/large-1mb.md`, open Find for `ordinary prose`, restore its production 150 ms
+debounce, and wait for styling and Replace authority to settle. The probes time 30
+synchronous native `insertText` calls with 20 ms between them, in source-only and WYSIWYG.
+Timing includes native input, App publication and scheduling; it excludes async
+parse/layout and hardware event delivery. The baseline is refreshed origin/main e95ac36
+(#132; initial work started on d2f739a/#131). Identical untracked probes are installed
+only in the isolated baseline worktree. Every xcodebuild is serialized under the existing
+shared `lockf` lock, with load averages sampled after acquiring it. Final ABABAB samples
+are retained in [the raw JSON](evidence/editor-highlight-schedule-20261001-typing.json).
+The 16 ms budget is unchanged.
+
+| Run | Product | Load (1 / 5 / 15 min, start → end) | Source-only max / median (ms) | WYSIWYG max / median (ms) |
+|---:|---|---|---:|---:|
+| 1 | main e95ac36 | 18.99 / 15.29 / 11.16 → 15.17 / 14.72 / 11.10 | 17.364 / 14.771 | 16.275 / 14.892 |
+| 2 | bounded scheduler | 15.17 / 14.72 / 11.10 → 13.65 / 14.36 / 11.11 | 15.572 / 14.868 | 15.414 / 14.684 |
+| 3 | main e95ac36 | 13.65 / 14.36 / 11.11 → 12.18 / 13.95 / 11.07 | 16.289 / 14.713 | 15.532 / 14.703 |
+| 4 | bounded scheduler | 12.18 / 13.95 / 11.07 → 12.51 / 13.86 / 11.12 | 17.274 / 15.054 | 15.808 / 14.776 |
+| 5 | main e95ac36 | 12.51 / 13.86 / 11.12 → 11.41 / 13.46 / 11.07 | 20.506 / 14.839 | 15.235 / 14.666 |
+| 6 | bounded scheduler | 11.41 / 13.46 / 11.07 → 10.46 / 13.03 / 11.00 | 15.668 / 14.825 | 15.209 / 14.744 |
+
+The runs were interleaved ABABAB with identical probes. Both trees exceed the hard 16 ms
+budget in some runs; sample distributions remain bimodal. The shared-machine loads and
+three runs per product do not establish a speedup or exclude a regression. **Idle-machine
+measurement pending**: the owner must rerun both opt-in modes before opening the PR.
+These numbers are not keystroke-to-screen, hardware input or real-IME evidence.
+
+**Final bounded-scheduler stress:** 0 drops / 60 edit–Undo–Redo–Undo operations, load
+[19.25, 14.52, 11.67] → [17.5, 14.41, 11.7] (1 / 5 / 15 min). This is opt-in empirical evidence,
+not a deterministic reproduction of the original SwiftUI drop.
+
+EditorKit: 395 tests, 7 skips, zero failures.
+
+MarkdownCore: 303 tests, 0 skips, zero failures.
+
+hosted: 117 tests, 3 skips, zero failures.
+
+`make build`, pinned SwiftFormat 0.62.1 `make lint` and `git diff --check` passed.
+The scheduler contract suite has five deterministic tests; no production timing changed.
+
+Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
+removes presentation attributes until the next reparse. This branch does not repair it.
+
+## Replace PR F restack — 2026-10-01
+
+Merge origin/main e95ac36 (#131 d2f739a plus #132) into Replace F using merge, preserving
+main's authoritative nil-key-window override and the F WYSIWYG/asset helper. Then merge
+`phase3-editor-highlight-schedule-fix`. No rebase, push or Find-controller changes.
+The scheduler bug-fix PR owns the cancellation/coalescing implementation; F's automatic
+presentation reparses now run on it. PR D's presentation-attribute reset on rejected
+publication remains a known follow-up, with no repair in either change.
+
+Post-restack verification on the merged source tree: **EditorKit 411 tests**, seven
+real-IME opt-in skips, zero failures; **hosted EditorFind/EditorReplace plus all nine
+App WYSIWYG policies: 125 tests**, four stress/typing opt-in skips, zero failures.
+`testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo` and
+`testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo` each passed **3/3**
+using `-test-iterations 3`, with no failure retry. The complete hosted run also passed
+both cases once. Repeated-run load (1 / 5 / 15 min):
+[13.96, 14.4, 12.17] → [12.04, 13.93, 12.07].
+`make build`, pinned SwiftFormat 0.62.1 `make lint`, and `git diff --check` passed.
+[Verification record](evidence/editor-replace-f-restack-20261001.json).
+The A/B typing samples above validate the scheduler dependency only to the stated limits:
+idle-machine measurement is pending, the 16 ms gate remains unchanged, and R9/real IME
+and batch Replace remain open.

@@ -1043,33 +1043,29 @@ hosted spike PR #112.
   raw selection/copy/accessibility and one Undo/Redo step are asserted.
   `testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally` asserts one
   replacement publication and reads the normal live preview; it does not mutate
-  the DOM. Review-fix runs, with the unchanged `.task(id:)` scheduler: the nested
-  heading method passed three consecutive executions (3/3); in one complete hosted
-  run the folded-delimiter and image methods timed out waiting for automatic
-  reparse (see the next item), and the other five passed.
-- Scheduler observation (unproven, not deterministic): with the unchanged
-  `.task(id:)` debounce, the automatic-reparse hosted methods can time out under
-  load. An in-memory trace showed SwiftUI evaluating `body` with the final
-  `highlightRevision` at least five times without cancelling the in-flight task or
-  starting the new one; the in-flight task then dropped at its revision guard and
-  nothing re-requested the parse. At load averages of about 12–19,
-  `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`
-  failed 8/15 with `.task(id:)` and passed 15/15 with a directly restarted `Task`.
-  The reviewer saw no failure on a quieter machine, and the interleaving could not
-  be forced, so this PR keeps `.task(id:)` (Decision Log) and these hosted methods
-  can fail intermittently on a loaded host. Bullet 4's deterministic evidence is
-  the EditorKit post-write/Undo/Redo reparse assertions above.
-- Typing: `MarkdownEditorView`, the keystroke path, and the selection path are
-  unchanged from #131. The only edit-path addition is an O(1) record made once per
-  *applied* debounced highlight (never per keystroke); see
-  [perf-log.md](perf-log.md#replace-pr-f-wysiwyg-single-replace--2026-09-30). The
-  hosted `large-1mb.md` typing probe is opt-in
-  (`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`). Review-fix verification:
-  full MarkdownCore 303/303; full EditorKit 405 tests (seven actual-IME opt-in
-  skips, zero failures); hosted EditorFind/EditorReplace classes plus the nine App
-  WYSIWYG policy tests: 114 executed, 111 passed, the typing probe skipped, and the
-  two automatic-reparse timeouts above. Pinned SwiftFormat 0.62.1 format/lint,
-  `make build`, and `git diff --check` passed.
+  the DOM. Historical review-fix runs on `.task(id:)` had two automatic-reparse
+  timeouts (folded delimiter and image); the other five methods passed.
+- Scheduler dependency: the highlight-scheduling bug-fix PR
+  (`phase3-editor-highlight-schedule-fix`, local commit `8257250421af4f848760fb060c684a411057fe43`) owns the Task scheduler.
+  Replace F stacks on it. The trace showed `body` evaluating the final revision without
+  restarting the task, then the old task stopping at its revision guard. This dropped
+  request explains both historical hosted timeouts. Under load about 12–19 the folded
+  test failed 8/15 with `.task(id:)` and passed 15/15 with the original direct Task;
+  a deterministic reproduction of the SwiftUI drop could not be forced. The bug-fix PR
+  adds deterministic cancellation/coalescing tests and an opt-in stress reproduction.
+  The final bounded implementation and interleaved A/B typing evidence live in its
+  [perf entry](perf-log.md#editor-highlight-scheduling-fix--2026-10-01).
+- Typing: Replace F's own addition remains an O(1) snapshot recorded once per applied
+  highlight, never per keystroke. The scheduling change is inherited from the separate
+  bug-fix PR. The unchanged native-edit and marked-text guards remain in force.
+  Hosted typing is opt-in (`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`), with the
+  unchanged 16 ms budget and idle-machine measurement pending. Historical review-fix
+  counts and failures remain recorded in the perf log. Post-restack verification:
+  full EditorKit 411 tests (seven real-IME opt-in skips), hosted EditorFind/EditorReplace
+  plus nine App WYSIWYG policies 125 tests (four opt-in skips), zero failures. Both
+  previously timed-out automatic-reparse cases passed 3/3 with no failure retry.
+  `make build`, pinned SwiftFormat 0.62.1 lint, and `git diff --check` passed;
+  [verification record](evidence/editor-replace-f-restack-20261001.json).
   The reveal proof runs only on explicit Replace. These synthetic native-input
   probes do not close R9 or real IME.
 

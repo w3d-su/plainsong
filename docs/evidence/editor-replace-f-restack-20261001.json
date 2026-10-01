@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-01",
+  "main": "e95ac36675a55d14c56fb4440d29a5f649c507e8",
+  "main_merge": "a1ce98f",
+  "scheduling_fix": "8257250421af4f848760fb060c684a411057fe43",
+  "method": "Merge main, then merge scheduling branch. All xcodebuild commands use the existing shared lockf lock. Repeated cases use -test-iterations 3, no retry-on-failure.",
+  "checks": {
+    "EditorKit": {
+      "executed": 411,
+      "skipped": 7,
+      "failures": 0,
+      "log_sha256": "6fcf42a35e24fb82abec68828976473ebe0887bc0bd3aa131248577fe3bc9192"
+    },
+    "hosted": {
+      "executed": 125,
+      "skipped": 4,
+      "failures": 0,
+      "log_sha256": "34e95cc1d2fe98c42c87d3647d9d6e7d38bfc0e847bea186c85e8b0899404185"
+    }
+  },
+  "repeated_tests": {
+    "testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo": {
+      "passed": 3,
+      "executions": 3
+    },
+    "testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo": {
+      "passed": 3,
+      "executions": 3
+    }
+  },
+  "repeated_load_start_1_5_15": [
+    13.9599609375,
+    14.3994140625,
+    12.1708984375
+  ],
+  "repeated_load_end_1_5_15": [
+    12.0380859375,
+    13.927734375,
+    12.0654296875
+  ],
+  "pending": [
+    "idle-machine typing measurement before opening PR",
+    "pre-existing PR D rejection-restore presentation attribute follow-up"
+  ],
+  "source_sha256": {
+    "Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift": "c041b27fa7710e5873659eb7cc8ba2517a545bcf3a1ed2197d37430e9dc6c683",
+    "Packages/EditorKit/Sources/EditorKit/EditorHighlightScheduler.swift": "4b667d8fbe90cd0f982d3d1974f851c368e0dc63ac2d6d88d0d22d46198bbce7",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceExecutor.swift": "0ef33ca76fbb8609c55f90769e64667a7b19a770d0f38ee33f138432abaab5fd",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceExecutor+WYSIWYG.swift": "c0094dc12759e5f5d73154096da20a53d13712491d0c7969fb0a01265b524aaa"
+  }
+}
