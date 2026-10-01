@@ -488,7 +488,8 @@ The exception is narrow. The export path must still refuse to:
    persistent recovery journal, or second export output. The writer's own temporary entries
    are the operation-private item-replacement directory and its single staged file
    (amended 2026-09-29; shared-ancestor reporting clarified 2026-10-01):
-   - These are the only operation-owned temporary entries. If Foundation places that directory in the chosen folder
+   - These are the only operation-owned temporary entries. If Foundation places that directory
+     in the chosen folder
      (its fallback creates it before any check can run), fail closed. Remove the directory
      only if it is empty and its identity matches; otherwise report its exact path. The one
      exception is a directory below the app-private root under step 1's owner decision of
@@ -498,8 +499,8 @@ The exception is narrow. The export path must still refuse to:
      `unprovenDirectoryURLs` under E6; those ancestors are never deleted or assumed to be
      operation-owned. A universal no-extra-entry observation remains an owner sandbox smoke.
    - Neither operation-owned entry may survive a reported success.
-   - Either operation-owned entry may remain only after a truthfully reported indeterminate failure, at an exact
-     reported path, so that no identity is destroyed.
+   - Either operation-owned entry may remain only after a truthfully reported indeterminate
+     failure, at an exact reported path, so that no identity is destroyed.
 5. Rekey a session, mark source saved/clean, change recents, adopt the export as the
    current document, or enter the workspace mutation/recovery journal.
 6. Retry silently at an old/stale URL or treat a partial/uncertain write as success.
