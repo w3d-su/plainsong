@@ -15,10 +15,14 @@ for module in WorkspaceKit MarkdownCore Yams CYaml; do
     if [[ -f "$build_path/$module.o" ]]; then
         objects+=("$build_path/$module.o")
     else
-        for object in "$build_path/$module.build/"*.o; do
-            [[ -f "$object" ]] || { echo "Missing built objects for $module" >&2; exit 1; }
+        module_build="$build_path/$module.build"
+        [[ -d "$module_build" ]] || { echo "Missing build directory for $module" >&2; exit 1; }
+        count_before=${#objects[@]}
+        # Native SwiftPM preserves C source subdirectories (for example CYaml.build/src/*.o).
+        while IFS= read -r -d '' object; do
             objects+=("$object")
-        done
+        done < <(/usr/bin/find "$module_build" -type f -name '*.o' -print0)
+        [[ ${#objects[@]} -gt $count_before ]] || { echo "Missing built objects for $module" >&2; exit 1; }
     fi
 done
 swiftc -I "$build_path" -I "$build_path/Modules" \
