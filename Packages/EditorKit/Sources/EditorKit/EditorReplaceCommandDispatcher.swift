@@ -109,9 +109,14 @@ public enum EditorReplaceCommandDispatcher {
     /// `EditorSelectionProbe.keyWindowOverrideForTesting`, the same seam every other
     /// EditorKit key-window entry point uses; the window must still report `isKeyWindow`.
     static var keyWindow: NSWindow? {
-        guard let window = EditorSelectionProbe.keyWindowOverrideForTesting?()
-            ?? NSApplication.shared.keyWindow,
-            window.isKeyWindow
+        // An installed override is authoritative even when it designates no key window.
+        // Falling back on its nil result would leak the XCTest host's real key window.
+        let candidate: NSWindow? = if let override = EditorSelectionProbe.keyWindowOverrideForTesting {
+            override()
+        } else {
+            NSApplication.shared.keyWindow
+        }
+        guard let window = candidate, window.isKeyWindow
         else {
             return nil
         }

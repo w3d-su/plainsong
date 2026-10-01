@@ -131,7 +131,7 @@ extension EditorFindHostedGateTests {
     /// eligible, and Replace reaches that window's editor. Only which window is key is
     /// stubbed (`keyWindowNumberOverride`, Find's existing seam); the report-versus-key
     /// comparison runs for real. The `NSApp.keyWindow` query-field branch stays unexercised
-    /// here because a test process has no real key window.
+    /// here because the fixture controls designated key status, not the host's real key window.
     func testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck() async throws {
         let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
@@ -182,8 +182,12 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(session.text, "hit one hit two")
 
         designateKeyWindow(nil, in: hosted.group)
+        XCTAssertNil(EditorReplaceCommandDispatcher.keyWindow, "the nil designation overrides the host's key window")
+        let keyBefore = EditorReplaceEffectSnapshot(appState, textView: keyEditor)
+        let otherBefore = EditorReplaceEffectSnapshot(appState, textView: otherEditor)
         XCTAssertEqual(appState.performEditorReplace(replacement: "HIT"), .notDelivered(.noKeyWindow))
-        XCTAssertEqual(session.text, "hit one hit two")
+        XCTAssertEqual(EditorReplaceEffectSnapshot(appState, textView: keyEditor), keyBefore)
+        XCTAssertEqual(EditorReplaceEffectSnapshot(appState, textView: otherEditor), otherBefore)
 
         designateKeyWindow(hosted.window, in: hosted.group)
         XCTAssertTrue(hosted.window.makeFirstResponder(keyEditor))

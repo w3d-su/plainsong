@@ -40,6 +40,27 @@ final class EditorReplaceCommandDispatcherTests: XCTestCase {
         assertUntouched(ready)
     }
 
+    func testNilKeyWindowOverrideRefusesBeforeAuthorization() async throws {
+        let ready = try await makeKeyReady(source: "one two", pattern: "one")
+        let checks = AuthorizationCheckCount()
+        let command = try makeCommand(
+            ready,
+            replacement: "ONE",
+            authorization: EditorReplaceAuthorization {
+                MainActor.assumeIsolated { checks.value += 1 }
+                return true
+            }
+        )
+        EditorSelectionProbe.keyWindowOverrideForTesting = { nil }
+
+        XCTAssertNil(EditorReplaceCommandDispatcher.keyWindow)
+        XCTAssertEqual(EditorReplaceCommandDispatcher.captureKeyWindowEditorStamp(), .failure(.noKeyWindow))
+        XCTAssertEqual(EditorReplaceCommandDispatcher.send(command), .notDelivered(.noKeyWindow))
+        XCTAssertEqual(EditorReplaceCommandDispatcher.sendToKeyWindowEditor(command), .notDelivered(.noKeyWindow))
+        XCTAssertEqual(checks.value, 0)
+        assertUntouched(ready)
+    }
+
     /// Focus in find chrome or the query field: no editor on the responder chain, so App's
     /// fallback reaches the same key window's installed editor explicitly.
     func testFocusOffTheEditorNeedsTheKeyWindowFallback() async throws {
