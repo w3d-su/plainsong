@@ -163,14 +163,14 @@ public final class EditorFindController {
 
     /// Re-activates the current match with a fresh navigation ID (F3).
     public func activateCurrentMatch() {
-        stepIntentState.activateCurrent()
+        stepIntentState.clearCurrentActivation()
         emitNavigation(for: session?.currentMatch)
         notifySessionDidChange()
     }
 
-    /// Retains the resolved ordinal while fencing work and clearing unpublished navigation.
-    /// If no session has resolved yet, reruns the retained query counter-only so it remains
-    /// usable after the bar closes. Otherwise the next step continues from the retained match.
+    /// Retains the resolved ordinal; `cancelInFlightWork` advances the generation so a detached
+    /// result drops at apply. With no session yet the query is still debouncing: fencing it would
+    /// leave it permanently unusable, so it reruns counter-only. Otherwise ⌘G continues from it.
     public func suspendNavigation() {
         pendingNavigationCommand = nil
         stepIntentState.clear()
@@ -180,12 +180,12 @@ public final class EditorFindController {
         }
         cancelInFlightWork()
         // The retained session already resolved an ordinal, so the next step moves from it.
-        stepIntentState.activateCurrent()
+        stepIntentState.clearCurrentActivation()
         notifySessionDidChange()
     }
 
     public func cancelInFlightWork() {
-        // Count supersession of either debounce admission or running match work.
+        // Count supersession of debounce admission (the common rapid-typing path) or match work.
         if matchWorker.cancel() {
             cancelledMatchCount &+= 1
         }
@@ -355,8 +355,9 @@ extension EditorFindController {
         )
     }
 
-    /// Admits one verified revision for an immediate `afterOneReplace` rescan; later
-    /// edits, queries, and rebinds supersede it like any generation.
+    /// Admits one verified single-Replace revision: one `afterOneReplace` rescan, run without
+    /// the typing debounce because Replace is one explicit command and the counter is blank
+    /// until it lands. A later edit, query, or rebind supersedes it like any generation.
     func startReplacementGeneration(
         plan: EditorReplaceOneMatchPlan,
         text: String,
@@ -371,6 +372,7 @@ extension EditorFindController {
         )
         let generation = beginGeneration()
         replacementEngineInvocationCount &+= 1
+        // Identity is re-read after beginGeneration's callback, exactly as the pre-split fence.
         let binding = EditorFindDocumentBinding(identity: documentBinding.identity, text: text, revision: revision)
         startMatchWork(binding: binding, generation: generation) {
             EditorReplaceContinuationPlanning.afterOneReplace(plan: plan, postWriteSource: text)
@@ -389,9 +391,7 @@ extension EditorFindController {
         _ continuation: EditorReplaceContinuation,
         stepsRecordedFor generation: UInt64?
     ) {
-        let resolved = stepIntentState.resolveContinuation(
-            continuation.session, generation: generation
-        )
+        let resolved = stepIntentState.resolveContinuation(continuation.session, generation: generation)
         session = resolved
         caretAnchorUTF16 = continuation.resumeUTF16
         emitNavigation(to: resolved.currentMatch?.range ?? continuation.collapsedSelection)

@@ -36,7 +36,8 @@ struct EditorFindStepIntentState {
         pendingStepIntent = nil
     }
 
-    mutating func activateCurrent() {
+    /// The next step moves from the current match instead of first re-activating it.
+    mutating func clearCurrentActivation() {
         shouldActivateCurrentOnNextStep = false
     }
 
@@ -44,10 +45,6 @@ struct EditorFindStepIntentState {
         guard shouldActivateCurrentOnNextStep else { return false }
         shouldActivateCurrentOnNextStep = false
         return true
-    }
-
-    mutating func record(_ delta: Int, generation: UInt64, hasQuery: Bool) {
-        recordPendingStep(delta, generation: generation, hasQuery: hasQuery)
     }
 
     mutating func resolve(
@@ -80,7 +77,7 @@ struct EditorFindStepIntentState {
     /// newer query/edit/rebind supersedes that generation. The net count is clamped so a
     /// pathological press rate cannot overflow — any magnitude past one full cycle wraps
     /// to the same ordinal anyway.
-    private mutating func recordPendingStep(_ delta: Int, generation: UInt64, hasQuery: Bool) {
+    mutating func record(_ delta: Int, generation: UInt64, hasQuery: Bool) {
         guard hasQuery else { return }
         let ceiling = EditorFindLimits.retainedMatchCeiling
         if var intent = pendingStepIntent, intent.generation == generation {

@@ -55,16 +55,6 @@ final class EditorFindMatchWorker {
         current: @escaping @MainActor (Owner) -> (EditorFindDocumentBinding, UInt64),
         apply: @escaping @MainActor (Owner, Output, Bool, Bool) -> Void
     ) {
-        startMatchWork(owner: owner, request: request, compute: compute, current: current, apply: apply)
-    }
-
-    private func startMatchWork<Owner: AnyObject, Output: Sendable>(
-        owner: Owner,
-        request: Request,
-        compute: @escaping @Sendable () -> Output,
-        current: @escaping @MainActor (Owner) -> (EditorFindDocumentBinding, UInt64),
-        apply: @escaping @MainActor (Owner, Output, Bool, Bool) -> Void
-    ) {
         let fence = Self.fence(request.binding, generation: request.generation)
         let hold = request.hold
         let forceMain = request.forceMain
@@ -86,7 +76,9 @@ final class EditorFindMatchWorker {
                 }.value
             }
 
-            // Cancellation still completes and fence-drops. Only owner lifetime ends apply.
+            // `Task.detached` does not inherit cancellation and the engine has no cancel points, so a
+            // superseded worker still finishes and is dropped by the fence; `droppedStaleMatchCount`
+            // stays a real signal. Only the owner's lifetime ending skips apply.
             guard let owner else { return }
             let (binding, generation) = current(owner)
             apply(owner, result.output, result.ranOffMain, Self.fence(binding, generation: generation) == fence)
