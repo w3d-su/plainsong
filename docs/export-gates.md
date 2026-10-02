@@ -13,7 +13,11 @@
 > `~/Documents`). Staging moves to a same-device item-replacement directory with
 > exact-leaf publication, proven by an owner-run DEBUG probe. The E6 mechanism bullets
 > proven against the retired parent-anchored writer, including the ownership inspection
-> (which is parent-descriptor-derived), are reopened for PR E2, and PR F waits for E2.** Precedent:
+> (which is parent-descriptor-derived), were reopened for PR E2, and PR F waits for E2.
+> PR E2 (2026-09-30) replaces the writer with the amended-D5 leaf-path writer and moves the
+> ownership inspection to leaf-path metadata; it re-proves every reopened E6 bullet and the
+> rewritten sibling bullet. The leaf-grant bullet (PR F's owner smoke) and the
+> fresh-panel-URL bullet (PR F) stay open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -328,6 +332,35 @@ in the chosen folder, other than publishing the leaf itself:
      - the destination volume does not advertise both exclusive and swap renaming
        (`volumeSupportsExclusiveRenaming` / `volumeSupportsSwapRenaming`).
    - There is no cross-device copy fallback.
+   - **Owner decision 2026-09-30 (E2 review): containment.** In the sandbox, the
+     item-replacement directory lives under `~/Library/Containers/<id>/Data`, so the rule
+     above refused exports to the home-folder root (`~/x.html`). It is replaced by this rule.
+     Staging is accepted only when either:
+     - (a) the returned directory is not inside the chosen folder at all; or
+     - (b) all of the following hold:
+       - it lies strictly inside an injected app-private root (the sandbox container's data
+         directory, supplied by App only when running sandboxed; otherwise there is none);
+       - the chosen folder is a proper ancestor of that root;
+       - it is neither the chosen folder nor a direct child of it.
+
+     Everything else stays refused, including:
+     - staging inside a chosen folder that is equal to or inside the app-private root (a
+       chosen folder there is fine when the staging directory lies outside it, under rule (a));
+     - a direct child of the chosen folder;
+     - a directory inside the chosen folder but outside the root.
+
+     The root must already exist before staging begins: it is proven to be a directory with no
+     symlink anywhere (`AT_SYMLINK_NOFOLLOW_ANY`, final component included) before Foundation is
+     asked for a directory, so Foundation's `create: true` cannot have created it. If it cannot be
+     proven, only rule (a) applies.
+
+     Spellings are compared canonically:
+     - the staging directory and the root via `getattrlist(ATTR_CMN_FULLPATH)`;
+     - the chosen folder as proven by the leaf proof;
+     - component by component.
+
+     The chosen folder therefore never gains a new visible entry: anything created lies below
+     pre-existing `Library/Containers/…` directories.
 2. **Staged bytes.** Create exactly one staged file there with `open(O_CREAT | O_EXCL |
    O_NOFOLLOW | O_WRONLY)`, write and `fsync` the complete artifact, and record its
    `st_dev`/`st_ino` identity.
@@ -451,16 +484,23 @@ The exception is narrow. The export path must still refuse to:
    inventory includes current, warm/cached, retired, quarantined/detached, editor-bound,
    context-only, recovery, and indeterminate aliases. Comparison includes hard links and
    the filesystem's case/canonical aliases, not only URL-string equality.
-4. Create a delivered sibling asset/font file, intermediate directory, persistent
-   recovery journal, or second output. No entry other than the published leaf is ever
-   created in the chosen folder (amended 2026-09-29):
-   - The only temporary entries are the operation-private item-replacement directory
-     and its single staged file. If Foundation places that directory in the chosen folder
+4. Intentionally create a delivered sibling asset/font file, intermediate directory,
+   persistent recovery journal, or second export output. The writer's own temporary entries
+   are the operation-private item-replacement directory and its single staged file
+   (amended 2026-09-29; shared-ancestor reporting clarified 2026-10-01):
+   - These are the only operation-owned temporary entries. If Foundation places that directory
+     in the chosen folder
      (its fallback creates it before any check can run), fail closed. Remove the directory
-     only if it is empty and its identity matches; otherwise report its exact path.
-   - Neither may survive a reported success.
-   - Either may remain only after a truthfully reported indeterminate failure, at an exact
-     reported path, so that no identity is destroyed.
+     only if it is empty and its identity matches; otherwise report its exact path. The one
+     exception is a directory below the app-private root under step 1's owner decision of
+     2026-09-30: it adds no entry to the chosen folder itself.
+   - Foundation can also create shared ancestors such as `.TemporaryItems/folders.<uid>`
+     before containment runs. Their tracked namespace uncertainty is reported by exact
+     `unprovenDirectoryURLs` under E6; those ancestors are never deleted or assumed to be
+     operation-owned. A universal no-extra-entry observation remains an owner sandbox smoke.
+   - Neither operation-owned entry may survive a reported success.
+   - Either operation-owned entry may remain only after a truthfully reported indeterminate
+     failure, at an exact reported path, so that no identity is destroyed.
 5. Rekey a session, mark source saved/clean, change recents, adopt the export as the
    current document, or enter the workspace mutation/recovery journal.
 6. Retry silently at an old/stale URL or treat a partial/uncertain write as success.
@@ -843,21 +883,39 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `NSSavePanel`; cancel, denied scope, and stale URL write nothing.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
-> against the now-retired parent-anchored writer, so all five are reopened until PR E2
-> re-proves them on the leaf-path mechanism: `RENAME_EXCL`/`RENAME_SWAP` publication,
+> against the now-retired parent-anchored writer, so all five were reopened until PR E2
+> re-proved them on the leaf-path mechanism: `RENAME_EXCL`/`RENAME_SWAP` publication,
 > overwrite postflight, ownership inspection, uncertainty paths, and failure reporting.
-> The ownership inventory itself is reused unchanged, but the adapter's destination
-> inspection, canonical spelling, and case sensitivity are parent-descriptor-derived.
+> **PR E2 (2026-09-30)** re-proves them, and the rewritten sibling bullet, with the named
+> tests in the PR E2 evidence below. The leaf-grant bullet stays open for PR F's owner smoke.
 
 - [ ] A leaf-only grant is never widened implicitly:
-  - the operation never opens, enumerates, or creates entries in the chosen folder;
+  - the operation never opens or enumerates the chosen folder, and never gives it a new entry
+    other than the leaf (a staging directory may lie below it only inside the app-private
+    root, per D5 step 1's owner decision of 2026-09-30);
   - staging lives only in a same-device, operation-private item-replacement directory;
   - if that directory cannot be established, the operation fails without a direct-write or
     alternate-directory fallback.
 
   Mechanism evidence: the D5 amendment probe (owner, 2026-09-29). Production evidence:
-  PR E2 tests plus PR F's owner smoke.
-- [ ] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
+  PR E2 tests plus PR F's owner smoke. PR E2 supporting evidence (a simulation, not a
+  Powerbox grant): `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder` and the
+  hosted `testWriteOnlyParentNeedsNoParentHandleForOwnership` (mode `0300` parent: its
+  `open(O_RDONLY)` fails with `EACCES`; every writer call on the chosen folder is an
+  `fstatat` or `getattrlist` metadata read, and no descriptor names it at any boundary),
+  `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback`,
+  `testStagingInsideTheAppPrivateRootIsAcceptedWhenTheChosenFolderIsItsAncestor` (a fake
+  home and container layout). Open until PR F's owner smoke records a real save-panel grant,
+  covering these cases under the real sandbox (record each outcome):
+  - **The home-folder root (`~/x.html`)**, which exercises containment rule (b).
+  - **An accented folder created with Terminal (`mkdir café`)**: export a new file into it, and
+    an overwrite. Foundation can rebuild path-string URLs in NFD, so an NFC on-disk name may be
+    falsely refused as `destinationAlias` by the byte-exact rule. The record decides whether
+    NFC/NFD adoption is relaxed; that is an owner decision, not part of PR E2.
+  - **An external volume's root**: unsandboxed, Foundation may create
+    `.TemporaryItems/folders.<uid>/` at the volume root before the writer refuses. Record
+    whether that happens under the sandbox.
+- [x] New-file publication uses `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, and owner-confirmed
   exact-regular-file replacement uses `RENAME_SWAP | RENAME_NOFOLLOW_ANY`, both by exact
   leaf path. Ordinary rename-overwrite and truncating direct writes are absent. These fail
   closed:
@@ -867,31 +925,164 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   - an unsupported extension;
   - cross-device staging;
   - a volume without exclusive or swap renaming;
-  - a case or normalization alias of an existing entry;
-  - an item-replacement directory that is, or lies inside, the chosen folder.
+  - a case, normalization, or firmlink alias of an existing leaf or of the parent folder;
+  - an item-replacement directory that is the chosen folder or its direct child, or that lies
+    inside the chosen folder outside the app-private root (D5 step 1, owner decision
+    2026-09-30).
 
-  *(Reopened 2026-09-29.)*
-- [ ] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
+  *(Reopened 2026-09-29; re-proven by PR E2.)*
+- [x] Overwrite postflight proves the leaf holds the writer bytes and the staged name holds
   the exact displaced panel-approved identity before cleanup. A mismatch reverses only
   after an exact two-name proof. Otherwise both identities remain, the exact leaf and
-  item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29.)*
-- [ ] Source collisions reuse the authoritative App ownership inventory from Save Copy
+  item-replacement paths are reported, and success is impossible. *(Reopened 2026-09-29;
+  re-proven by PR E2.)*
+- [x] Source collisions reuse the authoritative App ownership inventory from Save Copy
   and mutations, including detached/recovery/indeterminate aliases; hard links and
-  case/canonical aliases are rejected. *(Reopened 2026-09-29: the adapter's inspection,
-  canonical spelling, and case sensitivity are parent-descriptor-derived and must move to
-  leaf-path metadata in PR E2.)*
-- [ ] No entry other than the published leaf is ever created in the chosen folder. The
-  item-replacement directory and its single staged file are proven absent on success. No
-  delivered sibling, intermediate directory, persistent recovery journal, bookmark,
-  retry/fallback destination, or second artifact is created. *(Rewritten 2026-09-29. The
-  earlier owner-reading question about a second `.plainsong-cleanup-*` sibling is
-  superseded, because no sibling is ever staged in the chosen folder.)*
-- [ ] Namespace/cleanup uncertainty is reported with the exact leaf and item-replacement
+  case/canonical aliases are rejected. *(Reopened 2026-09-29; PR E2 moved the adapter's
+  identity, canonical spelling, and case sensitivity to leaf-path metadata. The hosted
+  tests run outside the sandbox, as PR E's did.)* Precisely:
+  - the destination spelling is proven kernel-canonical before ownership runs (`F_GETPATH`
+    of an existing leaf; `getattrlist(ATTR_CMN_FULLPATH)` of a new leaf's parent), so any
+    case, normalization, or firmlink alias of the selected path is refused as
+    `destinationAlias`;
+  - the inventory then matches hard links by `st_dev`/`st_ino` and locations by full-path
+    alias keys (NFC, plus case folding on a case-insensitive volume) against that canonical
+    spelling;
+  - owned URLs are compared in the spelling the App retained: descriptor-derived for
+    anchored locations, and as stored for context-only URLs.
+- [x] The writer creates only its selected leaf and one staged file in its accepted
+  item-replacement directory. A clean outcome proves the staged file and returned directory
+  absent. This does **not** promise that Foundation creates no shared ancestor: unsandboxed
+  exports to an external APFS volume root can leave `.TemporaryItems/folders.<uid>/` before
+  containment refuses the returned directory. Metadata-only before/after observations cover
+  those two paths and the selected-folder descendants leading to an injected app-private root.
+  A new, replaced, or relevant unobservable ancestor produces `.indeterminate` with its exact
+  `unprovenDirectoryURLs`, even after the operation-private directory was removed or the
+  Foundation provider threw. Those ancestors are never deleted by the writer. Existing ancestors
+  whose identities remain unchanged are preserved without being attributed to this operation.
+  No delivered sibling, recovery journal, bookmark, retry/fallback destination, or second
+  artifact is intentionally created. The existing temporary-folder namespace test and fake
+  container test prove their fixture-specific no-extra-entry observations; actual sandbox
+  save-panel grants and external-volume no-extra-entry observations remain open under the
+  leaf-grant bullet above. *(Review correction, 2026-10-01.)*
+- [x] Namespace/cleanup uncertainty is reported with the exact leaf and item-replacement
   paths, and is never called an identity-atomic non-commit or a clean success. If the
   user's displaced original is left inside the app container, the report says so.
-  *(Reopened 2026-09-29.)*
-- [ ] Write failure/uncertainty is reported as failure and cannot be presented as a
-  complete artifact. *(Reopened 2026-09-29.)*
+  *(Reopened 2026-09-29; re-proven by PR E2 at the writer level. PR F owns the
+  user-visible wording.)*
+- [x] Write failure/uncertainty is reported as failure and cannot be presented as a
+  complete artifact. *(Reopened 2026-09-29; re-proven by PR E2 at the writer level.)*
+- PR E2 evidence (leaf-path writer, 2026-09-30; `swift test --package-path
+  Packages/WorkspaceKit` and the hosted `ExportDestinationOwnershipAppTests`). The writer
+  (`ExportArtifactWriter` in WorkspaceKit) proves the leaf with
+  `fstatat(AT_FDCWD, …, AT_SYMLINK_NOFOLLOW_ANY)` of the parent path and the exact leaf path,
+  opens an existing leaf with `O_NOFOLLOW_ANY` only to require its `F_GETPATH` spelling to
+  equal the selected spelling (for a new leaf, the parent's `getattrlist(ATTR_CMN_FULLPATH)`
+  spelling must equal the selected parent spelling), stages one file in Foundation's
+  item-replacement directory (compared with the chosen folder by identity before any other
+  use, never opened, canonical `getattrlist` spelling, same `st_dev`, containment per D5
+  step 1), and publishes with `renameatx_np(AT_FDCWD, staged, AT_FDCWD, leaf, …)`. Removals
+  use `unlinkat(…, AT_SYMLINK_NOFOLLOW_ANY)`. It returns `.committed` only
+  when the leaf holds the staged identity and byte count, any displaced original was unlinked,
+  and the staged name and the directory are proven absent; `.notCommitted` only when nothing
+  was published (or a swap was provably reversed) and no operation entry remains; otherwise
+  `.indeterminate` with the exact selected URL, staged-file URL, item-replacement directory
+  URL, unproven shared-ancestor URLs, residue contents (displaced original, writer bytes, or unknown), and
+  `residueIsInPurgeableTemporaryFolder`.
+  - Publication: `testNewLeafPublishesWithExclusiveRenameAndRemovesStaging`,
+    `testConfirmedOverwriteSwapsExactIdentityAndKeepsTheDisplacedMode` (an outside hard link
+    keeps the displaced bytes; Q3 mode kept), `testNewLeafModeIsTheUmaskDefault` (Q3),
+    `testOverwriteKeepsPermissionBitsButNeverSpecialBits` (Q3 hardening: `04755` becomes
+    `0755`, `0640` stays `0640`),
+    `testInspectDestinationReportsNewLeafAndPanelApprovedIdentity`,
+    `testLeafInspectionComesFromLeafPathMetadata`,
+    `testUbiquitousDestinationPublishesInsideFileCoordination` (Q1, injectable ubiquity; a
+    coordination failure publishes nothing). Q1's real `NSFileCoordinator` branches, not
+    mocked:
+    - `testCancelledCoordinationPublishesNothing`: the coordination error branch, via a
+      cancelled coordinator; deterministic.
+    - `testCoordinatedMoveWhileWaitingIsRefusedByTheAccessorURL`: a byte-exact accessor-URL
+      mismatch from a second real coordinated writer that moves the leaf. It releases that
+      writer after a timed margin, because no signal is observable that shows the export is
+      waiting.
+  - Refusal matrix: `testSymbolicLinkLeafIsRefusedForBothDispositions`,
+    `testSymbolicLinkPathComponentIsRefused` (final and intermediate component),
+    `testSymlinkedComponentAtThePublishBoundaryIsRefusedByRenameNoFollowAny` (the kernel
+    flag itself, after the re-proof passed), `testDirectoryAndFIFOLeavesAreRefusedAsNonRegular`
+    (device nodes cannot be created unprivileged; the FIFO exercises the same refusal),
+    `testUnsupportedExtensionsAndInvalidURLsWriteNothing`,
+    `testDispositionMismatchesAreRefusedBeforeStaging`,
+    `testCaseAndNormalizationAliasOfExistingLeafIsRefused`,
+    `testFirmlinkCaseOrNormalizationSpellingOfTheParentIsRefused` (a new leaf's parent,
+    proven by `getattrlist` without an open),
+    `testSymlinkSwappedInBeforeTheParentSpellingObservationIsRefused` (spelling, identity, and
+    type come from one observation), `testPathAttributeReplyParsingIsStrict`,
+    `testMissingOrUnsearchableParentFailsBeforeAnyWrite`,
+    `testUnsupportedVolumeCapabilitiesFailClosedBeforeStaging` (keys read from the parent URL
+    for a new leaf, the leaf for an overwrite), `testRealVolumeKeysReportBothRenameSemanticsOnTheTestVolume`,
+    `testCrossDeviceItemReplacementDirectoryIsRefusedWithoutCopyFallback` (a real devfs/data
+    volume pair), `testItemReplacementDirectoryInsideTheChosenFolderIsRefusedAndRemoved`
+    (Foundation's sibling fallback, a deeper directory, and the chosen folder itself, which is
+    never removed, opened, or read except by metadata),
+    `testStagingInsideTheChosenFolderOutsideRuleBIsRefused` (a chosen folder equal to or inside
+    the private root, a root reachable only through a symlink, a directory outside the root),
+    `testDirectChildAndTheChosenFolderItselfAreRefusedWithoutOpeningIt`,
+    `testNilPrivateRootKeepsRefusingStagingInsideTheChosenFolder`,
+    `testPrivateRootMustExistBeforeStagingBegins` (proven before Foundation is asked),
+    `testIdentityAndTypeRacesBeforePublicationFailClosedWithoutTouchingRacer`
+    (including a replaced parent directory),
+    `testRaceAtTheFinalPublishBoundaryNeverOverwritesTheRacerOrClaimsSuccess`,
+    `testOwnershipRefusalWritesNothingAndReceivesTheLeafInspection`,
+    `testCancelledOperationWritesNothing`.
+  - Fault injection (staging create/write/chmod/fsync, publish, postflight, two-name proof,
+    reverse swap, reversal proof, displaced unlink, staged unlink, removal proof, `rmdir`):
+    `testStagingCreateWriteChmodAndSyncFailuresLeaveTheDestinationUntouched`,
+    `testRealStagingCreateDenialIsNotPermittedWithoutFallback` (real `EACCES`),
+    `testPublishFailuresRemoveStagingAndLeaveTheDestinationUnchanged`,
+    `testPostflightMismatchReversesTheSwapOnlyAfterAnExactTwoNameProof`,
+    `testNewLeafPostflightMismatchIsIndeterminateAndNeverUnlinksTheLeafByPath`,
+    `testReverseSwapFailurePreservesBothIdentitiesAndReportsExactPaths`,
+    `testDisplacedUnlinkFailureReportsTheOriginalInThePurgeableTemporaryFolder`,
+    `testStagingDirectoryRemovalFailureIsNeverSuccessOrACleanNonCommit`,
+    `testUnpublishedStagedFileThatCannotBeRemovedIsReportedExactly`,
+    `testCommittedNewLeafRequiresTheStagedNameProvenAbsent`,
+    `testRemovalNeverFollowsASymlinkedStagingComponent` (the staged unlink and the `rmdir`),
+    `testStagingDirectoryThatCannotBeCanonicalizedIsRemovedOrReported`,
+    `testRefusedStagingDirectoryThatCannotBeRemovedIsReportedExactly`,
+    `testUnobservableReturnedDirectoryIsReportedNotCalledAbsent`,
+    `testUnavailableItemReplacementDirectoryFailsClosedWithoutFallback` (only proven absence is
+    a clean non-commit), `testParentSpellingObservationFailureAtPreflightWritesNothing`,
+    `testParentSpellingObservationFailureAtTheReproofPublishesNothing`,
+    `testPrivateRootObservationFailureLeavesOnlyRuleA`.
+  - Namespace and lifetime: `testNoEntryOtherThanTheLeafIsEverCreatedInTheChosenFolder`
+    (directory snapshots at every boundary; exactly one staged file, outside the chosen
+    folder), `testWriteOnlyParentPublishesWithoutEverOpeningTheChosenFolder`,
+    `testFoundationReturnsDistinctStagingDirectoriesOutsideSelectedTemporaryFolderOnSameDevice`,
+    `testWriterReleasesEveryDescriptorAfterEachOutcomeKind`,
+    `testStagingInsideTheAppPrivateRootIsAcceptedWhenTheChosenFolderIsItsAncestor` (at every
+    boundary the fake home folder holds only its prior entries and the leaf).
+  - Ownership (hosted `ExportDestinationOwnershipAppTests`; the App adapter
+    `App/AppState+ExportDestinationOwnership.swift` re-derives the writer's
+    `ExportArtifactLeafInspection` and requires equality, then walks the Save Copy owner
+    inventory (hard links by `st_dev`/`st_ino`, locations by full-path alias keys under the
+    volume case flag) and the mutation owner URLs; every refusal test first proves an
+    unowned control is permitted): all PR E cases, now driven by the leaf inspection —
+    `testHardLinkToCachedAnchoredSessionIsRefusedAndNothingIsWritten`,
+    `testHardLinkToEveryUnanchoredManagedOwnerIsRefused`,
+    `testCaseAliasOfMissingDetachedSessionIsRefused`,
+    `testQuarantinedIndeterminateSaveCopyDestinationIsRefused`,
+    `testLiveWorkspaceMutationRecoveryCandidateAndItsCaseAliasAreRefused`,
+    `testTextRecoveryOriginalAndContextOnlyOwnersAreRefused`,
+    `testSubfolderExportCollidingByHardLinkIsRefusedAcrossRootAuthorities`,
+    `testSubfolderCaseAliasOfOwnedMissingFileIsRefusedByFullPathComparison`,
+    `testRecoveryStoreLoadFailureRefusesEveryExportDestination`,
+    `testUnownedDestinationCommitsAndOnlyAFileLessSourceIsExempt`,
+    `testDisagreeingWriterInspectionIsRefused` — plus
+    `testWriteOnlyParentNeedsNoParentHandleForOwnership` (the retired parent-anchored
+    inspection throws there; the leaf-path adapter refuses the hard link and commits the
+    control), `testFirmlinkSpellingOfAnOwnedMissingDestinationIsRefused` (refused as an alias
+    before ownership; the canonical spelling is refused by the inventory), and
+    `testExportAppPrivateRootValidatesInjectedContainerIDAndHomeSuffix`.
 - PR E evidence (historical: the parent-anchored writer, retired for panel destinations by
   the 2026-09-29 D5 amendment; its hosted App ownership tests ran outside the sandbox and
   used parent-descriptor inspection). Writer level, headless: `ExportArtifactWriter` in WorkspaceKit reuses the
@@ -1011,6 +1202,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   WorkspaceKit suite (Save/Save Copy/mutation/recovery write primitives) and the hosted
   App Save Copy/mutation suites stay green with the writer and adapter; the remaining
   preview/render/scroll suites and measured evidence stay open for PR G.
+- PR E2 evidence: `git diff 1c3a4d7 -- '*Package.swift' '*Package.resolved'
+  'preview-src/package*.json' project.yml` is empty. The full WorkspaceKit suite and the
+  hosted `ExportDestinationOwnershipAppTests`, `AppStateTests`,
+  `AppStateWorkspaceDataIntegrityTests`, `AppStateSessionStateCleanupTests`, and
+  `WorkspaceMutation{Operation,Text}RecoveryStoreTests` stay green with the leaf-path writer,
+  the restored pre-PR-E write primitive, and the extracted Save Copy owner walk.
 
 ## 9. Performance and Security Acceptance
 
@@ -1044,3 +1241,38 @@ implementation ships.
 | Implementer | Keep all boxes unchecked until the owning PR carries the named evidence; stop at E0 failure; obey D1–D5 without silent fallback. |
 | Owner | Explicitly sign off **D3 self-contained asset/style policy**, **D4 separate PDF/Print workflows**, and **D5 one-shot filesystem-authority exception** before PR B begins; run the Print-panel/product smoke in E5. |
 | Maintainer | Review/squash-merge each PR after green required checks; never rely on the author to merge their own PR. |
+
+### PR E2 review follow-up evidence — 2026-10-01
+
+- `testFoundationScaffoldingIsReportedAfterTheReturnedDirectoryIsRemoved` covers absent,
+  partly pre-existing, and fully pre-existing `.TemporaryItems/folders.<uid>` ancestors;
+  `testFoundationScaffoldingIsReportedEvenWhenTheProviderThrows` and
+  `testUnobservableFoundationScaffoldingBelowTheReturnedPathIsReported` cover acquisition
+  failure and uncertain metadata. `testKnownAbsentScaffoldingThatBecomesUnobservableAfterProviderThrowsIsReported`
+  distinguishes known absence from denied metadata; the outside-staging control
+  `testUnobservableUnrelatedScaffoldingDoesNotRejectOutsideStaging` guards against rejecting
+  every leaf grant when unrelated metadata is denied. Only the returned identity-checked empty
+  directory is removed.
+  `testPrivateRootMustExistBeforeStagingBegins` now reports the exact retained `Library` →
+  `Data` ancestor chain when its provider creates a previously absent root.
+- Root guards: `testPrivateRootObservationFailureLeavesOnlyRuleA` (stat failure),
+  `testPrivateRootGetattrlistFailureRefusesRuleBWithoutPublication`,
+  `testNonDirectoryPrivateRootRefusesRuleBBeforeGetattrlist`,
+  `testPrivateRootTypeOrIdentityChangeBeforeGetattrlistRefusesRuleB`, and
+  `testPrivateRootFirmlinkSpellingUsesKernelCanonicalContainment`, alongside the existing
+  nil-root/symlink/containment controls. Injected input-shape testing is explicitly named
+  `testExportAppPrivateRootValidatesInjectedContainerIDAndHomeSuffix`.
+- Real app-sandbox process: run `Scripts/check-export-sandbox-root.sh`. It compiles the same
+  production `AppState.exportAppPrivateRoot()` source into a helper signed with Plainsong's
+  sandbox entitlements, without injecting its environment or home. On macOS 27 / Xcode 27:
+  `APP_SANDBOX_CONTAINER_ID=app.plainsong.export-root-probe`; `NSHomeDirectory()` was
+  `/Users/davis._.su/Library/Containers/app.plainsong.export-root-probe/Data`; default root was
+  that non-nil Data directory. The helper's unique `/private/tmp` write was denied and absent.
+  With the actual root, production writer + Foundation provider reached one root canonical
+  observation, one staged-file create and one publication attempt for a unique leaf in the real
+  user's home. Publication was correctly denied with `EPERM` because no Powerbox grant was
+  supplied; cleanup proved the staged file/directory absent. A nil-root control refused at
+  containment with zero staged creates/publications. This proves runtime acquisition and rule
+  (b) supply, **not** a successful `NSSavePanel` grant. PR F's save-panel owner smoke for
+  `~/x.html`, accented folders and an external APFS root remains open. The scaffolding tests
+  simulate Foundation's observed external-root layout; no external volume was written here.
