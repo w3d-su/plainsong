@@ -308,12 +308,15 @@ enum ExportHTMLNoticeMapper {
             lines.append("Temporary file to inspect: \(path(stagingURL)).")
         }
         if let directoryURL = write.itemReplacementDirectoryURL {
-            lines.append("Temporary folder that remains: \(path(directoryURL)).")
+            lines.append("Temporary folder not proven removed: \(path(directoryURL)).")
             revealURL = revealURL ?? directoryURL
         }
         if !write.unprovenDirectoryURLs.isEmpty {
             let paths = write.unprovenDirectoryURLs.map(path).joined(separator: ", ")
-            lines.append("macOS created folders that Plainsong did not remove: \(paths).")
+            lines
+                .append(
+                    "Folders not proven removed: \(paths). They may already have existed and may be shared — do not delete them."
+                )
         }
         return ExportHTMLNotice(
             operationID: operationID,

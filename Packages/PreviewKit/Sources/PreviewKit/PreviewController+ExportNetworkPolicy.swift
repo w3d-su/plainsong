@@ -6,9 +6,11 @@ extension PreviewController {
     /// start a request as soon as innerHTML is parsed, before the pipeline rewrites their URLs.
     /// A compiled WebKit rule blocks every HTTP(S) load at the loader, including that interval.
     /// Compilation failure refuses export. The live preview never receives this rule.
-    public static func makeHTMLExportController() async throws -> PreviewController {
+    public static func makeHTMLExportController(
+        websiteDataStore: WKWebsiteDataStore? = nil
+    ) async throws -> PreviewController {
         try await makeHTMLExportController(
-            previewIndexURL: defaultPreviewIndexURL(), websiteDataStore: .nonPersistent()
+            previewIndexURL: defaultPreviewIndexURL(), websiteDataStore: websiteDataStore ?? .nonPersistent()
         )
     }
 

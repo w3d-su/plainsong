@@ -3,6 +3,7 @@ import AppKit
 import MarkdownCore
 @testable import Plainsong
 import SwiftUI
+import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -71,14 +72,21 @@ extension AppBackedEditorPerformanceTests {
         directoryPrefix: String,
         fileName: String
     ) async throws -> AppFixture {
-        let rootURL = FileManager.default.temporaryDirectory
+        let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("\(directoryPrefix)-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: directory)
+        let rootURL = authority.canonicalRootURL
         let documentURL = rootURL.appendingPathComponent(fileName)
-        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try source.write(to: documentURL, atomically: true, encoding: .utf8)
 
         let session = DocumentSession(text: source, url: documentURL, fileKind: .markdown)
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        let location = try authority.location(relativePath: fileName)
+        let read = try MarkdownFileStore().loadResult(at: location)
+        appState.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
+            location: location, identity: read.metadata.identity, sha256Digest: read.sha256Digest
+        )
         appState.sessionCache[documentURL.standardizedFileURL] = session
         appState.recordKnownDiskText(source, for: documentURL)
         let binding = appState.editorDocumentBinding(for: session)

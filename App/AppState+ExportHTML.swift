@@ -3,6 +3,7 @@ import Foundation
 import MarkdownCore
 import PreviewKit
 import UniformTypeIdentifiers
+import WebKit
 import WorkspaceKit
 
 /// Export PR F (Phase B): File › Export as HTML…
@@ -18,7 +19,26 @@ extension AppState {
     /// Enabled only while a file-backed `.md`/`.mdx` document is current; untitled documents
     /// refuse export, as Save Copy does (`docs/export-gates.md` owner decision 2).
     var canExportCurrentDocumentAsHTML: Bool {
-        currentDocument.fileURL.flatMap(FileKind.init(url:)) != nil
+        isExportHTMLFileBacked && exportHTMLDocumentWindow != nil
+    }
+
+    private var isExportHTMLFileBacked: Bool {
+        currentDocument.fileURL.map { ["md", "mdx"].contains($0.pathExtension.lowercased()) } ?? false
+    }
+
+    static let exportHTMLWindowRegistered = Notification.Name("plainsong-export-document-window-registered")
+    static let exportHTMLWorkspaceWindowIdentifier = NSUserInterfaceItemIdentifier("plainsong-workspace-window")
+
+    /// An installed test provider, including nil, is authoritative.
+    var exportHTMLDocumentWindow: NSWindow? {
+        if let provider = exportHTMLOperations.panelWindowProvider { return provider() }
+        return Self.exportHTMLDocumentWindow(key: NSApp.keyWindow, main: NSApp.mainWindow)
+    }
+
+    static func exportHTMLDocumentWindow(key: NSWindow?, main: NSWindow?) -> NSWindow? {
+        if let key, key.identifier == exportHTMLWorkspaceWindowIdentifier { return key }
+        if let main, main.identifier == exportHTMLWorkspaceWindowIdentifier { return main }
+        return nil
     }
 
     /// Starts one Export as HTML… operation and supersedes any older one. Returns the operation
@@ -47,7 +67,9 @@ extension AppState {
             guard let self else { return }
             let result: ExportHTMLOperationResult
             do {
-                let controller = try await PreviewController.makeHTMLExportController()
+                let controller = try await PreviewController.makeHTMLExportController(
+                    websiteDataStore: exportHTMLOperations.websiteDataStoreProvider?()
+                )
                 defer { controller.invalidate() }
                 if let stop = exportHTMLStopReason(for: snapshot) {
                     result = .stopped(stop)
@@ -67,9 +89,10 @@ extension AppState {
 
     func captureExportHTMLSnapshot() -> Result<ExportHTMLOperationSnapshot, ExportHTMLStopReason> {
         let session = currentDocument
-        guard canExportCurrentDocumentAsHTML, session.fileURL != nil else {
+        guard isExportHTMLFileBacked else {
             return .failure(.untitledDocument)
         }
+        guard let window = exportHTMLDocumentWindow else { return .failure(.documentChanged) }
         if let reason = exportHTMLOwnershipStopReason() { return .failure(reason) }
         guard !hasPendingEditorSource(for: session) else {
             return .failure(.pendingEditorSource)
@@ -85,7 +108,7 @@ extension AppState {
                 preferences.previewTheme,
                 appearance: NSApplication.shared.effectiveAppearance
             ),
-            window: exportHTMLOperations.panelWindowProvider?() ?? NSApp.keyWindow ?? NSApp.mainWindow
+            window: window
         ))
     }
 
@@ -256,18 +279,17 @@ extension AppState {
     }
 
     /// A fresh panel per operation. Its URL is used once and never bookmarked or reused.
-    private func presentExportHTMLSavePanel(
+    func presentExportHTMLSavePanel(
         _ request: ExportHTMLDestinationRequest, window: NSWindow?
     ) async -> URL? {
         let panel = NSSavePanel()
         panel.title = "Export as HTML"
         panel.prompt = "Export"
-        panel.allowedContentTypes = [.html]
+        panel.allowedContentTypes = UTType(filenameExtension: request.allowedExtension).map { [$0] } ?? []
         panel.nameFieldStringValue = request.defaultFileName
         panel.directoryURL = request.directoryURL
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
-        panel.setAccessibilityIdentifier(ExportHTMLAccessibility.savePanel)
         panel.setAccessibilityLabel(request.accessibilityLabel)
         exportHTMLOperations.presentedPanel = panel
         defer {
@@ -275,9 +297,12 @@ extension AppState {
                 exportHTMLOperations.presentedPanel = nil
             }
         }
-        // A window sheet keeps the snapshot's document from being edited underneath the panel.
+        // Attach only to the workspace window captured at invocation; Settings/About are excluded.
         guard let window else {
             return nil
+        }
+        if let presenter = exportHTMLOperations.savePanelPresenter {
+            return await presenter(panel, window)
         }
         return await withCheckedContinuation { continuation in
             panel.beginSheetModal(for: window) { response in

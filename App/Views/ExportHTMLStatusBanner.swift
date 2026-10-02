@@ -5,6 +5,32 @@ import SwiftUI
 struct ExportHTMLStatusBanner: View {
     @EnvironmentObject private var appState: AppState
 
+    /// Announce each operation start once, then its result/error. Filename preparation must
+    /// not repeat the progress announcement. Silent cancellation stays silent.
+    @MainActor
+    static func announce(
+        _ status: ExportHTMLStatus?, previous: ExportHTMLStatus?,
+        post: (@MainActor (String) -> Void)? = nil
+    ) {
+        let message: String
+        switch status {
+        case let .exporting(operationID, fileName):
+            if case let .exporting(previousID, _) = previous, previousID == operationID { return }
+            message = ExportHTMLAccessibility.progressLabel(fileName: fileName)
+        case let .notice(notice):
+            guard status != previous else { return }
+            message = notice.accessibilityLabel
+        case nil:
+            return
+        }
+        if let post { post(message) }
+        else {
+            NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
+                                 userInfo: [.announcement: message,
+                                            .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        }
+    }
+
     var body: some View {
         if let status = appState.exportHTMLStatus {
             HStack(alignment: .top, spacing: 10) {

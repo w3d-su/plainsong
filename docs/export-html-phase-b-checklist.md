@@ -35,12 +35,13 @@ automated label tests do not close that acceptance. No PDF/Print owner case is p
 Run from `/Users/davis._.su/Documents/plainsong-export-html-command`:
 
 ```sh
+mkdir -p "$(dirname "${PLAINSONG_XCODEBUILD_LOCK:-${TMPDIR:-/tmp}/plainsong-xcodebuild-test.lock}")"
 Scripts/run-export-html-hosted-tests.sh
 swift test --package-path Packages/PreviewKit
 swift test --package-path Packages/WorkspaceKit
 Scripts/check-export-sandbox-root.sh
-PATH=/private/tmp/claude-501/-Users-davis---su-Documents-blogeditor/50f4130b-7177-4f95-827c-f97a63ad8e24/scratchpad/swiftformat-0.62.1:$PATH make lint
-lockf -k /private/tmp/claude-501/-Users-davis---su-Documents-blogeditor/50f4130b-7177-4f95-827c-f97a63ad8e24/scratchpad/plainsong-xcodebuild-test.lock make build
+make lint  # SwiftFormat 0.62.1, the CI pin, first on PATH
+lockf -k "${PLAINSONG_XCODEBUILD_LOCK:-${TMPDIR:-/tmp}/plainsong-xcodebuild-test.lock}" make build
 ```
 
 The hosted-test script starts a test-only loopback recorder outside the sandboxed app,
@@ -51,10 +52,10 @@ the script runs it with both the zero-request assertion and a positive live-prev
 
 ## Safe DEBUG feedback preview
 
-Build with a known output directory under the shared lock:
+Build with a known output directory under the shared lock (create its parent directory first):
 
 ```sh
-lockf -k /private/tmp/claude-501/-Users-davis---su-Documents-blogeditor/50f4130b-7177-4f95-827c-f97a63ad8e24/scratchpad/plainsong-xcodebuild-test.lock xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath /private/tmp/plainsong-export-f-owner build
+lockf -k "${PLAINSONG_XCODEBUILD_LOCK:-${TMPDIR:-/tmp}/plainsong-xcodebuild-test.lock}" xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -derivedDataPath /private/tmp/plainsong-export-f-owner build
 PLAINSONG_EXPORT_FEEDBACK_SMOKE=displaced-original /private/tmp/plainsong-export-f-owner/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong
 PLAINSONG_EXPORT_FEEDBACK_SMOKE=unknown /private/tmp/plainsong-export-f-owner/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong
 ```
@@ -93,3 +94,8 @@ The iCloud evicted-leaf/materialization and coordination wait must be measured b
 owner in the real sandboxed panel flow. No test manufactures an iCloud account. If the
 writer stalls the UI noticeably, stop and propose an E2-contract review; do not move it
 off-main in this PR. No export-specific time or memory budget is frozen.
+
+Correctness-only E9 smoke: `Scripts/run-export-html-e9.sh --smoke Debug`. It executes
+one sample per fixture and the 64 MiB writer, and exercises active-export typing without
+budget assertions or reporting timing/RSS as evidence. It holds the same lock but skips
+the idle check; formal Debug/Release measurements remain pending an idle machine.

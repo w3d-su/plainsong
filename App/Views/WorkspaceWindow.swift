@@ -458,6 +458,10 @@ private struct WindowMetadataAccessor: NSViewRepresentable {
 
     private func applyMetadata(to window: NSWindow?) {
         guard let window else { return }
+        if window.identifier != AppState.exportHTMLWorkspaceWindowIdentifier {
+            window.identifier = AppState.exportHTMLWorkspaceWindowIdentifier
+            NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
+        }
         window.representedURL = representedURL
         window.title = title
         window.isDocumentEdited = isDocumentEdited

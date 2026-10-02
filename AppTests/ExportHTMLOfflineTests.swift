@@ -37,11 +37,13 @@ final class ExportHTMLOfflineTests: XCTestCase {
         let proxies = [ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))]
         fixture.appState.preferences.setAllowsRemoteImages(true)
         let destination = fixture.exportsDirectory.appendingPathComponent("offline.html")
-        fixture.appState.exportHTMLOperations.destinationChooser = { _ in
-            fixture.appState.exportHTMLOperations.offscreenController?.webView.configuration.websiteDataStore
-                .proxyConfigurations = proxies
-            return destination
+        func proxyDataStore() -> WKWebsiteDataStore {
+            let store = WKWebsiteDataStore.nonPersistent()
+            store.proxyConfigurations = proxies
+            return store
         }
+        fixture.appState.exportHTMLOperations.websiteDataStoreProvider = proxyDataStore
+        fixture.appState.exportHTMLOperations.destinationChooser = { _ in destination }
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
         try await assertNoRequests(proxy)
         XCTAssertEqual(fixture.appState.exportHTMLNotice?.group, .exportedWithPlaceholders)
@@ -77,10 +79,9 @@ final class ExportHTMLOfflineTests: XCTestCase {
         // Positive control proves this isolated proxy actually sees WebKit requests.
         let live = PreviewController(
             previewIndexURL: PreviewController.defaultPreviewIndexURL(),
-            websiteDataStore: .nonPersistent()
+            websiteDataStore: proxyDataStore()
         )
         defer { live.invalidate() }
-        live.webView.configuration.websiteDataStore.proxyConfigurations = proxies
         live.setAllowsRemoteImages(true)
         _ = await live.renderForExport(DocumentTextChange(
             text: "![control](https://plainsong-app-export.invalid/control.png)", version: 1,

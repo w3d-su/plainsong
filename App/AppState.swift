@@ -183,7 +183,13 @@ final class AppState: ObservableObject {
     @Published var completionWorkspace: CompletionWorkspace = .empty
     @Published var recentItemURLs: [URL] = []
     @Published var presentedError: UserVisibleError?
-    @Published var exportHTMLStatus: ExportHTMLStatus?
+    @Published var exportHTMLStatus: ExportHTMLStatus? {
+        didSet {
+            ExportHTMLStatusBanner.announce(exportHTMLStatus, previous: oldValue,
+                                            post: exportHTMLOperations.announcementPoster)
+        }
+    }
+
     @Published var externalChangePrompt: ExternalChangePrompt? {
         didSet { noteEditorReplaceAuthorityInputDidChange() }
     }

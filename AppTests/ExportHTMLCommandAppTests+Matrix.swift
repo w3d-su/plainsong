@@ -8,6 +8,10 @@ import XCTest
 @MainActor
 extension ExportHTMLCommandAppTests {
     func testNamedMarkdownAndMDXFixturesAreEquivalentAcrossLayoutsAndFreezeAllThemes() async throws {
+        let previousAppearance = NSApp.appearance
+        defer { NSApp.appearance = previousAppearance }
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        XCTAssertEqual(NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]), .darkAqua)
         for (name, ext) in [("export-f-markdown", "md"), ("export-f-mdx", "mdx")] {
             let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: name, withExtension: ext))
             let source = try String(contentsOf: url, encoding: .utf8)

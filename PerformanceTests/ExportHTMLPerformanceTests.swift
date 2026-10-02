@@ -43,12 +43,10 @@ final class ExportHTMLPerformanceTests: XCTestCase {
             let source = try String(contentsOf: resource, encoding: .utf8) + "\n\n" + images
             var times: [Double] = []
             var peakHostRSS = Self.hostRSS()
-            for sample in 0 ..< 3 {
+            for sample in 0 ..< (isSmoke ? 1 : 3) {
                 let document = root.appendingPathComponent("source.md")
                 try source.write(to: document, atomically: true, encoding: .utf8)
-                let session = DocumentSession(text: source, url: document)
-                let app = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
-                app.workspaceRootURL = root
+                let app = try makeApp(document: document, root: root, source: source)
                 let destination = root.appendingPathComponent("\(path)-\(sample).html")
                 app.exportHTMLOperations.destinationChooser = { _ in destination }
                 let start = DispatchTime.now().uptimeNanoseconds
@@ -61,7 +59,10 @@ final class ExportHTMLPerformanceTests: XCTestCase {
                 times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000)
                 XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
             }
-            print("EXPORT E9 \(path) production milliseconds \(times); peak sampled host RSS MiB \(peakHostRSS)")
+            if isSmoke { print("EXPORT E9 SMOKE \(path) production body committed; no timing evidence") }
+            else {
+                print("EXPORT E9 \(path) production milliseconds \(times); peak sampled host RSS MiB \(peakHostRSS)")
+            }
         }
     }
 
@@ -71,11 +72,10 @@ final class ExportHTMLPerformanceTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let document = root.appendingPathComponent("source.md")
         try Data("# Writer timing".utf8).write(to: document)
-        let app = AppState(currentDocument: DocumentSession(text: "# Writer timing", url: document),
-                           shouldRestoreLastOpenedFile: false)
+        let app = try makeApp(document: document, root: root, source: "# Writer timing")
         let bytes = Data(repeating: 65, count: 64 * 1_048_576)
         var samples: [Double] = []
-        for index in 0 ..< 3 {
+        for index in 0 ..< (isSmoke ? 1 : 3) {
             let request = ExportArtifactWriteRequest(destinationURL: root.appendingPathComponent("cap-\(index).html"),
                                                      kind: .html, disposition: .createNew, bytes: bytes)
             let start = DispatchTime.now().uptimeNanoseconds
@@ -84,8 +84,32 @@ final class ExportHTMLPerformanceTests: XCTestCase {
             guard case .committed = outcome else { return XCTFail("Writer probe must commit: \(outcome)") }
             samples.append(elapsed)
         }
-        print("EXPORT E9 64 MiB synchronous main-actor writer milliseconds \(samples). " +
-            "Review any visible UI stall with the owner before changing the E2 contract.")
+        if isSmoke { print("EXPORT E9 SMOKE 64 MiB writer body committed; no timing evidence") }
+        else {
+            print("EXPORT E9 64 MiB synchronous main-actor writer milliseconds \(samples). " +
+                "Review any visible UI stall with the owner before changing the E2 contract.")
+        }
+    }
+
+    private var isSmoke: Bool {
+        ProcessInfo.processInfo.environment["PLAINSONG_EXPORT_E9_SMOKE"] == "1"
+    }
+
+    private func makeApp(document: URL, root: URL, source: String) throws -> AppState {
+        let authority = try WorkspaceFileSystemRootAuthority(rootURL: root)
+        let location = try authority.location(relativePath: document.lastPathComponent)
+        let read = try MarkdownFileStore().loadResult(at: location)
+        let session = DocumentSession(text: source, url: document)
+        let app = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false)
+        app.workspaceRootURL = authority.canonicalRootURL
+        app.anchoredSessionFileBindings[ObjectIdentifier(session)] = AnchoredWorkspaceSessionFileBinding(
+            location: location, identity: read.metadata.identity, sha256Digest: read.sha256Digest
+        )
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 800, height: 600),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        app.exportHTMLOperations.panelWindowProvider = { window }
+        return app
     }
 
     private func requireOptIn() throws {

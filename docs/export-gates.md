@@ -884,7 +884,9 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   (Markdown and MDX) and the sandboxed App's
   `ExportHTMLOfflineTests.testProductCommandAndWrittenHTMLIssueZeroHTTPRequestsWithLiveRemotePreferenceOn`.
   Both refuse loopback proxy tunnels and then prove the live-preview positive control
-  reaches that recorder. The App test reopens the actual written file without the
+  reaches that recorder. The App test installs its proxy data store before constructing
+  the export controller; its unblocked positive control uses the same pre-construction
+  data-store setup and must record the `.invalid` host request. The App test reopens the actual written file without the
   export content blocker and verifies embedded image, math, code, and Mermaid.
   `PreviewController.makeHTMLExportController` installs its HTTP(S) content rule before
   the bundled page loads: detached images can initiate a load before JS rewrites them.
@@ -1197,11 +1199,14 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
 
 ### E7 — App / File-menu UX and side-effect isolation
 
-- [x] HTML: File › Export as HTML… uses the system `.importExport` group without a
-  new top-level menu or global shortcut, enabled only for a file-backed `.md`/`.mdx`.
+- [x] HTML: the actual File menu contains one Export as HTML… item after Save,
+  with no top-level Export menu and an empty key equivalent. Availability requires a
+  file-backed `.md`/`.mdx` and a document window. The declaration places the command
+  after `.importExport`; the native menu test also checks before Print when present.
 - [ ] PDF/Print command availability and menu smoke (PR G).
-- [x] HTML: a fresh `.html` window sheet has sanitized frontmatter-title/basename defaults
-  and never rekeys the document or changes Save/Save Copy behavior.
+- [x] HTML: fresh save panels are configured for `.html`, sanitized title/basename defaults,
+  directory creation, and accessibility. Destination/presentation seams prove cancellation
+  and document isolation; real sheet/Powerbox/bookmark lifetime acceptance stays under E6.
 - [ ] PDF panel defaults (PR G), and owner verification of the real HTML panel (E6).
 - [x] HTML: progress/Cancel, render/MDX/resource errors, placeholder counts, every writer
   failure group, and indeterminate paths have accessible word/symbol feedback.
@@ -1209,7 +1214,13 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
 - [x] HTML success/cancel/failure/indeterminate leaves text, selection, editor/visible-preview
   scroll/DOM/theme, dirty/saved baseline, identity, recents, tree and recovery state unchanged.
 - [ ] PDF/Print side-effect isolation (PR G).
-- Evidence: `ExportHTMLCommandAppTests.testUntitledDocumentIsRefusedBeforeAnyPanel`,
+- Evidence: `ExportHTMLCommandAppTests.testAvailabilityRequiresMarkdownOrMDXAndADocumentWindow`,
+  `testFileMenuContainsExportInTheImportExportSlotWithoutAShortcut`,
+  `testSettingsAndAboutCannotBecomeExportSheetParents`,
+  `testConfiguredFreshSavePanelsReadRequestDefaultsAndCancelWithoutRetainingDestination`,
+  `testFilenameSanitizerRemovesLeadingDotsAndBoundsUTF8WithoutSplittingCharacters`,
+  `testProgressResultAndErrorAreAnnouncedOnceAndCancelIsSilent`,
+  `testUntitledDocumentIsRefusedBeforeAnyPanel`,
   `testPanelDefaultsSanitizeTitlesAndFallBackForInvalidOrEmptyFrontmatter`,
   `testEveryInvocationRequiresAFreshPanelResultAndNeverReusesACancelledDestination`,
   `testUnavailableOwnershipAndRecoveryLoadFailureRefuseBeforeThePanel`,
@@ -1224,7 +1235,8 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   The Phase A `AppState+Autosave.swift` change only moved `SessionBackgroundTask`; it is
   no longer in the main diff after merging E2. Phase B does not suspend timer/explicit/
   termination autosave. Its focus-notification guard applies only while choosing an
-  export destination.
+  export destination: this is the narrow export-panel exception to agent.md §4 autosave
+  on window resign; ordinary focus autosave resumes afterwards.
 
 ### E8 — Format, content, theme, and layout matrix
 
@@ -1249,8 +1261,11 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
 
 ### E9 — Accessibility, performance, security, and regression
 
-- [x] HTML: stable identifiers and full spoken labels cover the command, save panel,
-  progress/Cancel, omission notice, and every error group. Named evidence:
+- [x] HTML: identifier constants are distinct; notice/progress labels cover every mapped
+  error group. The configured AppKit save panel exposes its native `save-panel`
+  identifier and receives the requested spoken label; a custom panel identifier is not claimed.
+  SwiftUI-to-NSMenuItem/banner identifier delivery remains owner UI acceptance.
+  Named evidence:
   `testStopReasonsHaveDistinctAccessibleMessagesAndStableControls`,
   `testEveryWriterFailureMapsToAnActionableAccessibleGroup`, and
   `testIndeterminateStatesAndEveryResidueReportRecoveryPathsWithoutClaimingSuccess`.
@@ -1302,6 +1317,56 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   export/RSS, active-export typing and 64 MiB synchronous writer are pending an idle
   machine. Real iCloud evicted-leaf/coordination timing, physical-input evidence,
   keyboard-only acceptance and the E6 Powerbox cases remain owner work. No budget is frozen.
+
+### PR F review follow-up — 2026-10-02
+
+- PreviewKit: 71 tests; WorkspaceKit: 351 tests; zero failures and no skips.
+- Locked targeted hosted run: 54 App tests, zero failures and no skips:
+  `ExportHTMLCommandAppTests` 31, `ExportHTMLFeedbackAppTests` 5,
+  App `ExportHTMLOfflineTests` 1, `ExportDestinationOwnershipAppTests` 14,
+  and `MenuBarStateTests` 3. The seven new command cases verify availability/window
+  refresh, auxiliary-window exclusion, actual configured fresh panels, the native File
+  menu and empty key equivalent, bounded Unicode filenames, and spoken transitions.
+- E4's App proxy data store is installed before controller construction. The unblocked
+  live positive control uses the same factory for its data store and records the
+  `.invalid` host. The written file is reopened without the export blocker; both export
+  and standalone reopen issue zero HTTP(S) requests. PreviewKit's interceptor is unchanged.
+- E8's existing 18-case matrix now forces `NSApp.appearance` to `.darkAqua` and restores
+  the previous appearance afterwards, so resolved-system dark is exercised explicitly.
+- ONE correctness-only opt-in smoke of each E9 probe body passed under the shared lock
+  in Debug (3 tests, zero failures/skips): production export commits one sample each of
+  `large-1mb.md` and `export-f-heavy.md` with 24 raster assets; the 64 MiB writer commits
+  one sample; the typing body executes the native insertion and public-view update,
+  then confirms the edit fences publication. All fixtures use canonical roots and
+  anchored session bindings. No time/memory sample is reported as E9 evidence and the
+  typing budget assertion is bypassed only by `PLAINSONG_EXPORT_E9_SMOKE=1`.
+  Formal Debug/Release measurements remain **pending idle-machine run**.
+- Reproduce the combined targeted run with `TEST_RUNNER_PLAINSONG_RUN_EXPORT_E9=1`
+  and `TEST_RUNNER_PLAINSONG_EXPORT_E9_SMOKE=1` before
+  `Scripts/run-export-html-hosted-tests.sh`, adding `-only-testing:PlainsongTests/MenuBarStateTests`,
+  `-only-testing:PerformanceTests/ExportHTMLPerformanceTests`, and
+  `-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget`.
+  Set `PLAINSONG_XCODEBUILD_LOCK` to the shared machine lock for coordinated runs.
+  `Scripts/run-export-html-e9.sh --smoke Debug` also exposes the correctness-only mode;
+  normal Debug/Release runs retain the idle check and existing typing assertion.
+- `Scripts/check-export-sandbox-root.sh` passes: the production default root admits
+  staging, nil root refuses, unauthorized outside publication is denied, and operation
+  paths are absent. Locked `make build` passes; `git diff --check` passes.
+  Pinned SwiftFormat 0.62.1 `make lint` exits 0 (312 warnings, zero serious).
+  Changed feature files contain no session-specific lock/lint paths; no writer, bridge,
+  preview source/bundle, dependency manifest or `project.yml` change is added by this review fix.
+- Checked-box wording is narrowed to evidence: E7 covers native menu bounds and actual
+  panel configuration/cancellation, while E9 covers declared identifiers, mapped labels,
+  and the panel's native `save-panel` identifier (AppKit ignores the custom setter).
+  Actual SwiftUI identifier delivery to NSMenuItem/banner controls, real sheet/Powerbox
+  and bookmark-lifetime acceptance, keyboard navigation and VoiceOver remain owner work.
+  Progress start, result and error post `announcementRequested` on the application;
+  duplicate filename updates and silent cancellation do not announce again.
+- Release test seams remain live, matching repository practice and the Release E9
+  destination chooser. E6 owner boxes remain unchecked; no D5 relaxation or off-main
+  writer change. The export-panel window-resign autosave exception is recorded under
+  E7 and in the Phase B Decision Log; `agent.md` is unchanged. Main's Decision Log rows
+  are untouched; only the feature's Phase A/Phase B rows are updated.
 
 ## 9. Performance and Security Acceptance
 

@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -42,7 +43,13 @@ final class MenuBarState: ObservableObject {
 
     init(appState: AppState) {
         snapshot = MenuBarSnapshot(appState: appState)
+        let windowChanges = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                             NSWindow.didBecomeMainNotification, NSWindow.didResignMainNotification,
+                             NSWindow.willCloseNotification, AppState.exportHTMLWindowRegistered].map {
+            NotificationCenter.default.publisher(for: $0).map { _ in () }.eraseToAnyPublisher()
+        }
         subscription = appState.objectWillChange
+            .merge(with: Publishers.MergeMany(windowChanges))
             .receive(on: RunLoop.main)
             .sink { [weak self, weak appState] _ in
                 MainActor.assumeIsolated {

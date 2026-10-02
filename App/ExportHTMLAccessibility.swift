@@ -2,7 +2,8 @@ import Foundation
 
 enum ExportHTMLAccessibility {
     static let command = "export-html-command"
-    static let savePanel = "export-html-save-panel"
+    /// NSSavePanel exposes the system identifier even after setAccessibilityIdentifier.
+    static let savePanel = "save-panel"
     static let progress = "export-html-progress"
     static let cancel = "export-html-cancel"
     static let dismiss = "export-html-dismiss"

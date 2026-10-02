@@ -231,6 +231,11 @@ extension ExportHTMLCommandAppTests {
         let session = DocumentSession(text: text, url: documentURL)
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "ExportHTMLTests-\(UUID().uuidString)"))
         let appState = AppState(currentDocument: session, shouldRestoreLastOpenedFile: false, userDefaults: defaults)
+        let window = NSWindow(contentRect: .init(x: 0, y: 0, width: 800, height: 600),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        appState.exportHTMLOperations.panelWindowProvider = { window }
+        addTeardownBlock { @MainActor in window.orderOut(nil) }
         appState.preferences.setAutosaveIntervalSeconds(30)
         appState.workspaceRootURL = root
         appState.workspaceSearchRootAuthority = authority

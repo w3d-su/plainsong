@@ -3,6 +3,7 @@ import Combine
 import Foundation
 import MarkdownCore
 import PreviewKit
+import WebKit
 import WorkspaceKit
 
 /// The built-in preview theme frozen into one export (`docs/export-gates.md` D3): `system`
@@ -81,10 +82,16 @@ struct ExportHTMLOperationSnapshot {
             nil
         }
         func sanitize(_ value: String) -> String {
-            String(value.unicodeScalars.map { scalar in
+            let cleaned = String(value.unicodeScalars.map { scalar in
                 CharacterSet.controlCharacters.contains(scalar) || scalar == "/" || scalar == ":"
                     ? "-" : String(scalar)
             }.joined()).trimmingCharacters(in: .whitespacesAndNewlines)
+            var bounded = ""
+            for character in cleaned.drop(while: { $0 == "." }) {
+                guard bounded.utf8.count + String(character).utf8.count <= 200 else { break }
+                bounded.append(character)
+            }
+            return bounded
         }
         let sanitizedTitle = title.map(sanitize) ?? ""
         let base = sanitizedTitle.isEmpty
@@ -146,16 +153,22 @@ struct ExportHTMLOperationRegistry {
     weak var presentedPanel: NSSavePanel?
     var panelOperationID: UInt64?
     var windowCloseObserver: AnyCancellable?
+    /// Installs networking configuration before the export controller constructs its web view.
+    var websiteDataStoreProvider: (@MainActor () -> WKWebsiteDataStore)?
+    /// Replaces only sheet presentation, after the real fresh panel has been configured.
+    var savePanelPresenter: (@MainActor (NSSavePanel, NSWindow) async -> URL?)?
+    /// Observes spoken announcements in hosted tests without requiring VoiceOver.
+    var announcementPoster: (@MainActor (String) -> Void)?
     var panelWindowProvider: (@MainActor () -> NSWindow?)?
     /// The current operation's dedicated offscreen controller (diagnostics and tests only).
     weak var offscreenController: PreviewController?
     /// Test seam: replaces the `NSSavePanel` sheet. Return `nil` to cancel.
     var destinationChooser: (@MainActor (ExportHTMLDestinationRequest) async -> URL?)?
-    /// Test seam: observes every finished operation's typed result.
     /// Test seam: injects a typed writer outcome without touching a destination.
     var injectedWriteOutcome: ExportArtifactWriteOutcome?
     /// Test seam: pause after the panel-approved identity is captured, before rendering.
     var didInspectDestination: (@MainActor () async -> Void)?
     var didPrepareArtifact: (@MainActor () async -> Void)?
+    /// Test seam: observes every finished operation's typed result.
     var didFinishOperation: (@MainActor (UInt64, ExportHTMLOperationResult) -> Void)?
 }
