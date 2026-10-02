@@ -180,10 +180,12 @@ extension WorkspaceAnchoredFileSystem {
                 leaf: leaf,
                 metadata: metadata
             )
+            // Preserve only the rwx bits. `fchmod` would otherwise carry a replaced file's
+            // setuid, setgid, and sticky bits onto the new inode; Export applies the same mask.
             return .existing(
                 descriptor: descriptor,
                 metadata: metadata,
-                permissions: mode_t(status.st_mode & mode_t(0o7777)),
+                permissions: mode_t(status.st_mode & mode_t(0o777)),
                 expectedDigest: expectedDigest
             )
         } catch {
