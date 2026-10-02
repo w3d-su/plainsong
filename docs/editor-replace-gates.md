@@ -1050,7 +1050,7 @@ hosted spike PR #112.
   the DOM. Historical review-fix runs on `.task(id:)` had two automatic-reparse
   timeouts (folded delimiter and image); the other five methods passed.
 - Scheduler dependency: the highlight-scheduling bug-fix PR
-  (`phase3-editor-highlight-schedule-fix`, local commit `8257250421af4f848760fb060c684a411057fe43`) owns the Task scheduler.
+  (#136, `phase3-editor-highlight-schedule-fix`) owns the Task scheduler.
   Replace F stacks on it. The trace showed `body` evaluating the final revision without
   restarting the task, then the old task stopping at its revision guard. Both historical
   hosted timeouts were attributed to this dropped request. Under load about 12–19 the folded

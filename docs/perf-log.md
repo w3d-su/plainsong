@@ -1282,7 +1282,7 @@ editor keystroke path.
 Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug.
 The exact reveal proof runs only on explicit Replace. After the 2026-10-01 review
 fix and subsequent restack, `MarkdownEditorView` inherits the separate scheduling
-bug-fix PR (`phase3-editor-highlight-schedule-fix`, `8257250421af4f848760fb060c684a411057fe43`), which bounds executing
+bug-fix PR (#136, `phase3-editor-highlight-schedule-fix`), which bounds executing
 highlight work and pending requests. Native writer/input, caret snapping,
 selection-driven reveal, marked-text and native-edit styling guards remain unchanged. The only edit-path addition is an O(1)
 record of the applied model, made once per *applied* debounced highlight in
@@ -1550,4 +1550,4 @@ functional checks. Run `python3 docs/evidence/editor-highlight-schedule-20261002
 LAST to compare the committed bug-fix head and, separately, the committed stacked F
 head against the e95ac36 baseline. Exact batch commands and the strict load/lock gate
 are retained in the highlight-scheduler review entry above. R9, real IME and batch
-Replace remain open. The requested original `8257250421af…` citations are preserved.
+Replace remain open. The scheduler fix is cited as #136.
