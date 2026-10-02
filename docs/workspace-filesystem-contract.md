@@ -128,7 +128,8 @@ installed.
 All writes first create a same-directory, exclusive `.plainsong-write-*.tmp` file as `0600`
 through an `O_RDWR` descriptor. Preparation explicitly truncates to zero, writes the requested
 byte count, `fsync`s, verifies descriptor size plus SHA-256 against the requested `Data`, applies
-the existing destination mode when replacing, `fsync`s again, and repeats exact verification.
+the existing destination's `rwx` permission bits (`st_mode & 0777`; setuid, setgid, and sticky
+bits are never carried over) when replacing, `fsync`s again, and repeats exact verification.
 The expected byte count and digest stay in `PreparedWrite`; descriptor content and the temporary
 name's identity are revalidated after preparation, immediately before rename, after rename,
 and at the final durable postflight. Empty writes therefore commit as exact zero-byte files, and
