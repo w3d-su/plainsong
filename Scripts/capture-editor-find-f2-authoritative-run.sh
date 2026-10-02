@@ -91,9 +91,9 @@ f2_verify_module() {
 }
 
 f2_verify_module "editor-find-f2-capture/common.sh" "e8a41b63d2b1fb4042aff7412cdacf7be2e19fd2c1b8e0cf3ac5c656a7d9ad7e"
-f2_verify_module "editor-find-f2-capture/processes.sh" "196f82193a08fafd3b530a81c1795d63e950a31cc2c1647f3a6183c073ef9098"
+f2_verify_module "editor-find-f2-capture/processes.sh" "7afa90b44a69264bdafd51a0018d525e655677c905010d65d0df203a94994fa0"
 f2_verify_module "editor-find-f2-capture/monitor.sh" "755249f0798091a7fb4c857bd619894754b3ec21bf59385a6bc856094e6f15b4"
-f2_verify_module "editor-find-f2-capture/run.sh" "528eb4519cb8aca241a8d8544411c67529294266d2c9996e6c199e1bed0dcd9d"
+f2_verify_module "editor-find-f2-capture/run.sh" "e263bf428029a5090746c0c6b43b80e321b7bfc04b5644198207adf9af159c9b"
 f2_verify_module "editor-find-f2-capture/session_status.py" "3cff713e0bf7385eaa355b0f116e142bf7a76736007294d20fb3c21a45ef33e5"
 f2_verify_module "editor-find-f2-evidence/schema.json" "156177ae6c047e7f1295381c557c440263dcac63d48a3fbaf01dd69d4bcb3d56"
 f2_verify_module "editor-find-f2-evidence/schema_check.py" "ffacce11ab1fdaac1dd2a328900d2eb98794650801eb028363f9de444b6f93f4"
