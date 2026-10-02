@@ -1,11 +1,9 @@
 # Window-Scoped State and Native Window Tabs — Gate Specification
 
 > **Status: spec only (Windows PR A, `phase3-window-state-spec`). No W-gate is checked.**
-> This file changes no behavior, code, test, dependency, or `project.yml`. It does not
-> edit `agent.md` because in-flight PRs touch it; §12.2 lists the `agent.md` edits the
-> implementation PRs must make. The owner decisions in §9 have deadlines tied to the PR
-> that first depends on them. Check a gate only with named-test or owner-recorded evidence
-> in the same implementation commit.
+> Only this spec and one Decision Log row change. §12.2 assigns later `agent.md` edits;
+> §9 assigns owner-decision deadlines. Check gates only with named-test or owner-recorded
+> evidence in the implementation commit.
 
 Created 2026-10-01. Code citations are `path:line` on `origin/main` at `e95ac36` (#132,
 Export PR E2, which moved export's ownership check to leaf-path inspection while keeping
@@ -17,13 +15,10 @@ delivery); `docs/export-gates.md` D5 (ownership inventory).
 
 ## 1. Problem, goals, and non-goals
 
-`PlainsongApp` creates one `AppState` and injects it into every `WindowGroup` window
-(`App/PlainsongApp.swift:26`, `App/PlainsongApp.swift:42-44`). `AppState` calls itself the
-state "for the current editor window" (`App/AppState.swift:133`) but holds one current
-document, one workspace root, one find bar, one search sidebar, and one LRU. A second
-window therefore mirrors the first (`agent.md` §5). The File menu removes New Window
-(`App/PlainsongCommands.swift:21`), but other paths can still create a second window
-(§2.1, W0).
+`PlainsongApp` injects one AppState into every WindowGroup window
+(`App/PlainsongApp.swift:26`, `:42-44`), despite its "current editor window" description
+(`App/AppState.swift:133`). Windows mirror one document/root/Find/search/LRU (`agent.md` §5).
+New Window is removed (`App/PlainsongCommands.swift:21`); other creation paths remain (W0).
 
 | ID | Goal |
 |---|---|
@@ -34,12 +29,9 @@ window therefore mirrors the first (`agent.md` §5). The File menu removes New W
 | G5 | Native macOS window tabs, where each tab is a window. |
 | G6 | §12 typing latency does not change. The memory budget is restated for N windows and met. |
 
-**Non-goals:** collaboration, multi-user editing, or sync; more than one host process
-(WebKit helpers stay as they are today); iPad; any change to editing behavior inside a
-window (editing behaviors, Find/Replace semantics, the preview pipeline, WYSIWYG gates);
-a custom (non-AppKit) tab bar; split panes inside one window; one `DocumentSession`
-installed in two editors at once (§4.1 option b); and bridge changes (`PROTOCOL_VERSION`
-stays unchanged).
+**Non-goals:** collaboration/sync, multiple host processes, iPad, changing single-window
+editing/Find/Replace/preview/WYSIWYG behavior, custom tabs, split panes, a session installed
+in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged).
 
 ## 2. Baseline (code verified)
 
@@ -93,24 +85,35 @@ stays unchanged).
 | Every `WorkspaceWindow` flushes when **any** window resigns key (no `object:` filter). | `App/Views/WorkspaceWindow.swift:83-85` | N windows mean N flushes per resign. |
 | The external-change and missing-file prompts are single values for the current document. Switching clears them. | `App/AppState.swift:178-184`, `App/AppState+ExternalChanges.swift:42-55`, `App/AppState+Workspace.swift:469-472` | They are per-window projections of per-file state. |
 | Indeterminate-write quarantine is per session and blocks `canSave`. | `App/AppState.swift:321-326`, `:809-825` | Per file. |
-| A namespace mutation sets depth 1, fences its sessions, and its end clears **all** fences. | `App/AppState+WorkspaceMutationTransaction.swift:24-48`, `:55-60` | Two concurrent root transactions would clear each other's fences (§3.4 I4). |
+| A namespace mutation sets depth 1, fences the supplied relocation-record sessions, and its end clears **all** fences. | `App/AppState+WorkspaceMutationTransaction.swift:24-48`, `:55-60` | Two concurrent root transactions would clear each other's fences (§3.4 I4). |
 | The recovery stores load once, in `init`, from one Application Support directory. A load failure fences file access. Restore is skipped while recovery is pending. | `App/AppState.swift:416-450`, `:552-562`, `App/WorkspaceMutationOperationRecoveryStore.swift:786-805`, `App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`, `:39-51` | Two loaders would read and rewrite the same durable files. |
 | "Destination ownership is App-global". | `App/AppState+WorkspaceMutationPreflight.swift:116-118` | The rule this spec keeps. |
 | Export checks a leaf-path destination against the Save Copy owner walk and the mutation inventory (`workspaceMutationManagedSessions()` plus owned state URLs). | `App/AppState+MissingFile.swift:374-481`, `App/AppState+ExportDestinationOwnership.swift:37-97` | Export inherits both inventories, so it spans windows once they do. |
 | Export's app-private staging root comes from the process environment and home directory. | `App/AppState+ExportAppPrivateRoot.swift:9-26` | App-global, with no window coupling. |
-| Eight hand-built session lists each read one `AppState`: autosave flush, retained-authority collision, physical duplicate, LRU protection, workspace closure, Save Copy candidates, mutation-managed sessions, termination sessions. | `App/AppState+Autosave.swift:7-11`, `App/AppState+WorkspaceSessions.swift:248-255`, `:313-319`, `:431-437`, `App/AppState+WorkspaceRetirement.swift:92-100`, `App/AppState+MissingFile.swift:483-490`, `App/AppState+WorkspaceMutationPreflight.swift:22-31`, `App/AppState+WorkspaceMutationTextRecovery.swift:442-450` | Each must span every window (§3.4 I2). |
+| Known hand-built session lists read one `AppState`: autosave flush, retained-authority collision, physical duplicate, LRU protection, workspace closure, Save Copy candidates, mutation-managed sessions, termination sessions. | `App/AppState+Autosave.swift:7-11`, `App/AppState+WorkspaceSessions.swift:248-255`, `:313-319`, `:431-437`, `App/AppState+WorkspaceRetirement.swift:92-100`, `App/AppState+MissingFile.swift:483-490`, `App/AppState+WorkspaceMutationPreflight.swift:22-31`, `App/AppState+WorkspaceMutationTextRecovery.swift:442-450` | These are examples, not an exhaustive inventory; I2 defines the migration rule. |
 | Hard links and case aliases are detected by physical identity. | `App/AppState+WorkspaceSessions.swift:309-336` | The basis for "same file" (§4.1). |
 | Opening a workspace closes the previous one, starts one security scope, and starts one watcher. | `App/AppState+Workspace.swift:327-368` | Per root. |
 | Opening a single file closes the workspace. | `App/AppState+Workspace.swift:271-273` | Must become "this window's root". |
-| Closing or replacing a workspace retires its sessions, empties `sessionCache`, and resets the LRU. | `App/AppState+WorkspaceRetirement.swift:16-87`, `:243`, `:254` | Run as-is, it would tear down sessions shown in other windows. |
+| Closing or replacing a workspace retires its sessions, empties `sessionCache`, and resets the LRU. | `App/AppState+WorkspaceRetirement.swift:16-87`, `:243`, `:254` | It also sweeps unrelated warm sessions. Root-scoped release must replace this global closure (§6.2). |
 | A watcher event inspects only sessions of that root authority. An unanchored session records membership in at most one installed root. | `App/AppState+Workspace.swift:111-131`, `App/AppState+SessionOwnership.swift:491-538` (early return at `:496`) | Overlapping roots are unsafe (§4.3). |
-| `WorkspaceFileTree` bundles the scanned root with `expandedNodeIDs` and `selectedNodeID`. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:149-160` | The tree must split into a shared root and per-window projections. |
+| `WorkspaceFileTree` bundles the scanned root with `expandedNodeIDs` and `selectedNodeID`. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:149-160` | Share the snapshot only. Each window owns its entire filtered tree and reload disposition (`App/AppState+WorkspaceReload.swift:232-250`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:245-248`). |
 | One last-opened bookmark key and ten recents. Restore runs once per `AppState` and re-saves stale bookmarks. A restored workspace selects its first file, not the last document. | `Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:4`, `:25-43`, `Packages/WorkspaceKit/Sources/WorkspaceKit/RecentItemStore.swift:4`, `:12-20`, `App/AppState.swift:545-573`, `App/AppState+Workspace.swift:363-367` | Per-window restoration needs a list (§6.4). |
 | Restoration starts from every window's `.task`, guarded only per `AppState`. | `App/Views/WorkspaceWindow.swift:79-82`, `App/AppState.swift:546-547` | Per-window state would restore into every new window. |
 | Workspace Search requires a root. Its UI, task, and generation live on `AppState`. | `App/AppState+WorkspaceSearchUI.swift:8-10`, `:53-60`, `App/AppState.swift:163-171`, `:231-234` | Per window, bound to a per-root generation. |
 | One cached `PlainsongPreferences` per `AppState`, with one `onChange` callback. | `App/AppState.swift:427`, `:451-453`, `App/PlainsongPreferences.swift:63`, `:67` | Two instances would not see each other's changes. |
 | The layout mode persists under one key. | `App/AppState.swift:734-736`, `:770` | WD9. |
-| `App/AppState.swift` is 978 lines. SwiftLint's default `file_length` error is 1000, and `.swiftlint.yml` does not override it. | `wc -l` | PR B must shrink it, not grow it. |
+| `App/AppState.swift` is 978 lines. SwiftLint's default `file_length` error is 1000, and `.swiftlint.yml` does not override it. | `wc -l` | B1/B2 must shrink it, not grow it. |
+
+Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
+
+| Consumer | Evidence | Migration obligation |
+|---|---|---|
+| `retainMetadataOnlyForRetiredEditorSessions` | `App/AppState+WorkspaceSessions.swift:338-389`; caller `App/AppState+WorkspaceRetirement.swift:255` | Preserve every window's current session and registry-retained session; a root release prunes only its eligible sessions. This clears save fences (`App/AppState.swift:296-299`), bindings, proofs, quarantine, and detached URLs today. |
+| `firstUnretirableExternalConflict` | `App/AppState+WorkspaceSessions.swift:156-175` | Enumerate globally, then filter to the release operation's root when closing one root. |
+| `isAddressableExternalResolutionSession` | `App/AppState+ExternalChanges.swift:772-786` | Accept registry-owned sessions, including another window's current session. |
+| `canAutosave` membership | `App/AppState+Autosave.swift:145` | Registry membership; never one window's cache/current document. |
+| `releaseUnreferencedUntitledSessionOwnership` | `App/AppState+SessionOwnership.swift:92-104` | Check all windows and retained owners before releasing proof. |
+| Search dirty overlays and relevant-edit membership | `App/AppState+CompletionWorkspace.swift:154-162`, `App/AppState+WorkspaceReload.swift:62` | Registry candidates filtered to the query's root; refresh each affected window's search. |
 
 ### 2.4 Packages
 
@@ -124,7 +127,7 @@ stays unchanged).
 
 | Fact | Evidence |
 |---|---|
-| About 339 `AppState(` constructions in `AppTests`, plus `PerformanceTests`. | `git grep -c "AppState(" -- AppTests`; `PerformanceTests/AppBackedEditorPerformanceTests.swift:223` |
+| 286 direct `AppState(` initializers in `AppTests`; 339 substring matches include helper names. Performance tests also construct it. | Token-boundary count over `git grep "AppState(" origin/main -- AppTests`; `PerformanceTests/AppBackedEditorPerformanceTests.swift:223` |
 | UI tests pick "the" window as the first hittable one and query identifiers app-wide. | `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`, `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` |
 | Accessibility identifiers are not unique across windows. | `App/Views/WorkspaceWindow.swift:200` |
 | Real dual-window key activation has never been verified. | `docs/editor-find-gates.md:776-781`, `docs/decision-log.md:180` |
@@ -138,7 +141,7 @@ stays unchanged).
 | Scope | Owner (names non-binding) | Lifetime |
 |---|---|---|
 | Per window | `WindowState` | One window or tab. |
-| Per workspace root | `WorkspaceRootContext`, reference-counted by windows | First window that opens the root → last window that releases it. |
+| Per workspace root | `WorkspaceRootContext`, reference-counted by windows | First root open → last window release; retained session authority may keep its scope alive (§6.2). |
 | Per document file | Entries keyed by `ObjectIdentifier(DocumentSession)` or by canonical URL inside the app-global registry | The session's lifetime. |
 | App-global | `AppDocumentRegistry`, `KeyWindowRouter`, services | The process. |
 
@@ -156,13 +159,13 @@ Line numbers are in `App/AppState.swift`.
 | `editorFocusRequestID` (193), `editorNavigationCommand` (173), `editorNavigationGeneration` (235) | Window | They target that window's editor. |
 | `editorFindHost` (172): controller, `ui`, match highlight, selection cache, chrome focus, test overrides | Window, **except** `replaceAuthority.generation` | A Find session binds one installed editor. The generation is advanced by app-global fences too; one app-global monotonic counter supersedes plans at least as often as today. |
 | `workspaceRootURL` (154) | Window (a reference into a root) | Which root the window shows. |
-| `workspaceTree` (155) | Split: root node → root; `expandedNodeIDs` and `selectedNodeID` → window | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:158-160`. |
+| `workspaceTree` (155) | Window, including the root node | `showAllFiles` filters the whole tree; reconcile and current-document disposition run per window (`App/AppState+WorkspaceReload.swift:232-250`). Only the scan snapshot is shared. |
 | `showAllFiles` (174) | Window | A view filter. |
 | `workspaceSnapshot` (156), `workspaceSearchRootAuthority` (157), `workspaceInstalledCaptureGeneration` (161), `workspaceGeneration` (162), `workspaceReloadTask` (216), reload hooks (218, 220, 222) | Root | One scan, authority, and generation per root. |
 | `workspaceAccess` (285), `workspaceWatcher` (286) | Root, reference-counted | One security scope and one FSEvents stream per root. |
 | `workspaceSearchState` (163), `workspaceSearchUI` (166), `workspaceSearchFocusKeyEpoch` (169), `workspaceSearchFocusKeyWindowCheck` (171), `workspaceSearchTask` (231), `workspaceSearchTaskToken` (232), `workspaceSearchQueryGeneration` (233), `workspaceSearchRefreshIntent` (234), `workspaceSearchPostActivationHook` (224) | Window | Each window keeps its own query, results, and focus. The root generation invalidates results. |
 | `completionWorkspace` (175), `completionWorkspaceTask` (279) | Window | Built from the root snapshot plus the window's current document. |
-| `presentedError` (177) | Window | Alerts are per window. App-global failures go to the key window. |
+| `presentedError` (177) | Window | Operation failures go to their initiating window; background failures follow the notice routing below. |
 | `externalChangePrompt` (178), `missingFilePrompt` (182), `indeterminateFileWriteReconciliationPrompt` (186) | Window projection of per-file state | Shown for the window's own document. The maps behind them are per file. |
 | `isSaving` (152) | File | A save belongs to its session. Windows project it. |
 | `autosaveTask` (214), `statisticsTask` (215), `sessionAutosaveTasks` (280), `sessionStatisticsTasks` (281) | File | The foreground split assumes one current document (`App/AppState+Autosave.swift:27-66`). Merge into per-session tasks. |
@@ -171,13 +174,20 @@ Line numbers are in `App/AppState.swift`.
 | `deferredExternalChangeResolutions` (251), `externalResolutionIntentCaptures` (255), `externalReloadTasks` (256), `externalDiskInspectionTasks` (260), `pendingExternalReloadApplications` (264), `nextExternalReloadGeneration` (270), `externalDiskEventGenerations` (271), `lastKnownDiskHashes` (290), `lastKnownDiskModificationDates` (291), `pendingExternalTexts` (292), `pendingExternalFileVersions` (300), `detachedSessionURLs` (304) | File | One disk truth per file. |
 | `anchoredSessionFileBindings` (310), `unanchoredManagedSessionOwnershipProofs` (313), `editorImageAssetDocumentAuthorities` (318), `indeterminateSessionWrites` (321), `indeterminateSessionWriteContexts` (326) | File | Authority and quarantine belong to the file. |
 | `sessionCache` (287), `sessionPolicy` (289) | App-global | One warm set and one LRU (WD6). |
-| `workspaceMutationWriteFences` (329), `workspaceMutationNamespaceDepth` (335), `workspaceMutationRefreshPending` (338), `workspaceMutationExternalRefreshPending` (341), `workspaceMutationRefreshRootAuthority` (344), `workspaceImageAssetInsertionCount` (347), `editorImageAssetDiscardEventHandler` (349) | App-global in v1 (one namespace transaction at a time, which records its root) | A fence must stop a save from whatever window shows the session. `endWorkspaceNamespaceMutation` clears every fence (`App/AppState+WorkspaceMutationTransaction.swift:58`), so per-root concurrent transactions need a separate design. |
+| `workspaceMutationWriteFences` (329), `workspaceMutationNamespaceDepth` (335) | App-global | One namespace transaction app-wide in v1; the registry holds its affected-session fences and root identity. It fences relocation records, not every session under a root (`App/AppState+WorkspaceMutationPlanning.swift:190-206`). |
+| `workspaceMutationRefreshPending` (338), `workspaceMutationExternalRefreshPending` (341), `workspaceMutationRefreshRootAuthority` (344) | Root | Each root retains its own deferred watcher/refresh intent, even while another root's transaction runs. Drain all queued roots; today's single-root drain loses an R2 event during R1 mutation (`App/AppState+Workspace.swift:14-24`, `App/AppState+WorkspaceMutationTransaction.swift:62-70`). |
+| `workspaceImageAssetInsertionCount` (347), `editorImageAssetDiscardEventHandler` (349) | Root | Root-owned image-placement fence/callback; namespace begin checks the root's count under the app-wide transaction lock (`App/AppState+WorkspaceMutationTransaction.swift:24-29`). |
 | `indeterminateWorkspaceMutationSessions` (353), `workspaceMutationRecoveries` (357), `workspaceMutationOperationRecoveryRecords` (358), `workspaceMutationOperationRecoveryIDsWithUnpromotedText` (360), `workspaceMutationRecoveryIDBySession` (361), `workspaceMutationTextRecoveryContexts` (362), `workspaceMutationTextRecoverySessions` (364), `workspaceMutationTextRecoveryTasks` (365), `pendingWorkspaceMutationTextRecoveryRecords` (366), `pendingWorkspaceMutationOperationRecoveryRecords` (368), `workspaceMutationRecoveryLoadErrors` (370), `workspaceMutationOperationRecoveryLoadError` (371), `workspaceMutationTextRecoveryLoadError` (372), `workspaceMutationOperationRecoveryLoadFailed` (373), `workspaceMutationTextRecoveryLoadFailed` (374), `workspaceMutationReconciliationPrompt` (188) | App-global | The durable stores are single files. One loader, one fence, one prompt. |
-| `fileWriteArtifactNotices` (190), `workspaceTrashCleanupNotices` (191), `recentItemURLs` (176) | App-global | Outcomes of app-wide write paths, and one recents list. |
+| `fileWriteArtifactNotices` (190), `workspaceTrashCleanupNotices` (191), `recentItemURLs` (176) | App-global | Registry stores notices with an initiating/home window ID and affected session/root. Show them there, else in a window showing that session/root, else the frontmost workspace window; queue if none. Recents are shared. |
 | `shouldRestoreLastOpenedFile` (283), `didAttemptRestore` (284) | App-global | Restoration runs once per launch, not once per window (§6.4). |
-| `preferences` (375), `isWYSIWYGMechanismHealthy` (376), `userDefaults` (211) | App-global | One settings source. A mechanism failure is process-wide. |
+| `preferences` (375), `isWYSIWYGMechanismHealthy` (376), `userDefaults` (211) | App-global | One settings source; its single `onChange` fans out to every window (`App/AppState.swift:451-453`). A mechanism failure is process-wide. |
 | `fileStore` (197), `coherentFileReader` (198), `externalReloadApplicationPreparer` (199), `lastOpenedFileStore` (200), `recentItemStore` (201), `directoryScanner` (202), `workspaceSearchStreamProvider` (203), `workspaceSearchLimits` (204), `workspaceSearchDebounceNanoseconds` (205), `fileOperations` (206), `workspaceMutationOperationRecoveryStore` (207), `workspaceMutationTextRecoveryStore` (209), `reportedTrashBookmarkAccess` (210), `editorImageThumbnailAdapter` (212), `anchoredFileSaveOverride` (226) | App-global | Injected services and a test seam. |
 | `editorImageThumbnailRefreshProxy` (213) | Root | It fans out by workspace-relative path. |
+
+Recovery-banner placement (`App/AppState+WorkspaceMutationRecoveryLoadFailure.swift:5-13`)
+has one home workspace window, initially the launch window; the registry retains the global
+fence and retargets presentation if that window closes. Background autosave failures use the
+same notice routing, preserving their session identity even when it is warm and unseen.
 
 ### 3.3 Process-wide statics outside `AppState`
 
@@ -186,20 +196,27 @@ Line numbers are in `App/AppState.swift`.
 | `PlainsongAppServices.appState` | `App/PlainsongAppServices.swift:7-10` | Removed. `KeyWindowRouter` resolves the key window's `WindowState`; the registry serves app-global needs. |
 | Hot-key handler and registration | `App/PlainsongApplication.swift:12-18` | Stays app-global. Its action resolves the key window (§5.1). |
 | `EditorFindActionHooks` | `Packages/EditorKit/Sources/EditorKit/EditorFindActionHooks.swift:6-14` | The hooks receive the originating text view's window (an EditorKit API change). |
-| `EditorSelectionProbe.keyWindowOverrideForTesting` | `Packages/EditorKit/Sources/EditorKit/EditorSelectionProbe.swift:120` | Unchanged. |
-| `EditorCommandResponderRegistry.routes` | `Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift:120` | Unchanged (keyed per text view). |
-| `WorkspaceDirectoryCloneSourceRegistry.shared` | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceItemCreationTypes.swift:24-28` | Unchanged (lock-protected). |
-| `AppState.exportAppPrivateRoot(environment:homeDirectory:)` | `App/AppState+ExportAppPrivateRoot.swift:9-26` | Unchanged (a pure static of the process environment). |
+| `WorkspaceSearchKeyboardSmokeProbe` | `App/WorkspaceSearchSelection.swift:27-38` | Key observations by window; hosted multi-window tests cannot read a last-writer-wins static. |
+| `EditorPreviewScrollCoordinator.latestDebugInstance` | `App/Views/EditorScrollBridge.swift:24` | Resolve a designated window's coordinator in hosted tests. |
+| `EditorNavigationDebugProbe.shared` | `Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Navigation.swift:301` | Key observations by window/installation in hosted tests. |
+| `EditorFindSpike.fireCount`, `lastFireDate` | `Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:29-32` | Keep aggregate diagnostics; add originating-window evidence for routing tests. |
+| Delegate Debug fixture state | `App/PlainsongApplicationDelegate.swift:5-11`, `:56-95` | App-global creation/cleanup once; explicitly bind fixture actions to the first test window. |
+
+Unchanged: `EditorSelectionProbe.keyWindowOverrideForTesting`
+(`Packages/EditorKit/Sources/EditorKit/EditorSelectionProbe.swift:120`), per-view responder
+routes (`Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift:120`), the locked
+clone registry (`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceItemCreationTypes.swift:24-28`),
+and pure `exportAppPrivateRoot` (`App/AppState+ExportAppPrivateRoot.swift:9-26`).
 
 ### 3.4 Safety invariants that must stay global
 
 | ID | Invariant | Rule |
 |---|---|---|
-| I1 | One writer per file. | At most one `editorWriterInstallations` entry per session across all windows (`App/AppState+EditorBinding.swift:444-450`). Under WD1, at most one window installs a given physical file. |
-| I2 | Every ownership inventory spans all windows. | Save Copy, export, mutation destination, retained-authority collision, physical duplicate, LRU protection, workspace closure, and termination all read **one** registry enumerator that replaces the eight lists in §2.3. List-specific extras (recovery sessions, text-recovery sessions) stay explicit. Save Copy, export, and mutations then refuse a destination owned by any window. |
-| I3 | Recovery and quarantine fences are global. | Each durable store loads once. A load failure fences file access in every window. Pending recovery blocks restoration of every window. A quarantined session refuses writes from every window. |
-| I4 | The workspace write fence spans windows that share a root. | A namespace transaction fences every session under its root whichever window shows it (`App/AppState+WorkspaceMutationTransaction.swift:40-48`), and a second transaction from any window is refused (`:24-26`). |
-| I5 | One termination check. | `prepareForTermination` covers every window's sessions. |
+| I1 | One writer per file. | At most one `editorWriterInstallations` entry per session across all windows (`App/AppState+EditorBinding.swift:444-450`). Under WD1, one window owns the file; asynchronous installation teardown obeys W4. |
+| I2 | Every ownership inventory spans all windows. | After B2, nothing outside `WindowState` reads `currentDocument`, and nothing outside the registry reads `sessionCache`; this is a grep gate, not a count of lists. All consumers in §2.3 use window projections or one registry enumerator, with explicit operation filters and recovery extras. Save Copy, export, and mutations refuse any window's owner. A façade forwards APIs without reading either store. |
+| I3 | Recovery and quarantine fences are global. | Each store loads once; load failure fences every window, pending recovery blocks restoration, and quarantine refuses writes. The per-file save/autosave gate also consults that file's showing-window prompts, or equivalent per-file flags, even for background saves (`App/AppState.swift:823-824`, `App/AppState+Autosave.swift:154-155`). |
+| I4 | The workspace write fence spans windows that share a root. | The global enumerator supplies affected relocation-record sessions from every window (`App/AppState+WorkspaceMutationPlanning.swift:190-206`); begin fences those sessions (`App/AppState+WorkspaceMutationTransaction.swift:40-48`). One app-global transaction excludes a second (`:24-26`). Root-owned image placement and deferred refresh stay per root (§3.2). |
+| I5 | One termination check. | `prepareForTermination` covers the registry, including warm sessions no window shows. |
 | I6 | One writer for app-wide bookmarks. | Recents, the restoration store, and the legacy last-opened key. |
 
 ## 4. The same file or the same workspace in two windows
@@ -219,25 +236,22 @@ may adopt one when no other window shows it.
 | (b) Share one `DocumentSession` | B installs a second editor for the session, with its own selection and scroll. | Live per-keystroke propagation to the other installation (today a non-writer converges only at its next activation, `App/AppState+EditorBinding.swift:433-441`). A shared undo model (today each view has its own `CoalescingUndoManager`). IME: marked text in A while B publishes. Per-view WYSIWYG fold and thumbnail presentation over shifting ranges. Find/Replace authority per window over one session (the editor stamp includes window and selection, `Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift:10-15`). One external-change prompt resolved from two banners. One autosave. | Cross-window work on every keystroke (§12 typing gate), undo corruption, and the highest review cost. Not for v1. |
 | (c) Refuse | An error: "already open in another window". | Least code. | Hostile: the user must find the window. Kept only as the fail-closed fallback when focusing is impossible (the target window is mid-close or has a sheet). |
 
-**Recommendation: (a).** It keeps I1 trivially, because each physical file has one
-installation and therefore one writer candidate. It keeps undo, IME, WYSIWYG, and
-Find/Replace exactly as they are in one window. It adds no per-keystroke work. It matches
-Typora and the NSDocument convention: reopening an open document brings its window
-forward. Residual risk: two opens of one file race only on the main actor, which
-serializes them, and a closing window stops owning its file once its close has committed
-(§6.2).
+**Recommendation: (a).** One writer always, one installation once teardown settles (W4);
+undo, IME, WYSIWYG, and Find/Replace keep their single-window behavior, with no per-keystroke
+fan-out. Main-actor opens serialize; the window releases file ownership only on committed
+close (§6.2). Reopening focuses the owner, following the NSDocument convention.
 
 ### 4.2 Same workspace root (WD2)
 
 | Option | Behavior | What it needs | Risks |
 |---|---|---|---|
-| **(i) Shared root context — recommended** | One `WorkspaceRootContext` per canonical root: one security scope, one watcher, one scan snapshot and generation, one mutation fence that covers sessions in every window, and one image-placement fence. Each window keeps its own current document, expansion, selection, Show All Files, and search. Closing a window releases its reference; the last release runs today's closure semantics. | Split `WorkspaceFileTree` (`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:158-160`). Closure becomes a release, and must not empty other windows' sessions (`App/AppState+WorkspaceRetirement.swift:243`, `:254`). A reference-counted scope (precedent: `App/AppState.swift:855-930`). | The most code, all in PR D. A rename in one window reloads both sidebars, which is the desired result. |
+| **(i) Shared root context — recommended** | One `WorkspaceRootContext` per canonical root: security scope, watcher, shared scan snapshot/generation, and image-placement fence. The registry transaction fences affected sessions in every window (I4). Each window owns its whole filtered tree, document, and search. Last release retires only this root's eligible sessions (§6.2). | Share `workspaceSnapshot`, build each tree separately, and scope closure by retained authority or installed root membership. Other-root and single-file warm sessions survive; remove selected LRU entries only (`App/AppState+WorkspaceRetirement.swift:92-109`, `:243-255`). A reference-counted scope (precedent: `App/AppState.swift:855-930`). | The most code, in PR D1. A rename in one window reloads both sidebars, which is the desired result. |
 | (ii) Focus the existing window for the same root | One window per root. Opening the root again focuses that window. | The same lookup as WD1. | Tabs lose their main use (several posts of one blog as tabs). "Open in New Window" becomes impossible inside one root. |
 | (iii) Refuse | An error. | Least code. | Hostile. |
 | (iv) Independent duplicates | Two scans, watchers, and fences for one root. | None. | **Never allowed.** A rename in A would not fence B's session, which violates I4. |
 
 **Recommendation: (i)**, with WD1 applied per file inside it. If the owner wants a smaller
-PR D, (ii) is a safe v1 and (i) can follow: PRs B and C create the root context either way.
+PR D1, (ii) is a safe v1 and (i) can follow: B1/B2 and C create the root context either way.
 
 ### 4.3 Overlapping roots and single files inside an open root
 
@@ -250,10 +264,15 @@ single-file session records membership in at most one installed root
   refused: "This folder overlaps a workspace open in another window", with a Show button.
 - Opening a single file that lies inside an open root opens it as a workspace document of
   that root. WD1 applies first, then WD7 decides the window.
-- Opening a root that contains a file already open as a single file in another window is
-  allowed. The root's installation adopts membership for that session through the existing
-  `retainInstalledWorkspaceMembershipIfAvailable` path, so the watcher and mutation fences
-  cover it. The single-file window keeps showing it.
+- In v1, opening a root containing a file already installed as a single file in another
+  window **refuses before root installation**, with a Show button. Do not assume the existing
+  membership helper runs at root install: its caller accepts an already-proven proof
+  (`App/AppState+SessionOwnership.swift:186-190`), while the production load caller passes
+  a new session (`App/AppState+Workspace.swift:431-443`); membership resolution reads one
+  root authority (`App/AppState+SessionOwnership.swift:525-526`). Supporting adoption later
+  requires explicit root-install and release hooks, including membership revocation.
+  Root release still preserves any installed session, even if it retained that root's
+  authority before switching to a single-file window.
 
 ## 5. Command and event routing
 
@@ -267,16 +286,16 @@ single-file session records membership in at most one installed root
   document commands disable and never fall back to the main window
   (`Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift:64-70`).
 - **`MenuBarState` keeps its contract** (`App/MenuBarState.swift:26-34`). It re-subscribes
-  when `activeWindowState` changes. For the active window only, it observes
-  `objectWillChange.receive(on: RunLoop.main)`, re-reads a `MenuBarSnapshot`, and
-  republishes only on change. The snapshot holds the window facts (open document,
+  when `activeWindowState` changes. It observes the active window plus a deduplicated
+  registry/recents signal for file-scoped saving, fences, and quarantine; it re-reads
+  `MenuBarSnapshot` on the main run loop and republishes only on change. The snapshot holds the window facts (open document,
   `canSave`, workspace search, layout title), the app-global `recentItemURLs`, and a new
-  `hasActiveWorkspaceWindow`. Background windows' publishes never reach the menu.
-- **Rejected:** `@FocusedObject` / `focusedSceneObject(WindowState)` in `PlainsongCommands`.
-  It observes the whole window object and brings back the high-churn menu rebuilds that
-  `MenuBarState` exists to stop. A `focusedSceneValue` of the already-deduplicated snapshot
-  is an acceptable alternative if W0 shows it is deterministic. It is not the default,
-  because hosted tests designate key windows through AppKit (§8).
+  `hasActiveWorkspaceWindow`. Background-window UI publishes never reach the menu; a background save
+  finishing must still update Save enablement for the active file.
+- **Rejected:** whole-object `@FocusedObject` / `focusedSceneObject(WindowState)` restores
+  high-churn menu observation. A deduplicated `focusedSceneValue` is an alternative only
+  if W0 proves deterministic routing with hosted AppKit key-window seams (§8).
+
 - **Actions resolve their target when invoked**, for example
   `router.activeWindowState?.save()`. `PlainsongCommands` stops capturing an `AppState`
   (`App/PlainsongCommands.swift:13`).
@@ -284,8 +303,9 @@ single-file session records membership in at most one installed root
   Because enablement excludes non-workspace key windows, AppKit's main-window fallback
   cannot fire. The Find hooks and the App fallbacks
   (`App/EditorFindCommandDelivery.swift:17-48`) resolve the key window's state. The EditorKit
-  selectors (`Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:68-83`) pass their
-  own window, so a command reaches the window that owns the text view.
+  selectors (`Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift:68-83`), including
+  Escape `cancelFind` (`Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift:75`),
+  pass their own window, so a command reaches the window that owns the text view.
 - **Carbon ⇧⌘F** stays registered app-wide while active
   (`App/PlainsongApplication.swift:57-85`). `PlainsongWorkspaceSearchKeyAction` toggles
   search on `activeWindowState` only, and still consumes the event when there is none
@@ -293,9 +313,11 @@ single-file session records membership in at most one installed root
 
 ### 5.2 Entry-point routing
 
-"Same rule as Open" means: if the file or root is open in another window, focus it (WD1,
-WD2, §4.3). Otherwise, if the key workspace window is empty (no document and no root),
-open there. Otherwise open a new window (WD7). Exactly one window acts, and no blank scene
+"Same rule as Open" means: focus an installed file owner (WD1); a root follows WD2
+(reuse its shared context, or focus under the smaller fallback) and §4.3. Use an empty target
+(no document and no root), else a new window (WD7). Menu Open targets the key workspace
+window. External events use the frontmost workspace window by AppKit z-order, even before
+activation; they cannot rely only on `didBecomeKey` having fired. Exactly one window acts, and no blank scene
 is left behind.
 
 | Entry point | Today | Target |
@@ -319,7 +341,7 @@ which Plainsong removed by replacing `.newItem` (`App/PlainsongCommands.swift:21
 
 | Option | For | Against |
 |---|---|---|
-| **(A) Keep ⌘N for New File; add File › New Window ⇧⌘N (and New Tab ⌘T under WD4) — recommended** | §6.4 and `docs/m4-checklist.md` stay valid. ⇧⌘N and ⌘T are unused: every App shortcut is in `App/PlainsongCommands.swift:25-138`. | It departs from apps where ⌘N opens a window. |
+| **(A) Keep ⌘N for New File; add File › New Window ⇧⌘N (and New Tab ⌘T under WD4) — recommended** | §6.4 and `docs/m4-checklist.md` stay valid. No App shortcut collides (`App/PlainsongCommands.swift:25-138`); W0 must also check system-provided menu items. | It departs from apps where ⌘N opens a window. |
 | (B) ⌘N for New Window; New File moves to ⌥⌘N | The stock macOS binding. | It breaks §6.4, the M4 checklist, and existing muscle memory. |
 | (C) No New Window command | No new command. | Users cannot open an empty window. The tab-bar "+" depends on unverified AppKit behavior. |
 
@@ -327,52 +349,55 @@ which Plainsong removed by replacing `.newItem` (`App/PlainsongCommands.swift:21
 
 ### 6.1 Opening a window or tab
 
-- A new window gets an empty `WindowState`: no document, no root, the last persisted layout
-  (WD9), the Find bar closed, and Files mode. It never runs launch restoration. Today every
-  window's `.task` calls it (`App/Views/WorkspaceWindow.swift:79-82`).
-- It creates no WKWebView until it shows a document with the preview visible (§7.2).
-  Today the controller and its WKWebView are created when the editor area mounts, whether
-  or not the preview is visible (`App/Views/WorkspaceWindow.swift:102`,
-  `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:54`, `:66`).
-- It registers with `KeyWindowRouter`.
+- An empty WindowState has no document/root, inherits layout (WD9), closes Find, and starts
+  in Files mode. New windows never launch restoration (`App/Views/WorkspaceWindow.swift:79-82`).
+- Register it with KeyWindowRouter. Create a WKWebView only when a document's preview is
+  visible (§7.2); today editor mount creates it even in source-only layout
+  (`App/Views/WorkspaceWindow.swift:102`, `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:54`, `:66`).
 
 ### 6.2 Closing a window or tab
 
+Close interception is a W0 prerequisite: SwiftUI owns the window delegate, so safely
+vetoing/deferring `windowShouldClose` needs a probe before relying on it (WD8).
 In order (closing a tab is closing a window):
 
-1. **Refuse** (WD8): the window stays open and an alert explains why, if its current
-   document has pending editor source or marked text (`App/AppState+EditorBinding.swift:291`),
-   an unresolved external-change or missing-file prompt, an indeterminate write, a dirty
-   detached or text-recovery session, or a namespace mutation in progress. These are the
-   states that already refuse workspace closure and termination
+1. **Preflight/refuse:** pending editor source or marked text, an in-flight save or external
+   resolution, a namespace mutation, or quarantine refuses or defers the close. Dirty detached,
+   untitled, text-recovery, or external-conflict state may stay warm **only** with proven
+   registry retention of text, authority, prompts, and LRU protection; otherwise refuse.
+   Preflight step 4's release set before revoking installation; compare closure/termination rules
    (`App/AppState+WorkspaceRetirement.swift:26-82`,
    `App/AppState+WorkspaceMutationTextRecovery.swift:300-400`).
-2. **Flush:** save the current document if it is dirty and `canAutosave`
-   (`App/AppState+Autosave.swift:135-156`). A saved session stays warm in the global LRU.
-3. **Revoke** the window's editor installation through the existing path
-   (`App/AppState+EditorBinding.swift:361-405`). This releases the writer, reconciles the
-   LRU, and finishes retirement where possible.
-4. **Release** the root reference. The last release runs today's closure checks and
-   retirement (`App/AppState+WorkspaceRetirement.swift:16-87`), but only over sessions that
-   no other window references. A single-file window inside the root keeps its session
-   (§4.3).
-5. **Cancel** window-owned tasks (search, completion, Find, navigation) and invalidate the
-   preview controller (`Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:153-170`).
-6. **Remove** the window's restoration record, on a user close only (§6.3).
+2. **Flush:** save a dirty current document when `canAutosave`
+   (`App/AppState+Autosave.swift:135-156`). A failed save cancels close. A prompt-blocked
+   session is retained under step 1, never saved through that prompt. A saved session stays warm.
+3. **Revoke:** use the installation-release path (`App/AppState+EditorBinding.swift:361-405`)
+   to release the writer and reconcile the LRU; validate all retention before committing close.
+4. **Release:** on the last root-window reference, select registry sessions whose retained
+   authority or installed membership belongs to **this root**, excluding any session still
+   installed by any window. Preflight only that set; retirement must keep protected sessions.
+   Remove only eligible cache/LRU entries; never reset the whole LRU. Scope metadata pruning
+   to those retired sessions, preserving fences, bindings, proofs, quarantine, detached URLs,
+   other roots' warm sessions, and standalone warm sessions. The global sweep at
+   `App/AppState+WorkspaceRetirement.swift:92-109`, `:243-255` cannot be called unchanged.
+   Release installed membership explicitly; retained authority/security-scope references
+   remain alive until their sessions can safely retire (`App/AppState.swift:855-930`).
+5. **Cancel** window tasks and invalidate its preview
+   (`Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:153-170`).
+6. **Remove** its restoration record on user close only (§6.3).
 
-The §5 LRU guarantees stay: a failed or fenced eviction candidate stays protected for the
-pass (`App/AppState+WorkspaceSessions.swift:391-410`), and the cache may exceed its limit
-while saves cannot complete. Plainsong has no unsaved untitled editing: New File creates
-the file first (`App/AppState+NewFile.swift:45-60`), and `hasOpenDocument` requires a URL
-(`App/AppState.swift:805-807`). An untitled or recovery session therefore falls under
-step 1. Closing the last window leaves the app running, as it does today.
+Failed or fenced eviction candidates remain protected for the pass; an over-limit cache
+is allowed (`App/AppState+WorkspaceSessions.swift:391-410`). New File creates a file first
+(`App/AppState+NewFile.swift:45-60`); untitled/recovery sessions still require
+retention proof. Closing the last window is expected to leave the app running (W7 smoke).
 
 ### 6.3 Quitting
 
-- `applicationShouldTerminate` calls one app-global `prepareForTermination()` over every
-  window's sessions (`App/PlainsongApplicationDelegate.swift:42-54`,
-  `App/AppState+WorkspaceMutationTextRecovery.swift:442-450`). A refusal brings the window
-  that owns the blocking session to the front and shows the error there.
+- `applicationShouldTerminate` calls one app-global `prepareForTermination()` over the
+  whole registry, including warm/protected sessions without a showing window (`App/PlainsongApplicationDelegate.swift:42-54`,
+  `App/AppState+WorkspaceMutationTextRecovery.swift:442-450`). A refusal focuses the
+  showing/home window; for an unseen warm session, show the retained prompt and error in
+  the frontmost workspace window (create a recovery window if none).
 - Autosave flushes once. The per-window `willTerminate` observer
   (`App/PlainsongApp.swift:54-56`) moves to the delegate.
 - Restoration records are written before AppKit closes the windows. Closes during
@@ -380,11 +405,10 @@ step 1. Closing the last window leaves the app running, as it does today.
 
 ### 6.4 State restoration on relaunch (WD5)
 
-**Today:** one bookmark for the last opened file or folder
-(`Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:4`), restored once
-per `AppState` after recovery (`App/AppState.swift:545-573`). A restored workspace selects
-its first file (`App/AppState+Workspace.swift:363-367`). Stale bookmarks are re-saved
-(`Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:38-40`).
+**Today:** one last-opened bookmark, restored once per AppState after recovery, with stale
+bookmarks re-saved and first workspace file selected (`App/AppState.swift:545-573`,
+`Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:38-40`,
+`App/AppState+Workspace.swift:363-367`).
 
 **Proposal:** an app-owned, schema-versioned `WindowRestorationStore` in UserDefaults. It
 holds an ordered list of records: an opaque window ID; the kind (workspace or file); a
@@ -406,8 +430,8 @@ coordinator reads it once:
 5. **Migration:** with no store, the legacy single bookmark becomes one record, so M1's
    "quit & relaunch restores last file" keeps passing.
 
-**Mechanism risk.** SwiftUI and AppKit also recreate windows when the system setting
-"Close windows when quitting an application" is off. W9's first bullet must prove exactly
+**Mechanism risk.** SwiftUI/AppKit are expected to recreate windows when the system
+setting "Close windows when quitting an application" is off; W9 must prove this behavior. W9's first bullet must prove exactly
 one window per record with that setting on and off. `restorationBehavior(_:)` is believed
 to need macOS 15, while the deployment target is macOS 14, so the probe must find a
 macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, or AppKit
@@ -415,14 +439,11 @@ macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, 
 
 ### 6.5 Native tabs (WD4)
 
-- A tab is a window: one `WindowState` per tab, with AppKit tab groups. There is no custom
-  tab bar and no extra state model.
-- The tabbing mode is `.automatic`, which follows the system "Prefer tabs" setting. File ›
-  New Tab ⌘T adds an empty window to the key window's group.
-- Merge All Windows, Move Tab to New Window, and dragging between groups are pure AppKit.
-  The window object, and therefore its `WindowState`, must survive them (W0 probe).
-- Tab titles are window titles (§8). A hidden tab is a hidden window for preview
-  residency (§7.2). Closing a tab follows §6.2. Restoration records group order (§6.4).
+- Each AppKit tab is a window with its own WindowState; no custom tab model.
+- C disallows tabbing via `tabbingMode = .disallowed` or `allowsAutomaticWindowTabbing = false`
+  and guards creation paths. F enables `.automatic` (system Prefer tabs); ⌘T joins the key group.
+- Merge/move/drag preserve the window object and state (W0); titles follow §8, hidden tabs
+  follow §7.2 residency, close follows §6.2, and E restores tab-group order (§6.4).
 
 ## 7. Performance and memory
 
@@ -431,8 +452,11 @@ macOS 14 path (for example `WindowGroup(for:)` presented values as record keys, 
 The LRU stays **global**: 8 warm sessions plus every installed current document. Today
 protected entries count toward the limit
 (`Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:94-100`), so
-N windows would leave 8 − N warm slots. PR D changes the WorkspaceKit policy so installed
-URLs do not use warm capacity, with unit tests. A per-window LRU is rejected: it costs 8·N
+N windows would leave 8 − N warm slots. PR D1 adds a separate `installedURLs` input:
+installed entries do not count toward warm capacity and cannot be evicted. Keep
+`protectedURLs` counting toward capacity for failed-eviction, fenced, quarantined, and
+retired candidates (`App/AppState+WorkspaceSessions.swift:401-451`); verify both policies
+with named tests. Do not subtract the whole protected set from capacity. A per-window LRU is rejected: it costs 8·N
 sessions, and a session warm in two windows would still need one cross-window owner.
 
 ### 7.2 Preview residency (WD6)
@@ -450,88 +474,74 @@ sessions, and a session warm in two windows would still need one cross-window ow
   preview cannot deliver a checkbox toggle. Render IDs restart per controller
   (`Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:27`). That is safe
   because `checkboxToggled` requires the controller's latest render ID (`agent.md` §7.3).
-- **Cost today:** 141.6–149.8 MB host RSS with two settled webviews, and about 500 MB in
-  two WebKit helpers (`docs/perf-log.md:51`, `:69`). Helper memory is diagnostic under R16
-  (`docs/risk-register.md:26`), but users feel it with many windows.
 
 ### 7.3 Restated §12 memory budget (proposal)
 
-"< 400 MB host RSS with 8 warm sessions and 4 windows: 2 visible settled previews and
-2 hidden windows past teardown." Also record, in `docs/perf-log.md`, the host RSS delta
-per additional live preview and the helper RSS (diagnostic). The existing two-webview
-test (`PerformanceTests/PerformanceBudgetTests.swift:309`) stays.
+< 400 MB host RSS: 8 warm sessions, 4 windows, 2 visible settled previews, 2 hidden windows
+past teardown. Record host delta per preview and helper RSS diagnostics in `docs/perf-log.md`;
+keep the two-webview test (`PerformanceTests/PerformanceBudgetTests.swift:309`).
 
 ### 7.4 Typing latency
 
-- There is no per-keystroke cross-window work. Under WD1 a keystroke reaches one
-  installation. `DocumentSession` still does not publish text
-  (`Packages/MarkdownCore/Sources/MarkdownCore/DocumentSession.swift:34-41`). Each
-  `WindowState` forwards only its own document's publishes; today the one `AppState`
-  forwards them to every window (`App/AppState.swift:683-688`). The registry publishes
-  nothing per keystroke. `MenuBarState` observes only the active window. W12 measures this.
+WD1 adds no per-keystroke cross-window work. DocumentSession still does not publish text
+(`Packages/MarkdownCore/Sources/MarkdownCore/DocumentSession.swift:34-41`); WindowState forwards
+only its document's publishes (today AppState forwards app-wide, `App/AppState.swift:683-688`).
+The registry publishes no text changes; menus observe deduplicated facts. W12 measures this.
 
 ## 8. Accessibility and UI-test implications
 
-- **Window and tab titles.** Today the title is the root name, else the file name
-  (`App/AppState.swift:827-829`), applied with `representedURL` and `isDocumentEdited`
-  (`App/Views/WorkspaceWindow.swift:439-460`). Two windows on one root would share a title
-  in the Window menu, the tab bar, Mission Control, and VoiceOver. **Proposal:** the title is
-  the current document's name (the root name with no document; "Plainsong" with neither),
-  the subtitle is the root name, and the represented URL and edited dot stay per window. When
-  two windows would have the same title (`index.md` in two roots), append " — <root name>".
-  Tab titles follow window titles.
-- **Accessibility identifiers** stay stable but are no longer unique in the app
-  (`plainsong.editor.fileName` at `App/Views/WorkspaceWindow.swift:200`, the Find field, the
-  Search mode). Every XCUITest query must be scoped to one window element.
-- **UI tests to change.** `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129` uses
-  the app-wide `staticTexts[...]` and `.first(where: \.isHittable)`.
-  `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` uses the app-wide
-  `descendants`. Both must select their window by its unique title.
-- **Hosted tests** keep the designated key window
-  (`AppTests/EditorFindHostedFocusGateTestSupport.swift:22`). Real activation needs an
-  out-of-process XCUITest in an interactive session (`docs/decision-log.md:180`). New
-  Window (WD3) makes that test possible for the first time.
-- **VoiceOver and Full Keyboard Access.** Switching windows announces the window title.
-  Each window restores focus to its own last focused control. ⌘` cycles windows, and each
-  window's Find chrome keeps its own focus report.
+- **Titles:** today root name else file name (`App/AppState.swift:827-829`), with represented
+  URL/edited dot (`App/Views/WorkspaceWindow.swift:439-460`). Use document name, else root,
+  else Plainsong; root subtitle; append root name for duplicate filenames. Tab titles follow.
+- **Selectors:** identifiers stay stable but queries scope to a uniquely titled window.
+  App-wide queries/first hittable window in `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`
+  and `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` must change.
+- **Hosted tests:** designate a key window (`AppTests/EditorFindHostedFocusGateTestSupport.swift:22`)
+  and window-specific probes (§3.3). Real activation requires interactive XCUITest
+  (`docs/decision-log.md:180`), coordinated with Replace I/Export G acceptance (§10).
+- **VoiceOver/FKA:** distinct titles, each window's last-control focus restored; ⌘` cycles
+  windows, and each Find chrome owns its focus report. W13 records the smoke.
 
 ## 9. Owner decisions
 
-Deadlines: WD9 before PR C; WD1, WD2, WD3, WD6 (LRU part), WD7, and WD8 before PR D; WD5
-before PR E; WD4 before PR F; WD6 (residency and budget) before PR G. Silence, an
+Deadlines: WD4 and WD9 before PR C; WD1, WD2, and WD6 (LRU) before D1; WD3, WD7,
+and WD8 before D2; WD5 before E; WD6 (residency/budget) before G. Silence, an
 implementation, or green CI is not a decision.
 
 | # | Question | Options | Recommended default | Consequences |
 |---|---|---|---|---|
 | WD1 | The same file in two windows | (a) focus the existing window; (b) share one session; (c) refuse | **(a)**, also for sidebar clicks and preview links | I1 holds trivially. No undo, IME, or typing-path change. (b) needs its own spec. |
-| WD2 | The same workspace root in two windows | (i) shared reference-counted root context; (ii) focus the existing window; (iii) refuse | **(i)**, plus refusal of overlapping roots and the §4.3 single-file routing | PR D splits the tree and turns closure into a release. (ii) is the smaller fallback. |
+| WD2 | The same workspace root in two windows | (i) shared reference-counted root context; (ii) focus the existing window; (iii) refuse | **(i)**, plus refusal of overlapping roots and the §4.3 single-file routing | D1 shares the snapshot, keeps each whole tree window-owned, and scopes release to one root. (ii) is the smaller fallback. |
 | WD3 | ⌘N versus New Window | (A) ⌘N New File + ⇧⌘N New Window; (B) ⌘N New Window; (C) no command | **(A)** | §6.4 gains rows; none move. |
-| WD4 | Are tabs in scope for this line? | Yes, as PR F; defer (then set tabbing to disallowed so tabs cannot mirror) | **Yes**, `.automatic` mode, ⌘T | WD2 (i) is what makes tabs useful. |
+| WD4 | Are tabs in scope for this line? | Yes, as PR F; defer (then set tabbing to disallowed so tabs cannot mirror) | **Yes**, enabled in F with `.automatic` and ⌘T | Decide before C; C disallows tabs/extra scene opens until guarded D2 routing exists; F waits for D2. |
 | WD5 | Restoration | Restore every window and tab with document and layout; restore only the frontmost (today's single bookmark); follow the system setting only | **Restore every window**; skip missing items with one notice; recovery first | Needs the W9 mechanism probe. |
 | WD6 | Preview and memory policy | Lazy, visible always live, two hidden within a 30 s grace; always live with a window cap; per-window LRU | **The first**, plus a global LRU of 8 warm + installed and the restated §12 budget (§7.3) | Re-showing a torn-down preview costs one cold render. |
-| WD7 | Where an external open lands | A new window unless the key window is empty; always the key window (today's behavior); always a new window | **A new window unless the key window is empty** | Matches Typora and NSDocument. |
-| WD8 | Closing a window whose document cannot be saved safely | Refuse the close with an explanation; close and keep the session invisible | **Refuse** | No invisible unsaved state. |
+| WD7 | Where an external open lands | A new window unless the frontmost workspace window is empty; always that window; always new | **Reuse an empty frontmost workspace window, else new** | Resolve z-order before activation; WD1/WD2 take precedence. |
+| WD8 | Closing a window whose document cannot be saved safely | Refuse every blocked close; retain protected state after close; hybrid | **Hybrid (§6.2): refuse transient/quarantine states; retain stable blocked sessions only with proof** | Switching documents already keeps dirty/conflicted sessions warm and restores prompts (`App/AppState+Workspace.swift:469-472`). Closing can do likewise; last-root release must preserve authority and fences. An unseen protected session still participates in termination. W0 proves interception; absent retention proof, refuse. |
 | WD9 | Layout mode and Find query scope | Per window, new windows inherit the last persisted layout; global | **Per window** | M2's "layout restored on relaunch" moves into the WD5 records. |
 
 ## 10. Review-sized PR split
 
-One PR at a time, each branched from then-current `origin/main` and opened against `main`.
-The maintainer squash-merges. PR B touches every `AppState` extension, so schedule it after
-the in-flight Replace F and G work lands, or coordinate with that stream first.
+Each PR branches from then-current `origin/main` and targets `main`; the maintainer
+squash-merges. Coordinate the AppState-wide B1/B2 moves with Replace F/G, Replace H's
+menu/responder/focus work and I's acceptance (`docs/editor-replace-gates.md:685-688`),
+Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 
 | PR | Scope | Expected gates | Security review |
 |---|---|---|---|
-| **A — this spec** | `docs/window-state-gates.md` and one Decision Log row. No code, test, or checked box. | None | No |
-| **B — mechanical partition** | Introduce the registry, root-context, and window-state types. `AppState` stays the façade for one window, so the ~339 test constructions compile. One session enumerator feeds the eight inventories. No behavior change, no new publish, still one window. Record the W0 inventory. | W0 (inventory bullet), W1 | **Yes**: it moves ownership-inventory, recovery, and quarantine code. |
-| **C — per-window state and key-window routing** | One `WindowState` per window, proven with hosted multi-window tests. The shipped app stays single-window: no New Window, and external opens reach the one window. `MenuBarState` follows the key window. `PlainsongAppServices` is removed. The hot key, Find hooks, and Find/Replace fallbacks route by window. Find, search, layout, and prompts are per window. Restoration runs once per launch. | W0 (mechanism bullets), W2, W3, W5 | **Yes**: writer authority and ownership across windows. |
-| **D — policies and window creation** | WD1, WD2, and §4.3 routing; root reference counting and retirement on last release; overlap refusal; New Window ⇧⌘N; the §5.2 external-open table; the §6.2 close lifecycle; the LRU policy change. | W4, W6, W7, W8 | **Yes**: mutation fences, retirement, ownership. |
-| **E — restoration** | The restoration store, migration, the mechanism probe, and missing-item handling. | W9 | **Yes (light)**: security-scoped bookmarks. |
-| **F — native tabs** | Tabbing mode, New Tab ⌘T, title rules, merge and move. | W10 | No |
-| **G — residency and acceptance** | Preview residency, out-of-process dual-window XCUITest, multi-window memory and typing measurements, accessibility. | W11, W12, W13 | No. Residency must not touch the bridge. |
+| **A — this spec** | Two docs only; no checked box. | None | No |
+| **B1 — types and forwarding** | Registry/root/window types and behavior-neutral forwarding façade; preserve all authority hooks, 286 direct AppTests initializers, and existing APIs. No inventory logic change or new publish; still shared one-window behavior. | W0 inventory; W1 partition/hooks/regressions | **Yes**: authority/recovery storage moves |
+| **B2 — registry enumeration** | Migrate all session consumers under I2, with explicit list extras and operation filters. Preserve one-window behavior; prove no missed direct reads by grep. | W1 enumerator/grep; W3 registry fixtures | **Yes**: ownership, pruning, fences |
+| **C — independent state/routing, creation guarded** | Per-window state; deduplicated menus; remove singleton; route hot key and all Find hooks, including Escape. Disallow native tabs until F. Close W0 bullet 2; disable or route **every** W0-bullet-1 path to the existing window, including system menus and onOpenURL scene creation. Any unavoidable second WindowState fails closed on **any** file/root open until D2. Hosted test fixtures may bypass only creation guards. | W0 external-open + creation-guard/close probes; W2/W3/W5 hosted bullets | **Yes**: cross-window authority |
+| **D1 — root/session lifecycle** | Root reference counts; per-window filtered trees; scoped release/prune; per-root deferred refresh/image placement; WD2 overlap policy; separate installed/warm LRU capacity. No user window creation yet; retain C guards. | W6; W4 adoption; W11 LRU | **Yes**: mutation, retirement, quarantine |
+| **D2 — routing and window lifecycle** | WD1 focus policy, New Window, external-open routing, guarded opens and close lifecycle (WD3/WD7/WD8). Remove C fallback only after these paths pass. | W4; W7; W8 | **Yes**: ownership and close retention |
+| **F — native tabs** | Enable tabbing; New Tab, titles, merge/move. W0 must prove New Tab joins the key group. | W0 tab identity/New Tab; W10 | No |
+| **E — restoration** | After F: restoration/migration, missing-item handling, tab-group/order records and restoration. | W9 | **Yes (light)**: bookmarks |
+| **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W11; W12; W13 | No |
 
-Order: B → C → D → (E and F in parallel) → G. Before declaring an implementation PR done:
-the relevant package and hosted tests, `make format`, `make lint`, `make test`,
-`make build`, and `git diff --check`. The PR body lists the gates closed and still open.
+Order: B1 → B2 → C → D1 → D2 → F → E → G. E follows F because it restores tab order.
+Implementation completion requires relevant package/hosted tests, `make format`, `make lint`,
+`make test`, `make build`, and `git diff --check`; PR bodies name closed and open gates.
 
 ## 11. Gates
 
@@ -541,126 +551,94 @@ recorded in the closing commit.
 
 ### W0 — Baseline inventory and mechanism probe
 
-- [ ] On the shipped build, record which actions create a second window today: the tab-bar
-  "+", Window › Merge All Windows and Show Tab Bar, Finder Open With while running, and a
-  Dock drop. *Owner smoke.*
-- [ ] The chosen external-open mechanism delivers each Finder or Dock open to exactly one
-  existing window and leaves no blank scene. *Hosted probe + owner smoke.*
-- [ ] A window's `WindowState` identity survives tab merge, tab move, and `openWindow`
-  creation, and `openWindow` from `Commands` creates a fresh `WindowState`. *Hosted probe.*
+- [ ] Inventory second-window paths on the shipped build: tab-bar "+", Show Tab Bar, Merge All Windows, Finder Open With, Dock drop, and onOpenURL-created scenes. Include system-provided menu shortcuts in the ⇧⌘N/⌘T collision check. *Owner smoke.*
+- [ ] Chosen external-open mechanism delivers every Finder/Dock open to exactly one existing window, with no blank scene. Close in **PR C**. *Hosted probe + owner smoke.*
+- [ ] **PR C guard:** tabbing disallowed until F; every first-bullet creation path disabled/routed to the existing window. If a second WindowState still appears, every file/root open there refuses until D2. *Named hosted tests + owner smoke covering each path.*
+- [ ] With SwiftUI owning the delegate, the chosen `windowShouldClose` interception safely vetoes/defers close without breaking scene teardown. Close before C ships. *Hosted probe + owner smoke.*
+- [ ] WindowState identity survives tab merge/move and `openWindow`; command creation gives a fresh state, and New Tab ⌘T joins the key window's group. Close before F relies on it. *Hosted probe + owner smoke.*
 - Evidence: _open_
 
-### W1 — Behavior-neutral partition (PR B)
+### W1 — Behavior-neutral partition (B1/B2)
 
-- [ ] Every `AppState` stored property lives in the scope §3.2 assigns. *Review checklist
-  in the PR body.*
-- [ ] One registry enumerator feeds all eight inventories. A test registers a session only
-  in a second `WindowState` and proves each inventory sees it. *Named hosted test.*
-- [ ] All existing package, `AppTests`, and `PerformanceTests` tests pass with mechanical
-  renames only.
-- [ ] No new publish on the keystroke path: the typing test is unchanged within noise.
-  *Perf measurement.*
-- [ ] `App/AppState.swift` and every new file stay under the 1000-line SwiftLint error and
-  near the ~400-line guidance.
+- [ ] Every AppState property follows §3.2; forwarding preserves all 16 `didSet { noteEditorReplaceAuthorityInputDidChange() }` hooks (`App/AppState.swift:149-354`). *PR checklist + named stale-plan hosted tests for each moved input.*
+- [ ] I2 grep gate: `git grep -n -E '\b(currentDocument|sessionCache)\b' -- App Packages` has no currentDocument reads outside WindowState and no sessionCache reads outside the registry. Review every hit, including extensions and forwarding APIs; attach the command/output and classification in the PR. *Source audit.*
+- [ ] Registry enumeration covers all §2.3 consumers, including pruning, autosave/addressability, untitled ownership, and search. Register a session only in a second WindowState and prove each operation sees it with its documented filters/extras. *Named hosted tests.*
+- [ ] Existing package, AppTests, and PerformanceTests pass with mechanical renames only. *Exact-head CI run with named jobs/suites.*
+- [ ] No new keystroke publish; unchanged typing test within noise. *Perf measurement.*
+- [ ] AppState and new files meet SwiftLint's 1000-line error and ~400-line guidance. *`make lint` output + recorded source line counts.*
 - Evidence: _open_
 
 ### W2 — Two windows never mirror each other's document
 
-- [ ] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and
-  `B.md`. Editor text, preview render, window title, file header, Find bar visibility and
-  query, search mode and results, banners, and layout are independent. Switching the
-  document in window 1 leaves window 2 untouched. *Named hosted test.*
+- [ ] Two production `WorkspaceWindow`s with separate `WindowState`s open `A.md` and `B.md`. Editor text, selection, editor/preview scroll, preview render, title, file header, Find visibility/query, search mode/results, banners, and layout are independent. Switching the document in window 1 leaves window 2 untouched. *Named hosted test.*
 - [ ] The same holds for two different roots. *Named hosted test.*
-- [ ] An external change to `A.md` shows its banner only in the window showing `A.md`.
-  *Named hosted test.*
+- [ ] An external change to `A.md` shows its banner only in the window showing `A.md`. *Named hosted test.*
 - [ ] The first bullet passes out of process (PR G). *Named XCUITest.*
 - Evidence: _open_
 
 ### W3 — Ownership refusals are cross-window
 
-- [ ] Save Copy from window 1 onto the file current in window 2 is refused, including a
-  hard link and a case alias. *Named hosted test.*
-- [ ] An export destination owned by window 2 is refused
-  (`validateExportArtifactDestinationOwnership`, through both its Save Copy and mutation
-  inventories). *Named hosted test.*
-- [ ] A mutation destination owned by a window-2 session is refused
-  (`validateWorkspaceMutationDestinationOwnership`). *Named hosted test.*
-- [ ] The retained-authority collision and physical-duplicate checks see window-2 sessions.
-  *Named hosted test.*
-- [ ] Termination refuses for a blocked session in a background window and brings that
-  window forward. *Named hosted test.*
-- [ ] A recovery-store load failure fences file access in every window. *Named hosted test.*
+- [ ] Save Copy from window 1 onto the file current in window 2 is refused, including a hard link and a case alias. *Named hosted test.*
+- [ ] An export destination owned by window 2 is refused (`validateExportArtifactDestinationOwnership`, through both its Save Copy and mutation inventories). *Named hosted test.*
+- [ ] A mutation destination owned by a window-2 session is refused (`validateWorkspaceMutationDestinationOwnership`). *Named hosted test.*
+- [ ] The retained-authority collision and physical-duplicate checks see window-2 sessions. *Named hosted test.*
+- [ ] Termination refuses for a blocked background-window session and focuses it; an unseen warm blocked session presents its error/prompt in the home/frontmost workspace window. *Named hosted tests.*
+- [ ] A recovery-store load failure fences every window; the recovery banner has the §3.2 home window. Write/trash notices and unseen-session autosave failures retain their home/session routing across close. *Named hosted tests.*
+- [ ] Closing R1 never prunes pendingExternalTexts/versions, bindings, proofs, detached URLs, or quarantine for a session window 2 shows. *Named hosted test.*
+- [ ] A prompt shown in window 2 blocks that file's Save/autosave from any window or background task; window 1's prompt cannot block an unrelated file. *Named hosted tests.*
 - Evidence: _open_
 
 ### W4 — One writer per file across windows
 
-- [ ] Every §5.2 entry point that targets a file current in another window focuses that
-  window and creates no second installation. *Named hosted tests, one per entry point.*
+- [ ] Every §5.2 entry point that targets a file current in another window focuses that window and creates no second installation. *Named hosted tests, one per entry point.*
 - [ ] Hard links and case or NFC/NFD aliases count as the same file. *Named hosted test.*
-- [ ] For every session, live installations across windows ≤ 1 and
-  `editorWriterInstallations` ≤ 1. *Debug assertion + named hosted test.*
-- [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer;
-  window 1's stale installation cannot publish. *Named hosted test.*
+- [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown.*
+- [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
 - Evidence: _open_
 
 ### W5 — Menu commands act only on the key window
 
-- [ ] With window 2 key, Format, Find (⌘F, ⌘G, ⇧⌘G, ⌘E), Replace, Save, ⇧⌘P, Toggle
-  Workspace Search (menu and Carbon), and New File act on window 2. Window 1's source,
-  selection, undo stack, and Find query are unchanged. *Named hosted tests with a
-  designated key window.*
-- [ ] With Settings key and a workspace window main, document commands are disabled and ⌘B
-  does not reach the main window's editor. *Named hosted test.*
-- [ ] Menu enablement follows the key window within one run-loop pass. Background-window
-  publishes do not republish the snapshot. *Named hosted test with a publish counter.*
-- [ ] A Find hook fired from a text view reaches its own window's state. *Named hosted
-  test.*
+- [ ] With window 2 key, Format, Find (⌘F, ⌘G, ⇧⌘G, ⌘E), the installed Replace dispatcher, Save, ⇧⌘P, Toggle Workspace Search (menu and Carbon), and New File act on window 2. Window 1's source, selection, undo stack, and Find query are unchanged. *Named hosted tests with a designated key window. Replace menu/UI coverage follows Replace H; Export/Print coverage follows Export F/G.*
+- [ ] With Settings key and a workspace window main, document commands are disabled and ⌘B does not reach the main window's editor. *Named hosted test.*
+- [ ] Menu enablement follows the key window within one run-loop pass. Background-window UI publishes do not republish it; registry/recents changes update relevant deduplicated facts. *Named hosted test with a publish counter.*
+- [ ] Background save completion re-enables Save for the active file; registry fence/quarantine transitions and recents also update enablement without unrelated menu churn. *Named hosted test with a publish counter.*
+- [ ] Every Find hook, including Escape cancelFind, reaches its originating text view's window. *Named hosted tests.*
+- [ ] A preferences change updates every window through one shared callback. *Named hosted test.*
 - Evidence: _open_
 
 ### W6 — Same-workspace shared root context
 
-- [ ] Two windows on one root share one watcher, one security-scope start, and one scan
-  per refresh. *Named hosted test.*
-- [ ] A rename in window 1 of the file current in window 2 relocates window 2's session.
-  Window 2's saves are refused during the fence. Both trees update, and each keeps its own
-  expansion and selection. *Named hosted test.*
-- [ ] Closing window 1 keeps the root alive. Closing the last window runs the closure checks
-  once. A single-file window's session inside the root survives. *Named hosted test.*
-- [ ] An overlapping root is refused, and a single file inside an open root routes per §4.3.
-  *Named hosted test.*
-- [ ] A second namespace transaction, from any window or root, is refused while one runs.
-  *Named hosted test.*
+- [ ] Two windows on one root share one watcher, one security-scope start, and one scan per refresh. *Named hosted test.*
+- [ ] A rename in window 1 of the file current in window 2 relocates window 2's session. Window 2's saves are refused during the fence. Both trees update with each window preserving its own Show All Files filter, expansion, selection, and reload disposition. *Named hosted test.*
+- [ ] Closing window 1 keeps its root alive. Last release checks only eligible R1 sessions once; any still-installed session/authority survives. *Named hosted test.*
+- [ ] Last R1 release preserves R2 warm sessions and standalone warm sessions, their tasks/metadata and LRU entries/recency; no global LRU reset or prune. *Named hosted test.*
+- [ ] R2 fenced/quarantined/conflicted state does not block an otherwise-safe R1 release and is unchanged by it. Global transaction/store-load fences remain enforced. *Named hosted tests.*
+- [ ] An R2 watcher event during R1 mutation stays queued and refreshes R2 after drain; every deferred root is serviced. *Named hosted test.*
+- [ ] Overlapping roots and a root containing an installed standalone file refuse before installation; files inside an open root route per §4.3. *Named hosted tests.*
+- [ ] A second namespace transaction, from any window or root, is refused while one runs. *Named hosted test.*
 - Evidence: _open_
 
 ### W7 — Window close lifecycle
 
-- [ ] A dirty, savable document is saved and stays warm. *Named hosted test.*
-- [ ] Each blocking state in §6.2 step 1 refuses the close with an alert, the window stays,
-  and nothing is lost. *Named hosted tests.*
-- [ ] The installation is revoked, the writer released, and the LRU reconciled; a failed
-  eviction candidate is still retained (§5). *Named hosted test.*
-- [ ] The preview controller is invalidated and released (its weak reference becomes
-  `nil`). *Named hosted test.*
+- [ ] A dirty, savable document is saved; it stays warm unless eligible for last-root retirement. *Named hosted tests.*
+- [ ] Every transient/quarantine state in §6.2 refuses/defers close without loss. Stable blocked sessions close only with registry retention proof; prompts, text, authority, and protection survive adoption into another window. Last-root release obeys the same rule. *Named hosted tests.*
+- [ ] Closing the last window leaves the app running. *Owner smoke.*
+- [ ] The installation is revoked, the writer released, and the LRU reconciled; a failed eviction candidate is still retained (§5). *Named hosted test.*
+- [ ] The preview controller is invalidated and released (its weak reference becomes `nil`). *Named hosted test.*
 - [ ] A user close removes the restoration record; a quit does not. *Named hosted test.*
 - Evidence: _open_
 
 ### W8 — External-open and ⌘N routing
 
-- [ ] Every §5.2 row: focus the existing window, reuse an empty key window, or open a new
-  window. Exactly one window acts and none is left blank. *Named hosted tests + owner smoke
-  for Finder and Dock.*
-- [ ] ⌘N creates a file in the key window's root. ⇧⌘N opens an empty window that does not
-  restore. *Named hosted test.*
+- [ ] Every §5.2 row: focus the existing owner, reuse its specified empty target, or open a new window; external events before activation resolve frontmost workspace z-order. Exactly one window acts and none is left blank. *Named hosted tests + owner smoke for Finder and Dock.*
+- [ ] ⌘N creates a file in the key window's root. ⇧⌘N opens an empty window that does not restore. *Named hosted test.*
 - Evidence: _open_
 
 ### W9 — Restoration
 
-- [ ] Exactly one window per record, with the system "Close windows when quitting" setting
-  on and off, on macOS 14 and the current macOS. *Owner smoke (mechanism probe).*
-- [ ] A mix of workspace and single-file windows restores each root or file, current
-  document, layout, and tab order. *Named hosted test + owner smoke.*
-- [ ] A missing or unresolvable bookmark is skipped with one notice, no empty window, and no
-  panel. *Named hosted test.*
+- [ ] Exactly one window per record, with the system "Close windows when quitting" setting on and off. *Owner smoke on an owner-provisioned logged-in macOS 14 VM (14.x/build recorded) and the current-macOS Mac (version/build recorded); W9 stays open until both environments exist and pass.*
+- [ ] A mix of workspace and single-file windows restores each root or file, current document, layout, and tab order. *Named hosted test + owner smoke.*
+- [ ] A missing or unresolvable bookmark is skipped with one notice, no empty window, and no panel. *Named hosted test.*
 - [ ] With recovery pending, nothing else is restored. *Named hosted test.*
 - [ ] The legacy single bookmark migrates to one record. *Named hosted test.*
 - [ ] Records that break WD1 or WD2 collapse to the first. *Named hosted test.*
@@ -668,76 +646,55 @@ recorded in the closing commit.
 
 ### W10 — Native tabs
 
-- [ ] New Tab ⌘T joins the key window's group, and every W2 bullet holds between tabs.
-  *Named hosted test + owner smoke.*
-- [ ] Merge All Windows, Move Tab to New Window, and dragging a tab keep each tab's document,
-  selection, undo stack, and Find state. *Owner smoke.*
+- [ ] New Tab ⌘T joins the key window's group, and every W2 bullet holds between tabs. *Named hosted test + owner smoke.*
+- [ ] Merge All Windows, Move Tab to New Window, and dragging a tab keep each tab's document, selection, undo stack, and Find state. *Owner smoke.*
 - [ ] Tab titles are unique per §8, and closing a tab follows §6.2. *Named hosted test.*
 - [ ] A background tab's preview follows §7.2 residency. *Named hosted test.*
 - Evidence: _open_
 
 ### W11 — Memory
 
-- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview
-  host delta are recorded. *Perf measurement in `docs/perf-log.md`.*
-- [ ] Hidden previews beyond two are torn down after the grace period (controller
-  released), and visible previews are never torn down. *Named hosted test.*
-- [ ] The LRU keeps 8 warm sessions plus the installed ones, and
-  `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes.
-  *Named tests.*
+- [ ] The §7.3 configuration stays under 400 MB host RSS. Helper RSS and the per-preview host delta are recorded. *Perf measurement in `docs/perf-log.md`.*
+- [ ] Hidden previews beyond two are torn down after the grace period (controller released), and visible previews are never torn down. *Named hosted test.*
+- [ ] Separate installedURLs allows 8 warm sessions plus installed ones; other protectedURLs still count and failed/fenced evictions retain the over-limit cache. `testZZZMemoryWithEightWarmSessionsAndTwoLiveWebViewsStaysUnderBudget` still passes. *Named policy/hosted/perf tests.*
 - Evidence: _open_
 
 ### W12 — Typing latency
 
-- [ ] The §12 typing test with four windows open (two previews visible) stays under 16 ms.
-  Three Debug and three Release runs are recorded. *Perf measurement.*
-- [ ] Zero body evaluations or `objectWillChange` sends in other windows per keystroke.
-  *Named test with an instrumented counter.*
+- [ ] The §12 typing test with four windows open (two previews visible) stays under 16 ms. Three Debug and three Release runs are recorded. *Perf measurement.*
+- [ ] Zero body evaluations or `objectWillChange` sends in other windows per keystroke. *Named test with an instrumented counter.*
 - Evidence: _open_
 
 ### W13 — Accessibility and out-of-process acceptance
 
-- [ ] Two windows opened with New Window, real key activation, menus act on the frontmost
-  window, and every selector is scoped to a window. *Named XCUITest.*
-- [ ] VoiceOver reads distinct window titles, and Full Keyboard Access reaches each window's
-  Find chrome. *Owner smoke.*
+- [ ] Two windows opened with New Window, real key activation, menus act on the frontmost window, and every selector is scoped to a window. *Named XCUITest.*
+- [ ] VoiceOver reads distinct window titles, and Full Keyboard Access reaches each window's Find chrome. *Owner smoke.*
 - [ ] The existing UI tests use window-scoped queries and still pass. *Named XCUITests.*
-- [ ] Zhuyin and Pinyin composition in window 2 while window 1 holds marked text corrupts
-  neither (`agent.md` §13). *Owner smoke.*
+- [ ] Zhuyin and Pinyin composition in window 2 while window 1 holds marked text corrupts neither (`agent.md` §13). *Owner smoke.*
 - Evidence: _open_
 
 ## 12. Risks and `agent.md` edits for implementation
 
 ### 12.1 Risks
 
-| Risk | Where | Mitigation |
-|---|---|---|
-| SwiftUI scene behavior (external events, restoration, tab merge) differs from its documentation or between macOS 14 and current macOS. | §2.1, §6.4, §6.5 | W0 and W9 mechanism bullets close before any code relies on them. |
-| PR B is large and collides with the Replace and Find streams. | Every `AppState` extension | Mechanical only; `AppState` stays the façade; schedule after Replace F and G. |
-| A missed inventory weakens a cross-window refusal. | §2.3, I2 | One enumerator, W3 tests, security review on B, C, and D. |
-| `endWorkspaceNamespaceMutation` clears every fence. | `App/AppState+WorkspaceMutationTransaction.swift:58` | One app-global namespace transaction in v1 (§3.2). |
-| Memory grows with many windows, mostly in WebKit helpers. | §7 | Lazy creation, hidden teardown, the restated budget, R16 diagnostics. |
-| Fan-out publishes regress typing latency. | §7.4 | W12 counter. |
-| Hosted tests cannot activate real windows. | §8 | Designated key windows for routing; the W13 XCUITest for activation. |
-| Overlapping roots break watcher and fence coverage. | §4.3 | Refused in v1. |
+| Risk | Mitigation |
+|---|---|
+| Scene creation, restoration, tab merge, New Tab grouping, or close interception differs by macOS version. | W0/W9 mechanism evidence before reliance; C creation guards fail closed. |
+| B1/B2 overlap Replace/Find and Export command streams. | Coordinate §10 surfaces; separate forwarding from enumeration/security review. |
+| Missed cross-window owner or overbroad retirement/pruning. | I2 grep audit and W3/W6 root-scope fixtures; security review B1–D2. |
+| Global fence clear or a single-root refresh drain loses protection/events. | I4 single transaction, root-specific queued refresh, W6. |
+| Memory/typing grows with windows; hosted activation is artificial. | W11/W12 budgets and counters, R16 helper diagnostics, W13 real activation. |
+| Overlapping roots break watcher and fence coverage. | Refuse under §4.3. |
 
 ### 12.2 `agent.md` edits the implementation PRs must make
 
 | Section | Edit | PR |
 |---|---|---|
-| §3 | The `AppState.swift` layout comment ("open workspaces, recent items") describes the registry, root-context, and window-state split. | B |
-| §4 | Key types gain `WindowState`, `AppDocumentRegistry`, `WorkspaceRootContext`, and `KeyWindowRouter`. Data-flow item 6 ("on window resign") becomes one app-global flush. | B, C |
-| §5 | Replace the "Multiple workspace windows … mirror" bullet with WD1, WD2, and §4.3. State that the LRU is global (8 warm + installed). Add close and quit rules and per-window restoration. | D, E |
+| §3 | The `AppState.swift` layout comment ("open workspaces, recent items") describes the registry, root-context, and window-state split. | B1, B2 |
+| §4 | Key types gain `WindowState`, `AppDocumentRegistry`, `WorkspaceRootContext`, and `KeyWindowRouter`. Data-flow item 6 ("on window resign") becomes one app-global flush. | B1, B2, C |
+| §5 | Replace the "Multiple workspace windows … mirror" bullet with WD1, WD2, and §4.3. State that the LRU is global (8 warm + installed). Add close and quit rules and per-window restoration. | D1, D2, E |
 | §5 | Replace the "Tabs … deferred" bullet with native tabs per WD4. | F |
-| §6.4 | Add New Window ⇧⌘N and New Tab ⌘T. State that every menu command acts on the key window and never falls back to the main window. | C, D, F |
+| §6.4 | Add New Window ⇧⌘N and New Tab ⌘T. State that every menu command acts on the key window and never falls back to the main window. | C, D2, F |
 | §12 | Restate the memory row (§7.3). Measure typing with several windows open. | G |
 | §14 | Move "window tabs" out of Phase 3 candidates. | F |
 | §16 | UI tests use window-scoped selectors and include a dual-window smoke. | G |
-
-## 13. Sign-off
-
-| Role | Responsibility |
-|---|---|
-| Implementer | Close W0 mechanism bullets before relying on them; named evidence for every checked W-gate; keep layering (`agent.md` §17.3) and the §3.4 invariants. |
-| Owner | Record WD1–WD9 by their deadlines; run the W0, W8, W9, W10, and W13 smokes. |
-| Maintainer | Review and squash-merge each PR after green CI, with a security review for B–E. Never permit a self-merge or a direct push to `main`. |
