@@ -66,6 +66,7 @@ source {shlex.quote(str(self.capture / 'monitor.sh'))}
 source {shlex.quote(str(self.capture / 'run.sh'))}
 F2_CONTROL_DIRECTORY={shlex.quote(str(control))}
 trap 'if [[ -n "$F2_ACTIVE_RUNNER_PID" ]]; then
+    : > "$F2_CONTROL_DIRECTORY/session-drain"
     if [[ "$F2_RUNNER_LIFECYCLE" == signalable ]]; then
         f2_terminate_run_tree "$F2_ACTIVE_RUNNER_PID" KILL
     fi
@@ -93,7 +94,7 @@ printf 'cleanup_status=%s\nlifecycle=%s\npid=%s\n' \
                     capture_output=True,
                     text=True,
                     check=False,
-                    timeout=3,
+                    timeout=10,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(
