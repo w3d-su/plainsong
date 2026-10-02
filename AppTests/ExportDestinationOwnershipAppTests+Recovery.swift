@@ -4,8 +4,8 @@ import MarkdownCore
 import WorkspaceKit
 import XCTest
 
-/// Recovery, context-only, and different-authority (workspace subfolder) owners reach the
-/// export writer through the same App inventory as Save Copy and workspace mutations.
+/// Recovery, context-only, and workspace-subfolder owners reach the export writer through the
+/// same App inventory as Save Copy and workspace mutations.
 extension ExportDestinationOwnershipAppTests {
     func testLiveWorkspaceMutationRecoveryCandidateAndItsCaseAliasAreRefused() throws {
         let root = try makeTemporaryDirectory()
@@ -42,7 +42,7 @@ extension ExportDestinationOwnershipAppTests {
         XCTAssertEqual(outcome, .notCommitted(.ownedDestination))
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path(percentEncoded: false)), [])
         let aliasInspection = try inspection(of: root.appendingPathComponent("page.html"))
-        if !aliasInspection.parentIsCaseSensitive {
+        if !aliasInspection.volumeIsCaseSensitive {
             XCTAssertEqual(
                 appState.exportArtifactDestinationOwnership(
                     for: aliasInspection,
@@ -104,11 +104,11 @@ extension ExportDestinationOwnershipAppTests {
         let subfolder = fixture.ownedURL.deletingLastPathComponent()
         let exportURL = subfolder.appendingPathComponent("export.html")
         try FileManager.default.linkItem(at: fixture.ownedURL, to: exportURL)
-        let exportLocation = try WorkspaceFileSystemLocation(fileURL: exportURL)
-        XCTAssertNotEqual(
-            exportLocation.rootAuthority,
-            fixture.authority,
-            "the export parent is its own authority, so ownership compares full paths"
+        // The export inspection carries no root authority, so ownership compares full paths
+        // against the workspace authority's retained locations.
+        XCTAssertEqual(
+            try fixture.authority.relativePath(forFileURL: inspection(of: exportURL).canonicalLeafURL),
+            "posts/export.html"
         )
         XCTAssertEqual(
             try fixture.appState.exportArtifactDestinationOwnership(
@@ -147,16 +147,15 @@ extension ExportDestinationOwnershipAppTests {
         try FileManager.default.removeItem(at: fixture.ownedURL)
         fixture.appState.markSessionDetachedFromMissingFile(fixture.ownedSession, url: fixture.ownedURL)
         let aliasInspection = try inspection(of: subfolder.appendingPathComponent("draft.md"))
-        guard !aliasInspection.parentIsCaseSensitive else {
+        guard !aliasInspection.volumeIsCaseSensitive else {
             throw XCTSkip("Case aliases require a case-insensitive test volume")
         }
-        XCTAssertNotEqual(aliasInspection.canonicalLocation.rootAuthority, fixture.authority)
         try assertUnownedControlIsPermitted(fixture)
 
-        // The Save Copy inventory alone refuses it, through its different-authority path.
-        XCTAssertThrowsError(try fixture.appState.validateWorkspaceSaveCopyDestinationOwnership(
-            at: aliasInspection.canonicalLocation,
-            excluding: nil
+        // The Save Copy inventory alone refuses it, through its full-path comparison.
+        XCTAssertThrowsError(try fixture.appState.validateExportArtifactSaveCopyInventory(
+            aliasInspection,
+            exportSource: nil
         ))
         XCTAssertEqual(
             fixture.appState.exportArtifactDestinationOwnership(
