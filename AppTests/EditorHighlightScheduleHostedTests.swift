@@ -37,6 +37,14 @@ extension EditorFindHostedGateTests {
                 }
                 XCTAssertEqual(hosted.appState.currentDocument.text, step == "undo" ? source : edited)
                 let applied = await poll(timeout: 3) { coordinator.lastAppliedHighlightRevision != before }
+                await settleHighlight(coordinator)
+                let plan = try XCTUnwrap(coordinator.lastAppliedHighlightFoldPlan)
+                let expected = try MarkdownSyntaxParser().visibleTokensAndFoldPlan(
+                    in: hosted.appState.currentDocument.text, fileKind: .markdown,
+                    visibleRange: plan.visibleRange, selection: editor.selectedRange(),
+                    linkFoldingEnabled: plan.linkFoldingEnabled
+                ).foldPlan
+                XCTAssertEqual(plan, expected, "settled fold plan must reflect current text and selection")
                 if !applied {
                     drops.append("\(cycle):\(step)")
                 }
@@ -52,8 +60,8 @@ extension EditorFindHostedGateTests {
     }
 
     /// Opt-in local typing probe, the method of
-    /// `docs/evidence/editor-replace-r5-20260930-typing.json` with an open Find session and its production 150 ms
-    /// debounce.
+    /// `docs/evidence/editor-highlight-schedule-20261001-typing.json`, with an open Find
+    /// session and its production 150 ms debounce.
     func testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget() async throws {
         try await assertHostedLargeFixtureTyping(layoutMode: .wysiwyg)
     }
