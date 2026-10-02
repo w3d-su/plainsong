@@ -1311,7 +1311,7 @@ with any other Mac test run (`lockf` on the shared lock file if agents share the
 ```sh
 lockf -k "$PLAINSONG_XCODEBUILD_LOCK" env TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild -project Plainsong.xcodeproj \
   -scheme Plainsong -configuration Debug test \
-  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget
 ```
 
 xcodebuild forwards only `TEST_RUNNER_`-prefixed variables into the hosted test
@@ -1337,7 +1337,8 @@ steady measurements but does not establish a speedup or exclude smaller regressi
 first-iteration latency still needs profiling. It is not full keystroke-to-screen,
 physical-keyboard or real-IME evidence and does not close R9.
 
-Review-fix opt-in run (2026-10-01, final tree, one iteration): a plumbing check only,
+Review-fix opt-in run (2026-10-01, 7598f28 `.task(id:)` tree, one iteration):
+a plumbing check only,
 taken at load averages of 21–27 from other agents' work on the shared Mac. Maximum
 **19.044584 ms** (median 15.083 ms; the same bimodal ~0.8 ms / ~15 ms samples as
 above), so it **failed** the hard budget. Contention makes this unusable as
@@ -1353,8 +1354,9 @@ guard returned the normal slow samples to about 14.6 ms. That trial was removed;
 no presentation-apply or typing-budget exception ships. The 18/18 hosted
 post-write/Undo/Redo reparse executions reported before review used the `Task`
 scheduler. Before restack, restoring `.task(id:)` allowed those automatic-reparse
-methods to time out under load. The dropped final request explains the two recorded
-timeouts; the separate scheduling bug-fix PR now supplies the fix (see its entry below).
+methods to time out under load. The two recorded timeouts were attributed to the
+dropped final request; the separate scheduling bug-fix PR now supplies the fix
+(see its entry below).
 
 Earlier complete EditorFind/EditorReplace hosted run (pre-review tree): **104/104
 passed**, including the hard local typing probe (maximum **15.009834 ms**; raw
@@ -1523,3 +1525,29 @@ Run from `/private/tmp/plainsong-highlight-baseline`,
 `/private/tmp/plainsong-replace-wysiwyg` as indicated by the interleaving. Both opt-in
 modes keep the production 150 ms Find debounce and the hard 16 ms local budget.
 No loaded numbers are recorded as idle evidence.
+
+
+## Replace PR F review follow-ups — 2026-10-02
+
+Merged the updated highlight scheduler branch (`fff481cc98de1edeb7adb0b9e459de780ba8c88b`)
+with local merge `d8305c3251cab0d8ed991e3d658315c0238b2cab`. The nested-bold link
+regression refuses all seven hidden chrome pieces with zero writer activations, and
+commits when the link chrome is revealed. The retained bug-fix typing probe and one
+`makeHostedEditorWorkspace` helper replace the duplicate probe and workspace helper;
+the opt-in environment variable is unchanged. The 7598f28 typing run above is now
+labelled with its measured `.task(id:)` tree. Historical timeouts are attributed to
+the observed dropped request; no deterministic reproduction is claimed.
+
+Verification: full EditorKit **415 tests**, seven real-IME opt-in skips, zero failures;
+hosted EditorFind/EditorReplace plus all nine WYSIWYG policies **124 tests**, two typing
+opt-in skips, zero failures. The enhanced highlight stress probe was enabled in the
+hosted run: **0 drops / 60 edits**, including settled fold-plan checks. Both historical
+automatic-reparse timeout methods passed **3/3**, six executions total, without failure
+retry. `make build`, pinned SwiftFormat 0.62.1 lint, and `git diff --check` passed.
+
+**Idle measurement still pending.** No new typing numbers were recorded during these
+functional checks. Run `python3 docs/evidence/editor-highlight-schedule-20261002-idle.py`
+LAST to compare the committed bug-fix head and, separately, the committed stacked F
+head against the e95ac36 baseline. Exact batch commands and the strict load/lock gate
+are retained in the highlight-scheduler review entry above. R9, real IME and batch
+Replace remain open. The requested original `8257250421af…` citations are preserved.

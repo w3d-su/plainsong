@@ -106,43 +106,6 @@ struct HostedReplaceWorkspace {
 
 @MainActor
 extension EditorFindHostedGateTests {
-    /// Opens `post.md`, mounts it in a designated key window, opens Find for `query`, and
-    /// waits until the hosted editor has applied the current match and holds focus.
-    func makeHostedReplaceWorkspace(
-        source: String,
-        query: String,
-        localEdit: String? = nil,
-        assets: [String: Data] = [:],
-        layoutMode: EditorLayoutMode = .sourceOnly
-    ) async throws -> HostedReplaceWorkspace {
-        let fixture = try makeWorkspaceFixture(files: ["post.md": source])
-        for (name, data) in assets {
-            try data.write(to: fixture.root.appendingPathComponent(name))
-        }
-        let appState = fixture.appState
-        if layoutMode == .wysiwyg {
-            appState.preferences.setExperimentalWYSIWYGEnabled(true)
-        }
-        appState.setLayoutMode(layoutMode)
-        // A local edit must stay dirty when the disk changes, or Reload is silent.
-        appState.preferences.setAutosaveIntervalSeconds(30)
-        appState.openExternalFile(fixture.root)
-        try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
-        }
-        let group = makeHostedWorkspaceGroup(fixture: fixture)
-        let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
-        designateKeyWindow(window, in: group)
-        designateReplaceKeyWindow(in: group)
-        if let localEdit {
-            appState.replaceDocumentText(localEdit)
-        }
-        openFindBar(appState, query: query)
-        let hosted = HostedReplaceWorkspace(fixture: fixture, group: group, window: window)
-        try await focusEditorOnCurrentMatch(hosted, window: window)
-        return hosted
-    }
-
     /// EditorKit reads the key window through the shared probe seam; point it at whichever
     /// window of `group` is designated key, and reset it after the test.
     func designateReplaceKeyWindow(in group: HostedWorkspaceGroup) {

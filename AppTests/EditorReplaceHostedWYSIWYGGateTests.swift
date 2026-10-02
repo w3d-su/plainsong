@@ -27,8 +27,8 @@ extension EditorFindHostedGateTests {
         image.unlockFocus()
         let bitmap = try XCTUnwrap(NSBitmapImageRep(data: XCTUnwrap(image.tiffRepresentation)))
         let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
-        let hosted = try await makeHostedReplaceWorkspace(source: "Intro ![文字😀](fixture.png) tail", query: "文字😀",
-                                                          assets: ["fixture.png": png], layoutMode: .wysiwyg)
+        let hosted = try await makeHostedEditorWorkspace(source: "Intro ![文字😀](fixture.png) tail", query: "文字😀",
+                                                         assets: ["fixture.png": png], layoutMode: .wysiwyg)
         try await waitForHostedReplaceWYSIWYG(hosted)
         try await waitForHostedReplaceAuthorization(hosted)
         let editor = try hostedEditor(hosted)
@@ -54,7 +54,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "Intro ![alt](fixture.png) tail",
             query: "](fixture.png)",
             layoutMode: .wysiwyg
@@ -82,7 +82,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "Intro **one** tail",
             query: "**one",
             layoutMode: .wysiwyg
@@ -104,8 +104,8 @@ extension EditorFindHostedGateTests {
     /// PR F review: the heading owner is revealed by the selection, while the strong it
     /// contains is untouched by the match and stays folded. Replace must still commit.
     func testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "# Title **bold** word", query: "word",
-                                                          layoutMode: .wysiwyg)
+        let hosted = try await makeHostedEditorWorkspace(source: "# Title **bold** word", query: "word",
+                                                         layoutMode: .wysiwyg)
         try await waitForHostedReplaceWYSIWYG(hosted)
         try await waitForHostedReplaceAuthorization(hosted)
         let editor = try hostedEditor(hosted)
@@ -144,7 +144,7 @@ extension EditorFindHostedGateTests {
 
     func testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally() async throws {
         for mode in [EditorLayoutMode.sourceOnly, .sourcePreview] {
-            let hosted = try await makeHostedReplaceWorkspace(
+            let hosted = try await makeHostedEditorWorkspace(
                 source: "# Hosted\n\nhit one hit two",
                 query: "hit",
                 layoutMode: mode
@@ -184,7 +184,7 @@ extension EditorFindHostedGateTests {
     private func assertHostedWYSIWYGReplace(source: String, query: String, replacement: String,
                                             kind: WYSIWYGFoldRegion.Kind) async throws
     {
-        let hosted = try await makeHostedReplaceWorkspace(source: source, query: query, layoutMode: .wysiwyg)
+        let hosted = try await makeHostedEditorWorkspace(source: source, query: query, layoutMode: .wysiwyg)
         try await waitForHostedReplaceWYSIWYG(hosted)
         try await waitForHostedReplaceAuthorization(hosted)
         let editor = try hostedEditor(hosted)

@@ -8,6 +8,33 @@ import XCTest
 /// own fold, so the proof must not require it revealed or Replace would refuse forever.
 @MainActor
 extension EditorReplaceWYSIWYGTests {
+    func testNestedFoldInLinkTextStillRejectsEveryHiddenChromePiece() async throws {
+        let source = "Intro [**bold** text](https://host/a \"T\") tail"
+        for piece in ["[", "]", "(", "https://host/a", "\"T\"", ")", "](https://host/a \"T\")"] {
+            let ready = try await foldedReady(source: source, pattern: "text")
+            try navigateAndReveal(ready, replacement: "TEXT")
+            let nested = try region(.strong, in: ready)
+            XCTAssertFalse(nested.isRevealed, "untouched nested bold remains folded")
+            let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: ready.fixture.textView))
+            let hidden = (source as NSString).range(of: piece)
+            XCTAssertNotEqual(hidden.location, NSNotFound)
+            storage.addAttribute(WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
+                                 value: true, range: hidden)
+            XCTAssertEqual(EditorReplaceSingleSupport.perform(ready, replacement: "TEXT"),
+                           .refused(.wysiwygRangeNotRevealed), "hidden chrome: \(piece)")
+            XCTAssertEqual(ready.fixture.model.writerActivations, 0)
+            XCTAssertEqual(ready.fixture.model.publications, [])
+            XCTAssertEqual(ready.fixture.model.source, source)
+            XCTAssertEqual(ready.fixture.model.revision, 0)
+            XCTAssertFalse(ready.fixture.textView.undoManager?.canUndo == true)
+        }
+    }
+
+    func testRevealedLinkChromeWithUntouchedNestedBoldCommits() async throws {
+        try await assertNestedFoldCommits(source: "Intro [**bold** text](https://host/a \"T\") tail",
+                                          pattern: "text", replacement: "TEXT", owner: .link, nested: .strong)
+    }
+
     func testHeadingOwnerWithUntouchedFoldedStrongCommits() async throws {
         try await assertNestedFoldCommits(source: "# Title **bold** word", pattern: "word", replacement: "WORD",
                                           owner: .heading(level: 1), nested: .strong)

@@ -63,10 +63,10 @@
 > owner's whole range unfolded refused such matches forever). Otherwise the action
 > refuses with `wysiwygRangeNotRevealed`, without revealing or writing; the unused
 > `wysiwygPresentationInstalled` case is removed. Post-write and native Undo/Redo
-> reparse the authoritative source through the existing off-main highlighter and
-> the unchanged `.task(id:)` debounce. Under load, that scheduler was observed to
-> drop the final request (unproven, not deterministic; see the R5 evidence and
-> Decision Log). Native input, the editing/marked-text apply guards, and
+> reparse `text` through the existing off-main highlighter and
+> the 20 ms debounce from the highlight-scheduling bug-fix PR
+> (`EditorHighlightScheduler`).
+> Native input, the editing/marked-text apply guards, and
 > selection-driven reveal are unchanged; the only edit-path addition is an O(1)
 > record of each applied highlight. App authorization, writer activation, and
 > replacement publication retain PR D/E's path. R5 stays open for Replace All;
@@ -1021,7 +1021,11 @@ hosted spike PR #112.
   and `testHeadingOwnerWithUntouchedImageProjectionCommits` (the untouched image
   keeps its marker). After the selection leaves, owner and nested construct both
   refold. `testWholeLinkProofRejectsHiddenChromeOutsideTheMatch` still refuses a
-  hidden `[`.
+  hidden `[`. `testNestedFoldInLinkTextStillRejectsEveryHiddenChromePiece` covers
+  `Intro [**bold** text](https://host/a "T") tail`, query `text`: hiding any one of
+  `[`, `]`, `(`, the URL, `"T"`, `)`, or the whole `](…)` refuses with zero writer
+  activations. `testRevealedLinkChromeWithUntouchedNestedBoldCommits` commits with
+  revealed link chrome while the untouched nested bold remains folded.
   `testRejectedPublicationWithWYSIWYGLeavesNoUndoStepRawSourceAndRederivablePresentation`
   covers `.refused(.writeNotApplied)` under WYSIWYG: no undo/redo step, unchanged
   source/copy/accessibility, no newly hidden range, and an unadvanced applied model.
@@ -1048,8 +1052,8 @@ hosted spike PR #112.
 - Scheduler dependency: the highlight-scheduling bug-fix PR
   (`phase3-editor-highlight-schedule-fix`, local commit `8257250421af4f848760fb060c684a411057fe43`) owns the Task scheduler.
   Replace F stacks on it. The trace showed `body` evaluating the final revision without
-  restarting the task, then the old task stopping at its revision guard. This dropped
-  request explains both historical hosted timeouts. Under load about 12–19 the folded
+  restarting the task, then the old task stopping at its revision guard. Both historical
+  hosted timeouts were attributed to this dropped request. Under load about 12–19 the folded
   test failed 8/15 with `.task(id:)` and passed 15/15 with the original direct Task;
   a deterministic reproduction of the SwiftUI drop could not be forced. The bug-fix PR
   adds deterministic cancellation/coalescing tests and an opt-in stress reproduction.
