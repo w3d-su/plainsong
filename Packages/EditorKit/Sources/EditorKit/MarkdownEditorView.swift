@@ -155,6 +155,7 @@ public struct MarkdownEditorView: View {
             scheduleHighlight()
         }
         .onAppear {
+            highlightScheduler.activate()
             activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
         }
@@ -193,6 +194,10 @@ public struct MarkdownEditorView: View {
     /// text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
+        // The closure captures this view value, including its fixed settings. Every update
+        // reinstalls the scheduling callback, and onChange(of: text) supersedes old work.
+        // A stale value can survive only while input is deferred; the editing/marked-text
+        // guards defer its apply too, until the subsequent update requests fresh settings.
         highlightScheduler.restart(revision: highlightRevision) { revision in
             await applyVisibleHighlight(for: revision)
         }

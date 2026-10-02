@@ -12,18 +12,12 @@ final class EditorHighlightSchedulerTests: XCTestCase {
         for revision in 2 ... 50 {
             scheduler.restart(revision: revision) { recorder.applied.append($0) }
         }
-        // The gate deliberately ignores cancellation; even then no new task starts.
-        for _ in 0 ..< 50 {
-            await Task.yield()
-        }
-        XCTAssertEqual(debounce.arrivals, 1)
+        // Debounces can overlap a cancelled wait; only parses are serialized.
+        try await waitUntil { debounce.arrivals == 50 }
         debounce.releaseAll()
-        try await waitUntil { debounce.arrivals == 2 }
-        XCTAssertEqual(debounce.results, [false])
-        debounce.releaseAll()
-        try await waitUntil { recorder.applied == [50] }
-        XCTAssertEqual(debounce.results, [false, true])
-        XCTAssertEqual(debounce.maximumInFlight, 1)
+        try await waitUntil { debounce.results.count == 50 && recorder.applied == [50] }
+        XCTAssertEqual(debounce.results.filter { !$0 }.count, 49)
+        XCTAssertEqual(debounce.results.filter { $0 }.count, 1)
     }
 
     func testEveryStartedSupersededRequestIsCancelled() async throws {
@@ -38,11 +32,10 @@ final class EditorHighlightSchedulerTests: XCTestCase {
             try await waitUntil { debounce.arrivals == revision }
         }
         debounce.releaseAll()
-        try await waitUntil { debounce.results.count == 50 }
+        try await waitUntil { debounce.results.count == 50 && recorder.applied == [50] }
         XCTAssertEqual(recorder.applied, [50])
         XCTAssertEqual(debounce.results.filter { !$0 }.count, 49)
         XCTAssertEqual(debounce.results.filter { $0 }.count, 1)
-        XCTAssertEqual(debounce.maximumInFlight, 1)
     }
 
     func testSupersessionDuringParseWaitsForCancelledParseBeforeStartingFinalRequest() async throws {
@@ -79,18 +72,69 @@ final class EditorHighlightSchedulerTests: XCTestCase {
         scheduler.restart(revision: 1) { recorder.applied.append($0) }
         try await waitUntil { debounce.arrivals == 1 }
         scheduler.restart(revision: 2) { recorder.applied.append($0) }
+        try await waitUntil { debounce.arrivals == 2 }
         scheduler.cancel()
         debounce.releaseAll()
-        try await waitUntil { debounce.results.count == 1 }
+        try await waitUntil { debounce.results.count == 2 }
         for _ in 0 ..< 50 {
             await Task.yield()
         }
-        XCTAssertEqual(debounce.arrivals, 1)
+        XCTAssertEqual(debounce.arrivals, 2)
         XCTAssertEqual(recorder.applied, [])
+        scheduler.activate()
         scheduler.restart(revision: 3) { recorder.applied.append($0) }
-        try await waitUntil { debounce.arrivals == 2 }
+        try await waitUntil { debounce.arrivals == 3 }
         debounce.releaseAll()
         try await waitUntil { recorder.applied == [3] }
+    }
+
+    func testFinalDebounceCompletesWhileCancelledParseIsStillReturning() async throws {
+        let debounce = ManualGate()
+        let parse = ManualGate()
+        let scheduler = EditorHighlightScheduler(debounce: { await debounce.wait() })
+        let recorder = ApplyRecorder()
+        let apply: @MainActor (Int) async -> Void = { revision in
+            _ = await parse.wait()
+            if !Task.isCancelled { recorder.applied.append(revision) }
+        }
+        scheduler.restart(revision: 1, apply: apply)
+        try await waitUntil { debounce.arrivals == 1 }
+        debounce.releaseAll()
+        try await waitUntil { parse.arrivals == 1 }
+        scheduler.restart(revision: 2, apply: apply)
+        try await waitUntil { debounce.arrivals == 2 }
+        debounce.releaseAll()
+        try await waitUntil { debounce.results.count == 2 }
+        XCTAssertEqual(parse.arrivals, 1, "final debounce finishes without overlapping parses")
+        parse.releaseAll()
+        try await waitUntil { parse.arrivals == 2 }
+        XCTAssertEqual(debounce.arrivals, 2, "no second debounce after the old parse returns")
+        parse.releaseAll()
+        try await waitUntil { recorder.applied == [2] }
+        XCTAssertEqual(parse.maximumInFlight, 1)
+    }
+
+    func testQueuedViewportRestartAfterDisappearIsIgnoredUntilAppearance() async throws {
+        let debounce = ManualGate()
+        let scheduler = EditorHighlightScheduler(debounce: { await debounce.wait() })
+        let recorder = ApplyRecorder()
+        // Gate the viewport callback so its delivery after cancel is deterministic.
+        let delivery = ManualGate()
+        let viewport = Task { @MainActor in
+            _ = await delivery.wait()
+            scheduler.restart(revision: 1) { recorder.applied.append($0) }
+        }
+        try await waitUntil { delivery.arrivals == 1 }
+        scheduler.cancel()
+        delivery.releaseAll()
+        await viewport.value
+        XCTAssertEqual(debounce.arrivals, 0, "inactive restart must not even start a debounce")
+        XCTAssertEqual(recorder.applied, [])
+        scheduler.activate()
+        scheduler.restart(revision: 2) { recorder.applied.append($0) }
+        try await waitUntil { debounce.arrivals == 1 }
+        debounce.releaseAll()
+        try await waitUntil { recorder.applied == [2] }
     }
 
     func testProductionDebounceAppliesOnlyTheFinalRevisionOfABurst() async throws {

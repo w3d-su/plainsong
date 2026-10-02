@@ -1329,8 +1329,10 @@ supplied Replace F Find-session measurement method.
 on `Fixtures/large-1mb.md`, open Find for `ordinary prose`, restore its production 150 ms
 debounce, and wait for styling and Replace authority to settle. The probes time 30
 synchronous native `insertText` calls with 20 ms between them, in source-only and WYSIWYG.
-Timing includes native input, App publication and scheduling; it excludes async
-parse/layout and hardware event delivery. The baseline is refreshed origin/main e95ac36
+Timing includes native input and App publication. The fix also runs `restart()` inside
+the timed `insertText`, whereas main restarts `.task(id:)` outside this window; the
+comparison is conservative against the fix. It excludes async parse/layout and hardware
+event delivery. The baseline is refreshed origin/main e95ac36
 (#132; initial work started on d2f739a/#131). Identical untracked probes are installed
 only in the isolated baseline worktree. Every xcodebuild is serialized under the existing
 shared `lockf` lock, with load averages sampled after acquiring it. Final ABABAB samples
@@ -1367,3 +1369,45 @@ The scheduler contract suite has five deterministic tests; no production timing 
 
 Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
 removes presentation attributes until the next reparse. This branch does not repair it.
+
+
+## Highlight scheduler review follow-ups — 2026-10-02
+
+The 20 ms debounce now starts before waiting for a cancelled parse; only parse/apply
+is serialized. Deterministic tests cover this overlap, one in-flight parse, and a
+queued viewport callback delivered after disappearance. The hosted stress probe also
+compares the settled applied fold plan against current text and native selection.
+EditorKit: 397 tests, seven opt-in skips, zero failures; the seven scheduler contract
+tests passed. Hosted Find/Replace and WYSIWYG policy suite: 117 tests, three opt-in
+skips, zero failures. Pinned SwiftFormat 0.62.1 lint and `git diff --check` passed.
+
+No always-on test covers the SwiftUI wiring. Reverting the view to `.task(id:)` would
+still pass `make test`; the hosted stress probe is opt-in empirical coverage.
+
+**Idle measurement still pending.** The historical loaded A/B numbers above remain
+loaded diagnostics. The final process gate requires 1-minute load below 3 and no
+other xcodebuild holding the shared lock, checked before every batch. Run the retained
+helper LAST, after both branches' functional validation:
+
+```sh
+/usr/bin/python3 docs/evidence/editor-highlight-schedule-20261002-idle.py
+```
+
+The helper acquires the existing lock nonblockingly, samples `sysctl -n vm.loadavg`
+inside it, refuses loaded batches, and waits at most five minutes for a qualifying
+slot. It rebuilds the e95ac36 isolated baseline, then runs main/fix/main/fix/main/fix,
+followed separately by main/stack/main/stack/main/stack. Each batch uses:
+
+```sh
+env TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild \
+  -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -destination platform=macOS test-without-building \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget
+```
+
+Run from `/private/tmp/plainsong-highlight-baseline`,
+`/Users/davis._.su/Documents/plainsong-highlight-schedule-fix`, or
+`/private/tmp/plainsong-replace-wysiwyg` as indicated by the interleaving. Both opt-in
+modes keep the production 150 ms Find debounce and the hard 16 ms local budget.
+No loaded numbers are recorded as idle evidence.
