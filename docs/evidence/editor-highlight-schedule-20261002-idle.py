@@ -1,7 +1,17 @@
 import subprocess,sys,time,json,os
 from pathlib import Path
-lock='/private/tmp/claude-501/-Users-davis---su-Documents-blogeditor/50f4130b-7177-4f95-827c-f97a63ad8e24/scratchpad/plainsong-xcodebuild-test.lock'
-roots={'main':'/private/tmp/plainsong-highlight-baseline','fix':'/Users/davis._.su/Documents/plainsong-highlight-schedule-fix','stack':'/private/tmp/plainsong-replace-wysiwyg'}
+# Example roots: /private/tmp/plainsong-highlight-baseline,
+# /Users/davis._.su/Documents/plainsong-highlight-schedule-fix,
+# /private/tmp/plainsong-replace-wysiwyg. All roots must be supplied explicitly.
+lock=os.environ.get('PLAINSONG_XCODEBUILD_LOCK',str(Path(os.environ.get('TMPDIR') or '/tmp')/'plainsong-xcodebuild-test.lock'))
+Path(lock).parent.mkdir(parents=True,exist_ok=True)
+root_vars={'main':'PLAINSONG_BASELINE_ROOT','fix':'PLAINSONG_FIX_ROOT','stack':'PLAINSONG_STACK_ROOT'}
+missing=[v for v in root_vars.values() if not os.environ.get(v)]
+if missing:
+ print('Missing worktree environment variables: '+', '.join(missing),file=sys.stderr); sys.exit(2)
+roots={k:os.environ[v] for k,v in root_vars.items()}
+baseline_sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=roots['main'],text=True).strip()
+print('BASELINE_HEAD '+baseline_sha,flush=True)
 filters=['-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget','-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget']
 if len(sys.argv)>1 and sys.argv[1]=='batch':
  name,iteration,action=sys.argv[2:]
@@ -11,6 +21,7 @@ if len(sys.argv)>1 and sys.argv[1]=='batch':
   print('NOT_IDLE '+load,flush=True); sys.exit(75)
  log=Path('/private/tmp/review-idle-'+name+'-'+iteration+'-'+action+'.log')
  with log.open('w') as f:
+  f.write('BASELINE_HEAD '+baseline_sha+'\n')
   f.write('PRODUCT_HEAD '+subprocess.check_output(['git','rev-parse','HEAD'],cwd=roots[name],text=True).strip()+'\n')
   f.write('SYSCTL_LOAD_START '+load+'\n'); f.flush()
   cmd=['env','TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1','xcodebuild','-project','Plainsong.xcodeproj','-scheme','Plainsong','-configuration','Debug','-destination','platform=macOS',action]
@@ -30,7 +41,8 @@ def run(name,iteration,action):
   if time.monotonic()>=deadline:
    print('idle measurement still pending',flush=True); sys.exit(75)
   time.sleep(30)
-run('main',0,'build-for-testing')
+for product in ['main','fix','stack']:
+ run(product,0,'build-for-testing')
 for comparison in ['fix','stack']:
  for i in range(1,4):
   run('main',comparison+'-'+str(i),'test-without-building')
