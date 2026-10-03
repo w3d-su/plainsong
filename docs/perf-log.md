@@ -1313,3 +1313,27 @@ Pending measurements:
 No export-specific time or memory budget is frozen. If the writer noticeably stalls
 input, stop for an E2-contract review before moving any writer work off-main. See
 `docs/export-html-phase-b-checklist.md` for the owner entry points and unchecked smoke cases.
+
+
+## Export F E9 idle admission — 2026-10-04
+
+**Pending idle-machine run.** Candidate product SHA `ea2e723fdd3388981b75e467751bf4f57ab2bb6b` includes main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Debug and Release admission both exited 75 at 1-minute load 8.15
+(require ≤1.0); neither built nor recorded any performance samples. The required
+three runs per configuration, fixture wall times/peak memory, typing during export,
+and 64 MiB writer main-thread time remain pending. Budgets are unchanged and no
+E9, keyboard or VoiceOver acceptance checkbox is closed. No writer decision can
+be made from these admission-only runs.
+
+Raw logs: `docs/evidence/h22-e9-debug-admission.log` and
+`docs/evidence/h22-e9-release-admission.log`. Structured status:
+`docs/evidence/handoff22-20261004-admission.json`.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+# Obtain at least three qualified runs per configuration, checking admission each time.
+```

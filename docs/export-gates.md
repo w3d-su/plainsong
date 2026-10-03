@@ -1435,3 +1435,12 @@ implementation ships.
   (b) supply, **not** a successful `NSSavePanel` grant. PR F's save-panel owner smoke for
   `~/x.html`, accented folders and an external APFS root remains open. The scaffolding tests
   simulate Foundation's observed external-root layout; no external volume was written here.
+
+
+### Handoff 22 E9 admission — 2026-10-04
+
+Formal E9 remains **pending idle-machine run**. Debug and Release both exited 75
+at 1-minute load 8.15 (>1.0); zero samples, zero new E9 boxes checked. Candidate SHA,
+raw logs, JSON and rerun commands are in `docs/perf-log.md`, section
+"Export F E9 idle admission — 2026-10-04". Three qualified runs per configuration
+are still required. Keyboard/VoiceOver acceptance remains owner-only.
