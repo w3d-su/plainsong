@@ -13,7 +13,7 @@ import XCTest
 @MainActor
 extension EditorFindHostedGateTests {
     func testHostedReplaceRefusesWhileAnExternalChangeAwaitsAChoice() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
@@ -24,7 +24,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
@@ -50,7 +50,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesAReadableIndeterminateWriteQuarantine() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
@@ -76,7 +76,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
@@ -105,7 +105,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesDuringAWorkspaceMutationWriteFence() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let session = appState.currentDocument
         try appState.beginWorkspaceNamespaceMutation([session])
@@ -120,7 +120,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesWhileEditorSourceIsPending() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let editor = try hostedEditor(hosted)
         editor.setMarkedText(
             "ㄅ",
@@ -133,7 +133,7 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceRefusesARecoveryFencedDetachedSession() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"

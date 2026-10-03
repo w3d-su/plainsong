@@ -82,6 +82,14 @@ extension MarkdownTextView {
         restoreImagePresentationMarkers(preservedImageMarkers, in: textStorage)
         EditorFindMatchHighlight.restore(preservedFindHighlights, in: textStorage)
         textStorage.endEditing()
+        if let view = textView as? MarkdownSTTextView, styledText.foldPlan != nil {
+            view.replacePresentationSnapshot = EditorReplacePresentationSnapshot(
+                styledText: styledText,
+                coordinator: view.textDelegate as? MarkdownTextViewCoordinator
+            )
+        } else if let view = textView as? MarkdownSTTextView {
+            view.replacePresentationSnapshot = nil
+        }
         if styledText.foldPlan != nil,
            let textRange = NSTextRange(targetRange, in: textView.textContentManager)
         {

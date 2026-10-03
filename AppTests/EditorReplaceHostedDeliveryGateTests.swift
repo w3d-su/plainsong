@@ -11,7 +11,7 @@ import XCTest
 @MainActor
 extension EditorFindHostedGateTests {
     func testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
 
@@ -34,7 +34,7 @@ extension EditorFindHostedGateTests {
     /// A fence that appears between command validation and EditorKit's commit-time call is
     /// seen by the commit check, which refuses before writer preflight and any undo group.
     func testHostedFenceAppearingBeforeCommitRefusesAtTheCommitCheck() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
         let session = appState.currentDocument
@@ -77,7 +77,7 @@ extension EditorFindHostedGateTests {
     /// R7 bullet 6: a plan made before a fence appears is dropped before any undo group, even
     /// though the fence is gone again and every observable value has returned.
     func testHostedFenceAppearingAfterPlanningDropsThePlanBeforeAnyUndoGroup() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
         let session = appState.currentDocument
@@ -104,7 +104,7 @@ extension EditorFindHostedGateTests {
     /// App uses Find's own fallback eligibility and still reaches only that key window's
     /// installed editor. Without the fallback's eligibility nothing is delivered.
     func testHostedReplaceFromTheQueryFieldUsesTheFindFallback() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
         try clickIntoFindField(in: hosted.window)
@@ -133,7 +133,7 @@ extension EditorFindHostedGateTests {
     /// comparison runs for real. The `NSApp.keyWindow` query-field branch stays unexercised
     /// here because the fixture controls designated key status, not the host's real key window.
     func testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
         appState.editorFindHost.commandContextOverride = nil
@@ -162,7 +162,7 @@ extension EditorFindHostedGateTests {
     /// Two windows share one `AppState`. Only the key window's installation is reached; with no
     /// key window nothing is; and a key-window change supersedes an outstanding plan.
     func testHostedReplaceReachesOnlyTheKeyWindowsInstallation() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let session = appState.currentDocument
         let other = mountDesignatedKeyWorkspace(in: hosted.group, appState: appState, originX: 40)
@@ -210,7 +210,7 @@ extension EditorFindHostedGateTests {
     /// and refuses; no replacement applies, no replacement undo group opens, nothing is
     /// queued, and Find recomputes counter-only before a fresh explicit Replace.
     func testHostedWriterRefusalAfterAuthorizationOnlyConverges() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(source: "hit one hit two", query: "hit")
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
         let appState = hosted.appState
         let editor = try hostedEditor(hosted)
         let session = appState.currentDocument

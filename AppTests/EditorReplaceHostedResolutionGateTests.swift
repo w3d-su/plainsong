@@ -15,7 +15,7 @@ extension EditorFindHostedGateTests {
     /// the second converges, Reload completes, Find recounts counter-only from the accepted
     /// disk source, a plan made before the conflict is superseded, and a fresh Replace works.
     func testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
@@ -67,7 +67,7 @@ extension EditorFindHostedGateTests {
     /// channel publication (F4b), and still supersedes every earlier plan.
     func testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace() async throws {
         let local = "hit local hit local"
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: local
@@ -109,7 +109,7 @@ extension EditorFindHostedGateTests {
     /// brings Find back to the accepted local source; with the hook disabled this test fails.
     func testHostedKeepMineCompletionHookRecountsAStaleFindBinding() async throws {
         let local = "hit local hit local"
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: local
@@ -139,7 +139,7 @@ extension EditorFindHostedGateTests {
     /// Reload completion without a second window: the counter comes from the accepted disk
     /// source, no navigation is emitted, and a plan made before the conflict cannot commit.
     func testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace() async throws {
-        let hosted = try await makeHostedReplaceWorkspace(
+        let hosted = try await makeHostedEditorWorkspace(
             source: "hit one",
             query: "hit",
             localEdit: "hit local hit local"
