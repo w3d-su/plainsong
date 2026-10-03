@@ -524,7 +524,7 @@ implementation, or green CI is not a decision.
 
 Each PR branches from then-current `origin/main` and targets `main`; the maintainer
 squash-merges. Coordinate the AppState-wide B1/B2 moves with Replace F/G, Replace H's
-menu/responder/focus work and I's acceptance (`docs/editor-replace-gates.md:685-688`),
+menu/responder/focus work and I's acceptance (`docs/editor-replace-gates.md` §7 rows F–I),
 Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 
 | PR | Scope | Expected gates | Security review |
