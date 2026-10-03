@@ -46,9 +46,12 @@
 > fallback exactly where Find uses it. Reload / Keep Mine completion supersedes
 > every plan and recounts Find counter-only. A write that is not applied
 > (`.refused(.writeNotApplied)`) now leaves no undo step. There is still no product
-> UI or Replace All; R4–R6 and R8–R10 stay open. Known follow-up:
-> `EditorFindController.swift` is 588 lines with a 287-line class body and should
-> be split without widening its private state.
+> UI or Replace All; R4–R6 and R8–R10 stay open. The controller split reduces
+> `EditorFindController.swift` to 400 lines, with private task/fence ownership in
+> `EditorFindMatchWorker.swift` (110 lines), private step intent ownership in
+> `EditorFindStepIntentState.swift` (114 lines), and the unchanged top-level types in
+> `EditorFindDocumentBinding.swift` (17 lines) and `EditorFindScheduleReason.swift`
+> (21 lines). Private state and helpers retain private access; no gate changes.
 > **PR F (`phase3-editor-replace-wysiwyg`) implements Experimental WYSIWYG
 > single Replace:** it closes R5 bullets 1–4 and 6. When the current match is not
 > the selection, the action only selects the raw match and synchronously removes
