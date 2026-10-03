@@ -1556,11 +1556,41 @@ automatic-reparse timeout methods passed **3/3**, six executions total, without 
 retry. `make build`, pinned SwiftFormat 0.62.1 lint, and `git diff --check` passed.
 
 **Idle measurement still pending.** No new typing numbers were recorded during these
-functional checks. Run `python3 docs/evidence/editor-highlight-schedule-20261002-idle.py`
+functional checks. Use the fully configured helper command below
 LAST to compare the committed bug-fix head and, separately, the committed stacked F
 head against the current fix/main merge-base baseline. Exact batch commands and the strict load/lock gate
 are retained in the highlight-scheduler review entry above. R9, real IME and batch
 Replace remain open. The scheduler fix is cited as #136.
+
+
+## Handoff 22 idle admission — 2026-10-04 (PR #136)
+
+**Idle measurement still pending.** Five-minute admission refused every batch;
+no build or typing probe ran, and no performance samples were recorded. The actual
+candidate product SHA is `2530c02ea1bf0205525c6477e881842c3d258616`; the clean baseline SHA is `4cef0ccf44e422ad22ab34c4319a46c42e69b009`.
+The former baseline contains an untracked test file, so a separate clean worktree
+`/private/tmp/plainsong-h22-baseline` was prepared without using that file.
+Raw admission output: `docs/evidence/h22-idle-admission.log`; structured status:
+`docs/evidence/handoff22-20261004-admission.json`. All historical loaded A/B values
+remain diagnostics, with no pass/fail or regression conclusion for this head.
+The hard 16 ms typing budget is unchanged. Owner heavy-app/agent shutdown was
+requested before admission. No owner-only gates are closed.
+
+Reproduce on an idle machine after fetching/merging main (then remeasure):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+# Refresh the clean baseline to the current fix/main merge base, then generate
+# all three projects in their own worktrees before running the helper.
+git -C "$PLAINSONG_BASELINE_ROOT" checkout --detach "$(git -C "$PLAINSONG_FIX_ROOT" merge-base HEAD origin/main)"
+for root in "$PLAINSONG_BASELINE_ROOT" "$PLAINSONG_FIX_ROOT" "$PLAINSONG_STACK_ROOT"; do
+  make -C "$root" generate
+done
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
 
 
 ## Handoff 22 idle admission — 2026-10-04 (PR #137)
