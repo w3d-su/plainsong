@@ -255,6 +255,8 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    /// Last successfully applied fold plan, retained in O(1) for hosted final-revision checks.
+    var lastAppliedHighlightFoldPlan: WYSIWYGFoldPlan?
     /// Find-match decoration currently on the storage, so an unchanged request costs nothing.
     /// The highlight pass preserves decoration, so re-application is needed only on change.
     var appliedFindMatchHighlight: EditorFindMatchHighlightRequest?

@@ -1276,3 +1276,138 @@ is unmeasured and belongs to E9's large-document pass. The payload rows come fro
 run against the PR head sources and then against this change. No export wall-clock
 budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
 editor keystroke path.
+
+## Editor highlight scheduling fix — 2026-10-01
+
+Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug, on a Mac shared
+with other agents' builds and tests (load averages recorded per run). `MarkdownEditorView`
+now restarts its 20 ms debounced visible-range highlight through `EditorHighlightScheduler`
+instead of SwiftUI `.task(id:)` (Decision Log 2026-10-01). Per keystroke the view still
+bumps `@State highlightRevision` and `body` still reads it, so the SwiftUI update cadence
+is unchanged. Each schedule replaces one pending operation and cancels the executing
+request; a single runner waits for it to return before creating the latest highlight task.
+The debounce, parser, apply guards and IME behavior are unchanged.
+
+**Dropped-request reproduction (opt-in, not deterministic).**
+`EditorFindHostedGateTests.testHostedHighlightScheduleStressAppliesAfterEveryEdit` opens
+`Intro **文字😀** tail` in Experimental WYSIWYG, then runs 15 cycles of edit / Undo / Redo
+/ Undo. It counts an edit as dropped when no highlight applies within 3 s. Set
+`PLAINSONG_XCODEBUILD_LOCK` to the shared lock used by the other agents, then run:
+
+```sh
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" env TEST_RUNNER_PLAINSONG_RUN_HIGHLIGHT_SCHEDULE_STRESS=1 xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug test \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit
+```
+
+| Run order | Product | Load average (1 min, start → end) | Edits without an applied highlight |
+|---:|---|---|---:|
+| 1 | d2f739a, `.task(id:)` (untracked copy of the probe) | 52.68 → 22.64 | 10 / 60 |
+| 2 | this branch | 22.64 → 22.03 | 0 / 60 |
+| 3 | this branch | 21.87 → 20.83 | 0 / 60 |
+| 4 | d2f739a, `.task(id:)` | 20.83 → 13.69 | 8 / 60 |
+
+Earlier, on the Replace PR F branch, the hosted folded-delimiter Replace test failed 8/15
+iterations with `.task(id:)` and passed 15/15 with a direct `Task` (load averages
+about 12–19). An in-memory trace of a failing iteration showed SwiftUI evaluating `body`
+with the final `highlightRevision` at least five times without cancelling the in-flight
+task or starting a new one, after which that task stopped at its revision guard. Passing
+iterations show the same traced event order, so **the drop could not be forced
+deterministically**. The rates depend on load, and the Replace PR F reviewer saw no failure
+on a quieter machine. The deterministic contract is pinned instead by
+`EditorHighlightSchedulerTests` (one apply of the final revision per burst; every superseded
+request cancelled, including one already past its debounce).
+
+**Initial typing diagnostic, superseded.** The earlier ABABAB measurements on d2f739a
+used a scheduler that cancelled and immediately spawned each new task, without an open
+Find session. They are retained in
+[evidence/editor-highlight-schedule-20261001-typing-initial.json](evidence/editor-highlight-schedule-20261001-typing-initial.json)
+for provenance only. They do not validate the final bounded scheduler or reproduce the
+supplied Replace F Find-session measurement method.
+
+**Final typing (§12, §17.8, opt-in).** Both trees mount the production `WorkspaceWindow`
+on `Fixtures/large-1mb.md`, open Find for `ordinary prose`, restore its production 150 ms
+debounce, and wait for styling and Replace authority to settle. The probes time 30
+synchronous native `insertText` calls with 20 ms between them, in source-only and WYSIWYG.
+Timing includes native input and App publication. The fix also runs `restart()` inside
+the timed `insertText`, whereas main restarts `.task(id:)` outside this window; the
+comparison is conservative against the fix. It excludes async parse/layout and hardware
+event delivery. The baseline is refreshed origin/main e95ac36
+(#132; initial work started on d2f739a/#131). Identical untracked probes are installed
+only in the isolated baseline worktree. Every xcodebuild is serialized under the existing
+shared `lockf` lock, with load averages sampled after acquiring it. Final ABABAB samples
+are retained in [the raw JSON](evidence/editor-highlight-schedule-20261001-typing.json).
+The 16 ms budget is unchanged.
+
+| Run | Product | Load (1 / 5 / 15 min, start → end) | Source-only max / median (ms) | WYSIWYG max / median (ms) |
+|---:|---|---|---:|---:|
+| 1 | main e95ac36 | 18.99 / 15.29 / 11.16 → 15.17 / 14.72 / 11.10 | 17.364 / 14.771 | 16.275 / 14.892 |
+| 2 | bounded scheduler | 15.17 / 14.72 / 11.10 → 13.65 / 14.36 / 11.11 | 15.572 / 14.868 | 15.414 / 14.684 |
+| 3 | main e95ac36 | 13.65 / 14.36 / 11.11 → 12.18 / 13.95 / 11.07 | 16.289 / 14.713 | 15.532 / 14.703 |
+| 4 | bounded scheduler | 12.18 / 13.95 / 11.07 → 12.51 / 13.86 / 11.12 | 17.274 / 15.054 | 15.808 / 14.776 |
+| 5 | main e95ac36 | 12.51 / 13.86 / 11.12 → 11.41 / 13.46 / 11.07 | 20.506 / 14.839 | 15.235 / 14.666 |
+| 6 | bounded scheduler | 11.41 / 13.46 / 11.07 → 10.46 / 13.03 / 11.00 | 15.668 / 14.825 | 15.209 / 14.744 |
+
+The runs were interleaved ABABAB with identical probes. Both trees exceed the hard 16 ms
+budget in some runs; sample distributions remain bimodal. The shared-machine loads and
+three runs per product do not establish a speedup or exclude a regression. **Idle-machine
+measurement pending**: the owner must rerun both opt-in modes before opening the PR.
+These numbers are not keystroke-to-screen, hardware input or real-IME evidence.
+
+**Final bounded-scheduler stress:** 0 drops / 60 edit–Undo–Redo–Undo operations, load
+[19.25, 14.52, 11.67] → [17.5, 14.41, 11.7] (1 / 5 / 15 min). This is opt-in empirical evidence,
+not a deterministic reproduction of the original SwiftUI drop.
+
+EditorKit: 395 tests, 7 skips, zero failures.
+
+MarkdownCore: 303 tests, 0 skips, zero failures.
+
+hosted: 117 tests, 3 skips, zero failures.
+
+`make build`, pinned SwiftFormat 0.62.1 `make lint` and `git diff --check` passed.
+The scheduler contract suite has five deterministic tests; no production timing changed.
+
+Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
+removes presentation attributes until the next reparse. This branch does not repair it.
+
+
+## Highlight scheduler review follow-ups — 2026-10-02
+
+The 20 ms debounce now starts before waiting for a cancelled parse; only parse/apply
+is serialized. Deterministic tests cover this overlap, one in-flight parse, and a
+queued viewport callback delivered after disappearance. The hosted stress probe also
+compares the settled applied fold plan against current text and native selection.
+EditorKit: 397 tests, seven opt-in skips, zero failures; the seven scheduler contract
+tests passed. Hosted Find/Replace and WYSIWYG policy suite: 117 tests, three opt-in
+skips, zero failures. Pinned SwiftFormat 0.62.1 lint and `git diff --check` passed.
+
+No always-on test covers the SwiftUI wiring. Reverting the view to `.task(id:)` would
+still pass `make test`; the hosted stress probe is opt-in empirical coverage.
+
+**Idle measurement still pending.** The historical loaded A/B numbers above remain
+loaded diagnostics. The final process gate requires 1-minute load below 3 and no
+other xcodebuild holding the shared lock, checked before every batch. Run the retained
+helper LAST, after both branches' functional validation:
+
+```sh
+/usr/bin/python3 docs/evidence/editor-highlight-schedule-20261002-idle.py
+```
+
+The helper acquires the existing lock nonblockingly, samples `sysctl -n vm.loadavg`
+inside it, refuses loaded batches, and waits at most five minutes for a qualifying
+slot. It rebuilds the e95ac36 isolated baseline, then runs main/fix/main/fix/main/fix,
+followed separately by main/stack/main/stack/main/stack. Each batch uses:
+
+```sh
+env TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild \
+  -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug \
+  -destination platform=macOS test-without-building \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget
+```
+
+Run from `/private/tmp/plainsong-highlight-baseline`,
+`/Users/davis._.su/Documents/plainsong-highlight-schedule-fix`, or
+`/private/tmp/plainsong-replace-wysiwyg` as indicated by the interleaving. Both opt-in
+modes keep the production 150 ms Find debounce and the hard 16 ms local budget.
+No loaded numbers are recorded as idle evidence.
