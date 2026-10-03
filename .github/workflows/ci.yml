@@ -21,6 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare CI evidence paths
+        run: |
+          artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$artifact_dir"
+          {
+            printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
+            printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
+            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+          } >> "$GITHUB_ENV"
+
       - name: Install tools
         run: |
           brew install xcodegen swiftlint
@@ -94,3 +104,28 @@ jobs:
 
       - name: Build app
         run: make build
+
+      - name: Capture failure environment
+        if: ${{ failure() || cancelled() }}
+        run: |
+          artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT}"
+          mkdir -p "$artifact_dir"
+          printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir" >> "$GITHUB_ENV"
+          {
+            printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
+            xcodebuild -version
+            df -h "$RUNNER_TEMP"
+            printf 'ulimit -n: '
+            ulimit -n
+          } > "$artifact_dir/environment.txt"
+
+      # Capture only the designated runner-temp evidence directory, never DerivedData,
+      # caches, the workspace, environment dumps or home-directory contents.
+      - name: Keep failure evidence
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: plainsong-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.XCODE_ARTIFACT_DIR }}/
+          retention-days: 14
+          if-no-files-found: warn

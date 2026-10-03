@@ -9,6 +9,11 @@ import XCTest
 
 @MainActor
 final class PerformanceBudgetTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        try PerformanceResourcePreflight.validateOnce(bundle: Self.testBundle)
+    }
+
     func testTypingLatencyStaysUnderFrameBudget() throws {
         let fixtureText = try Self.fixtureText("Fixtures/large-1mb.md")
         let mdxPrefix = """
@@ -453,20 +458,7 @@ private extension PerformanceBudgetTests {
     }
 
     static func resourceURL(_ path: String) throws -> URL {
-        let path = path as NSString
-        let file = path.lastPathComponent as NSString
-        let fileExtension = file.pathExtension
-        let resourceName = file.deletingPathExtension
-        let subdirectory = path.deletingLastPathComponent
-
-        return try XCTUnwrap(
-            testBundle.url(
-                forResource: resourceName,
-                withExtension: fileExtension.isEmpty ? nil : fileExtension,
-                subdirectory: subdirectory.isEmpty ? nil : subdirectory
-            ),
-            "missing bundled performance resource: \(path)"
-        )
+        try PerformanceResourcePreflight.resourceURL(bundle: testBundle, path: path)
     }
 
     static func milliseconds(since start: UInt64) -> Double {
