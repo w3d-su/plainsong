@@ -1571,7 +1571,7 @@ candidate product SHA is `e76b87530e5f018498abe8d2b3638f030ee7b1b4`; the clean b
 The former baseline contains an untracked test file, so a separate clean worktree
 `/private/tmp/plainsong-h22-baseline` was prepared without using that file.
 Raw admission output: `docs/evidence/h22-idle-admission.log`; structured status:
-`docs/evidence/handoff22-20261004-admission.json`. All historical loaded A/B values
+`docs/evidence/handoff22-pr137-20261004-admission.json`. All historical loaded A/B values
 remain diagnostics, with no pass/fail or regression conclusion for this head.
 The hard 16 ms typing budget is unchanged. Owner heavy-app/agent shutdown was
 requested before admission. No owner-only gates are closed.
