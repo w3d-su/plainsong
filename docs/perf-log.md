@@ -1390,12 +1390,22 @@ other xcodebuild holding the shared lock, checked before every batch. Run the re
 helper LAST, after both branches' functional validation:
 
 ```sh
-/usr/bin/python3 docs/evidence/editor-highlight-schedule-20261002-idle.py
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+# Refresh the clean baseline to the current fix/main merge base, then generate
+# all three projects in their own worktrees before running the helper.
+git -C "$PLAINSONG_BASELINE_ROOT" checkout --detach "$(git -C "$PLAINSONG_FIX_ROOT" merge-base HEAD origin/main)"
+for root in "$PLAINSONG_BASELINE_ROOT" "$PLAINSONG_FIX_ROOT" "$PLAINSONG_STACK_ROOT"; do
+  make -C "$root" generate
+done
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
 ```
 
 The helper acquires the existing lock nonblockingly, samples `sysctl -n vm.loadavg`
 inside it, refuses loaded batches, and waits at most five minutes for a qualifying
-slot. It rebuilds the e95ac36 isolated baseline, then runs main/fix/main/fix/main/fix,
+slot. It builds every product for testing and records the actual merge-base SHA of the isolated baseline, then runs main/fix/main/fix/main/fix,
 followed separately by main/stack/main/stack/main/stack. Each batch uses:
 
 ```sh
@@ -1411,3 +1421,33 @@ Run from `/private/tmp/plainsong-highlight-baseline`,
 `/private/tmp/plainsong-replace-wysiwyg` as indicated by the interleaving. Both opt-in
 modes keep the production 150 ms Find debounce and the hard 16 ms local budget.
 No loaded numbers are recorded as idle evidence.
+
+
+## Handoff 22 idle admission — 2026-10-04 (PR #136)
+
+**Idle measurement still pending.** Five-minute admission refused every batch;
+no build or typing probe ran, and no performance samples were recorded. The actual
+candidate product SHA is `2530c02ea1bf0205525c6477e881842c3d258616`; the clean baseline SHA is `4cef0ccf44e422ad22ab34c4319a46c42e69b009`.
+The former baseline contains an untracked test file, so a separate clean worktree
+`/private/tmp/plainsong-h22-baseline` was prepared without using that file.
+Raw admission output: `docs/evidence/h22-idle-admission.log`; structured status:
+`docs/evidence/handoff22-20261004-admission.json`. All historical loaded A/B values
+remain diagnostics, with no pass/fail or regression conclusion for this head.
+The hard 16 ms typing budget is unchanged. Owner heavy-app/agent shutdown was
+requested before admission. No owner-only gates are closed.
+
+Reproduce on an idle machine after fetching/merging main (then remeasure):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+# Refresh the clean baseline to the current fix/main merge base, then generate
+# all three projects in their own worktrees before running the helper.
+git -C "$PLAINSONG_BASELINE_ROOT" checkout --detach "$(git -C "$PLAINSONG_FIX_ROOT" merge-base HEAD origin/main)"
+for root in "$PLAINSONG_BASELINE_ROOT" "$PLAINSONG_FIX_ROOT" "$PLAINSONG_STACK_ROOT"; do
+  make -C "$root" generate
+done
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
