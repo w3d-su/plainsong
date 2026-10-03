@@ -1276,3 +1276,40 @@ is unmeasured and belongs to E9's large-document pass. The payload rows come fro
 run against the PR head sources and then against this change. No export wall-clock
 budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
 editor keystroke path.
+
+
+## Export PR F Phase B — 2026-10-01: pending idle-machine run
+
+Correctness, package/hosted regressions, pinned lint and the native build finished before
+E9 was attempted. Under the shared Xcode lock, the final idle checks reported 1-minute
+load 35.84 for Debug and 35.21 for Release (the conservative idle threshold is <= 1.0).
+Both scripts exited 75: **pending idle-machine run; no performance samples recorded**.
+These load readings are an environment check, not export performance evidence.
+
+Run from `/Users/davis._.su/Documents/plainsong-export-html-command` after the machine is idle:
+
+```sh
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+```
+
+The scripts retain `Results.xcresult` and `run.log` under their printed evidence directory.
+The final hosted compilation probe executed three tests with three deliberate opt-in
+skips and zero failures; it verifies the entry points compile, not that a budget passes.
+
+Pending measurements:
+- `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`: three
+  full-command samples each for `large-1mb.md` and `export-f-heavy.md`, with 24 distinct
+  valid bounded PNG assets; elapsed time and peak host RSS sampled every 5 ms. WebKit
+  helper-process memory and an exact OS high-water mark are not claimed.
+- `AppBackedEditorPerformanceTests.testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget`:
+  native input plus public-view update while export is active, using the existing 16 ms
+  typing budget. This remains synthetic AppKit evidence.
+- `ExportHTMLPerformanceTests.testSixtyFourMiBWriterMainActorTime`: three synchronous
+  `writeExportArtifact` calls at the 64 MiB cap; byte allocation is outside the timer.
+- Real iCloud evicted-leaf materialization and coordination wait, responsiveness and
+  physical-input/compositor evidence remain owner-only, using the real save panel.
+
+No export-specific time or memory budget is frozen. If the writer noticeably stalls
+input, stop for an E2-contract review before moving any writer work off-main. See
+`docs/export-html-phase-b-checklist.md` for the owner entry points and unchecked smoke cases.
