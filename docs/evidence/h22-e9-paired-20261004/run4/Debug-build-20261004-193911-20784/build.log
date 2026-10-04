@@ -221,25 +221,25 @@ CopySwiftLibs /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/D
 
 CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-export-html-command
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
 /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib: replacing existing signature
 
 CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-export-html-command
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
 /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib: replacing existing signature
 
 CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-export-html-command
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app
 /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app: replacing existing signature
 
@@ -256,4 +256,3 @@ PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8
 PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/ExplicitPrecompiledModules
 
 ** TEST BUILD SUCCEEDED **
-

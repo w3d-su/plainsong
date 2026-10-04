@@ -260,9 +260,9 @@ GenerateDSYMFile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a1
 
 CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest (in target 'PerformanceTests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-export-html-command
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest
 
 RegisterExecutionPolicyException /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest (in target 'PerformanceTests' from project 'Plainsong')
@@ -275,9 +275,9 @@ Touch /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/B
 
 CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-export-html-command
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Intermediates.noindex/Plainsong.build/Release/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app
 
 RegisterExecutionPolicyException /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Products/Release/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
@@ -301,4 +301,3 @@ PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8
 PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
 
 ** TEST BUILD SUCCEEDED **
-

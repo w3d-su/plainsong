@@ -1,0 +1,35 @@
+{
+  "purpose": "Remove trailing whitespace and excess EOF blank lines for git diff --check. Original raw logs remain in the /private/tmp measurement directories recorded by the evidence JSON; timing and diagnostic content unchanged.",
+  "files": [
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run1/Release-build-20261004-150625-18265/build.log",
+      "original_sha256": "f307ea3fcc44dd3eb22a019c56dfa8e936cf3690b611d75af357419361c7c050",
+      "normalized_sha256": "1195fb8ae94f952861847c6dab72b7533e73afd77da0771da07536b99d18ed5c"
+    },
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run1/Debug-build-20261004-150201-17158/build.log",
+      "original_sha256": "1977cae5ddb86476abd85937a390d665316b308e27aeed7b3a8a1be4c6080296",
+      "normalized_sha256": "a123ada85e03941b088b95a6b8cb8fcf659af2d1ec28377a1fbedd860ddc6100"
+    },
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run4/Debug-build-20261004-193911-20784/build.log",
+      "original_sha256": "363e4cb9499212d6e01be5887ddacddaf6f2779158518e7750038aabf2dd1202",
+      "normalized_sha256": "c7508b133c0805c108bba8c9431876a2833310fa8c92aacf067874e7ea6567d4"
+    },
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run4/Release-build-20261004-193918-20944/build.log",
+      "original_sha256": "587308442e78077525e744393823f526bf459e7ad8f4f73bc1c5994d799bb1a6",
+      "normalized_sha256": "2b62e0c7e5f662f1bf84deeb5421bd3c07720c4c0a561e049d19a63b6305874f"
+    },
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run5/Release-build-20261004-194219-21150/build.log",
+      "original_sha256": "51a7cc9cb37b10cfae554846aaedd9872e8ef9e168236b78b550878828f4b735",
+      "normalized_sha256": "20946a6764b8d8098344bcd80552b6d2b6ce902b4be6369cfc225a2ebd3ead2d"
+    },
+    {
+      "path": "docs/evidence/h22-e9-paired-20261004/run2/Release-build-20261004-193320-20103/build.log",
+      "original_sha256": "5ff9e666d9fb2fbb27df9dc86546d86c507184344781de70a72307fe79f98809",
+      "normalized_sha256": "110b9f09a5075bed46115404a95505a65bdb7b89649a26dcb66e9b6558cd5b5f"
+    }
+  ]
+}
