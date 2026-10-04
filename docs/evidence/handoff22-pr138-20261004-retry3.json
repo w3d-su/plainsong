@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "attempt": "retry3",
+  "pr": 138,
+  "status": "pending idle-machine run",
+  "candidate_product_sha": "72a5a6974a61e7742edda13f9f377ef22f4eedce",
+  "main_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "owner_ready_confirmed": true,
+  "other_xcodebuild_before_each_attempt": false,
+  "threshold_1min_load": "<=1.0",
+  "configurations": {
+    "debug": {
+      "load_1min": 15.23,
+      "exit_code": 75,
+      "performance_samples": []
+    },
+    "release": {
+      "load_1min": 14.0,
+      "exit_code": 75,
+      "performance_samples": []
+    }
+  },
+  "required_successful_runs_per_configuration": 3,
+  "typing_budget_ms": 16,
+  "raw_logs": [
+    "docs/evidence/h22-retry3-e9-debug-admission.log",
+    "docs/evidence/h22-retry3-e9-release-admission.log"
+  ]
+}

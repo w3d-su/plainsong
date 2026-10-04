@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.5341796875,
+    3.2705078125,
+    3.3388671875
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 27.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 22.9 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+    "  9.5 /usr/sbin/coreaudiod",
+    "  8.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  7.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+  ],
+  "exit_code": 0
+}

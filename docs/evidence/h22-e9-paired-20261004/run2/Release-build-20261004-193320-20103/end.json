@@ -1,0 +1,16 @@
+{
+  "load": [
+    8.0361328125,
+    4.29248046875,
+    3.70849609375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 39.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 21.7 /System/Library/CoreServices/NotificationCenter.app/Contents/MacOS/NotificationCenter",
+    "  7.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  6.0 /System/Library/CoreServices/SystemUIServer.app/Contents/MacOS/SystemUIServer",
+    "  5.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+  ],
+  "exit_code": 65
+}

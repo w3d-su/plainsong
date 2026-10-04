@@ -10,6 +10,7 @@ struct WorkspaceWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ExportHTMLStatusBanner()
             if appState.workspaceMutationRecoveryBannerPlacement == .global {
                 WorkspaceMutationRecoveryBanner()
             }
@@ -79,9 +80,12 @@ struct WorkspaceWindow: View {
         .task {
             await Task.yield()
             appState.restoreLastOpenedFileIfNeeded()
+            #if DEBUG
+                appState.showExportHTMLFeedbackSmokeIfRequested()
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
-            appState.flushAutosaveIfNeeded()
+            appState.flushAutosaveAfterWindowResignedKey()
         }
     }
 
@@ -454,6 +458,10 @@ private struct WindowMetadataAccessor: NSViewRepresentable {
 
     private func applyMetadata(to window: NSWindow?) {
         guard let window else { return }
+        if window.identifier != AppState.exportHTMLWorkspaceWindowIdentifier {
+            window.identifier = AppState.exportHTMLWorkspaceWindowIdentifier
+            NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
+        }
         window.representedURL = representedURL
         window.title = title
         window.isDocumentEdited = isDocumentEdited

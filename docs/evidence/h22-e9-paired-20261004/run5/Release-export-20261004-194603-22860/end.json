@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.6064453125,
+    3.31396484375,
+    3.3525390625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 20.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  7.5 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+    "  7.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  6.6 /usr/sbin/coreaudiod",
+    "  4.6 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+  ],
+  "exit_code": 0
+}

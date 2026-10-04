@@ -1,0 +1,16 @@
+{
+  "load": [
+    4.45703125,
+    3.712890625,
+    3.5009765625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 46.9 /usr/libexec/swcd",
+    " 23.6 /usr/libexec/siriknowledged",
+    " 22.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 11.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+    " 10.5 /usr/libexec/coreduetd"
+  ],
+  "exit_code": 0
+}
