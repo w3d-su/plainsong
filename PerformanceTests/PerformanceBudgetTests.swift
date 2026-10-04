@@ -14,6 +14,17 @@ final class PerformanceBudgetTests: XCTestCase {
         try PerformanceResourcePreflight.validateOnce(bundle: Self.testBundle)
     }
 
+    func testBundledFixtureURLsRemainAbsoluteForAnchoredReads() throws {
+        for path in ["Fixtures/perf-500kb.md", "Fixtures/perf-100kb.md", "Fixtures/large-1mb.md",
+                     "preview/index.html"]
+        {
+            let url = try Self.resourceURL(path)
+            XCTAssertNil(url.baseURL, "Bundled fixture lookup must not retain a relative base: \(url)")
+            XCTAssertTrue(url.path(percentEncoded: false).hasPrefix("/"))
+            _ = try WorkspaceFileSystemLocation(fileURL: url)
+        }
+    }
+
     func testTypingLatencyStaysUnderFrameBudget() throws {
         let fixtureText = try Self.fixtureText("Fixtures/large-1mb.md")
         let mdxPrefix = """
@@ -458,7 +469,20 @@ private extension PerformanceBudgetTests {
     }
 
     static func resourceURL(_ path: String) throws -> URL {
-        try PerformanceResourcePreflight.resourceURL(bundle: testBundle, path: path)
+        let path = path as NSString
+        let file = path.lastPathComponent as NSString
+        let fileExtension = file.pathExtension
+        let resourceName = file.deletingPathExtension
+        let subdirectory = path.deletingLastPathComponent
+
+        return try XCTUnwrap(
+            testBundle.url(
+                forResource: resourceName,
+                withExtension: fileExtension.isEmpty ? nil : fileExtension,
+                subdirectory: subdirectory.isEmpty ? nil : subdirectory
+            ),
+            "missing bundled performance resource: \(path)"
+        ).absoluteURL
     }
 
     static func milliseconds(since start: UInt64) -> Double {

@@ -30,7 +30,7 @@ enum PerformanceResourcePreflight {
         guard let root = bundle.resourceURL else {
             throw diagnostic(bundle: bundle, path: path, code: ENOENT)
         }
-        return root.appendingPathComponent(path)
+        return root.appendingPathComponent(path).absoluteURL
     }
 
     private static func validate(bundle: Bundle) throws {
