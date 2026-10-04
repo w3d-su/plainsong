@@ -1,0 +1,112 @@
+{
+  "product": "main",
+  "iteration": "fix-3",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      3.24560546875,
+      3.60302734375,
+      3.51123046875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 16.3 /usr/libexec/sysmond",
+      " 15.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 14.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 13.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      "  9.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      3.2587890625,
+      3.5888671875,
+      3.5068359375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 79.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 30.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 13.1 /usr/libexec/sysmond",
+      " 12.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 12.6 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-fix-3-test-without-building.log",
+  "samples": {
+    "source-only": [
+      1.261,
+      14.290333,
+      14.232708,
+      0.726542,
+      14.281458,
+      0.6745,
+      14.527167,
+      0.713209,
+      14.435416,
+      0.636292,
+      14.35525,
+      0.650459,
+      14.249667,
+      0.618375,
+      14.262917,
+      0.630292,
+      14.192125,
+      0.62525,
+      14.1945,
+      0.640125,
+      14.178208,
+      0.648459,
+      14.229625,
+      0.629084,
+      14.175,
+      0.63625,
+      14.231625,
+      0.624458,
+      14.223458,
+      0.613625
+    ],
+    "wysiwyg": [
+      0.76325,
+      14.237458,
+      14.21625,
+      0.687458,
+      14.2755,
+      0.6785,
+      14.2655,
+      0.757834,
+      14.275667,
+      0.670041,
+      14.276583,
+      0.677541,
+      14.331709,
+      0.658208,
+      14.368708,
+      0.696291,
+      14.279666,
+      0.718708,
+      14.240875,
+      0.703,
+      14.251833,
+      0.682333,
+      14.294584,
+      0.65875,
+      14.277167,
+      0.672542,
+      14.302625,
+      0.69425,
+      14.318833,
+      0.7155
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

@@ -1,0 +1,114 @@
+{
+  "product": "fix",
+  "iteration": "fix-2",
+  "action": "test-without-building",
+  "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+  "start": {
+    "load": [
+      5.60302734375,
+      7.3740234375,
+      8.244140625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 88.7 /usr/libexec/dasd",
+      " 31.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 27.8 /usr/libexec/PerfPowerServices",
+      " 25.7 /usr/libexec/sysmond",
+      " 19.3 /sbin/launchd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.4365234375,
+      7.279296875,
+      8.2001953125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 76.9 /usr/libexec/dasd",
+      " 26.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 25.0 /usr/libexec/PerfPowerServices",
+      " 22.2 /usr/sbin/spindump",
+      " 22.1 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 65,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-2-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.892042,
+      14.763,
+      14.293916,
+      0.777625,
+      14.920167,
+      0.67975,
+      14.895833,
+      0.697458,
+      14.803792,
+      14.284084,
+      0.665042,
+      14.800167,
+      0.724958,
+      14.585708,
+      0.648708,
+      14.7225,
+      0.645334,
+      14.792958,
+      14.833125,
+      0.672042,
+      14.820084,
+      0.648916,
+      14.915833,
+      0.664958,
+      14.208667,
+      0.668042,
+      15.414,
+      0.69025,
+      14.233292,
+      0.664125
+    ],
+    "wysiwyg": [
+      0.758042,
+      14.208791,
+      14.206334,
+      0.69,
+      14.393958,
+      0.703209,
+      14.294834,
+      0.774291,
+      14.265375,
+      0.725375,
+      14.310834,
+      0.69975,
+      14.18525,
+      0.686375,
+      14.314333,
+      0.716209,
+      14.329917,
+      0.736708,
+      14.299875,
+      0.741708,
+      14.405583,
+      0.771,
+      15.389667,
+      0.728834,
+      14.383375,
+      1.448375,
+      17.417875,
+      15.169625,
+      14.970708,
+      14.832875
+    ]
+  },
+  "assertion_failure_lines": [
+    "/Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorHighlightScheduleHostedTests.swift:141: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"17.417875\") is not less than (\"16.0\") - native input including debounce scheduling: [0.758042, 14.208791, 14.206334, 0.69, 14.393958, 0.703209, 14.294834, 0.774291, 14.265375, 0.725375, 14.310834, 0.69975, 14.18525, 0.686375, 14.314333, 0.716209, 14.329917, 0.736708, 14.299875, 0.741708, 14.405583, 0.771, 15.389667, 0.728834, 14.383375, 1.448375, 17.417875, 15.169625, 14.970708, 14.832875]"
+  ],
+  "valid_measurement_batch": true
+}

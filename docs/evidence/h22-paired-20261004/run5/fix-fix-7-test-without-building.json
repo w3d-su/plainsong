@@ -1,0 +1,112 @@
+{
+  "product": "fix",
+  "iteration": "fix-7",
+  "action": "test-without-building",
+  "product_sha": "e438ac19c91388326280e39bcfafc104fa8bc58c",
+  "start": {
+    "load": [
+      5.3525390625,
+      4.5029296875,
+      3.89599609375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 99.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 63.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 19.9 /usr/libexec/sysmond",
+      " 17.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 11.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.2177734375,
+      4.501953125,
+      3.90283203125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 58.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 51.7 /usr/sbin/spindump",
+      " 35.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 21.7 /usr/libexec/sysmond",
+      " 21.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/fix-fix-7-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.933417,
+      15.488709,
+      15.161084,
+      0.719875,
+      14.337292,
+      0.667083,
+      14.169542,
+      0.682792,
+      14.87375,
+      0.658333,
+      14.292625,
+      0.662583,
+      14.216625,
+      0.71325,
+      14.197584,
+      0.6245,
+      14.289041,
+      0.659,
+      15.047583,
+      0.679375,
+      14.361833,
+      15.691667,
+      0.658958,
+      14.227708,
+      0.674,
+      14.389875,
+      0.684083,
+      14.166875,
+      0.654625,
+      14.929291
+    ],
+    "wysiwyg": [
+      0.801541,
+      14.94425,
+      14.310125,
+      0.739875,
+      14.339042,
+      0.72475,
+      14.301291,
+      0.74675,
+      14.277583,
+      14.301583,
+      0.75275,
+      14.294417,
+      0.747084,
+      14.304834,
+      0.727667,
+      14.279708,
+      0.706166,
+      14.260875,
+      0.737667,
+      14.288667,
+      0.73125,
+      14.287208,
+      0.740708,
+      14.261792,
+      0.752917,
+      14.272917,
+      0.7365,
+      14.260666,
+      0.730875,
+      14.496291
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

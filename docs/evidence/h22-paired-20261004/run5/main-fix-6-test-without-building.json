@@ -1,0 +1,112 @@
+{
+  "product": "main",
+  "iteration": "fix-6",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      3.51513671875,
+      3.59912109375,
+      3.51318359375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 99.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 66.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 16.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 13.5 /usr/libexec/sysmond",
+      " 12.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      8.150390625,
+      4.59716796875,
+      3.86865234375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 71.4 /usr/libexec/spotlightknowledged.updater",
+      " 27.7 /System/Library/ExtensionKit/Extensions/AssetMetricsExtension.appex/Contents/MacOS/AssetMetricsExtension",
+      " 26.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 13.8 /usr/libexec/transparencyd",
+      " 13.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-fix-6-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.87125,
+      14.682167,
+      14.25425,
+      0.828875,
+      15.445958,
+      0.770833,
+      15.337459,
+      0.65675,
+      14.391417,
+      0.769666,
+      15.026792,
+      15.293625,
+      0.682875,
+      14.242125,
+      0.61275,
+      14.214542,
+      0.6385,
+      14.215875,
+      0.617292,
+      15.315584,
+      0.671667,
+      14.254417,
+      0.622833,
+      14.40175,
+      0.631667,
+      14.185167,
+      0.633,
+      14.132791,
+      0.615416,
+      14.236041
+    ],
+    "wysiwyg": [
+      0.735292,
+      14.38575,
+      14.26975,
+      0.677334,
+      14.297042,
+      0.695042,
+      14.356,
+      0.697208,
+      14.574167,
+      0.81175,
+      15.641834,
+      0.728209,
+      14.46225,
+      0.736958,
+      14.412458,
+      14.533291,
+      0.725041,
+      14.32625,
+      0.689834,
+      14.255167,
+      0.717458,
+      15.234875,
+      0.705416,
+      14.262666,
+      0.702125,
+      14.205125,
+      0.689458,
+      14.293375,
+      0.847917,
+      14.313291
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

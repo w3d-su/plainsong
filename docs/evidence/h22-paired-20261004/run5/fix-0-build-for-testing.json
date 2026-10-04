@@ -1,0 +1,46 @@
+{
+  "product": "fix",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "e438ac19c91388326280e39bcfafc104fa8bc58c",
+  "start": {
+    "load": [
+      3.892578125,
+      3.7900390625,
+      3.56982421875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 31.1 /usr/libexec/sysmond",
+      " 30.7 /usr/libexec/siriknowledged",
+      " 27.2 /usr/libexec/eligibilityd",
+      " 18.6 /Users/davis._.su/Library/Application Support/Setapp/LaunchAgents/Setapp.app/Contents/MacOS/SetappAgent",
+      " 12.9 /usr/libexec/linkd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      3.82080078125,
+      3.77685546875,
+      3.56640625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 32.0 /usr/libexec/eligibilityd",
+      " 16.1 /usr/libexec/sysmond",
+      " 14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 12.9 /usr/libexec/linkd",
+      " 12.3 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/fix-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

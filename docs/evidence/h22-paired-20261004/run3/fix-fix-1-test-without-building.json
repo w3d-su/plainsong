@@ -1,0 +1,112 @@
+{
+  "product": "fix",
+  "iteration": "fix-1",
+  "action": "test-without-building",
+  "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+  "start": {
+    "load": [
+      4.232421875,
+      7.33056640625,
+      8.2578125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 87.8 /usr/libexec/dasd",
+      " 28.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 25.9 /usr/libexec/PerfPowerServices",
+      " 22.2 /usr/libexec/sysmond",
+      " 19.1 /sbin/launchd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      4.34326171875,
+      7.2529296875,
+      8.21923828125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 79.7 /usr/libexec/dasd",
+      " 29.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 25.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 22.6 /usr/libexec/PerfPowerServices",
+      " 19.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-1-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.912625,
+      14.9925,
+      14.384167,
+      0.776458,
+      14.982417,
+      0.723792,
+      14.253541,
+      0.688584,
+      14.255417,
+      14.445166,
+      0.71,
+      14.618166,
+      14.234542,
+      0.7135,
+      14.548042,
+      0.702084,
+      14.586416,
+      0.662167,
+      14.553708,
+      0.670167,
+      14.37875,
+      0.705333,
+      14.896,
+      0.644875,
+      14.526125,
+      0.677542,
+      14.92375,
+      0.660583,
+      14.694083,
+      0.661208
+    ],
+    "wysiwyg": [
+      0.769042,
+      14.303792,
+      14.344625,
+      0.759125,
+      14.82125,
+      0.75225,
+      14.277167,
+      0.7645,
+      15.073625,
+      0.724584,
+      14.911458,
+      0.76275,
+      14.291042,
+      0.79175,
+      14.336125,
+      14.428625,
+      0.776042,
+      14.228709,
+      0.74375,
+      14.954834,
+      0.726,
+      15.003958,
+      0.788375,
+      14.295,
+      0.762417,
+      14.612709,
+      0.741,
+      14.803125,
+      0.758625,
+      14.377292
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}
