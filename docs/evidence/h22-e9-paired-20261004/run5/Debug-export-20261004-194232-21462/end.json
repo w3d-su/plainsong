@@ -1,0 +1,16 @@
+{
+  "load": [
+    1.98291015625,
+    2.85693359375,
+    3.24755859375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 38.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  9.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  7.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+    "  6.4 /usr/sbin/coreaudiod",
+    "  3.8 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+  ],
+  "exit_code": 0
+}

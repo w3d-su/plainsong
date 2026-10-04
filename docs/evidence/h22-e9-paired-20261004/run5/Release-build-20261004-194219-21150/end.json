@@ -1,0 +1,16 @@
+{
+  "load": [
+    1.580078125,
+    2.84765625,
+    3.2548828125
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 13.3 /usr/libexec/linkd",
+    "  9.8 /usr/libexec/siriknowledged",
+    "  8.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  7.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  6.9 /usr/libexec/eligibilityd"
+  ],
+  "exit_code": 0
+}

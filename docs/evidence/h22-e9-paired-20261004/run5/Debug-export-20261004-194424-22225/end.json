@@ -1,0 +1,16 @@
+{
+  "load": [
+    2.9765625,
+    3.00439453125,
+    3.255859375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 53.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+    " 46.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+    " 27.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+    "  7.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  7.6 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+  ],
+  "exit_code": 65
+}

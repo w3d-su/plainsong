@@ -1,0 +1,16 @@
+{
+  "load": [
+    4.046875,
+    3.849609375,
+    3.625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 19.2 /Applications/Xcode-beta.app/Contents/Developer/usr/bin/ibtoold",
+    " 14.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 12.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  6.3 /System/Library/CoreServices/SystemUIServer.app/Contents/MacOS/SystemUIServer",
+    "  5.8 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+  ],
+  "exit_code": 0
+}

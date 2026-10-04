@@ -1,0 +1,25 @@
+{
+  "status": "running",
+  "label": "observed under recorded load",
+  "method": "Debug/Release interleaved; plain/export AB; 10 pairs per configuration; no documented warm-up discarded; fixed-seed 10000-resample bootstrap",
+  "requested_pairs_per_configuration": 10,
+  "product_sha": "b59e9ccf5ceb420d5280e54ce225453c4e179d2b",
+  "runs": [],
+  "pairs": {
+    "Debug": [],
+    "Release": []
+  },
+  "absolute_idle_acceptance": "pending owner run",
+  "owner_writer_decision_required": false,
+  "admission_checks": [],
+  "analysis": {
+    "Debug": {
+      "status": "still pending",
+      "complete_pairs": 0
+    },
+    "Release": {
+      "status": "still pending",
+      "complete_pairs": 0
+    }
+  }
+}

@@ -1,0 +1,19 @@
+EVIDENCE /private/tmp/plainsong-h22-e9-paired-20261004-run3
+Traceback (most recent call last):
+  File "/Users/davis._.su/Documents/plainsong-export-html-command/Scripts/run-export-html-e9-paired.py", line 136, in <module>
+    main()
+  File "/Users/davis._.su/Documents/plainsong-export-html-command/Scripts/run-export-html-e9-paired.py", line 124, in main
+    run(config, 'build', 0)
+  File "/Users/davis._.su/Documents/plainsong-export-html-command/Scripts/run-export-html-e9-paired.py", line 94, in run
+    code = subprocess.run([str(ROOT / 'Scripts/run-export-html-e9.sh'), *flags, config], cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT).returncode
+  File "/Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 507, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1126, in communicate
+    self.wait()
+  File "/Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1189, in wait
+    return self._wait(timeout=timeout)
+  File "/Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1917, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 1875, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt

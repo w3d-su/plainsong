@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "pr": 138,
+  "status": "idle measurement still pending",
+  "product_sha": "ea2e723fdd3388981b75e467751bf4f57ab2bb6b",
+  "baseline_sha": null,
+  "performance_samples": [],
+  "typing_budget_ms": 16,
+  "threshold_1min_load": "<=1.0",
+  "raw_logs": [
+    "docs/evidence/h22-e9-debug-admission.log",
+    "docs/evidence/h22-e9-release-admission.log"
+  ]
+}

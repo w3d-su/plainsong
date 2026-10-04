@@ -119,6 +119,12 @@ targets:
         buildPhase: resources
       - path: Fixtures/export-e0-mdx.mdx
         buildPhase: resources
+      - path: Fixtures/export-f-markdown.md
+        buildPhase: resources
+      - path: Fixtures/export-f-mdx.mdx
+        buildPhase: resources
+      - path: Fixtures/math.md
+        buildPhase: resources
     dependencies:
       - target: Plainsong
       - sdk: PDFKit.framework
@@ -140,6 +146,9 @@ targets:
         buildPhase: resources
       - path: Scripts/performance-required-resources.txt
         buildPhase: resources
+    scheme:
+      testTargets:
+        - PerformanceTests
     dependencies:
       - target: Plainsong
     settings:

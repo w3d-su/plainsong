@@ -30,6 +30,7 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportTimeoutNanoseconds: UInt64 = 15_000_000_000
     private(set) var isInvalidated = false
     var pendingHTMLExport: PendingHTMLExport?
+    var pendingExportRender: PendingExportRender?
     private var theme = "system"
     private var allowRemoteImages = false
     private var workspaceAssetRootURL: URL?
@@ -39,7 +40,11 @@ public final class PreviewController: NSObject, ObservableObject {
         self.init(previewIndexURL: Self.defaultPreviewIndexURL())
     }
 
-    init(previewIndexURL: URL?) {
+    init(
+        previewIndexURL: URL?,
+        contentRuleList: WKContentRuleList? = nil,
+        websiteDataStore: WKWebsiteDataStore? = nil
+    ) {
         let configuration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
         let assetSchemeHandler = AssetURLSchemeHandler()
@@ -47,6 +52,8 @@ public final class PreviewController: NSObject, ObservableObject {
         let previewIndexURL = previewIndexURL?.standardizedFileURL
 
         userContentController.add(scriptMessageProxy, name: "bridge")
+        if let contentRuleList { userContentController.add(contentRuleList) }
+        if let websiteDataStore { configuration.websiteDataStore = websiteDataStore }
         configuration.userContentController = userContentController
         configuration.setURLSchemeHandler(assetSchemeHandler, forURLScheme: "asset")
         configuration.preferences.isElementFullscreenEnabled = false
@@ -94,7 +101,7 @@ public final class PreviewController: NSObject, ObservableObject {
         submitRender(change)
     }
 
-    private func submitRender(_ change: DocumentTextChange, session: DocumentSession? = nil) -> Int {
+    func submitRender(_ change: DocumentTextChange, session: DocumentSession? = nil) -> Int {
         guard !isInvalidated else { return -1 }
         exportSourceText = change.text
         let assetContext = Self.assetContext(
@@ -104,7 +111,7 @@ public final class PreviewController: NSObject, ObservableObject {
         exportAssetRootURL = assetContext.allowedRoot
         let assetRootID = assetSchemeHandler.updateAllowedRoot(assetContext.allowedRoot)
 
-        failPendingHTMLExport(reason: "render-superseded")
+        failPendingExportWork(reason: "render-superseded")
 
         let renderID = nextRenderID
         nextRenderID += 1
@@ -166,7 +173,7 @@ public final class PreviewController: NSObject, ObservableObject {
         onLinkClicked = nil
         onCheckboxToggled = nil
         renderCompletionObserver = nil
-        failPendingHTMLExport(reason: "invalidated")
+        failPendingExportWork(reason: "invalidated")
     }
 
     func shutdownForTesting() {
@@ -212,6 +219,7 @@ public final class PreviewController: NSObject, ObservableObject {
                 return
             }
             renderCompletionObserver?(payload)
+            completePendingExportRender(payload.renderID)
             flushPendingScrollDeliveryIfReady()
 
         case let .previewScrolled(payload):
@@ -265,7 +273,7 @@ public final class PreviewController: NSObject, ObservableObject {
 extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
         isReady = false
-        failPendingHTMLExport(reason: "web-content-process-terminated")
+        failPendingExportWork(reason: "web-content-process-terminated")
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
     }
@@ -294,7 +302,7 @@ extension PreviewController: WKNavigationDelegate {
 }
 
 extension PreviewController {
-    private nonisolated static func defaultPreviewIndexURL() -> URL? {
+    nonisolated static func defaultPreviewIndexURL() -> URL? {
         Bundle.main.url(
             forResource: "index",
             withExtension: "html",
