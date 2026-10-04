@@ -1,0 +1,615 @@
+{
+  "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+  "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+  "max_load": 6.0,
+  "requested_pairs": 10,
+  "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "product_shas": {
+    "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+    "fix": "6aebf1c263dcaa85abbe2150dd343621d1263715",
+    "stack": "3026f97917822ba45779b019efae988bd41657fb"
+  },
+  "batches": [
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "product_sha": "6aebf1c263dcaa85abbe2150dd343621d1263715",
+      "start": {
+        "load": [
+          5.55419921875,
+          8.43701171875,
+          10.14599609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 54.9 /usr/libexec/dasd",
+          " 44.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 33.3 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 15.3 /sbin/launchd"
+        ],
+        "build_processes": {}
+      },
+      "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+      "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+      "end": {
+        "load": [
+          8.9404296875,
+          8.98486328125,
+          10.2919921875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 30.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 21.3 /usr/libexec/siriknowledged",
+          " 20.0 /usr/libexec/eligibilityd",
+          " 19.5 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/fix-0-build-for-testing.log",
+      "samples": {},
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "main",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+      "start": {
+        "load": [
+          5.986328125,
+          7.4169921875,
+          10.1806640625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.5 /usr/libexec/dasd",
+          " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 32.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 17.1 /usr/libexec/sysmond",
+          " 13.6 /sbin/launchd"
+        ],
+        "build_processes": {}
+      },
+      "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+      "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+      "end": {
+        "load": [
+          21.93310546875,
+          11.66943359375,
+          11.52587890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 40.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 32.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 17.2 /usr/libexec/swcd",
+          " 13.7 /usr/libexec/sysmond",
+          " 10.4 /usr/libexec/siriknowledged"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-0-build-for-testing.log",
+      "samples": {},
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "main",
+      "iteration": "fix-1",
+      "action": "test-without-building",
+      "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+      "start": {
+        "load": [
+          5.25732421875,
+          7.4140625,
+          9.2998046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 78.8 /usr/libexec/dasd",
+          " 16.9 /sbin/launchd",
+          " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 13.7 /usr/libexec/PerfPowerServices"
+        ],
+        "build_processes": {}
+      },
+      "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+      "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+      "end": {
+        "load": [
+          4.99609375,
+          7.32373046875,
+          9.2568359375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 51.7 /usr/libexec/dasd",
+          " 42.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.2 /sbin/launchd",
+          " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 11.8 /usr/libexec/siriknowledged"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-fix-1-test-without-building.log",
+      "samples": {},
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": false
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "product_sha": "3026f97917822ba45779b019efae988bd41657fb",
+      "start": {
+        "load": [
+          5.669921875,
+          7.75390625,
+          9.62744140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.1 /usr/libexec/dasd",
+          " 47.1 /usr/libexec/spotlightknowledged.updater",
+          " 24.2 /usr/libexec/PerfPowerServices",
+          " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.5 /sbin/launchd"
+        ],
+        "build_processes": {}
+      },
+      "probe_sha256": "129f632ffba22aae34288d226777096ff1c72a4412be766adccc7f33818bb359",
+      "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+      "end": {
+        "load": [
+          9.787109375,
+          8.57470703125,
+          9.87890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 21.5 /usr/libexec/airportd",
+          " 21.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.8 /usr/libexec/sysmond",
+          " 17.9 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 13.1 /usr/libexec/dasd"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/stack-0-build-for-testing.log",
+      "samples": {},
+      "valid_measurement_batch": true
+    }
+  ],
+  "status": "blocked by build/test failure; no verdict",
+  "admission_checks": [
+    {
+      "product": "main",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          5.986328125,
+          7.4169921875,
+          10.1806640625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.5 /usr/libexec/dasd",
+          " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 32.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 17.1 /usr/libexec/sysmond",
+          " 13.6 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          21.93310546875,
+          11.66943359375,
+          11.52587890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 44.4 /usr/libexec/swcd",
+          " 40.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 33.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 33.6 /usr/libexec/sysmond",
+          " 11.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          16.58056640625,
+          11.361328125,
+          11.4189453125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 46.9 /usr/libexec/dasd",
+          " 38.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 14.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 14.2 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          12.4814453125,
+          10.85107421875,
+          11.22998046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 53.0 /usr/libexec/dasd",
+          " 44.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 32.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 15.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 14.7 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          10.466796875,
+          10.50146484375,
+          11.087890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 52.4 /usr/libexec/dasd",
+          " 41.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 32.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 24.0 /usr/libexec/sysmond",
+          " 17.0 /System/Library/CoreServices/NotificationCenter.app/Contents/MacOS/NotificationCenter"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          8.232421875,
+          9.95751953125,
+          10.86962890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 54.7 /usr/libexec/dasd",
+          " 38.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 35.8 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 15.8 /sbin/launchd",
+          " 12.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          6.96484375,
+          9.47021484375,
+          10.65966796875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 51.2 /usr/libexec/dasd",
+          " 46.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 34.1 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 19.3 /usr/libexec/sysmond",
+          " 13.7 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          6.87548828125,
+          9.21484375,
+          10.52587890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 53.5 /usr/libexec/dasd",
+          " 43.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 35.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 15.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 14.9 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          6.47705078125,
+          8.890625,
+          10.3623046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 57.2 /usr/libexec/dasd",
+          " 42.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 34.4 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 16.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 15.8 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "fix",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          5.55419921875,
+          8.43701171875,
+          10.14599609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 54.9 /usr/libexec/dasd",
+          " 44.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 33.3 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 15.3 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          8.9404296875,
+          8.98486328125,
+          10.2919921875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 31.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 20.8 /usr/libexec/sysmond",
+          " 17.3 /usr/libexec/siriknowledged",
+          " 15.8 /usr/libexec/eligibilityd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          7.212890625,
+          8.56884765625,
+          10.09521484375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 51.9 /usr/libexec/dasd",
+          " 41.1 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 41.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 16.0 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          6.56201171875,
+          8.275390625,
+          9.9345703125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 55.1 /usr/libexec/dasd",
+          " 38.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 37.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+          " 23.7 /usr/libexec/sysmond",
+          " 15.7 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          6.4375,
+          8.09912109375,
+          9.81298828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.3 /usr/libexec/dasd",
+          " 22.6 /sbin/launchd",
+          " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.6 /usr/libexec/PerfPowerServices"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "stack",
+      "iteration": "0",
+      "action": "build-for-testing",
+      "snapshot": {
+        "load": [
+          5.669921875,
+          7.75390625,
+          9.62744140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.1 /usr/libexec/dasd",
+          " 47.1 /usr/libexec/spotlightknowledged.updater",
+          " 24.2 /usr/libexec/PerfPowerServices",
+          " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.5 /sbin/launchd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "main",
+      "iteration": "fix-1",
+      "action": "test-without-building",
+      "snapshot": {
+        "load": [
+          9.787109375,
+          8.57470703125,
+          9.87890625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 21.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.6 /usr/libexec/sysmond",
+          " 19.5 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 17.6 /usr/libexec/dasd",
+          " 14.0 /usr/libexec/mdmclient"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "main",
+      "iteration": "fix-1",
+      "action": "test-without-building",
+      "snapshot": {
+        "load": [
+          8.0126953125,
+          8.25048828125,
+          9.71484375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 75.1 /usr/libexec/dasd",
+          " 22.8 /sbin/launchd",
+          " 21.3 /usr/libexec/sysmond",
+          " 12.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "main",
+      "iteration": "fix-1",
+      "action": "test-without-building",
+      "snapshot": {
+        "load": [
+          6.14208984375,
+          7.7783203125,
+          9.49169921875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.2 /usr/libexec/dasd",
+          " 22.4 /sbin/launchd",
+          " 15.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 13.2 /usr/libexec/sysmond",
+          " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "main",
+      "iteration": "fix-1",
+      "action": "test-without-building",
+      "snapshot": {
+        "load": [
+          5.25732421875,
+          7.4140625,
+          9.2998046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 78.8 /usr/libexec/dasd",
+          " 16.9 /sbin/launchd",
+          " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 13.7 /usr/libexec/PerfPowerServices"
+        ],
+        "build_processes": {}
+      }
+    }
+  ],
+  "analysis": {
+    "fix": {
+      "source-only": {
+        "status": "still pending",
+        "complete_pairs": 0
+      },
+      "wysiwyg": {
+        "status": "still pending",
+        "complete_pairs": 0
+      }
+    },
+    "stack": {
+      "source-only": {
+        "status": "still pending",
+        "complete_pairs": 0
+      },
+      "wysiwyg": {
+        "status": "still pending",
+        "complete_pairs": 0
+      }
+    }
+  }
+}

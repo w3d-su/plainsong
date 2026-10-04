@@ -1,0 +1,46 @@
+{
+  "product": "fix",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+  "start": {
+    "load": [
+      5.0595703125,
+      7.74462890625,
+      8.427734375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 67.8 /usr/libexec/dasd",
+      " 29.2 /usr/libexec/siriknowledged",
+      " 23.9 /usr/libexec/sysmond",
+      " 23.0 /usr/libexec/PerfPowerServices",
+      " 20.7 /usr/libexec/eligibilityd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      4.89453125,
+      7.66552734375,
+      8.3955078125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 26.6 /usr/libexec/eligibilityd",
+      " 19.6 /usr/libexec/dasd",
+      " 15.5 /usr/libexec/linkd",
+      " 11.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  9.3 /usr/libexec/airportd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

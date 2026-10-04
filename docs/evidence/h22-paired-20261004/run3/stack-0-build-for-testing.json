@@ -1,0 +1,46 @@
+{
+  "product": "stack",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "142efcf7daad63bd41c9485a90cbe011bbc85de3",
+  "start": {
+    "load": [
+      4.89453125,
+      7.66552734375,
+      8.3955078125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 30.4 /usr/libexec/sysmond",
+      " 21.5 /usr/libexec/eligibilityd",
+      " 13.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 11.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 10.4 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "7d4e2153f6bb830117174da4649598d79aa84caff59559eed4cd268a2a5ad421",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      4.44921875,
+      7.478515625,
+      8.3203125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 34.7 /usr/libexec/siriknowledged",
+      " 27.5 /usr/libexec/eligibilityd",
+      " 14.0 /usr/libexec/linkd",
+      " 11.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 11.5 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/stack-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

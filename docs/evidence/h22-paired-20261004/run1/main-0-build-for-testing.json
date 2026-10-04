@@ -1,0 +1,44 @@
+{
+  "product": "main",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      5.986328125,
+      7.4169921875,
+      10.1806640625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 47.5 /usr/libexec/dasd",
+      " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 32.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+      " 17.1 /usr/libexec/sysmond",
+      " 13.6 /sbin/launchd"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      21.93310546875,
+      11.66943359375,
+      11.52587890625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 40.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 32.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+      " 17.2 /usr/libexec/swcd",
+      " 13.7 /usr/libexec/sysmond",
+      " 10.4 /usr/libexec/siriknowledged"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}
