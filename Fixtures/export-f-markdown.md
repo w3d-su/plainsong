@@ -1,0 +1,35 @@
+---
+title: Export F Matrix
+---
+
+# Export F Matrix
+
+**Strong**, ~~deleted~~, [link](https://example.invalid/page), and `inline code`.
+
+| Left | Right |
+| --- | --- |
+| alpha | beta |
+
+- [x] checked task
+- [ ] unchecked task
+
+$E=mc^2$
+
+$$
+\int_0^1 x^2\,dx = \frac{1}{3}
+$$
+
+```swift
+let matrixValue = 42
+```
+
+```mermaid
+graph TD
+A[Export]-->B[Offline]
+```
+
+![eligible](assets/pixel.png)
+
+![missing](assets/missing.png)
+
+![remote](https://example.invalid/remote.png)

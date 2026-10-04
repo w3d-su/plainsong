@@ -1,0 +1,74 @@
+{
+  "status": "blocked by build failure; no verdict",
+  "label": "observed under recorded load",
+  "method": "Debug/Release interleaved; plain/export AB; 10 pairs per configuration; no documented warm-up discarded; fixed-seed 10000-resample bootstrap",
+  "requested_pairs_per_configuration": 10,
+  "product_sha": "60579977f9634ac92ed0c6cd47ac3e52d44f61ad",
+  "runs": [],
+  "pairs": {
+    "Debug": [],
+    "Release": []
+  },
+  "absolute_idle_acceptance": "pending owner run",
+  "owner_writer_decision_required": false,
+  "admission_checks": [
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run2/Debug-build-20261004-193320-20080/start.json",
+      "snapshot": {
+        "load": [
+          2.58935546875,
+          2.76953125,
+          3.1767578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 23.1 /usr/libexec/sysmond",
+          " 10.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  9.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  6.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "60579977f9634ac92ed0c6cd47ac3e52d44f61ad",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run2/Release-build-20261004-193320-20103/start.json",
+      "snapshot": {
+        "load": [
+          2.58935546875,
+          2.76953125,
+          3.1767578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.4 /usr/libexec/sysmond",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  3.4 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "build_processes": {},
+        "product_sha": "60579977f9634ac92ed0c6cd47ac3e52d44f61ad",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true
+      }
+    }
+  ],
+  "analysis": {
+    "Debug": {
+      "status": "still pending",
+      "complete_pairs": 0
+    },
+    "Release": {
+      "status": "still pending",
+      "complete_pairs": 0
+    }
+  }
+}

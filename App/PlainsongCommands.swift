@@ -52,6 +52,17 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canSave)
         }
 
+        // Export PR F: the system File-menu slot for writing formats the app does not open
+        // (after Save, before Print). No shortcut; PR G adds Export as PDF… / Print… nearby.
+        CommandGroup(after: .importExport) {
+            Button("Export as HTML…") {
+                appState.exportCurrentDocumentAsHTML()
+            }
+            .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportHTMLAccessibility.command)
+            .accessibilityLabel("Export as HTML")
+        }
+
         // In-document find (PR C). Claimed in the system Edit menu — not a separate
         // CommandMenu("Edit") — so key-equivalent dispatch is not swallowed by a
         // duplicated title (same rule as View / ⇧⌘P). Delivery is **responder-chain**

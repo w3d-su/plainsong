@@ -1,0 +1,21 @@
+{
+  "load": [
+    2.58935546875,
+    2.76953125,
+    3.1767578125
+  ],
+  "max_load": 6.0,
+  "top_cpu": [
+    " %CPU COMM",
+    " 20.4 /usr/libexec/sysmond",
+    " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+    "  8.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  8.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  3.4 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+  ],
+  "build_processes": {},
+  "product_sha": "60579977f9634ac92ed0c6cd47ac3e52d44f61ad",
+  "smoke": false,
+  "configuration": "Release",
+  "release_testability_override": true
+}

@@ -1,0 +1,16 @@
+{
+  "load": [
+    4.818359375,
+    3.9501953125,
+    3.60009765625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 22.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 14.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  9.5 /usr/sbin/coreaudiod",
+    "  7.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+    "  4.6 /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted"
+  ],
+  "exit_code": 0
+}

@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.7314453125,
+    3.3154296875,
+    3.35400390625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 98.6 /usr/libexec/spotlightknowledged.updater",
+    " 39.1 /usr/libexec/swcd",
+    " 24.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 18.5 /usr/libexec/siriknowledged",
+    " 17.3 /usr/sbin/cfprefsd"
+  ],
+  "exit_code": 0
+}

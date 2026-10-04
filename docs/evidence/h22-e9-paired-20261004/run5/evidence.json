@@ -1,0 +1,3755 @@
+{
+  "status": "complete; observed under recorded load",
+  "label": "observed under recorded load",
+  "method": "Debug/Release interleaved; plain/export AB; 10 pairs per configuration; no documented warm-up discarded; fixed-seed 10000-resample bootstrap",
+  "requested_pairs_per_configuration": 10,
+  "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+  "runs": [
+    {
+      "typing_ms": 15.467334,
+      "start": {
+        "load": [
+          1.580078125,
+          2.84765625,
+          3.2548828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 35.9 /usr/libexec/siriknowledged",
+          " 24.8 /usr/libexec/eligibilityd",
+          " 13.9 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.2 /usr/libexec/sharingd"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          1.693359375,
+          2.85009765625,
+          3.2529296875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 15.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.2 /usr/libexec/coreduetd",
+          "  5.9 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+          "  5.8 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194226-21318/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194226-21318/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 1
+    },
+    {
+      "typing_ms": 4.273208,
+      "start": {
+        "load": [
+          1.693359375,
+          2.85009765625,
+          3.2529296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 34.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  5.1 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+          "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          1.98291015625,
+          2.85693359375,
+          3.24755859375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 38.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  9.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  6.4 /usr/sbin/coreaudiod",
+          "  3.8 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194232-21462/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194232-21462/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2311.474417,
+            2206.962292,
+            2186.812917
+          ],
+          "peak_sampled_host_rss_mib": 183.96875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1127.413583,
+            1119.86825,
+            1125.2565
+          ],
+          "peak_sampled_host_rss_mib": 184.65625
+        }
+      },
+      "writer_ms": [
+        38.239042,
+        49.577209,
+        15.345708
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 1
+    },
+    {
+      "typing_ms": 15.142166,
+      "start": {
+        "load": [
+          1.98291015625,
+          2.85693359375,
+          3.24755859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 38.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 25.4 /usr/libexec/sysmond",
+          "  9.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  4.5 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.54443359375,
+          2.95849609375,
+          3.28125
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 37.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.1 /usr/libexec/siriknowledged",
+          " 15.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 11.4 /usr/libexec/nehelper",
+          "  9.4 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194247-21541/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194247-21541/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 1
+    },
+    {
+      "typing_ms": 11.340209,
+      "start": {
+        "load": [
+          2.54443359375,
+          2.95849609375,
+          3.28125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.8 /usr/libexec/sysmond",
+          " 10.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.5 /usr/libexec/siriknowledged"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.626953125,
+          2.9599609375,
+          3.27734375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 37.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  6.5 /usr/sbin/coreaudiod",
+          "  4.1 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+          "  3.8 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194251-21596/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194251-21596/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2380.313875,
+            2209.160625,
+            2220.290875
+          ],
+          "peak_sampled_host_rss_mib": 173.546875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1087.8955,
+            1131.938333,
+            1113.248625
+          ],
+          "peak_sampled_host_rss_mib": 173.078125
+        }
+      },
+      "writer_ms": [
+        15.423167,
+        15.004375,
+        14.943125
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 1
+    },
+    {
+      "typing_ms": 14.421041,
+      "start": {
+        "load": [
+          2.626953125,
+          2.9599609375,
+          3.27734375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.9 /usr/libexec/sysmond",
+          " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.57666015625,
+          2.94384765625,
+          3.26953125
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 15.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.5 /usr/libexec/coreduetd",
+          "  6.5 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  5.1 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194304-21672/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194304-21672/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 2
+    },
+    {
+      "typing_ms": 5.023709,
+      "start": {
+        "load": [
+          2.57666015625,
+          2.94384765625,
+          3.26953125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 38.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.8 /usr/libexec/sysmond",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.0390625,
+          3.02734375,
+          3.29296875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 31.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.1 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.3 /usr/sbin/coreaudiod",
+          "  4.4 /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted",
+          "  3.9 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194307-21724/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194307-21724/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2243.552083,
+            2215.515375,
+            2171.54575
+          ],
+          "peak_sampled_host_rss_mib": 184.34375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1107.589958,
+            1141.592917,
+            1135.863208
+          ],
+          "peak_sampled_host_rss_mib": 185.703125
+        }
+      },
+      "writer_ms": [
+        15.489625,
+        15.290833,
+        15.297
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 2
+    },
+    {
+      "typing_ms": 14.865333,
+      "start": {
+        "load": [
+          3.0390625,
+          3.02734375,
+          3.29296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 32.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 24.9 /usr/libexec/sysmond",
+          " 19.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.0390625,
+          3.02734375,
+          3.29296875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 40.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 25.2 /usr/libexec/siriknowledged",
+          " 19.4 /usr/libexec/swcd",
+          " 17.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.9 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194323-21790/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194323-21790/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 2
+    },
+    {
+      "typing_ms": 4.702958,
+      "start": {
+        "load": [
+          3.11572265625,
+          3.04345703125,
+          3.296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /usr/libexec/siriknowledged",
+          "  8.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.02392578125,
+          3.025390625,
+          3.287109375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 30.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  6.9 /usr/sbin/coreaudiod",
+          "  3.7 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194326-21842/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194326-21842/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2244.695208,
+            2173.564709,
+            2197.621417
+          ],
+          "peak_sampled_host_rss_mib": 181.359375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1097.88775,
+            1121.182,
+            1123.111541
+          ],
+          "peak_sampled_host_rss_mib": 180.703125
+        }
+      },
+      "writer_ms": [
+        15.242042,
+        14.6135,
+        15.2135
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 2
+    },
+    {
+      "typing_ms": 3.875875,
+      "start": {
+        "load": [
+          2.94189453125,
+          3.00830078125,
+          3.279296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 15.5 /usr/libexec/sysmond",
+          " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.94189453125,
+          3.00830078125,
+          3.279296875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 45.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.2 /usr/libexec/coreduetd",
+          "  7.1 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  5.6 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194341-21908/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194341-21908/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 3
+    },
+    {
+      "typing_ms": 26.703167,
+      "start": {
+        "load": [
+          2.94189453125,
+          3.00830078125,
+          3.279296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.4 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.7412109375,
+          2.95751953125,
+          3.25390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 25.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  9.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          "  8.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  8.1 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  3.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+        ],
+        "exit_code": 65
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194344-21962/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194344-21962/Results.xcresult",
+      "assertion_failure_lines": [
+        "/Users/davis._.su/Documents/plainsong-export-html-command/PerformanceTests/AppBackedEditorPerformanceTests+Export.swift:48: error: -[PerformanceTests.AppBackedEditorPerformanceTests testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget] : failed - WS3B PERF typing during HTML export 26.703 ms exceeded 16 ms budget"
+      ],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2269.722791,
+            2203.962792,
+            2193.319
+          ],
+          "peak_sampled_host_rss_mib": 192.71875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1090.381833,
+            1120.794708,
+            1120.045292
+          ],
+          "peak_sampled_host_rss_mib": 193.421875
+        }
+      },
+      "writer_ms": [
+        15.936291,
+        15.076125,
+        15.802458
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 3
+    },
+    {
+      "typing_ms": 14.589375,
+      "start": {
+        "load": [
+          2.7412109375,
+          2.95751953125,
+          3.25390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.0 /usr/libexec/sysmond",
+          " 13.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  9.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.921875,
+          2.9912109375,
+          3.263671875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 46.5 /usr/libexec/swcd",
+          " 37.6 /usr/libexec/siriknowledged",
+          " 35.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.1 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.2 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194405-22052/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194405-22052/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 3
+    },
+    {
+      "typing_ms": 10.584083,
+      "start": {
+        "load": [
+          2.921875,
+          2.9912109375,
+          3.263671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 37.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 30.6 /usr/libexec/siriknowledged",
+          " 17.4 /usr/libexec/swcd",
+          " 12.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 35.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  6.4 /usr/sbin/coreaudiod",
+          "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  4.0 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194408-22107/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194408-22107/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2372.679,
+            2210.400916,
+            2207.9405
+          ],
+          "peak_sampled_host_rss_mib": 175.671875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1087.091,
+            1126.161042,
+            1110.089167
+          ],
+          "peak_sampled_host_rss_mib": 174.171875
+        }
+      },
+      "writer_ms": [
+        15.250375,
+        15.086375,
+        14.365375
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 3
+    },
+    {
+      "typing_ms": 15.570875,
+      "start": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.0 /usr/libexec/sysmond",
+          "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.1 /usr/libexec/coreduetd",
+          "  8.0 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  6.2 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194421-22173/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194421-22173/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 4
+    },
+    {
+      "typing_ms": 36.191125,
+      "start": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  5.8 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.9765625,
+          3.00439453125,
+          3.255859375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 53.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 46.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 27.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  7.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  7.6 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "exit_code": 65
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194424-22225/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194424-22225/Results.xcresult",
+      "assertion_failure_lines": [
+        "/Users/davis._.su/Documents/plainsong-export-html-command/PerformanceTests/AppBackedEditorPerformanceTests+Export.swift:48: error: -[PerformanceTests.AppBackedEditorPerformanceTests testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget] : failed - WS3B PERF typing during HTML export 36.191 ms exceeded 16 ms budget"
+      ],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2260.490292,
+            2184.471667,
+            2209.168084
+          ],
+          "peak_sampled_host_rss_mib": 191.296875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1102.26875,
+            1140.499125,
+            1115.833667
+          ],
+          "peak_sampled_host_rss_mib": 192.734375
+        }
+      },
+      "writer_ms": [
+        18.745875,
+        24.943083,
+        15.872375
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 4
+    },
+    {
+      "typing_ms": 14.953667,
+      "start": {
+        "load": [
+          2.9765625,
+          3.00439453125,
+          3.255859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 16.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 10.2 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          2.97802734375,
+          3.00390625,
+          3.25390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 36.1 /usr/libexec/swcd",
+          " 25.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.9 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194444-22291/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194444-22291/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 4
+    },
+    {
+      "typing_ms": 10.858209,
+      "start": {
+        "load": [
+          2.97802734375,
+          3.00390625,
+          3.25390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 45.3 /usr/libexec/siriknowledged",
+          " 34.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 29.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.5 /usr/libexec/swcd",
+          " 16.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 48.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 34.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.3 /usr/sbin/coreaudiod",
+          "  6.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194447-22346/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194447-22346/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2389.395458,
+            2187.021583,
+            2208.547959
+          ],
+          "peak_sampled_host_rss_mib": 173.09375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1113.342583,
+            1127.46125,
+            1118.341792
+          ],
+          "peak_sampled_host_rss_mib": 171.84375
+        }
+      },
+      "writer_ms": [
+        15.603875,
+        14.683542,
+        15.430667
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 4
+    },
+    {
+      "typing_ms": 14.157834,
+      "start": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 50.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 30.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 25.1 /usr/libexec/sysmond",
+          " 22.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.1 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.5 /usr/libexec/coreduetd",
+          "  7.1 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  5.6 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194501-22412/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194501-22412/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 5
+    },
+    {
+      "typing_ms": 20.920208,
+      "start": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.9580078125,
+          3.27783203125,
+          3.34423828125
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 78.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 31.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 16.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          "  7.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  7.2 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "exit_code": 65
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194504-22464/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194504-22464/Results.xcresult",
+      "assertion_failure_lines": [
+        "/Users/davis._.su/Documents/plainsong-export-html-command/PerformanceTests/AppBackedEditorPerformanceTests+Export.swift:48: error: -[PerformanceTests.AppBackedEditorPerformanceTests testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget] : failed - WS3B PERF typing during HTML export 20.920 ms exceeded 16 ms budget"
+      ],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2270.846208,
+            2185.723959,
+            2220.025541
+          ],
+          "peak_sampled_host_rss_mib": 193.1875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1091.7035,
+            1125.3365,
+            1120.677708
+          ],
+          "peak_sampled_host_rss_mib": 193.90625
+        }
+      },
+      "writer_ms": [
+        15.980375,
+        15.310875,
+        15.248583
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 5
+    },
+    {
+      "typing_ms": 14.284209,
+      "start": {
+        "load": [
+          3.9580078125,
+          3.27783203125,
+          3.34423828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 93.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 19.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.201171875,
+          3.33935546875,
+          3.365234375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 39.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 33.6 /usr/libexec/siriknowledged",
+          " 33.4 /usr/libexec/swcd",
+          " 21.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 18.0 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194524-22530/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194524-22530/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 5
+    },
+    {
+      "typing_ms": 8.458834,
+      "start": {
+        "load": [
+          4.201171875,
+          3.33935546875,
+          3.365234375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 68.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 35.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 26.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.4 /usr/libexec/siriknowledged",
+          " 17.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 29.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          "  6.7 /usr/sbin/coreaudiod",
+          "  6.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194527-22585/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194527-22585/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2240.129834,
+            2221.543375,
+            2213.663833
+          ],
+          "peak_sampled_host_rss_mib": 181.796875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1102.177917,
+            1123.62725,
+            1109.04875
+          ],
+          "peak_sampled_host_rss_mib": 180.390625
+        }
+      },
+      "writer_ms": [
+        15.176875,
+        15.1075,
+        16.005459
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 5
+    },
+    {
+      "typing_ms": 15.331917,
+      "start": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.3 /usr/libexec/sysmond",
+          "  8.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 39.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 13.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  8.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.8 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194542-22652/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194542-22652/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 6
+    },
+    {
+      "typing_ms": 10.29625,
+      "start": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 29.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.6 /usr/libexec/sysmond",
+          " 10.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.5341796875,
+          3.2705078125,
+          3.3388671875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 27.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 22.9 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          "  9.5 /usr/sbin/coreaudiod",
+          "  8.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194545-22705/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194545-22705/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2200.725875,
+            2179.201709,
+            2130.697041
+          ],
+          "peak_sampled_host_rss_mib": 181.703125
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1060.361667,
+            1081.868416,
+            1079.098292
+          ],
+          "peak_sampled_host_rss_mib": 182.328125
+        }
+      },
+      "writer_ms": [
+        18.050667,
+        17.688,
+        21.582083
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 6
+    },
+    {
+      "typing_ms": 13.192,
+      "start": {
+        "load": [
+          3.5341796875,
+          3.2705078125,
+          3.3388671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 30.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 23.2 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 19.7 /usr/libexec/sysmond",
+          " 16.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.7314453125,
+          3.3154296875,
+          3.35400390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 98.6 /usr/libexec/spotlightknowledged.updater",
+          " 39.1 /usr/libexec/swcd",
+          " 24.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.5 /usr/libexec/siriknowledged",
+          " 17.3 /usr/sbin/cfprefsd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 6
+    },
+    {
+      "typing_ms": 3.968541,
+      "start": {
+        "load": [
+          3.7314453125,
+          3.3154296875,
+          3.35400390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 98.3 /usr/libexec/spotlightknowledged.updater",
+          " 37.4 /usr/libexec/siriknowledged",
+          " 28.2 /usr/libexec/swcd",
+          " 19.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.2 /usr/sbin/cfprefsd"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.6064453125,
+          3.31396484375,
+          3.3525390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  7.5 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  7.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  6.6 /usr/sbin/coreaudiod",
+          "  4.6 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194603-22860/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194603-22860/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2201.4835,
+            2154.45975,
+            2171.074375
+          ],
+          "peak_sampled_host_rss_mib": 176.3125
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1039.883917,
+            1059.497583,
+            1060.807875
+          ],
+          "peak_sampled_host_rss_mib": 176.96875
+        }
+      },
+      "writer_ms": [
+        15.278334,
+        14.585917,
+        14.355959
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 6
+    },
+    {
+      "typing_ms": 3.863459,
+      "start": {
+        "load": [
+          3.6064453125,
+          3.31396484375,
+          3.3525390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 18.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 16.6 /usr/libexec/sysmond",
+          "  9.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.6064453125,
+          3.31396484375,
+          3.3525390625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  6.9 /usr/libexec/coreduetd",
+          "  6.4 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194618-22926/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194618-22926/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 7
+    },
+    {
+      "typing_ms": 3.667875,
+      "start": {
+        "load": [
+          3.4775390625,
+          3.2919921875,
+          3.34423828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 23.4 /usr/libexec/sysmond",
+          " 20.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.31689453125,
+          3.26513671875,
+          3.33349609375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  9.7 /usr/sbin/coreaudiod",
+          "  7.8 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  7.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194621-22978/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194621-22978/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2196.935208,
+            2129.277208,
+            2154.038875
+          ],
+          "peak_sampled_host_rss_mib": 182.859375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1061.634334,
+            1065.82825,
+            1064.426959
+          ],
+          "peak_sampled_host_rss_mib": 183.46875
+        }
+      },
+      "writer_ms": [
+        18.784209,
+        20.088625,
+        26.370334
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 7
+    },
+    {
+      "typing_ms": 12.754708,
+      "start": {
+        "load": [
+          3.61181640625,
+          3.32666015625,
+          3.3544921875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 18.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 16.5 /usr/libexec/sysmond",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.61181640625,
+          3.32666015625,
+          3.3544921875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 47.5 /usr/libexec/swcd",
+          " 26.2 /usr/libexec/siriknowledged",
+          " 23.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194636-23044/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194636-23044/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 7
+    },
+    {
+      "typing_ms": 4.812125,
+      "start": {
+        "load": [
+          3.61181640625,
+          3.32666015625,
+          3.3544921875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 44.4 /usr/libexec/siriknowledged",
+          " 21.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.1 /usr/libexec/swcd",
+          " 14.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 12.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          3.685546875,
+          3.3583984375,
+          3.36474609375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 21.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  6.3 /usr/sbin/coreaudiod",
+          "  5.0 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194639-23099/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194639-23099/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2223.853875,
+            2134.438417,
+            2175.463333
+          ],
+          "peak_sampled_host_rss_mib": 178.671875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1057.122583,
+            1054.886333,
+            1053.114459
+          ],
+          "peak_sampled_host_rss_mib": 178.09375
+        }
+      },
+      "writer_ms": [
+        15.064666,
+        14.012875,
+        14.570875
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 7
+    },
+    {
+      "typing_ms": 13.677042,
+      "start": {
+        "load": [
+          3.685546875,
+          3.3583984375,
+          3.36474609375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.4 /usr/libexec/sysmond",
+          " 12.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          5.55224609375,
+          3.75048828125,
+          3.5029296875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 24.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  8.4 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  6.1 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194653-23171/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194653-23171/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 8
+    },
+    {
+      "typing_ms": 4.371875,
+      "start": {
+        "load": [
+          5.55224609375,
+          3.75048828125,
+          3.5029296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.3 /usr/libexec/sysmond",
+          " 20.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 13.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 11.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  8.9 /sbin/launchd",
+          "  6.1 /usr/sbin/coreaudiod"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194656-23223/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194656-23223/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2199.855042,
+            2159.1155,
+            2171.069625
+          ],
+          "peak_sampled_host_rss_mib": 183.453125
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1059.806,
+            1065.802458,
+            1060.880583
+          ],
+          "peak_sampled_host_rss_mib": 183.9375
+        }
+      },
+      "writer_ms": [
+        19.593208,
+        19.568375,
+        25.521625
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 8
+    },
+    {
+      "typing_ms": 12.815625,
+      "start": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 28.7 /sbin/launchd",
+          " 19.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 17.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /usr/libexec/sysmond",
+          " 12.4 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 37.9 /usr/libexec/swcd",
+          " 28.8 /usr/libexec/siriknowledged",
+          " 22.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.9 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194711-23289/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194711-23289/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 8
+    },
+    {
+      "typing_ms": 6.515958,
+      "start": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.1 /usr/libexec/siriknowledged",
+          " 18.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /usr/libexec/swcd",
+          " 13.7 /usr/libexec/sysmond",
+          " 13.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.52001953125,
+          3.67578125,
+          3.48388671875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  6.3 /usr/sbin/coreaudiod",
+          "  4.6 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194714-23344/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194714-23344/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2195.370667,
+            2158.482875,
+            2170.943792
+          ],
+          "peak_sampled_host_rss_mib": 178.734375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1039.889333,
+            1060.196583,
+            1075.337708
+          ],
+          "peak_sampled_host_rss_mib": 177.328125
+        }
+      },
+      "writer_ms": [
+        15.2105,
+        14.690542,
+        14.799
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 8
+    },
+    {
+      "typing_ms": 13.630291,
+      "start": {
+        "load": [
+          4.52001953125,
+          3.67578125,
+          3.48388671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 21.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 13.4 /usr/libexec/sysmond",
+          " 10.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.31787109375,
+          3.64794921875,
+          3.47509765625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 24.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.0 /usr/libexec/coreduetd",
+          "  8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  6.7 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194729-23412/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194729-23412/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 9
+    },
+    {
+      "typing_ms": 3.653625,
+      "start": {
+        "load": [
+          4.31787109375,
+          3.64794921875,
+          3.47509765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.4 /usr/libexec/sysmond",
+          " 22.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 21.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  6.0 /usr/sbin/coreaudiod",
+          "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194732-23464/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194732-23464/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2169.125708,
+            2127.152791,
+            2159.005417
+          ],
+          "peak_sampled_host_rss_mib": 181.9375
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1064.452625,
+            1078.622375,
+            1059.878875
+          ],
+          "peak_sampled_host_rss_mib": 182.4375
+        }
+      },
+      "writer_ms": [
+        31.66475,
+        46.001542,
+        21.740208
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 9
+    },
+    {
+      "typing_ms": 3.286375,
+      "start": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 12.4 /usr/libexec/sysmond",
+          " 11.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 46.9 /usr/libexec/swcd",
+          " 23.6 /usr/libexec/siriknowledged",
+          " 22.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          " 10.5 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194747-23530/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194747-23530/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 9
+    },
+    {
+      "typing_ms": 5.022417,
+      "start": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 52.3 /usr/libexec/siriknowledged",
+          " 21.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 19.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.2 /usr/libexec/swcd",
+          " 10.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.30712890625,
+          3.7109375,
+          3.50341796875
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 21.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.8 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  6.7 /usr/sbin/coreaudiod"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194750-23585/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194750-23585/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2178.662709,
+            2132.692625,
+            2158.561792
+          ],
+          "peak_sampled_host_rss_mib": 176.78125
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1040.639042,
+            1069.856042,
+            1075.322041
+          ],
+          "peak_sampled_host_rss_mib": 176.46875
+        }
+      },
+      "writer_ms": [
+        15.343292,
+        14.495375,
+        14.550167
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 9
+    },
+    {
+      "typing_ms": 13.627667,
+      "start": {
+        "load": [
+          4.30712890625,
+          3.7109375,
+          3.50341796875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 24.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  8.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.2822265625,
+          3.71533203125,
+          3.505859375
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 24.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.0 /usr/libexec/coreduetd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194804-23675/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194804-23675/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Debug",
+      "mode": "plain",
+      "iteration": 10
+    },
+    {
+      "typing_ms": 7.146083,
+      "start": {
+        "load": [
+          4.2822265625,
+          3.71533203125,
+          3.505859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 35.2 /usr/libexec/sysmond",
+          " 19.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.0 /usr/sbin/coreaudiod",
+          "  8.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  4.5 /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194807-23727/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194807-23727/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2175.864375,
+            2141.727667,
+            2154.000916
+          ],
+          "peak_sampled_host_rss_mib": 182.671875
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1049.819667,
+            1061.500291,
+            1057.980125
+          ],
+          "peak_sampled_host_rss_mib": 183.375
+        }
+      },
+      "writer_ms": [
+        15.60425,
+        14.925167,
+        14.944042
+      ],
+      "configuration": "Debug",
+      "mode": "export",
+      "iteration": 10
+    },
+    {
+      "typing_ms": 12.985292,
+      "start": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 20.5 /usr/libexec/sysmond",
+          " 18.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 21.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /usr/libexec/coreduetd",
+          "  7.2 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+          "  6.8 /System/Library/Frameworks/Security.framework/Versions/A/XPCServices/authd.xpc/Contents/MacOS/authd"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194822-23794/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194822-23794/Results.xcresult",
+      "assertion_failure_lines": [],
+      "configuration": "Release",
+      "mode": "plain",
+      "iteration": 10
+    },
+    {
+      "typing_ms": 4.73725,
+      "start": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 14.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.5 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      },
+      "end": {
+        "load": [
+          4.818359375,
+          3.9501953125,
+          3.60009765625
+        ],
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.5 /usr/sbin/coreaudiod",
+          "  7.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  4.6 /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted"
+        ],
+        "exit_code": 0
+      },
+      "raw_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194825-23846/run.log",
+      "xcresult": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194825-23846/Results.xcresult",
+      "assertion_failure_lines": [],
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": [
+            2181.848875,
+            2145.728375,
+            2158.650791
+          ],
+          "peak_sampled_host_rss_mib": 177.25
+        },
+        "export-f-heavy.md": {
+          "wall_ms": [
+            1042.009709,
+            1068.6765,
+            1069.113333
+          ],
+          "peak_sampled_host_rss_mib": 177.8125
+        }
+      },
+      "writer_ms": [
+        21.325333,
+        24.766875,
+        24.058042
+      ],
+      "configuration": "Release",
+      "mode": "export",
+      "iteration": 10
+    }
+  ],
+  "pairs": {
+    "Debug": [
+      {
+        "pair": 1,
+        "plain_typing_ms": 15.467334,
+        "export_typing_ms": 4.273208,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194226-21318/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194232-21462/run.log"
+      },
+      {
+        "pair": 2,
+        "plain_typing_ms": 14.421041,
+        "export_typing_ms": 5.023709,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194304-21672/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194307-21724/run.log"
+      },
+      {
+        "pair": 3,
+        "plain_typing_ms": 3.875875,
+        "export_typing_ms": 26.703167,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194341-21908/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194344-21962/run.log"
+      },
+      {
+        "pair": 4,
+        "plain_typing_ms": 15.570875,
+        "export_typing_ms": 36.191125,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194421-22173/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194424-22225/run.log"
+      },
+      {
+        "pair": 5,
+        "plain_typing_ms": 14.157834,
+        "export_typing_ms": 20.920208,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194501-22412/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194504-22464/run.log"
+      },
+      {
+        "pair": 6,
+        "plain_typing_ms": 15.331917,
+        "export_typing_ms": 10.29625,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194542-22652/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194545-22705/run.log"
+      },
+      {
+        "pair": 7,
+        "plain_typing_ms": 3.863459,
+        "export_typing_ms": 3.667875,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194618-22926/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194621-22978/run.log"
+      },
+      {
+        "pair": 8,
+        "plain_typing_ms": 13.677042,
+        "export_typing_ms": 4.371875,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194653-23171/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194656-23223/run.log"
+      },
+      {
+        "pair": 9,
+        "plain_typing_ms": 13.630291,
+        "export_typing_ms": 3.653625,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194729-23412/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194732-23464/run.log"
+      },
+      {
+        "pair": 10,
+        "plain_typing_ms": 13.627667,
+        "export_typing_ms": 7.146083,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194804-23675/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194807-23727/run.log"
+      }
+    ],
+    "Release": [
+      {
+        "pair": 1,
+        "plain_typing_ms": 15.142166,
+        "export_typing_ms": 11.340209,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194247-21541/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194251-21596/run.log"
+      },
+      {
+        "pair": 2,
+        "plain_typing_ms": 14.865333,
+        "export_typing_ms": 4.702958,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194323-21790/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194326-21842/run.log"
+      },
+      {
+        "pair": 3,
+        "plain_typing_ms": 14.589375,
+        "export_typing_ms": 10.584083,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194405-22052/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194408-22107/run.log"
+      },
+      {
+        "pair": 4,
+        "plain_typing_ms": 14.953667,
+        "export_typing_ms": 10.858209,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194444-22291/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194447-22346/run.log"
+      },
+      {
+        "pair": 5,
+        "plain_typing_ms": 14.284209,
+        "export_typing_ms": 8.458834,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194524-22530/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194527-22585/run.log"
+      },
+      {
+        "pair": 6,
+        "plain_typing_ms": 13.192,
+        "export_typing_ms": 3.968541,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194603-22860/run.log"
+      },
+      {
+        "pair": 7,
+        "plain_typing_ms": 12.754708,
+        "export_typing_ms": 4.812125,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194636-23044/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194639-23099/run.log"
+      },
+      {
+        "pair": 8,
+        "plain_typing_ms": 12.815625,
+        "export_typing_ms": 6.515958,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194711-23289/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194714-23344/run.log"
+      },
+      {
+        "pair": 9,
+        "plain_typing_ms": 3.286375,
+        "export_typing_ms": 5.022417,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194747-23530/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194750-23585/run.log"
+      },
+      {
+        "pair": 10,
+        "plain_typing_ms": 12.985292,
+        "export_typing_ms": 4.73725,
+        "plain_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194822-23794/run.log",
+        "export_log": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194825-23846/run.log"
+      }
+    ]
+  },
+  "absolute_idle_acceptance": "pending owner run",
+  "owner_writer_decision_required": false,
+  "admission_checks": [
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-build-20261004-194218-21126/start.json",
+      "snapshot": {
+        "load": [
+          1.22802734375,
+          2.826171875,
+          3.2529296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.9 /usr/libexec/sysmond",
+          " 11.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194232-21462/start.json",
+      "snapshot": {
+        "load": [
+          1.693359375,
+          2.85009765625,
+          3.2529296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 34.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  5.1 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+          "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194307-21724/start.json",
+      "snapshot": {
+        "load": [
+          2.57666015625,
+          2.94384765625,
+          3.26953125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 38.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.8 /usr/libexec/sysmond",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194344-21962/start.json",
+      "snapshot": {
+        "load": [
+          2.94189453125,
+          3.00830078125,
+          3.279296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.4 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194424-22225/start.json",
+      "snapshot": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  5.8 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194504-22464/start.json",
+      "snapshot": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194545-22705/start.json",
+      "snapshot": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 29.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.6 /usr/libexec/sysmond",
+          " 10.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194621-22978/start.json",
+      "snapshot": {
+        "load": [
+          3.4775390625,
+          3.2919921875,
+          3.34423828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 23.4 /usr/libexec/sysmond",
+          " 20.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194656-23223/start.json",
+      "snapshot": {
+        "load": [
+          5.55224609375,
+          3.75048828125,
+          3.5029296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.3 /usr/libexec/sysmond",
+          " 20.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 13.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194732-23464/start.json",
+      "snapshot": {
+        "load": [
+          4.31787109375,
+          3.64794921875,
+          3.47509765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.4 /usr/libexec/sysmond",
+          " 22.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 21.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-export-20261004-194807-23727/start.json",
+      "snapshot": {
+        "load": [
+          4.2822265625,
+          3.71533203125,
+          3.505859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 35.2 /usr/libexec/sysmond",
+          " 19.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194226-21318/start.json",
+      "snapshot": {
+        "load": [
+          1.580078125,
+          2.84765625,
+          3.2548828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 35.9 /usr/libexec/siriknowledged",
+          " 24.8 /usr/libexec/eligibilityd",
+          " 13.9 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.2 /usr/libexec/sharingd"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194304-21672/start.json",
+      "snapshot": {
+        "load": [
+          2.626953125,
+          2.9599609375,
+          3.27734375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.9 /usr/libexec/sysmond",
+          " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194341-21908/start.json",
+      "snapshot": {
+        "load": [
+          2.94189453125,
+          3.00830078125,
+          3.279296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 15.5 /usr/libexec/sysmond",
+          " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194421-22173/start.json",
+      "snapshot": {
+        "load": [
+          3.14208984375,
+          3.03955078125,
+          3.275390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.0 /usr/libexec/sysmond",
+          "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194501-22412/start.json",
+      "snapshot": {
+        "load": [
+          3.93701171875,
+          3.21484375,
+          3.32421875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 50.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 30.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 25.1 /usr/libexec/sysmond",
+          " 22.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.1 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194542-22652/start.json",
+      "snapshot": {
+        "load": [
+          4.05859375,
+          3.353515625,
+          3.36962890625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.3 /usr/libexec/sysmond",
+          "  8.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194618-22926/start.json",
+      "snapshot": {
+        "load": [
+          3.6064453125,
+          3.31396484375,
+          3.3525390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 18.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 16.6 /usr/libexec/sysmond",
+          "  9.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194653-23171/start.json",
+      "snapshot": {
+        "load": [
+          3.685546875,
+          3.3583984375,
+          3.36474609375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.4 /usr/libexec/sysmond",
+          " 12.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194729-23412/start.json",
+      "snapshot": {
+        "load": [
+          4.52001953125,
+          3.67578125,
+          3.48388671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 21.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 13.4 /usr/libexec/sysmond",
+          " 10.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Debug-plain-20261004-194804-23675/start.json",
+      "snapshot": {
+        "load": [
+          4.30712890625,
+          3.7109375,
+          3.50341796875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 24.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 10.9 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  8.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Debug",
+        "release_testability_override": false,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-build-20261004-194219-21150/start.json",
+      "snapshot": {
+        "load": [
+          1.22802734375,
+          2.826171875,
+          3.2529296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 18.6 /usr/libexec/sysmond",
+          "  9.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  8.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  3.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194251-21596/start.json",
+      "snapshot": {
+        "load": [
+          2.54443359375,
+          2.95849609375,
+          3.28125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 36.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.8 /usr/libexec/sysmond",
+          " 10.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.5 /usr/libexec/siriknowledged"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194326-21842/start.json",
+      "snapshot": {
+        "load": [
+          3.11572265625,
+          3.04345703125,
+          3.296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 41.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.4 /usr/libexec/siriknowledged",
+          "  8.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194408-22107/start.json",
+      "snapshot": {
+        "load": [
+          2.921875,
+          2.9912109375,
+          3.263671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 37.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 30.6 /usr/libexec/siriknowledged",
+          " 17.4 /usr/libexec/swcd",
+          " 12.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194447-22346/start.json",
+      "snapshot": {
+        "load": [
+          2.97802734375,
+          3.00390625,
+          3.25390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 45.3 /usr/libexec/siriknowledged",
+          " 34.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 29.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.5 /usr/libexec/swcd",
+          " 16.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194527-22585/start.json",
+      "snapshot": {
+        "load": [
+          4.201171875,
+          3.33935546875,
+          3.365234375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 68.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 35.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 26.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.4 /usr/libexec/siriknowledged",
+          " 17.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194603-22860/start.json",
+      "snapshot": {
+        "load": [
+          3.7314453125,
+          3.3154296875,
+          3.35400390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 98.3 /usr/libexec/spotlightknowledged.updater",
+          " 37.4 /usr/libexec/siriknowledged",
+          " 28.2 /usr/libexec/swcd",
+          " 19.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.2 /usr/sbin/cfprefsd"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194639-23099/start.json",
+      "snapshot": {
+        "load": [
+          3.61181640625,
+          3.32666015625,
+          3.3544921875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 44.4 /usr/libexec/siriknowledged",
+          " 21.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 20.1 /usr/libexec/swcd",
+          " 14.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 12.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194714-23344/start.json",
+      "snapshot": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.1 /usr/libexec/siriknowledged",
+          " 18.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /usr/libexec/swcd",
+          " 13.7 /usr/libexec/sysmond",
+          " 13.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194750-23585/start.json",
+      "snapshot": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 52.3 /usr/libexec/siriknowledged",
+          " 21.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 19.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.2 /usr/libexec/swcd",
+          " 10.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-export-20261004-194825-23846/start.json",
+      "snapshot": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 19.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 14.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  7.5 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194247-21541/start.json",
+      "snapshot": {
+        "load": [
+          1.98291015625,
+          2.85693359375,
+          3.24755859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 38.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 25.4 /usr/libexec/sysmond",
+          "  9.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  7.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  4.5 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194323-21790/start.json",
+      "snapshot": {
+        "load": [
+          3.0390625,
+          3.02734375,
+          3.29296875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 32.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 24.9 /usr/libexec/sysmond",
+          " 19.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  8.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194405-22052/start.json",
+      "snapshot": {
+        "load": [
+          2.7412109375,
+          2.95751953125,
+          3.25390625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.0 /usr/libexec/sysmond",
+          " 13.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  9.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194444-22291/start.json",
+      "snapshot": {
+        "load": [
+          2.9765625,
+          3.00439453125,
+          3.255859375
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 42.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 16.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 10.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 10.2 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194524-22530/start.json",
+      "snapshot": {
+        "load": [
+          3.9580078125,
+          3.27783203125,
+          3.34423828125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 93.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 19.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 11.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/start.json",
+      "snapshot": {
+        "load": [
+          3.5341796875,
+          3.2705078125,
+          3.3388671875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 30.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 23.2 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 19.7 /usr/libexec/sysmond",
+          " 16.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194636-23044/start.json",
+      "snapshot": {
+        "load": [
+          3.61181640625,
+          3.32666015625,
+          3.3544921875
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 18.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 16.5 /usr/libexec/sysmond",
+          "  9.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          "  8.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194711-23289/start.json",
+      "snapshot": {
+        "load": [
+          4.96142578125,
+          3.7119140625,
+          3.49267578125
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 28.7 /sbin/launchd",
+          " 19.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 17.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.3 /usr/libexec/sysmond",
+          " 12.4 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194747-23530/start.json",
+      "snapshot": {
+        "load": [
+          4.45703125,
+          3.712890625,
+          3.5009765625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 22.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 18.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          " 12.4 /usr/libexec/sysmond",
+          " 11.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    },
+    {
+      "path": "/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194822-23794/start.json",
+      "snapshot": {
+        "load": [
+          5.494140625,
+          4.033203125,
+          3.62353515625
+        ],
+        "max_load": 6.0,
+        "top_cpu": [
+          " %CPU COMM",
+          " 20.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+          " 20.5 /usr/libexec/sysmond",
+          " 18.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+          "  9.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+        ],
+        "build_processes": {},
+        "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+        "smoke": false,
+        "configuration": "Release",
+        "release_testability_override": true,
+        "scheme": "PerformanceTests"
+      }
+    }
+  ],
+  "analysis": {
+    "Debug": {
+      "typing": {
+        "pair_differences_ms": [
+          -11.194125999999999,
+          -9.397332,
+          22.827292,
+          20.62025,
+          6.762373999999999,
+          -5.035667,
+          -0.1955840000000002,
+          -9.305167,
+          -9.976666,
+          -6.481584000000001
+        ],
+        "median_difference_ms": -5.758625500000001,
+        "bootstrap_95_ci_ms": [
+          -9.6409165,
+          10.212333
+        ],
+        "bootstrap_resamples": 10000,
+        "seed": 20261004,
+        "candidate_worse_pairs": 3,
+        "plain": {
+          "count": 10,
+          "median": 13.917438,
+          "range": [
+            3.863459,
+            15.570875
+          ],
+          "p95": 15.52428155
+        },
+        "export": {
+          "count": 10,
+          "median": 6.0848960000000005,
+          "range": [
+            3.653625,
+            36.191125
+          ],
+          "p95": 31.92154389999999
+        },
+        "fraction_over_16ms": {
+          "plain": 0.0,
+          "export": 0.3
+        },
+        "verdict": "no regression signal detected under recorded load",
+        "limitations": "One keystroke per batch, so per-batch median/p95/max coincide. Across-batch distribution and pair differences are reported. Absolute idle acceptance remains open; differences smaller than the CI width cannot be excluded."
+      },
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": {
+            "count": 30,
+            "median": 2186.268438,
+            "range": [
+              2127.152791,
+              2311.474417
+            ],
+            "p95": 2270.34067035
+          },
+          "peak_sampled_host_rss_mib": {
+            "count": 10,
+            "median": 183.7109375,
+            "range": [
+              181.703125,
+              193.1875
+            ],
+            "p95": 192.9765625
+          }
+        },
+        "export-f-heavy.md": {
+          "wall_ms": {
+            "count": 30,
+            "median": 1086.1251244999999,
+            "range": [
+              1049.819667,
+              1141.592917
+            ],
+            "p95": 1138.41296235
+          },
+          "peak_sampled_host_rss_mib": {
+            "count": 10,
+            "median": 184.296875,
+            "range": [
+              182.328125,
+              193.90625
+            ],
+            "p95": 193.68828125
+          }
+        }
+      },
+      "writer_ms": {
+        "count": 30,
+        "median": 17.8693335,
+        "range": [
+          14.925167,
+          49.577209
+        ],
+        "p95": 42.50841699999998
+      }
+    },
+    "Release": {
+      "typing": {
+        "pair_differences_ms": [
+          -3.801957,
+          -10.162375,
+          -4.005292000000001,
+          -4.095457999999999,
+          -5.825375000000001,
+          -9.223459,
+          -7.942583000000001,
+          -6.299667,
+          1.7360419999999999,
+          -8.248041999999998
+        ],
+        "median_difference_ms": -6.062521,
+        "bootstrap_95_ci_ms": [
+          -8.583021,
+          -3.9487074999999994
+        ],
+        "bootstrap_resamples": 10000,
+        "seed": 20261004,
+        "candidate_worse_pairs": 1,
+        "plain": {
+          "count": 10,
+          "median": 13.7381045,
+          "range": [
+            3.286375,
+            15.142166
+          ],
+          "p95": 15.05734145
+        },
+        "export": {
+          "count": 10,
+          "median": 5.7691875,
+          "range": [
+            3.968541,
+            11.340209
+          ],
+          "p95": 11.123308999999999
+        },
+        "fraction_over_16ms": {
+          "plain": 0.0,
+          "export": 0.0
+        },
+        "verdict": "no regression signal detected under recorded load",
+        "limitations": "One keystroke per batch, so per-batch median/p95/max coincide. Across-batch distribution and pair differences are reported. Absolute idle acceptance remains open; differences smaller than the CI width cannot be excluded."
+      },
+      "fixtures": {
+        "large-1mb.md": {
+          "wall_ms": {
+            "count": 30,
+            "median": 2196.4960419999998,
+            "range": [
+              2132.692625,
+              2389.395458
+            ],
+            "p95": 2376.87818125
+          },
+          "peak_sampled_host_rss_mib": {
+            "count": 10,
+            "median": 177.015625,
+            "range": [
+              173.09375,
+              181.796875
+            ],
+            "p95": 181.6
+          }
+        },
+        "export-f-heavy.md": {
+          "wall_ms": {
+            "count": 30,
+            "median": 1081.214354,
+            "range": [
+              1039.883917,
+              1131.938333
+            ],
+            "p95": 1126.8761564
+          },
+          "peak_sampled_host_rss_mib": {
+            "count": 10,
+            "median": 177.1484375,
+            "range": [
+              171.84375,
+              180.703125
+            ],
+            "p95": 180.5625
+          }
+        }
+      },
+      "writer_ms": {
+        "count": 30,
+        "median": 15.0969375,
+        "range": [
+          14.012875,
+          24.766875
+        ],
+        "p95": 22.828322949999993
+      }
+    }
+  }
+}
