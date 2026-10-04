@@ -9,6 +9,22 @@ import XCTest
 
 @MainActor
 final class PerformanceBudgetTests: XCTestCase {
+    override func setUp() async throws {
+        try await super.setUp()
+        try PerformanceResourcePreflight.validateOnce(bundle: Self.testBundle)
+    }
+
+    func testBundledFixtureURLsRemainAbsoluteForAnchoredReads() throws {
+        for path in ["Fixtures/perf-500kb.md", "Fixtures/perf-100kb.md", "Fixtures/large-1mb.md",
+                     "preview/index.html"]
+        {
+            let url = try Self.resourceURL(path)
+            XCTAssertNil(url.baseURL, "Bundled fixture lookup must not retain a relative base: \(url)")
+            XCTAssertTrue(url.path(percentEncoded: false).hasPrefix("/"))
+            _ = try WorkspaceFileSystemLocation(fileURL: url)
+        }
+    }
+
     func testTypingLatencyStaysUnderFrameBudget() throws {
         let fixtureText = try Self.fixtureText("Fixtures/large-1mb.md")
         let mdxPrefix = """
@@ -466,7 +482,7 @@ private extension PerformanceBudgetTests {
                 subdirectory: subdirectory.isEmpty ? nil : subdirectory
             ),
             "missing bundled performance resource: \(path)"
-        )
+        ).absoluteURL
     }
 
     static func milliseconds(since start: UInt64) -> Double {

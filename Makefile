@@ -1,6 +1,10 @@
 # Plainsong build entry points (agent.md §15).
 # Requires: Xcode 16+, Homebrew. Run `make bootstrap` once after cloning.
 
+XCODE_RESULT_BUNDLE ?=
+XCODE_DERIVED_DATA ?=
+XCODE_ARTIFACT_DIR ?=
+
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
 SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Scripts
 # SwiftFormat 0.62 enabled these wrapping rules by default. Keep the repository's
@@ -28,7 +32,7 @@ generate:
 	xcodegen generate
 
 build: generate
-	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug build
+	xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug $(if $(XCODE_DERIVED_DATA),-derivedDataPath "$(XCODE_DERIVED_DATA)") build
 
 test: generate
 	$(MAKE) test-f2-tooling
@@ -41,7 +45,9 @@ test: generate
 # which does not inherit the shell env; without this, PerformanceTests'
 # isContinuousIntegration check never sees CI and hosted-runner WebKit timing
 # variance fails budgets that are informational-only on CI (risk R15).
-	TEST_RUNNER_CI="$${CI:-}" xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug test
+	TEST_RUNNER_CI="$${CI:-}" XCODE_RESULT_BUNDLE="$(XCODE_RESULT_BUNDLE)" \
+	    XCODE_DERIVED_DATA="$(XCODE_DERIVED_DATA)" XCODE_ARTIFACT_DIR="$(XCODE_ARTIFACT_DIR)" \
+	    Scripts/run-hosted-tests.sh
 	cd preview-src && npm test
 
 test-f2-tooling:

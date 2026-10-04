@@ -193,8 +193,8 @@ extension ExportArtifactWriter {
     /// rejects the two together with `EINVAL`) and requires the kernel's `F_GETPATH` spelling of that
     /// exact identity to equal the selected spelling byte for byte. On a case- or
     /// normalization-insensitive volume `fstatat` resolves an alias to the existing entry; the
-    /// kernel path names the on-disk spelling (a hard link keeps the name it was opened by), so
-    /// an alias fails closed without enumerating the parent.
+    /// kernel path names a current vnode spelling, which can change after another hard-link
+    /// lookup. A mismatch fails closed without enumerating the parent, even for a hard link.
     private static func proveCanonicalSpelling(
         _ selection: ExportArtifactSelection,
         identity: WorkspaceFileSystemIdentity,

@@ -144,6 +144,8 @@ targets:
       - path: App/Resources/preview
         type: folder
         buildPhase: resources
+      - path: Scripts/performance-required-resources.txt
+        buildPhase: resources
     scheme:
       testTargets:
         - PerformanceTests
