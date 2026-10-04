@@ -1,0 +1,45 @@
+{
+  "product": "fix",
+  "iteration": "fix-1",
+  "action": "test-without-building",
+  "product_sha": "3ee448c2a8fad53430530d11d24b4fe84863a1ef",
+  "start": {
+    "load": [
+      5.43603515625,
+      6.40625,
+      8.3984375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 75.2 /usr/libexec/dasd",
+      " 21.2 /sbin/launchd",
+      " 13.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 13.4 /usr/libexec/PerfPowerServices",
+      " 11.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      13.53955078125,
+      9.234375,
+      8.958984375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "198.9 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+      " 87.1 /usr/libexec/spotlightknowledged.updater",
+      " 25.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 22.5 /usr/libexec/dasd",
+      " 18.2 /usr/sbin/cfprefsd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": -15,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/fix-fix-1-test-without-building.log",
+  "samples": {},
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": false
+}

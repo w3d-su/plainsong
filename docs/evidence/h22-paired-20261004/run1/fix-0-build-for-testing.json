@@ -1,0 +1,44 @@
+{
+  "product": "fix",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "6aebf1c263dcaa85abbe2150dd343621d1263715",
+  "start": {
+    "load": [
+      5.55419921875,
+      8.43701171875,
+      10.14599609375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 54.9 /usr/libexec/dasd",
+      " 44.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 33.3 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+      " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 15.3 /sbin/launchd"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      8.9404296875,
+      8.98486328125,
+      10.2919921875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 30.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+      " 21.3 /usr/libexec/siriknowledged",
+      " 20.0 /usr/libexec/eligibilityd",
+      " 19.5 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/fix-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

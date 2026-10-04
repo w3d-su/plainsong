@@ -1,0 +1,44 @@
+{
+  "product": "stack",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "751e6a1a7836964e57032e29b1538ce705dd935d",
+  "start": {
+    "load": [
+      5.46240234375,
+      6.6103515625,
+      8.72900390625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 58.5 /usr/libexec/dasd",
+      " 31.8 /usr/libexec/sysmond",
+      " 16.0 /sbin/launchd",
+      " 14.7 /usr/libexec/eligibilityd",
+      " 12.8 /System/Library/Frameworks/CoreMedia.framework/Versions/A/XPCServices/com.apple.CMExtensionBroker.xpc/Contents/MacOS/com.apple.CMExtensionBroker"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "129f632ffba22aae34288d226777096ff1c72a4412be766adccc7f33818bb359",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      5.34521484375,
+      6.56689453125,
+      8.701171875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 52.1 /usr/libexec/dasd",
+      " 32.5 /usr/libexec/eligibilityd",
+      " 16.0 /sbin/launchd",
+      " 12.5 /usr/libexec/linkd",
+      " 11.2 /usr/libexec/PerfPowerServices"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/stack-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

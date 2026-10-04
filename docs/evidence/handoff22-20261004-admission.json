@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "pr": 136,
+  "status": "idle measurement still pending",
+  "product_sha": "2530c02ea1bf0205525c6477e881842c3d258616",
+  "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "performance_samples": [],
+  "typing_budget_ms": 16,
+  "threshold_1min_load": "<3",
+  "raw_logs": [
+    "docs/evidence/h22-idle-admission.log"
+  ]
+}

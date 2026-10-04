@@ -1,0 +1,46 @@
+{
+  "product": "main",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      3.2109375,
+      3.6630859375,
+      3.52392578125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 14.8 /usr/libexec/ReportMemoryException",
+      " 13.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 13.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 12.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 11.5 /usr/libexec/biomesyncd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      3.892578125,
+      3.7900390625,
+      3.56982421875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 14.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 12.3 /usr/libexec/siriknowledged",
+      " 10.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  9.5 /usr/libexec/eligibilityd",
+      "  9.0 /usr/libexec/lsd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

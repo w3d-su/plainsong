@@ -1,0 +1,112 @@
+{
+  "product": "main",
+  "iteration": "fix-2",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      4.3955078125,
+      7.21533203125,
+      8.2001953125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 83.4 /usr/libexec/dasd",
+      " 36.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 32.5 /usr/libexec/sysmond",
+      " 21.5 /usr/libexec/PerfPowerServices",
+      " 17.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.60302734375,
+      7.3740234375,
+      8.244140625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 73.4 /usr/libexec/dasd",
+      " 43.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 24.2 /usr/libexec/PerfPowerServices",
+      " 22.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 19.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-fix-2-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.907792,
+      14.282875,
+      14.792792,
+      0.705958,
+      14.5915,
+      0.724292,
+      14.193541,
+      0.751333,
+      14.198209,
+      0.710417,
+      14.8575,
+      14.217208,
+      0.682583,
+      14.235292,
+      0.711416,
+      14.57825,
+      0.636042,
+      14.923959,
+      0.656417,
+      14.885875,
+      0.66625,
+      14.162584,
+      0.662666,
+      14.855833,
+      0.672125,
+      14.267334,
+      0.6625,
+      14.178042,
+      0.701291,
+      14.458584
+    ],
+    "wysiwyg": [
+      0.745291,
+      15.006125,
+      14.200958,
+      0.7595,
+      15.061542,
+      0.727167,
+      0.777167,
+      14.82325,
+      0.791709,
+      14.698916,
+      0.769042,
+      14.9915,
+      0.734708,
+      15.030958,
+      0.743708,
+      14.331959,
+      0.699375,
+      14.887583,
+      0.755875,
+      14.288291,
+      0.825041,
+      14.398667,
+      0.696708,
+      14.949125,
+      15.08575,
+      0.76925,
+      14.312833,
+      0.687125,
+      14.997,
+      0.754042
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

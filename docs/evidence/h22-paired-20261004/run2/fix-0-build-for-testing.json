@@ -1,0 +1,44 @@
+{
+  "product": "fix",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "3ee448c2a8fad53430530d11d24b4fe84863a1ef",
+  "start": {
+    "load": [
+      5.46240234375,
+      6.6103515625,
+      8.72900390625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 42.1 /usr/libexec/siriknowledged",
+      " 23.7 /usr/libexec/sysmond",
+      " 20.2 /usr/libexec/dasd",
+      " 20.0 /usr/libexec/eligibilityd",
+      " 11.3 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      5.46240234375,
+      6.6103515625,
+      8.72900390625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 54.0 /usr/libexec/dasd",
+      " 31.9 /usr/libexec/eligibilityd",
+      " 15.2 /sbin/launchd",
+      " 13.5 /usr/libexec/linkd",
+      " 10.9 /usr/libexec/PerfPowerServices"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/fix-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

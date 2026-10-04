@@ -1,0 +1,46 @@
+{
+  "product": "main",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      5.35595703125,
+      7.142578125,
+      7.931640625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 47.5 /usr/libexec/dasd",
+      " 20.8 /usr/libexec/PerfPowerServices",
+      " 19.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+      " 19.0 /usr/libexec/sysmond",
+      " 12.8 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      6.35107421875,
+      7.30126953125,
+      7.978515625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 65.0 /usr/libexec/dasd",
+      " 25.3 /usr/libexec/PerfPowerServices",
+      " 18.1 /usr/libexec/sysmond",
+      " 17.8 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+      " 16.5 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run4/main-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

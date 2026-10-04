@@ -1,0 +1,206 @@
+{"product": "fix", "iteration": "fix-2", "action": "test-without-building", "product_sha": "8360954ab845db9f233697f246fcf41c36588965", "start": {"load": [5.60302734375, 7.3740234375, 8.244140625], "top_cpu": ["%CPU COMM", " 88.7 /usr/libexec/dasd", " 31.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores", " 27.8 /usr/libexec/PerfPowerServices", " 25.7 /usr/libexec/sysmond", " 19.3 /sbin/launchd"], "build_processes": {}}, "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247", "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f", "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd", "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e"}
+Command line invocation:
+    /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration Debug -destination platform=macOS -parallel-testing-enabled NO -resultBundlePath /private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-2-test-without-building.xcresult test-without-building "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget" "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  STTextKitPlus: https://github.com/krzyzanowskim/STTextKitPlus @ 0.3.1
+  MarkdownCore: /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/MarkdownCore
+  PreviewKit: /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/PreviewKit
+  EditorKit: /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/EditorKit
+  WorkspaceKit: /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/WorkspaceKit
+  TreeSitter: https://github.com/tree-sitter/tree-sitter @ 0.25.10
+  TreeSitterMarkdown: https://github.com/tree-sitter-grammars/tree-sitter-markdown.git @ 0.5.3
+  SwiftTreeSitter: https://github.com/tree-sitter/swift-tree-sitter.git @ 0.10.0
+  Yams: https://github.com/jpsim/Yams.git @ 6.2.2
+  STTextView: https://github.com/krzyzanowskim/STTextView.git @ 2.3.10
+  CoreTextSwift: https://github.com/krzyzanowskim/CoreTextSwift @ 0.2.0
+
+Writing result bundle at path:
+	/private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-2-test-without-building.xcresult
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006000-0004042411D2801E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006000-0004042411D2801E, name:My Mac }
+2026-10-04 14:45:44.695519+0800 Plainsong[16397:112516] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.695835+0800 Plainsong[16397:112516] [Application] Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.696596+0800 Plainsong[16397:112518] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.696624+0800 Plainsong[16397:112518] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.697525+0800 Plainsong[16397:112516] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.697548+0800 Plainsong[16397:112516] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.698460+0800 Plainsong[16397:112516] [Connection] Will NOT re-try to establish the connection
+2026-10-04 14:45:44.698498+0800 Plainsong[16397:112518] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.698512+0800 Plainsong[16397:112518] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 14:45:44.819401+0800 Plainsong[16397:112499] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /Users/davis._.su/Library/Containers/app.plainsong.editor/Data/tmp/app.plainsong.editor.savedState
+Test Suite 'Selected tests' started at 2026-10-04 14:45:45.042.
+Test Suite 'PlainsongTests.xctest' started at 2026-10-04 14:45:45.042.
+Test Suite 'EditorFindHostedGateTests' started at 2026-10-04 14:45:45.042.
+Test Case '-[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget]' started.
+2026-10-04 14:45:45.449316+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.449348+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.449355+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.449360+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.449366+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.449370+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.510375+0800 Plainsong[16397:112499] [general] WebContent[16401] Connection to 'pboard' server had an error: <dictionary: 0x1f59c8b60> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f59c8ca0> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-10-04 14:45:45.510401+0800 Plainsong[16397:112499] [general] WebContent[16401] Failed to set up CFPasteboardRef 'Apple CFPasteboard general'. Error: <dictionary: 0x1f59c8b60> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f59c8ca0> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-10-04 14:45:45.511563+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchservicesd prohibited because kLSServerConnectionStatusProcessIsDaemonMask is set.
+2026-10-04 14:45:45.511605+0800 Plainsong[16397:112499] [cas] WebContent[16401] CRASHSTRING: rdar://problem/28724618 Couldn't connect to launchservicesd.
+2026-10-04 14:45:45.513575+0800 Plainsong[16397:112499] [access] WebContent[16401] send_message_with_reply_sync(): XPC_ERROR_CONNECTION_INVALID for msgID=16401.1 (function=TCCAccessRequest, service=kTCCServiceListenEvent)
+2026-10-04 14:45:45.513610+0800 Plainsong[16397:112499] [access] WebContent[16401] TCCAccessRequest_block_invoke: Connection invalid
+2026-10-04 14:45:45.514099+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.514177+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.514233+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.514350+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.525730+0800 Plainsong[16397:112499] WebContent[16401] invalid product id '(null)'
+2026-10-04 14:45:45.525848+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.525889+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.526046+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.526132+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.529381+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.534683+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.534707+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.534715+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.534721+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534727+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534731+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534737+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534760+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534770+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534777+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534782+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.534788+0800 Plainsong[16397:112499] [sharedcache] WebContent[16401] checkinWithServer: Failed bootstrap_lookup2 for name of coreservicesd, kern_return_t=#1100/0x44c Permission denied name=com.apple.CoreServices.coreservicesd
+2026-10-04 14:45:45.535204+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16401] FSNode_FillIOKitProperties: could not get iokit object for <private>
+2026-10-04 14:45:45.535214+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16401] FSNode_SetFSSharedDeviceInfo: failed to fetch IOKit properties for <private>
+2026-10-04 14:45:45.535219+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16401] FSNode_FillIOKitProperties: could not get iokit object for <private>
+2026-10-04 14:45:45.535224+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16401] FSNode_SetFSSharedDeviceInfo: failed to fetch IOKit properties for <private>
+2026-10-04 14:45:45.535239+0800 Plainsong[16397:112499] [connection] WebContent[16401] The sandbox in this process does not allow access to RunningBoard.
+2026-10-04 14:45:45.535245+0800 Plainsong[16397:112499] [connection] WebContent[16401] Handshake aborted as the connection has been invalidated
+2026-10-04 14:45:45.535571+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.535595+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.535603+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.535610+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.535617+0800 Plainsong[16397:112499] [cas] WebContent[16401] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:45.535884+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535897+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535906+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535912+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535918+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535925+0800 Plainsong[16397:112499] [default] WebContent[16401] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:45.535943+0800 Plainsong[16397:112499] [access] WebContent[16401] send_message_with_reply_sync(): XPC_ERROR_CONNECTION_INVALID for msgID=16401.2 (function=TCCAccessLaunchDisclosurePromptIfNeeded, service=(null))
+2026-10-04 14:45:45.535949+0800 Plainsong[16397:112499] [access] WebContent[16401] TCCAccessLaunchDisclosurePromptIfNeeded_block_invoke_2: Connection invalid
+2026-10-04 14:45:45.594102+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.594128+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.594137+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.594147+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.594155+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16401] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:45.594178+0800 Plainsong[16397:112499] [audiocomp] WebContent[16401] AudioComponentPluginMgr.mm:593   reg server remote proxy error Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.audio.AudioComponentRegistrar was invalidated: Connection init failed at lookup with error 1 - Operation not permitted." UserInfo={NSDebugDescription=The connection to service named com.apple.audio.AudioComponentRegistrar was invalidated: Connection init failed at lookup with error 1 - Operation not permitted.}
+2026-10-04 14:45:45.594192+0800 Plainsong[16397:112499] [Connection] WebContent[16401] Missing com.apple.linkd.application-service / com.apple.linkd.autoShortcut mach-lookup entitlement, will NOT register the process
+2026-10-04 14:45:45.594199+0800 Plainsong[16397:112499] [Application] WebContent[16401] Error registering app with intents framework: Error Domain=LNProcessInstanceRegistryClientErrorDomain Code=1
+2026-10-04 14:45:45.594390+0800 Plainsong[16397:112499] [ResourceLoadStatistics] WebContent[16401] Unable to filter tracking query parameters (missing data)
+2026-10-04 14:45:45.594412+0800 Plainsong[16397:112499] WebContent[16401] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+2026-10-04 14:45:45.594427+0800 Plainsong[16397:112499] WebContent[16401] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+2026-10-04 14:45:45.644068+0800 Plainsong[16397:112587] [Common] Unable to obtain a task name port right for pid 440: (os/kern) failure (0x5)
+2026-10-04 14:45:45.653123+0800 Plainsong[16397:112647] [ResourceLoadStatistics] WebContent[16401] Unable to hide query parameters from script (missing data)
+Hosted source-only large-1mb.md typing milliseconds: [0.892042, 14.763, 14.293916, 0.777625, 14.920167, 0.67975, 14.895833, 0.697458, 14.803792, 14.284084, 0.665042, 14.800167, 0.724958, 14.585708, 0.648708, 14.7225, 0.645334, 14.792958, 14.833125, 0.672042, 14.820084, 0.648916, 14.915833, 0.664958, 14.208667, 0.668042, 15.414, 0.69025, 14.233292, 0.664125]; maximum: 15.414
+Test Case '-[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget]' passed (2.102 seconds).
+Test Case '-[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget]' started.
+2026-10-04 14:45:47.410934+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.410975+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.410982+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.410987+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.410991+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.410997+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.419051+0800 Plainsong[16397:112499] [general] WebContent[16406] Connection to 'pboard' server had an error: <dictionary: 0x1f59c8b60> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f59c8ca0> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-10-04 14:45:47.419097+0800 Plainsong[16397:112499] [general] WebContent[16406] Failed to set up CFPasteboardRef 'Apple CFPasteboard general'. Error: <dictionary: 0x1f59c8b60> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f59c8ca0> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-10-04 14:45:47.420355+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchservicesd prohibited because kLSServerConnectionStatusProcessIsDaemonMask is set.
+2026-10-04 14:45:47.420374+0800 Plainsong[16397:112499] [cas] WebContent[16406] CRASHSTRING: rdar://problem/28724618 Couldn't connect to launchservicesd.
+2026-10-04 14:45:47.422378+0800 Plainsong[16397:112499] [access] WebContent[16406] send_message_with_reply_sync(): XPC_ERROR_CONNECTION_INVALID for msgID=16406.1 (function=TCCAccessRequest, service=kTCCServiceListenEvent)
+2026-10-04 14:45:47.422399+0800 Plainsong[16397:112499] [access] WebContent[16406] TCCAccessRequest_block_invoke: Connection invalid
+2026-10-04 14:45:47.422831+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.422892+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.422961+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.426236+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.434128+0800 Plainsong[16397:112499] WebContent[16406] invalid product id '(null)'
+2026-10-04 14:45:47.434288+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.434300+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.434359+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.434559+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.437608+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.439697+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.439713+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.439718+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.439725+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439731+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439753+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439785+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439793+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439808+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.439814+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.440032+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.440528+0800 Plainsong[16397:112499] [sharedcache] WebContent[16406] checkinWithServer: Failed bootstrap_lookup2 for name of coreservicesd, kern_return_t=#1100/0x44c Permission denied name=com.apple.CoreServices.coreservicesd
+2026-10-04 14:45:47.440713+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16406] FSNode_FillIOKitProperties: could not get iokit object for <private>
+2026-10-04 14:45:47.440777+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16406] FSNode_SetFSSharedDeviceInfo: failed to fetch IOKit properties for <private>
+2026-10-04 14:45:47.440849+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16406] FSNode_FillIOKitProperties: could not get iokit object for <private>
+2026-10-04 14:45:47.440866+0800 Plainsong[16397:112499] [FileIDMap] WebContent[16406] FSNode_SetFSSharedDeviceInfo: failed to fetch IOKit properties for <private>
+2026-10-04 14:45:47.441229+0800 Plainsong[16397:112499] [connection] WebContent[16406] The sandbox in this process does not allow access to RunningBoard.
+2026-10-04 14:45:47.441261+0800 Plainsong[16397:112499] [connection] WebContent[16406] Handshake aborted as the connection has been invalidated
+2026-10-04 14:45:47.441451+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.441464+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.441469+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.441475+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.441482+0800 Plainsong[16397:112499] [cas] WebContent[16406] CONNECT: Attempt to connect to launchserivcesd prohibited because kLSServerConnectionStatusDoNotConnectToServerMask.
+2026-10-04 14:45:47.441487+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.441795+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.441808+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.441814+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.441833+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.441842+0800 Plainsong[16397:112499] [default] WebContent[16406] Conn 0x0 is not a valid connection ID.
+2026-10-04 14:45:47.442024+0800 Plainsong[16397:112499] [access] WebContent[16406] send_message_with_reply_sync(): XPC_ERROR_CONNECTION_INVALID for msgID=16406.2 (function=TCCAccessLaunchDisclosurePromptIfNeeded, service=(null))
+2026-10-04 14:45:47.442035+0800 Plainsong[16397:112499] [access] WebContent[16406] TCCAccessLaunchDisclosurePromptIfNeeded_block_invoke_2: Connection invalid
+2026-10-04 14:45:47.443141+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.443231+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.443255+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.443325+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.443388+0800 Plainsong[16397:112499] [cfprefsd] WebContent[16406] Couldn't open <private> due to No such file or directory
+2026-10-04 14:45:47.444840+0800 Plainsong[16397:112499] [Connection] WebContent[16406] Missing com.apple.linkd.application-service / com.apple.linkd.autoShortcut mach-lookup entitlement, will NOT register the process
+2026-10-04 14:45:47.444979+0800 Plainsong[16397:112499] [audiocomp] WebContent[16406] AudioComponentPluginMgr.mm:593   reg server remote proxy error Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.audio.AudioComponentRegistrar was invalidated: Connection init failed at lookup with error 1 - Operation not permitted." UserInfo={NSDebugDescription=The connection to service named com.apple.audio.AudioComponentRegistrar was invalidated: Connection init failed at lookup with error 1 - Operation not permitted.}
+2026-10-04 14:45:47.445007+0800 Plainsong[16397:112499] [Application] WebContent[16406] Error registering app with intents framework: Error Domain=LNProcessInstanceRegistryClientErrorDomain Code=1
+2026-10-04 14:45:47.447073+0800 Plainsong[16397:112499] WebContent[16406] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+2026-10-04 14:45:47.447087+0800 Plainsong[16397:112499] WebContent[16406] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+Hosted wysiwyg large-1mb.md typing milliseconds: [0.758042, 14.208791, 14.206334, 0.69, 14.393958, 0.703209, 14.294834, 0.774291, 14.265375, 0.725375, 14.310834, 0.69975, 14.18525, 0.686375, 14.314333, 0.716209, 14.329917, 0.736708, 14.299875, 0.741708, 14.405583, 0.771, 15.389667, 0.728834, 14.383375, 1.448375, 17.417875, 15.169625, 14.970708, 14.832875]; maximum: 17.417875
+/Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorHighlightScheduleHostedTests.swift:141: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: ("17.417875") is not less than ("16.0") - native input including debounce scheduling: [0.758042, 14.208791, 14.206334, 0.69, 14.393958, 0.703209, 14.294834, 0.774291, 14.265375, 0.725375, 14.310834, 0.69975, 14.18525, 0.686375, 14.314333, 0.716209, 14.329917, 0.736708, 14.299875, 0.741708, 14.405583, 0.771, 15.389667, 0.728834, 14.383375, 1.448375, 17.417875, 15.169625, 14.970708, 14.832875]
+Test Case '-[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget]' failed (2.065 seconds).
+Test Suite 'EditorFindHostedGateTests' failed at 2026-10-04 14:45:49.210.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 4.167 (4.168) seconds
+Test Suite 'PlainsongTests.xctest' failed at 2026-10-04 14:45:49.211.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 4.167 (4.169) seconds
+Test Suite 'Selected tests' failed at 2026-10-04 14:45:49.211.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 4.167 (4.169) seconds
+2026-10-04 14:45:53.290 xcodebuild[16372:112379] [MT] IDETestOperationsObserverDebug: 9.061 elapsed -- Testing started completed.
+2026-10-04 14:45:53.290 xcodebuild[16372:112379] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-04 14:45:53.290 xcodebuild[16372:112379] [MT] IDETestOperationsObserverDebug: 9.061 sec, +9.061 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/plainsong-h22-paired-20261004-run3/fix-fix-2-test-without-building.xcresult
+
+Failing tests:
+	EditorFindHostedGateTests.testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget()
+
+** TEST EXECUTE FAILED **
+
+Testing started
