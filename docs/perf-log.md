@@ -1337,3 +1337,22 @@ Scripts/run-export-html-e9.sh Debug
 Scripts/run-export-html-e9.sh Release
 # Obtain at least three qualified runs per configuration, checking admission each time.
 ```
+
+
+## Export F E9 retry after handoff 23 — 2026-10-04
+
+**Pending idle-machine run.** After PR #141 normal CI run 37178629394 passed,
+E9 was retried at candidate `f472bd56434b31a4eca43e747b7f0a113e48fb6d`, which
+includes main `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. No other xcodebuild
+was present before either batch. Debug refused 1-minute load 4.67 and Release
+refused 5.34 (require ≤1.0); both exited 75 before building or measuring.
+There are zero qualified runs; the required ≥3 per configuration, fixture wall
+time/peak memory, typing during export and 64 MiB writer time remain pending.
+No performance or writer-off-main conclusion is possible, no budget changed
+and no E9 or owner-only keyboard/VoiceOver box was checked.
+
+Raw logs: `docs/evidence/h22-post23-e9-debug-admission.log` and
+`docs/evidence/h22-post23-e9-release-admission.log`; JSON:
+`docs/evidence/handoff22-pr138-20261004-post23-admission.json`. Use the exact
+shared-lock/load/process-check commands in the preceding E9 admission section
+and repeat each configuration until three qualified runs exist.

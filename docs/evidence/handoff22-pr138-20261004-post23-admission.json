@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "pr": 138,
+  "status": "pending idle-machine run",
+  "sequence": "retry after handoff23 PR141 normal CI green",
+  "handoff23_ci_run": 37178629394,
+  "candidate_product_sha": "f472bd56434b31a4eca43e747b7f0a113e48fb6d",
+  "main_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "threshold_1min_load": "<=1.0",
+  "other_xcodebuild_before_each_attempt": false,
+  "configurations": {
+    "debug": {
+      "load_1min": 4.67,
+      "exit_code": 75,
+      "performance_samples": []
+    },
+    "release": {
+      "load_1min": 5.34,
+      "exit_code": 75,
+      "performance_samples": []
+    }
+  },
+  "required_successful_runs_per_configuration": 3,
+  "typing_budget_ms": 16,
+  "writer_owner_decision": "not assessable; no export performance samples",
+  "raw_logs": [
+    "docs/evidence/h22-post23-e9-debug-admission.log",
+    "docs/evidence/h22-post23-e9-release-admission.log"
+  ]
+}

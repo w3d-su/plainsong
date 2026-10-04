@@ -1444,3 +1444,13 @@ at 1-minute load 8.15 (>1.0); zero samples, zero new E9 boxes checked. Candidate
 raw logs, JSON and rerun commands are in `docs/perf-log.md`, section
 "Export F E9 idle admission — 2026-10-04". Three qualified runs per configuration
 are still required. Keyboard/VoiceOver acceptance remains owner-only.
+
+
+### Handoff 22 E9 retry after handoff 23 — 2026-10-04
+
+Formal E9 remains **pending idle-machine run**. On the post-23 retry, Debug and
+Release refused 1-minute loads 4.67 and 5.34 (require ≤1.0), both exit 75; no
+xcodebuild or performance probe ran. Candidate SHA, raw logs, JSON and commands
+are in `docs/perf-log.md`, "Export F E9 retry after handoff 23 — 2026-10-04".
+Zero qualified runs and no new E9 boxes; ≥3 Debug and ≥3 Release runs still
+required. Keyboard/VoiceOver remains owner-only.
