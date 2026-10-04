@@ -1,0 +1,112 @@
+{
+  "product": "stack",
+  "iteration": "stack-8",
+  "action": "test-without-building",
+  "product_sha": "2306bdb86eae40517dc9806edb4bf2664280cc22",
+  "start": {
+    "load": [
+      5.97509765625,
+      7.89306640625,
+      6.8388671875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "103.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 50.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 32.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 13.7 /usr/libexec/sysmond",
+      " 10.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "7d4e2153f6bb830117174da4649598d79aa84caff59559eed4cd268a2a5ad421",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.818359375,
+      7.796875,
+      6.81640625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 83.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 56.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 26.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      "  5.4 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  4.5 /System/Library/DriverExtensions/com.apple.DriverKit-AppleBCMWLAN.dext/com.apple.DriverKit-AppleBCMWLAN"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/stack-stack-8-test-without-building.log",
+  "samples": {
+    "source-only": [
+      1.110917,
+      14.571041,
+      14.408375,
+      0.737541,
+      14.269542,
+      0.709667,
+      14.204667,
+      0.739709,
+      14.191667,
+      0.652375,
+      14.286625,
+      0.673917,
+      14.182667,
+      0.648417,
+      14.241584,
+      0.64575,
+      14.240792,
+      0.659667,
+      14.187708,
+      0.683708,
+      14.263083,
+      0.666542,
+      14.222125,
+      0.659667,
+      14.18,
+      0.665375,
+      14.190584,
+      0.656459,
+      14.220167,
+      0.662375
+    ],
+    "wysiwyg": [
+      0.74625,
+      14.273,
+      14.218,
+      0.725,
+      14.310417,
+      0.701584,
+      14.2965,
+      0.716709,
+      14.315625,
+      0.715667,
+      14.296708,
+      0.77375,
+      14.311917,
+      0.69925,
+      14.263584,
+      0.719792,
+      14.251833,
+      0.698833,
+      14.257125,
+      0.712167,
+      14.24425,
+      0.739041,
+      14.288334,
+      0.718458,
+      14.209375,
+      0.743167,
+      14.232458,
+      0.689542,
+      14.4115,
+      0.716541
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

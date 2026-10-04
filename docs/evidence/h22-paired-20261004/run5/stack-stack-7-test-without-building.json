@@ -1,0 +1,115 @@
+{
+  "product": "stack",
+  "iteration": "stack-7",
+  "action": "test-without-building",
+  "product_sha": "2306bdb86eae40517dc9806edb4bf2664280cc22",
+  "start": {
+    "load": [
+      5.33544921875,
+      7.955078125,
+      6.82861328125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 86.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 67.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 35.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 10.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      "  9.8 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "7d4e2153f6bb830117174da4649598d79aa84caff59559eed4cd268a2a5ad421",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.56494140625,
+      7.921875,
+      6.830078125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 80.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 59.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 17.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      "  9.1 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  4.7 /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 65,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/stack-stack-7-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.839166,
+      17.856375,
+      16.979542,
+      0.767834,
+      17.114208,
+      0.683333,
+      17.154708,
+      0.724584,
+      16.888584,
+      16.964375,
+      0.663584,
+      16.941291,
+      0.659916,
+      16.952417,
+      0.663208,
+      16.856792,
+      0.653083,
+      17.110083,
+      0.666417,
+      16.95375,
+      0.65875,
+      16.861667,
+      0.660833,
+      16.912042,
+      0.666708,
+      16.939917,
+      0.666459,
+      16.887334,
+      0.663542,
+      16.952916
+    ],
+    "wysiwyg": [
+      0.740833,
+      17.007334,
+      16.990458,
+      0.723541,
+      17.045458,
+      17.055625,
+      0.745958,
+      16.96625,
+      0.731041,
+      17.0445,
+      0.765167,
+      17.024708,
+      0.728,
+      17.050125,
+      0.732042,
+      16.917333,
+      0.752,
+      16.972959,
+      0.725375,
+      17.022417,
+      0.740834,
+      17.035667,
+      0.73475,
+      17.0035,
+      0.749792,
+      16.968667,
+      0.740959,
+      17.121084,
+      0.739917,
+      16.946042
+    ]
+  },
+  "assertion_failure_lines": [
+    "/tmp/plainsong-replace-wysiwyg/AppTests/EditorHighlightScheduleHostedTests.swift:155: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"17.856375\") is not less than (\"16.0\") - native input including debounce scheduling: [0.839166, 17.856375, 16.979542, 0.767834, 17.114208, 0.683333, 17.154708, 0.724584, 16.888584, 16.964375, 0.663584, 16.941291, 0.659916, 16.952417, 0.663208, 16.856792, 0.653083, 17.110083, 0.666417, 16.95375, 0.65875, 16.861667, 0.660833, 16.912042, 0.666708, 16.939917, 0.666459, 16.887334, 0.663542, 16.952916]",
+    "/tmp/plainsong-replace-wysiwyg/AppTests/EditorHighlightScheduleHostedTests.swift:155: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"17.121084\") is not less than (\"16.0\") - native input including debounce scheduling: [0.740833, 17.007334, 16.990458, 0.723541, 17.045458, 17.055625, 0.745958, 16.96625, 0.731041, 17.0445, 0.765167, 17.024708, 0.728, 17.050125, 0.732042, 16.917333, 0.752, 16.972959, 0.725375, 17.022417, 0.740834, 17.035667, 0.73475, 17.0035, 0.749792, 16.968667, 0.740959, 17.121084, 0.739917, 16.946042]"
+  ],
+  "valid_measurement_batch": true
+}

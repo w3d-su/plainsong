@@ -1,0 +1,114 @@
+{
+  "product": "stack",
+  "iteration": "stack-4",
+  "action": "test-without-building",
+  "product_sha": "2306bdb86eae40517dc9806edb4bf2664280cc22",
+  "start": {
+    "load": [
+      4.89111328125,
+      8.83642578125,
+      6.94873046875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "100.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+      " 25.4 /System/Library/PrivateFrameworks/FileProvider.framework/Support/fileproviderd",
+      " 22.4 /usr/libexec/sysmond",
+      " 19.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 16.2 /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "7d4e2153f6bb830117174da4649598d79aa84caff59559eed4cd268a2a5ad421",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.04150390625,
+      8.74169921875,
+      6.93701171875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 68.1 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+      " 28.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 20.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+      " 12.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 10.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 65,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/stack-stack-4-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.837042,
+      16.039333,
+      15.580083,
+      15.012666,
+      14.242208,
+      0.689959,
+      14.472084,
+      0.740833,
+      14.302834,
+      14.617875,
+      0.674709,
+      14.515458,
+      0.695208,
+      14.248041,
+      0.67575,
+      14.644583,
+      14.2325,
+      0.718042,
+      14.386458,
+      0.704333,
+      14.769792,
+      0.682167,
+      14.64,
+      0.673167,
+      14.178917,
+      0.67175,
+      14.640833,
+      14.296917,
+      0.680208,
+      14.928875
+    ],
+    "wysiwyg": [
+      0.809667,
+      14.839959,
+      14.271,
+      0.78175,
+      14.791292,
+      0.779084,
+      14.31075,
+      0.770875,
+      14.727458,
+      14.765584,
+      0.75,
+      14.9855,
+      14.65425,
+      14.292,
+      0.779125,
+      15.076542,
+      0.826292,
+      14.344,
+      14.894625,
+      0.789625,
+      14.305875,
+      0.838083,
+      14.313291,
+      14.578666,
+      0.783583,
+      14.251292,
+      0.753708,
+      14.693333,
+      0.732667,
+      14.86075
+    ]
+  },
+  "assertion_failure_lines": [
+    "/tmp/plainsong-replace-wysiwyg/AppTests/EditorHighlightScheduleHostedTests.swift:155: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"16.039333\") is not less than (\"16.0\") - native input including debounce scheduling: [0.837042, 16.039333, 15.580083, 15.012666, 14.242208, 0.689959, 14.472084, 0.740833, 14.302834, 14.617875, 0.674709, 14.515458, 0.695208, 14.248041, 0.67575, 14.644583, 14.2325, 0.718042, 14.386458, 0.704333, 14.769792, 0.682167, 14.64, 0.673167, 14.178917, 0.67175, 14.640833, 14.296917, 0.680208, 14.928875]"
+  ],
+  "valid_measurement_batch": true
+}
