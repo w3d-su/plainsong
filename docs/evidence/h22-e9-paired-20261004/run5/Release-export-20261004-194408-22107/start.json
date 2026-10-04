@@ -1,0 +1,22 @@
+{
+  "load": [
+    2.921875,
+    2.9912109375,
+    3.263671875
+  ],
+  "max_load": 6.0,
+  "top_cpu": [
+    " %CPU COMM",
+    " 37.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 30.6 /usr/libexec/siriknowledged",
+    " 17.4 /usr/libexec/swcd",
+    " 12.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+    " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+  ],
+  "build_processes": {},
+  "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+  "smoke": false,
+  "configuration": "Release",
+  "release_testability_override": true,
+  "scheme": "PerformanceTests"
+}

@@ -1,0 +1,16 @@
+{
+  "load": [
+    4.201171875,
+    3.33935546875,
+    3.365234375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 39.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 33.6 /usr/libexec/siriknowledged",
+    " 33.4 /usr/libexec/swcd",
+    " 21.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+    " 18.0 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+  ],
+  "exit_code": 0
+}

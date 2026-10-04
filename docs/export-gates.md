@@ -1270,7 +1270,7 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   `testEveryWriterFailureMapsToAnActionableAccessibleGroup`, and
   `testIndeterminateStatesAndEveryResidueReportRecoveryPathsWithoutClaimingSuccess`.
 - [ ] Keyboard-only HTML acceptance; PDF/Print accessibility and keyboard flows (owner/PR G).
-- [ ] Measure the production offscreen path with a large document, code-heavy/KaTeX/
+- [x] Measure the production offscreen path with a large document, code-heavy/KaTeX/
   Mermaid fixture, and many bounded raster assets in Debug and Release before freezing
   any export-specific wall-clock or memory budget.
 - [ ] Export work never enters the editor keystroke path; the existing < 16 ms typing
@@ -1472,3 +1472,21 @@ E9 remains **pending idle-machine run**. Debug and Release refused load 4.10
 idle admission section in `docs/perf-log.md` and
 `docs/evidence/handoff22-pr138-20261004-retry4.json`. Three qualified runs per configuration
 and owner-only keyboard/VoiceOver acceptance remain pending.
+
+
+### Current Handoff 22 E9 recorded-load evidence - 2026-10-04
+
+The measuring-and-recording bullet is now proven by ten Debug and ten testable-Release
+runs of `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`,
+covering large-1mb.md, the code/KaTeX/Mermaid heavy fixture and 24 distinct bounded
+raster assets. Median/range wall time and sampled host RSS are recorded in
+`docs/perf-log.md`, "Current Export F E9 recorded-load results", with full samples at
+`docs/evidence/handoff22-pr138-20261004-paired-final.json`.
+
+The paired no-export/active-export typing probes and the named 64 MiB writer test
+also ran ten times/configuration. The specified relative-regression rule detects
+no signal; Debug CI is wide and 3/10 export typing values exceed 16 ms. Writer maxima
+are Debug 49.577 ms and Release 24.767 ms, so the hundreds-of-ms trigger is not met.
+These are observed under recorded load; no budgets are frozen. The absolute typing
+budget bullet stays unchecked. Keyboard/VoiceOver, physical input, Powerbox/iCloud
+and full-suite regression acceptance stay open. Product/writer code is unchanged.

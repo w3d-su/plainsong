@@ -1,0 +1,259 @@
+Command line invocation:
+    /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration Debug -destination platform=macOS -parallel-testing-enabled NO -derivedDataPath /private/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug ENABLE_TESTABILITY=YES build-for-testing
+
+Build settings from command line:
+    ENABLE_TESTABILITY = YES
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  EditorKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/EditorKit
+  STTextView: https://github.com/krzyzanowskim/STTextView.git @ 2.3.10
+  TreeSitterMarkdown: https://github.com/tree-sitter-grammars/tree-sitter-markdown.git @ 0.5.3
+  CoreTextSwift: https://github.com/krzyzanowskim/CoreTextSwift @ 0.2.0
+  SwiftTreeSitter: https://github.com/tree-sitter/swift-tree-sitter.git @ 0.10.0
+  MarkdownCore: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/MarkdownCore
+  STTextKitPlus: https://github.com/krzyzanowskim/STTextKitPlus @ 0.3.1
+  Yams: https://github.com/jpsim/Yams.git @ 6.2.2
+  PreviewKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/PreviewKit
+  WorkspaceKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/WorkspaceKit
+  TreeSitter: https://github.com/tree-sitter/tree-sitter @ 0.25.10
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006000-0004042411D2801E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006000-0004042411D2801E, name:My Mac }
+2026-10-04 19:39:15.898 xcodebuild[20806:193244] [MT] DVTAssertions: Warning in IDEFrameworks/IDEFoundation/Testing/IDETestRunSpecificationBuilder.m:463
+Details:  Test host (/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong) for <Xcode3TargetProduct:0x76294112c0:PerformanceTests.xctest blueprint:<Xcode3Target:0x7629c4d180:PerformanceTests>> was not found among the preferred buildables but a match was found in the workspace-wide search.
+Object:   <IDETestRunSpecificationBuilder>
+Method:   +hostBuildableProductForBuildable:buildParameters:workspace:preferredBuildables:
+Thread:   <_NSMainThread: 0x102a79170>{number = 1, name = main}
+Please file a bug at https://feedbackassistant.apple.com with this warning message and any useful information you can provide.
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (36 targets)
+    Target 'PerformanceTests' in project 'Plainsong'
+        ➜ Explicit dependency on target 'Plainsong' in project 'Plainsong'
+    Target 'Plainsong' in project 'Plainsong'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'EditorKit-product' in project 'EditorKit'
+        ➜ Explicit dependency on target 'PreviewKit-product' in project 'PreviewKit'
+        ➜ Explicit dependency on target 'WorkspaceKit-product' in project 'WorkspaceKit'
+    Target 'WorkspaceKit-product' in project 'WorkspaceKit'
+        ➜ Explicit dependency on target 'WorkspaceKit' in project 'WorkspaceKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+    Target 'WorkspaceKit' in project 'WorkspaceKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+    Target 'PreviewKit-product' in project 'PreviewKit'
+        ➜ Explicit dependency on target 'PreviewKit' in project 'PreviewKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+    Target 'PreviewKit' in project 'PreviewKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+    Target 'EditorKit-product' in project 'EditorKit'
+        ➜ Explicit dependency on target 'EditorKit' in project 'EditorKit'
+        ➜ Explicit dependency on target 'TreeSitterTSXFixed' in project 'EditorKit'
+        ➜ Explicit dependency on target 'TreeSitterYAMLFixed' in project 'EditorKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'STTextView-product' in project 'STTextView'
+        ➜ Explicit dependency on target 'SwiftTreeSitter-product' in project 'SwiftTreeSitter'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown-product' in project 'TreeSitterMarkdown'
+    Target 'EditorKit' in project 'EditorKit'
+        ➜ Explicit dependency on target 'TreeSitterTSXFixed' in project 'EditorKit'
+        ➜ Explicit dependency on target 'TreeSitterYAMLFixed' in project 'EditorKit'
+        ➜ Explicit dependency on target 'MarkdownCore-product' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'STTextView-product' in project 'STTextView'
+        ➜ Explicit dependency on target 'SwiftTreeSitter-product' in project 'SwiftTreeSitter'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown-product' in project 'TreeSitterMarkdown'
+    Target 'TreeSitterMarkdown-product' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdownInline' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown_TreeSitterMarkdown' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown_TreeSitterMarkdownInline' in project 'TreeSitterMarkdown'
+    Target 'TreeSitterMarkdownInline' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown_TreeSitterMarkdownInline' in project 'TreeSitterMarkdown'
+    Target 'TreeSitterMarkdown_TreeSitterMarkdownInline' in project 'TreeSitterMarkdown' (no dependencies)
+    Target 'TreeSitterMarkdown' in project 'TreeSitterMarkdown'
+        ➜ Explicit dependency on target 'TreeSitterMarkdown_TreeSitterMarkdown' in project 'TreeSitterMarkdown'
+    Target 'TreeSitterMarkdown_TreeSitterMarkdown' in project 'TreeSitterMarkdown' (no dependencies)
+    Target 'SwiftTreeSitter-product' in project 'SwiftTreeSitter'
+        ➜ Explicit dependency on target 'SwiftTreeSitter' in project 'SwiftTreeSitter'
+        ➜ Explicit dependency on target 'TreeSitter-product' in project 'TreeSitter'
+    Target 'SwiftTreeSitter' in project 'SwiftTreeSitter'
+        ➜ Explicit dependency on target 'TreeSitter-product' in project 'TreeSitter'
+    Target 'TreeSitter-product' in project 'TreeSitter'
+        ➜ Explicit dependency on target 'TreeSitter' in project 'TreeSitter'
+    Target 'TreeSitter' in project 'TreeSitter' (no dependencies)
+    Target 'STTextView-product' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextView' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUI' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STObjCLandShim' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUICommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUIAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'CoreTextSwift-product' in project 'CoreTextSwift'
+    Target 'STTextViewSwiftUI' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STObjCLandShim' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextView' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUICommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUIAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'CoreTextSwift-product' in project 'CoreTextSwift'
+    Target 'STTextViewSwiftUIAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STObjCLandShim' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextView' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewSwiftUICommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'CoreTextSwift-product' in project 'CoreTextSwift'
+    Target 'STTextViewSwiftUICommon' in project 'STTextView' (no dependencies)
+    Target 'STTextView' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STObjCLandShim' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'CoreTextSwift-product' in project 'CoreTextSwift'
+    Target 'STTextViewAppKit' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STObjCLandShim' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'CoreTextSwift-product' in project 'CoreTextSwift'
+    Target 'CoreTextSwift-product' in project 'CoreTextSwift'
+        ➜ Explicit dependency on target 'CoreTextSwift' in project 'CoreTextSwift'
+    Target 'CoreTextSwift' in project 'CoreTextSwift' (no dependencies)
+    Target 'STObjCLandShim' in project 'STTextView' (no dependencies)
+    Target 'STTextViewCommon' in project 'STTextView'
+        ➜ Explicit dependency on target 'STTextKitPlus-product' in project 'STTextKitPlus'
+    Target 'STTextKitPlus-product' in project 'STTextKitPlus'
+        ➜ Explicit dependency on target 'STTextKitPlus' in project 'STTextKitPlus'
+    Target 'STTextKitPlus' in project 'STTextKitPlus' (no dependencies)
+    Target 'TreeSitterYAMLFixed' in project 'EditorKit' (no dependencies)
+    Target 'TreeSitterTSXFixed' in project 'EditorKit' (no dependencies)
+    Target 'MarkdownCore-product' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'MarkdownCore' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'Yams-product' in project 'Yams'
+    Target 'MarkdownCore' in project 'MarkdownCore'
+        ➜ Explicit dependency on target 'Yams-product' in project 'Yams'
+    Target 'Yams-product' in project 'Yams'
+        ➜ Explicit dependency on target 'Yams' in project 'Yams'
+        ➜ Explicit dependency on target 'CYaml' in project 'Yams'
+    Target 'Yams' in project 'Yams'
+        ➜ Explicit dependency on target 'CYaml' in project 'Yams'
+    Target 'CYaml' in project 'Yams' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -x objective-c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ReadFileContents /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/share/docc/features.json
+
+Build description signature: 78373a89608cb7fc27d762848030d1c0
+Build description path: /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/XCBuildData/78373a89608cb7fc27d762848030d1c0.xcbuilddata
+ClangStatCache /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache
+    cd /Users/davis._.su/Documents/plainsong-export-html-command/Plainsong.xcodeproj
+    /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -o /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache
+
+ProcessInfoPlistFile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle/Contents/Info.plist /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/TreeSitterMarkdown.build/Debug/TreeSitterMarkdown_TreeSitterMarkdown-b.build/empty-TreeSitterMarkdown_TreeSitterMarkdown.plist (in target 'TreeSitterMarkdown_TreeSitterMarkdown' from project 'TreeSitterMarkdown')
+    cd /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/SourcePackages/checkouts/tree-sitter-markdown
+    builtin-infoPlistUtility /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/TreeSitterMarkdown.build/Debug/TreeSitterMarkdown_TreeSitterMarkdown-b.build/empty-TreeSitterMarkdown_TreeSitterMarkdown.plist -producttype com.apple.product-type.bundle -expandbuildsettings -platform macosx -o /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle/Contents/Info.plist
+
+ProcessInfoPlistFile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle/Contents/Info.plist /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/TreeSitterMarkdown.build/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline-b.build/empty-TreeSitterMarkdown_TreeSitterMarkdownInline.plist (in target 'TreeSitterMarkdown_TreeSitterMarkdownInline' from project 'TreeSitterMarkdown')
+    cd /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/SourcePackages/checkouts/tree-sitter-markdown
+    builtin-infoPlistUtility /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/TreeSitterMarkdown.build/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline-b.build/empty-TreeSitterMarkdown_TreeSitterMarkdownInline.plist -producttype com.apple.product-type.bundle -expandbuildsettings -platform macosx -o /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle/Contents/Info.plist
+
+Copy /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources
+
+Copy /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdown.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources
+
+CopySwiftLibs /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Frameworks --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Library/SystemExtensions --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Extensions --platform macosx --toolchain /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+
+ProcessInfoPlistFile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Info.plist /Users/davis._.su/Documents/plainsong-export-html-command/App/Info.plist (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-infoPlistUtility /Users/davis._.su/Documents/plainsong-export-html-command/App/Info.plist -producttype com.apple.product-type.application -genpkginfo /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/assetcatalog_generated_info.plist -scanforprivacyfile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdown.bundle -scanforprivacyfile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle -o /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/Info.plist
+
+Copy /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle (in target 'PerformanceTests' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources
+
+Copy /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdown.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle (in target 'PerformanceTests' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/TreeSitterMarkdown_TreeSitterMarkdown.bundle /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources
+
+ProcessInfoPlistFile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Info.plist /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/PerformanceTests.build/empty-PerformanceTests.plist (in target 'PerformanceTests' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-infoPlistUtility /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/PerformanceTests.build/empty-PerformanceTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -platform macosx -scanforprivacyfile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdown.bundle -scanforprivacyfile /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Resources/TreeSitterMarkdown_TreeSitterMarkdownInline.bundle -o /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Info.plist
+
+CopySwiftLibs /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest (in target 'PerformanceTests' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/MacOS/PerformanceTests --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Frameworks --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/PlugIns --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Library/SystemExtensions --scan-folder /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Extensions --platform macosx --toolchain /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/Contents/Frameworks --strip-bitcode --scan-executable /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/PerformanceTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+
+CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
+/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib: replacing existing signature
+
+CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
+/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib: replacing existing signature
+
+CodeSign /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --entitlements /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app
+/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app: replacing existing signature
+
+Validate /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    builtin-validationUtility /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+
+RegisterWithLaunchServices /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
+    cd /Users/davis._.su/Documents/plainsong-export-html-command
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Products/Debug/Plainsong.app
+
+PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+PruneExplicitPrecompiledModules /tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Debug/Build/Intermediates.noindex/ExplicitPrecompiledModules
+
+** TEST BUILD SUCCEEDED **
+

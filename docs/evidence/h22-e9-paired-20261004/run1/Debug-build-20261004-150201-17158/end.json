@@ -1,0 +1,16 @@
+{
+  "load": [
+    12.94921875,
+    8.3193359375,
+    7.96240234375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    "138.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+    " 19.3 /usr/libexec/spotlightknowledged.updater",
+    " 14.8 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+    " 11.2 /System/Library/PrivateFrameworks/ChronoCore.framework/Support/chronod",
+    "  8.1 /usr/libexec/sharingd"
+  ],
+  "exit_code": 0
+}

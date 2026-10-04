@@ -1,0 +1,22 @@
+{
+  "load": [
+    4.201171875,
+    3.33935546875,
+    3.365234375
+  ],
+  "max_load": 6.0,
+  "top_cpu": [
+    " %CPU COMM",
+    " 68.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+    " 35.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+    " 26.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 20.4 /usr/libexec/siriknowledged",
+    " 17.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+  ],
+  "build_processes": {},
+  "product_sha": "9c4fab94745843495142609e3392b306b9250da1",
+  "smoke": false,
+  "configuration": "Release",
+  "release_testability_override": true,
+  "scheme": "PerformanceTests"
+}

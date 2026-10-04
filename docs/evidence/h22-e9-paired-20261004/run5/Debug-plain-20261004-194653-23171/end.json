@@ -1,0 +1,16 @@
+{
+  "load": [
+    5.55224609375,
+    3.75048828125,
+    3.5029296875
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 24.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 12.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    " 10.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+    "  8.4 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+    "  6.1 /usr/libexec/coreduetd"
+  ],
+  "exit_code": 0
+}

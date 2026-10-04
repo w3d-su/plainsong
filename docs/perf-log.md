@@ -1394,3 +1394,85 @@ Scripts/run-export-html-e9.sh Debug
 Scripts/run-export-html-e9.sh Release
 # Obtain at least three qualified runs per configuration.
 ```
+
+
+## Current Export F E9 recorded-load results - 2026-10-04
+
+**Complete: ten Debug and ten testable-Release export runs, each paired with a
+same-session/configuration no-export typing batch.** Debug/Release were interleaved;
+build-for-testing occurred once per scheme/configuration, then all measurement
+batches used test-without-building. Candidate `9c4fab94745843495142609e3392b306b9250da1` includes main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. This supersedes earlier idle-pending
+measurement entries. It is **observed under recorded load**, not idle acceptance.
+
+Every batch passed inside-lock load <=6 and no other named compiler processes;
+start load `1.58-5.55`, end `1.69-5.55`.
+Top five CPU processes and product SHA are retained for each batch. Owner confirmed
+quiet readiness. Release retains -O but enables existing @testable seams, which can
+affect timing/optimization; these are testable-Release, not retail-binary numbers.
+The dedicated PerformanceTests scheme avoids unrelated Debug-only AppTests. Earlier
+build/array/signature failures and their fixes are preserved as historical logs.
+
+Production offscreen export: 30 wall-time samples per fixture/configuration and ten
+peak sampled host RSS values, with 24 distinct bounded PNG paths. Values are median
+(range); wall time includes the full production command path:
+
+| Configuration / fixture | Wall ms median (range) | Peak sampled host RSS MiB median (range) |
+|---|---|---|
+| Debug large-1mb.md | 2186.268 (2127.153-2311.474) | 183.711 (181.703-193.188) |
+| Debug export-f-heavy.md | 1086.125 (1049.820-1141.593) | 184.297 (182.328-193.906) |
+| Release large-1mb.md | 2196.496 (2132.693-2389.395) | 177.016 (173.094-181.797) |
+| Release export-f-heavy.md | 1081.214 (1039.884-1131.938) | 177.148 (171.844-180.703) |
+
+RSS is sampled every 5 ms for the host, not an exact OS high-water mark or WebKit
+helper-process memory. Real iCloud materialization/coordination remains owner work.
+
+Typing (native input plus scheduled public-view update; one keystroke per batch):
+
+| Config | No-export median / p95 / max ms | Active-export median / p95 / max ms | Median B-A; bootstrap 95% CI ms | B worse | >16 ms A / B |
+|---|---|---|---|---|---|
+| Debug | 13.917 / 15.524 / 15.571 | 6.085 / 31.922 / 36.191 | -5.759; [-9.641, 10.212] | 3/10 | 0% / 30% |
+| Release | 13.738 / 15.057 / 15.142 | 5.769 / 11.123 / 11.340 | -6.063; [-8.583, -3.949] | 1/10 | 0% / 0% |
+
+One sample means each batch's median/p95/max coincide; all ten pair differences
+are in JSON. Bootstrap uses 10,000 resamples, seed 20261004. Neither configuration
+meets CI entirely above +0.5 ms and B worse in >=8/10 pairs: **no regression signal
+detected under recorded load**. Debug has a wide CI (~19.85 ms), so meaningful
+median penalties cannot be excluded; 3/10 active-export samples exceeded 16 ms,
+maximum ~36.19 ms. These are reported, not declared harmless or a green absolute
+budget. Release has no >16 ms sample but does not establish idle/physical acceptance.
+
+Synchronous main-actor writeExportArtifact at 64 MiB (30 samples/configuration;
+allocation outside timer), milliseconds:
+
+| Config | Median ms | Range ms |
+|---|---|---|
+| Debug | 17.869 | 14.925-49.577 |
+| Release | 15.097 | 14.013-24.767 |
+
+No relative-regression trigger or hundreds-of-ms writer sample occurred, so the
+specified writer-off-main owner decision trigger is not met. This does not prove
+absence of all UI stalls. No writer changes or export-specific budget was frozen.
+
+Named tests: `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`,
+`testSixtyFourMiBWriterMainActorTime`,
+`AppBackedEditorPerformanceTests.testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget`,
+and `testTypingWithoutHTMLExportForRecordedLoadComparison`. All 40 batches produced
+complete named samples and valid functional checks; three Debug export batches
+exited 65 solely for the existing 16 ms assertion. Other 37 batches exited 0.
+
+Evidence: `docs/evidence/handoff22-pr138-20261004-paired-final.json`; raw logs and start/end snapshots under
+`docs/evidence/h22-e9-paired-20261004/`. xcresults are retained at paths in JSON.
+Only E9's measuring-and-recording checkbox is closed. Absolute 16 ms, keyboard,
+VoiceOver, Powerbox/iCloud and broad regression-suite acceptance remain open.
+Pinned lint, Bash syntax, bootstrap boundary and diff checks passed; no full-suite
+or current-head CI green claim is made.
+
+Exact full-run command (after fetch/merge main if necessary; pause other builds/tests):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+/usr/bin/python3 Scripts/run-export-html-e9-paired.py
+```

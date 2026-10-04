@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.0390625,
+    3.02734375,
+    3.29296875
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 40.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 25.2 /usr/libexec/siriknowledged",
+    " 19.4 /usr/libexec/swcd",
+    " 17.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  9.9 /usr/libexec/coreduetd"
+  ],
+  "exit_code": 0
+}
