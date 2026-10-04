@@ -1674,3 +1674,18 @@ Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
 `docs/evidence/handoff22-pr136-20261004-retry3.json`. Exact rerun commands remain
 in the first Handoff 22 admission section above; fetch/merge main, regenerate
 projects and remeasure before claiming a later head. Budgets remain unchanged.
+
+
+## Handoff 22 third idle admission attempt - 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** Prepared stacked candidate
+`284a61f1e40a57e10f4d734155dd8f7996419850`, clean baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed readiness, but
+baseline admission refused all eleven checks over five minutes at loads
+18.10-86.29 (require <3); exit 75. No product build or A/B comparison was reached.
+Zero samples, no maxima/medians, 16 ms pass/fail or regression conclusion.
+Latest #136 docs-only evidence is merged; historical loaded runs remain diagnostics.
+
+Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
+`docs/evidence/handoff22-pr137-20261004-retry3.json`. Exact shared-lock/environment
+rerun commands remain above. R9, real IME and owner-only gates remain open.
