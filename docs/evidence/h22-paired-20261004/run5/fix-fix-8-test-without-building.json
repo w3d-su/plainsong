@@ -1,0 +1,114 @@
+{
+  "product": "fix",
+  "iteration": "fix-8",
+  "action": "test-without-building",
+  "product_sha": "e438ac19c91388326280e39bcfafc104fa8bc58c",
+  "start": {
+    "load": [
+      5.30419921875,
+      4.5576171875,
+      3.9326171875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 78.9 /usr/sbin/spindump",
+      " 57.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 30.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 18.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 16.7 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      12.5859375,
+      6.13916015625,
+      4.50634765625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "138.0 /Library/Application Support/Logitech.localized/LogiOptionsPlus/logioptionsplus_agent.app/Contents/MacOS/logioptionsplus_agent",
+      " 28.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 23.1 /Library/Application Support/Logitech.localized/LogiOptionsPlus/logioptionsplus_agent.app/Contents/Frameworks/logioptionsplus_updater.app/Contents/MacOS/logioptionsplus_updater",
+      " 18.6 /usr/libexec/sysmond",
+      " 17.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 65,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/fix-fix-8-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.904333,
+      20.531375,
+      14.301042,
+      0.713541,
+      14.239417,
+      0.673541,
+      14.2755,
+      0.650041,
+      14.192042,
+      0.648667,
+      14.192583,
+      0.6515,
+      14.18725,
+      0.645875,
+      14.219166,
+      0.648208,
+      14.195417,
+      0.652792,
+      14.194875,
+      14.241708,
+      0.659458,
+      14.238834,
+      0.646458,
+      14.1805,
+      0.640125,
+      14.189584,
+      0.644375,
+      14.218625,
+      0.643333,
+      14.257125
+    ],
+    "wysiwyg": [
+      0.737333,
+      14.332625,
+      14.315958,
+      0.709292,
+      14.335375,
+      0.708417,
+      14.192416,
+      0.739334,
+      14.264541,
+      0.703166,
+      14.388125,
+      0.713292,
+      14.253167,
+      0.733209,
+      14.302875,
+      0.712375,
+      14.218375,
+      0.726417,
+      14.269167,
+      0.724792,
+      14.234459,
+      0.733375,
+      14.234292,
+      0.713917,
+      14.286292,
+      0.7175,
+      14.219417,
+      0.749333,
+      14.22975,
+      0.733417
+    ]
+  },
+  "assertion_failure_lines": [
+    "/Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorHighlightScheduleHostedTests.swift:141: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"20.531375\") is not less than (\"16.0\") - native input including debounce scheduling: [0.904333, 20.531375, 14.301042, 0.713541, 14.239417, 0.673541, 14.2755, 0.650041, 14.192042, 0.648667, 14.192583, 0.6515, 14.18725, 0.645875, 14.219166, 0.648208, 14.195417, 0.652792, 14.194875, 14.241708, 0.659458, 14.238834, 0.646458, 14.1805, 0.640125, 14.189584, 0.644375, 14.218625, 0.643333, 14.257125]"
+  ],
+  "valid_measurement_batch": true
+}

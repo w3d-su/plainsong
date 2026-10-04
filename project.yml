@@ -113,6 +113,8 @@ targets:
     platform: macOS
     sources:
       - path: AppTests
+      - path: Fixtures/large-1mb.md
+        buildPhase: resources
       - path: Fixtures/export-e0-markdown.md
         buildPhase: resources
       - path: Fixtures/export-e0-mdx.mdx
