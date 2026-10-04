@@ -1621,3 +1621,22 @@ for root in "$PLAINSONG_BASELINE_ROOT" "$PLAINSONG_FIX_ROOT" "$PLAINSONG_STACK_R
 done
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
 ```
+
+
+## Handoff 22 retry after handoff 23 — 2026-10-04 (PR #136)
+
+**Idle measurement still pending.** After PR #141 normal CI run 37178629394
+passed at `323f672`, the five-minute typing admission was retried at candidate
+`54ca2161d890ec7ae267bef90c333100f528a17e` against clean baseline `4cef0ccf44e422ad22ab34c4319a46c42e69b009`.
+No other xcodebuild was present before admission. All eleven inside-lock checks
+refused loads 3.24–4.74 (require <3); exit 75. No build or typing
+probe ran and no performance samples exist for this retry. Maxima, medians and
+pass/fail against 16 ms remain unmeasured; there is no regression conclusion.
+The prior loaded runs remain diagnostics. Heavy-app/other-agent shutdown was
+requested again before this retry.
+
+Raw log: `docs/evidence/h22-post23-idle-admission.log`; JSON:
+`docs/evidence/handoff22-pr136-20261004-post23-admission.json`. The exact idle rerun
+commands are in the preceding Handoff 22 admission section. Fetch/merge main,
+regenerate the three projects and remeasure before treating a future head as proven.
+No budgets or owner-only gates changed.
