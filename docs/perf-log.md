@@ -1791,3 +1791,59 @@ export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedu
 export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
+
+
+## Paired typing comparison under recorded load - 2026-10-04 (PR #136)
+
+**Still pending: zero complete pairs out of the required ten per mode.** This
+supersedes the earlier idle-admission status as the current measurement plan.
+True idle / absolute 16 ms acceptance remains with R9, PR I or an owner run;
+the historical idle attempts above remain historical admission records.
+
+Candidate `8360954ab845db9f233697f246fcf41c36588965`; baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed other builds/tests were paused,
+heavy-app shutdown, power and non-use readiness. The ceiling is 6, checked inside
+the shared non-blocking lock together with exact-name compiler-process exclusion.
+Every attempt records load and top five CPU processes; each batch records SHA.
+The helper now generates projects after installing the isolated baseline test
+probe. Its timed function and fixture hashes match all three products.
+
+The first attempt ran zero baseline tests and was rejected. The second produced
+one baseline batch (30 source-only and 30 WYSIWYG samples) but no candidate
+samples: the candidate main thread blocked in `open` while reading its Documents
+fixture, captured in the committed process sample. The owned runner and host were
+terminated. Test-only fixture loading now uses the test bundle, including an
+isolated resource-manifest overlay on baseline. The latest baseline build passed;
+latest fix/stack bundled-probe builds were not admitted. No product code changed.
+The last two attempts each exhausted the five-minute wait; the latest stopped
+before the candidate build. No complete comparison exists. The earlier one-sided
+baseline values are diagnostic and are not a candidate verdict.
+
+The requested analysis is median/p95/max per batch, B-minus-A pair differences,
+10,000 fixed-seed bootstrap resamples and a 95% CI of each median pair difference.
+A regression signal needs CI wholly above +0.5 ms and candidate worse in at least
+80% of pairs; otherwise the completed comparison reports no detected signal under
+recorded load, with CI-width sensitivity. No documented warm-up is discarded.
+Fractions over 16 ms for both products are observations, never absolute acceptance.
+With zero complete pairs, medians/p95 differences, bootstrap CI and verdict remain
+unavailable; there is no regression or absolute-budget conclusion and no gate closure.
+
+Evidence: `docs/evidence/handoff22-pr136-20261004-paired.json`. Committed raw logs and rejected-attempt
+metadata: `docs/evidence/h22-paired-20261004/`; xcresult paths remain in each JSON.
+Pinned `make lint` passed (existing warnings, zero serious), statistical boundary
+checks passed, and `git diff --check` is clean. A full correctness suite was not run.
+
+Before retrying, fetch/merge main if it advances, prepare a clean detached baseline
+at the fix/main merge base, pause other builds/tests and leave the Mac on power.
+The helper installs its test-only baseline overlay before generating/building.
+Use a new evidence directory for each run (the default is timestamped):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
+```

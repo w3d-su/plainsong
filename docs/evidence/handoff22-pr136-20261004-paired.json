@@ -1,0 +1,3204 @@
+{
+  "pr": 136,
+  "date": "2026-10-04 Asia/Taipei",
+  "status": "still pending; zero complete pairs",
+  "label": "observed under recorded load; no absolute idle verdict",
+  "candidate_product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+  "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "latest_run": {
+    "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+    "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+    "max_load": 6.0,
+    "requested_pairs": 10,
+    "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+    "product_shas": {
+      "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+      "fix": "8360954ab845db9f233697f246fcf41c36588965",
+      "stack": "142efcf7daad63bd41c9485a90cbe011bbc85de3"
+    },
+    "batches": [
+      {
+        "product": "main",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+        "start": {
+          "load": [
+            5.35595703125,
+            7.142578125,
+            7.931640625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            " 47.5 /usr/libexec/dasd",
+            " 20.8 /usr/libexec/PerfPowerServices",
+            " 19.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 19.0 /usr/libexec/sysmond",
+            " 12.8 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd"
+          ],
+          "build_processes": {}
+        },
+        "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+        "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+        "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+        "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+        "end": {
+          "load": [
+            6.35107421875,
+            7.30126953125,
+            7.978515625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            " 65.0 /usr/libexec/dasd",
+            " 25.3 /usr/libexec/PerfPowerServices",
+            " 18.1 /usr/libexec/sysmond",
+            " 17.8 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+            " 16.5 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd"
+          ],
+          "build_processes": {}
+        },
+        "exit_code": 0,
+        "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run4/main-0-build-for-testing.log",
+        "samples": {},
+        "valid_measurement_batch": true
+      }
+    ],
+    "status": "still pending; quiet-machine admission timeout",
+    "admission_checks": [
+      {
+        "product": "main",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            5.35595703125,
+            7.142578125,
+            7.931640625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            " 47.5 /usr/libexec/dasd",
+            " 20.8 /usr/libexec/PerfPowerServices",
+            " 19.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 19.0 /usr/libexec/sysmond",
+            " 12.8 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            6.35107421875,
+            7.30126953125,
+            7.978515625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            " 67.4 /usr/libexec/dasd",
+            " 22.9 /usr/libexec/PerfPowerServices",
+            " 20.4 /usr/libexec/sysmond",
+            " 14.9 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+            " 14.0 /usr/libexec/siriknowledged"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            6.1640625,
+            7.14697265625,
+            7.89794921875
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "106.2 /usr/libexec/dasd",
+            " 60.1 /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/Versions/A/knowledgeconstructiond",
+            " 36.2 /usr/libexec/PerfPowerServices",
+            " 20.6 /sbin/launchd",
+            " 18.6 /usr/libexec/sysmond"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            6.02978515625,
+            6.9951171875,
+            7.814453125
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "266.4 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 98.1 /usr/libexec/dasd",
+            " 22.8 /sbin/launchd",
+            " 19.2 /usr/libexec/PerfPowerServices",
+            " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.38134765625,
+            7.2197265625,
+            7.8662109375
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "240.2 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 61.5 /usr/libexec/dasd",
+            " 27.0 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd",
+            " 21.6 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+            " 15.4 /sbin/launchd"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.5732421875,
+            7.29052734375,
+            7.869140625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "155.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            "102.3 /usr/libexec/dasd",
+            " 23.1 /sbin/launchd",
+            " 23.0 /usr/libexec/sysmond",
+            " 22.7 /usr/libexec/PerfPowerServices"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.267578125,
+            7.2705078125,
+            7.8427734375
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "270.8 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 77.8 /usr/libexec/dasd",
+            " 19.8 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+            " 19.1 /sbin/launchd",
+            " 12.3 /usr/libexec/PerfPowerServices"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.091796875,
+            7.22705078125,
+            7.806640625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "238.5 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 73.4 /usr/libexec/dasd",
+            " 18.4 /usr/libexec/PerfPowerServices",
+            " 17.4 /sbin/launchd",
+            " 16.7 /usr/libexec/sysmond"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.18115234375,
+            7.24853515625,
+            7.794921875
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "234.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 63.5 /usr/libexec/dasd",
+            " 15.4 /sbin/launchd",
+            " 12.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+            " 12.1 /usr/libexec/PerfPowerServices"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            8.10693359375,
+            7.462890625,
+            7.8525390625
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "254.0 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 78.0 /usr/libexec/dasd",
+            " 19.0 /sbin/launchd",
+            " 17.4 /usr/libexec/sysmond",
+            " 15.2 /usr/libexec/PerfPowerServices"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.92138671875,
+            7.4677734375,
+            7.83935546875
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "240.9 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 70.8 /usr/libexec/dasd",
+            " 32.6 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd",
+            " 27.7 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+            " 19.3 /sbin/launchd"
+          ],
+          "build_processes": {}
+        }
+      },
+      {
+        "product": "fix",
+        "iteration": "0",
+        "action": "build-for-testing",
+        "snapshot": {
+          "load": [
+            7.5615234375,
+            7.4599609375,
+            7.82470703125
+          ],
+          "top_cpu": [
+            "%CPU COMM",
+            "291.8 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+            " 84.5 /usr/libexec/spotlightknowledged.updater",
+            " 16.6 /usr/sbin/cfprefsd",
+            " 14.5 /usr/libexec/sysmond",
+            " 14.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+          ],
+          "build_processes": {}
+        }
+      }
+    ],
+    "analysis": {
+      "fix": {
+        "source-only": {
+          "status": "still pending",
+          "complete_pairs": 0
+        },
+        "wysiwyg": {
+          "status": "still pending",
+          "complete_pairs": 0
+        }
+      },
+      "stack": {
+        "source-only": {
+          "status": "still pending",
+          "complete_pairs": 0
+        },
+        "wysiwyg": {
+          "status": "still pending",
+          "complete_pairs": 0
+        }
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "evidence": {
+        "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+        "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+        "max_load": 6.0,
+        "requested_pairs": 10,
+        "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+        "product_shas": {
+          "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+          "fix": "6aebf1c263dcaa85abbe2150dd343621d1263715",
+          "stack": "3026f97917822ba45779b019efae988bd41657fb"
+        },
+        "batches": [
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "6aebf1c263dcaa85abbe2150dd343621d1263715",
+            "start": {
+              "load": [
+                5.55419921875,
+                8.43701171875,
+                10.14599609375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 54.9 /usr/libexec/dasd",
+                " 44.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 33.3 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 15.3 /sbin/launchd"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                8.9404296875,
+                8.98486328125,
+                10.2919921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 42.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 30.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 21.3 /usr/libexec/siriknowledged",
+                " 20.0 /usr/libexec/eligibilityd",
+                " 19.5 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/fix-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.986328125,
+                7.4169921875,
+                10.1806640625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.5 /usr/libexec/dasd",
+                " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 32.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 17.1 /usr/libexec/sysmond",
+                " 13.6 /sbin/launchd"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                21.93310546875,
+                11.66943359375,
+                11.52587890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 40.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 32.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 17.2 /usr/libexec/swcd",
+                " 13.7 /usr/libexec/sysmond",
+                " 10.4 /usr/libexec/siriknowledged"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.25732421875,
+                7.4140625,
+                9.2998046875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 78.8 /usr/libexec/dasd",
+                " 16.9 /sbin/launchd",
+                " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 13.7 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                4.99609375,
+                7.32373046875,
+                9.2568359375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 51.7 /usr/libexec/dasd",
+                " 42.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 16.2 /sbin/launchd",
+                " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 11.8 /usr/libexec/siriknowledged"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-fix-1-test-without-building.log",
+            "samples": {},
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": false
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "3026f97917822ba45779b019efae988bd41657fb",
+            "start": {
+              "load": [
+                5.669921875,
+                7.75390625,
+                9.62744140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 73.1 /usr/libexec/dasd",
+                " 47.1 /usr/libexec/spotlightknowledged.updater",
+                " 24.2 /usr/libexec/PerfPowerServices",
+                " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 16.5 /sbin/launchd"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "129f632ffba22aae34288d226777096ff1c72a4412be766adccc7f33818bb359",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                9.787109375,
+                8.57470703125,
+                9.87890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 21.5 /usr/libexec/airportd",
+                " 21.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 19.8 /usr/libexec/sysmond",
+                " 17.9 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+                " 13.1 /usr/libexec/dasd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/stack-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          }
+        ],
+        "status": "blocked by build/test failure; no verdict",
+        "admission_checks": [
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.986328125,
+                7.4169921875,
+                10.1806640625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.5 /usr/libexec/dasd",
+                " 42.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 32.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 17.1 /usr/libexec/sysmond",
+                " 13.6 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                21.93310546875,
+                11.66943359375,
+                11.52587890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 44.4 /usr/libexec/swcd",
+                " 40.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 33.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 33.6 /usr/libexec/sysmond",
+                " 11.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                16.58056640625,
+                11.361328125,
+                11.4189453125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 46.9 /usr/libexec/dasd",
+                " 38.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 14.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 14.2 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                12.4814453125,
+                10.85107421875,
+                11.22998046875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 53.0 /usr/libexec/dasd",
+                " 44.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 32.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 15.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 14.7 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                10.466796875,
+                10.50146484375,
+                11.087890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 52.4 /usr/libexec/dasd",
+                " 41.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 32.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 24.0 /usr/libexec/sysmond",
+                " 17.0 /System/Library/CoreServices/NotificationCenter.app/Contents/MacOS/NotificationCenter"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                8.232421875,
+                9.95751953125,
+                10.86962890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 54.7 /usr/libexec/dasd",
+                " 38.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 35.8 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 15.8 /sbin/launchd",
+                " 12.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.96484375,
+                9.47021484375,
+                10.65966796875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 51.2 /usr/libexec/dasd",
+                " 46.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 34.1 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 19.3 /usr/libexec/sysmond",
+                " 13.7 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.87548828125,
+                9.21484375,
+                10.52587890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 53.5 /usr/libexec/dasd",
+                " 43.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 35.9 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 15.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 14.9 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.47705078125,
+                8.890625,
+                10.3623046875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 57.2 /usr/libexec/dasd",
+                " 42.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 34.4 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 16.5 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 15.8 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.55419921875,
+                8.43701171875,
+                10.14599609375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 54.9 /usr/libexec/dasd",
+                " 44.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 33.3 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 15.3 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                8.9404296875,
+                8.98486328125,
+                10.2919921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 31.2 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 20.8 /usr/libexec/sysmond",
+                " 17.3 /usr/libexec/siriknowledged",
+                " 15.8 /usr/libexec/eligibilityd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.212890625,
+                8.56884765625,
+                10.09521484375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 51.9 /usr/libexec/dasd",
+                " 41.1 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 41.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 16.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 16.0 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.56201171875,
+                8.275390625,
+                9.9345703125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 55.1 /usr/libexec/dasd",
+                " 38.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 37.6 /Applications/Claude.app/Contents/Frameworks/Claude Helper.app/Contents/MacOS/Claude Helper",
+                " 23.7 /usr/libexec/sysmond",
+                " 15.7 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.4375,
+                8.09912109375,
+                9.81298828125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 73.3 /usr/libexec/dasd",
+                " 22.6 /sbin/launchd",
+                " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 10.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 10.6 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.669921875,
+                7.75390625,
+                9.62744140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 73.1 /usr/libexec/dasd",
+                " 47.1 /usr/libexec/spotlightknowledged.updater",
+                " 24.2 /usr/libexec/PerfPowerServices",
+                " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 16.5 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                9.787109375,
+                8.57470703125,
+                9.87890625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 21.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 19.6 /usr/libexec/sysmond",
+                " 19.5 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+                " 17.6 /usr/libexec/dasd",
+                " 14.0 /usr/libexec/mdmclient"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                8.0126953125,
+                8.25048828125,
+                9.71484375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 75.1 /usr/libexec/dasd",
+                " 22.8 /sbin/launchd",
+                " 21.3 /usr/libexec/sysmond",
+                " 12.9 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.14208984375,
+                7.7783203125,
+                9.49169921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 73.2 /usr/libexec/dasd",
+                " 22.4 /sbin/launchd",
+                " 15.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 13.2 /usr/libexec/sysmond",
+                " 12.6 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                5.25732421875,
+                7.4140625,
+                9.2998046875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 78.8 /usr/libexec/dasd",
+                " 16.9 /sbin/launchd",
+                " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 13.7 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          }
+        ],
+        "analysis": {
+          "fix": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          },
+          "stack": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          }
+        }
+      },
+      "runner_log": "/private/tmp/h22-paired-run1.log"
+    },
+    {
+      "attempt": 2,
+      "evidence": {
+        "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+        "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+        "max_load": 6.0,
+        "requested_pairs": 10,
+        "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+        "product_shas": {
+          "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+          "fix": "3ee448c2a8fad53430530d11d24b4fe84863a1ef",
+          "stack": "751e6a1a7836964e57032e29b1538ce705dd935d"
+        },
+        "batches": [
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "3ee448c2a8fad53430530d11d24b4fe84863a1ef",
+            "start": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 42.1 /usr/libexec/siriknowledged",
+                " 23.7 /usr/libexec/sysmond",
+                " 20.2 /usr/libexec/dasd",
+                " 20.0 /usr/libexec/eligibilityd",
+                " 11.3 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 54.0 /usr/libexec/dasd",
+                " 31.9 /usr/libexec/eligibilityd",
+                " 15.2 /sbin/launchd",
+                " 13.5 /usr/libexec/linkd",
+                " 10.9 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/fix-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "product_sha": "3ee448c2a8fad53430530d11d24b4fe84863a1ef",
+            "start": {
+              "load": [
+                5.43603515625,
+                6.40625,
+                8.3984375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 75.2 /usr/libexec/dasd",
+                " 21.2 /sbin/launchd",
+                " 13.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 13.4 /usr/libexec/PerfPowerServices",
+                " 11.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "47f4522552fcb2076dbe007beb06f9b518e9efb388b96699fae696ecaa08108c",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                13.53955078125,
+                9.234375,
+                8.958984375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "198.9 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 87.1 /usr/libexec/spotlightknowledged.updater",
+                " 25.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+                " 22.5 /usr/libexec/dasd",
+                " 18.2 /usr/sbin/cfprefsd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": -15,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/fix-fix-1-test-without-building.log",
+            "samples": {},
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": false
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                4.29833984375,
+                6.46826171875,
+                8.71875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 79.6 /usr/libexec/dasd",
+                " 21.7 /sbin/launchd",
+                " 14.7 /usr/libexec/PerfPowerServices",
+                " 11.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 39.0 /usr/libexec/siriknowledged",
+                " 32.2 /usr/libexec/eligibilityd",
+                " 22.9 /usr/libexec/sysmond",
+                " 20.0 /usr/libexec/dasd",
+                " 12.5 /usr/libexec/linkd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/main-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.34521484375,
+                6.56689453125,
+                8.701171875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 56.8 /usr/libexec/dasd",
+                " 34.6 /usr/libexec/sysmond",
+                " 16.7 /sbin/launchd",
+                " 13.9 /usr/libexec/eligibilityd",
+                " 12.4 /System/Library/Frameworks/CoreMedia.framework/Versions/A/XPCServices/com.apple.CMExtensionBroker.xpc/Contents/MacOS/com.apple.CMExtensionBroker"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                6.36376953125,
+                6.720703125,
+                8.71728515625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 56.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 36.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+                " 33.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 28.3 /usr/libexec/dasd",
+                "  9.1 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 65,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/main-fix-1-test-without-building.log",
+            "samples": {
+              "source-only": [
+                0.903917,
+                15.98225,
+                16.287125,
+                0.822209,
+                14.614917,
+                0.717458,
+                14.450625,
+                0.76675,
+                14.363,
+                0.9055,
+                14.640334,
+                0.742417,
+                14.663666,
+                0.713875,
+                14.602292,
+                0.717625,
+                14.355333,
+                0.777459,
+                14.408167,
+                0.668042,
+                14.441083,
+                14.455834,
+                0.722167,
+                14.690708,
+                14.573584,
+                14.546958,
+                0.67875,
+                15.0665,
+                0.70775,
+                14.583875
+              ],
+              "wysiwyg": [
+                1.035708,
+                14.577542,
+                14.650584,
+                0.851583,
+                14.675083,
+                14.693542,
+                0.775958,
+                14.367291,
+                0.867583,
+                14.910417,
+                0.809833,
+                14.8065,
+                0.822958,
+                14.618375,
+                0.776333,
+                14.535708,
+                0.763417,
+                14.714125,
+                14.6085,
+                0.836417,
+                14.784709,
+                14.597959,
+                0.839333,
+                14.650375,
+                0.830584,
+                14.653958,
+                0.779875,
+                14.663125,
+                14.706208,
+                0.878833
+              ]
+            },
+            "assertion_failure_lines": [
+              "/tmp/plainsong-h22-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:89: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"16.287125\") is not less than (\"16.0\") - native input including debounce scheduling: [0.903917, 15.98225, 16.287125, 0.822209, 14.614917, 0.717458, 14.450625, 0.76675, 14.363, 0.9055, 14.640334, 0.742417, 14.663666, 0.713875, 14.602292, 0.717625, 14.355333, 0.777459, 14.408167, 0.668042, 14.441083, 14.455834, 0.722167, 14.690708, 14.573584, 14.546958, 0.67875, 15.0665, 0.70775, 14.583875]"
+            ],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "751e6a1a7836964e57032e29b1538ce705dd935d",
+            "start": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 58.5 /usr/libexec/dasd",
+                " 31.8 /usr/libexec/sysmond",
+                " 16.0 /sbin/launchd",
+                " 14.7 /usr/libexec/eligibilityd",
+                " 12.8 /System/Library/Frameworks/CoreMedia.framework/Versions/A/XPCServices/com.apple.CMExtensionBroker.xpc/Contents/MacOS/com.apple.CMExtensionBroker"
+              ],
+              "build_processes": {}
+            },
+            "probe_sha256": "129f632ffba22aae34288d226777096ff1c72a4412be766adccc7f33818bb359",
+            "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+            "end": {
+              "load": [
+                5.34521484375,
+                6.56689453125,
+                8.701171875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 52.1 /usr/libexec/dasd",
+                " 32.5 /usr/libexec/eligibilityd",
+                " 16.0 /sbin/launchd",
+                " 12.5 /usr/libexec/linkd",
+                " 11.2 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/stack-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          }
+        ],
+        "status": "blocked by build/test failure; no verdict",
+        "admission_checks": [
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                4.29833984375,
+                6.46826171875,
+                8.71875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 79.6 /usr/libexec/dasd",
+                " 21.7 /sbin/launchd",
+                " 14.7 /usr/libexec/PerfPowerServices",
+                " 11.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 42.1 /usr/libexec/siriknowledged",
+                " 23.7 /usr/libexec/sysmond",
+                " 20.2 /usr/libexec/dasd",
+                " 20.0 /usr/libexec/eligibilityd",
+                " 11.3 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.46240234375,
+                6.6103515625,
+                8.72900390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 58.5 /usr/libexec/dasd",
+                " 31.8 /usr/libexec/sysmond",
+                " 16.0 /sbin/launchd",
+                " 14.7 /usr/libexec/eligibilityd",
+                " 12.8 /System/Library/Frameworks/CoreMedia.framework/Versions/A/XPCServices/com.apple.CMExtensionBroker.xpc/Contents/MacOS/com.apple.CMExtensionBroker"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                5.34521484375,
+                6.56689453125,
+                8.701171875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 56.8 /usr/libexec/dasd",
+                " 34.6 /usr/libexec/sysmond",
+                " 16.7 /sbin/launchd",
+                " 13.9 /usr/libexec/eligibilityd",
+                " 12.4 /System/Library/Frameworks/CoreMedia.framework/Versions/A/XPCServices/com.apple.CMExtensionBroker.xpc/Contents/MacOS/com.apple.CMExtensionBroker"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.36376953125,
+                6.720703125,
+                8.71728515625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 69.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 39.0 /usr/libexec/dasd",
+                " 22.3 /usr/libexec/sysmond",
+                " 17.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+                " 12.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.35302734375,
+                6.6826171875,
+                8.63330078125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 63.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 38.2 /usr/libexec/dasd",
+                " 29.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+                " 22.4 /usr/libexec/sysmond",
+                " 13.8 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.03857421875,
+                6.59521484375,
+                8.5341796875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 75.9 /usr/libexec/dasd",
+                " 21.2 /sbin/launchd",
+                " 15.0 /usr/libexec/PerfPowerServices",
+                " 13.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 13.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                5.43603515625,
+                6.40625,
+                8.3984375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 75.2 /usr/libexec/dasd",
+                " 21.2 /sbin/launchd",
+                " 13.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 13.4 /usr/libexec/PerfPowerServices",
+                " 11.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          }
+        ],
+        "analysis": {
+          "fix": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          },
+          "stack": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          }
+        }
+      },
+      "runner_log": "/private/tmp/h22-paired-run2.log"
+    },
+    {
+      "attempt": 3,
+      "evidence": {
+        "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+        "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+        "max_load": 6.0,
+        "requested_pairs": 10,
+        "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+        "product_shas": {
+          "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+          "fix": "8360954ab845db9f233697f246fcf41c36588965",
+          "stack": "142efcf7daad63bd41c9485a90cbe011bbc85de3"
+        },
+        "batches": [
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+            "start": {
+              "load": [
+                5.0595703125,
+                7.74462890625,
+                8.427734375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 67.8 /usr/libexec/dasd",
+                " 29.2 /usr/libexec/siriknowledged",
+                " 23.9 /usr/libexec/sysmond",
+                " 23.0 /usr/libexec/PerfPowerServices",
+                " 20.7 /usr/libexec/eligibilityd"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                4.89453125,
+                7.66552734375,
+                8.3955078125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 26.6 /usr/libexec/eligibilityd",
+                " 19.6 /usr/libexec/dasd",
+                " 15.5 /usr/libexec/linkd",
+                " 11.3 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                "  9.3 /usr/libexec/airportd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+            "start": {
+              "load": [
+                4.232421875,
+                7.33056640625,
+                8.2578125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 87.8 /usr/libexec/dasd",
+                " 28.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 25.9 /usr/libexec/PerfPowerServices",
+                " 22.2 /usr/libexec/sysmond",
+                " 19.1 /sbin/launchd"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                4.34326171875,
+                7.2529296875,
+                8.21923828125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 79.7 /usr/libexec/dasd",
+                " 29.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 25.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 22.6 /usr/libexec/PerfPowerServices",
+                " 19.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-1-test-without-building.log",
+            "samples": {
+              "source-only": [
+                0.912625,
+                14.9925,
+                14.384167,
+                0.776458,
+                14.982417,
+                0.723792,
+                14.253541,
+                0.688584,
+                14.255417,
+                14.445166,
+                0.71,
+                14.618166,
+                14.234542,
+                0.7135,
+                14.548042,
+                0.702084,
+                14.586416,
+                0.662167,
+                14.553708,
+                0.670167,
+                14.37875,
+                0.705333,
+                14.896,
+                0.644875,
+                14.526125,
+                0.677542,
+                14.92375,
+                0.660583,
+                14.694083,
+                0.661208
+              ],
+              "wysiwyg": [
+                0.769042,
+                14.303792,
+                14.344625,
+                0.759125,
+                14.82125,
+                0.75225,
+                14.277167,
+                0.7645,
+                15.073625,
+                0.724584,
+                14.911458,
+                0.76275,
+                14.291042,
+                0.79175,
+                14.336125,
+                14.428625,
+                0.776042,
+                14.228709,
+                0.74375,
+                14.954834,
+                0.726,
+                15.003958,
+                0.788375,
+                14.295,
+                0.762417,
+                14.612709,
+                0.741,
+                14.803125,
+                0.758625,
+                14.377292
+              ]
+            },
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-2",
+            "action": "test-without-building",
+            "product_sha": "8360954ab845db9f233697f246fcf41c36588965",
+            "start": {
+              "load": [
+                5.60302734375,
+                7.3740234375,
+                8.244140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 88.7 /usr/libexec/dasd",
+                " 31.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 27.8 /usr/libexec/PerfPowerServices",
+                " 25.7 /usr/libexec/sysmond",
+                " 19.3 /sbin/launchd"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                5.4365234375,
+                7.279296875,
+                8.2001953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 76.9 /usr/libexec/dasd",
+                " 26.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 25.0 /usr/libexec/PerfPowerServices",
+                " 22.2 /usr/sbin/spindump",
+                " 22.1 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 65,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/fix-fix-2-test-without-building.log",
+            "samples": {
+              "source-only": [
+                0.892042,
+                14.763,
+                14.293916,
+                0.777625,
+                14.920167,
+                0.67975,
+                14.895833,
+                0.697458,
+                14.803792,
+                14.284084,
+                0.665042,
+                14.800167,
+                0.724958,
+                14.585708,
+                0.648708,
+                14.7225,
+                0.645334,
+                14.792958,
+                14.833125,
+                0.672042,
+                14.820084,
+                0.648916,
+                14.915833,
+                0.664958,
+                14.208667,
+                0.668042,
+                15.414,
+                0.69025,
+                14.233292,
+                0.664125
+              ],
+              "wysiwyg": [
+                0.758042,
+                14.208791,
+                14.206334,
+                0.69,
+                14.393958,
+                0.703209,
+                14.294834,
+                0.774291,
+                14.265375,
+                0.725375,
+                14.310834,
+                0.69975,
+                14.18525,
+                0.686375,
+                14.314333,
+                0.716209,
+                14.329917,
+                0.736708,
+                14.299875,
+                0.741708,
+                14.405583,
+                0.771,
+                15.389667,
+                0.728834,
+                14.383375,
+                1.448375,
+                17.417875,
+                15.169625,
+                14.970708,
+                14.832875
+              ]
+            },
+            "assertion_failure_lines": [
+              "/Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorHighlightScheduleHostedTests.swift:141: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"17.417875\") is not less than (\"16.0\") - native input including debounce scheduling: [0.758042, 14.208791, 14.206334, 0.69, 14.393958, 0.703209, 14.294834, 0.774291, 14.265375, 0.725375, 14.310834, 0.69975, 14.18525, 0.686375, 14.314333, 0.716209, 14.329917, 0.736708, 14.299875, 0.741708, 14.405583, 0.771, 15.389667, 0.728834, 14.383375, 1.448375, 17.417875, 15.169625, 14.970708, 14.832875]"
+            ],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.44921875,
+                7.9072265625,
+                8.4921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "103.6 /usr/libexec/dasd",
+                " 29.8 /usr/libexec/PerfPowerServices",
+                " 22.1 /sbin/launchd",
+                " 18.3 /usr/libexec/sysmond",
+                " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                5.0595703125,
+                7.74462890625,
+                8.427734375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 63.7 /usr/libexec/dasd",
+                " 27.6 /usr/libexec/siriknowledged",
+                " 26.6 /usr/libexec/PerfPowerServices",
+                " 21.2 /usr/libexec/sysmond",
+                " 17.3 /usr/libexec/eligibilityd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                4.44921875,
+                7.478515625,
+                8.3203125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 42.1 /usr/libexec/siriknowledged",
+                " 25.6 /usr/libexec/eligibilityd",
+                " 17.0 /usr/libexec/sysmond",
+                " 14.2 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+                " 10.4 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                4.232421875,
+                7.33056640625,
+                8.2578125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 79.1 /usr/libexec/dasd",
+                " 26.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 25.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 21.6 /usr/libexec/PerfPowerServices",
+                " 20.6 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-fix-1-test-without-building.log",
+            "samples": {
+              "source-only": [
+                0.948209,
+                14.391541,
+                14.248667,
+                0.6855,
+                14.232459,
+                0.636459,
+                14.294959,
+                0.632333,
+                14.281167,
+                0.609708,
+                14.143083,
+                0.605667,
+                14.249041,
+                0.619084,
+                14.190084,
+                0.650083,
+                14.204208,
+                0.635375,
+                14.218875,
+                0.694666,
+                14.346459,
+                0.651458,
+                14.1735,
+                0.625459,
+                14.162667,
+                0.587875,
+                14.179042,
+                0.65525,
+                14.156041,
+                0.633166
+              ],
+              "wysiwyg": [
+                0.779334,
+                14.259584,
+                14.321,
+                0.671875,
+                14.249959,
+                0.691084,
+                14.301625,
+                0.726791,
+                14.81575,
+                0.739459,
+                14.454,
+                0.709084,
+                14.512416,
+                0.672208,
+                14.357333,
+                0.677417,
+                14.318166,
+                0.622708,
+                14.276417,
+                0.672375,
+                14.258791,
+                0.71825,
+                14.288833,
+                0.64875,
+                14.235333,
+                0.668,
+                14.2535,
+                0.639333,
+                14.258041,
+                0.666333
+              ]
+            },
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "fix-2",
+            "action": "test-without-building",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                4.3955078125,
+                7.21533203125,
+                8.2001953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 83.4 /usr/libexec/dasd",
+                " 36.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 32.5 /usr/libexec/sysmond",
+                " 21.5 /usr/libexec/PerfPowerServices",
+                " 17.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                5.60302734375,
+                7.3740234375,
+                8.244140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 73.4 /usr/libexec/dasd",
+                " 43.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 24.2 /usr/libexec/PerfPowerServices",
+                " 22.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 19.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-fix-2-test-without-building.log",
+            "samples": {
+              "source-only": [
+                0.907792,
+                14.282875,
+                14.792792,
+                0.705958,
+                14.5915,
+                0.724292,
+                14.193541,
+                0.751333,
+                14.198209,
+                0.710417,
+                14.8575,
+                14.217208,
+                0.682583,
+                14.235292,
+                0.711416,
+                14.57825,
+                0.636042,
+                14.923959,
+                0.656417,
+                14.885875,
+                0.66625,
+                14.162584,
+                0.662666,
+                14.855833,
+                0.672125,
+                14.267334,
+                0.6625,
+                14.178042,
+                0.701291,
+                14.458584
+              ],
+              "wysiwyg": [
+                0.745291,
+                15.006125,
+                14.200958,
+                0.7595,
+                15.061542,
+                0.727167,
+                0.777167,
+                14.82325,
+                0.791709,
+                14.698916,
+                0.769042,
+                14.9915,
+                0.734708,
+                15.030958,
+                0.743708,
+                14.331959,
+                0.699375,
+                14.887583,
+                0.755875,
+                14.288291,
+                0.825041,
+                14.398667,
+                0.696708,
+                14.949125,
+                15.08575,
+                0.76925,
+                14.312833,
+                0.687125,
+                14.997,
+                0.754042
+              ]
+            },
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "main",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.4365234375,
+                7.279296875,
+                8.2001953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 82.0 /usr/libexec/dasd",
+                " 27.5 /usr/sbin/spindump",
+                " 23.9 /usr/libexec/PerfPowerServices",
+                " 19.0 /sbin/launchd",
+                " 16.8 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                6.3916015625,
+                7.396484375,
+                8.22509765625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 80.8 /usr/libexec/dasd",
+                " 30.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+                " 24.6 /usr/libexec/PerfPowerServices",
+                " 19.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 17.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-fix-3-test-without-building.log",
+            "samples": {
+              "source-only": [
+                1.050666,
+                14.632542,
+                14.846958,
+                0.749125,
+                14.214917,
+                0.700417,
+                14.467375,
+                0.7005,
+                14.810625,
+                0.662959,
+                14.169292,
+                0.687375,
+                14.185333,
+                0.719458,
+                14.41175,
+                0.699375,
+                14.983,
+                0.663458,
+                14.172292,
+                0.735125,
+                14.801042,
+                14.858917,
+                0.654709,
+                14.864333,
+                0.648167,
+                14.268459,
+                0.672625,
+                14.610708,
+                0.69,
+                14.455333
+              ],
+              "wysiwyg": [
+                0.739125,
+                14.331958,
+                14.58725,
+                14.898042,
+                0.818667,
+                14.894708,
+                0.768291,
+                14.912125,
+                0.717333,
+                14.943583,
+                0.754459,
+                14.27825,
+                0.792167,
+                14.394833,
+                0.725791,
+                14.992333,
+                0.738292,
+                14.622625,
+                0.786083,
+                14.266167,
+                0.76775,
+                14.694666,
+                0.705084,
+                14.83375,
+                0.75075,
+                14.3265,
+                14.973333,
+                0.798459,
+                14.686416,
+                0.69575
+              ]
+            },
+            "assertion_failure_lines": [],
+            "valid_measurement_batch": true
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "142efcf7daad63bd41c9485a90cbe011bbc85de3",
+            "start": {
+              "load": [
+                4.89453125,
+                7.66552734375,
+                8.3955078125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 30.4 /usr/libexec/sysmond",
+                " 21.5 /usr/libexec/eligibilityd",
+                " 13.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 11.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 10.4 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "7d4e2153f6bb830117174da4649598d79aa84caff59559eed4cd268a2a5ad421",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                4.44921875,
+                7.478515625,
+                8.3203125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 34.7 /usr/libexec/siriknowledged",
+                " 27.5 /usr/libexec/eligibilityd",
+                " 14.0 /usr/libexec/linkd",
+                " 11.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 11.5 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/stack-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          }
+        ],
+        "status": "still pending; quiet-machine admission timeout",
+        "admission_checks": [
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                12.63037109375,
+                9.37255859375,
+                9.0166015625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "112.4 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 37.2 /usr/libexec/spotlightknowledged.updater",
+                " 32.0 /usr/libexec/airportd",
+                " 11.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                "  8.8 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                10.01416015625,
+                9.0869140625,
+                8.92626953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 16.8 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 15.9 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 12.6 /usr/libexec/sysmond",
+                "  7.1 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+                "  1.9 lockf"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.75341796875,
+                8.390625,
+                8.6787109375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 89.6 /usr/libexec/airportd",
+                " 19.3 /System/Library/CoreServices/talagentd",
+                " 14.8 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 14.2 /usr/libexec/sysmond",
+                " 13.4 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.44921875,
+                7.9072265625,
+                8.4921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "103.6 /usr/libexec/dasd",
+                " 29.8 /usr/libexec/PerfPowerServices",
+                " 22.1 /sbin/launchd",
+                " 18.3 /usr/libexec/sysmond",
+                " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.0595703125,
+                7.74462890625,
+                8.427734375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 67.8 /usr/libexec/dasd",
+                " 29.2 /usr/libexec/siriknowledged",
+                " 23.9 /usr/libexec/sysmond",
+                " 23.0 /usr/libexec/PerfPowerServices",
+                " 20.7 /usr/libexec/eligibilityd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "stack",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                4.89453125,
+                7.66552734375,
+                8.3955078125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 30.4 /usr/libexec/sysmond",
+                " 21.5 /usr/libexec/eligibilityd",
+                " 13.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+                " 11.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 10.4 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                4.44921875,
+                7.478515625,
+                8.3203125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 42.1 /usr/libexec/siriknowledged",
+                " 25.6 /usr/libexec/eligibilityd",
+                " 17.0 /usr/libexec/sysmond",
+                " 14.2 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+                " 10.4 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-1",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                4.232421875,
+                7.33056640625,
+                8.2578125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 87.8 /usr/libexec/dasd",
+                " 28.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 25.9 /usr/libexec/PerfPowerServices",
+                " 22.2 /usr/libexec/sysmond",
+                " 19.1 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-2",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                4.3955078125,
+                7.21533203125,
+                8.2001953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 83.4 /usr/libexec/dasd",
+                " 36.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 32.5 /usr/libexec/sysmond",
+                " 21.5 /usr/libexec/PerfPowerServices",
+                " 17.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-2",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                5.60302734375,
+                7.3740234375,
+                8.244140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 88.7 /usr/libexec/dasd",
+                " 31.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 27.8 /usr/libexec/PerfPowerServices",
+                " 25.7 /usr/libexec/sysmond",
+                " 19.3 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "main",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                5.4365234375,
+                7.279296875,
+                8.2001953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 82.0 /usr/libexec/dasd",
+                " 27.5 /usr/sbin/spindump",
+                " 23.9 /usr/libexec/PerfPowerServices",
+                " 19.0 /sbin/launchd",
+                " 16.8 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.3916015625,
+                7.396484375,
+                8.22509765625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 91.5 /usr/libexec/dasd",
+                " 34.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 31.8 /usr/libexec/sysmond",
+                " 26.0 /usr/libexec/PerfPowerServices",
+                " 19.6 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.39013671875,
+                7.2568359375,
+                8.14208984375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 77.3 /usr/libexec/spotlightknowledged.updater",
+                " 43.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
+                " 25.4 /Applications/OneDrive.app/Contents/PlugIns/OneDrive File Provider.appex/Contents/MacOS/OneDrive File Provider",
+                " 22.1 /usr/libexec/sysmond",
+                " 21.7 /Applications/OneDrive.app/Contents/PlugIns/OneDrive File Provider.appex/Contents/MacOS/OneDrive File Provider"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                7.94140625,
+                7.5361328125,
+                8.21142578125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "130.4 /usr/libexec/spotlightknowledged.updater",
+                " 94.1 /usr/libexec/dasd",
+                " 43.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 24.8 /usr/libexec/PerfPowerServices",
+                " 22.2 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                9.20849609375,
+                7.88134765625,
+                8.31201171875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 92.6 /usr/libexec/spotlightknowledged.updater",
+                " 64.0 /usr/libexec/dasd",
+                " 39.4 /sbin/launchd",
+                " 23.6 /System/Library/PrivateFrameworks/IDS.framework/identityservicesd.app/Contents/MacOS/identityservicesd",
+                " 21.9 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                8.86181640625,
+                7.93603515625,
+                8.31689453125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "106.7 /usr/libexec/spotlightknowledged.updater",
+                " 67.5 /usr/libexec/dasd",
+                " 62.0 /sbin/launchd",
+                " 27.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 21.7 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                8.2412109375,
+                7.87646484375,
+                8.28173828125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 85.1 /usr/libexec/spotlightknowledged.updater",
+                " 82.9 /usr/libexec/dasd",
+                " 36.6 /sbin/launchd",
+                " 33.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+                " 27.6 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                8.49072265625,
+                7.955078125,
+                8.29345703125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "124.0 /usr/libexec/spotlightknowledged.updater",
+                " 74.6 /usr/libexec/dasd",
+                " 31.3 /usr/libexec/PerfPowerServices",
+                " 24.5 /sbin/launchd",
+                " 23.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                11.837890625,
+                8.71630859375,
+                8.55126953125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "135.1 /usr/libexec/spotlightknowledged.updater",
+                " 83.1 /usr/libexec/dasd",
+                " 22.4 /usr/libexec/sysmond",
+                " 19.5 /sbin/launchd",
+                " 17.5 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                8.78564453125,
+                8.2666015625,
+                8.392578125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 91.6 /usr/libexec/dasd",
+                " 82.3 /usr/libexec/spotlightknowledged.updater",
+                " 25.4 /usr/libexec/PerfPowerServices",
+                " 21.8 /sbin/launchd",
+                " 16.3 /System/Library/PrivateFrameworks/CoreSuggestions.framework/Versions/A/Support/reversetemplated"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                7.36376953125,
+                7.9814453125,
+                8.28466796875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "111.5 /usr/libexec/spotlightknowledged.updater",
+                " 99.3 /usr/libexec/dasd",
+                " 26.4 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+                " 24.4 /usr/libexec/PerfPowerServices",
+                " 23.6 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "fix-3",
+            "action": "test-without-building",
+            "snapshot": {
+              "load": [
+                6.01806640625,
+                7.59912109375,
+                8.134765625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "105.1 /usr/libexec/dasd",
+                " 84.4 /usr/libexec/spotlightknowledged.updater",
+                " 27.1 /usr/libexec/PerfPowerServices",
+                " 23.0 /sbin/launchd",
+                " 15.4 /usr/sbin/cfprefsd"
+              ],
+              "build_processes": {}
+            }
+          }
+        ],
+        "analysis": {
+          "fix": {
+            "source-only": {
+              "complete_pairs": 2,
+              "baseline": {
+                "count": 60,
+                "median_ms": 14.149562,
+                "p95_ms": 14.855916350000001,
+                "maximum_ms": 14.923959,
+                "fraction_over_16ms": 0.0
+              },
+              "candidate": {
+                "count": 60,
+                "median_ms": 14.233917,
+                "p95_ms": 14.92668335,
+                "maximum_ms": 15.414,
+                "fraction_over_16ms": 0.0
+              },
+              "pairs": [
+                {
+                  "pair": 1,
+                  "baseline": {
+                    "count": 30,
+                    "median_ms": 7.5456460000000005,
+                    "p95_ms": 14.323284,
+                    "maximum_ms": 14.391541,
+                    "fraction_over_16ms": 0.0
+                  },
+                  "candidate": {
+                    "count": 30,
+                    "median_ms": 14.2440415,
+                    "p95_ms": 14.95601685,
+                    "maximum_ms": 14.9925,
+                    "fraction_over_16ms": 0.0
+                  }
+                },
+                {
+                  "pair": 2,
+                  "baseline": {
+                    "count": 30,
+                    "median_ms": 14.170313,
+                    "p95_ms": 14.87310625,
+                    "maximum_ms": 14.923959,
+                    "fraction_over_16ms": 0.0
+                  },
+                  "candidate": {
+                    "count": 30,
+                    "median_ms": 14.2209795,
+                    "p95_ms": 14.918216699999999,
+                    "maximum_ms": 15.414,
+                    "fraction_over_16ms": 0.0
+                  }
+                }
+              ],
+              "metrics": {
+                "median_ms": {
+                  "pair_differences_ms": [
+                    6.698395499999999,
+                    0.05066650000000017
+                  ],
+                  "median_difference_ms": 3.3745309999999997,
+                  "bootstrap_95_ci_ms": [
+                    0.05066650000000017,
+                    6.698395499999999
+                  ],
+                  "bootstrap_resamples": 10000,
+                  "seed": 20261004,
+                  "candidate_worse_pairs": 2,
+                  "regression_signal": false,
+                  "ci_width_ms": 6.647728999999999
+                },
+                "p95_ms": {
+                  "pair_differences_ms": [
+                    0.63273285,
+                    0.04511044999999925
+                  ],
+                  "median_difference_ms": 0.33892164999999963,
+                  "bootstrap_95_ci_ms": [
+                    0.04511044999999925,
+                    0.63273285
+                  ],
+                  "bootstrap_resamples": 10000,
+                  "seed": 20261004,
+                  "candidate_worse_pairs": 2,
+                  "regression_signal": false,
+                  "ci_width_ms": 0.5876224000000008
+                }
+              },
+              "verdict": "still pending; insufficient pairs",
+              "limitation": "Differences smaller than the CI width cannot be excluded. Observed fractions above 16 ms do not decide absolute idle acceptance."
+            },
+            "wysiwyg": {
+              "complete_pairs": 2,
+              "baseline": {
+                "count": 60,
+                "median_ms": 7.5129995,
+                "p95_ms": 15.007366650000002,
+                "maximum_ms": 15.08575,
+                "fraction_over_16ms": 0.0
+              },
+              "candidate": {
+                "count": 60,
+                "median_ms": 14.21875,
+                "p95_ms": 15.078425,
+                "maximum_ms": 17.417875,
+                "fraction_over_16ms": 0.016666666666666666
+              },
+              "pairs": [
+                {
+                  "pair": 1,
+                  "baseline": {
+                    "count": 30,
+                    "median_ms": 7.5073335000000005,
+                    "p95_ms": 14.4861288,
+                    "maximum_ms": 14.81575,
+                    "fraction_over_16ms": 0.0
+                  },
+                  "candidate": {
+                    "count": 30,
+                    "median_ms": 14.252938,
+                    "p95_ms": 14.9818522,
+                    "maximum_ms": 15.073625,
+                    "fraction_over_16ms": 0.0
+                  }
+                },
+                {
+                  "pair": 2,
+                  "baseline": {
+                    "count": 30,
+                    "median_ms": 7.5129995,
+                    "p95_ms": 15.047779199999999,
+                    "maximum_ms": 15.08575,
+                    "fraction_over_16ms": 0.0
+                  },
+                  "candidate": {
+                    "count": 30,
+                    "median_ms": 14.2075625,
+                    "p95_ms": 15.290648099999999,
+                    "maximum_ms": 17.417875,
+                    "fraction_over_16ms": 0.03333333333333333
+                  }
+                }
+              ],
+              "metrics": {
+                "median_ms": {
+                  "pair_differences_ms": [
+                    6.7456045,
+                    6.694563
+                  ],
+                  "median_difference_ms": 6.72008375,
+                  "bootstrap_95_ci_ms": [
+                    6.694563,
+                    6.7456045
+                  ],
+                  "bootstrap_resamples": 10000,
+                  "seed": 20261004,
+                  "candidate_worse_pairs": 2,
+                  "regression_signal": true,
+                  "ci_width_ms": 0.051041500000000184
+                },
+                "p95_ms": {
+                  "pair_differences_ms": [
+                    0.49572340000000104,
+                    0.2428688999999995
+                  ],
+                  "median_difference_ms": 0.36929615000000027,
+                  "bootstrap_95_ci_ms": [
+                    0.2428688999999995,
+                    0.49572340000000104
+                  ],
+                  "bootstrap_resamples": 10000,
+                  "seed": 20261004,
+                  "candidate_worse_pairs": 2,
+                  "regression_signal": false,
+                  "ci_width_ms": 0.25285450000000154
+                }
+              },
+              "verdict": "still pending; insufficient pairs",
+              "limitation": "Differences smaller than the CI width cannot be excluded. Observed fractions above 16 ms do not decide absolute idle acceptance."
+            }
+          },
+          "stack": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          }
+        }
+      },
+      "runner_log": "/private/tmp/h22-paired-run3.log"
+    },
+    {
+      "attempt": 4,
+      "evidence": {
+        "method": "AB interleaved; 30 keystrokes per mode; no documented warm-up discarded; per-pair median and p95; 10000 bootstrap resamples",
+        "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+        "max_load": 6.0,
+        "requested_pairs": 10,
+        "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+        "product_shas": {
+          "main": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+          "fix": "8360954ab845db9f233697f246fcf41c36588965",
+          "stack": "142efcf7daad63bd41c9485a90cbe011bbc85de3"
+        },
+        "batches": [
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+            "start": {
+              "load": [
+                5.35595703125,
+                7.142578125,
+                7.931640625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.5 /usr/libexec/dasd",
+                " 20.8 /usr/libexec/PerfPowerServices",
+                " 19.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 19.0 /usr/libexec/sysmond",
+                " 12.8 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd"
+              ],
+              "build_processes": {}
+            },
+            "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+            "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+            "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+            "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+            "end": {
+              "load": [
+                6.35107421875,
+                7.30126953125,
+                7.978515625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 65.0 /usr/libexec/dasd",
+                " 25.3 /usr/libexec/PerfPowerServices",
+                " 18.1 /usr/libexec/sysmond",
+                " 17.8 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+                " 16.5 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd"
+              ],
+              "build_processes": {}
+            },
+            "exit_code": 0,
+            "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run4/main-0-build-for-testing.log",
+            "samples": {},
+            "valid_measurement_batch": true
+          }
+        ],
+        "status": "still pending; quiet-machine admission timeout",
+        "admission_checks": [
+          {
+            "product": "main",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                5.35595703125,
+                7.142578125,
+                7.931640625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 47.5 /usr/libexec/dasd",
+                " 20.8 /usr/libexec/PerfPowerServices",
+                " 19.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 19.0 /usr/libexec/sysmond",
+                " 12.8 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.35107421875,
+                7.30126953125,
+                7.978515625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                " 67.4 /usr/libexec/dasd",
+                " 22.9 /usr/libexec/PerfPowerServices",
+                " 20.4 /usr/libexec/sysmond",
+                " 14.9 /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent",
+                " 14.0 /usr/libexec/siriknowledged"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.1640625,
+                7.14697265625,
+                7.89794921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "106.2 /usr/libexec/dasd",
+                " 60.1 /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/Versions/A/knowledgeconstructiond",
+                " 36.2 /usr/libexec/PerfPowerServices",
+                " 20.6 /sbin/launchd",
+                " 18.6 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                6.02978515625,
+                6.9951171875,
+                7.814453125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "266.4 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 98.1 /usr/libexec/dasd",
+                " 22.8 /sbin/launchd",
+                " 19.2 /usr/libexec/PerfPowerServices",
+                " 14.7 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.38134765625,
+                7.2197265625,
+                7.8662109375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "240.2 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 61.5 /usr/libexec/dasd",
+                " 27.0 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd",
+                " 21.6 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+                " 15.4 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.5732421875,
+                7.29052734375,
+                7.869140625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "155.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                "102.3 /usr/libexec/dasd",
+                " 23.1 /sbin/launchd",
+                " 23.0 /usr/libexec/sysmond",
+                " 22.7 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.267578125,
+                7.2705078125,
+                7.8427734375
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "270.8 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 77.8 /usr/libexec/dasd",
+                " 19.8 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+                " 19.1 /sbin/launchd",
+                " 12.3 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.091796875,
+                7.22705078125,
+                7.806640625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "238.5 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 73.4 /usr/libexec/dasd",
+                " 18.4 /usr/libexec/PerfPowerServices",
+                " 17.4 /sbin/launchd",
+                " 16.7 /usr/libexec/sysmond"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.18115234375,
+                7.24853515625,
+                7.794921875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "234.6 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 63.5 /usr/libexec/dasd",
+                " 15.4 /sbin/launchd",
+                " 12.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+                " 12.1 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                8.10693359375,
+                7.462890625,
+                7.8525390625
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "254.0 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 78.0 /usr/libexec/dasd",
+                " 19.0 /sbin/launchd",
+                " 17.4 /usr/libexec/sysmond",
+                " 15.2 /usr/libexec/PerfPowerServices"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.92138671875,
+                7.4677734375,
+                7.83935546875
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "240.9 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 70.8 /usr/libexec/dasd",
+                " 32.6 /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/Versions/A/modelcatalogd",
+                " 27.7 /System/Library/ExtensionKit/Extensions/TGOnDeviceInferenceProviderService.appex/Contents/MacOS/TGOnDeviceInferenceProviderService",
+                " 19.3 /sbin/launchd"
+              ],
+              "build_processes": {}
+            }
+          },
+          {
+            "product": "fix",
+            "iteration": "0",
+            "action": "build-for-testing",
+            "snapshot": {
+              "load": [
+                7.5615234375,
+                7.4599609375,
+                7.82470703125
+              ],
+              "top_cpu": [
+                "%CPU COMM",
+                "291.8 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+                " 84.5 /usr/libexec/spotlightknowledged.updater",
+                " 16.6 /usr/sbin/cfprefsd",
+                " 14.5 /usr/libexec/sysmond",
+                " 14.4 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+              ],
+              "build_processes": {}
+            }
+          }
+        ],
+        "analysis": {
+          "fix": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          },
+          "stack": {
+            "source-only": {
+              "status": "still pending",
+              "complete_pairs": 0
+            },
+            "wysiwyg": {
+              "status": "still pending",
+              "complete_pairs": 0
+            }
+          }
+        }
+      },
+      "runner_log": "/private/tmp/h22-paired-run4.log"
+    }
+  ],
+  "probe_and_fixture_proof": {
+    "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+    "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+    "matched_across_baseline_fix_stack": true
+  },
+  "owner_ready_confirmed": true,
+  "measurement_plumbing_only": true,
+  "latest_bundled_probe_compile": {
+    "baseline": "build-for-testing passed",
+    "fix": "not admitted on latest head",
+    "stack": "not admitted on latest head"
+  },
+  "notes": [
+    "Run1 baseline overlay was installed after project generation, causing zero selected tests; rejected.",
+    "Run2 baseline produced 30 samples per mode; candidate stopped before sampling. Its process sample showed main-thread open blocked while reading the Documents fixture. The owned xcodebuild and host were terminated; no complete pair.",
+    "Fixture loading now uses the test bundle. Baseline uses an isolated, documented test-only source and resource-manifest overlay, while product HEAD stays at the merge base.",
+    "Run3 admission timed out; Run4 built the bundled baseline, then timed out before candidate build.",
+    "Only the original 16 ms assertion may fail in an otherwise complete batch. Missing samples and functional failures are rejected.",
+    "Pinned SwiftFormat 0.62.1 archive SHA256 verified against CI. make lint passed (existing warnings, zero serious); Python bootstrap boundary checks and git diff --check passed."
+  ],
+  "committed_raw_logs": "docs/evidence/h22-paired-20261004/",
+  "xcresults": "Retained at paths in per-run evidence JSON; binary bundles are not committed."
+}
