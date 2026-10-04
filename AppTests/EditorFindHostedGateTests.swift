@@ -13,6 +13,8 @@ import XCTest
 /// or Full Keyboard Access evidence.
 @MainActor
 final class EditorFindHostedGateTests: XCTestCase {
+    var hostedTimeoutDiagnostics: [@MainActor () -> String] = []
+
     func testHostedFindBarSurvivesExternalReloadAndUnmountsAfterMissingFileClose() async throws {
         let fixture = try makeWorkspaceFixture(files: ["post.md": "hit one"])
         let appState = fixture.appState
