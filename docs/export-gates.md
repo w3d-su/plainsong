@@ -1463,3 +1463,12 @@ E9 remains **pending idle-machine run**. Debug/Release refused loads 15.23/14.00
 idle admission section and `docs/evidence/handoff22-pr138-20261004-retry3.json`
 for candidate SHA, raw logs and exact rerun commands. Three qualified runs per
 configuration and owner keyboard/VoiceOver acceptance remain open.
+
+
+### Handoff 22 E9 fourth idle admission attempt - 2026-10-04
+
+E9 remains **pending idle-machine run**. Debug and Release refused load 4.10
+(require <=1.0), each exit 75; zero samples or new E9 boxes. See the fourth
+idle admission section in `docs/perf-log.md` and
+`docs/evidence/handoff22-pr138-20261004-retry4.json`. Three qualified runs per configuration
+and owner-only keyboard/VoiceOver acceptance remain pending.

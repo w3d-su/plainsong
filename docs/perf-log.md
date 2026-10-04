@@ -1372,3 +1372,25 @@ Raw logs `docs/evidence/h22-retry3-e9-debug-admission.log` and
 `docs/evidence/h22-retry3-e9-release-admission.log`; JSON
 `docs/evidence/handoff22-pr138-20261004-retry3.json`. Exact shared-lock/load/process
 check and Debug/Release commands remain in the first E9 admission section above.
+
+
+## Export F E9 fourth idle admission attempt - 2026-10-04
+
+**Pending idle-machine run.** Candidate `b64fc771f2b6b88dfadcb639da2866444551ac7f`, baseline/main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed idle readiness during admission;
+no competing xcodebuild was present. Debug and Release each refused 1-minute load 4.10 (require <=1.0), exit 75. Zero qualified runs; at least three runs per configuration, fixture wall time/peak memory, typing during export and 64 MiB writer main-thread time remain pending. No writer-off-main conclusion is possible.
+No performance samples, budget changes or owner-only gate closures.
+
+Raw logs: `docs/evidence/h22-retry4-e9-debug-admission.log`, `docs/evidence/h22-retry4-e9-release-admission.log`.
+Structured status: `docs/evidence/handoff22-pr138-20261004-retry4.json`.
+Fetch and merge main if it advances, refresh the clean baseline to the fix/main
+merge base, regenerate each project, then remeasure before claiming a later head.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+# Obtain at least three qualified runs per configuration.
+```
