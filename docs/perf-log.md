@@ -1514,7 +1514,7 @@ export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 
 ## Paired typing comparison under recorded load - 2026-10-04 (PR #136)
 
-**Still pending: zero complete pairs out of the required ten per mode.** This
+**Still pending: two complete pairs out of the required ten per mode.** This
 supersedes the earlier idle-admission status as the current measurement plan.
 True idle / absolute 16 ms acceptance remains with R9, PR I or an owner run;
 the historical idle attempts above remain historical admission records.
@@ -1532,11 +1532,14 @@ one baseline batch (30 source-only and 30 WYSIWYG samples) but no candidate
 samples: the candidate main thread blocked in `open` while reading its Documents
 fixture, captured in the committed process sample. The owned runner and host were
 terminated. Test-only fixture loading now uses the test bundle, including an
-isolated resource-manifest overlay on baseline. The latest baseline build passed;
-latest fix/stack bundled-probe builds were not admitted. No product code changed.
-The last two attempts each exhausted the five-minute wait; the latest stopped
-before the candidate build. No complete comparison exists. The earlier one-sided
-baseline values are diagnostic and are not a candidate verdict.
+isolated resource-manifest overlay on baseline. Run3 built all three bundled-probe
+products and completed two baseline/fix pairs per mode before waiting five minutes
+for candidate pair 3; the third baseline batch is unpaired and excluded. Run4
+rebuilt baseline and timed out before candidate build, adding no typing samples.
+No stack typing batch ran. No product code changed. The original zero-pair summary
+missed the completed run3 pairs; this entry and the structured evidence correct it.
+The two complete pairs share the candidate SHAs and bundled probe used by run4.
+
 
 The requested analysis is median/p95/max per batch, B-minus-A pair differences,
 10,000 fixed-seed bootstrap resamples and a 95% CI of each median pair difference.
@@ -1544,8 +1547,26 @@ A regression signal needs CI wholly above +0.5 ms and candidate worse in at leas
 80% of pairs; otherwise the completed comparison reports no detected signal under
 recorded load, with CI-width sensitivity. No documented warm-up is discarded.
 Fractions over 16 ms for both products are observations, never absolute acceptance.
-With zero complete pairs, medians/p95 differences, bootstrap CI and verdict remain
-unavailable; there is no regression or absolute-budget conclusion and no gate closure.
+For #136, two-pair observations (60 samples per product per mode), in milliseconds:
+
+| Mode | Baseline median / p95 / max | Candidate median / p95 / max | Fraction >16 ms A / B |
+|---|---|---|---|
+| source-only | 14.150 / 14.856 / 14.924 | 14.234 / 14.927 / 15.414 | 0 / 0 |
+| WYSIWYG | 7.513 / 15.007 / 15.086 | 14.219 / 15.078 / 17.418 | 0 / 1/60 |
+
+Per-pair median differences: source-only `[6.6984, 0.0507]`, WYSIWYG
+`[6.7456, 6.6946]`; p95 differences: source-only `[0.6327, 0.0451]`, WYSIWYG
+`[0.4957, 0.2429]`. Candidate is worse in 2/2 pairs for both metrics/modes.
+Exploratory median-difference bootstrap CIs are source-only `[0.0507, 6.6984]`
+and WYSIWYG `[6.6946, 6.7456]`; p95-difference CIs are `[0.0451, 0.6327]`
+and `[0.2429, 0.4957]`. With only two pairs these resamples do not establish
+population precision or satisfy the >=10-pair rule: **no formal verdict**.
+The WYSIWYG median increase needs the full paired run; it is not dismissed as
+noise. The raw early metric flag is exploratory; the corrected derived analysis
+requires ten pairs for any regression flag. Per-batch loads and all thirty
+keystroke samples are in the run3 JSON. No absolute-budget conclusion or gate
+closure is possible; R9, real IME and owner-only acceptance remain open.
+
 
 Evidence: `docs/evidence/handoff22-pr136-20261004-paired.json`. Committed raw logs and rejected-attempt
 metadata: `docs/evidence/h22-paired-20261004/`; xcresult paths remain in each JSON.

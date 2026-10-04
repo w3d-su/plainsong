@@ -1,7 +1,7 @@
 {
   "pr": 136,
   "date": "2026-10-04 Asia/Taipei",
-  "status": "still pending; zero complete pairs",
+  "status": "still pending; 2 complete pairs of required 10 per mode",
   "label": "observed under recorded load; no absolute idle verdict",
   "candidate_product_sha": "8360954ab845db9f233697f246fcf41c36588965",
   "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
@@ -3187,18 +3187,202 @@
   "owner_ready_confirmed": true,
   "measurement_plumbing_only": true,
   "latest_bundled_probe_compile": {
-    "baseline": "build-for-testing passed",
-    "fix": "not admitted on latest head",
-    "stack": "not admitted on latest head"
+    "baseline": "build-for-testing passed in run3; product SHA matches run4",
+    "fix": "build-for-testing passed in run3; product SHA matches run4",
+    "stack": "build-for-testing passed in run3; product SHA matches run4"
   },
   "notes": [
     "Run1 baseline overlay was installed after project generation, causing zero selected tests; rejected.",
     "Run2 baseline produced 30 samples per mode; candidate stopped before sampling. Its process sample showed main-thread open blocked while reading the Documents fixture. The owned xcodebuild and host were terminated; no complete pair.",
     "Fixture loading now uses the test bundle. Baseline uses an isolated, documented test-only source and resource-manifest overlay, while product HEAD stays at the merge base.",
-    "Run3 admission timed out; Run4 built the bundled baseline, then timed out before candidate build.",
     "Only the original 16 ms assertion may fail in an otherwise complete batch. Missing samples and functional failures are rejected.",
-    "Pinned SwiftFormat 0.62.1 archive SHA256 verified against CI. make lint passed (existing warnings, zero serious); Python bootstrap boundary checks and git diff --check passed."
+    "Pinned SwiftFormat 0.62.1 archive SHA256 verified against CI. make lint passed (existing warnings, zero serious); Python bootstrap boundary checks and git diff --check passed.",
+    "Run3 built all three bundled-probe products and completed two baseline/fix pairs per mode before admission timeout on candidate pair 3. Baseline pair 3 is unpaired and excluded from paired analysis. No stack typing batch ran.",
+    "Run4 rebuilt baseline and timed out before candidate build, adding no typing samples.",
+    "Current derived relative_analysis suppresses all regression flags until the required ten pairs. The original raw JSON retains its earlier exploratory internal metric flag; its overall verdict was always insufficient pairs.",
+    "The initial zero-complete-pair summary missed run3 samples; current data and perf-log entries are corrected."
   ],
   "committed_raw_logs": "docs/evidence/h22-paired-20261004/",
-  "xcresults": "Retained at paths in per-run evidence JSON; binary bundles are not committed."
+  "xcresults": "Retained at paths in per-run evidence JSON; binary bundles are not committed.",
+  "relative_analysis": {
+    "source-only": {
+      "complete_pairs": 2,
+      "baseline": {
+        "count": 60,
+        "median_ms": 14.149562,
+        "p95_ms": 14.855916350000001,
+        "maximum_ms": 14.923959,
+        "fraction_over_16ms": 0.0
+      },
+      "candidate": {
+        "count": 60,
+        "median_ms": 14.233917,
+        "p95_ms": 14.92668335,
+        "maximum_ms": 15.414,
+        "fraction_over_16ms": 0.0
+      },
+      "pairs": [
+        {
+          "pair": 1,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.5456460000000005,
+            "p95_ms": 14.323284,
+            "maximum_ms": 14.391541,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2440415,
+            "p95_ms": 14.95601685,
+            "maximum_ms": 14.9925,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 2,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.170313,
+            "p95_ms": 14.87310625,
+            "maximum_ms": 14.923959,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2209795,
+            "p95_ms": 14.918216699999999,
+            "maximum_ms": 15.414,
+            "fraction_over_16ms": 0.0
+          }
+        }
+      ],
+      "metrics": {
+        "median_ms": {
+          "pair_differences_ms": [
+            6.698395499999999,
+            0.05066650000000017
+          ],
+          "median_difference_ms": 3.3745309999999997,
+          "bootstrap_95_ci_ms": [
+            0.05066650000000017,
+            6.698395499999999
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 2,
+          "regression_signal": false,
+          "ci_width_ms": 6.647728999999999
+        },
+        "p95_ms": {
+          "pair_differences_ms": [
+            0.63273285,
+            0.04511044999999925
+          ],
+          "median_difference_ms": 0.33892164999999963,
+          "bootstrap_95_ci_ms": [
+            0.04511044999999925,
+            0.63273285
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 2,
+          "regression_signal": false,
+          "ci_width_ms": 0.5876224000000008
+        }
+      },
+      "verdict": "still pending; insufficient pairs",
+      "limitation": "Differences smaller than the CI width cannot be excluded. Observed fractions above 16 ms do not decide absolute idle acceptance."
+    },
+    "wysiwyg": {
+      "complete_pairs": 2,
+      "baseline": {
+        "count": 60,
+        "median_ms": 7.5129995,
+        "p95_ms": 15.007366650000002,
+        "maximum_ms": 15.08575,
+        "fraction_over_16ms": 0.0
+      },
+      "candidate": {
+        "count": 60,
+        "median_ms": 14.21875,
+        "p95_ms": 15.078425,
+        "maximum_ms": 17.417875,
+        "fraction_over_16ms": 0.016666666666666666
+      },
+      "pairs": [
+        {
+          "pair": 1,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.5073335000000005,
+            "p95_ms": 14.4861288,
+            "maximum_ms": 14.81575,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.252938,
+            "p95_ms": 14.9818522,
+            "maximum_ms": 15.073625,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 2,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.5129995,
+            "p95_ms": 15.047779199999999,
+            "maximum_ms": 15.08575,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2075625,
+            "p95_ms": 15.290648099999999,
+            "maximum_ms": 17.417875,
+            "fraction_over_16ms": 0.03333333333333333
+          }
+        }
+      ],
+      "metrics": {
+        "median_ms": {
+          "pair_differences_ms": [
+            6.7456045,
+            6.694563
+          ],
+          "median_difference_ms": 6.72008375,
+          "bootstrap_95_ci_ms": [
+            6.694563,
+            6.7456045
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 2,
+          "regression_signal": false,
+          "ci_width_ms": 0.051041500000000184
+        },
+        "p95_ms": {
+          "pair_differences_ms": [
+            0.49572340000000104,
+            0.2428688999999995
+          ],
+          "median_difference_ms": 0.36929615000000027,
+          "bootstrap_95_ci_ms": [
+            0.2428688999999995,
+            0.49572340000000104
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 2,
+          "regression_signal": false,
+          "ci_width_ms": 0.25285450000000154
+        }
+      },
+      "verdict": "still pending; insufficient pairs",
+      "limitation": "Differences smaller than the CI width cannot be excluded. Observed fractions above 16 ms do not decide absolute idle acceptance."
+    }
+  },
+  "relative_analysis_source": "run3: same bundled-probe product heads as run4; later run4 adds no typing pairs"
 }
