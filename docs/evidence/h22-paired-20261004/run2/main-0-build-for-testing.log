@@ -226,7 +226,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PlainsongTests (in target 'P
 
 SwiftCompile normal arm64 (in target 'PlainsongTests' from project 'Plainsong')
     cd /tmp/plainsong-h22-baseline
-    
+
 
 SwiftCompile normal arm64 Compiling\ EditorHighlightScheduleHostedTests.swift /tmp/plainsong-h22-baseline/AppTests/EditorHighlightScheduleHostedTests.swift (in target 'PlainsongTests' from project 'Plainsong')
 
@@ -374,32 +374,32 @@ ProcessInfoPlistFile /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plain
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest (in target 'PlainsongTests' from project 'Plainsong')
     cd /tmp/plainsong-h22-baseline
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-h22-baseline
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib: replacing existing signature
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-h22-baseline
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib: replacing existing signature
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-h22-baseline
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cvvtmnduihdznzedyuxywddbrvsp/Build/Products/Debug/Plainsong.app: replacing existing signature
 
@@ -428,4 +428,3 @@ Result bundle written to path:
 	/tmp/plainsong-h22-paired-20261004-run2/main-0-build-for-testing.xcresult
 
 ** TEST BUILD SUCCEEDED **
-

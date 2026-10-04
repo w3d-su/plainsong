@@ -268,30 +268,30 @@ SwiftDriver MarkdownCore normal arm64 com.apple.xcode.tools.swift.compiler (in t
 
 ScanDependencies /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/scanner.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterYAMLFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     builtin-ScanDependencies -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o.scan -- /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/scanner.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o
 
 ScanDependencies /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/parser.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterYAMLFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     builtin-ScanDependencies -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o.scan -- /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/parser.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o
 
 ScanDependencies /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/scanner.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterTSXFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     builtin-ScanDependencies -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o.scan -- /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/scanner.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o
 
 ScanDependencies /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/parser.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterTSXFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     builtin-ScanDependencies -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o.scan -- /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/parser.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o
 
 ExtractAppIntentsMetadata (in target 'STTextViewSwiftUICommon' from project 'STTextView')
@@ -314,9 +314,9 @@ ExtractAppIntentsMetadata (in target 'CoreTextSwift' from project 'CoreTextSwift
 
 CompileC /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/scanner.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterTSXFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/scanner.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/scanner.o
 
 Ld /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/SwiftTreeSitter.o normal (in target 'SwiftTreeSitter' from project 'SwiftTreeSitter')
@@ -325,23 +325,23 @@ Ld /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdc
 
 CompileC /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/scanner.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterYAMLFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/scanner.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/scanner.o
 
 CompileC /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/parser.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterYAMLFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterYAMLFixed/src/parser.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterYAMLFixed-t.build/Objects-normal/arm64/parser.o
 
 CompileC /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/parser.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'TreeSitterTSXFixed' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
     Using response file: /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp
-    
+
     /Applications/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c -ivfsstatcache /Users/davis._.su/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx27.0-26A5353p-45874285e5972fffeae925c4ab065928.sdkstatcache -target arm64-apple-macos14.0 -fmessage-length\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -fno-color-diagnostics -fmodules-prune-interval\=86400 -fmodules-prune-after\=345600 -fbuild-session-file\=/Users/davis._.su/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Wno-return-type -Wno-missing-braces -Wparentheses -Wswitch -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -Wno-unused-variable -Wunused-value -Wno-empty-body -Wno-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wno-constant-conversion -Wno-int-conversion -Wno-bool-conversion -Wno-enum-conversion -Wno-float-conversion -Wno-non-literal-null-conversion -Wno-objc-literal-conversion -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-implicit-fallthrough -isysroot /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk -fstrict-aliasing -Wdeprecated-declarations -Wno-sign-conversion -Wno-infinite-recursion -Wno-comma -Wno-block-capture-autoreleasing -Wno-strict-prototypes -Wno-semicolon-before-method-body -index-store-path /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Index.noindex/DataStore @/Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/7187679823f38a2a940e0043cdf9d637-common-args.resp -MMD -MT dependencies -MF /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.d --serialize-diagnostics /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.dia -c /private/tmp/plainsong-replace-wysiwyg/Packages/EditorKit/Sources/TreeSitterTSXFixed/src/parser.c -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o -index-unit-output-path /EditorKit.build/Debug/TreeSitterTSXFixed-t.build/Objects-normal/arm64/parser.o
 
 Ld /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Yams.o normal (in target 'Yams' from project 'Yams')
@@ -388,7 +388,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ MarkdownCore (in target 'Mar
 
 SwiftCompile normal arm64 (in target 'MarkdownCore' from project 'MarkdownCore')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ AutoPairing.swift,\ CheckboxEditing.swift,\ CodeFenceEditing.swift,\ CompletionEngine+Completions.swift,\ CompletionEngine+Contexts.swift /private/tmp/plainsong-replace-wysiwyg/Packages/MarkdownCore/Sources/MarkdownCore/AutoPairing.swift /private/tmp/plainsong-replace-wysiwyg/Packages/MarkdownCore/Sources/MarkdownCore/CheckboxEditing.swift /private/tmp/plainsong-replace-wysiwyg/Packages/MarkdownCore/Sources/MarkdownCore/CodeFenceEditing.swift /private/tmp/plainsong-replace-wysiwyg/Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Completions.swift /private/tmp/plainsong-replace-wysiwyg/Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Contexts.swift (in target 'MarkdownCore' from project 'MarkdownCore')
 
@@ -814,13 +814,13 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ WorkspaceKit (in target 'Wor
 
 SwiftCompile normal arm64 (in target 'WorkspaceKit' from project 'WorkspaceKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
 
 SwiftEmitModule normal arm64 Emitting\ module\ for\ PreviewKit (in target 'PreviewKit' from project 'PreviewKit')
 
 SwiftCompile normal arm64 (in target 'PreviewKit' from project 'PreviewKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/TreeSitterYAMLFixed-EHL2B0A1YQ0A5V9B4SIYDFA1Y.pcm
 
@@ -916,7 +916,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ EditorKit (in target 'Editor
 
 SwiftCompile normal arm64 (in target 'EditorKit' from project 'EditorKit')
     cd /tmp/plainsong-replace-wysiwyg/Plainsong.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ PreviewController+Export.swift,\ PreviewController+ScrollDelivery.swift /private/tmp/plainsong-replace-wysiwyg/Packages/PreviewKit/Sources/PreviewKit/PreviewController+Export.swift /private/tmp/plainsong-replace-wysiwyg/Packages/PreviewKit/Sources/PreviewKit/PreviewController+ScrollDelivery.swift (in target 'PreviewKit' from project 'PreviewKit')
 
@@ -1329,9 +1329,9 @@ SwiftDriverJobDiscovery normal arm64 Compiling EditorFindStepIntentState.swift, 
 
 ProcessProductPackaging /tmp/plainsong-replace-wysiwyg/App/Plainsong.entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Entitlements:
-    
+
     {
     "com.apple.security.app-sandbox" = 1;
     "com.apple.security.files.bookmarks.app-scope" = 1;
@@ -1339,7 +1339,7 @@ ProcessProductPackaging /tmp/plainsong-replace-wysiwyg/App/Plainsong.entitlement
     "com.apple.security.get-task-allow" = 1;
     "com.apple.security.network.client" = 1;
 }
-    
+
     builtin-productPackagingUtility /tmp/plainsong-replace-wysiwyg/App/Plainsong.entitlements -entitlements -format xml -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent
 
 ExtractAppIntentsMetadata (in target 'MarkdownCore' from project 'MarkdownCore')
@@ -1483,7 +1483,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ Plainsong (in target 'Plains
 
 SwiftCompile normal arm64 (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
 
 SwiftCompile normal arm64 Compiling\ EditorLayoutMode.swift,\ EditorScrollBridge.swift,\ ExternalPreparedFileRead.swift,\ FileWriteReconciliationBanner.swift,\ FrontmatterPanel.swift,\ MenuBarState.swift,\ MissingFileBanner.swift,\ PlainsongApp.swift,\ PlainsongAppServices.swift,\ PlainsongApplication.swift,\ PlainsongApplicationDelegate.swift,\ PlainsongCommands.swift /tmp/plainsong-replace-wysiwyg/App/EditorLayoutMode.swift /tmp/plainsong-replace-wysiwyg/App/Views/EditorScrollBridge.swift /tmp/plainsong-replace-wysiwyg/App/ExternalPreparedFileRead.swift /tmp/plainsong-replace-wysiwyg/App/Views/FileWriteReconciliationBanner.swift /tmp/plainsong-replace-wysiwyg/App/Views/FrontmatterPanel.swift /tmp/plainsong-replace-wysiwyg/App/MenuBarState.swift /tmp/plainsong-replace-wysiwyg/App/Views/MissingFileBanner.swift /tmp/plainsong-replace-wysiwyg/App/PlainsongApp.swift /tmp/plainsong-replace-wysiwyg/App/PlainsongAppServices.swift /tmp/plainsong-replace-wysiwyg/App/PlainsongApplication.swift /tmp/plainsong-replace-wysiwyg/App/PlainsongApplicationDelegate.swift /tmp/plainsong-replace-wysiwyg/App/PlainsongCommands.swift (in target 'Plainsong' from project 'Plainsong')
 
@@ -1555,11 +1555,11 @@ WorkspaceKit.WorkspaceEventWatcher:1:20: note: class 'WorkspaceEventWatcher' doe
   6 | import UniformTypeIdentifiers
   7 | import WorkspaceKit
     | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'WorkspaceKit' [#AddPreconcurrencyImport]
-  8 | 
+  8 |
   9 | protocol LastOpenedFilePersisting: AnyObject {
     :
 456 |     }
-457 | 
+457 |
 458 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 459 |         workspaceReloadTask?.cancel()
@@ -1681,7 +1681,7 @@ SwiftCompile normal arm64 Compiling\ AppState+AnchoredWorkspaceActivation.swift,
     |                   `- warning: passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure; this is an error in the Swift 6 language mode [#RegionIsolation::SendingClosureRisksDataRace]
 198 |                 var seenRelativePaths: [String] = []
 199 |                 var overlays: [WorkspaceSearchOverlay] = []
-200 | 
+200 |
 201 |                 for input in inputs {
     |                              `- note: closure captures 'inputs' which is accessible to main actor-isolated code
 202 |                     try Task.checkCancellation()
@@ -1862,18 +1862,18 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/App/Views/WorkspaceSear
  11 |         WorkspaceSearchFieldFocus.accessibilityIdentifier
     |                                   `- warning: main actor-isolated static property 'accessibilityIdentifier' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
  12 |     }
- 13 | 
+ 13 |
 
 /tmp/plainsong-replace-wysiwyg/App/Views/WindowKeyStateTracker.swift:197:16: note: static property declared here
 195 |     static let placeholder = "Search in workspace"
 196 |     /// Stable AppKit identity for the Search query field.
 197 |     static let accessibilityIdentifier = "plainsong.workspaceSearch.queryField"
     |                `- note: static property declared here
-198 | 
+198 |
 199 |     /// Production identity: accessibility identifier only.
 
 /tmp/plainsong-replace-wysiwyg/App/Views/WindowKeyStateTracker.swift:120:9: warning: cannot access property 'becomeKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
-118 | 
+118 |
 119 |     deinit {
 120 |         if let becomeKeyObserver {
     |         `- warning: cannot access property 'becomeKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
@@ -1882,10 +1882,10 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/App/Views/WorkspaceSear
 
 /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/objc/NSObject.h:15:11: note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
  13 | @class NSString, NSMethodSignature, NSInvocation;
- 14 | 
+ 14 |
  15 | @protocol NSObject
     |           `- note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
- 16 | 
+ 16 |
  17 | - (BOOL)isEqual:(id)object;
 
 /tmp/plainsong-replace-wysiwyg/App/Views/WindowKeyStateTracker.swift:1:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjectiveC' [#AddPreconcurrencyImport]
@@ -1895,7 +1895,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/App/Views/WorkspaceSear
   3 | import SwiftUI
     :
 117 |     }
-118 | 
+118 |
 119 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 120 |         if let becomeKeyObserver {
@@ -1903,7 +1903,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/App/Views/WorkspaceSear
 
 /tmp/plainsong-replace-wysiwyg/App/Views/WindowKeyStateTracker.swift:123:9: warning: cannot access property 'resignKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
 117 |     }
-118 | 
+118 |
 119 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 120 |         if let becomeKeyObserver {
@@ -1916,10 +1916,10 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/App/Views/WorkspaceSear
 
 /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/objc/NSObject.h:15:11: note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
  13 | @class NSString, NSMethodSignature, NSInvocation;
- 14 | 
+ 14 |
  15 | @protocol NSObject
     |           `- note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
- 16 | 
+ 16 |
  17 | - (BOOL)isEqual:(id)object;
 
 [#AddPreconcurrencyImport]: <https://docs.swift.org/compiler/documentation/diagnostics/add-preconcurrency-import>
@@ -2022,7 +2022,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PlainsongUITests (in target 
 
 SwiftCompile normal arm64 (in target 'PlainsongUITests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
 
 SwiftCompile normal arm64 Compiling\ EditorFindChromeAcceptanceTests.swift,\ EditorFindOwnedPasteboard.swift /tmp/plainsong-replace-wysiwyg/PlainsongUITests/EditorFindChromeAcceptanceTests.swift /tmp/plainsong-replace-wysiwyg/PlainsongUITests/EditorFindOwnedPasteboard.swift (in target 'PlainsongUITests' from project 'Plainsong')
 
@@ -2066,7 +2066,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PlainsongTests (in target 'P
 
 SwiftCompile normal arm64 (in target 'PlainsongTests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
 
 Copy /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests.swiftmodule/arm64-apple-macos.abi.json /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/PlainsongUITests.build/Objects-normal/arm64/PlainsongUITests.abi.json (in target 'PlainsongUITests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
@@ -2078,7 +2078,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PerformanceTests (in target 
 
 SwiftCompile normal arm64 (in target 'PerformanceTests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Compiling EditorFindOwnedPasteboardFailureTests.swift, EditorFindOwnedPasteboardTests.swift (in target 'PlainsongUITests' from project 'Plainsong')
 
@@ -2161,7 +2161,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/ExportPDFMecha
     builtin-SwiftPerFileCompile ExportPDFMechanismSpikeTests+Support.swift
 
 /tmp/plainsong-replace-wysiwyg/AppTests/EditorReplaceSingleReplaceAppTests.swift:14:30: warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
- 12 | 
+ 12 |
  13 |     override func tearDown() {
  14 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
     |                              `- warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
@@ -2172,14 +2172,14 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 1 | enum EditorSelectionProbe {
 2 | @MainActor internal static var keyWindowOverrideForTesting: (() -> NSWindow?)?}
   |                                `- note: mutation of this static property is only permitted within the actor
-3 | 
+3 |
 
 /tmp/plainsong-replace-wysiwyg/AppTests/EditorReplaceSingleReplaceAppTests.swift:15:23: warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
   9 | @MainActor
  10 | final class EditorReplaceSingleReplaceAppTests: XCTestCase {
  11 |     private var windows: [NSWindow] = []
     |                 `- note: property declared here
- 12 | 
+ 12 |
  13 |     override func tearDown() {
  14 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
  15 |         for window in windows {
@@ -2225,7 +2225,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
  10 | final class EditorReplaceSingleReplaceAppTests: XCTestCase {
  11 |     private var windows: [NSWindow] = []
     |                 `- note: mutation of this property is only permitted within the actor
- 12 | 
+ 12 |
  13 |     override func tearDown() {
     :
  17 |             window.orderOut(nil)
@@ -2383,7 +2383,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/EditorReplaceH
     builtin-SwiftPerFileCompile EditorReplaceHostedWYSIWYGGateTests.swift
 
 /tmp/plainsong-replace-wysiwyg/AppTests/EditorReplaceAuthorizationAppTests.swift:18:30: warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
- 16 | 
+ 16 |
  17 |     override func tearDown() {
  18 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
     |                              `- warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
@@ -2394,14 +2394,14 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 1 | enum EditorSelectionProbe {
 2 | @MainActor internal static var keyWindowOverrideForTesting: (() -> NSWindow?)?}
   |                                `- note: mutation of this static property is only permitted within the actor
-3 | 
+3 |
 
 /tmp/plainsong-replace-wysiwyg/AppTests/EditorReplaceAuthorizationAppTests.swift:19:23: warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
  13 | @MainActor
  14 | final class EditorReplaceAuthorizationAppTests: XCTestCase {
  15 |     var windows: [NSWindow] = []
     |         `- note: property declared here
- 16 | 
+ 16 |
  17 |     override func tearDown() {
  18 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
  19 |         for window in windows {
@@ -2431,7 +2431,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
  14 | final class EditorReplaceAuthorizationAppTests: XCTestCase {
  15 |     var windows: [NSWindow] = []
     |         `- note: mutation of this property is only permitted within the actor
- 16 | 
+ 16 |
  17 |     override func tearDown() {
     :
  20 |             window.orderOut(nil)
@@ -2446,7 +2446,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 10 | final class EditorReplaceBatchSpikeAppTests: XCTestCase {
 11 |     private var windows: [NSWindow] = []
    |                 `- note: property declared here
-12 | 
+12 |
 13 |     override func tearDown() {
 14 |         for window in windows {
    |                       `- warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
@@ -2491,7 +2491,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 10 | final class EditorReplaceBatchSpikeAppTests: XCTestCase {
 11 |     private var windows: [NSWindow] = []
    |                 `- note: mutation of this property is only permitted within the actor
-12 | 
+12 |
 13 |     override func tearDown() {
    :
 16 |             window.orderOut(nil)
@@ -2567,16 +2567,16 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
     builtin-SwiftPerFileCompile DebugEditorFindFixtureLeaseTests.swift
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateTests.swift:11823:56: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
-11821 | 
+11821 |
 11822 |         // Decoy remains unstamped before and after focus.
 11823 |         XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
       |                                                        `- warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11824 |         XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
-11825 | 
+11825 |
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateTests.swift:11835:56: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11833 |         }
-11834 | 
+11834 |
 11835 |         XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
       |                                                        `- warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11836 |         XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
@@ -2584,7 +2584,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1165:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1163 |         fixture.appState.applyDocumentText("Changed", to: fixture.appState.currentDocument)
-1164 | 
+1164 |
 1165 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -2593,7 +2593,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1196:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1194 |         fixture.appState.applyDocumentText("Dirty cached owner", to: cached)
-1195 | 
+1195 |
 1196 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -2602,7 +2602,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1233:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1231 |         fixture.appState.pendingEditorSourceInstallations[installation] = bound
-1232 | 
+1232 |
 1233 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -2610,7 +2610,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 1235 |                 at: fixture.location("folder"),
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1945:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
-1943 | 
+1943 |
 1944 |         await recycler.complete()
 1945 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
@@ -2620,7 +2620,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1962:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1960 |         defer { cleanUp(fixture) }
-1961 | 
+1961 |
 1962 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -2628,7 +2628,7 @@ SwiftCompile normal arm64 /tmp/plainsong-replace-wysiwyg/AppTests/DebugEditorFin
 1964 |                 at: fixture.location("post.md"),
 
 /tmp/plainsong-replace-wysiwyg/AppTests/AppStateWorkspaceDataIntegrityTests.swift:2329:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
-2327 | 
+2327 |
 2328 |         await recycler.fail()
 2329 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
@@ -2931,9 +2931,9 @@ CopySwiftLibs /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-ca
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest (in target 'PerformanceTests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest
 
 SwiftDriverJobDiscovery normal arm64 Compiling AppStateSessionStateCleanupTests.swift, AppStateTests.swift, AppStateWorkspaceDataIntegrityTests.swift, DebugEditorFindFixtureCleanupSafetyTests.swift, DebugEditorFindFixtureLeaseMutationRetryTests.swift, DebugEditorFindFixtureLeaseQuarantineRaceTests.swift, DebugEditorFindFixtureLeaseRecoveryTests.swift, DebugEditorFindFixtureLeaseTests.swift (in target 'PlainsongTests' from project 'Plainsong')
@@ -2958,30 +2958,30 @@ ExtractAppIntentsMetadata (in target 'PlainsongTests' from project 'Plainsong')
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest (in target 'PlainsongTests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app
 
 Validate /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
@@ -3012,16 +3012,16 @@ CopySwiftLibs /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-ca
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/PlugIns/PlainsongUITests.xctest (in target 'PlainsongUITests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/PlainsongUITests.build/PlainsongUITests.xctest.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/PlugIns/PlainsongUITests.xctest
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests-Runner.app (in target 'PlainsongUITests' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/PlainsongUITests.build/PlainsongUITests.xctest.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests-Runner.app
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/PlainsongUITests-Runner.app: replacing existing signature
 
@@ -3034,4 +3034,3 @@ Result bundle written to path:
 	/tmp/plainsong-h22-paired-20261004-run1/stack-0-build-for-testing.xcresult
 
 ** TEST BUILD SUCCEEDED **
-
