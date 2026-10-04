@@ -1,0 +1,112 @@
+{
+  "product": "main",
+  "iteration": "stack-4",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      4.65087890625,
+      5.48828125,
+      4.650390625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 69.6 /System/Library/PrivateFrameworks/SoftwareUpdateCore.framework/Versions/A/XPCServices/SUCoreHelperService.xpc/Contents/MacOS/SUCoreHelperService",
+      " 18.5 /usr/libexec/sysmond",
+      " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 12.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  8.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      9.0283203125,
+      6.3681640625,
+      4.970703125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 37.5 /System/Library/PrivateFrameworks/FileProvider.framework/Support/fileproviderd",
+      " 32.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 24.5 /usr/libexec/sysmond",
+      " 19.9 /usr/libexec/spotlightknowledged.updater",
+      " 17.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-stack-4-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.987542,
+      14.8595,
+      14.39225,
+      14.749375,
+      0.852959,
+      14.444125,
+      14.64925,
+      0.907709,
+      14.480583,
+      0.799375,
+      14.553917,
+      0.729042,
+      14.554333,
+      0.754958,
+      14.721875,
+      14.651625,
+      0.775459,
+      14.898667,
+      14.426,
+      0.838584,
+      14.801541,
+      0.7525,
+      14.731459,
+      14.532167,
+      14.606417,
+      0.7535,
+      14.419666,
+      14.552542,
+      0.756333,
+      14.545916
+    ],
+    "wysiwyg": [
+      0.752958,
+      14.645583,
+      14.491417,
+      14.994709,
+      14.447292,
+      15.146,
+      0.815625,
+      15.288291,
+      0.817083,
+      15.140167,
+      15.406792,
+      0.791708,
+      14.624,
+      14.597667,
+      0.792333,
+      15.019917,
+      0.886833,
+      14.574292,
+      0.850167,
+      15.014834,
+      15.122875,
+      0.96075,
+      14.772917,
+      0.807792,
+      15.239583,
+      0.837125,
+      14.613666,
+      0.810917,
+      15.009625,
+      14.678209
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

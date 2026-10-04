@@ -1,0 +1,112 @@
+{
+  "product": "main",
+  "iteration": "fix-9",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      5.14697265625,
+      5.3623046875,
+      4.37109375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 18.8 /usr/libexec/sysmond",
+      " 13.6 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 11.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      "  8.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      "  8.0 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      4.5087890625,
+      5.21826171875,
+      4.3310546875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 82.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 21.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 14.1 /usr/libexec/sysmond",
+      " 12.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      "  7.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-fix-9-test-without-building.log",
+  "samples": {
+    "source-only": [
+      1.220459,
+      14.921,
+      14.767,
+      0.784875,
+      14.900958,
+      14.936791,
+      0.835,
+      14.498583,
+      0.745416,
+      14.695792,
+      0.690417,
+      14.625208,
+      0.765541,
+      14.637416,
+      0.89,
+      14.613416,
+      0.743416,
+      14.650458,
+      0.741375,
+      14.609042,
+      0.693416,
+      14.555042,
+      0.919167,
+      14.521417,
+      0.704,
+      14.460416,
+      0.79575,
+      14.830709,
+      14.715792,
+      14.676875
+    ],
+    "wysiwyg": [
+      0.762125,
+      14.764,
+      14.806417,
+      0.844583,
+      14.671125,
+      0.915417,
+      14.615792,
+      0.792333,
+      14.645625,
+      1.068625,
+      14.880875,
+      0.7805,
+      14.902042,
+      14.75525,
+      0.806709,
+      14.822958,
+      14.846917,
+      0.963708,
+      14.646708,
+      14.834167,
+      0.854292,
+      14.890666,
+      14.786292,
+      0.833,
+      14.78,
+      0.763625,
+      14.839416,
+      0.865291,
+      14.7605,
+      14.798708
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

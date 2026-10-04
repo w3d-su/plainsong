@@ -18,6 +18,7 @@ public struct MarkdownEditorView: View {
         @StateObject private var debugNavigationProbe = EditorNavigationDebugProbe.shared
     #endif
     @StateObject private var defaultCommandProxy = EditorCommandProxy()
+    @StateObject private var highlightScheduler = EditorHighlightScheduler()
 
     private static let highlightService = MarkdownHighlightService()
     nonisolated static let highlightDebounceNanoseconds: UInt64 = 20_000_000
@@ -94,6 +95,12 @@ public struct MarkdownEditorView: View {
 
     public var body: some View {
         let activeCommandProxy = commandProxy ?? defaultCommandProxy
+        // `.task(id:)` used to read the revision here. Keep that dependency so every request
+        // still drives the same SwiftUI update, which ends per-edit coordinator state such as
+        // `isUserEditing`; the request itself now starts in `scheduleHighlight()`. A view
+        // builder needs `let _ =` for a statement that only reads.
+        // swiftformat:disable:next redundantLet
+        let _ = highlightRevision // swiftlint:disable:this redundant_discardable_let
 
         MarkdownTextView(
             // Proxy binding: typing no longer publishes through the document model
@@ -133,9 +140,6 @@ public struct MarkdownEditorView: View {
                 updateVisibleRange(range)
             }
         }
-        .task(id: highlightRevision) {
-            await applyScheduledVisibleHighlight(for: highlightRevision)
-        }
         .onChange(of: text) { _, _ in
             scheduleHighlight()
         }
@@ -151,8 +155,12 @@ public struct MarkdownEditorView: View {
             scheduleHighlight()
         }
         .onAppear {
+            highlightScheduler.activate()
             activeCommandProxy.update(fileKind: fileKind)
             scheduleHighlight()
+        }
+        .onDisappear {
+            highlightScheduler.cancel()
         }
         #if DEBUG
         .overlay(alignment: .topLeading) {
@@ -178,12 +186,21 @@ public struct MarkdownEditorView: View {
         }
     #endif
 
-    /// Every text, file-kind, or viewport change bumps the revision; `.task(id:)`
-    /// restarts after a short debounce so rapid typing cancels stale visible-range
-    /// work before it reaches the parser. Scheduling during IME composition is safe
-    /// because `MarkdownTextView` blocks the apply while marked text exists.
+    /// Every text, file-kind, or viewport change bumps the revision and restarts the
+    /// debounced request directly, so rapid typing cancels stale visible-range work
+    /// before it reaches the parser and the final request always starts. The `@State`
+    /// bump still drives the same SwiftUI update as before. Scheduling during IME
+    /// composition is safe because `MarkdownTextView` blocks the apply while marked
+    /// text exists.
     private func scheduleHighlight() {
         highlightRevision += 1
+        // The closure captures this view value, including its fixed settings. Every update
+        // reinstalls the scheduling callback, and onChange(of: text) supersedes old work.
+        // A stale value can survive only while input is deferred; the editing/marked-text
+        // guards defer its apply too, until the subsequent update requests fresh settings.
+        highlightScheduler.restart(revision: highlightRevision) { revision in
+            await applyVisibleHighlight(for: revision)
+        }
     }
 
     private func updateVisibleRange(_ range: NSRange) {
@@ -193,14 +210,6 @@ public struct MarkdownEditorView: View {
 
         visibleTextRange = range
         scheduleHighlight()
-    }
-
-    private func applyScheduledVisibleHighlight(for revision: Int) async {
-        guard await Self.waitForHighlightDebounce() else {
-            return
-        }
-
-        await applyVisibleHighlight(for: revision)
     }
 
     nonisolated static func waitForHighlightDebounce(

@@ -316,6 +316,7 @@ struct MarkdownTextView: NSViewRepresentable {
         let didApply = Self.applyHighlightedText(styledText, to: textView)
         if didApply {
             coordinator.lastAppliedHighlightRevision = styledText.revision
+            coordinator.lastAppliedHighlightFoldPlan = styledText.foldPlan
         }
         coordinator.isUpdating = false
         return didApply
