@@ -1,0 +1,112 @@
+{
+  "product": "fix",
+  "iteration": "fix-2",
+  "action": "test-without-building",
+  "product_sha": "e438ac19c91388326280e39bcfafc104fa8bc58c",
+  "start": {
+    "load": [
+      3.3701171875,
+      3.640625,
+      3.52392578125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "106.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 67.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 28.9 /usr/libexec/sysmond",
+      " 11.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 10.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "bfc6ed2faae8a086c039519703ef97b7248b9f05d643101cc20c0a8cca0939bd",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      3.24560546875,
+      3.60302734375,
+      3.51123046875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 22.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 21.2 /usr/libexec/sysmond",
+      " 13.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  8.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      "  3.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/fix-fix-2-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.878625,
+      14.598375,
+      14.191084,
+      0.692375,
+      14.181709,
+      0.677541,
+      14.207292,
+      0.706792,
+      14.23675,
+      0.661791,
+      14.150708,
+      0.644917,
+      14.164417,
+      0.6465,
+      14.227916,
+      0.643083,
+      14.141375,
+      0.643584,
+      14.246083,
+      0.6505,
+      14.177916,
+      0.664625,
+      14.152375,
+      0.654334,
+      14.148792,
+      0.642292,
+      14.210041,
+      0.647042,
+      14.118625,
+      0.653833
+    ],
+    "wysiwyg": [
+      0.742917,
+      14.253292,
+      14.185209,
+      0.6845,
+      14.302,
+      0.700917,
+      14.26175,
+      0.738209,
+      14.359167,
+      0.700542,
+      14.309958,
+      0.715375,
+      14.242417,
+      0.714417,
+      14.169667,
+      0.690542,
+      14.214583,
+      0.709375,
+      14.22775,
+      0.707791,
+      14.178167,
+      0.708334,
+      14.305416,
+      0.73475,
+      14.19075,
+      0.713583,
+      14.222625,
+      0.70875,
+      14.217875,
+      0.707
+    ]
+  },
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": true
+}

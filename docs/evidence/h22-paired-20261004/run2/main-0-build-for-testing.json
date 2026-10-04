@@ -1,0 +1,44 @@
+{
+  "product": "main",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      4.29833984375,
+      6.46826171875,
+      8.71875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 79.6 /usr/libexec/dasd",
+      " 21.7 /sbin/launchd",
+      " 14.7 /usr/libexec/PerfPowerServices",
+      " 11.1 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      "  9.7 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      5.46240234375,
+      6.6103515625,
+      8.72900390625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 39.0 /usr/libexec/siriknowledged",
+      " 32.2 /usr/libexec/eligibilityd",
+      " 22.9 /usr/libexec/sysmond",
+      " 20.0 /usr/libexec/dasd",
+      " 12.5 /usr/libexec/linkd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run2/main-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

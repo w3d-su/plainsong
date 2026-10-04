@@ -1,0 +1,45 @@
+{
+  "product": "main",
+  "iteration": "fix-1",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      5.25732421875,
+      7.4140625,
+      9.2998046875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 78.8 /usr/libexec/dasd",
+      " 16.9 /sbin/launchd",
+      " 16.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 14.3 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+      " 13.7 /usr/libexec/PerfPowerServices"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "12dd94e0d45a882a65f08e952a689c72d9ba71d43044551252bcd38abbf4adad",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      4.99609375,
+      7.32373046875,
+      9.2568359375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 51.7 /usr/libexec/dasd",
+      " 42.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 16.2 /sbin/launchd",
+      " 13.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      " 11.8 /usr/libexec/siriknowledged"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/main-fix-1-test-without-building.log",
+  "samples": {},
+  "assertion_failure_lines": [],
+  "valid_measurement_batch": false
+}

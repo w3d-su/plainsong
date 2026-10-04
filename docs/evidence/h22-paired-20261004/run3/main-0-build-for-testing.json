@@ -1,0 +1,46 @@
+{
+  "product": "main",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      5.44921875,
+      7.9072265625,
+      8.4921875
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      "103.6 /usr/libexec/dasd",
+      " 29.8 /usr/libexec/PerfPowerServices",
+      " 22.1 /sbin/launchd",
+      " 18.3 /usr/libexec/sysmond",
+      " 13.3 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      5.0595703125,
+      7.74462890625,
+      8.427734375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 63.7 /usr/libexec/dasd",
+      " 27.6 /usr/libexec/siriknowledged",
+      " 26.6 /usr/libexec/PerfPowerServices",
+      " 21.2 /usr/libexec/sysmond",
+      " 17.3 /usr/libexec/eligibilityd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run3/main-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

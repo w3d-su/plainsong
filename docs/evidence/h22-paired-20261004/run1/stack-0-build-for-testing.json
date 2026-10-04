@@ -1,0 +1,44 @@
+{
+  "product": "stack",
+  "iteration": "0",
+  "action": "build-for-testing",
+  "product_sha": "3026f97917822ba45779b019efae988bd41657fb",
+  "start": {
+    "load": [
+      5.669921875,
+      7.75390625,
+      9.62744140625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 73.1 /usr/libexec/dasd",
+      " 47.1 /usr/libexec/spotlightknowledged.updater",
+      " 24.2 /usr/libexec/PerfPowerServices",
+      " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 16.5 /sbin/launchd"
+    ],
+    "build_processes": {}
+  },
+  "probe_sha256": "129f632ffba22aae34288d226777096ff1c72a4412be766adccc7f33818bb359",
+  "typing_probe_sha256": "4d0cba79af6d0e3ca9696f04f1f0bb0f34f19c7f96fbf6c0f6a0718145138df0",
+  "end": {
+    "load": [
+      9.787109375,
+      8.57470703125,
+      9.87890625
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 21.5 /usr/libexec/airportd",
+      " 21.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+      " 19.8 /usr/libexec/sysmond",
+      " 17.9 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+      " 13.1 /usr/libexec/dasd"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 0,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run1/stack-0-build-for-testing.log",
+  "samples": {},
+  "valid_measurement_batch": true
+}

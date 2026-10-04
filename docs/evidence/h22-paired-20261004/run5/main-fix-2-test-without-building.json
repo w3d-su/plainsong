@@ -1,0 +1,114 @@
+{
+  "product": "main",
+  "iteration": "fix-2",
+  "action": "test-without-building",
+  "product_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "start": {
+    "load": [
+      3.2783203125,
+      3.6396484375,
+      3.5224609375
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 78.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 39.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 33.4 /usr/libexec/sysmond",
+      " 10.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      "  9.2 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python"
+    ],
+    "build_processes": {}
+  },
+  "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+  "manifest_sha256": "99f7d7c40ecb9a7429edca42016e4991a760857b87eb695fe7f925818bcf223f",
+  "probe_sha256": "6553c368fdd28c3fe92bcdcdf441a7bbfb1e2d402590c9f373c5ae875cc42731",
+  "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+  "end": {
+    "load": [
+      3.3701171875,
+      3.640625,
+      3.52392578125
+    ],
+    "top_cpu": [
+      "%CPU COMM",
+      " 93.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+      " 67.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+      " 28.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+      " 10.0 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "  8.8 /usr/libexec/sysmond"
+    ],
+    "build_processes": {}
+  },
+  "exit_code": 65,
+  "raw_log": "/private/tmp/plainsong-h22-paired-20261004-run5/main-fix-2-test-without-building.log",
+  "samples": {
+    "source-only": [
+      0.900625,
+      14.370041,
+      14.268333,
+      0.710083,
+      14.256292,
+      0.65775,
+      14.279042,
+      0.763792,
+      14.242875,
+      0.666083,
+      14.227417,
+      0.657792,
+      14.309709,
+      0.654458,
+      14.194708,
+      0.647708,
+      14.222625,
+      0.669083,
+      14.230625,
+      0.6605,
+      14.247042,
+      0.660417,
+      14.200666,
+      0.825458,
+      14.777583,
+      0.7035,
+      14.180958,
+      0.650792,
+      14.214833,
+      0.648166
+    ],
+    "wysiwyg": [
+      0.802292,
+      14.376875,
+      14.376375,
+      0.708083,
+      14.420583,
+      0.72925,
+      14.375667,
+      0.730292,
+      14.307833,
+      0.702708,
+      14.566125,
+      0.70825,
+      14.536042,
+      0.757542,
+      14.582167,
+      14.559458,
+      0.739917,
+      15.251542,
+      0.960541,
+      14.535541,
+      0.780875,
+      19.808,
+      0.819333,
+      14.599917,
+      0.933,
+      14.936584,
+      15.128917,
+      0.765292,
+      14.885375,
+      0.87125
+    ]
+  },
+  "assertion_failure_lines": [
+    "/tmp/plainsong-h22-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:89: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"19.808\") is not less than (\"16.0\") - native input including debounce scheduling: [0.802292, 14.376875, 14.376375, 0.708083, 14.420583, 0.72925, 14.375667, 0.730292, 14.307833, 0.702708, 14.566125, 0.70825, 14.536042, 0.757542, 14.582167, 14.559458, 0.739917, 15.251542, 0.960541, 14.535541, 0.780875, 19.808, 0.819333, 14.599917, 0.933, 14.936584, 15.128917, 0.765292, 14.885375, 0.87125]"
+  ],
+  "valid_measurement_batch": true
+}
