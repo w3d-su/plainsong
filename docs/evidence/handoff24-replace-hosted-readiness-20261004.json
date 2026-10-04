@@ -1,0 +1,752 @@
+{
+  "date": "2026-10-04",
+  "scope": "Handoff 24 failure B: test-only hosted Replace observation readiness",
+  "baseHead": "74321d9aa952566d3fe9bc344194a5ed18d8afb9",
+  "hostedFailure": {
+    "run": 37179939966,
+    "head": "64b6476",
+    "test": "EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit",
+    "reason": "externalObservationPending"
+  },
+  "policy": "Unchanged. The stricter-than-5.6 refusal recorded by PR 131 is pinned with a production-inspection zero-effect test.",
+  "classification": "The hosted failure matches deliberate policy. Baseline repetitions did not reproduce it; the new deterministic regression starts the real inspection before replacing in the same main-actor turn.",
+  "validation": [
+    {
+      "label": "b-main-before",
+      "exit": 0,
+      "command": [
+        "/usr/bin/lockf",
+        "-k",
+        "/private/tmp/plainsong-xcodebuild-test.lock",
+        "xcodebuild",
+        "test-without-building",
+        "-xctestrun",
+        "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS",
+        "-parallel-testing-enabled",
+        "NO",
+        "-test-iterations",
+        "30",
+        "-resultBundlePath",
+        "<EVIDENCE>/b-main-before.xcresult",
+        "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit"
+      ],
+      "logSHA256": "01269b6e04daf11220698357c9cd21348df6b42431e9dc11fe7abb69fcca782b",
+      "totals": {
+        "started": 30,
+        "passed": 30,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tests": {
+        "EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "label": "b-main-after-serial",
+      "exit": 0,
+      "command": [
+        "/usr/bin/lockf",
+        "-k",
+        "/private/tmp/plainsong-xcodebuild-test.lock",
+        "xcodebuild",
+        "test-without-building",
+        "-xctestrun",
+        "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS",
+        "-parallel-testing-enabled",
+        "NO",
+        "-test-iterations",
+        "30",
+        "-resultBundlePath",
+        "<EVIDENCE>/b-main-after-serial.xcresult",
+        "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit",
+        "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect"
+      ],
+      "logSHA256": "9b8c423cfbd075758921118606173bb5478d2bffb56882494aad7e4b19f08315",
+      "totals": {
+        "started": 60,
+        "passed": 60,
+        "failed": 0,
+        "skipped": 0
+      },
+      "tests": {
+        "EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "label": "b-delivery-find-replace",
+      "exit": 0,
+      "command": [
+        "/usr/bin/lockf",
+        "-k",
+        "/private/tmp/plainsong-xcodebuild-test.lock",
+        "xcodebuild",
+        "test-without-building",
+        "-xctestrun",
+        "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+        "-destination",
+        "platform=macOS",
+        "-parallel-testing-enabled",
+        "NO",
+        "-resultBundlePath",
+        "<EVIDENCE>/b-delivery-find-replace.xcresult",
+        "-only-testing:PlainsongTests/EditorFindHostedGateTests",
+        "-only-testing:PlainsongTests/EditorFindMatchHighlightAppTests",
+        "-only-testing:PlainsongTests/EditorFindUITests",
+        "-only-testing:PlainsongTests/EditorReplaceAuthorizationAppTests",
+        "-only-testing:PlainsongTests/EditorFindLifecycleCombinationTests",
+        "-only-testing:PlainsongTests/EditorFindReviewFixTests",
+        "-only-testing:PlainsongTests/EditorReplaceSingleReplaceAppTests",
+        "-only-testing:PlainsongTests/EditorReplaceBatchSpikeAppTests",
+        "-only-testing:PlainsongTests/EditorFindFocusReceiptTests"
+      ],
+      "logSHA256": "efb4857380f7719da2c15fe1e96dd57ec8d17000eb5809e181d5931e38b32539",
+      "totals": {
+        "started": 101,
+        "passed": 98,
+        "failed": 0,
+        "skipped": 3
+      },
+      "tests": {
+        "EditorFindFocusReceiptTests/testBackgroundWindowAndSupersededRequestsNeverAdvanceTheReceipt": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testBackgroundWindowCannotClearTheKeyWindowsChromeFocusReport": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testBackgroundWindowCannotOverwriteTheKeyWindowsChromeFocusReport": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testEditorAndQueryFieldResponderEligibilityIsUnchanged": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testEveryBarCloseRouteClearsReportedChromeFocus": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testFindBarChromeFocusKeepsMenuCommandsEligibleOnlyForTheHostingKeyWindow": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testFindBarControlsActEvenWhenTheResponderGuardWouldRejectTheContext": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testFocusReceiptIsSharedSoASecondWindowCannotReplayASpentRequest": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testKeyWindowChangeAloneFlipsChromeFocusEligibility": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testNewerFocusRequestIsApplicableAgainAfterAnEarlierOneWasConsumed": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testResponderEligibilityIsScopedToTheWindowItIsAskedAbout": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testRetryContinuesWhileTheBarIsVisibleAndTheRequestIsUnresolved": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testSelectAllReceiptIsSharedSoASecondWindowCannotReplayIt": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testSelectAllReceiptRejectsStaleAndRepeatedRequests": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testSwitchingBackToAWindowThatAlreadyReportedFocusRestoresEligibility": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testWindowBridgeAttachThenImmediateDetachNeverPublishesTheStaleWindow": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testWindowBridgeDefersPublicationToTheNextMainActorTurn": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testWindowBridgeDismantleDetachesTheProbe": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindFocusReceiptTests/testWindowBridgePublishesOnlyTheLatestOfARapidSequence": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedDetachedSaveCopyRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedExternalReloadDropsAFindNavigationStillComputingBeforeIt": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFenceAppearingAfterPlanningDropsThePlanBeforeAnyUndoGroup": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFenceAppearingBeforeCommitRefusesAtTheCommitCheck": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFindAndSearchFocusReceiptsStayIndependentOnRealFirstResponders": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFindBarSurvivesExternalReloadAndUnmountsAfterMissingFileClose": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFindEligibleAfterSearchHandoffOnlyTheNewerFindRequestTakesFocus": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedFindToWorkspaceSearchHandoffSupersedesOlderFindFocusWhileHostIsIneligible": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit": {
+          "started": 1,
+          "passed": 0,
+          "failed": 0,
+          "skipped": 1
+        },
+        "EditorFindHostedGateTests/testHostedIndeterminateSaveCopyQuarantineRekeysFindAndCancelsAPublishedNavigation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedKeepMineCompletionHookRecountsAStaleFindBinding": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedKeepMineKeepsTheFindBarOnTheLocalSourceWithoutNavigation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget": {
+          "started": 1,
+          "passed": 0,
+          "failed": 0,
+          "skipped": 1
+        },
+        "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget": {
+          "started": 1,
+          "passed": 0,
+          "failed": 0,
+          "skipped": 1
+        },
+        "EditorFindHostedGateTests/testHostedMarkedTextCommandsStayInFindFieldAndDoNotMutateDocument": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedMissingFileCloseCancelsAPublishedNavigationAndUnmountsTheBar": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedRemountedBarCannotReplayASpentRequestAndANewOneLandsOnlyInTheKeyWindow": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedRenameRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceFromTheQueryFieldUsesTheFindFallback": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceReachesOnlyTheKeyWindowsInstallation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesAReadableIndeterminateWriteQuarantine": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesARecoveryFencedDetachedSession": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesDuringAWorkspaceMutationWriteFence": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesWhileAnExternalChangeAwaitsAChoice": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesWhileEditorSourceIsPending": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedSourcePreviewFindBypassesActivePreviewScrollOwner": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedSourcePreviewFindBypassesDisabledTypewriterSync": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedSpentFocusAndSelectAllCannotReplayInAnotherWindow": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedWriterRefusalAfterAuthorizationOnlyConverges": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindLifecycleCombinationTests/testCleanExternalReloadRecountsFindWithoutAutoJumping": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindLifecycleCombinationTests/testDetachedSaveCopyRekeysFindToTheDestination": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindLifecycleCombinationTests/testIndeterminateSaveCopyQuarantineRekeysFindToTheQuarantinedLocation": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindLifecycleCombinationTests/testKeepMineAfterExternalChangeLeavesFindOnTheLocalSource": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindLifecycleCombinationTests/testRenameRekeysFindIdentityToTheNewURL": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindMatchHighlightAppTests/testClosingTheBarStopsRequestingDecoration": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindMatchHighlightAppTests/testHighlightRequestCarriesEveryMatchAndTheZeroBasedCurrentIndex": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindMatchHighlightAppTests/testNoDecorationIsRequestedForAnEmptyOrUnmatchedQuery": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindMatchHighlightAppTests/testSteppingToTheNextMatchMovesTheCurrentIndex": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testAppliedSelectionIsRejectedWithoutMatchingDocumentAndRevisionProvenance": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testClosingTheBarFencesAQueryStillInsideTheDebounceWindow": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testClosingTheBarKeepsTheOrdinalSoTheNextStepAdvances": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testEscapeFromBarChromeClosesTheBar": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testEscapeFromTheEditorClosesTheBarAndReportsItConsumedTheKey": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testPublishedFindNavigationDoesNotSeedTheSelectionCache": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testWorkspaceSearchHandOffKeepsTheQueryAndReAnchorsTheNextStep": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindReviewFixTests/testWorkspaceSearchHandOffStopsAnInFlightFindFromNavigatingAfterwards": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testAccessibilityIdentifiersAreStableUnderPlainsongEditorFindNamespace": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testCachedSelectionDoesNotCrossDocumentIdentity": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testCachedSelectionDoesNotCrossSourceRevision": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testCommandFAndWorkspaceSearchFocusReceiptsDoNotCrossConsume": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testCommandFWhileBarOpenRefocusesAndNeverCloses": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindBarClosesOnWorkspaceClose": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindBarClosesWhenNoDocumentRemains": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindBarStaysOpenAndRebindsOnDocumentSwitchWithoutAutoJump": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindCommandsNoOpWhenBarVisibleButFocusNotEditorOrFindField": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindFocusTokensIndependentOfWorkspaceSearchTokens": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindNavigationUsesSharedAppNavigationChannelViaProvider": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testFindQueryFieldCoordinatorLeavesMarkedTextCommandsToInputContext": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testSourceOnlyControlStillNavigatesWithoutPreview": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testSourcePlusPreviewLayoutEmitsFindNavigationOnSharedChannel": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testSupersededFindFocusIsNotEligibleForApply": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testTruncatedCounterPresentationIsDistinctFromExactTotal": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testUseSelectionForFindSetsPatternWithoutShowingBar": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindUITests/testUseSelectionRejectsNewlinesAndOversizedPatterns": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testAuthorityGenerationAdvancesOnLifecycleFocusAndBarTransitions": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testCommitAuthorizationReEvaluatesLiveStateAndRecordsItsReason": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testDecisionIsBoundToTheExactSessionAndIsNotCanSave": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testEverySection56StateRefusesWithItsReasonAndAdvancesTheGeneration": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testInstalledUntitledDocumentIsAllowedThroughTheProductionPath": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testRestoredTextRecoverySessionIsRecoveryFenced": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceAuthorizationAppTests/testTypingSupersedesAStampWithoutTouchingTheGeneration": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceBatchSpikeAppTests/testMinimalEnclosingRangeUsesTheRealAppSourceContract": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceSingleReplaceAppTests/testAppRoutedPublicationNotifiesFindObserversAfterTheWrite": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorReplaceSingleReplaceAppTests/testSingleReplacePublishesToDocumentConsumersAndRescansOnce": {
+          "started": 1,
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0
+        }
+      }
+    }
+  ],
+  "checks": {
+    "makeBuild": "passed under shared xcodebuild lock; dedicated DerivedData and copied resolved packages",
+    "makeLint": "passed with SHA256-verified SwiftFormat 0.62.1; existing non-serious warnings",
+    "makeFormat": "passed; zero existing files changed",
+    "diffCheck": "passed"
+  },
+  "exclusions": [
+    "Earlier after repetitions overlapping an orphaned local xcodebuild were discarded; b-main-after-serial replaces them.",
+    "Zero-test invocations are excluded.",
+    "Three existing opt-in hosted stress/typing tests were skipped by design; no test was newly disabled.",
+    "No full make test, physical keyboard, IME, Powerbox, performance-budget or manual gate claim."
+  ],
+  "rawEvidence": "Logs and xcresults retained locally; commands use portable PRODUCTS and EVIDENCE placeholders."
+}
