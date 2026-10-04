@@ -1657,3 +1657,20 @@ Raw log: `docs/evidence/h22-post23-idle-admission.log`; JSON:
 `docs/evidence/handoff22-pr137-20261004-post23-admission.json`. The exact rerun
 commands remain in the preceding Handoff 22 admission section. Historical loaded
 numbers remain diagnostics; R9, real IME and owner-only gates remain open.
+
+
+## Handoff 22 third idle admission attempt - 2026-10-04 (PR #136)
+
+**Idle measurement still pending.** Candidate `64b6476a5d589355fad179de55daf2f13442476f`,
+baseline `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Missing temporary stack/baseline
+checkouts were recreated from the retained branch and current main; all candidate
+worktrees were clean and projects regenerated. Owner confirmed heavy-app/agent
+shutdown readiness. No other xcodebuild was present before admission, but all
+eleven inside-lock checks over five minutes refused loads 18.10-86.29 (require <3).
+Exit 75; no build, typing probe or performance sample. Maxima/medians and 16 ms
+pass/fail remain unmeasured; no regression conclusion or gate closure.
+
+Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
+`docs/evidence/handoff22-pr136-20261004-retry3.json`. Exact rerun commands remain
+in the first Handoff 22 admission section above; fetch/merge main, regenerate
+projects and remeasure before claiming a later head. Budgets remain unchanged.

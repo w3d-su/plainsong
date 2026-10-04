@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "attempt": "retry3",
+  "pr": 136,
+  "status": "idle measurement still pending",
+  "candidate_product_sha": "64b6476a5d589355fad179de55daf2f13442476f",
+  "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "owner_ready_confirmed": true,
+  "other_xcodebuild_before_attempt": false,
+  "threshold_1min_load": "<3",
+  "admission_loads": [
+    86.29,
+    61.73,
+    40.85,
+    33.61,
+    30.47,
+    24.67,
+    19.73,
+    18.1,
+    44.25,
+    29.2,
+    20.5
+  ],
+  "wait_seconds": 300,
+  "exit_code": 75,
+  "performance_samples": [],
+  "typing_budget_ms": 16,
+  "raw_logs": [
+    "docs/evidence/h22-retry3-idle-admission.log"
+  ]
+}
