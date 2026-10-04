@@ -1277,6 +1277,97 @@ run against the PR head sources and then against this change. No export wall-clo
 budget is frozen, and export still runs only from `PreviewController.exportHTML`, off the
 editor keystroke path.
 
+## Replace PR F WYSIWYG single Replace — 2026-09-30
+
+Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug.
+The exact reveal proof runs only on explicit Replace. After the 2026-10-01 review
+fix and subsequent restack, `MarkdownEditorView` inherits the separate scheduling
+bug-fix PR (#136, `phase3-editor-highlight-schedule-fix`), which bounds executing
+highlight work and pending requests. Native writer/input, caret snapping,
+selection-driven reveal, marked-text and native-edit styling guards remain unchanged. The only edit-path addition is an O(1)
+record of the applied model, made once per *applied* debounced highlight in
+`MarkdownTextView+HighlightApply.swift`, never per keystroke; the reveal proof reads it.
+
+`EditorReplaceWYSIWYGPerformanceTests.testLargeFixtureWYSIWYGTypingWithAppliedReplaceSnapshotStaysUnderBudget`
+passed in the complete EditorKit suite: 30 native insertions on `large-1mb.md`,
+maximum **0.398583 ms** (review-fix rerun: **0.453542 ms**). This model-backed fixture
+does not run the production SwiftUI/Find pipeline and is not App typing proof.
+
+`EditorFindHostedGateTests.testHostedLargeFixtureWYSIWYGTypingWithReplaceFindSessionStaysUnderBudget`
+mounts the production `WorkspaceWindow`, Experimental WYSIWYG and an open Find
+session (`ordinary prose`), waits for initial styling/authorization, then inserts
+30 characters with 20 ms between calls. Timing includes synchronous native
+insertion, App publication and debounce scheduling; it excludes the async parse,
+settled rendering and hardware event delivery. The functional fixture removes
+Find's debounce, so this probe restores its **production 150 ms** default before
+timing. Local `< 16 ms` assertions remain hard; hosted CI wall clocks are
+informational under risk R15.
+
+**The probe is opt-in** because its first-iteration maximum exceeded 16 ms in both
+#131 and PR F (below), so a plain `make test` would flake; the budget is unchanged.
+Without the variable it reports an `XCTSkip`. Run it on an idle machine, serialized
+with any other Mac test run (`lockf` on the shared lock file if agents share the Mac):
+
+```sh
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" env TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1 xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug test \
+  -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget
+```
+
+xcodebuild forwards only `TEST_RUNNER_`-prefixed variables into the hosted test
+process, where the prefix is stripped (the same mechanism as `make test`'s
+`TEST_RUNNER_CI`). Raw samples are in the keep-always XCTest attachment and stdout.
+
+Controlled comparison (2026-09-30): exact #131 product
+`a0213857c69300931385b337369c0e7197cd8f3f` (only the identical hosted test/helper
+added), three iterations first; then the PR F tree as it stood before review, three
+iterations. **That PR F tree also restarted the highlight debounce with a directly
+created `Task`; the review fix reverted it, so the row below does not measure the
+final tree.** [Retained raw samples](evidence/editor-replace-r5-20260930-typing.json)
+come from keep-always XCTest attachments.
+
+| Product | Iteration 1 maximum | Iteration 2 maximum | Iteration 3 maximum | Hard-budget result |
+|---|---:|---:|---:|---|
+| #131 baseline | 23.599500 ms | 15.162750 ms | 15.375958 ms | 1 failure, 2 passes |
+| PR F before review (`Task` scheduler, native-edit guard unchanged) | 24.359250 ms | 14.850583 ms | 15.258833 ms | 1 failure, 2 passes |
+
+**The first iteration exceeds budget in both products; the budget is not relaxed.**
+Later iterations pass in both. This ordered, low-sample comparison shows similar
+steady measurements but does not establish a speedup or exclude smaller regressions;
+first-iteration latency still needs profiling. It is not full keystroke-to-screen,
+physical-keyboard or real-IME evidence and does not close R9.
+
+Review-fix opt-in run (2026-10-01, 7598f28 `.task(id:)` tree, one iteration):
+a plumbing check only,
+taken at load averages of 21–27 from other agents' work on the shared Mac. Maximum
+**19.044584 ms** (median 15.083 ms; the same bimodal ~0.8 ms / ~15 ms samples as
+above), so it **failed** the hard budget. Contention makes this unusable as
+evidence, and no baseline was rerun beside it. The final tree's typing path has not
+been re-measured on an idle machine; the owner should run the command above before R9.
+
+Diagnostic history: with the helper's zero Find debounce, baseline maxima were
+30.008916 / 26.148167 / 23.394708 ms and an intermediate PR F tree measured
+21.157208 / 17.900292 / 16.685042 ms, all failed. A trial allowing fresh WYSIWYG
+styling while native editing was active measured 18.658417 / 18.299334 /
+18.608375 ms with production debounce (all failed), while restoring the existing
+guard returned the normal slow samples to about 14.6 ms. That trial was removed;
+no presentation-apply or typing-budget exception ships. The 18/18 hosted
+post-write/Undo/Redo reparse executions reported before review used the `Task`
+scheduler. Before restack, restoring `.task(id:)` allowed those automatic-reparse
+methods to time out under load. The two recorded timeouts were attributed to the
+dropped final request; the separate scheduling bug-fix PR now supplies the fix
+(see its entry below).
+
+Earlier complete EditorFind/EditorReplace hosted run (pre-review tree): **104/104
+passed**, including the hard local typing probe (maximum **15.009834 ms**; raw
+samples in the linked JSON). Review-fix runs (2026-10-01): full MarkdownCore
+303/303; full EditorKit 405 tests, seven real-IME opt-in skips, zero failures;
+hosted EditorFind/EditorReplace classes plus the nine App WYSIWYG policy tests: 114
+executed, 111 passed, the typing probe skipped (opt-in), and two failed
+(`testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo` and
+`testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`, both
+automatic-reparse timeouts at load averages of about 14–16).
+
 ## Editor highlight scheduling fix — 2026-10-01
 
 Apple M1 Pro (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A5194q), Debug, on a Mac shared
@@ -1370,6 +1461,29 @@ The scheduler contract suite has five deterministic tests; no production timing 
 Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
 removes presentation attributes until the next reparse. This branch does not repair it.
 
+## Replace PR F restack — 2026-10-01
+
+Merge origin/main e95ac36 (#131 d2f739a plus #132) into Replace F using merge, preserving
+main's authoritative nil-key-window override and the F WYSIWYG/asset helper. Then merge
+`phase3-editor-highlight-schedule-fix`. No rebase, push or Find-controller changes.
+The scheduler bug-fix PR owns the cancellation/coalescing implementation; F's automatic
+presentation reparses now run on it. PR D's presentation-attribute reset on rejected
+publication remains a known follow-up, with no repair in either change.
+
+Post-restack verification on the merged source tree: **EditorKit 411 tests**, seven
+real-IME opt-in skips, zero failures; **hosted EditorFind/EditorReplace plus all nine
+App WYSIWYG policies: 125 tests**, four stress/typing opt-in skips, zero failures.
+`testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo` and
+`testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo` each passed **3/3**
+using `-test-iterations 3`, with no failure retry. The complete hosted run also passed
+both cases once. Repeated-run load (1 / 5 / 15 min):
+[13.96, 14.4, 12.17] → [12.04, 13.93, 12.07].
+`make build`, pinned SwiftFormat 0.62.1 `make lint`, and `git diff --check` passed.
+[Verification record](evidence/editor-replace-f-restack-20261001.json).
+The A/B typing samples above validate the scheduler dependency only to the stated limits:
+idle-machine measurement is pending, the 16 ms gate remains unchanged, and R9/real IME
+and batch Replace remain open.
+
 
 ## Highlight scheduler review follow-ups — 2026-10-02
 
@@ -1423,6 +1537,32 @@ modes keep the production 150 ms Find debounce and the hard 16 ms local budget.
 No loaded numbers are recorded as idle evidence.
 
 
+## Replace PR F review follow-ups — 2026-10-02
+
+Merged the updated highlight scheduler branch (`fff481cc98de1edeb7adb0b9e459de780ba8c88b`)
+with local merge `d8305c3251cab0d8ed991e3d658315c0238b2cab`. The nested-bold link
+regression refuses all seven hidden chrome pieces with zero writer activations, and
+commits when the link chrome is revealed. The retained bug-fix typing probe and one
+`makeHostedEditorWorkspace` helper replace the duplicate probe and workspace helper;
+the opt-in environment variable is unchanged. The 7598f28 typing run above is now
+labelled with its measured `.task(id:)` tree. Historical timeouts are attributed to
+the observed dropped request; no deterministic reproduction is claimed.
+
+Verification: full EditorKit **415 tests**, seven real-IME opt-in skips, zero failures;
+hosted EditorFind/EditorReplace plus all nine WYSIWYG policies **124 tests**, two typing
+opt-in skips, zero failures. The enhanced highlight stress probe was enabled in the
+hosted run: **0 drops / 60 edits**, including settled fold-plan checks. Both historical
+automatic-reparse timeout methods passed **3/3**, six executions total, without failure
+retry. `make build`, pinned SwiftFormat 0.62.1 lint, and `git diff --check` passed.
+
+**Idle measurement still pending.** No new typing numbers were recorded during these
+functional checks. Use the fully configured helper command below
+LAST to compare the committed bug-fix head and, separately, the committed stacked F
+head against the current fix/main merge-base baseline. Exact batch commands and the strict load/lock gate
+are retained in the highlight-scheduler review entry above. R9, real IME and batch
+Replace remain open. The scheduler fix is cited as #136.
+
+
 ## Handoff 22 idle admission — 2026-10-04 (PR #136)
 
 **Idle measurement still pending.** Five-minute admission refused every batch;
@@ -1432,6 +1572,36 @@ The former baseline contains an untracked test file, so a separate clean worktre
 `/private/tmp/plainsong-h22-baseline` was prepared without using that file.
 Raw admission output: `docs/evidence/h22-idle-admission.log`; structured status:
 `docs/evidence/handoff22-20261004-admission.json`. All historical loaded A/B values
+remain diagnostics, with no pass/fail or regression conclusion for this head.
+The hard 16 ms typing budget is unchanged. Owner heavy-app/agent shutdown was
+requested before admission. No owner-only gates are closed.
+
+Reproduce on an idle machine after fetching/merging main (then remeasure):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+# Refresh the clean baseline to the current fix/main merge base, then generate
+# all three projects in their own worktrees before running the helper.
+git -C "$PLAINSONG_BASELINE_ROOT" checkout --detach "$(git -C "$PLAINSONG_FIX_ROOT" merge-base HEAD origin/main)"
+for root in "$PLAINSONG_BASELINE_ROOT" "$PLAINSONG_FIX_ROOT" "$PLAINSONG_STACK_ROOT"; do
+  make -C "$root" generate
+done
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
+
+
+## Handoff 22 idle admission — 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** Five-minute admission refused every batch;
+no build or typing probe ran, and no performance samples were recorded. The actual
+candidate product SHA is `e76b87530e5f018498abe8d2b3638f030ee7b1b4`; the clean baseline SHA is `4cef0ccf44e422ad22ab34c4319a46c42e69b009`.
+The former baseline contains an untracked test file, so a separate clean worktree
+`/private/tmp/plainsong-h22-baseline` was prepared without using that file.
+Raw admission output: `docs/evidence/h22-idle-admission.log`; structured status:
+`docs/evidence/handoff22-pr137-20261004-admission.json`. All historical loaded A/B values
 remain diagnostics, with no pass/fail or regression conclusion for this head.
 The hard 16 ms typing budget is unchanged. Owner heavy-app/agent shutdown was
 requested before admission. No owner-only gates are closed.
@@ -1472,6 +1642,23 @@ regenerate the three projects and remeasure before treating a future head as pro
 No budgets or owner-only gates changed.
 
 
+## Handoff 22 retry after handoff 23 — 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** The sequential A/B retry after PR #141 CI
+passed was prepared at stacked candidate `7a164fbbdf57333a483577c3467510709d4faf2b`,
+with baseline `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Baseline admission
+refused all eleven checks over five minutes (1-minute load 3.24–4.74, require <3),
+so no product build, baseline/fix comparison or baseline/stack comparison ran.
+The helper exited 75; no maxima, medians, 16 ms pass/fail or regression conclusion
+exists for this retry. Latest #136 pending evidence is merged into this stack;
+only evidence documents changed after the candidate was prepared.
+
+Raw log: `docs/evidence/h22-post23-idle-admission.log`; JSON:
+`docs/evidence/handoff22-pr137-20261004-post23-admission.json`. The exact rerun
+commands remain in the preceding Handoff 22 admission section. Historical loaded
+numbers remain diagnostics; R9, real IME and owner-only gates remain open.
+
+
 ## Handoff 22 third idle admission attempt - 2026-10-04 (PR #136)
 
 **Idle measurement still pending.** Candidate `64b6476a5d589355fad179de55daf2f13442476f`,
@@ -1487,6 +1674,21 @@ Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
 `docs/evidence/handoff22-pr136-20261004-retry3.json`. Exact rerun commands remain
 in the first Handoff 22 admission section above; fetch/merge main, regenerate
 projects and remeasure before claiming a later head. Budgets remain unchanged.
+
+
+## Handoff 22 third idle admission attempt - 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** Prepared stacked candidate
+`284a61f1e40a57e10f4d734155dd8f7996419850`, clean baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed readiness, but
+baseline admission refused all eleven checks over five minutes at loads
+18.10-86.29 (require <3); exit 75. No product build or A/B comparison was reached.
+Zero samples, no maxima/medians, 16 ms pass/fail or regression conclusion.
+Latest #136 docs-only evidence is merged; historical loaded runs remain diagnostics.
+
+Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
+`docs/evidence/handoff22-pr137-20261004-retry3.json`. Exact shared-lock/environment
+rerun commands remain above. R9, real IME and owner-only gates remain open.
 
 
 ## Handoff 22 fourth idle admission attempt - 2026-10-04 (PR #136)
@@ -1509,6 +1711,92 @@ export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
 export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
 export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
+
+
+## Handoff 22 fourth idle admission attempt - 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** Candidate `a6d2d436c9a1c091a6621b2df7ccff457ae0bb21`, baseline/main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed idle readiness during admission;
+no competing xcodebuild was present. All 11 inside-lock checks over five minutes refused 1-minute loads 4.08-5.66 (require <3), exit 75. No build or typing probe ran. The common helper stopped during baseline admission, so neither fix nor stack was measured. Maxima, medians, 16 ms pass/fail and any regression conclusion remain unmeasured.
+No performance samples, budget changes or owner-only gate closures.
+
+Raw logs: `docs/evidence/h22-retry4-idle-admission.log`.
+Structured status: `docs/evidence/handoff22-pr137-20261004-retry4.json`.
+Fetch and merge main if it advances, refresh the clean baseline to the fix/main
+merge base, regenerate each project, then remeasure before claiming a later head.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
+
+
+## Paired typing comparison under recorded load - 2026-10-04 (PR #137)
+
+**Still pending: two complete pairs out of the required ten per mode.** This
+supersedes the earlier idle-admission status as the current measurement plan.
+True idle / absolute 16 ms acceptance remains with R9, PR I or an owner run;
+the historical idle attempts above remain historical admission records.
+
+Candidate `142efcf7daad63bd41c9485a90cbe011bbc85de3`; baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed other builds/tests were paused,
+heavy-app shutdown, power and non-use readiness. The ceiling is 6, checked inside
+the shared non-blocking lock together with exact-name compiler-process exclusion.
+Every attempt records load and top five CPU processes; each batch records SHA.
+The helper now generates projects after installing the isolated baseline test
+probe. Its timed function and fixture hashes match all three products.
+
+The first attempt ran zero baseline tests and was rejected. The second produced
+one baseline batch (30 source-only and 30 WYSIWYG samples) but no candidate
+samples: the candidate main thread blocked in `open` while reading its Documents
+fixture, captured in the committed process sample. The owned runner and host were
+terminated. Test-only fixture loading now uses the test bundle, including an
+isolated resource-manifest overlay on baseline. Run3 built all three bundled-probe
+products and completed two baseline/fix pairs per mode before waiting five minutes
+for candidate pair 3; the third baseline batch is unpaired and excluded. Run4
+rebuilt baseline and timed out before candidate build, adding no typing samples.
+No stack typing batch ran. No product code changed. The original zero-pair summary
+missed the completed run3 pairs; this entry and the structured evidence correct it.
+The two complete pairs share the candidate SHAs and bundled probe used by run4.
+
+
+The requested analysis is median/p95/max per batch, B-minus-A pair differences,
+10,000 fixed-seed bootstrap resamples and a 95% CI of each median pair difference.
+A regression signal needs CI wholly above +0.5 ms and candidate worse in at least
+80% of pairs; otherwise the completed comparison reports no detected signal under
+recorded load, with CI-width sensitivity. No documented warm-up is discarded.
+Fractions over 16 ms for both products are observations, never absolute acceptance.
+There are zero complete stack pairs, so no stack differences, CI or verdict.
+The inherited #136 observations comprise two pairs per mode and show roughly
++6.7 ms WYSIWYG median differences, but remain below the ten-pair requirement.
+They are not substituted for stack evidence. No absolute-budget conclusion or
+gate closure is possible; R9, real IME and owner-only acceptance remain open.
+
+
+Evidence: `docs/evidence/handoff22-pr137-20261004-paired.json`. Committed raw logs and rejected-attempt
+metadata: `docs/evidence/h22-paired-20261004/`; xcresult paths remain in each JSON.
+Pinned `make lint` passed (existing warnings, zero serious), statistical boundary
+checks passed, and `git diff --check` is clean. A full correctness suite was not run.
+
+Before retrying, fetch/merge main if it advances, prepare a clean detached baseline
+at the fix/main merge base, pause other builds/tests and leave the Mac on power.
+The helper installs its test-only baseline overlay before generating/building.
+Use a new evidence directory for each run (the default is timestamped):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
 
 
@@ -1859,4 +2147,77 @@ export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
 export PLAINSONG_MAX_LOAD=6
 export PLAINSONG_PAIRS=10
 /usr/bin/python3 Scripts/run-export-html-e9-paired.py
+```
+
+## Current recorded-load paired result - 2026-10-04 (PR #137)
+
+**Complete: ten interleaved baseline/candidate pairs per mode. No regression signal
+detected under recorded load by the handoff rule.** This supersedes the preceding
+pending and exploratory two-pair entries; those remain historical diagnostics.
+Candidate `2306bdb86eae40517dc9806edb4bf2664280cc22`; common baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. #137 measures the full stacked head against this
+same baseline; it does not isolate Replace from the inherited scheduler change.
+
+Each batch has 30 native keystrokes in source-only and WYSIWYG with the production
+Find debounce; 300 samples per product/mode. No documented warm-up iteration exists,
+so none was removed from either product. Timed probe and fixture SHA-256 match all
+three products. Baseline retains its product HEAD and uses the reproducible test-only
+source/resource overlay installed by the helper. Only measurement plumbing, test
+instrumentation and test resource/scheme membership changed; product code is unchanged.
+
+Start load range `4.60-5.98`, end `4.60-9.16`.
+Every batch passed load <=6 and exact-name compiler exclusion **inside** the shared
+non-blocking lock. End loads can exceed the admission ceiling; all numbers are
+observed under recorded load, with top five CPU processes captured per batch.
+Owner confirmed other builds/tests paused, heavy-app shutdown, power and non-use.
+
+Pooled native typing observations (milliseconds; maxima include all iterations):
+
+| Mode | Baseline median / p95 / max | Candidate median / p95 / max | Fraction >16 ms A / B |
+|---|---|---|---|
+| source-only | 14.189 / 14.722 / 15.066 | 14.190 / 16.857 / 17.856 | 0.00% / 5.67% |
+| wysiwyg | 14.245 / 14.926 / 15.407 | 14.256 / 16.919 / 17.121 | 0.00% / 5.33% |
+
+Per-pair B-minus-A statistics; fixed seed 20261004, 10,000 bootstrap resamples of
+the median pair difference. Each pair's medians/p95 and all samples are in JSON:
+
+| Mode / pair statistic | Median difference ms | Bootstrap 95% CI ms | B worse |
+|---|---|---|---|
+| source-only median_ms | -0.015 | [-0.127, 1.370] | 4/10 |
+| source-only p95_ms | 0.038 | [-0.034, 0.277] | 8/10 |
+| wysiwyg median_ms | 0.008 | [-3.488, 0.033] | 6/10 |
+| wysiwyg p95_ms | -0.020 | [-0.173, 0.317] | 4/10 |
+
+A signal requires the CI entirely above +0.5 ms **and** B worse in >=8/10 pairs.
+Neither metric/mode satisfies both. This is detection under recorded load, not a
+claim of equivalence. CI widths bound sensitivity; the #136 WYSIWYG median CI is
+particularly wide (about 13.46 ms). The earlier two-pair +6.7 ms trend was not
+consistently reproduced across the complete run. Narrower p95 CIs mean not every
+comparison was inconclusive, so the optional CPU-time instrumentation was not added.
+The pooled #137 tails exceed 16 ms more often than baseline despite no median-pair
+signal; these observations remain visible and are not dismissed or called idle proof.
+No absolute 16 ms pass/fail is claimed. R9 / PR I, real IME, physical input and
+owner-only acceptance remain open. No performance budget changed or gate closed.
+
+Evidence: `docs/evidence/handoff22-pr137-20261004-paired-final.json`; complete batch metadata, raw logs,
+and admission checks: `docs/evidence/h22-paired-20261004/run5/`. xcresult bundles
+are retained at the printed paths in those JSONs. Named tests:
+`EditorFindHostedGateTests.testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget`
+and `testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget`. Both executed in every
+accepted batch. Only the existing 16 ms assertion failed in 2
+batches for this comparison; there were no functional failures or missing samples.
+Pinned lint, statistical boundary checks and `git diff --check` passed. This is not
+a full correctness-suite or current-head CI claim.
+
+Reproduce after fetching/merging main if needed and refreshing a clean baseline to
+the fix/main merge base; pause other builds/tests and leave the Mac on power:
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```

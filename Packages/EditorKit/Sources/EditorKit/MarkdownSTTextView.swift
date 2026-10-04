@@ -11,6 +11,7 @@ final class MarkdownSTTextView: STTextView {
     private var markedTextReplacementRange: NSRange?
     private var isMarkedTextReplacementRangeConfirmed = false
     var wysiwygZeroWidthContentStorageDelegate: WYSIWYGZeroWidthTextContentStorageDelegate?
+    var replacePresentationSnapshot: EditorReplacePresentationSnapshot?
     private var previousTextContentStorageDelegate: NSTextContentStorageDelegate?
 
     @discardableResult

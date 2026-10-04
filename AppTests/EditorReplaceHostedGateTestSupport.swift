@@ -106,36 +106,6 @@ struct HostedReplaceWorkspace {
 
 @MainActor
 extension EditorFindHostedGateTests {
-    /// Opens `post.md`, mounts it in a designated key window, opens Find for `query`, and
-    /// waits until the hosted editor has applied the current match and holds focus.
-    func makeHostedReplaceWorkspace(
-        source: String,
-        query: String,
-        localEdit: String? = nil
-    ) async throws -> HostedReplaceWorkspace {
-        let fixture = try makeWorkspaceFixture(files: ["post.md": source])
-        let appState = fixture.appState
-        appState.setLayoutMode(.sourceOnly)
-        // A local edit must stay dirty when the disk changes, or Reload is silent.
-        appState.preferences.setAutosaveIntervalSeconds(30)
-        appState.openExternalFile(fixture.root)
-        try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
-        }
-        let group = makeHostedWorkspaceGroup(fixture: fixture)
-        let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
-        designateKeyWindow(window, in: group)
-        designateReplaceKeyWindow(in: group)
-        if let localEdit {
-            appState.replaceDocumentText(localEdit)
-        }
-        openFindBar(appState, query: query)
-        let hosted = HostedReplaceWorkspace(fixture: fixture, group: group, window: window)
-        try await focusEditorOnCurrentMatch(hosted, window: window)
-        try await waitForHostedReplaceObservationQuiescence(hosted)
-        return hosted
-    }
-
     /// Setup must finish self-triggered fixture inspections before a test injects its own
     /// refusal state. This waits on external observation only, leaving every product fence intact.
     func waitForHostedReplaceObservationQuiescence(_ hosted: HostedReplaceWorkspace) async throws {

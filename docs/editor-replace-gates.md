@@ -52,6 +52,28 @@
 > `EditorFindStepIntentState.swift` (114 lines), and the unchanged top-level types in
 > `EditorFindDocumentBinding.swift` (17 lines) and `EditorFindScheduleReason.swift`
 > (21 lines). Private state and helpers retain private access; no gate changes.
+> **PR F (`phase3-editor-replace-wysiwyg`) implements Experimental WYSIWYG
+> single Replace:** it closes R5 bullets 1–4 and 6. When the current match is not
+> the selection, the action only selects the raw match and synchronously removes
+> any image marker over it; folded owners reveal later through the existing
+> debounced selection-driven reparse. An action whose selection already is the
+> match (even the first, e.g. after Find selected it) commits only with an applied
+> model at the current installation/revision, an exact raw slice, every overlapping
+> owner revealed, no folded attribute over the match or those owners' own fold
+> chrome (for a link, `[` plus the whole `](url "title")`), and no image marker
+> over the match or an overlapping image source. A construct nested in a revealed
+> owner but untouched by the match keeps its fold (review fix: requiring the
+> owner's whole range unfolded refused such matches forever). Otherwise the action
+> refuses with `wysiwygRangeNotRevealed`, without revealing or writing; the unused
+> `wysiwygPresentationInstalled` case is removed. Post-write and native Undo/Redo
+> reparse `text` through the existing off-main highlighter and
+> the 20 ms debounce from the highlight-scheduling bug-fix PR
+> (`EditorHighlightScheduler`).
+> Native input, the editing/marked-text apply guards, and
+> selection-driven reveal are unchanged; the only edit-path addition is an O(1)
+> record of each applied highlight. App authorization, writer activation, and
+> replacement publication retain PR D/E's path. R5 stays open for Replace All;
+> R6 and R9 stay open.
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -959,19 +981,100 @@ hosted spike PR #112.
 
 ### R5 — Experimental WYSIWYG raw-source replacement
 
-- [ ] Folded delimiter overlap reveals the owning region, replaces the exact
+- [x] Folded delimiter overlap reveals the owning region, replaces the exact
   raw-source UTF-16 span, and performs no Markdown repair.
-- [ ] Folded link-destination overlap reveals the whole link, replaces only
+- [x] Folded link-destination overlap reveals the whole link, replaces only
   the raw match, and performs no URL normalization.
-- [ ] Image overlap removes/suspends projection, replaces exact raw image
+- [x] Image overlap removes/suspends projection, replaces exact raw image
   source, and never mutates projected U+FFFC/U+200B text.
-- [ ] Valid post-write constructs may fold/thumbnail again only after reparse;
+- [x] Valid post-write constructs may fold/thumbnail again only after reparse;
   invalid constructs remain raw and editable.
 - [ ] Replace All suspends/reapplies presentation once per batch, not once per
   match; backing source, copy, selection, and accessibility remain canonical.
-- [ ] Source-only and source+preview publish through the normal document/
+- [x] Source-only and source+preview publish through the normal document/
   preview path; no preview DOM mutation.
-- Evidence: _open_
+- Evidence (PR F; R5 remains **open overall**, Replace All belongs to PR G):
+  `EditorReplaceWYSIWYGTests.testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo`
+  covers emphasis/strong/heading/strike/code, CJK/emoji UTF-16 spans, the literal
+  post-write source, and the fold kinds the parser derives from it (`*字🦊**` is
+  emphasis plus a literal `*`; the other malformed results have none).
+  `testLinkDestinationRevealsWholeSourceWithoutURLNormalization`
+  proves whole-link raw reveal and unchanged parentheses/percent-escape spelling
+  outside the exact match. `testImageProjectionNavigatesRevealsAndRebuildsAfterUndoRedo`
+  removes the owning marker on navigation and edits backing source only;
+  `testInvalidImageAfterReplaceStaysRawAndEditable` proves invalid syntax stays raw.
+  `testAdjacentMatchNeitherRevealsFoldNorRefuses` proves strict overlap;
+  `testRefoldedPresentationAtStillValidOffsetRefusesWithZeroEffect`,
+  `testWholeLinkProofRejectsHiddenChromeOutsideTheMatch`, and
+  `testImageProjectionReinstalledAtExactSelectionRefusesWithoutReveal` cover stale
+  or partially hidden presentation with no writer/publication/undo effects.
+  `testMarkedTextWithWYSIWYGRefusesBeforeAuthorizationOrReveal` extends deterministic
+  editor coverage only, with no R6 checkbox change.
+- Nested-fold review fix (bullets 1–3): an owner the match touches is revealed,
+  while a construct nested in it but untouched stays folded. The proof checks the
+  match plus each owner's own fold ranges, not the owner's whole source. Each of
+  these failed before the fix (`wysiwygRangeNotRevealed` on every attempt) and now
+  commits on the action after navigation, with the nested fold still hidden:
+  `testHeadingOwnerWithUntouchedFoldedStrongCommits` (`# Title **bold** word`),
+  `testHeadingOwnerWithUntouchedFoldedLinkCommits`
+  (`## See [Astro](https://astro.build) docs`),
+  `testLinkDestinationWithUntouchedFoldedCodeInLinkTextCommits`
+  (`` Intro [`code` docs](https://host/a) tail ``, query `host`),
+  `testStrongOwnerWithUntouchedFoldedEmphasisCommits` (`Intro **very *it* note** tail`),
+  and `testHeadingOwnerWithUntouchedImageProjectionCommits` (the untouched image
+  keeps its marker). After the selection leaves, owner and nested construct both
+  refold. `testWholeLinkProofRejectsHiddenChromeOutsideTheMatch` still refuses a
+  hidden `[`. `testNestedFoldInLinkTextStillRejectsEveryHiddenChromePiece` covers
+  `Intro [**bold** text](https://host/a "T") tail`, query `text`: hiding any one of
+  `[`, `]`, `(`, the URL, `"T"`, `)`, or the whole `](…)` refuses with zero writer
+  activations. `testRevealedLinkChromeWithUntouchedNestedBoldCommits` commits with
+  revealed link chrome while the untouched nested bold remains folded.
+  `testRejectedPublicationWithWYSIWYGLeavesNoUndoStepRawSourceAndRederivablePresentation`
+  covers `.refused(.writeNotApplied)` under WYSIWYG: no undo/redo step, unchanged
+  source/copy/accessibility, no newly hidden range, and an unadvanced applied model.
+  PR D's rejection restore (`applyReconciledSource` → `textView.text =`, shared with
+  source mode) resets storage attributes, so the untouched fold returns only on the
+  next reparse; the test asserts that reparse re-derives the identical folded set.
+- Production App evidence is in `EditorFindHostedGateTests`:
+  `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`,
+  `testHostedReplaceLinkDestinationThroughDispatcherWithoutURLNormalization`,
+  `testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo`,
+  `testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse`,
+  `testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair`, and
+  `testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits` drive #131's
+  dispatcher and both App authorization checkpoints. The first action only
+  navigates; the next commits exactly one raw range. Fresh applied model revisions
+  and original Undo source ranges check **automatic** post-write/Undo/Redo reparse,
+  without a test-side reparse or presentation repair. Valid constructs refold or
+  thumbnail after selection leaves; invalid ones remain raw/editable. Exact source,
+  raw selection/copy/accessibility and one Undo/Redo step are asserted.
+  `testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally` asserts one
+  replacement publication and reads the normal live preview; it does not mutate
+  the DOM. Historical review-fix runs on `.task(id:)` had two automatic-reparse
+  timeouts (folded delimiter and image); the other five methods passed.
+- Scheduler dependency: the highlight-scheduling bug-fix PR
+  (#136, `phase3-editor-highlight-schedule-fix`) owns the Task scheduler.
+  Replace F stacks on it. The trace showed `body` evaluating the final revision without
+  restarting the task, then the old task stopping at its revision guard. Both historical
+  hosted timeouts were attributed to this dropped request. Under load about 12–19 the folded
+  test failed 8/15 with `.task(id:)` and passed 15/15 with the original direct Task;
+  a deterministic reproduction of the SwiftUI drop could not be forced. The bug-fix PR
+  adds deterministic cancellation/coalescing tests and an opt-in stress reproduction.
+  The final bounded implementation and interleaved A/B typing evidence live in its
+  [perf entry](perf-log.md#editor-highlight-scheduling-fix--2026-10-01).
+- Typing: Replace F's own addition remains an O(1) snapshot recorded once per applied
+  highlight, never per keystroke. The scheduling change is inherited from the separate
+  bug-fix PR. The unchanged native-edit and marked-text guards remain in force.
+  Hosted typing is opt-in (`TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE=1`), with the
+  unchanged 16 ms budget and idle-machine measurement pending. Historical review-fix
+  counts and failures remain recorded in the perf log. Post-restack verification:
+  full EditorKit 411 tests (seven real-IME opt-in skips), hosted EditorFind/EditorReplace
+  plus nine App WYSIWYG policies 125 tests (four opt-in skips), zero failures. Both
+  previously timed-out automatic-reparse cases passed 3/3 with no failure retry.
+  `make build`, pinned SwiftFormat 0.62.1 lint, and `git diff --check` passed;
+  [verification record](evidence/editor-replace-f-restack-20261001.json).
+  The reveal proof runs only on explicit Replace. These synthetic native-input
+  probes do not close R9 or real IME.
 
 ### R6 — Marked text + real Zhuyin/Pinyin boundaries
 

@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-04 Asia/Taipei",
+  "pr": 137,
+  "status": "idle measurement still pending",
+  "sequence": "retry after handoff23 PR141 normal CI green",
+  "handoff23_head": "323f6729e3d0bf8f633d926b1e7026a37855ec42",
+  "handoff23_ci_run": 37178629394,
+  "candidate_product_sha": "7a164fbbdf57333a483577c3467510709d4faf2b",
+  "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
+  "threshold_1min_load": "<3",
+  "admission_loads": [
+    3.68,
+    3.24,
+    3.59,
+    3.5,
+    3.83,
+    4.09,
+    4.74,
+    4.31,
+    4.2,
+    3.65,
+    4.28
+  ],
+  "other_xcodebuild_before_attempt": false,
+  "wait_seconds": 300,
+  "exit_code": 75,
+  "performance_samples": [],
+  "typing_budget_ms": 16,
+  "regression_conclusion": "none; no qualifying samples",
+  "raw_logs": [
+    "docs/evidence/h22-post23-idle-admission.log"
+  ],
+  "batch_status": "not reached; baseline admission refused before any build or probe"
+}
