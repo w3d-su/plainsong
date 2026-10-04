@@ -1,0 +1,3969 @@
+{
+  "created_utc": "2026-10-04T17:55:04.943029+00:00",
+  "status": "complete; observed under recorded load",
+  "method": "AB interleaved; prebuilt Debug products; 30 keystrokes per mode; no documented warm-up discarded; per-pair median/p95; 10000 bootstrap resamples; seed 20261004",
+  "max_load": 6.0,
+  "requested_pairs": 10,
+  "quiet_wait_seconds": 300,
+  "lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "baseline_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+  "candidate_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+  "source_fingerprints": {
+    "baseline": {
+      "root": "/private/tmp/plainsong-h21-baseline",
+      "head": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "status": "",
+      "content_sha256": "94131cebca920a9d7a1b87cbee953f065f6fb85ae6f2d7acba7485366d629d91",
+      "manifest_path": "/private/tmp/plainsong-h21-typing-evidence/baseline-source-fingerprint.json"
+    },
+    "candidate": {
+      "root": "/Users/davis._.su/Documents/plainsong-reconciled-presentation",
+      "head": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "status": "",
+      "content_sha256": "ad6fbd6962f02e55b26767b000794d9c13fd621464c2e5428278dfeb05ddc4ec",
+      "manifest_path": "/private/tmp/plainsong-h21-typing-evidence/candidate-source-fingerprint.json"
+    }
+  },
+  "prebuilt_provenance": {
+    "baseline": {
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "xctestrun": [
+        {
+          "path": "/private/tmp/plainsong-h21-dd-baseline/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+          "sha256": "5735b336e00a498f67022b51bf4dae3afc20f40ff0de9f0a2b407d49ced7afca"
+        }
+      ],
+      "executables": [
+        {
+          "path": "/private/tmp/plainsong-h21-dd-baseline/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong",
+          "sha256": "9600b6e565722ef3f548403c3a09d2051d9a8147d6559f0ab3ff400884a50121"
+        },
+        {
+          "path": "/private/tmp/plainsong-h21-dd-baseline/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/MacOS/PlainsongUITests-Runner",
+          "sha256": "6a1574e3e09428e7dd1dd601000042b354e4f98b819fd8949c12a535d400b1db"
+        }
+      ]
+    },
+    "candidate": {
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "xctestrun": [
+        {
+          "path": "/private/tmp/plainsong-h21-dd-candidate/Build/Products/Plainsong_macosx27.0-arm64.xctestrun",
+          "sha256": "5735b336e00a498f67022b51bf4dae3afc20f40ff0de9f0a2b407d49ced7afca"
+        }
+      ],
+      "executables": [
+        {
+          "path": "/private/tmp/plainsong-h21-dd-candidate/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong",
+          "sha256": "d067c895088caf279fba6ba01986617189552ef93e07fea6887011fbc6825b31"
+        },
+        {
+          "path": "/private/tmp/plainsong-h21-dd-candidate/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/MacOS/PlainsongUITests-Runner",
+          "sha256": "1afc99a20a9346ed93ef69cffa9286c41f69e9ff78a746caaead442b7319a3fd"
+        }
+      ]
+    }
+  },
+  "measurement_inputs": {
+    "baseline": {
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e"
+    },
+    "candidate": {
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e"
+    }
+  },
+  "method_source": "/Users/davis._.su/Documents/plainsong-reconciled-presentation/docs/evidence/editor-highlight-schedule-paired.py",
+  "method_source_sha256": "6d223ce1d5479be4a2af571ee9e824111b65b89e2ea9874a06e37fd059aa07e1",
+  "runner_sha256": "8c95985b66c2429212d127bf1a8ed48add8b1e417eab27e9efeff03a3ee9817e",
+  "absolute_idle_acceptance": "pending R9 / PR I or owner run",
+  "run_attempts": [
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:55:04.950425+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:55:34.973361+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:56:04.980241+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:56:35.001922+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:57:05.014377+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:57:35.251523+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:58:05.455952+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:58:35.664729+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T17:59:05.885069+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T17:59:57.844016+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 1,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:00:15.931771+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:00:16.136159+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:00:46.377136+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:01:16.630924+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:01:46.865268+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:02:34.727544+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 2,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:02:47.485047+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 3,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:03:00.552621+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 3,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:03:13.681570+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 4,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:03:26.764169+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 4,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:03:39.593863+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 5,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:03:39.819985+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 5,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:04:23.231775+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 5,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:04:36.806370+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 6,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:04:49.662784+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:04:49.887298+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:05:20.137133+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:05:50.375698+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:06:20.637162+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:07:07.608499+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 7,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:07:21.018677+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:07:21.257855+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:07:51.516094+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:08:21.775929+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:08:52.046581+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:09:39.040918+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 8,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:09:53.671022+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 8,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:10:06.548061+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:10:06.791482+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:10:37.102002+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:11:07.370337+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:11:37.629916+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:12:23.988912+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 9,
+      "return_code": 75,
+      "recorded_utc": "2026-10-04T18:12:24.226734+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 9,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:13:11.047055+00:00"
+    },
+    {
+      "product": "baseline",
+      "iteration": 10,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:13:23.139825+00:00"
+    },
+    {
+      "product": "candidate",
+      "iteration": 10,
+      "return_code": 0,
+      "recorded_utc": "2026-10-04T18:13:35.845689+00:00"
+    }
+  ],
+  "batches": [
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.64111328125,
+          10.79541015625,
+          9.48876953125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "100.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 71.7 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorColdSnap",
+          " 28.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.1 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.4716796875,
+          10.4326171875,
+          9.38916015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 78.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 41.2 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorDubRobber",
+          " 22.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 16.2 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 15.1 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 65,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-01-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.990417,
+          14.722417,
+          14.584625,
+          14.324167,
+          0.744,
+          14.999416,
+          0.703041,
+          14.388166,
+          0.726834,
+          14.2265,
+          0.685833,
+          14.385,
+          0.697291,
+          14.82825,
+          0.719709,
+          14.476875,
+          0.775625,
+          14.295667,
+          0.710167,
+          14.401708,
+          0.801875,
+          14.267875,
+          14.5625,
+          0.734209,
+          14.302083,
+          0.740209,
+          14.275834,
+          14.582959,
+          0.755916,
+          14.2025
+        ],
+        "wysiwyg": [
+          0.745417,
+          14.565083,
+          0.838625,
+          18.634375,
+          0.780459,
+          14.593833,
+          0.778416,
+          14.329625,
+          0.733708,
+          14.287542,
+          14.862042,
+          0.796875,
+          14.42575,
+          0.755291,
+          14.78925,
+          14.722834,
+          0.76675,
+          14.943292,
+          0.808,
+          14.405167,
+          0.78725,
+          14.294959,
+          14.500125,
+          0.826875,
+          14.362167,
+          0.774959,
+          14.889375,
+          0.752083,
+          14.303792,
+          14.5505
+        ]
+      },
+      "assertion_failure_lines": [
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"18.634375\") is not less than (\"16.0\") - native input including debounce scheduling: [0.745417, 14.565083, 0.838625, 18.634375, 0.780459, 14.593833, 0.778416, 14.329625, 0.733708, 14.287542, 14.862042, 0.796875, 14.42575, 0.755291, 14.78925, 14.722834, 0.76675, 14.943292, 0.808, 14.405167, 0.78725, 14.294959, 14.500125, 0.826875, 14.362167, 0.774959, 14.889375, 0.752083, 14.303792, 14.5505]"
+      ],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.509765625,
+          8.9833984375,
+          8.98291015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 53.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 25.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  5.4 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.36279296875,
+          8.7109375,
+          8.88427734375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 29.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 15.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.1 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 65,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-02-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.875584,
+          18.3185,
+          18.063208,
+          18.252917,
+          18.631375,
+          17.163792,
+          17.054416,
+          0.663083,
+          17.05075,
+          0.696708,
+          17.024708,
+          0.665791,
+          17.039542,
+          0.685208,
+          17.100833,
+          0.771,
+          17.135583,
+          0.689208,
+          17.021417,
+          0.700834,
+          17.016416,
+          0.721,
+          17.011916,
+          0.670709,
+          16.994916,
+          0.663125,
+          16.983208,
+          0.663875,
+          17.031,
+          0.687208
+        ],
+        "wysiwyg": [
+          0.818458,
+          17.131708,
+          0.748542,
+          17.087542,
+          0.729583,
+          17.251875,
+          0.778,
+          17.076583,
+          17.189083,
+          0.787541,
+          17.17325,
+          0.814333,
+          17.1235,
+          0.802917,
+          17.225292,
+          0.741583,
+          17.019459,
+          16.983125,
+          0.748959,
+          17.168625,
+          0.76775,
+          17.085375,
+          17.142875,
+          0.726208,
+          18.024292,
+          0.852625,
+          17.793375,
+          0.959292,
+          20.461083,
+          19.139166
+        ]
+      },
+      "assertion_failure_lines": [
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"18.631375\") is not less than (\"16.0\") - native input including debounce scheduling: [0.875584, 18.3185, 18.063208, 18.252917, 18.631375, 17.163792, 17.054416, 0.663083, 17.05075, 0.696708, 17.024708, 0.665791, 17.039542, 0.685208, 17.100833, 0.771, 17.135583, 0.689208, 17.021417, 0.700834, 17.016416, 0.721, 17.011916, 0.670709, 16.994916, 0.663125, 16.983208, 0.663875, 17.031, 0.687208]",
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"20.461083\") is not less than (\"16.0\") - native input including debounce scheduling: [0.818458, 17.131708, 0.748542, 17.087542, 0.729583, 17.251875, 0.778, 17.076583, 17.189083, 0.787541, 17.17325, 0.814333, 17.1235, 0.802917, 17.225292, 0.741583, 17.019459, 16.983125, 0.748959, 17.168625, 0.76775, 17.085375, 17.142875, 0.726208, 18.024292, 0.852625, 17.793375, 0.959292, 20.461083, 19.139166]"
+      ],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 3,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          4.99267578125,
+          8.52197265625,
+          8.81494140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 81.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.5 /usr/libexec/sysmond",
+          " 11.8 python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.0068359375,
+          8.349609375,
+          8.74755859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 61.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 38.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 25.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 19.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.2 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-03-test-without-building.log",
+      "samples": {
+        "source-only": [
+          1.209875,
+          14.456,
+          14.531958,
+          14.275458,
+          0.726625,
+          14.313458,
+          0.683958,
+          14.271916,
+          0.685792,
+          14.284209,
+          0.677625,
+          14.253458,
+          0.728875,
+          14.279334,
+          0.675334,
+          14.254042,
+          14.255583,
+          0.680166,
+          14.296167,
+          0.668417,
+          14.198458,
+          0.665791,
+          14.234917,
+          14.235584,
+          0.69825,
+          14.188708,
+          0.66375,
+          14.31625,
+          0.678875,
+          14.3035
+        ],
+        "wysiwyg": [
+          0.752875,
+          14.373917,
+          14.331666,
+          0.755959,
+          14.290792,
+          0.759667,
+          14.241875,
+          0.725417,
+          14.424542,
+          0.736666,
+          14.342541,
+          14.301125,
+          0.747333,
+          14.288042,
+          0.765291,
+          14.42325,
+          0.744458,
+          14.387292,
+          0.780833,
+          14.280583,
+          0.772834,
+          14.244917,
+          0.754584,
+          14.839542,
+          0.794791,
+          14.3735,
+          0.758625,
+          14.336958,
+          0.764625,
+          14.266375
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 4,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.81640625,
+          8.36474609375,
+          8.74560546875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 86.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 38.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.5 /usr/libexec/sysmond",
+          " 14.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.8 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.91796875,
+          8.302734375,
+          8.71923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 85.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 23.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 15.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 14.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.4 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 65,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-04-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.847792,
+          16.028125,
+          15.208333,
+          14.311625,
+          14.351458,
+          0.678333,
+          14.247416,
+          0.675792,
+          14.24825,
+          0.660959,
+          14.193833,
+          0.674458,
+          14.2175,
+          0.68225,
+          14.2815,
+          0.65575,
+          14.689833,
+          0.661458,
+          14.204625,
+          14.289042,
+          0.703333,
+          14.196958,
+          0.661792,
+          14.245666,
+          0.6835,
+          14.282,
+          14.267791,
+          0.673,
+          14.189958,
+          0.672541
+        ],
+        "wysiwyg": [
+          0.776917,
+          14.338584,
+          14.235833,
+          0.754125,
+          14.302417,
+          0.742625,
+          14.299291,
+          0.777542,
+          14.7975,
+          0.802666,
+          14.26875,
+          0.758875,
+          14.455,
+          0.754375,
+          14.304208,
+          14.385833,
+          0.749791,
+          14.345708,
+          0.762291,
+          14.358583,
+          0.796333,
+          14.59425,
+          14.577167,
+          0.757125,
+          14.36425,
+          0.845584,
+          14.735666,
+          0.802083,
+          14.333208,
+          0.816334
+        ]
+      },
+      "assertion_failure_lines": [
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"16.028125\") is not less than (\"16.0\") - native input including debounce scheduling: [0.847792, 16.028125, 15.208333, 14.311625, 14.351458, 0.678333, 14.247416, 0.675792, 14.24825, 0.660959, 14.193833, 0.674458, 14.2175, 0.68225, 14.2815, 0.65575, 14.689833, 0.661458, 14.204625, 14.289042, 0.703333, 14.196958, 0.661792, 14.245666, 0.6835, 14.282, 14.267791, 0.673, 14.189958, 0.672541]"
+      ],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 5,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.35595703125,
+          7.85986328125,
+          8.53564453125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 77.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.13427734375,
+          7.7314453125,
+          8.48193359375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 81.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 24.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 19.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  6.2 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-05-test-without-building.log",
+      "samples": {
+        "source-only": [
+          1.098833,
+          14.620541,
+          14.252458,
+          14.321208,
+          0.677333,
+          14.3085,
+          0.682416,
+          14.284292,
+          14.224916,
+          0.681875,
+          14.199791,
+          0.699708,
+          14.295833,
+          0.662041,
+          14.217917,
+          0.658459,
+          14.258625,
+          0.696083,
+          14.248917,
+          0.69675,
+          14.245292,
+          0.756167,
+          14.509083,
+          0.698917,
+          14.24675,
+          0.682292,
+          14.174042,
+          0.667667,
+          14.282875,
+          14.293791
+        ],
+        "wysiwyg": [
+          0.767583,
+          14.665292,
+          14.292,
+          0.764916,
+          14.292708,
+          0.76475,
+          14.258209,
+          0.758125,
+          14.579292,
+          0.744083,
+          14.277125,
+          0.766416,
+          14.338417,
+          0.756375,
+          14.260291,
+          0.750667,
+          14.256958,
+          0.818584,
+          14.30575,
+          14.289541,
+          0.753834,
+          14.366709,
+          0.7605,
+          14.281584,
+          0.757209,
+          14.338666,
+          0.760917,
+          14.356834,
+          0.7545,
+          14.33625
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 6,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.3623046875,
+          7.6474609375,
+          8.43798828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 77.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 30.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.5 /usr/libexec/mobileassetd",
+          " 14.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.5 python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          9.78271484375,
+          8.5126953125,
+          8.732421875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 54.6 /usr/libexec/mobileassetd",
+          " 52.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 23.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 13.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-06-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.967,
+          14.596,
+          14.486458,
+          14.317208,
+          0.673041,
+          14.24875,
+          0.773292,
+          14.210125,
+          0.696042,
+          14.229042,
+          0.670709,
+          14.196625,
+          14.280708,
+          0.66675,
+          14.347875,
+          0.668042,
+          14.233458,
+          0.706042,
+          14.232042,
+          14.273541,
+          0.764958,
+          14.253375,
+          0.683834,
+          14.208541,
+          0.681167,
+          14.207708,
+          0.69475,
+          14.400417,
+          14.230667,
+          0.676167
+        ],
+        "wysiwyg": [
+          0.863,
+          14.75225,
+          14.727875,
+          0.864541,
+          15.028833,
+          14.389833,
+          0.746791,
+          14.295625,
+          0.915,
+          14.612542,
+          0.795459,
+          14.6975,
+          14.399042,
+          0.785541,
+          14.434083,
+          0.751917,
+          14.360666,
+          0.751375,
+          14.320875,
+          0.765333,
+          14.514208,
+          0.753,
+          14.300875,
+          0.737375,
+          14.284917,
+          0.844708,
+          14.945375,
+          0.797625,
+          14.362584,
+          0.771375
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 7,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.513671875,
+          7.29052734375,
+          8.20849609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 49.6 /usr/sbin/spindump",
+          " 47.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 19.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.5 python3",
+          " 14.6 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          6.390625,
+          7.39111328125,
+          8.2275390625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.5 /usr/sbin/spindump",
+          " 40.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 19.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 15.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 65,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-07-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.892916,
+          18.02775,
+          17.012791,
+          17.139916,
+          17.201166,
+          0.720083,
+          17.0095,
+          0.667417,
+          16.998792,
+          0.671,
+          16.971458,
+          17.256542,
+          0.691708,
+          17.306583,
+          17.009042,
+          0.66275,
+          17.088833,
+          0.669458,
+          16.926292,
+          0.672292,
+          17.020292,
+          0.69375,
+          16.947125,
+          16.972167,
+          0.671208,
+          16.9725,
+          0.681291,
+          16.998708,
+          0.655583,
+          16.942584
+        ],
+        "wysiwyg": [
+          0.758042,
+          17.067459,
+          17.19675,
+          17.574292,
+          0.787667,
+          17.364042,
+          0.814625,
+          17.021916,
+          0.761,
+          17.186958,
+          0.748417,
+          17.225167,
+          0.74875,
+          17.105,
+          17.144708,
+          0.766083,
+          17.144084,
+          0.746334,
+          17.108,
+          0.785625,
+          17.108375,
+          17.109167,
+          0.763833,
+          17.127708,
+          0.766833,
+          17.062625,
+          0.740125,
+          17.046334,
+          17.179541,
+          0.761125
+        ]
+      },
+      "assertion_failure_lines": [
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"18.02775\") is not less than (\"16.0\") - native input including debounce scheduling: [0.892916, 18.02775, 17.012791, 17.139916, 17.201166, 0.720083, 17.0095, 0.667417, 16.998792, 0.671, 16.971458, 17.256542, 0.691708, 17.306583, 17.009042, 0.66275, 17.088833, 0.669458, 16.926292, 0.672292, 17.020292, 0.69375, 16.947125, 16.972167, 0.671208, 16.9725, 0.681291, 16.998708, 0.655583, 16.942584]",
+        "/tmp/plainsong-h21-baseline/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"17.574292\") is not less than (\"16.0\") - native input including debounce scheduling: [0.758042, 17.067459, 17.19675, 17.574292, 0.787667, 17.364042, 0.814625, 17.021916, 0.761, 17.186958, 0.748417, 17.225167, 0.74875, 17.105, 17.144708, 0.766083, 17.144084, 0.746334, 17.108, 0.785625, 17.108375, 17.109167, 0.763833, 17.127708, 0.766833, 17.062625, 0.740125, 17.046334, 17.179541, 0.761125]"
+      ],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 8,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.98876953125,
+          6.95849609375,
+          7.93115234375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 59.7 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 53.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 22.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.1 python3",
+          " 15.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          6.14990234375,
+          6.95947265625,
+          7.91943359375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 44.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 42.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 27.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.7 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          " 17.4 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-08-test-without-building.log",
+      "samples": {
+        "source-only": [
+          1.071417,
+          15.124083,
+          14.386166,
+          14.242291,
+          0.718333,
+          14.241167,
+          0.673959,
+          14.390333,
+          0.682417,
+          14.337083,
+          0.676959,
+          14.274666,
+          0.68175,
+          14.193875,
+          14.786334,
+          0.710709,
+          15.021209,
+          14.909125,
+          0.833416,
+          15.201334,
+          15.120667,
+          0.809208,
+          15.033417,
+          15.219833,
+          0.792042,
+          14.885875,
+          14.768458,
+          0.790708,
+          14.756875,
+          14.35275
+        ],
+        "wysiwyg": [
+          0.746083,
+          14.767917,
+          14.790167,
+          0.770625,
+          14.314875,
+          0.763417,
+          14.242792,
+          0.771375,
+          14.383917,
+          14.370834,
+          0.759042,
+          14.301292,
+          0.812917,
+          14.385625,
+          0.759292,
+          14.331208,
+          0.748083,
+          14.361666,
+          14.536208,
+          0.765875,
+          14.310875,
+          0.758333,
+          14.265041,
+          0.753958,
+          14.328792,
+          0.737166,
+          14.374791,
+          0.764083,
+          14.425084,
+          14.275666
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.68359375,
+          6.71142578125,
+          7.6923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 69.4 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 65.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 46.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.8 /Users/davis._.su/miniforge3/bin/python3",
+          " 17.2 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          6.689453125,
+          6.84814453125,
+          7.716796875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 64.6 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 58.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 35.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 30.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  1.8 /System/Library/PrivateFrameworks/CacheDelete.framework/deleted"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-09-test-without-building.log",
+      "samples": {
+        "source-only": [
+          1.16275,
+          14.609667,
+          14.229042,
+          0.751417,
+          14.303833,
+          0.668,
+          14.216166,
+          0.665833,
+          14.262083,
+          0.68,
+          14.454334,
+          0.645334,
+          14.281084,
+          0.665542,
+          14.944875,
+          0.67775,
+          14.217917,
+          0.66875,
+          14.229209,
+          0.666333,
+          14.344708,
+          0.685667,
+          14.300458,
+          0.657583,
+          14.206708,
+          0.662875,
+          14.196125,
+          0.658,
+          14.209,
+          0.671458
+        ],
+        "wysiwyg": [
+          0.752125,
+          14.270541,
+          14.266708,
+          0.753333,
+          14.333583,
+          0.745417,
+          14.316958,
+          0.815,
+          14.438791,
+          0.730709,
+          14.442542,
+          0.793208,
+          14.268959,
+          0.7315,
+          14.358625,
+          0.718041,
+          14.326458,
+          0.730458,
+          14.250833,
+          0.749417,
+          14.274458,
+          0.739708,
+          14.33475,
+          0.747333,
+          14.32525,
+          0.738292,
+          14.345375,
+          0.750375,
+          14.322083,
+          0.737834
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "baseline",
+      "iteration": 10,
+      "action": "test-without-building",
+      "product_sha": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+      "start": {
+        "load": [
+          5.62548828125,
+          6.52880859375,
+          7.55224609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 71.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 70.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 28.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.2 python3",
+          " 13.6 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-baseline",
+      "end": {
+        "load": [
+          5.51611328125,
+          6.4775390625,
+          7.52197265625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 59.1 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 55.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 31.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 25.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  9.9 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/baseline-10-test-without-building.log",
+      "samples": {
+        "source-only": [
+          1.231667,
+          14.525917,
+          14.487417,
+          0.735875,
+          14.500917,
+          0.714084,
+          14.182042,
+          0.682625,
+          14.245959,
+          0.721083,
+          14.122791,
+          0.6515,
+          14.185166,
+          0.650458,
+          14.185708,
+          0.659875,
+          14.190083,
+          0.644417,
+          14.239083,
+          0.698209,
+          14.148584,
+          0.661709,
+          14.127709,
+          0.653875,
+          14.148208,
+          0.704209,
+          14.204042,
+          0.632042,
+          14.183125,
+          0.640167
+        ],
+        "wysiwyg": [
+          0.773208,
+          15.292791,
+          15.064208,
+          15.025084,
+          0.901917,
+          15.241708,
+          0.820833,
+          14.828875,
+          0.862917,
+          15.05475,
+          14.46225,
+          0.750625,
+          14.275375,
+          0.718417,
+          14.325584,
+          0.739792,
+          14.227958,
+          0.702667,
+          14.220166,
+          0.757166,
+          14.406875,
+          0.729375,
+          14.194541,
+          0.708458,
+          14.221083,
+          0.72,
+          14.232,
+          0.722333,
+          14.247084,
+          0.709875
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 1,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.4716796875,
+          10.4326171875,
+          9.38916015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 85.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 50.2 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorDubRobber",
+          " 29.8 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 16.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          7.15087890625,
+          10.49951171875,
+          9.43701171875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 69.2 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 32.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 25.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 15.2 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 14.9 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 65,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-01-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.996458,
+          14.610709,
+          14.557833,
+          14.459166,
+          0.720125,
+          14.570667,
+          0.746208,
+          14.794417,
+          14.430709,
+          0.801167,
+          14.222083,
+          0.731791,
+          14.357667,
+          14.271083,
+          0.700458,
+          14.184667,
+          0.733583,
+          14.640167,
+          14.240542,
+          0.726375,
+          14.266083,
+          0.684292,
+          14.240167,
+          14.66775,
+          0.665083,
+          14.178875,
+          0.684125,
+          14.658,
+          0.690708,
+          14.858292
+        ],
+        "wysiwyg": [
+          0.864,
+          15.680083,
+          15.496125,
+          20.157084,
+          0.919875,
+          16.177542,
+          0.924833,
+          15.793708,
+          0.899833,
+          15.55225,
+          0.841792,
+          16.030125,
+          15.076333,
+          0.905625,
+          15.425875,
+          14.654292,
+          0.890458,
+          15.252292,
+          15.296583,
+          0.835,
+          14.468458,
+          0.750416,
+          14.832083,
+          15.051292,
+          0.763833,
+          14.41975,
+          0.767334,
+          14.6295,
+          0.751042,
+          14.70775
+        ]
+      },
+      "assertion_failure_lines": [
+        "/Users/davis._.su/Documents/plainsong-reconciled-presentation/AppTests/EditorHighlightScheduleHostedTests.swift:156: error: -[PlainsongTests.EditorFindHostedGateTests testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget] : XCTAssertLessThan failed: (\"20.157084\") is not less than (\"16.0\") - native input including debounce scheduling: [0.864, 15.680083, 15.496125, 20.157084, 0.919875, 16.177542, 0.924833, 15.793708, 0.899833, 15.55225, 0.841792, 16.030125, 15.076333, 0.905625, 15.425875, 14.654292, 0.890458, 15.252292, 15.296583, 0.835, 14.468458, 0.750416, 14.832083, 15.051292, 0.763833, 14.41975, 0.767334, 14.6295, 0.751042, 14.70775]"
+      ],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 2,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.36279296875,
+          8.7109375,
+          8.88427734375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 76.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 39.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.6 /usr/libexec/sysmond",
+          "  9.7 python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          4.99267578125,
+          8.52197265625,
+          8.81494140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 57.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 39.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 14.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.6 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-02-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.891875,
+          15.445208,
+          15.803458,
+          15.563167,
+          14.496541,
+          0.700458,
+          14.294292,
+          0.682667,
+          14.218,
+          0.709417,
+          14.260709,
+          0.684417,
+          14.32575,
+          0.663958,
+          14.253083,
+          14.37625,
+          0.662541,
+          14.452208,
+          0.711667,
+          14.237542,
+          0.677417,
+          14.208958,
+          14.229209,
+          0.666041,
+          14.233,
+          0.678084,
+          14.217875,
+          0.677791,
+          14.239584,
+          14.240916
+        ],
+        "wysiwyg": [
+          0.759167,
+          14.407291,
+          14.296375,
+          0.748458,
+          14.336792,
+          0.738833,
+          14.314542,
+          0.82625,
+          14.315958,
+          14.272209,
+          0.78825,
+          14.394708,
+          0.816291,
+          14.330292,
+          0.748708,
+          14.30975,
+          0.742667,
+          14.232709,
+          0.766209,
+          14.278,
+          0.743625,
+          14.30425,
+          0.734083,
+          14.261583,
+          0.749417,
+          14.325584,
+          0.751792,
+          14.293167,
+          0.769875,
+          14.313125
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 3,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.0068359375,
+          8.349609375,
+          8.74755859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 75.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 35.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.6 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 17.8 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.81640625,
+          8.36474609375,
+          8.74560546875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 63.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 39.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  6.4 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-03-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.916167,
+          14.597875,
+          14.408583,
+          0.736958,
+          14.335916,
+          14.312167,
+          0.676125,
+          14.226958,
+          0.698417,
+          14.289083,
+          0.742791,
+          14.23775,
+          14.228292,
+          0.679959,
+          14.248125,
+          0.658334,
+          14.18425,
+          0.661958,
+          14.188708,
+          0.670042,
+          14.580416,
+          14.2105,
+          0.676,
+          14.198583,
+          0.665416,
+          14.263959,
+          0.655375,
+          14.207708,
+          0.660584,
+          14.205084
+        ],
+        "wysiwyg": [
+          0.784459,
+          14.460875,
+          14.305542,
+          0.742166,
+          14.360333,
+          0.753958,
+          14.577,
+          14.32125,
+          0.750375,
+          14.336958,
+          0.774125,
+          14.376625,
+          0.751375,
+          14.314084,
+          0.78325,
+          14.283167,
+          0.759708,
+          14.310875,
+          0.767083,
+          14.294375,
+          0.751292,
+          14.431334,
+          0.815542,
+          14.322208,
+          0.731458,
+          14.262292,
+          0.769875,
+          14.626916,
+          0.738584,
+          15.690083
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 4,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.91796875,
+          8.302734375,
+          8.71923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "107.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 18.5 /usr/libexec/sysmond",
+          " 17.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.8 /Users/davis._.su/miniforge3/bin/python3",
+          "  9.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          6.587890625,
+          8.32275390625,
+          8.7177734375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 79.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 42.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          "  7.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-04-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.86975,
+          14.45875,
+          14.344208,
+          0.788041,
+          14.251625,
+          14.280583,
+          0.704792,
+          14.41175,
+          0.681125,
+          14.247959,
+          0.681917,
+          14.247167,
+          14.237167,
+          0.671125,
+          14.187416,
+          0.677792,
+          14.162541,
+          0.679125,
+          14.241792,
+          0.662667,
+          14.27,
+          14.207167,
+          14.245292,
+          0.674792,
+          14.207209,
+          0.662125,
+          14.238959,
+          0.67625,
+          14.325875,
+          0.675291
+        ],
+        "wysiwyg": [
+          0.751458,
+          14.390542,
+          14.279041,
+          0.790084,
+          14.348,
+          0.742417,
+          14.353334,
+          0.735042,
+          14.27375,
+          0.751625,
+          14.285625,
+          14.315,
+          0.751791,
+          14.323667,
+          0.793125,
+          14.345334,
+          0.75,
+          14.252167,
+          0.751791,
+          14.295833,
+          0.769625,
+          14.285208,
+          0.736333,
+          14.267792,
+          0.7535,
+          14.2765,
+          0.752375,
+          14.268875,
+          0.7685,
+          14.509083
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 5,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          4.962890625,
+          7.65283203125,
+          8.44970703125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "110.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 16.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 10.9 /Users/davis._.su/miniforge3/bin/python3",
+          "  8.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.3623046875,
+          7.6474609375,
+          8.43798828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 51.1 /usr/libexec/mobileassetd",
+          " 40.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 28.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 21.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.7 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-05-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.900917,
+          14.369875,
+          14.446083,
+          0.71525,
+          14.283958,
+          0.650459,
+          14.251,
+          14.221291,
+          0.727958,
+          14.257042,
+          0.684583,
+          14.250625,
+          0.669667,
+          14.180042,
+          0.656708,
+          14.237792,
+          0.664125,
+          14.276291,
+          14.369292,
+          0.701708,
+          14.2015,
+          0.685209,
+          14.178333,
+          0.666125,
+          14.192291,
+          14.229583,
+          0.672416,
+          14.208333,
+          0.671875,
+          14.239125
+        ],
+        "wysiwyg": [
+          0.754459,
+          14.395792,
+          14.225042,
+          0.736083,
+          14.332042,
+          0.743667,
+          14.293917,
+          0.739833,
+          14.290917,
+          0.741333,
+          14.473084,
+          0.739958,
+          14.307,
+          0.760583,
+          14.353208,
+          0.729875,
+          14.274125,
+          0.757166,
+          14.291584,
+          0.731625,
+          14.277625,
+          0.789458,
+          14.2925,
+          0.765875,
+          14.230208,
+          0.749834,
+          14.274542,
+          0.738459,
+          14.236625,
+          0.762458
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.384765625,
+          7.3583984375,
+          8.248046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 75.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 55.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.1 /Users/davis._.su/miniforge3/bin/python3",
+          " 14.3 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.513671875,
+          7.29052734375,
+          8.20849609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 45.5 /usr/sbin/spindump",
+          " 40.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 24.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 14.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-06-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.904792,
+          14.4315,
+          14.440625,
+          0.725916,
+          14.235333,
+          0.698125,
+          14.548375,
+          0.693333,
+          14.410083,
+          0.752667,
+          14.495167,
+          14.388208,
+          0.684292,
+          14.505292,
+          0.668917,
+          14.254042,
+          0.6755,
+          14.233708,
+          14.295375,
+          0.685959,
+          14.217625,
+          0.741042,
+          14.197667,
+          0.665,
+          14.496917,
+          0.750667,
+          14.412208,
+          0.677125,
+          14.268917,
+          0.669417
+        ],
+        "wysiwyg": [
+          0.78275,
+          14.323458,
+          14.421834,
+          0.803083,
+          14.325583,
+          0.761708,
+          14.314083,
+          0.740333,
+          14.617541,
+          0.743125,
+          14.27175,
+          0.78975,
+          14.391042,
+          0.755709,
+          14.364792,
+          0.7265,
+          14.274959,
+          0.741958,
+          14.260708,
+          0.735375,
+          14.286459,
+          0.76575,
+          14.270208,
+          0.748208,
+          14.307417,
+          0.751542,
+          14.342125,
+          0.7475,
+          14.321542,
+          0.741041
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.74560546875,
+          6.98974609375,
+          7.96630859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 64.2 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 44.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 23.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.3 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.98876953125,
+          6.95849609375,
+          7.93115234375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.4 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 42.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 13.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-07-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.982416,
+          15.102958,
+          14.880375,
+          0.767792,
+          15.191875,
+          14.812875,
+          0.680166,
+          14.281792,
+          0.707625,
+          15.063041,
+          14.661708,
+          0.679792,
+          14.21975,
+          0.725,
+          14.723459,
+          14.253583,
+          0.77925,
+          15.096583,
+          14.585625,
+          0.813916,
+          15.119334,
+          0.701292,
+          14.484666,
+          0.729959,
+          14.755542,
+          14.343125,
+          0.798167,
+          14.411959,
+          14.357541,
+          0.732666
+        ],
+        "wysiwyg": [
+          0.80875,
+          14.475791,
+          14.260458,
+          0.742917,
+          14.372542,
+          0.741959,
+          14.27525,
+          0.719083,
+          14.457417,
+          14.4355,
+          0.81475,
+          14.323708,
+          0.751666,
+          14.327167,
+          0.742708,
+          14.25775,
+          0.737458,
+          14.373041,
+          14.343417,
+          0.735083,
+          14.319875,
+          0.737666,
+          14.2635,
+          0.736292,
+          14.240916,
+          0.737125,
+          14.459709,
+          0.777792,
+          14.321,
+          0.736625
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 8,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.9775390625,
+          6.91015625,
+          7.89599609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 58.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 50.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          " 17.2 python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          6.74267578125,
+          7.04443359375,
+          7.931640625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 57.8 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 51.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 24.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          " 18.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-08-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.864834,
+          14.390084,
+          14.418708,
+          0.726959,
+          14.356375,
+          0.707541,
+          14.4435,
+          0.667083,
+          14.239041,
+          0.662458,
+          14.513333,
+          14.243458,
+          0.665542,
+          14.261,
+          0.655125,
+          14.27525,
+          0.665208,
+          14.2045,
+          0.676083,
+          14.401041,
+          14.240625,
+          0.671125,
+          14.190417,
+          0.653292,
+          14.396042,
+          0.717,
+          14.320459,
+          0.646583,
+          14.226041,
+          0.672333
+        ],
+        "wysiwyg": [
+          0.758334,
+          14.440375,
+          0.763875,
+          14.298,
+          0.844917,
+          14.32275,
+          0.763292,
+          14.524,
+          0.761458,
+          14.285458,
+          0.759042,
+          14.279167,
+          0.735958,
+          14.33425,
+          0.745083,
+          14.351417,
+          0.74625,
+          14.294458,
+          0.74725,
+          14.2675,
+          0.803541,
+          14.303291,
+          0.765375,
+          14.27475,
+          0.757125,
+          14.289,
+          0.747958,
+          14.277292,
+          0.7695,
+          14.246416
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 9,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.77978515625,
+          6.607421875,
+          7.59814453125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 72.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 63.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 19.1 /Users/davis._.su/miniforge3/bin/python3",
+          "  9.9 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.62548828125,
+          6.52880859375,
+          7.55224609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 62.2 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 55.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 34.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 25.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  2.7 /usr/libexec/airportd"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-09-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.934292,
+          14.88225,
+          14.789583,
+          0.726084,
+          14.264667,
+          0.67275,
+          14.41125,
+          0.703125,
+          14.218209,
+          0.667875,
+          14.516875,
+          0.668666,
+          14.166625,
+          0.651042,
+          14.2,
+          0.62675,
+          14.181541,
+          0.662,
+          14.172458,
+          0.685375,
+          14.194667,
+          0.656208,
+          14.221958,
+          0.635917,
+          14.1465,
+          0.663417,
+          14.211417,
+          0.654417,
+          14.234209,
+          0.67
+        ],
+        "wysiwyg": [
+          0.757916,
+          14.263959,
+          14.205667,
+          0.777375,
+          14.407667,
+          0.725416,
+          14.278042,
+          0.743125,
+          14.315792,
+          0.73275,
+          14.340959,
+          0.759625,
+          14.331666,
+          0.734959,
+          14.268083,
+          0.725917,
+          14.21975,
+          0.736458,
+          14.249667,
+          0.7615,
+          14.223792,
+          0.733042,
+          14.261291,
+          0.739583,
+          14.286917,
+          0.772334,
+          14.263458,
+          0.742834,
+          14.308041,
+          0.735917
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    },
+    {
+      "product": "candidate",
+      "iteration": 10,
+      "action": "test-without-building",
+      "product_sha": "e0f26ceb2f104106eb7e1ed34de7ead9ba16af70",
+      "start": {
+        "load": [
+          5.51611328125,
+          6.4775390625,
+          7.52197265625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 71.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 69.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 31.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.8 /usr/libexec/sysmond",
+          " 13.9 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      },
+      "fixture_sha256": "d174f48ea6175db568abe44e5b71e82ee92f1cf9c0ed081d8f8308cc1961d247",
+      "manifest_sha256": "c7fb31a1b04c3b2632a4dd30a1986d0cd82c04dfa59f3b824fcc753ae2536da0",
+      "probe_sha256": "bc20f6e1b247c2f10078c4bfe0485acc4a4a0b0d1bd8d846f9ffb0e9dc24844e",
+      "typing_probe_sha256": "07a8a3ca37f18842fbba5db990e7b4146bd1a9bcd06b03a4d8aac2c3ab17111e",
+      "derivedDataPath": "/private/tmp/plainsong-h21-dd-candidate",
+      "end": {
+        "load": [
+          5.76416015625,
+          6.48583984375,
+          7.505859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 67.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 61.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 33.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 26.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd",
+          "  2.0 /System/Library/PrivateFrameworks/CacheDelete.framework/deleted"
+        ],
+        "build_processes": {}
+      },
+      "exit_code": 0,
+      "raw_log": "/private/tmp/plainsong-h21-typing-evidence/candidate-10-test-without-building.log",
+      "samples": {
+        "source-only": [
+          0.97375,
+          14.54225,
+          14.34675,
+          0.742708,
+          15.469959,
+          0.841042,
+          14.338209,
+          0.677708,
+          14.202708,
+          0.666125,
+          14.205667,
+          0.663625,
+          14.233875,
+          0.685334,
+          14.167792,
+          0.6495,
+          14.183791,
+          0.692375,
+          14.201167,
+          0.653584,
+          14.161709,
+          0.653167,
+          14.199458,
+          0.654209,
+          14.228417,
+          0.650458,
+          14.194625,
+          0.666167,
+          14.154416,
+          0.658042
+        ],
+        "wysiwyg": [
+          0.759334,
+          14.246167,
+          14.228917,
+          0.747083,
+          14.251875,
+          0.726667,
+          14.279584,
+          0.783416,
+          14.5885,
+          0.762541,
+          14.274792,
+          0.732708,
+          14.246167,
+          0.707625,
+          14.37825,
+          0.727042,
+          14.254625,
+          0.760083,
+          14.261333,
+          0.727333,
+          14.304291,
+          0.72325,
+          14.277084,
+          0.716625,
+          14.287416,
+          0.727834,
+          14.258375,
+          0.713958,
+          14.378834,
+          0.710334
+        ]
+      },
+      "assertion_failure_lines": [],
+      "valid_measurement_batch": true
+    }
+  ],
+  "admission_checks": [
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          9.52294921875,
+          13.3134765625,
+          10.05029296875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 49.2 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorSheepSwap",
+          " 48.2 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 23.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.0 /Users/davis._.su/miniforge3/bin/python3",
+          " 17.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          8.205078125,
+          12.64208984375,
+          9.919921875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 58.2 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorSheepSwap",
+          " 42.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.5 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          7.58203125,
+          12.08154296875,
+          9.810546875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 97.1 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 45.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 34.7 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorColdSnap",
+          " 23.6 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 23.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          7.29833984375,
+          11.6044921875,
+          9.71728515625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 99.6 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 58.1 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorColdSnap",
+          " 49.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.0 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          5.64111328125,
+          10.79541015625,
+          9.48876953125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "100.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 71.7 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorColdSnap",
+          " 28.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.1 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.7 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 1,
+      "snapshot": {
+        "load": [
+          5.4716796875,
+          10.4326171875,
+          9.38916015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 85.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 50.2 /Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtectRemediatorDubRobber",
+          " 29.8 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 16.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          7.15087890625,
+          10.49951171875,
+          9.43701171875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 84.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 29.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 27.4 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 24.1 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 19.5 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          6.87109375,
+          10.11474609375,
+          9.33349609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "100.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 90.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 31.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.9 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          7.15771484375,
+          9.8779296875,
+          9.2744140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 85.6 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 54.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 33.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 24.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.9 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          6.744140625,
+          9.5341796875,
+          9.17041015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 24.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.3 /Users/davis._.su/miniforge3/bin/python3",
+          "  8.3 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          5.509765625,
+          8.9833984375,
+          8.98291015625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 53.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 25.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+          "  5.4 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 2,
+      "snapshot": {
+        "load": [
+          5.36279296875,
+          8.7109375,
+          8.88427734375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 76.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 39.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.6 /usr/libexec/sysmond",
+          "  9.7 python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 3,
+      "snapshot": {
+        "load": [
+          4.99267578125,
+          8.52197265625,
+          8.81494140625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 81.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 15.3 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.5 /usr/libexec/sysmond",
+          " 11.8 python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 3,
+      "snapshot": {
+        "load": [
+          5.0068359375,
+          8.349609375,
+          8.74755859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 75.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 35.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.6 /System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow",
+          " 17.8 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 4,
+      "snapshot": {
+        "load": [
+          5.81640625,
+          8.36474609375,
+          8.74560546875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 86.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 38.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.5 /usr/libexec/sysmond",
+          " 14.4 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 13.8 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 4,
+      "snapshot": {
+        "load": [
+          5.91796875,
+          8.302734375,
+          8.71923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "107.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 18.5 /usr/libexec/sysmond",
+          " 17.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 10.8 /Users/davis._.su/miniforge3/bin/python3",
+          "  9.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 5,
+      "snapshot": {
+        "load": [
+          6.587890625,
+          8.32275390625,
+          8.7177734375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 92.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 40.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 14.1 python3",
+          " 13.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.9 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 5,
+      "snapshot": {
+        "load": [
+          5.35595703125,
+          7.85986328125,
+          8.53564453125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 77.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.4 /Users/davis._.su/miniforge3/bin/python3",
+          " 10.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 5,
+      "snapshot": {
+        "load": [
+          4.962890625,
+          7.65283203125,
+          8.44970703125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "110.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 16.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 12.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 10.9 /Users/davis._.su/miniforge3/bin/python3",
+          "  8.1 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          5.3623046875,
+          7.6474609375,
+          8.43798828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 77.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 30.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.5 /usr/libexec/mobileassetd",
+          " 14.5 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 14.5 python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          9.78271484375,
+          8.5126953125,
+          8.732421875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 59.7 /usr/libexec/mobileassetd",
+          " 54.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 22.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 14.8 python3",
+          " 13.6 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          8.0693359375,
+          8.2216796875,
+          8.61865234375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 46.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 45.8 /usr/libexec/mobileassetd",
+          " 26.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.2 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          6.90478515625,
+          7.93994140625,
+          8.5029296875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 73.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 54.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 27.4 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/154.0.8037.58/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          " 20.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 16.0 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          6.2978515625,
+          7.71533203125,
+          8.40185546875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          "167.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/corespotlightd",
+          " 51.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 40.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 21.2 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.8 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 6,
+      "snapshot": {
+        "load": [
+          5.384765625,
+          7.3583984375,
+          8.248046875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 75.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 55.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.1 /Users/davis._.su/miniforge3/bin/python3",
+          " 14.3 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          5.513671875,
+          7.29052734375,
+          8.20849609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 49.6 /usr/sbin/spindump",
+          " 47.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 19.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.5 python3",
+          " 14.6 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          6.390625,
+          7.39111328125,
+          8.2275390625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 64.0 /usr/sbin/spindump",
+          " 41.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 18.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 16.8 python3",
+          " 15.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          6.5947265625,
+          7.35107421875,
+          8.18359375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 55.8 /usr/sbin/spindump",
+          " 44.7 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 25.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.7 /Users/davis._.su/miniforge3/bin/python3",
+          " 15.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          7.306640625,
+          7.45751953125,
+          8.1923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 47.4 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 38.3 /usr/sbin/spindump",
+          " 23.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 18.8 /Users/davis._.su/miniforge3/bin/python3",
+          " 15.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mdworker_shared"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          6.36474609375,
+          7.2197265625,
+          8.080078125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 58.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 44.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 23.7 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.0 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 7,
+      "snapshot": {
+        "load": [
+          5.74560546875,
+          6.98974609375,
+          7.96630859375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 64.2 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 44.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 23.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 22.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 19.3 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 8,
+      "snapshot": {
+        "load": [
+          5.98876953125,
+          6.95849609375,
+          7.93115234375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 59.7 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 53.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 22.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.1 python3",
+          " 15.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 8,
+      "snapshot": {
+        "load": [
+          5.9775390625,
+          6.91015625,
+          7.89599609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 58.0 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 50.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          " 17.2 python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          6.74267578125,
+          7.04443359375,
+          7.931640625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 64.6 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 57.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 21.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.7 python3",
+          " 14.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          7.2880859375,
+          7.1748046875,
+          7.94921875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 52.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 47.5 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 27.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 19.9 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 11.5 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          6.6884765625,
+          7.044921875,
+          7.87451171875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 54.1 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 35.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 25.9 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 24.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+          " 17.1 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          6.359375,
+          6.9287109375,
+          7.80224609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 77.2 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 67.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 34.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.3 /Users/davis._.su/miniforge3/bin/python3",
+          "  3.7 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          5.68359375,
+          6.71142578125,
+          7.6923828125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 69.4 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 65.4 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 46.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.8 /Users/davis._.su/miniforge3/bin/python3",
+          " 17.2 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          6.689453125,
+          6.84814453125,
+          7.716796875
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 68.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 66.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 33.2 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 17.5 python3",
+          " 14.0 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 9,
+      "snapshot": {
+        "load": [
+          5.77978515625,
+          6.607421875,
+          7.59814453125
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 72.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 63.7 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 41.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 19.1 /Users/davis._.su/miniforge3/bin/python3",
+          "  9.9 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "baseline",
+      "iteration": 10,
+      "snapshot": {
+        "load": [
+          5.62548828125,
+          6.52880859375,
+          7.55224609375
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 71.3 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 70.9 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 28.8 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 18.2 python3",
+          " 13.6 /usr/libexec/sysmond"
+        ],
+        "build_processes": {}
+      }
+    },
+    {
+      "product": "candidate",
+      "iteration": 10,
+      "snapshot": {
+        "load": [
+          5.51611328125,
+          6.4775390625,
+          7.52197265625
+        ],
+        "top_cpu": [
+          "%CPU COMM",
+          " 71.5 /System/Library/PrivateFrameworks/AppleNeuralEngine.framework/XPCServices/ANECompilerService.xpc/Contents/MacOS/ANECompilerService",
+          " 69.6 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds_stores",
+          " 31.0 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Support/mds",
+          " 20.8 /usr/libexec/sysmond",
+          " 13.9 /Users/davis._.su/miniforge3/bin/python3"
+        ],
+        "build_processes": {}
+      }
+    }
+  ],
+  "analysis": {
+    "source-only": {
+      "complete_pairs": 10,
+      "baseline": {
+        "count": 300,
+        "median_ms": 14.201145499999999,
+        "p95_ms": 17.040102400000002,
+        "maximum_ms": 18.631375,
+        "fraction_over_16ms": 0.12
+      },
+      "candidate": {
+        "count": 300,
+        "median_ms": 14.191354,
+        "p95_ms": 14.75724405,
+        "maximum_ms": 15.803458,
+        "fraction_over_16ms": 0.0
+      },
+      "pairs": [
+        {
+          "pair": 1,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.247187499999999,
+            "p95_ms": 14.78062515,
+            "maximum_ms": 14.999416,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.231124999999999,
+            "p95_ms": 14.737416849999999,
+            "maximum_ms": 14.858292,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 2,
+          "baseline": {
+            "count": 30,
+            "median_ms": 17.003416,
+            "p95_ms": 18.28898765,
+            "maximum_ms": 18.631375,
+            "fraction_over_16ms": 0.5666666666666667
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2236045,
+            "p95_ms": 15.51008545,
+            "maximum_ms": 15.803458,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 3,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.216687499999999,
+            "p95_ms": 14.393112499999999,
+            "maximum_ms": 14.531958,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.193645499999999,
+            "p95_ms": 14.50309115,
+            "maximum_ms": 14.597875,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 4,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.1953955,
+            "p95_ms": 14.975007999999999,
+            "maximum_ms": 16.028125,
+            "fraction_over_16ms": 0.03333333333333333
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.1972915,
+            "p95_ms": 14.3813561,
+            "maximum_ms": 14.45875,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 5,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.208853999999999,
+            "p95_ms": 14.42453925,
+            "maximum_ms": 14.620541,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.1861665,
+            "p95_ms": 14.36961265,
+            "maximum_ms": 14.446083,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 6,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.2081245,
+            "p95_ms": 14.44773955,
+            "maximum_ms": 14.596,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.207646,
+            "p95_ms": 14.50152325,
+            "maximum_ms": 14.548375,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 7,
+          "baseline": {
+            "count": 30,
+            "median_ms": 16.9592915,
+            "p95_ms": 17.28406455,
+            "maximum_ms": 18.02775,
+            "fraction_over_16ms": 0.6
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.3124585,
+            "p95_ms": 15.111964799999999,
+            "maximum_ms": 15.191875,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 8,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.3058745,
+            "p95_ms": 15.16657105,
+            "maximum_ms": 15.219833,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.1974585,
+            "p95_ms": 14.432343600000001,
+            "maximum_ms": 14.513333,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 9,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.679437500000001,
+            "p95_ms": 14.53976715,
+            "maximum_ms": 14.944875,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.540395999999999,
+            "p95_ms": 14.6668644,
+            "maximum_ms": 14.88225,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 10,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.677229,
+            "p95_ms": 14.494842,
+            "maximum_ms": 14.525917,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.564083,
+            "p95_ms": 14.454274999999999,
+            "maximum_ms": 15.469959,
+            "fraction_over_16ms": 0.0
+          }
+        }
+      ],
+      "metrics": {
+        "median_ms": {
+          "pair_differences_ms": [
+            -0.016062500000000313,
+            -2.779811500000001,
+            -0.02304200000000023,
+            0.0018960000000003419,
+            -0.022687499999998195,
+            -0.0004784999999998263,
+            -2.646832999999999,
+            -0.10841600000000007,
+            -0.13904150000000115,
+            -0.11314599999999952
+          ],
+          "median_difference_ms": -0.06572900000000015,
+          "bootstrap_95_ci_ms": [
+            -1.3799894999999993,
+            -0.01158299999999901
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 1,
+          "regression_signal": false,
+          "ci_width_ms": 1.3684065000000003
+        },
+        "p95_ms": {
+          "pair_differences_ms": [
+            -0.04320830000000164,
+            -2.778902199999999,
+            0.1099786500000004,
+            -0.5936518999999993,
+            -0.05492659999999994,
+            0.05378370000000032,
+            -2.172099750000001,
+            -0.7342274499999988,
+            0.12709725000000027,
+            -0.04056700000000113
+          ],
+          "median_difference_ms": -0.04906745000000079,
+          "bootstrap_95_ci_ms": [
+            -1.3828758250000002,
+            0.05378370000000032
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 3,
+          "regression_signal": false,
+          "ci_width_ms": 1.4366595250000005
+        }
+      },
+      "verdict": "no regression signal detected under recorded load",
+      "limitation": "Differences smaller than the CI width cannot be excluded. Fractions over 16ms are observed under load; absolute idle acceptance remains open."
+    },
+    "wysiwyg": {
+      "complete_pairs": 10,
+      "baseline": {
+        "count": 300,
+        "median_ms": 14.259250000000002,
+        "p95_ms": 17.168856249999997,
+        "maximum_ms": 20.461083,
+        "fraction_over_16ms": 0.11666666666666667
+      },
+      "candidate": {
+        "count": 300,
+        "median_ms": 14.234667,
+        "p95_ms": 14.6569649,
+        "maximum_ms": 20.157084,
+        "fraction_over_16ms": 0.01
+      },
+      "pairs": [
+        {
+          "pair": 1,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.2993755,
+            "p95_ms": 14.919029349999999,
+            "maximum_ms": 18.634375,
+            "fraction_over_16ms": 0.03333333333333333
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.641896,
+            "p95_ms": 16.11120435,
+            "maximum_ms": 20.157084,
+            "fraction_over_16ms": 0.1
+          }
+        },
+        {
+          "pair": 2,
+          "baseline": {
+            "count": 30,
+            "median_ms": 17.048021,
+            "p95_ms": 18.637472699999996,
+            "maximum_ms": 20.461083,
+            "fraction_over_16ms": 0.5666666666666667
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.247146,
+            "p95_ms": 14.3686458,
+            "maximum_ms": 14.407291,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 3,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.243396,
+            "p95_ms": 14.423960600000001,
+            "maximum_ms": 14.839542,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2727295,
+            "p95_ms": 14.6044538,
+            "maximum_ms": 15.690083,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 4,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.2522915,
+            "p95_ms": 14.6720288,
+            "maximum_ms": 14.7975,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.2599795,
+            "p95_ms": 14.3737984,
+            "maximum_ms": 14.509083,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 5,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.257583499999999,
+            "p95_ms": 14.48362965,
+            "maximum_ms": 14.665292,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.50725,
+            "p95_ms": 14.3766292,
+            "maximum_ms": 14.473084,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 6,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.290271,
+            "p95_ms": 14.85846875,
+            "maximum_ms": 15.028833,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.531895499999999,
+            "p95_ms": 14.4079776,
+            "maximum_ms": 14.617541,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 7,
+          "baseline": {
+            "count": 30,
+            "median_ms": 17.0544795,
+            "p95_ms": 17.30154825,
+            "maximum_ms": 17.574292,
+            "fraction_over_16ms": 0.5666666666666667
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 14.249333,
+            "p95_ms": 14.4586776,
+            "maximum_ms": 14.475791,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 8,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.270353499999999,
+            "p95_ms": 14.66364795,
+            "maximum_ms": 14.790167,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.5456665,
+            "p95_ms": 14.4003439,
+            "maximum_ms": 14.524,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 9,
+          "baseline": {
+            "count": 30,
+            "median_ms": 7.5329165,
+            "p95_ms": 14.4027163,
+            "maximum_ms": 14.442542,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.491521,
+            "p95_ms": 14.33677715,
+            "maximum_ms": 14.407667,
+            "fraction_over_16ms": 0.0
+          }
+        },
+        {
+          "pair": 10,
+          "baseline": {
+            "count": 30,
+            "median_ms": 14.2073535,
+            "p95_ms": 15.161833,
+            "maximum_ms": 15.292791,
+            "fraction_over_16ms": 0.0
+          },
+          "candidate": {
+            "count": 30,
+            "median_ms": 7.5061665,
+            "p95_ms": 14.3785712,
+            "maximum_ms": 14.5885,
+            "fraction_over_16ms": 0.0
+          }
+        }
+      ],
+      "metrics": {
+        "median_ms": {
+          "pair_differences_ms": [
+            0.3425204999999991,
+            -2.800874999999998,
+            0.0293334999999999,
+            0.007687999999999917,
+            -6.750333499999999,
+            -6.758375500000001,
+            -2.8051464999999993,
+            -6.7246869999999985,
+            -0.04139550000000014,
+            -6.701187
+          ],
+          "median_difference_ms": -2.8030107499999986,
+          "bootstrap_95_ci_ms": [
+            -6.7257602499999996,
+            0.007687999999999917
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 3,
+          "regression_signal": false,
+          "ci_width_ms": 6.7334482499999995
+        },
+        "p95_ms": {
+          "pair_differences_ms": [
+            1.1921750000000024,
+            -4.268826899999997,
+            0.18049319999999902,
+            -0.29823039999999956,
+            -0.10700044999999925,
+            -0.4504911499999995,
+            -2.84287065,
+            -0.26330405000000034,
+            -0.06593915000000017,
+            -0.7832618
+          ],
+          "median_difference_ms": -0.28076722499999995,
+          "bootstrap_95_ci_ms": [
+            -1.6466808999999998,
+            -0.04140542500000066
+          ],
+          "bootstrap_resamples": 10000,
+          "seed": 20261004,
+          "candidate_worse_pairs": 2,
+          "regression_signal": false,
+          "ci_width_ms": 1.6052754749999991
+        }
+      },
+      "verdict": "no regression signal detected under recorded load",
+      "limitation": "Differences smaller than the CI width cannot be excluded. Fractions over 16ms are observed under load; absolute idle acceptance remains open."
+    }
+  }
+}

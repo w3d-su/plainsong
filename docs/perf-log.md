@@ -2265,4 +2265,77 @@ Hosted xcresult reports six runtime warnings (Environment reads in existing test
 support and a QoS wait); this does not attribute their cause. These are the two full
 package suites and required hosted slices, not a claim that all `make test` targets
 ran. Real keyboard/IME acceptance and absolute R9/§12 typing acceptance remain owner
-gates. The paired typing result follows in the measurement commit.
+gates.
+
+### Paired typing comparison under recorded load
+
+Compared clean merge-base `91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75` with the
+fixed implementation commit `e0f26ceb2f104106eb7e1ed34de7ead9ba16af70`. The evidence
+commit changes only documentation and measurement artifacts. Each Debug product was
+built once, then measured with `test-without-building`: AB interleaved, ten pairs
+per mode, 30 keystrokes per mode per batch, no documented warm-up discarded.
+Fixture, project manifest and typing-probe hashes matched. Source fingerprints and
+prebuilt executable hashes are recorded in the evidence.
+
+Every admitted batch held `/private/tmp/plainsong-xcodebuild-test.lock`, had no other
+build processes and began at one-minute load **4.963–5.989**, below the revised
+Handoff 22 ceiling of 6. End loads were **4.993–9.783**. The Mac was on AC power;
+27 rejected admission attempts were retained. This is recorded-load comparison,
+not an idle-machine claim.
+
+| Mode | Product | Samples | Median ms | p95 ms | Maximum ms | Over 16 ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Source-only | Baseline | 300 | 14.201 | 17.040 | 18.631 | 12.00% |
+| Source-only | Candidate | 300 | 14.191 | 14.757 | 15.803 | 0.00% |
+| WYSIWYG | Baseline | 300 | 14.259 | 17.169 | 20.461 | 11.67% |
+| WYSIWYG | Candidate | 300 | 14.235 | 14.657 | 20.157 | 1.00% |
+
+Per-pair `candidate − baseline` differences use the median of ten differences and a
+95% bootstrap CI (10,000 resamples, seed 20261004):
+
+| Mode / metric | Median difference ms | 95% CI ms | Candidate worse |
+| --- | ---: | --- | ---: |
+| Source-only median | -0.066 | [-1.380, -0.012] | 1/10 |
+| Source-only p95 | -0.049 | [-1.383, +0.054] | 3/10 |
+| WYSIWYG median | -2.803 | [-6.726, +0.008] | 3/10 |
+| WYSIWYG p95 | -0.281 | [-1.647, -0.041] | 2/10 |
+
+**No regression signal detected under recorded load** in either mode: neither
+metric met the rule requiring the entire CI above +0.5 ms and candidate worse in
+at least 8/10 pairs. CI widths are 1.368/1.437 ms for source-only median/p95 and
+6.733/1.605 ms for WYSIWYG. The wide WYSIWYG median CI limits sensitivity; smaller
+effects cannot be excluded, and these observations do not establish a speedup.
+Five batches returned exit 65 solely for the probe's existing 16 ms assertion
+(baseline 1/2/4/7, candidate 1); all 20 batches had both complete 30-sample series,
+with no functional failures. The over-budget fractions remain observations under
+load. Absolute §12/R9 typing acceptance and real keyboard/IME acceptance stay open.
+
+Evidence: `docs/evidence/handoff21-reconciled-presentation-20261005-paired.json`
+contains every raw sample, per-pair difference, admission snapshot and exact product
+SHA. Raw logs, source manifests and xcresults remain at its printed paths under
+`/private/tmp/plainsong-h21-typing-evidence/`. The unchanged runner is saved as
+`docs/evidence/reconciled-source-presentation-paired.py` (SHA-256
+`8c95985b66c2429212d127bf1a8ed48add8b1e417eab27e9efeff03a3ee9817e`). Statistics
+were independently recomputed, and all 1,200 samples matched their raw logs.
+
+To reproduce, use clean isolated worktrees at the two exact implementation SHAs
+above, generate their projects and prebuild each under the shared lock. Leave the
+Mac on power and pause other builds/tests. Copy the runner outside those worktrees,
+then run with fresh output paths:
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+# Run once in each exact-SHA worktree, using its own derived-data directory:
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" make generate
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug -destination platform=macOS \
+  -derivedDataPath /private/tmp/h21-retry-PRODUCT-dd build-for-testing
+# Supply those two worktrees and prebuilt product directories:
+python3 /private/tmp/reconciled-source-presentation-paired.py \
+  --baseline-root /private/tmp/h21-retry-baseline \
+  --candidate-root /private/tmp/h21-retry-candidate \
+  --baseline-derived-data /private/tmp/h21-retry-baseline-dd \
+  --candidate-derived-data /private/tmp/h21-retry-candidate-dd \
+  --candidate-sha e0f26ceb2f104106eb7e1ed34de7ead9ba16af70 \
+  --evidence-dir /private/tmp/h21-retry-evidence
+```
