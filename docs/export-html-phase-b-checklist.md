@@ -80,6 +80,9 @@ not idle acceptance. Pause other agents, close heavy apps, keep the Mac on power
 leave it alone. Start/end load, top five CPU processes and product SHA are retained
 with the `.xcresult` and `run.log`. Each configuration builds once, then uses
 `test-without-building`; after compilation admission is checked again.
+Release passes `ENABLE_TESTABILITY=YES` for the existing `@testable` seams while
+retaining the scheme's Release optimization. These are testable Release measurements,
+not retail-binary measurements; testability can affect optimization and timing.
 Interleave at least five Debug and five Release runs, with `--plain` typing batches
 before each export batch. Use ten pairs per configuration for the common paired
 regression method: per-pair differences, 10,000-resample bootstrap 95% CI, signal only

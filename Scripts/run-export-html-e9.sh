@@ -33,7 +33,7 @@ stamp="$(date +%Y%m%d-%H%M%S)-$$"
 evidence_root="${PLAINSONG_E9_EVIDENCE_ROOT:-/private/tmp/plainsong-export-f-e9}/$configuration-$mode-$stamp"
 mkdir -p "$evidence_root"
 set +e
-/usr/bin/python3 - "$evidence_root/start.json" "$smoke" <<'CHECK'
+/usr/bin/python3 - "$evidence_root/start.json" "$smoke" "$configuration" <<'CHECK'
 import json,math,os,subprocess,sys
 limit=float(os.environ.get('PLAINSONG_MAX_LOAD','6'))
 if not math.isfinite(limit) or limit<=0: raise SystemExit('Invalid PLAINSONG_MAX_LOAD')
@@ -42,7 +42,7 @@ for name in ('xcodebuild','swift-build','swift-frontend','clang','ld'):
     result=subprocess.run(['pgrep','-x',name],capture_output=True,text=True)
     if result.returncode not in (0,1): raise SystemExit(result.stderr)
     if result.returncode==0: builds[name]=result.stdout.splitlines()
-data={'load':list(os.getloadavg()),'max_load':limit,'top_cpu':subprocess.check_output(['ps','-Ao','%cpu,comm','-r'],text=True).splitlines()[:6],'build_processes':builds,'product_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'smoke':sys.argv[2]=='1'}
+data={'load':list(os.getloadavg()),'max_load':limit,'top_cpu':subprocess.check_output(['ps','-Ao','%cpu,comm','-r'],text=True).splitlines()[:6],'build_processes':builds,'product_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'smoke':sys.argv[2]=='1','configuration':sys.argv[3],'release_testability_override':sys.argv[3]=='Release'}
 with open(sys.argv[1],'w') as stream: json.dump(data,stream,indent=2)
 print(f"Export E9 quiet check: load {data['load'][0]:.2f}; ceiling {limit}; builds={builds}; evidence={os.path.dirname(sys.argv[1])}",flush=True)
 # Smoke remains correctness-only and bypasses load, but never concurrent builds.
@@ -58,12 +58,14 @@ product_sha="$(git rev-parse HEAD)"
 build_root="${PLAINSONG_E9_BUILD_ROOT:-/private/tmp/plainsong-e9-build-$product_sha}"
 derived_data="$build_root/$configuration"
 mkdir -p "$derived_data"
+test_settings=()
+if [ "$configuration" = Release ]; then test_settings+=(ENABLE_TESTABILITY=YES); fi
 if [ ! -f "$derived_data/build-complete" ]; then
     make generate
     set +e
     xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration "$configuration" \
         -destination 'platform=macOS' -parallel-testing-enabled NO -derivedDataPath "$derived_data" \
-        build-for-testing > "$evidence_root/build.log" 2>&1
+        "${test_settings[@]}" build-for-testing > "$evidence_root/build.log" 2>&1
     build_result=$?
     set -e
     /usr/bin/python3 - "$evidence_root/end.json" "$build_result" <<'BUILD_END'
@@ -100,7 +102,7 @@ set +e
 TEST_RUNNER_PLAINSONG_EXPORT_E9_SMOKE="$smoke" TEST_RUNNER_PLAINSONG_RUN_EXPORT_E9=1 \
     xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration "$configuration" \
     -destination 'platform=macOS' -parallel-testing-enabled NO -derivedDataPath "$derived_data" \
-    -resultBundlePath "$evidence_root/Results.xcresult" test-without-building "${filters[@]}" \
+    -resultBundlePath "$evidence_root/Results.xcresult" "${test_settings[@]}" test-without-building "${filters[@]}" \
     > "$evidence_root/run.log" 2>&1
 result=$?
 set -e
