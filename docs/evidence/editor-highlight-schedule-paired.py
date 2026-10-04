@@ -51,7 +51,7 @@ def differences(values):
     boot = [statistics.median(rng.choices(values, k=len(values))) for _ in range(10000)]
     ci = [percentile(boot, .025), percentile(boot, .975)]
     worse = sum(x > 0 for x in values)
-    return {'pair_differences_ms': values, 'median_difference_ms': statistics.median(values), 'bootstrap_95_ci_ms': ci, 'bootstrap_resamples': 10000, 'seed': 20261004, 'candidate_worse_pairs': worse, 'regression_signal': ci[0] > .5 and worse >= math.ceil(.8 * len(values)), 'ci_width_ms': ci[1] - ci[0]}
+    return {'pair_differences_ms': values, 'median_difference_ms': statistics.median(values), 'bootstrap_95_ci_ms': ci, 'bootstrap_resamples': 10000, 'seed': 20261004, 'candidate_worse_pairs': worse, 'regression_signal': len(values) >= PAIRS and ci[0] > .5 and worse >= math.ceil(.8 * len(values)), 'ci_width_ms': ci[1] - ci[0]}
 
 
 def analyze(batches):

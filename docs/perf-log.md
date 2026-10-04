@@ -1739,7 +1739,7 @@ export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 
 ## Paired typing comparison under recorded load - 2026-10-04 (PR #137)
 
-**Still pending: zero complete pairs out of the required ten per mode.** This
+**Still pending: two complete pairs out of the required ten per mode.** This
 supersedes the earlier idle-admission status as the current measurement plan.
 True idle / absolute 16 ms acceptance remains with R9, PR I or an owner run;
 the historical idle attempts above remain historical admission records.
