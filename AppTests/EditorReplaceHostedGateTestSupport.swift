@@ -106,6 +106,25 @@ struct HostedReplaceWorkspace {
 
 @MainActor
 extension EditorFindHostedGateTests {
+    /// Setup must finish self-triggered fixture inspections before a test injects its own
+    /// refusal state. This waits on external observation only, leaving every product fence intact.
+    func waitForHostedReplaceObservationQuiescence(_ hosted: HostedReplaceWorkspace) async throws {
+        let appState = hosted.appState
+        let session = appState.currentDocument
+        let identity = ObjectIdentifier(session)
+        try await waitUntil("hosted Replace setup has no pending external observation") {
+            guard appState.externalDiskInspectionTasks[identity] == nil,
+                  appState.externalReloadTasks[identity] == nil,
+                  appState.pendingExternalReloadApplications[identity] == nil,
+                  let url = appState.sessionStateURL(for: session)
+            else { return false }
+            return appState.pendingExternalTexts[url] == nil
+                && appState.pendingExternalFileVersions[url] == nil
+                && appState.deferredExternalChangeResolutions[url] == nil
+                && appState.externalChangePrompt?.fileURL != url
+        }
+    }
+
     /// EditorKit reads the key window through the shared probe seam; point it at whichever
     /// window of `group` is designated key, and reset it after the test.
     func designateReplaceKeyWindow(in group: HostedWorkspaceGroup) {

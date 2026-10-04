@@ -111,6 +111,7 @@ extension EditorFindHostedGateTests {
             }
             openFindBar(appState, query: query)
             try await focusEditorOnCurrentMatch(hosted, window: window)
+            try await waitForHostedReplaceObservationQuiescence(hosted)
         }
         return hosted
     }
