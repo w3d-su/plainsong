@@ -1,0 +1,70 @@
+{
+  "purpose": "Remove trailing whitespace and excess EOF blank lines for git diff --check. Original raw logs remain in the /private/tmp measurement directories recorded by the evidence JSON; timing and diagnostic content unchanged.",
+  "files": [
+    {
+      "path": "docs/evidence/h22-paired-20261004/run2/main-0-build-for-testing.log",
+      "original_sha256": "9f08bbe825bfa7f8e8824557af14848bc26b13bbe7e96aad1f9d0615a8439ae0",
+      "normalized_sha256": "daeccae74b0468db418758d3838b6a697017ca8ec4c282fa16d7143fdf9a5109"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run2/stack-0-build-for-testing.log",
+      "original_sha256": "8489478b4d287af1e1f44c507b33c47163cf476903839f0b93bda280d4b47e4d",
+      "normalized_sha256": "d2d53c1694758ebedd0c663929df0ee25315dc8895c32e63a76afa69d381a9f4"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run2/fix-0-build-for-testing.log",
+      "original_sha256": "07c01ee8c0a36104ae2a9f9b2f83e81955890a72b9585fea8f55df8d61c874cd",
+      "normalized_sha256": "fdbf295c20627532301bfe313be3b4fd30f9eafffc2ae142581601f2d2a2990e"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run5/main-0-build-for-testing.log",
+      "original_sha256": "8b73baf5f3d75d6a17171061609c3549bd44fbb31e58b2e7bee7d3108919e8eb",
+      "normalized_sha256": "f4240355099d5b777bed7a6f1c61bf57241ddc2777d757fee39087e2c454dcad"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run5/stack-0-build-for-testing.log",
+      "original_sha256": "9eefc6e2880547ecde6c5d310d92b96e27475e8c2e57db63e2816ddffcac79b7",
+      "normalized_sha256": "2be80b0556540bfac7881e313b1ba516c119f0c5f4c8172960caa0f3efe469de"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run5/fix-0-build-for-testing.log",
+      "original_sha256": "4f74da44322f046244f120d1b20ad0061e0108770e1beb93cf2e24fd8f641302",
+      "normalized_sha256": "968d27ee1b46d9b5e647aea977d23e02f89a3571f4c42a8485401d3d6d143497"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run4/main-0-build-for-testing.log",
+      "original_sha256": "5854820b633bef0571b7f6b233c84090157d6c19f9f0a9315f892eb5a1e9113f",
+      "normalized_sha256": "2754e358987c5ca82d86901eecd5fc20d292ee74d18fb64f82378a8a58124903"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run3/main-0-build-for-testing.log",
+      "original_sha256": "94088c9d38306c565d6fe328eff2f965ae04650418d184bc554ef3ba01a73e83",
+      "normalized_sha256": "b038eef2bed14d04b6f1f2bebb206d9f6bff680a7282f12d4f8075ecafbca79d"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run3/stack-0-build-for-testing.log",
+      "original_sha256": "b5ea23d2f894bb37dd1348cc83027b527b640b229d26e9b3490b7fea8ee02a54",
+      "normalized_sha256": "d9f6edf7fb18a9463a2f0f18c6cd56484210dce56a35fde152c43f159d71ddfb"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run3/fix-0-build-for-testing.log",
+      "original_sha256": "3b402f89ffc5afbea7c44be0c8488c1a15a910acfe72e8717f96d0ef8163aa18",
+      "normalized_sha256": "3e505b0b247b4a213aebd0dd78dbb5ff4c07a21395121560b0141d629c0b222d"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run1/main-0-build-for-testing.log",
+      "original_sha256": "765c18100f0b65ff37194b8bb63180af3ae86d6f060f0f27d6c00e3284d75555",
+      "normalized_sha256": "343bb46016462cc207e40d8e36771275e4a9c707f565b798eabbcf8349e2103c"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run1/stack-0-build-for-testing.log",
+      "original_sha256": "b1eb34cd354c5704e3513dbb083a2c2b3e28502187df9adade8b2f8be1e47947",
+      "normalized_sha256": "8a8e4a804df18d1090b376e9a3db51ba8464f226a854702059eb71ffc1cd9c41"
+    },
+    {
+      "path": "docs/evidence/h22-paired-20261004/run1/fix-0-build-for-testing.log",
+      "original_sha256": "cfb0fabda0425252ea796543755aa4694ffff6353a1a72add14b0ac54aced677",
+      "normalized_sha256": "23750043eabdb5fd7fad3860aa369176269b4020520df8a5bb529a77c5d75e06"
+    }
+  ]
+}

@@ -374,7 +374,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ WorkspaceKit (in target 'Wor
 
 SwiftCompile normal arm64 (in target 'WorkspaceKit' from project 'WorkspaceKit')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Plainsong.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ WorkspaceAnchoredFileSystem+WriteTargets.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+WriteTargets.swift (in target 'WorkspaceKit' from project 'WorkspaceKit')
 
@@ -414,7 +414,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ EditorKit (in target 'Editor
 
 SwiftCompile normal arm64 (in target 'EditorKit' from project 'EditorKit')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Plainsong.xcodeproj
-    
+
 
 SwiftCompile normal arm64 Compiling\ EditorFindScheduleReason.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/Packages/EditorKit/Sources/EditorKit/EditorFindScheduleReason.swift (in target 'EditorKit' from project 'EditorKit')
 
@@ -530,9 +530,9 @@ Copy /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrc
 
 ProcessProductPackaging /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Plainsong.entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Entitlements:
-    
+
     {
     "com.apple.security.app-sandbox" = 1;
     "com.apple.security.files.bookmarks.app-scope" = 1;
@@ -540,7 +540,7 @@ ProcessProductPackaging /Users/davis._.su/Documents/plainsong-highlight-schedule
     "com.apple.security.get-task-allow" = 1;
     "com.apple.security.network.client" = 1;
 }
-    
+
     builtin-productPackagingUtility /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Plainsong.entitlements -entitlements -format xml -o /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent
 
 ProcessProductPackagingDER /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent.der (in target 'Plainsong' from project 'Plainsong')
@@ -573,7 +573,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ Plainsong (in target 'Plains
 
 SwiftCompile normal arm64 (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
 
 SwiftCompile normal arm64 Compiling\ EditorFindAccessibility.swift,\ EditorFindBar.swift,\ EditorFindBarWindowBridge.swift,\ EditorFindCommandDelivery.swift,\ EditorFindHost.swift,\ EditorFindQueryField.swift,\ EditorFindResponderSupport.swift,\ EditorFindUIState.swift,\ EditorImageAssetAuthority.swift,\ EditorImageAssetCleanup.swift,\ EditorImageAssetIO.swift,\ EditorImageAssetPaths.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorFindAccessibility.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/EditorFindBar.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/EditorFindBarWindowBridge.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorFindCommandDelivery.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorFindHost.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/EditorFindQueryField.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorFindResponderSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorFindUIState.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorImageAssetAuthority.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorImageAssetCleanup.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorImageAssetIO.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/EditorImageAssetPaths.swift (in target 'Plainsong' from project 'Plainsong')
 
@@ -868,11 +868,11 @@ WorkspaceKit.WorkspaceEventWatcher:1:20: note: class 'WorkspaceEventWatcher' doe
   6 | import UniformTypeIdentifiers
   7 | import WorkspaceKit
     | `- warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'WorkspaceKit' [#AddPreconcurrencyImport]
-  8 | 
+  8 |
   9 | protocol LastOpenedFilePersisting: AnyObject {
     :
 456 |     }
-457 | 
+457 |
 458 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 459 |         workspaceReloadTask?.cancel()
@@ -936,18 +936,18 @@ SwiftCompile normal arm64 Compiling\ PlainsongMenuKeyBinding.swift,\ PlainsongPr
  11 |         WorkspaceSearchFieldFocus.accessibilityIdentifier
     |                                   `- warning: main actor-isolated static property 'accessibilityIdentifier' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode
  12 |     }
- 13 | 
+ 13 |
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/WindowKeyStateTracker.swift:197:16: note: static property declared here
 195 |     static let placeholder = "Search in workspace"
 196 |     /// Stable AppKit identity for the Search query field.
 197 |     static let accessibilityIdentifier = "plainsong.workspaceSearch.queryField"
     |                `- note: static property declared here
-198 | 
+198 |
 199 |     /// Production identity: accessibility identifier only.
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/WindowKeyStateTracker.swift:120:9: warning: cannot access property 'becomeKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
-118 | 
+118 |
 119 |     deinit {
 120 |         if let becomeKeyObserver {
     |         `- warning: cannot access property 'becomeKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
@@ -956,10 +956,10 @@ SwiftCompile normal arm64 Compiling\ PlainsongMenuKeyBinding.swift,\ PlainsongPr
 
 /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/objc/NSObject.h:15:11: note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
  13 | @class NSString, NSMethodSignature, NSInvocation;
- 14 | 
+ 14 |
  15 | @protocol NSObject
     |           `- note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
- 16 | 
+ 16 |
  17 | - (BOOL)isEqual:(id)object;
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/WindowKeyStateTracker.swift:1:1: warning: add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjectiveC' [#AddPreconcurrencyImport]
@@ -969,7 +969,7 @@ SwiftCompile normal arm64 Compiling\ PlainsongMenuKeyBinding.swift,\ PlainsongPr
   3 | import SwiftUI
     :
 117 |     }
-118 | 
+118 |
 119 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 120 |         if let becomeKeyObserver {
@@ -977,7 +977,7 @@ SwiftCompile normal arm64 Compiling\ PlainsongMenuKeyBinding.swift,\ PlainsongPr
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/App/Views/WindowKeyStateTracker.swift:123:9: warning: cannot access property 'resignKeyObserver' with a non-Sendable type '(any NSObjectProtocol)?' from nonisolated deinit; this is an error in the Swift 6 language mode
 117 |     }
-118 | 
+118 |
 119 |     deinit {
     |     `- note: add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'
 120 |         if let becomeKeyObserver {
@@ -990,10 +990,10 @@ SwiftCompile normal arm64 Compiling\ PlainsongMenuKeyBinding.swift,\ PlainsongPr
 
 /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/objc/NSObject.h:15:11: note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
  13 | @class NSString, NSMethodSignature, NSInvocation;
- 14 | 
+ 14 |
  15 | @protocol NSObject
     |           `- note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
- 16 | 
+ 16 |
  17 | - (BOOL)isEqual:(id)object;
 
 [#AddPreconcurrencyImport]: <https://docs.swift.org/compiler/documentation/diagnostics/add-preconcurrency-import>
@@ -1054,7 +1054,7 @@ SwiftCompile normal arm64 Compiling\ AppState+AnchoredWorkspaceActivation.swift,
     |                   `- warning: passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure; this is an error in the Swift 6 language mode [#RegionIsolation::SendingClosureRisksDataRace]
 198 |                 var seenRelativePaths: [String] = []
 199 |                 var overlays: [WorkspaceSearchOverlay] = []
-200 | 
+200 |
 201 |                 for input in inputs {
     |                              `- note: closure captures 'inputs' which is accessible to main actor-isolated code
 202 |                     try Task.checkCancellation()
@@ -1143,7 +1143,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PerformanceTests (in target 
 
 SwiftCompile normal arm64 (in target 'PerformanceTests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
 
 SwiftCompile normal arm64 Compiling\ AppBackedEditorPerformanceTests.swift,\ EditorFindPerformanceSupport.swift,\ EditorFindPerformanceTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/PerformanceTests/AppBackedEditorPerformanceTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/PerformanceTests/EditorFindPerformanceSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/PerformanceTests/EditorFindPerformanceTests.swift (in target 'PerformanceTests' from project 'Plainsong')
 
@@ -1185,7 +1185,7 @@ SwiftEmitModule normal arm64 Emitting\ module\ for\ PlainsongTests (in target 'P
 
 SwiftCompile normal arm64 (in target 'PlainsongTests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
 
 SwiftDriverJobDiscovery normal arm64 Compiling PlainsongMenuKeyBinding.swift, PlainsongPreferences.swift, SettingsView.swift, TransientWorkspaceMutationRecoveryStores.swift, WindowKeyStateTracker.swift, WorkspaceFilesSidebar.swift, WorkspaceMutationOperationRecoveryStore.swift, WorkspaceMutationRecoveryBanner.swift, WorkspaceMutationRecoveryDurableFileStore.swift, WorkspaceMutationTextRecoveryStore.swift, WorkspaceSearchAccessibility.swift, WorkspaceSearchFocusAttemptLoop.swift (in target 'Plainsong' from project 'Plainsong')
 
@@ -1298,16 +1298,16 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
     builtin-SwiftPerFileCompile DebugEditorFindFixtureLeaseTests.swift
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateTests.swift:11823:56: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
-11821 | 
+11821 |
 11822 |         // Decoy remains unstamped before and after focus.
 11823 |         XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
       |                                                        `- warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11824 |         XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
-11825 | 
+11825 |
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateTests.swift:11835:56: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11833 |         }
-11834 | 
+11834 |
 11835 |         XCTAssertEqual(decoy.accessibilityIdentifier() ?? "", "")
       |                                                        `- warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
 11836 |         XCTAssertFalse(WorkspaceSearchFieldFocus.matchesSearchField(decoy))
@@ -1315,7 +1315,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1165:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1163 |         fixture.appState.applyDocumentText("Changed", to: fixture.appState.currentDocument)
-1164 | 
+1164 |
 1165 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -1324,7 +1324,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1196:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1194 |         fixture.appState.applyDocumentText("Dirty cached owner", to: cached)
-1195 | 
+1195 |
 1196 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -1333,7 +1333,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1233:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1231 |         fixture.appState.pendingEditorSourceInstallations[installation] = bound
-1232 | 
+1232 |
 1233 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -1341,7 +1341,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 1235 |                 at: fixture.location("folder"),
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1945:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
-1943 | 
+1943 |
 1944 |         await recycler.complete()
 1945 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
@@ -1351,7 +1351,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:1962:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
 1960 |         defer { cleanUp(fixture) }
-1961 | 
+1961 |
 1962 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
      |               `- note: sending main actor-isolated value of non-Sendable type '() async throws -> Void' to @concurrent global function 'XCTAssertThrowsErrorAsync(_:file:line:)' risks causing races in between main actor-isolated and @concurrent uses
@@ -1359,7 +1359,7 @@ SwiftCompile normal arm64 /Users/davis._.su/Documents/plainsong-highlight-schedu
 1964 |                 at: fixture.location("post.md"),
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/AppStateWorkspaceDataIntegrityTests.swift:2329:15: warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
-2327 | 
+2327 |
 2328 |         await recycler.fail()
 2329 |         await XCTAssertThrowsErrorAsync {
      |               |- warning: sending value of non-Sendable type '() async throws -> Void' risks causing data races; this is an error in the Swift 6 language mode [#RegionIsolation::SendingRisksDataRace]
@@ -1403,7 +1403,7 @@ SwiftDriverJobDiscovery normal arm64 Compiling WorkspaceSearchKeyRouter.swift, W
 
 SwiftCompile normal arm64 Compiling\ EditorReplaceAuthorizationAppTestSupport.swift,\ EditorReplaceAuthorizationAppTests.swift,\ EditorReplaceBatchSpikeAppTests.swift,\ EditorReplaceHostedDeliveryGateTests.swift,\ EditorReplaceHostedFenceGateTests.swift,\ EditorReplaceHostedGateTestSupport.swift,\ EditorReplaceHostedResolutionGateTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceAuthorizationAppTestSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceAuthorizationAppTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceBatchSpikeAppTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceHostedDeliveryGateTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceHostedFenceGateTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceHostedGateTestSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceHostedResolutionGateTests.swift (in target 'PlainsongTests' from project 'Plainsong')
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceAuthorizationAppTests.swift:18:30: warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
- 16 | 
+ 16 |
  17 |     override func tearDown() {
  18 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
     |                              `- warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
@@ -1414,14 +1414,14 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 1 | enum EditorSelectionProbe {
 2 | @MainActor internal static var keyWindowOverrideForTesting: (() -> NSWindow?)?}
   |                                `- note: mutation of this static property is only permitted within the actor
-3 | 
+3 |
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceAuthorizationAppTests.swift:19:23: warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
  13 | @MainActor
  14 | final class EditorReplaceAuthorizationAppTests: XCTestCase {
  15 |     var windows: [NSWindow] = []
     |         `- note: property declared here
- 16 | 
+ 16 |
  17 |     override func tearDown() {
  18 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
  19 |         for window in windows {
@@ -1451,7 +1451,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
  14 | final class EditorReplaceAuthorizationAppTests: XCTestCase {
  15 |     var windows: [NSWindow] = []
     |         `- note: mutation of this property is only permitted within the actor
- 16 | 
+ 16 |
  17 |     override func tearDown() {
     :
  20 |             window.orderOut(nil)
@@ -1466,7 +1466,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 10 | final class EditorReplaceBatchSpikeAppTests: XCTestCase {
 11 |     private var windows: [NSWindow] = []
    |                 `- note: property declared here
-12 | 
+12 |
 13 |     override func tearDown() {
 14 |         for window in windows {
    |                       `- warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
@@ -1511,7 +1511,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 10 | final class EditorReplaceBatchSpikeAppTests: XCTestCase {
 11 |     private var windows: [NSWindow] = []
    |                 `- note: mutation of this property is only permitted within the actor
-12 | 
+12 |
 13 |     override func tearDown() {
    :
 16 |             window.orderOut(nil)
@@ -1609,7 +1609,7 @@ SwiftDriverJobDiscovery normal arm64 Compiling AppState+AnchoredWorkspaceActivat
 
 SwiftCompile normal arm64 Compiling\ EditorReplaceSingleReplaceAppTests.swift,\ ExportDestinationOwnershipAppTests+Canonical.swift,\ ExportDestinationOwnershipAppTests+Recovery.swift,\ ExportDestinationOwnershipAppTests.swift,\ ExportPDFMechanismSpikePDFSupport.swift,\ ExportPDFMechanismSpikeSupport.swift,\ ExportPDFMechanismSpikeTests+Support.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceSingleReplaceAppTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportDestinationOwnershipAppTests+Canonical.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportDestinationOwnershipAppTests+Recovery.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportDestinationOwnershipAppTests.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportPDFMechanismSpikePDFSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportPDFMechanismSpikeSupport.swift /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/ExportPDFMechanismSpikeTests+Support.swift (in target 'PlainsongTests' from project 'Plainsong')
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceSingleReplaceAppTests.swift:14:30: warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
- 12 | 
+ 12 |
  13 |     override func tearDown() {
  14 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
     |                              `- warning: main actor-isolated static property 'keyWindowOverrideForTesting' can not be mutated from a nonisolated context
@@ -1620,14 +1620,14 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
 1 | enum EditorSelectionProbe {
 2 | @MainActor internal static var keyWindowOverrideForTesting: (() -> NSWindow?)?}
   |                                `- note: mutation of this static property is only permitted within the actor
-3 | 
+3 |
 
 /Users/davis._.su/Documents/plainsong-highlight-schedule-fix/AppTests/EditorReplaceSingleReplaceAppTests.swift:15:23: warning: main actor-isolated property 'windows' can not be referenced from a nonisolated context
   9 | @MainActor
  10 | final class EditorReplaceSingleReplaceAppTests: XCTestCase {
  11 |     private var windows: [NSWindow] = []
     |                 `- note: property declared here
- 12 | 
+ 12 |
  13 |     override func tearDown() {
  14 |         EditorSelectionProbe.keyWindowOverrideForTesting = nil
  15 |         for window in windows {
@@ -1673,7 +1673,7 @@ EditorKit.EditorSelectionProbe.keyWindowOverrideForTesting:2:32: note: mutation 
  10 | final class EditorReplaceSingleReplaceAppTests: XCTestCase {
  11 |     private var windows: [NSWindow] = []
     |                 `- note: mutation of this property is only permitted within the actor
- 12 | 
+ 12 |
  13 |     override func tearDown() {
     :
  17 |             window.orderOut(nil)
@@ -1928,9 +1928,9 @@ CopySwiftLibs /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cx
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest (in target 'PerformanceTests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest
 
 SwiftDriverJobDiscovery normal arm64 Compiling AppStateSessionStateCleanupTests.swift, AppStateTests.swift, AppStateWorkspaceDataIntegrityTests.swift, DebugEditorFindFixtureCleanupSafetyTests.swift, DebugEditorFindFixtureLeaseMutationRetryTests.swift, DebugEditorFindFixtureLeaseQuarantineRaceTests.swift, DebugEditorFindFixtureLeaseRecoveryTests.swift, DebugEditorFindFixtureLeaseTests.swift (in target 'PlainsongTests' from project 'Plainsong')
@@ -1955,9 +1955,9 @@ ExtractAppIntentsMetadata (in target 'PlainsongTests' from project 'Plainsong')
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest (in target 'PlainsongTests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest
 
 RegisterExecutionPolicyException /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PlainsongTests.xctest (in target 'PlainsongTests' from project 'Plainsong')
@@ -1970,23 +1970,23 @@ Touch /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntr
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app
 
 Validate /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
@@ -2017,9 +2017,9 @@ ExtractAppIntentsMetadata (in target 'PlainsongUITests' from project 'Plainsong'
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/PlugIns/PlainsongUITests.xctest (in target 'PlainsongUITests' from project 'Plainsong')
     cd /Users/davis._.su/Documents/plainsong-highlight-schedule-fix
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/Plainsong.build/Debug/PlainsongUITests.build/PlainsongUITests.xctest.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Products/Debug/PlainsongUITests-Runner.app/Contents/PlugIns/PlainsongUITests.xctest
 
 PruneExplicitPrecompiledModules /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cxninnrntrcsyiafmevzgwyspjjw/Build/Intermediates.noindex/ExplicitPrecompiledModules
@@ -2031,4 +2031,3 @@ Result bundle written to path:
 	/tmp/plainsong-h22-paired-20261004-run1/fix-0-build-for-testing.xcresult
 
 ** TEST BUILD SUCCEEDED **
-

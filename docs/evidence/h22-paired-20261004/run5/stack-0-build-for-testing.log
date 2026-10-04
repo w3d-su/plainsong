@@ -212,25 +212,25 @@ CopySwiftLibs /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-ca
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/Plainsong.debug.dylib: replacing existing signature
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app/Contents/MacOS/__preview.dylib: replacing existing signature
 
 CodeSign /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app (in target 'Plainsong' from project 'Plainsong')
     cd /tmp/plainsong-replace-wysiwyg
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Intermediates.noindex/Plainsong.build/Debug/Plainsong.build/Plainsong.app.xcent --timestamp\=none --generate-entitlement-der /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app
 /Users/davis._.su/Library/Developer/Xcode/DerivedData/Plainsong-cauqxwfczoxdcobfzkqdhhqhbplc/Build/Products/Debug/Plainsong.app: replacing existing signature
 
@@ -255,4 +255,3 @@ Result bundle written to path:
 	/tmp/plainsong-h22-paired-20261004-run5/stack-0-build-for-testing.xcresult
 
 ** TEST BUILD SUCCEEDED **
-
