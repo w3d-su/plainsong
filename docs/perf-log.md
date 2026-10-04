@@ -1640,3 +1640,20 @@ Raw log: `docs/evidence/h22-post23-idle-admission.log`; JSON:
 commands are in the preceding Handoff 22 admission section. Fetch/merge main,
 regenerate the three projects and remeasure before treating a future head as proven.
 No budgets or owner-only gates changed.
+
+
+## Handoff 22 retry after handoff 23 — 2026-10-04 (PR #137)
+
+**Idle measurement still pending.** The sequential A/B retry after PR #141 CI
+passed was prepared at stacked candidate `7a164fbbdf57333a483577c3467510709d4faf2b`,
+with baseline `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Baseline admission
+refused all eleven checks over five minutes (1-minute load 3.24–4.74, require <3),
+so no product build, baseline/fix comparison or baseline/stack comparison ran.
+The helper exited 75; no maxima, medians, 16 ms pass/fail or regression conclusion
+exists for this retry. Latest #136 pending evidence is merged into this stack;
+only evidence documents changed after the candidate was prepared.
+
+Raw log: `docs/evidence/h22-post23-idle-admission.log`; JSON:
+`docs/evidence/handoff22-pr137-20261004-post23-admission.json`. The exact rerun
+commands remain in the preceding Handoff 22 admission section. Historical loaded
+numbers remain diagnostics; R9, real IME and owner-only gates remain open.
