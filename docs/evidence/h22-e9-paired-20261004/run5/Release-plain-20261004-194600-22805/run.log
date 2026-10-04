@@ -1,0 +1,60 @@
+Command line invocation:
+    /Applications/Xcode-beta.app/Contents/Developer/usr/bin/xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration Release -destination platform=macOS -parallel-testing-enabled NO -derivedDataPath /private/tmp/plainsong-e9-build-7377cf4e51edb85d023986a8c33cabd3edff6a10/Release -resultBundlePath /private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/Results.xcresult ENABLE_TESTABILITY=YES test-without-building "-only-testing:PerformanceTests/AppBackedEditorPerformanceTests/testTypingWithoutHTMLExportForRecordedLoadComparison"
+
+Build settings from command line:
+    ENABLE_TESTABILITY = YES
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  STTextKitPlus: https://github.com/krzyzanowskim/STTextKitPlus @ 0.3.1
+  TreeSitter: https://github.com/tree-sitter/tree-sitter @ 0.25.10
+  TreeSitterMarkdown: https://github.com/tree-sitter-grammars/tree-sitter-markdown.git @ 0.5.3
+  EditorKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/EditorKit
+  Yams: https://github.com/jpsim/Yams.git @ 6.2.2
+  SwiftTreeSitter: https://github.com/tree-sitter/swift-tree-sitter.git @ 0.10.0
+  STTextView: https://github.com/krzyzanowskim/STTextView.git @ 2.3.10
+  CoreTextSwift: https://github.com/krzyzanowskim/CoreTextSwift @ 0.2.0
+  WorkspaceKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/WorkspaceKit
+  MarkdownCore: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/MarkdownCore
+  PreviewKit: /Users/davis._.su/Documents/plainsong-export-html-command/Packages/PreviewKit
+
+Writing result bundle at path:
+	/private/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/Results.xcresult
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00006000-0004042411D2801E, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00006000-0004042411D2801E, name:My Mac }
+2026-10-04 19:46:02.748882+0800 Plainsong[22846:210071] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.749113+0800 Plainsong[22846:210071] [Application] Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.749936+0800 Plainsong[22846:210070] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.749983+0800 Plainsong[22846:210070] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.750843+0800 Plainsong[22846:210071] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.750869+0800 Plainsong[22846:210071] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.751684+0800 Plainsong[22846:210071] [Connection] Will NOT re-try to establish the connection
+2026-10-04 19:46:02.751739+0800 Plainsong[22846:210070] [Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.751758+0800 Plainsong[22846:210070] [Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-10-04 19:46:02.863651+0800 Plainsong[22846:210019] ApplePersistenceIgnoreState: Existing state will not be touched. New state will be written to /Users/davis._.su/Library/Containers/app.plainsong.editor/Data/tmp/app.plainsong.editor.savedState
+Test Suite 'Selected tests' started at 2026-10-04 19:46:03.102.
+Test Suite 'PerformanceTests.xctest' started at 2026-10-04 19:46:03.103.
+Test Suite 'AppBackedEditorPerformanceTests' started at 2026-10-04 19:46:03.103.
+Test Case '-[PerformanceTests.AppBackedEditorPerformanceTests testTypingWithoutHTMLExportForRecordedLoadComparison]' started.
+EXPORT E9 native input + public-view update without export 13.192 ms
+Test Case '-[PerformanceTests.AppBackedEditorPerformanceTests testTypingWithoutHTMLExportForRecordedLoadComparison]' passed (0.132 seconds).
+Test Suite 'AppBackedEditorPerformanceTests' passed at 2026-10-04 19:46:03.235.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.132 (0.133) seconds
+Test Suite 'PerformanceTests.xctest' passed at 2026-10-04 19:46:03.236.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.132 (0.133) seconds
+Test Suite 'Selected tests' passed at 2026-10-04 19:46:03.236.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.132 (0.134) seconds
+2026-10-04 19:46:03.521 xcodebuild[22821:209893] [MT] IDETestOperationsObserverDebug: 1.260 elapsed -- Testing started completed.
+2026-10-04 19:46:03.521 xcodebuild[22821:209893] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-04 19:46:03.521 xcodebuild[22821:209893] [MT] IDETestOperationsObserverDebug: 1.260 sec, +1.260 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/plainsong-h22-e9-paired-20261004-run5/Release-plain-20261004-194600-22805/Results.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

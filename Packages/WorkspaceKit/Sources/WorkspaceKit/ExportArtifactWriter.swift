@@ -202,6 +202,28 @@ public struct ExportArtifactIndeterminateWrite: Sendable, Equatable {
     /// residue holds `.displacedOriginal`, the user must be told to recover it promptly; the
     /// location is not durable.
     public let residueIsInPurgeableTemporaryFolder: Bool
+
+    /// Immutable result construction for App feedback previews and injected outcome tests.
+    /// Constructing a report does not grant write authority or execute the writer.
+    public init(
+        reason: WorkspaceAnchoredFileSystemError,
+        selectedURL: URL,
+        destinationState: ExportArtifactDestinationState,
+        residue: ExportArtifactResidue,
+        stagingURL: URL?,
+        itemReplacementDirectoryURL: URL?,
+        unprovenDirectoryURLs: [URL],
+        residueIsInPurgeableTemporaryFolder: Bool
+    ) {
+        self.reason = reason
+        self.selectedURL = selectedURL
+        self.destinationState = destinationState
+        self.residue = residue
+        self.stagingURL = stagingURL
+        self.itemReplacementDirectoryURL = itemReplacementDirectoryURL
+        self.unprovenDirectoryURLs = unprovenDirectoryURLs
+        self.residueIsInPurgeableTemporaryFolder = residueIsInPurgeableTemporaryFolder
+    }
 }
 
 public enum ExportArtifactWriteOutcome: Sendable, Equatable {

@@ -1950,6 +1950,204 @@ export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
 
+## Export PR F Phase B — 2026-10-01: pending idle-machine run
+
+Correctness, package/hosted regressions, pinned lint and the native build finished before
+E9 was attempted. Under the shared Xcode lock, the final idle checks reported 1-minute
+load 35.84 for Debug and 35.21 for Release (the conservative idle threshold is <= 1.0).
+Both scripts exited 75: **pending idle-machine run; no performance samples recorded**.
+These load readings are an environment check, not export performance evidence.
+
+Run from `/Users/davis._.su/Documents/plainsong-export-html-command` after the machine is idle:
+
+```sh
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+```
+
+The scripts retain `Results.xcresult` and `run.log` under their printed evidence directory.
+The final hosted compilation probe executed three tests with three deliberate opt-in
+skips and zero failures; it verifies the entry points compile, not that a budget passes.
+
+Pending measurements:
+- `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`: three
+  full-command samples each for `large-1mb.md` and `export-f-heavy.md`, with 24 distinct
+  valid bounded PNG assets; elapsed time and peak host RSS sampled every 5 ms. WebKit
+  helper-process memory and an exact OS high-water mark are not claimed.
+- `AppBackedEditorPerformanceTests.testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget`:
+  native input plus public-view update while export is active, using the existing 16 ms
+  typing budget. This remains synthetic AppKit evidence.
+- `ExportHTMLPerformanceTests.testSixtyFourMiBWriterMainActorTime`: three synchronous
+  `writeExportArtifact` calls at the 64 MiB cap; byte allocation is outside the timer.
+- Real iCloud evicted-leaf materialization and coordination wait, responsiveness and
+  physical-input/compositor evidence remain owner-only, using the real save panel.
+
+No export-specific time or memory budget is frozen. If the writer noticeably stalls
+input, stop for an E2-contract review before moving any writer work off-main. See
+`docs/export-html-phase-b-checklist.md` for the owner entry points and unchecked smoke cases.
+
+
+## Export F E9 idle admission — 2026-10-04
+
+**Pending idle-machine run.** Candidate product SHA `ea2e723fdd3388981b75e467751bf4f57ab2bb6b` includes main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Debug and Release admission both exited 75 at 1-minute load 8.15
+(require ≤1.0); neither built nor recorded any performance samples. The required
+three runs per configuration, fixture wall times/peak memory, typing during export,
+and 64 MiB writer main-thread time remain pending. Budgets are unchanged and no
+E9, keyboard or VoiceOver acceptance checkbox is closed. No writer decision can
+be made from these admission-only runs.
+
+Raw logs: `docs/evidence/h22-e9-debug-admission.log` and
+`docs/evidence/h22-e9-release-admission.log`. Structured status:
+`docs/evidence/handoff22-pr138-20261004-admission.json`.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+# Obtain at least three qualified runs per configuration, checking admission each time.
+```
+
+
+## Export F E9 retry after handoff 23 — 2026-10-04
+
+**Pending idle-machine run.** After PR #141 normal CI run 37178629394 passed,
+E9 was retried at candidate `f472bd56434b31a4eca43e747b7f0a113e48fb6d`, which
+includes main `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. No other xcodebuild
+was present before either batch. Debug refused 1-minute load 4.67 and Release
+refused 5.34 (require ≤1.0); both exited 75 before building or measuring.
+There are zero qualified runs; the required ≥3 per configuration, fixture wall
+time/peak memory, typing during export and 64 MiB writer time remain pending.
+No performance or writer-off-main conclusion is possible, no budget changed
+and no E9 or owner-only keyboard/VoiceOver box was checked.
+
+Raw logs: `docs/evidence/h22-post23-e9-debug-admission.log` and
+`docs/evidence/h22-post23-e9-release-admission.log`; JSON:
+`docs/evidence/handoff22-pr138-20261004-post23-admission.json`. Use the exact
+shared-lock/load/process-check commands in the preceding E9 admission section
+and repeat each configuration until three qualified runs exist.
+
+
+## Export F E9 third idle admission attempt - 2026-10-04
+
+**Pending idle-machine run.** Candidate `72a5a6974a61e7742edda13f9f377ef22f4eedce`,
+including main `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed
+readiness; no other xcodebuild was present before either batch. Debug refused
+load 15.23 and Release refused 14.00 (require <=1.0), both exit 75 before build
+or measurement. Zero qualified runs; at least three per configuration, fixture
+wall time/peak memory, typing during export and 64 MiB writer time remain pending.
+No writer decision, budget change, E9 box or owner acceptance closure.
+
+Raw logs `docs/evidence/h22-retry3-e9-debug-admission.log` and
+`docs/evidence/h22-retry3-e9-release-admission.log`; JSON
+`docs/evidence/handoff22-pr138-20261004-retry3.json`. Exact shared-lock/load/process
+check and Debug/Release commands remain in the first E9 admission section above.
+
+
+## Export F E9 fourth idle admission attempt - 2026-10-04
+
+**Pending idle-machine run.** Candidate `b64fc771f2b6b88dfadcb639da2866444551ac7f`, baseline/main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed idle readiness during admission;
+no competing xcodebuild was present. Debug and Release each refused 1-minute load 4.10 (require <=1.0), exit 75. Zero qualified runs; at least three runs per configuration, fixture wall time/peak memory, typing during export and 64 MiB writer main-thread time remain pending. No writer-off-main conclusion is possible.
+No performance samples, budget changes or owner-only gate closures.
+
+Raw logs: `docs/evidence/h22-retry4-e9-debug-admission.log`, `docs/evidence/h22-retry4-e9-release-admission.log`.
+Structured status: `docs/evidence/handoff22-pr138-20261004-retry4.json`.
+Fetch and merge main if it advances, refresh the clean baseline to the fix/main
+merge base, regenerate each project, then remeasure before claiming a later head.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh Release
+# Obtain at least three qualified runs per configuration.
+```
+
+
+## Current Export F E9 recorded-load results - 2026-10-04
+
+**Complete: ten Debug and ten testable-Release export runs, each paired with a
+same-session/configuration no-export typing batch.** Debug/Release were interleaved;
+build-for-testing occurred once per scheme/configuration, then all measurement
+batches used test-without-building. Candidate `9c4fab94745843495142609e3392b306b9250da1` includes main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. This supersedes earlier idle-pending
+measurement entries. It is **observed under recorded load**, not idle acceptance.
+
+Every batch passed inside-lock load <=6 and no other named compiler processes;
+start load `1.58-5.55`, end `1.69-5.55`.
+Top five CPU processes and product SHA are retained for each batch. Owner confirmed
+quiet readiness. Release retains -O but enables existing @testable seams, which can
+affect timing/optimization; these are testable-Release, not retail-binary numbers.
+The dedicated PerformanceTests scheme avoids unrelated Debug-only AppTests. Earlier
+build/array/signature failures and their fixes are preserved as historical logs.
+
+Production offscreen export: 30 wall-time samples per fixture/configuration and ten
+peak sampled host RSS values, with 24 distinct bounded PNG paths. Values are median
+(range); wall time includes the full production command path:
+
+| Configuration / fixture | Wall ms median (range) | Peak sampled host RSS MiB median (range) |
+|---|---|---|
+| Debug large-1mb.md | 2186.268 (2127.153-2311.474) | 183.711 (181.703-193.188) |
+| Debug export-f-heavy.md | 1086.125 (1049.820-1141.593) | 184.297 (182.328-193.906) |
+| Release large-1mb.md | 2196.496 (2132.693-2389.395) | 177.016 (173.094-181.797) |
+| Release export-f-heavy.md | 1081.214 (1039.884-1131.938) | 177.148 (171.844-180.703) |
+
+RSS is sampled every 5 ms for the host, not an exact OS high-water mark or WebKit
+helper-process memory. Real iCloud materialization/coordination remains owner work.
+
+Typing (native input plus scheduled public-view update; one keystroke per batch):
+
+| Config | No-export median / p95 / max ms | Active-export median / p95 / max ms | Median B-A; bootstrap 95% CI ms | B worse | >16 ms A / B |
+|---|---|---|---|---|---|
+| Debug | 13.917 / 15.524 / 15.571 | 6.085 / 31.922 / 36.191 | -5.759; [-9.641, 10.212] | 3/10 | 0% / 30% |
+| Release | 13.738 / 15.057 / 15.142 | 5.769 / 11.123 / 11.340 | -6.063; [-8.583, -3.949] | 1/10 | 0% / 0% |
+
+One sample means each batch's median/p95/max coincide; all ten pair differences
+are in JSON. Bootstrap uses 10,000 resamples, seed 20261004. Neither configuration
+meets CI entirely above +0.5 ms and B worse in >=8/10 pairs: **no regression signal
+detected under recorded load**. Debug has a wide CI (~19.85 ms), so meaningful
+median penalties cannot be excluded; 3/10 active-export samples exceeded 16 ms,
+maximum ~36.19 ms. These are reported, not declared harmless or a green absolute
+budget. Release has no >16 ms sample but does not establish idle/physical acceptance.
+
+Synchronous main-actor writeExportArtifact at 64 MiB (30 samples/configuration;
+allocation outside timer), milliseconds:
+
+| Config | Median ms | Range ms |
+|---|---|---|
+| Debug | 17.869 | 14.925-49.577 |
+| Release | 15.097 | 14.013-24.767 |
+
+No relative-regression trigger or hundreds-of-ms writer sample occurred, so the
+specified writer-off-main owner decision trigger is not met. This does not prove
+absence of all UI stalls. No writer changes or export-specific budget was frozen.
+
+Named tests: `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`,
+`testSixtyFourMiBWriterMainActorTime`,
+`AppBackedEditorPerformanceTests.testTypingDuringActiveHTMLExportStaysWithinTheExistingFrameBudget`,
+and `testTypingWithoutHTMLExportForRecordedLoadComparison`. All 40 batches produced
+complete named samples and valid functional checks; three Debug export batches
+exited 65 solely for the existing 16 ms assertion. Other 37 batches exited 0.
+
+Evidence: `docs/evidence/handoff22-pr138-20261004-paired-final.json`; raw logs and start/end snapshots under
+`docs/evidence/h22-e9-paired-20261004/`. xcresults are retained at paths in JSON.
+Only E9's measuring-and-recording checkbox is closed. Absolute 16 ms, keyboard,
+VoiceOver, Powerbox/iCloud and broad regression-suite acceptance remain open.
+Pinned lint, Bash syntax, bootstrap boundary and diff checks passed; no full-suite
+or current-head CI green claim is made.
+
+Exact full-run command (after fetch/merge main if necessary; pause other builds/tests):
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+/usr/bin/python3 Scripts/run-export-html-e9-paired.py
+```
 
 ## Current recorded-load paired result - 2026-10-04 (PR #137)
 

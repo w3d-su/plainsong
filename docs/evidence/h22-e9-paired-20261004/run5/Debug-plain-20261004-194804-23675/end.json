@@ -1,0 +1,16 @@
+{
+  "load": [
+    4.2822265625,
+    3.71533203125,
+    3.505859375
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 24.0 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 12.0 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension",
+    " 10.2 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    " 10.0 /Applications/Xcode-beta.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+    "  7.0 /usr/libexec/coreduetd"
+  ],
+  "exit_code": 0
+}
