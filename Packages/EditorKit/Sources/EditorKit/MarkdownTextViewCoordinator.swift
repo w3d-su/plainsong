@@ -255,6 +255,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var isUpdating = false
     var isUserEditing = false
     var lastAppliedHighlightRevision: Int?
+    /// Reconciliation-only restart; ordinary accepted edits keep their existing route.
+    var reconciledSourcePresentationInvalidationHandler: (() -> Int)?
+    var minimumHighlightRevisionAfterReconciliation: Int?
     /// Last successfully applied fold plan, retained in O(1) for hosted final-revision checks.
     var lastAppliedHighlightFoldPlan: WYSIWYGFoldPlan?
     /// Find-match decoration currently on the storage, so an unchanged request costs nothing.

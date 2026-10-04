@@ -1458,8 +1458,10 @@ hosted: 117 tests, 3 skips, zero failures.
 `make build`, pinned SwiftFormat 0.62.1 `make lint` and `git diff --check` passed.
 The scheduler contract suite has five deterministic tests; no production timing changed.
 
-Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
-removes presentation attributes until the next reparse. This branch does not repair it.
+Historical follow-up: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
+removed presentation attributes until an unrelated reparse. Handoff 21's
+[reconciled-source fix](#reconciled-source-presentation--2026-10-05) requests an automatic
+fresh parse; the scheduler PR itself did not repair it.
 
 ## Replace PR F restack — 2026-10-01
 
@@ -1468,7 +1470,8 @@ main's authoritative nil-key-window override and the F WYSIWYG/asset helper. The
 `phase3-editor-highlight-schedule-fix`. No rebase, push or Find-controller changes.
 The scheduler bug-fix PR owns the cancellation/coalescing implementation; F's automatic
 presentation reparses now run on it. PR D's presentation-attribute reset on rejected
-publication remains a known follow-up, with no repair in either change.
+publication was a known follow-up in both changes; it is addressed separately by
+[Handoff 21](#reconciled-source-presentation--2026-10-05).
 
 Post-restack verification on the merged source tree: **EditorKit 411 tests**, seven
 real-IME opt-in skips, zero failures; **hosted EditorFind/EditorReplace plus all nine
@@ -2221,3 +2224,45 @@ export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedu
 export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
+
+## Reconciled-source presentation — 2026-10-05
+
+Handoff 21 starts from `91f0ebac` after #136/#137 merged. All four
+`applyReconciledSource` callers retain the whole-source assignment, selection clamp,
+writer/source reconciliation and undo semantics. Only that restore requests the
+normal `EditorHighlightScheduler` restart, including when App text is unchanged.
+The 20 ms debounce and off-main parse are unchanged; marked-text and native-editing
+apply guards remain intact. Ordinary accepted input does not invoke the new hook.
+The hook is installed only after the exact document transition succeeds and removed
+on dismantle, so a deferred destination cannot replace the old source's callback.
+
+While the new parse is pending, backing text is raw. A persistent revision floor
+blocks already-produced pre-restore highlights; cancelled scheduler work cannot
+apply later. Resetting image presentation advances its generation, cancels returning
+loads and clears cached plans even when source samples are identical. Replace's
+presentation snapshot and Find decoration materialisation are invalidated as well.
+
+Verification: full EditorKit **426 tests, seven real-IME opt-in skips, zero
+failures**; full MarkdownCore **303 tests, zero failures**. The nine named
+`EditorReconciledSourcePresentationTests` cover all four callers, clamped selection,
+raw pending projection, syntax/link/fold/image equivalence to an independent parse,
+marked-text deferral, an already-produced but unapplied stale revision, and no new
+reconciliation request on an ordinary native edit. The existing PR F rejection test
+now waits for the automatic scheduler pass without intervening input.
+
+Hosted Find/Replace and all nine WYSIWYG policy tests: **119 tests, two typing
+opt-in skips, zero failures**. Both new rejected-publication tests ran, checking
+unchanged App source/revision/binding, no undo/redo, restored syntax/folds and a ready
+image thumbnail. The opt-in highlight stress completed **0 drops in 60 operations**.
+Temporarily disabling only the restart hook reproduced the source-mode recovery
+timeout; restoring it passed. This is a source-mode negative control: WYSIWYG's
+internal selection-driven scheduler can also request a reparse. The independent
+oracle restores custom fold attributes from its own fresh plan after Foundation's
+AttributedString bridge, without applying anything to the live editor.
+
+`make build`, pinned SwiftFormat **0.62.1** `make lint` and `git diff --check` passed.
+Hosted xcresult reports six runtime warnings (Environment reads in existing test
+support and a QoS wait); this does not attribute their cause. These are the two full
+package suites and required hosted slices, not a claim that all `make test` targets
+ran. Real keyboard/IME acceptance and absolute R9/§12 typing acceptance remain owner
+gates. The paired typing result follows in the measurement commit.
