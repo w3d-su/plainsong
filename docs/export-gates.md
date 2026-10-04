@@ -21,7 +21,10 @@
 > PR F Phase B (2026-10-01) closes E1 and the automated HTML portions of E4/E7/E8.
 > E6's real-panel/leaf-grant owner smoke, keyboard-only acceptance, PDF/Print portions,
 > and E9 performance remain open. Owner checklist and exact test/measurement commands:
-> `docs/export-html-phase-b-checklist.md`.** Precedent:
+> `docs/export-html-phase-b-checklist.md`.
+> PR G investigation (2026-10-04) hits handoff 20's design stop: D2-ready wide-table
+> content is clipped by the existing E0 capture geometry. E0 remains GO (paginated);
+> no PDF/Print product gate closes. See `docs/export-pdf-print-design-stop.md`.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -1490,3 +1493,21 @@ are Debug 49.577 ms and Release 24.767 ms, so the hundreds-of-ms trigger is not 
 These are observed under recorded load; no budgets are frozen. The absolute typing
 budget bullet stays unchecked. Keyboard/VoiceOver, physical input, Powerbox/iCloud
 and full-suite regression acceptance stay open. Product/writer code is unchanged.
+
+### PR G design stop — 2026-10-04
+
+`ExportPDFPaginationDesignStopTests.testFixedHeightCaptureDropsHorizontallyClippedTableContentAfterReadyBarrier`
+reuses E0 capture helpers after the exact render and D2 barrier on F's blocked
+offscreen controller. A 12-column table plus E0's tall fixture yields 3 valid pages
+at 14,354 pt: all 420 vertical sentinels survive once/in order, but columns 04–11
+are missing. Table scroll width is 2,299 pt inside a 732-pt scroll container;
+document width remains 800 pt. A diagnostic expansion control captures all columns.
+This reproduces the required wide-table design stop; it does not revoke E0's
+accepted fixture result or establish impossibility for a future layout policy.
+
+Eight hosted tests pass (7 E0, 1 diagnostic), with no failures/skips. The diagnostic
+asserts the limitation and closes no gate. Product PDF/Print implementation, E5,
+remaining E4/E6–E9 automation, real panel/Powerbox/keyboard/VoiceOver, and PDF/Print
+E9 (**pending idle-machine run**) remain open. See
+[the evidence and reproduction](export-pdf-print-design-stop.md) and
+[the unchecked owner checklist](export-pdf-print-checklist.md).

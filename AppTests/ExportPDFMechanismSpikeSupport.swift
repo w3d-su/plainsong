@@ -16,6 +16,11 @@ final class E0OffscreenPDFProbe {
         configureController()
     }
 
+    init(controller: PreviewController) {
+        self.controller = controller
+        configureController()
+    }
+
     init(previewIndexURL: URL?) {
         controller = PreviewController(previewIndexURL: previewIndexURL)
         configureController()
