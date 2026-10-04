@@ -66,16 +66,40 @@ recovery record and offers no misleading Finder action for a nonexistent origina
 `testIndeterminateStatesAndEveryResidueReportRecoveryPathsWithoutClaimingSuccess` asserts
 the real notice's Reveal target. Check the owner box only after reading both previews.
 
-## E9, last and only on an idle machine
+## E9, last on a quiet machine; observed under recorded load
 
 ```sh
 Scripts/run-export-html-e9.sh Debug
 Scripts/run-export-html-e9.sh Release
 ```
 
-The script acquires the shared lock before checking 1-minute load and refuses a run above
-1.0 (exit 75, “pending idle-machine run”). This is a conservative idle check, not an export
-budget. It retains a `.xcresult` and `run.log` under the printed evidence directory.
+The script acquires the shared lock non-blockingly, with a five-minute bounded wait.
+Inside the lock it refuses any other `xcodebuild`, `swift-build`, `swift-frontend`, `clang`
+or `ld`, and load above `PLAINSONG_MAX_LOAD` (default 6). These are contention guards,
+not idle acceptance. Pause other agents, close heavy apps, keep the Mac on power and
+leave it alone. Start/end load, top five CPU processes and product SHA are retained
+with the `.xcresult` and `run.log`. Each configuration builds once, then uses
+`test-without-building`; after compilation admission is checked again.
+Interleave at least five Debug and five Release runs, with `--plain` typing batches
+before each export batch. Use ten pairs per configuration for the common paired
+regression method: per-pair differences, 10,000-resample bootstrap 95% CI, signal only
+with CI above +0.5 ms and candidate worse in at least 80% of pairs. Report sample
+fractions above 16 ms for both modes without claiming an absolute budget verdict.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+Scripts/run-export-html-e9.sh --build-only Debug
+Scripts/run-export-html-e9.sh --build-only Release
+Scripts/run-export-html-e9.sh --plain Debug
+Scripts/run-export-html-e9.sh Debug
+Scripts/run-export-html-e9.sh --plain Release
+Scripts/run-export-html-e9.sh Release
+# Repeat the four measurement calls ten times; no other builds/tests may run.
+# Or let the paired runner build once and perform the full interleaving:
+/usr/bin/python3 Scripts/run-export-html-e9-paired.py
+```
+
 Ordinary tests skip all three probes unless `PLAINSONG_RUN_EXPORT_E9=1` reaches the runner.
 
 - `ExportHTMLPerformanceTests.testProductionOffscreenExportTimeAndHostMemory`: three
@@ -98,4 +122,5 @@ off-main in this PR. No export-specific time or memory budget is frozen.
 Correctness-only E9 smoke: `Scripts/run-export-html-e9.sh --smoke Debug`. It executes
 one sample per fixture and the 64 MiB writer, and exercises active-export typing without
 budget assertions or reporting timing/RSS as evidence. It holds the same lock but skips
-the idle check; formal Debug/Release measurements remain pending an idle machine.
+the load ceiling; other-build exclusion stays active. Smoke reports no timing evidence.
+Formal results are labeled observed under recorded load; idle-absolute acceptance stays open.

@@ -8,7 +8,7 @@ import WorkspaceKit
 import XCTest
 
 /// Opt-in E9 probes. Ordinary correctness runs never publish contention-dependent numbers.
-/// Run Scripts/run-export-html-e9.sh after the machine is idle, in Debug and Release.
+/// Run Scripts/run-export-html-e9.sh on a quiet machine, in Debug and Release; record load with every batch.
 @MainActor
 final class ExportHTMLPerformanceTests: XCTestCase {
     func testProductionOffscreenExportTimeAndHostMemory() async throws {
@@ -114,7 +114,7 @@ final class ExportHTMLPerformanceTests: XCTestCase {
 
     private func requireOptIn() throws {
         guard ProcessInfo.processInfo.environment["PLAINSONG_RUN_EXPORT_E9"] == "1" else {
-            throw XCTSkip("pending idle-machine run: Scripts/run-export-html-e9.sh Debug|Release")
+            throw XCTSkip("recorded-load opt-in probe: Scripts/run-export-html-e9.sh Debug|Release")
         }
     }
 
