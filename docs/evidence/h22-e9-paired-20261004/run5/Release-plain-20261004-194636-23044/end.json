@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.61181640625,
+    3.32666015625,
+    3.3544921875
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 47.5 /usr/libexec/swcd",
+    " 26.2 /usr/libexec/siriknowledged",
+    " 23.1 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 10.7 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    " 10.6 /System/Library/ExtensionKit/Extensions/WallpaperAerialsExtension.appex/Contents/MacOS/WallpaperAerialsExtension"
+  ],
+  "exit_code": 0
+}

@@ -1,0 +1,16 @@
+{
+  "load": [
+    3.14208984375,
+    3.03955078125,
+    3.275390625
+  ],
+  "top_cpu": [
+    " %CPU COMM",
+    " 35.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 10.5 /Applications/Ghostty.app/Contents/MacOS/ghostty",
+    "  6.4 /usr/sbin/coreaudiod",
+    "  4.3 /Users/davis._.su/.nvm/versions/node/v24.16.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+    "  4.0 /System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+  ],
+  "exit_code": 0
+}

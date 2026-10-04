@@ -1,0 +1,19 @@
+{
+  "load": [
+    5.13134765625,
+    6.8798828125,
+    7.4306640625
+  ],
+  "max_load": 6.0,
+  "top_cpu": [
+    " %CPU COMM",
+    "292.7 /System/Library/PrivateFrameworks/MediaAnalysis.framework/Versions/A/mediaanalysisd",
+    " 63.6 /usr/libexec/spotlightknowledged.updater",
+    " 13.7 /usr/libexec/sysmond",
+    " 12.0 /usr/sbin/cfprefsd",
+    " 11.0 /Applications/Ghostty.app/Contents/MacOS/ghostty"
+  ],
+  "build_processes": {},
+  "product_sha": "7377cf4e51edb85d023986a8c33cabd3edff6a10",
+  "smoke": false
+}
