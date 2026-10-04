@@ -42,6 +42,14 @@ struct EditorFindBar: View {
                 },
                 onEscape: {
                     appState.closeEditorFindBar()
+                },
+                onReplaceOwnerMount: { field in
+                    appState.editorFindHost.replaceMarkedTextOwners.register(field)
+                    appState.advanceEditorReplaceAuthorityGeneration()
+                },
+                onReplaceOwnerUnmount: { field in
+                    appState.editorFindHost.replaceMarkedTextOwners.unregister(field)
+                    appState.advanceEditorReplaceAuthorityGeneration()
                 }
             )
             .frame(minWidth: 160, idealWidth: 220, maxWidth: 320)

@@ -355,27 +355,27 @@ extension EditorFindController {
         )
     }
 
-    /// Admits one verified single-Replace revision: one `afterOneReplace` rescan, run without
+    /// Admits one verified Replace revision: one rescan, run without
     /// the typing debounce because Replace is one explicit command and the counter is blank
     /// until it lands. A later edit, query, or rebind supersedes it like any generation.
     func startReplacementGeneration(
-        plan: EditorReplaceOneMatchPlan,
+        work: EditorFindMatchWorker.Replacement,
         text: String,
         revision: UInt64
     ) {
-        lastScheduleReason = .replacement(resumeUTF16: plan.resumeUTF16)
+        lastScheduleReason = .replacement(resumeUTF16: work.resumeUTF16)
         replacementScheduleCount &+= 1
         documentBinding = EditorFindDocumentBinding(
             identity: documentBinding.identity,
             text: text,
             revision: revision
         )
-        let generation = beginGeneration()
         replacementEngineInvocationCount &+= 1
-        // Identity is re-read after beginGeneration's callback, exactly as the pre-split fence.
-        let binding = EditorFindDocumentBinding(identity: documentBinding.identity, text: text, revision: revision)
+        // Retain the admitted identity across the observer callback; it may rebind.
+        let binding = documentBinding
+        let generation = beginGeneration()
         startMatchWork(binding: binding, generation: generation) {
-            EditorReplaceContinuationPlanning.afterOneReplace(plan: plan, postWriteSource: text)
+            work.continuation(postWriteSource: text)
         } apply: { controller, continuation in
             controller.installContinuation(continuation, stepsRecordedFor: generation)
         }

@@ -11,6 +11,31 @@ private struct EditorFindMatchFence: Equatable {
 /// Long-lived task owner. Tasks capture the controller weakly, just as before extraction.
 @MainActor
 final class EditorFindMatchWorker {
+    /// Off-main continuation work shares Find's existing worker and generation fence.
+    enum Replacement: Sendable {
+        case one(EditorReplaceOneMatchPlan)
+        case batch(MarkdownCore.EditorReplaceBatchPlan, TextSearchMatch?, Int, Int)
+
+        var resumeUTF16: Int {
+            switch self {
+            case let .one(plan): plan.resumeUTF16
+            case let .batch(_, _, _, anchor): anchor
+            }
+        }
+
+        nonisolated func continuation(postWriteSource: String) -> EditorReplaceContinuation {
+            switch self {
+            case let .one(plan):
+                EditorReplaceContinuationPlanning.afterOneReplace(plan: plan, postWriteSource: postWriteSource)
+            case let .batch(plan, match, caret, _):
+                EditorReplaceContinuationPlanning.afterBatch(
+                    plan: plan, preWriteCurrentMatch: match,
+                    preWriteCaretUTF16: caret, postWriteSource: postWriteSource
+                )
+            }
+        }
+    }
+
     private var matchTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
 
