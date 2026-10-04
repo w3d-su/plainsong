@@ -220,6 +220,7 @@ f2_reap_runner_only() {
 
 f2_stop_and_reap_runner() {
     local runner_pid="$1"
+    local cleanup_status=0
 
     if ! f2_terminate_run_tree "$runner_pid" TERM; then
         f2_runner_enter_reap_only "$runner_pid" || return
@@ -233,11 +234,15 @@ f2_stop_and_reap_runner() {
         f2_runner_enter_reap_only "$runner_pid" || return
         : > "$F2_CONTROL_DIRECTORY/session-drain"
     else
+        cleanup_status=$?
+        printf 'F2 runner cleanup forced: runner=%s drain_status=%s; no drain proof\n' \
+            "$runner_pid" "$cleanup_status" >&2
         f2_terminate_run_tree "$runner_pid" KILL || return
     fi
     builtin wait "$runner_pid" 2>/dev/null || true
     F2_RUNNER_LIFECYCLE=cleared
     F2_ACTIVE_RUNNER_PID=""
+    return "$cleanup_status"
 }
 
 f2_write_outer_status() {

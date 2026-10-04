@@ -89,3 +89,38 @@ parsed summary: `/private/tmp/h23-probe-xcresult-summary.json`.
 The deliberate probe is removed in a new revert commit, never by force-push.
 Final exact-head normal CI and success upload-skip are checked and reported in the PR body
 when that run completes. No local full-suite or owner-only gate is relabelled green.
+
+
+## PR #141 integration repair — 2026-10-05
+
+The prior head `f9fe3fa9c4844305760fdd3f21ebb3fc828fedbc` failed
+[CI run 37213337242/a1](https://github.com/w3d-su/plainsong/actions/runs/37213337242?attempt=1)
+in the package phase: `ExportArtifactWriterTests.testLeafInspectionComesFromLeafPathMetadata`
+threw `destinationAlias` at the hard-link inspection. Hosted tests had not started, so
+artifact `11307777823` contains only the failure environment summary (338-byte ZIP);
+absence of xcresult/build/preflight logs at that point is expected.
+
+The test assumed `F_GETPATH` retained the name used to open a hard link. Apple's
+[XNU implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_descrip.c)
+resolves the descriptor's vnode through `vn_getpath_ext`; the
+[vnode contract](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/vnode.h)
+notes that a vnode can have multiple hard-link paths. A local real-filesystem control opens
+`link.html`, looks up `export.html`, then queries the same descriptor: its reported path
+changes to `export.html` while both names retain identical device/inode and bytes.
+This reproduces the failed assumption; the historical resource/CAS root cause remains unknown.
+
+The single-name metadata test now retains its original missing/existing-leaf assertions.
+`testHardLinkInspectionUsesCurrentKernelSpelling` uses the existing boundary observer to
+look up each hard-link name immediately before the real `F_GETPATH`. It requires successful
+inspection for matching spelling and `destinationAlias` for the alternate spelling; it also
+requires publication refusal, no staging creation, and unchanged identities, contents and
+folder entries. No writer logic, permission, budget, retry or owner gate changes.
+
+Current main `1c427beb7c2b83a5bc2cbc6583e7356bb0b04d78` is integrated, preserving both
+Decision Log entries and the inherited F2 drain fix without modifying its tooling.
+The 67 Export writer tests, pinned SwiftFormat 0.62.1 lint and `git diff --check` pass.
+Local logs: `/private/tmp/pr141-workspace-export-tests.log`, `/private/tmp/pr141-lint.log`.
+Full `make test` is recorded in `/private/tmp/pr141-make-test.log` with isolated DerivedData,
+a fixed result bundle and the shared test lock; its result and final exact-head hosted CI
+are reported in the PR body after completion. Functional CI-mode runs do not close idle
+performance or owner-only acceptance gates.

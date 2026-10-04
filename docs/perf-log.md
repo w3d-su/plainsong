@@ -419,12 +419,12 @@ are historical artifacts, not maintained large-file exceptions in the current ch
 | Historical measured-source runner (`c871ddf`) | `90e5aa9edd01a96132b80a092421c2cfc47c7e6d2944f1876bf8ddcf76edea8d` |
 | Historical outer capture wrapper (`03ffd70`) | `2a704978fd73e3a15cc383882d01440e099927eff3672ebd31bfa39420df56bf` |
 | Historical pack builder / auditor (`03ffd70`) | `11bce3e0fbaa4419f430cbb814749d3bdb9825a0692a73fba5f9f90b653440a9` / `605a56d322ecb253f59f82e4c9787df7bd922a76bb5ec6e6e910e1cc0adfb819` |
-| Current `Scripts/editor-find-f2-tooling.sha256` | `c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec` |
+| Current `Scripts/editor-find-f2-tooling.sha256` | `c448303f9f5b2f89169564aed76af3c8b5e8387015385fac3fd62b40958e8b28` |
 | Current inventory verifier | `047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c` |
 | Current isolated bootstrap | `b67dac167543c83b0c8c4e1844dbe2421c1d16a6bcff301603bf2c3ac0bfa59d` |
 | Current capture schema | `156177ae6c047e7f1295381c557c440263dcac63d48a3fbaf01dd69d4bcb3d56` |
 | Current auditor / builder entry points | `ed9ad47f21d6a4df4ae1dc24a76c669e9eac11548fbdcab1bd0a49722cf3a9f2` / `6cab5471e11f06cb9b853a54c209fd9f87279330975da696a74c33c5094b3b4f` |
-| Current capture / runner / build entry points | `8317ac44819387ac0b53167643be3c3f5e023b4ee1d6c3cb2dad1f38686c7f8e` / `0d220849377cd21d11207ebd35056b7ce9a21f93df23592945fd9ee5bcd169c5` / `9c54513d118bf150d52aa8f781933df98fc2141959c988e67dcf42718cd9e6a2` |
+| Current capture / runner / build entry points | `7531e3bbc81b264125c98341a61f4a38f48bb2e358385cce4cd5ce7b3652ff2f` / `0d220849377cd21d11207ebd35056b7ce9a21f93df23592945fd9ee5bcd169c5` / `9c54513d118bf150d52aa8f781933df98fc2141959c988e67dcf42718cd9e6a2` |
 
 All 36 maintained executable/support modules are in the external inventory. Current Python entry
 points require isolated `-I` startup, verify canonical current-UID-owned non-symlink paths with no
@@ -465,7 +465,7 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/editor-find-f2-tooling.sha256")" = \
-  c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec
+  c448303f9f5b2f89169564aed76af3c8b5e8387015385fac3fd62b40958e8b28
 test "$(f2_sha256 "$F2_CHECKOUT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
   047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c
 test "$(f2_sha256 "$F2_PACK/manifest.json")" = \
@@ -534,7 +534,7 @@ f2_sha256() {
 }
 
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/editor-find-f2-tooling.sha256")" = \
-  c5224b734b99a64dcd96ace010ae9583ab1b32ff3950fd9744342bd622fa7eec
+  c448303f9f5b2f89169564aed76af3c8b5e8387015385fac3fd62b40958e8b28
 test "$(f2_sha256 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py")" = \
   047aca8f71e33ff6907f447546111eecbbb0bdea391ad98b2d1681c0ac4edb0c
 "$F2_REPOSITORY_ROOT/Scripts/check-editor-find-f2-tooling-inventory.py"
