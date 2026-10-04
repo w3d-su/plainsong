@@ -1487,3 +1487,26 @@ Raw log `docs/evidence/h22-retry3-idle-admission.log`; JSON
 `docs/evidence/handoff22-pr136-20261004-retry3.json`. Exact rerun commands remain
 in the first Handoff 22 admission section above; fetch/merge main, regenerate
 projects and remeasure before claiming a later head. Budgets remain unchanged.
+
+
+## Handoff 22 fourth idle admission attempt - 2026-10-04 (PR #136)
+
+**Idle measurement still pending.** Candidate `a7709ff499cf5a7632799e07d6999c93af2c0b65`, baseline/main
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed idle readiness during admission;
+no competing xcodebuild was present. All 11 inside-lock checks over five minutes refused 1-minute loads 4.08-5.66 (require <3), exit 75. No build or typing probe ran. The common helper stopped during baseline admission, so neither fix nor stack was measured. Maxima, medians, 16 ms pass/fail and any regression conclusion remain unmeasured.
+No performance samples, budget changes or owner-only gate closures.
+
+Raw logs: `docs/evidence/h22-retry4-idle-admission.log`.
+Structured status: `docs/evidence/handoff22-pr136-20261004-retry4.json`.
+Fetch and merge main if it advances, refresh the clean baseline to the fix/main
+merge base, regenerate each project, then remeasure before claiming a later head.
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+sysctl -n vm.loadavg
+pgrep -fl xcodebuild # no matches required before each batch
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-20261002-idle.py"
+```
