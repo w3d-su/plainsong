@@ -99,6 +99,8 @@ def batch(roots, output, name, iteration, action):
     cmd = ['xcodebuild', '-project', 'Plainsong.xcodeproj', '-scheme', 'Plainsong', '-configuration', 'Debug', '-destination', 'platform=macOS', '-parallel-testing-enabled', 'NO', '-resultBundlePath', str(output / (stem + '.xcresult')), action]
     if action == 'test-without-building':
         cmd += ['-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget', '-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget']
+    if action == 'build-for-testing':
+        subprocess.run(['make', 'generate'], cwd=root, check=True)
     env = dict(os.environ, TEST_RUNNER_PLAINSONG_RUN_HOSTED_TYPING_GATE='1')
     with log.open('w') as stream:
         stream.write(json.dumps(metadata) + '\n')
