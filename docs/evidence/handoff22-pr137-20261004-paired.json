@@ -1,7 +1,7 @@
 {
   "pr": 137,
   "date": "2026-10-04 Asia/Taipei",
-  "status": "still pending; zero complete pairs",
+  "status": "still pending; 0 complete pairs of required 10 per mode",
   "label": "observed under recorded load; no absolute idle verdict",
   "candidate_product_sha": "142efcf7daad63bd41c9485a90cbe011bbc85de3",
   "baseline_sha": "4cef0ccf44e422ad22ab34c4319a46c42e69b009",
@@ -3187,18 +3187,32 @@
   "owner_ready_confirmed": true,
   "measurement_plumbing_only": true,
   "latest_bundled_probe_compile": {
-    "baseline": "build-for-testing passed",
-    "fix": "not admitted on latest head",
-    "stack": "not admitted on latest head"
+    "baseline": "build-for-testing passed in run3; product SHA matches run4",
+    "fix": "build-for-testing passed in run3; product SHA matches run4",
+    "stack": "build-for-testing passed in run3; product SHA matches run4"
   },
   "notes": [
     "Run1 baseline overlay was installed after project generation, causing zero selected tests; rejected.",
     "Run2 baseline produced 30 samples per mode; candidate stopped before sampling. Its process sample showed main-thread open blocked while reading the Documents fixture. The owned xcodebuild and host were terminated; no complete pair.",
     "Fixture loading now uses the test bundle. Baseline uses an isolated, documented test-only source and resource-manifest overlay, while product HEAD stays at the merge base.",
-    "Run3 admission timed out; Run4 built the bundled baseline, then timed out before candidate build.",
     "Only the original 16 ms assertion may fail in an otherwise complete batch. Missing samples and functional failures are rejected.",
-    "Pinned SwiftFormat 0.62.1 archive SHA256 verified against CI. make lint passed (existing warnings, zero serious); Python bootstrap boundary checks and git diff --check passed."
+    "Pinned SwiftFormat 0.62.1 archive SHA256 verified against CI. make lint passed (existing warnings, zero serious); Python bootstrap boundary checks and git diff --check passed.",
+    "Run3 built all three bundled-probe products and completed two baseline/fix pairs per mode before admission timeout on candidate pair 3. Baseline pair 3 is unpaired and excluded from paired analysis. No stack typing batch ran.",
+    "Run4 rebuilt baseline and timed out before candidate build, adding no typing samples.",
+    "Current derived relative_analysis suppresses all regression flags until the required ten pairs. The original raw JSON retains its earlier exploratory internal metric flag; its overall verdict was always insufficient pairs.",
+    "The initial zero-complete-pair summary missed run3 samples; current data and perf-log entries are corrected."
   ],
   "committed_raw_logs": "docs/evidence/h22-paired-20261004/",
-  "xcresults": "Retained at paths in per-run evidence JSON; binary bundles are not committed."
+  "xcresults": "Retained at paths in per-run evidence JSON; binary bundles are not committed.",
+  "relative_analysis": {
+    "source-only": {
+      "status": "still pending",
+      "complete_pairs": 0
+    },
+    "wysiwyg": {
+      "status": "still pending",
+      "complete_pairs": 0
+    }
+  },
+  "relative_analysis_source": "run3: same bundled-probe product heads as run4; later run4 adds no typing pairs"
 }
