@@ -103,8 +103,8 @@ extension EditorFindHostedGateTests {
 
     private func assertHostedLargeFixtureTyping(layoutMode: EditorLayoutMode) async throws {
         try Self.requireHostedOptIn("PLAINSONG_RUN_HOSTED_TYPING_GATE", purpose: "hosted large-1mb.md typing gate")
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let source = try String(contentsOf: root.appendingPathComponent("Fixtures/large-1mb.md"))
+        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
+        let source = try String(contentsOf: fixture, encoding: .utf8)
         let hosted = try await makeHostedEditorWorkspace(source: source, layoutMode: layoutMode)
         designateReplaceKeyWindow(in: hosted.group)
         openFindBar(hosted.appState, query: "ordinary prose")
@@ -162,7 +162,9 @@ extension EditorFindHostedGateTests {
     private func poll(timeout: TimeInterval, _ predicate: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if predicate() { return true }
+            if predicate() {
+                return true
+            }
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
         return predicate()

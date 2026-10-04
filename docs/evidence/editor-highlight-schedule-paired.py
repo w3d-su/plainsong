@@ -91,6 +91,8 @@ def batch(roots, output, name, iteration, action):
     root = roots[name]
     metadata = {'product': name, 'iteration': iteration, 'action': action, 'product_sha': command(['git', 'rev-parse', 'HEAD'], root), 'start': start}
     probe = Path(root) / 'AppTests/EditorHighlightScheduleHostedTests.swift'
+    metadata['fixture_sha256'] = hashlib.sha256((Path(root) / 'Fixtures/large-1mb.md').read_bytes()).hexdigest()
+    metadata['manifest_sha256'] = hashlib.sha256((Path(root) / 'project.yml').read_bytes()).hexdigest()
     metadata['probe_sha256'] = hashlib.sha256(probe.read_bytes()).hexdigest()
     timed = probe.read_text().split('    private func assertHostedLargeFixtureTyping', 1)[1].split('    /// Waits until', 1)[0].split('    private static func requireHostedOptIn', 1)[0].strip()
     metadata['typing_probe_sha256'] = hashlib.sha256(timed.encode()).hexdigest()
@@ -139,8 +141,17 @@ def main():
         source = source[:a] + source[b:]
         probe = Path(roots['main']) / 'AppTests/EditorHighlightScheduleHostedTests.swift'
         if probe.exists() and probe.read_text() != source:
-            raise SystemExit('Baseline probe already exists with different contents; preserve it and prepare a clean baseline.')
+            old = probe.read_text()
+            old = old.replace('        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()\n        let source = try String(contentsOf: root.appendingPathComponent("Fixtures/large-1mb.md"))', '        let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))\n        let source = try String(contentsOf: fixture, encoding: .utf8)')
+            if old != source:
+                raise SystemExit('Baseline probe differs from known overlay; preserve it and prepare a clean baseline.')
         probe.write_text(source)
+        manifest = Path(roots['main']) / 'project.yml'
+        original = manifest.read_text()
+        start = original.index('  PlainsongTests:')
+        section = original[start:].split('  PerformanceTests:', 1)[0]
+        if 'path: Fixtures/large-1mb.md' not in section:
+            manifest.write_text(original[:start] + original[start:].replace('      - path: AppTests\n', '      - path: AppTests\n      - path: Fixtures/large-1mb.md\n        buildPhase: resources\n', 1))
     Path(LOCK).parent.mkdir(parents=True, exist_ok=True)
     if len(sys.argv) > 1 and sys.argv[1] == 'batch':
         raise SystemExit(batch(roots, Path(sys.argv[2]), *sys.argv[3:]))
