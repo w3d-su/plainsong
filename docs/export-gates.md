@@ -1454,3 +1454,12 @@ xcodebuild or performance probe ran. Candidate SHA, raw logs, JSON and commands
 are in `docs/perf-log.md`, "Export F E9 retry after handoff 23 — 2026-10-04".
 Zero qualified runs and no new E9 boxes; ≥3 Debug and ≥3 Release runs still
 required. Keyboard/VoiceOver remains owner-only.
+
+
+### Handoff 22 E9 third idle admission attempt - 2026-10-04
+
+E9 remains **pending idle-machine run**. Debug/Release refused loads 15.23/14.00
+(require <=1.0), each exit 75, zero samples or new E9 boxes. See perf-log's third
+idle admission section and `docs/evidence/handoff22-pr138-20261004-retry3.json`
+for candidate SHA, raw logs and exact rerun commands. Three qualified runs per
+configuration and owner keyboard/VoiceOver acceptance remain open.

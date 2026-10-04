@@ -1356,3 +1356,19 @@ Raw logs: `docs/evidence/h22-post23-e9-debug-admission.log` and
 `docs/evidence/handoff22-pr138-20261004-post23-admission.json`. Use the exact
 shared-lock/load/process-check commands in the preceding E9 admission section
 and repeat each configuration until three qualified runs exist.
+
+
+## Export F E9 third idle admission attempt - 2026-10-04
+
+**Pending idle-machine run.** Candidate `72a5a6974a61e7742edda13f9f377ef22f4eedce`,
+including main `4cef0ccf44e422ad22ab34c4319a46c42e69b009`. Owner confirmed
+readiness; no other xcodebuild was present before either batch. Debug refused
+load 15.23 and Release refused 14.00 (require <=1.0), both exit 75 before build
+or measurement. Zero qualified runs; at least three per configuration, fixture
+wall time/peak memory, typing during export and 64 MiB writer time remain pending.
+No writer decision, budget change, E9 box or owner acceptance closure.
+
+Raw logs `docs/evidence/h22-retry3-e9-debug-admission.log` and
+`docs/evidence/h22-retry3-e9-release-admission.log`; JSON
+`docs/evidence/handoff22-pr138-20261004-retry3.json`. Exact shared-lock/load/process
+check and Debug/Release commands remain in the first E9 admission section above.
