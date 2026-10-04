@@ -121,15 +121,37 @@ f2_run_group_has_live_member() {
     local snapshot
     local status
 
-    snapshot="$(f2_process_table_snapshot 2>/dev/null)" || return 2
+    if snapshot="$(f2_process_table_snapshot)"; then
+        :
+    else
+        local snapshot_status=$?
+        printf 'F2 runner drain inspection failed: runner=%s process-table exit=%s\n' \
+            "$runner_pid" "$snapshot_status" >&2
+        return 2
+    fi
     printf '%s\n' "$snapshot" | /usr/bin/awk -v runner_pid="$runner_pid" '
-        NF != 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^[A-Za-z+<]+$/ {
+        NF != 3 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ {
+            print "F2 runner drain inspection failed: malformed row: " $0 > "/dev/stderr"
             invalid=1
+            next
         }
-        NF == 3 { rows++ }
-        $2 == runner_pid && $1 != runner_pid && $3 !~ /^Z/ { found=1 }
+        { rows++ }
+        # An unrelated process state cannot prove or disprove the owned group drain.
+        # Validate states only for members whose liveness affects that proof.
+        $2 == runner_pid && $1 != runner_pid {
+            if ($3 !~ /^[A-Za-z+<]+$/) {
+                print "F2 runner drain inspection failed: owned row: " $0 > "/dev/stderr"
+                invalid=1
+            } else if ($3 !~ /^Z/) {
+                found=1
+            }
+        }
         END {
-            if (invalid || rows == 0) exit 2
+            if (rows == 0) {
+                print "F2 runner drain inspection failed: empty process table" > "/dev/stderr"
+                invalid=1
+            }
+            if (invalid) exit 2
             exit(found ? 0 : 1)
         }
     '
