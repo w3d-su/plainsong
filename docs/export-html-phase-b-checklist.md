@@ -78,7 +78,9 @@ Inside the lock it refuses any other `xcodebuild`, `swift-build`, `swift-fronten
 or `ld`, and load above `PLAINSONG_MAX_LOAD` (default 6). These are contention guards,
 not idle acceptance. Pause other agents, close heavy apps, keep the Mac on power and
 leave it alone. Start/end load, top five CPU processes and product SHA are retained
-with the `.xcresult` and `run.log`. Each configuration builds once, then uses
+with the `.xcresult` and `run.log`. The dedicated `PerformanceTests` scheme builds only the E9 test bundle and its
+app/package dependencies, excluding unrelated Debug-only AppTests and UITests.
+Each configuration builds once, then uses
 `test-without-building`; after compilation admission is checked again.
 Release passes `ENABLE_TESTABILITY=YES` for the existing `@testable` seams while
 retaining the scheme's Release optimization. These are testable Release measurements,

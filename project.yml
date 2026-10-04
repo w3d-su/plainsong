@@ -142,6 +142,9 @@ targets:
       - path: App/Resources/preview
         type: folder
         buildPhase: resources
+    scheme:
+      testTargets:
+        - PerformanceTests
     dependencies:
       - target: Plainsong
     settings:

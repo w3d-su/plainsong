@@ -42,7 +42,7 @@ for name in ('xcodebuild','swift-build','swift-frontend','clang','ld'):
     result=subprocess.run(['pgrep','-x',name],capture_output=True,text=True)
     if result.returncode not in (0,1): raise SystemExit(result.stderr)
     if result.returncode==0: builds[name]=result.stdout.splitlines()
-data={'load':list(os.getloadavg()),'max_load':limit,'top_cpu':subprocess.check_output(['ps','-Ao','%cpu,comm','-r'],text=True).splitlines()[:6],'build_processes':builds,'product_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'smoke':sys.argv[2]=='1','configuration':sys.argv[3],'release_testability_override':sys.argv[3]=='Release'}
+data={'load':list(os.getloadavg()),'max_load':limit,'top_cpu':subprocess.check_output(['ps','-Ao','%cpu,comm','-r'],text=True).splitlines()[:6],'build_processes':builds,'product_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'smoke':sys.argv[2]=='1','configuration':sys.argv[3],'release_testability_override':sys.argv[3]=='Release','scheme':'PerformanceTests'}
 with open(sys.argv[1],'w') as stream: json.dump(data,stream,indent=2)
 print(f"Export E9 quiet check: load {data['load'][0]:.2f}; ceiling {limit}; builds={builds}; evidence={os.path.dirname(sys.argv[1])}",flush=True)
 # Smoke remains correctness-only and bypasses load, but never concurrent builds.
@@ -60,10 +60,11 @@ derived_data="$build_root/$configuration"
 mkdir -p "$derived_data"
 test_settings=()
 if [ "$configuration" = Release ]; then test_settings+=(ENABLE_TESTABILITY=YES); fi
-if [ ! -f "$derived_data/build-complete" ]; then
+build_marker="$derived_data/build-complete-PerformanceTests"
+if [ ! -f "$build_marker" ]; then
     make generate
     set +e
-    xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration "$configuration" \
+    xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration "$configuration" \
         -destination 'platform=macOS' -parallel-testing-enabled NO -derivedDataPath "$derived_data" \
         "${test_settings[@]}" build-for-testing > "$evidence_root/build.log" 2>&1
     build_result=$?
@@ -74,7 +75,7 @@ with open(sys.argv[1],'w') as stream:
     json.dump({'load':list(os.getloadavg()),'top_cpu':subprocess.check_output(['ps','-Ao','%cpu,comm','-r'],text=True).splitlines()[:6],'exit_code':int(sys.argv[2])},stream,indent=2)
 BUILD_END
     if [ "$build_result" != 0 ]; then exit "$build_result"; fi
-    touch "$derived_data/build-complete"
+    touch "$build_marker"
     # Compilation changes load: re-enter through the same quiet checks before measuring.
     if [ "$mode" != build ]; then
         options=(--locked)
@@ -100,7 +101,7 @@ if [ "$mode" = plain ]; then
 fi
 set +e
 TEST_RUNNER_PLAINSONG_EXPORT_E9_SMOKE="$smoke" TEST_RUNNER_PLAINSONG_RUN_EXPORT_E9=1 \
-    xcodebuild -project Plainsong.xcodeproj -scheme Plainsong -configuration "$configuration" \
+    xcodebuild -project Plainsong.xcodeproj -scheme PerformanceTests -configuration "$configuration" \
     -destination 'platform=macOS' -parallel-testing-enabled NO -derivedDataPath "$derived_data" \
     -resultBundlePath "$evidence_root/Results.xcresult" "${test_settings[@]}" test-without-building "${filters[@]}" \
     > "$evidence_root/run.log" 2>&1
