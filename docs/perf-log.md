@@ -1875,3 +1875,77 @@ export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedu
 export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
+
+
+## Current recorded-load paired result - 2026-10-04 (PR #136)
+
+**Complete: ten interleaved baseline/candidate pairs per mode. No regression signal
+detected under recorded load by the handoff rule.** This supersedes the preceding
+pending and exploratory two-pair entries; those remain historical diagnostics.
+Candidate `e438ac19c91388326280e39bcfafc104fa8bc58c`; common baseline
+`4cef0ccf44e422ad22ab34c4319a46c42e69b009`. #137 measures the full stacked head against this
+same baseline; it does not isolate Replace from the inherited scheduler change.
+
+Each batch has 30 native keystrokes in source-only and WYSIWYG with the production
+Find debounce; 300 samples per product/mode. No documented warm-up iteration exists,
+so none was removed from either product. Timed probe and fixture SHA-256 match all
+three products. Baseline retains its product HEAD and uses the reproducible test-only
+source/resource overlay installed by the helper. Only measurement plumbing, test
+instrumentation and test resource/scheme membership changed; product code is unchanged.
+
+Start load range `3.10-5.36`, end `3.10-12.59`.
+Every batch passed load <=6 and exact-name compiler exclusion **inside** the shared
+non-blocking lock. End loads can exceed the admission ceiling; all numbers are
+observed under recorded load, with top five CPU processes captured per batch.
+Owner confirmed other builds/tests paused, heavy-app shutdown, power and non-use.
+
+Pooled native typing observations (milliseconds; maxima include all iterations):
+
+| Mode | Baseline median / p95 / max | Candidate median / p95 / max | Fraction >16 ms A / B |
+|---|---|---|---|
+| source-only | 14.181 / 14.901 / 190.683 | 14.151 / 14.768 / 20.531 | 0.67% / 0.33% |
+| wysiwyg | 14.216 / 14.813 / 19.808 | 14.202 / 14.708 / 14.978 | 0.33% / 0.00% |
+
+Per-pair B-minus-A statistics; fixed seed 20261004, 10,000 bootstrap resamples of
+the median pair difference. Each pair's medians/p95 and all samples are in JSON:
+
+| Mode / pair statistic | Median difference ms | Bootstrap 95% CI ms | B worse |
+|---|---|---|---|
+| source-only median_ms | -0.059 | [-0.162, 3.298] | 4/10 |
+| source-only p95_ms | -0.104 | [-0.414, 0.007] | 2/10 |
+| wysiwyg median_ms | -0.023 | [-6.726, 6.733] | 4/10 |
+| wysiwyg p95_ms | 0.007 | [-0.163, 0.034] | 6/10 |
+
+A signal requires the CI entirely above +0.5 ms **and** B worse in >=8/10 pairs.
+Neither metric/mode satisfies both. This is detection under recorded load, not a
+claim of equivalence. CI widths bound sensitivity; the #136 WYSIWYG median CI is
+particularly wide (about 13.46 ms). The earlier two-pair +6.7 ms trend was not
+consistently reproduced across the complete run. Narrower p95 CIs mean not every
+comparison was inconclusive, so the optional CPU-time instrumentation was not added.
+The pooled #137 tails exceed 16 ms more often than baseline despite no median-pair
+signal; these observations remain visible and are not dismissed or called idle proof.
+No absolute 16 ms pass/fail is claimed. R9 / PR I, real IME, physical input and
+owner-only acceptance remain open. No performance budget changed or gate closed.
+
+Evidence: `docs/evidence/handoff22-pr136-20261004-paired-final.json`; complete batch metadata, raw logs,
+and admission checks: `docs/evidence/h22-paired-20261004/run5/`. xcresult bundles
+are retained at the printed paths in those JSONs. Named tests:
+`EditorFindHostedGateTests.testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget`
+and `testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget`. Both executed in every
+accepted batch. Only the existing 16 ms assertion failed in 3
+batches for this comparison; there were no functional failures or missing samples.
+Pinned lint, statistical boundary checks and `git diff --check` passed. This is not
+a full correctness-suite or current-head CI claim.
+
+Reproduce after fetching/merging main if needed and refreshing a clean baseline to
+the fix/main merge base; pause other builds/tests and leave the Mac on power:
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+export PLAINSONG_MAX_LOAD=6
+export PLAINSONG_PAIRS=10
+export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
+export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
+export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
+/usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
+```
