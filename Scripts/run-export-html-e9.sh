@@ -7,7 +7,11 @@ if [ "${1:-}" != "--locked" ]; then
     deadline=$((SECONDS + 300))
     while true; do
         set +e
-        lockf -k -t 0 "$lock_path" "$PWD/Scripts/run-export-html-e9.sh" --locked "$@"
+        lockf -k -t 0 "$lock_path" /bin/bash -c '
+            "$@"; child_result=$?
+            if [ "$child_result" = 1 ]; then exit 2; fi
+            exit "$child_result"
+        ' e9-child "$PWD/Scripts/run-export-html-e9.sh" --locked "$@"
         result=$?
         set -e
         case "$result" in
@@ -58,8 +62,9 @@ product_sha="$(git rev-parse HEAD)"
 build_root="${PLAINSONG_E9_BUILD_ROOT:-/private/tmp/plainsong-e9-build-$product_sha}"
 derived_data="$build_root/$configuration"
 mkdir -p "$derived_data"
-test_settings=()
-if [ "$configuration" = Release ]; then test_settings+=(ENABLE_TESTABILITY=YES); fi
+# macOS Bash 3.2 treats an empty array as unset under set -u.
+# Debug already enables testability; making it explicit preserves its behavior.
+test_settings=(ENABLE_TESTABILITY=YES)
 build_marker="$derived_data/build-complete-PerformanceTests"
 if [ ! -f "$build_marker" ]; then
     make generate
