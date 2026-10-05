@@ -51,8 +51,8 @@ public enum EditorReplaceBatchRefusal: Equatable, Sendable, Error {
 /// Plain values for PR H's result presentation. No-op batches retain the exact
 /// session, selection, ordinal, revision, and undo history.
 public enum EditorReplaceBatchOutcome: Equatable, Sendable {
-    case noChanges(MarkdownCore.EditorReplaceBatchPlan)
-    case replaced(MarkdownCore.EditorReplaceBatchPlan)
+    case noChanges(EditorReplaceBatchPlan)
+    case replaced(EditorReplaceBatchPlan)
     case unverifiedWrite
     case refused(EditorReplaceBatchRefusal)
 }

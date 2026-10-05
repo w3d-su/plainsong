@@ -5,11 +5,19 @@ import MarkdownCore
 final class EditorReplaceBatchCancellation: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
+    private var explicitCancel = false
 
-    func cancel() {
+    func cancel(explicit: Bool = false) {
         lock.lock()
+        explicitCancel = explicitCancel || explicit
         cancelled = true
         lock.unlock()
+    }
+
+    var wasExplicitlyCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return explicitCancel
     }
 
     var isCancelled: Bool {
@@ -36,6 +44,11 @@ final class EditorReplaceBatchRuntime {
     var preparationMilliseconds = 0.0
     var commitMilliseconds = 0.0
     var lastResult: EditorReplaceBatchCommandResult?
+
+    func cancel() {
+        cancellation?.cancel(explicit: true)
+        supersede()
+    }
 
     func setReplacement(_ value: String) -> Bool {
         guard !ExactSourceText.matches(replacement, value) else { return false }

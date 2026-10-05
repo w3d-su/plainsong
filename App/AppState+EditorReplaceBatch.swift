@@ -31,7 +31,7 @@ extension AppState {
     }
 
     func cancelEditorReplaceAll() {
-        editorFindHost.replaceBatch.supersede()
+        editorFindHost.replaceBatch.cancel()
         advanceEditorReplaceAuthorityGeneration()
     }
 
@@ -63,7 +63,10 @@ extension AppState {
         guard plan.request.sourceRevision == editorFindHost.controller.documentBinding.revision,
               plan.request.sourceRevision == UInt64(max(0, currentDocument.version)),
               plan.request.documentIdentity == activeEditorDocumentIdentity
-        else { return .superseded }
+        else {
+            refreshEditorFindCounterFromAppSource()
+            return .superseded
+        }
 
         let state = editorFindHost.replaceBatch
         let previousTask = state.preparationTask
@@ -123,8 +126,21 @@ extension AppState {
         if state.preparationActionID == capture.actionID {
             state.preparationMilliseconds = elapsedMilliseconds(since: began)
         }
+        let result = finishEditorReplaceBatchPreparation(prepared, capture: capture, token: token)
+        state.finish(action: capture.actionID, result: result)
+        return result
+    }
+
+    private func finishEditorReplaceBatchPreparation(
+        _ prepared: Result<EditorReplacePreparedBatch, EditorReplaceBatchPreparationFailure>,
+        capture: EditorReplaceBatchCapture,
+        token: EditorReplaceBatchCancellation
+    ) -> EditorReplaceBatchCommandResult {
+        let state = editorFindHost.replaceBatch
         let result: EditorReplaceBatchCommandResult
-        if Task.isCancelled {
+        if token.wasExplicitlyCancelled {
+            result = .cancelled
+        } else if Task.isCancelled {
             // Caller cancellation supersedes via the same App generation after drain.
             if state.actionID == capture.actionID {
                 cancelEditorReplaceAll()
@@ -139,7 +155,6 @@ extension AppState {
             case let .success(batch): result = commitEditorReplaceBatch(batch, capture: capture)
             }
         }
-        state.finish(action: capture.actionID, result: result)
         return result
     }
 
@@ -197,8 +212,16 @@ extension AppState {
         }
         state.commitMilliseconds = elapsedMilliseconds(since: began)
         switch delivery {
+        case .notDelivered(.staleEditorStamp): return .superseded
         case let .notDelivered(reason): return .notDelivered(reason)
         case .delivered(.refused(.unauthorized)): return .refused(record.refusal ?? .authoritySuperseded)
+        case .delivered(.refused(.markedText)): return .markedText
+        case .delivered(.refused(.superseded)): return .superseded
+        case let .delivered(.refused(.invalidPlan(reason))): return .invalidPlan(reason)
+        case .delivered(.refused(.staleIdentity)), .delivered(.refused(.staleRevision)),
+             .delivered(.refused(.staleQueryGeneration)), .delivered(.refused(.staleSession)):
+            refreshEditorFindCounterFromAppSource()
+            return .superseded
         case let .delivered(outcome):
             switch outcome {
             case .refused(.writerPreflightFailed), .refused(.writeNotApplied), .unverifiedWrite:

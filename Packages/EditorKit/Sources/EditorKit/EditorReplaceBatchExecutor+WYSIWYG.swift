@@ -6,11 +6,11 @@ extension MarkdownTextViewCoordinator {
     /// Attribute-only suspension once for the whole batch. The raw TextKit source
     /// stays authoritative; no projected U+FFFC/U+200B text enters the replacement.
     /// Its one publication requests the normal post-write presentation reparse.
-    func suspendBatchReplacePresentation(in textView: STTextView) {
+    func suspendBatchReplacePresentation(in textView: STTextView) -> Bool {
         guard let view = textView as? MarkdownSTTextView,
               view.wysiwygZeroWidthContentStorageDelegate != nil,
               let storage = MarkdownTextView.textStorage(of: view)
-        else { return }
+        else { return false }
         let manager = view.undoManager
         let restoresRegistration = manager?.isUndoRegistrationEnabled == true
         if restoresRegistration {
@@ -29,5 +29,17 @@ extension MarkdownTextViewCoordinator {
             view.textLayoutManager.invalidateLayout(for: textRange)
         }
         view.needsDisplay = true
+        return true
+    }
+
+    func restoreFailedBatchPresentation(in textView: STTextView, previousResetRevision: Int?) {
+        // #144 may already have reset/restarted through applyReconciledSource.
+        guard minimumHighlightRevisionAfterReconciliation == previousResetRevision,
+              let view = textView as? MarkdownSTTextView
+        else { return }
+        lastAppliedHighlightFoldPlan = nil
+        view.replacePresentationSnapshot = nil
+        imageThumbnailPresentationController.presentationWasReset(in: view)
+        minimumHighlightRevisionAfterReconciliation = reconciledSourcePresentationInvalidationHandler?()
     }
 }

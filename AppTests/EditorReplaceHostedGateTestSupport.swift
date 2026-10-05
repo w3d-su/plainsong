@@ -68,6 +68,9 @@ struct EditorReplaceEffectSnapshot: Equatable {
     let navigation: EditorNavigationCommand?
     let pendingNavigation: EditorNavigationRequest?
     let recovery: EditorReplaceRecoveryAuthority
+    let foldedRanges: [NSRange]
+    let imageMarkerRanges: [NSRange]
+    let imageMarkerSignatures: [WYSIWYGImagePresentationMarker.Signature]
 
     @MainActor
     init(_ appState: AppState, textView: MarkdownSTTextView?) {
@@ -85,6 +88,27 @@ struct EditorReplaceEffectSnapshot: Equatable {
         pendingNavigation = (textView?.textDelegate as? MarkdownTextViewCoordinator)?
             .navigationState.pendingRequest
         recovery = EditorReplaceRecoveryAuthority(appState)
+        var folds: [NSRange] = []
+        var images: [NSRange] = []
+        var signatures: [WYSIWYGImagePresentationMarker.Signature] = []
+        if let storage = textView.flatMap({ MarkdownTextView.textStorage(of: $0) }) {
+            let full = NSRange(location: 0, length: storage.length)
+            storage
+                .enumerateAttribute(WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
+                                    in: full)
+                { value, range, _ in
+                    if value != nil { folds.append(range) }
+                }
+            storage.enumerateAttribute(WYSIWYGImagePresentationMarker.attribute, in: full) { value, range, _ in
+                if let marker = value as? WYSIWYGImagePresentationMarker {
+                    images.append(range)
+                    signatures.append(marker.signature)
+                }
+            }
+        }
+        foldedRanges = folds
+        imageMarkerRanges = images
+        imageMarkerSignatures = signatures
     }
 }
 

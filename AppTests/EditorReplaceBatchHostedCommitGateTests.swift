@@ -61,7 +61,7 @@ extension EditorFindHostedGateTests {
             app.editorFindHost.replaceMarkedTextOwners.hasMarkedTextForTesting = nil
         }
         let result = await app.performEditorReplaceAll(replacement: "NEW")
-        XCTAssertEqual(result, .delivered(.refused(.markedText)))
+        XCTAssertEqual(result, .markedText)
         XCTAssertEqual(EditorReplaceEffectSnapshot(app, textView: editor), before)
         XCTAssertEqual(app.editorWriterInstallations, writers)
     }
@@ -151,6 +151,14 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(stale, .superseded)
         try assertHostedBatchDidNotWrite(hosted, since: beforeStale)
         XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing)
+        try await waitUntil("stale refusal requests a counter-only recount") {
+            controller.documentBinding.revision == UInt64(app.currentDocument.version)
+                && controller.session != nil
+        }
+        if case .navigate? = app.editorNavigationCommand {
+            XCTFail("counter-only recount must invalidate old navigation without issuing a new selection")
+        }
+        XCTAssertEqual(editor.selectedRange(), beforeStale.selection)
     }
 
     func testHostedReplaceAllPreparationIsOffMainAndProgressIsBoundedMonotonic() async throws {
@@ -175,10 +183,13 @@ extension EditorFindHostedGateTests {
         let (hold, task) = try await startHeldHostedBatch(hosted, atCheckpoint: { $0.plannedMatchCount == 64 })
         defer { hold.release() }
         let before = try EditorReplaceEffectSnapshot(hosted.appState, textView: hostedEditor(hosted))
+        let worker = try XCTUnwrap(hosted.appState.editorFindHost.replaceBatch.preparationTask)
         task.cancel()
         hold.release()
         let result = await task.value
+        let workerResult = await worker.value
         XCTAssertEqual(result, .cancelled)
+        XCTAssertEqual(workerResult, .failure(.cancelled))
         try assertHostedBatchDidNotWrite(hosted, since: before)
     }
 
@@ -189,10 +200,13 @@ extension EditorFindHostedGateTests {
         let (hold, task) = try await startHeldHostedBatch(hosted, atCheckpoint: { $0.copiedUTF16Count == 65536 })
         defer { hold.release() }
         let before = try EditorReplaceEffectSnapshot(hosted.appState, textView: hostedEditor(hosted))
+        let worker = try XCTUnwrap(hosted.appState.editorFindHost.replaceBatch.preparationTask)
         task.cancel()
         hold.release()
         let result = await task.value
+        let workerResult = await worker.value
         XCTAssertEqual(result, .cancelled)
+        XCTAssertEqual(workerResult, .failure(.cancelled))
         try assertHostedBatchDidNotWrite(hosted, since: before)
     }
 }

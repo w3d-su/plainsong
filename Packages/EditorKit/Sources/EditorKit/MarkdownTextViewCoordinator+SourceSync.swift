@@ -11,6 +11,11 @@ extension MarkdownTextViewCoordinator {
         }
     }
 
+    /// Do not apply a captured styled value after a presentation reset.
+    func canApplyHighlightRevision(_ revision: Int) -> Bool {
+        minimumHighlightRevisionAfterReconciliation.map { revision >= $0 } ?? true
+    }
+
     func applyReconciledSource(
         _ source: String,
         replacing _: String,

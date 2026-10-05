@@ -100,6 +100,23 @@ extension EditorFindHostedGateTests {
         }
     }
 
+    func testHostedReplaceAllRepeatedWorkspaceSearchFocusAfterFindFocusSupersededDropsPlan() async throws {
+        let hosted = try await makeHostedBatchWorkspace()
+        let app = hosted.appState
+        app.editorFindHost.commandContextOverride = nil
+        app.supersedePendingEditorFindFocus()
+        let (hold, task) = try await startHeldHostedBatch(hosted)
+        defer { hold.release() }
+        let before = try EditorReplaceEffectSnapshot(app, textView: hostedEditor(hosted))
+        let generation = app.editorReplaceAuthorityGeneration
+        app.focusWorkspaceSearch()
+        XCTAssertGreaterThan(app.editorReplaceAuthorityGeneration, generation)
+        hold.release()
+        let result = await task.value
+        XCTAssertEqual(result, .superseded)
+        try assertHostedBatchDidNotWrite(hosted, since: before)
+    }
+
     func testHostedReplaceAllWorkspaceSearchActivationWhilePreparingDropsPlanWithoutUndo() async throws {
         try await assertHeldHostedBatchSupersession { hosted in
             hosted.appState.notifyEditorFindWorkspaceSearchWillNavigate(to: NSRange(location: 4, length: 3))
@@ -122,17 +139,22 @@ extension EditorFindHostedGateTests {
     }
 
     func testHostedReplaceAllCancelWhilePreparingLeavesExactSourceSelectionOrdinalAndUndo() async throws {
-        let hosted = try await makeHostedBatchWorkspace(layoutMode: .wysiwyg)
+        let source = "**hit** ![image](fixture.png) hit **untouched**"
+        let hosted = try await makeHostedBatchWorkspace(source: source, layoutMode: .wysiwyg)
         let editor = try hostedEditor(hosted)
+        editor.textSelection = NSRange(location: source.utf16.count, length: 0)
+        try await waitForHostedBatchPresentationQuiescence(hosted)
         let (hold, task) = try await startHeldHostedBatch(hosted)
         defer { hold.release() }
         let before = EditorReplaceEffectSnapshot(hosted.appState, textView: editor)
+        XCTAssertFalse(before.foldedRanges.isEmpty)
+        XCTAssertFalse(before.imageMarkerRanges.isEmpty)
         hosted.appState.cancelEditorReplaceAll()
         let began = Date()
         hold.release()
         let result = await task.value
         print("Replace All informational Cancel-to-drain: \(Date().timeIntervalSince(began) * 1000) ms")
-        XCTAssertEqual(result, .superseded)
+        XCTAssertEqual(result, .cancelled)
         XCTAssertEqual(EditorReplaceEffectSnapshot(hosted.appState, textView: editor), before)
         XCTAssertFalse(hosted.appState.editorFindHost.replaceBatch.isPreparing)
     }

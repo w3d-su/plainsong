@@ -254,6 +254,9 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     var isUpdating = false
     var isUserEditing = false
+    var reconciledSourcePresentationInvalidationHandler: (() -> Int)?
+    var minimumHighlightRevisionAfterReconciliation: Int?
+
     var lastAppliedHighlightRevision: Int?
     /// Last successfully applied fold plan, retained in O(1) for hosted final-revision checks.
     var lastAppliedHighlightFoldPlan: WYSIWYGFoldPlan?

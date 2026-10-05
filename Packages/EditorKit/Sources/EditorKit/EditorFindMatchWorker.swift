@@ -14,7 +14,7 @@ final class EditorFindMatchWorker {
     /// Off-main continuation work shares Find's existing worker and generation fence.
     enum Replacement: Sendable {
         case one(EditorReplaceOneMatchPlan)
-        case batch(MarkdownCore.EditorReplaceBatchPlan, TextSearchMatch?, Int, Int)
+        case batch(EditorReplaceBatchPlan, TextSearchMatch?, Int, Int)
 
         var resumeUTF16: Int {
             switch self {

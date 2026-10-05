@@ -55,34 +55,47 @@ final class HostedBatchPresentationObservation {
     private var observer: NSObjectProtocol?
     private(set) var suspensions = 0
     private(set) var reapplications = 0
+    private var foldedRanges: [NSRange] = []
+    private(set) var lastFoldTransaction = Date()
 
-    init(editor: MarkdownSTTextView, original: String, expected: String) throws {
+    init(editor: MarkdownSTTextView, original: String, expected: String, attempted: String? = nil) throws {
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
+        foldedRanges = Self.foldRanges(in: storage)
         observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification, object: storage, queue: nil
         ) { [weak self, weak storage] _ in
             MainActor.assumeIsolated {
                 guard let observation = self, let storage else { return }
                 XCTAssertTrue(ExactSourceText.matches(storage.string, original)
-                    || ExactSourceText.matches(storage.string, expected), "backing text stays canonical throughout")
+                    || ExactSourceText.matches(storage.string, expected)
+                    || (attempted.map { ExactSourceText.matches(storage.string, $0) } ?? false),
+                    "backing text stays canonical throughout")
+                let previous = observation.foldedRanges
+                let current = Self.foldRanges(in: storage)
+                observation.foldedRanges = current
                 guard storage.editedMask == .editedAttributes,
-                      storage.editedRange == NSRange(location: 0, length: storage.length)
+                      (previous + current).contains(where: {
+                          NSIntersectionRange($0, storage.editedRange).length > 0
+                      })
                 else { return }
-                var hasFold = false
-                storage.enumerateAttribute(WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
-                                           in: NSRange(location: 0, length: storage.length))
-                { value, _, _ in
-                    if value != nil {
-                        hasFold = true
-                    }
-                }
-                if ExactSourceText.matches(storage.string, original), !hasFold {
+                observation.lastFoldTransaction = Date()
+                if !previous.isEmpty, current.isEmpty {
                     observation.suspensions += 1
-                } else if ExactSourceText.matches(storage.string, expected), hasFold {
+                } else if ExactSourceText.matches(storage.string, expected), !current.isEmpty {
                     observation.reapplications += 1
                 }
             }
         }
+    }
+
+    private static func foldRanges(in storage: NSTextStorage) -> [NSRange] {
+        var ranges: [NSRange] = []
+        storage.enumerateAttribute(WYSIWYGInlineFoldPresentation.foldedDelimiterAttribute,
+                                   in: NSRange(location: 0, length: storage.length))
+        { value, range, _ in
+            if value != nil { ranges.append(range) }
+        }
+        return ranges
     }
 
     func stop() {
@@ -112,6 +125,26 @@ extension EditorFindHostedGateTests {
         // subsequent filesystem notifications so only the tested event can supersede.
         hosted.appState.workspaceWatcher?.stop()
         return hosted
+    }
+
+    func waitForHostedBatchPresentationQuiescence(
+        _ hosted: HostedReplaceWorkspace,
+        observation: HostedBatchPresentationObservation? = nil
+    ) async throws {
+        let editor = try hostedEditor(hosted)
+        var previous: EditorReplaceEffectSnapshot?
+        var stableSince = Date()
+        try await waitUntil("batch folds and image markers settle", timeout: 10) {
+            let current = EditorReplaceEffectSnapshot(hosted.appState, textView: editor)
+            if previous != current {
+                previous = current
+                stableSince = Date()
+            }
+            return editor.replacePresentationSnapshot?.sourceRevision == hosted.appState.currentDocument.version
+                && !current.foldedRanges.isEmpty && !current.imageMarkerRanges.isEmpty
+                && Date().timeIntervalSince(stableSince) >= 0.25
+                && (observation.map { Date().timeIntervalSince($0.lastFoldTransaction) >= 0.25 } ?? true)
+        }
     }
 
     func startHeldHostedBatch(

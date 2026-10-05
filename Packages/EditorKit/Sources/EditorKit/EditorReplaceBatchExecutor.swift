@@ -40,11 +40,19 @@ extension MarkdownTextViewCoordinator {
         else { return .refused(.invalidPlan(.noCurrentMatch)) }
         let preWriteCaret = textView.selectedRange().location
         var preWriteRevision: Int?
+        var suspendedPresentation = false
+        var replaced = false
+        let previousResetRevision = minimumHighlightRevisionAfterReconciliation
+        defer {
+            if suspendedPresentation, !replaced {
+                restoreFailedBatchPresentation(in: textView, previousResetRevision: previousResetRevision)
+            }
+        }
         let opened = performPreflightedTextMutation(in: textView) {
             guard let revision = currentInstalledSourceSnapshot?.revision else { return }
             preWriteRevision = revision
             controller.armReplacementPublication()
-            suspendBatchReplacePresentation(in: textView)
+            suspendedPresentation = suspendBatchReplacePresentation(in: textView)
             insertAuthorizedBatch(
                 slice,
                 enclosing: enclosing,
@@ -73,6 +81,7 @@ extension MarkdownTextViewCoordinator {
                 preWriteCaretUTF16: preWriteCaret,
                 mappedAnchorUTF16: prepared.postSelection.location
             )
+            replaced = admitted
             return admitted ? .replaced(prepared.plan) : .unverifiedWrite
         }
         controller.abandonReplacementPublication()

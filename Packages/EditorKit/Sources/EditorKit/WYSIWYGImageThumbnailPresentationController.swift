@@ -133,6 +133,14 @@ final class WYSIWYGImagePresentationController {
         beginNewSource(source, in: textView)
     }
 
+    /// Reset cached marker ownership even when the authoritative source is unchanged.
+    func presentationWasReset(in textView: MarkdownSTTextView) {
+        guard configuration != nil,
+              let source = MarkdownTextView.textStorage(of: textView)?.string
+        else { return }
+        beginNewSource(source, in: textView)
+    }
+
     func detach(from textView: MarkdownSTTextView) {
         if hasPresentationState {
             teardown(in: textView, removeAllMarkers: true)

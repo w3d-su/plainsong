@@ -47,7 +47,7 @@ enum EditorReplaceBatchSpike {
         ranges: [NSRange],
         replacement: String,
         mechanism: EditorReplaceBatchMechanism
-    ) -> EditorReplaceBatchPlan? {
+    ) -> EditorReplaceBatchSpikePlan? {
         guard !ranges.isEmpty,
               let enclosing = EditorReplaceSourceConstruction.enclosingRange(of: ranges),
               let slice = EditorReplaceSourceConstruction.replacedSlice(
@@ -78,7 +78,7 @@ enum EditorReplaceBatchSpike {
     }
 }
 
-enum EditorReplaceBatchPlan: Equatable {
+enum EditorReplaceBatchSpikePlan: Equatable {
     case reverseOrderedNativeEdits
     case minimalEnclosingRange(range: NSRange, text: String)
     case fullDocument(text: String)
@@ -128,7 +128,7 @@ extension MarkdownTextViewCoordinator {
     }
 
     private func applyPreparedReplaceBatch(
-        _ plan: EditorReplaceBatchPlan,
+        _ plan: EditorReplaceBatchSpikePlan,
         request: EditorReplaceBatchRequest,
         sourceLength: Int,
         in textView: STTextView

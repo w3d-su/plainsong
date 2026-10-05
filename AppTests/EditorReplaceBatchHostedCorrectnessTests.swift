@@ -38,11 +38,13 @@ extension EditorFindHostedGateTests {
             return model?.regions.contains(where: { !$0.isRevealed }) == true
                 && model?.imageRegions.isEmpty == false
         }
+        try await waitForHostedBatchPresentationQuiescence(hosted)
         // Replace All intentionally accepts the exact retained set without selecting
         // or revealing each match. The final caret follows the current-match boundary.
         let passes = try HostedBatchPresentationObservation(editor: editor, original: source, expected: expected)
         defer { passes.stop() }
         try await assertHostedBatchCommit(hosted, replacement: "NEW", expected: expected, caret: 5) {
+            try await self.waitForHostedBatchPresentationQuiescence(hosted, observation: passes)
             XCTAssertEqual(passes.suspensions, 1, "one full batch attribute suspension")
             XCTAssertEqual(passes.reapplications, 1, "one authoritative post-write fold pass")
         }
@@ -182,7 +184,7 @@ extension EditorFindHostedGateTests {
         expected: String,
         caret: Int,
         timeout: TimeInterval = 10,
-        beforeUndo: () throws -> Void = {}
+        beforeUndo: () async throws -> Void = {}
     ) async throws {
         let app = hosted.appState
         let editor = try hostedEditor(hosted)
@@ -223,7 +225,7 @@ extension EditorFindHostedGateTests {
         print(
             "Replace All informational timing: preparation=\(state.preparationMilliseconds) ms commit=\(state.commitMilliseconds) ms rescan-drain=\(rescanMilliseconds) ms presentation-drain=\(presentationMilliseconds) ms"
         )
-        try beforeUndo()
+        try await beforeUndo()
         editor.undoManager?.undo()
         XCTAssertEqual(app.currentDocument.text, source)
         XCTAssertEqual(editor.selectedRange(), selection)

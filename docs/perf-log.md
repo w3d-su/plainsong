@@ -2257,3 +2257,22 @@ handlers and highlight apply are unchanged. Detached plan/progress tasks start
 only in explicit `performEditorReplaceAll`; its temporary selection observer is
 removed before commit. Query marked-text owners register on mount/unmount only.
 This is structural typing-path evidence; it does not replace PR I's measurements.
+
+## Replace All PR G review-fix verification — 2026-10-05
+
+The review-fix run is correctness evidence only. MarkdownCore 320 tests, EditorKit
+428 tests (seven opt-in skips), and serial hosted Find/Replace/R0 plus nine WYSIWYG
+policies 163 tests (three opt-in skips) pass with zero failures. Preparation remains
+off-main and no new preparation/progress/reset work runs per keystroke. The shared
+highlight floor is an O(1) apply check; failed explicit batches request a new parse.
+
+Recorded load at verification start: `11:58  up 22:25, 2 users, load averages: 6.09 5.54 5.02`.
+Per-case preparation, native commit, rescan/presentation drain and Cancel-to-drain
+values are retained verbatim in the [review-fix evidence](evidence/editor-replace-g-review-fixes-20261005.json).
+The WYSIWYG presentation counts now include partial-range transactions and wait for
+quiescence; rejected publication automatically restores folds/images exactly once.
+The 8,921-match large fixture still uses a 256-unit replacement, exact source, one
+publication and one undo. These loaded timings do not close R9 or any absolute
+latency budget; R6 real IME and R8/R10 also remain open. Earlier failed test-development
+runs are retained separately in that evidence, with their corrected assertions and
+injection conditions.
