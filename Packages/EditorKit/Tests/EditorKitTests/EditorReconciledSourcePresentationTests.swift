@@ -2,6 +2,7 @@ import AppKit
 @testable import EditorKit
 import MarkdownCore
 import STTextView
+import SwiftUI
 import XCTest
 
 @MainActor
@@ -56,6 +57,9 @@ final class EditorReconciledSourcePresentationTests: XCTestCase {
         XCTAssertEqual(fixture.model.publications, [])
     }
 
+    /// Reconciliation completes before this composition begins; only the pending
+    /// presentation apply is blocked here. During marked text, publication defers
+    /// upstream, writer activation is skipped, and App's pending-source fence applies.
     func testPendingReconciliationPresentationSkipsMarkedTextWithoutCorruptingComposition() async throws {
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
             source: source + "\nStale suffix",
@@ -179,6 +183,43 @@ final class EditorReconciledSourcePresentationTests: XCTestCase {
         XCTAssertTrue(fixture.textView.undoManager?.canUndo == true)
     }
 
+    func testWriterActivationClampPublishesCaretBeforeWYSIWYGReparseAcrossHeadingBoundary() async throws {
+        for rejected in [false, true] {
+            let restored = "Intro\n## Heading"
+            let stale = restored + " stale suffix"
+            let staleSelection = NSRange(location: (stale as NSString).length - 1, length: 0)
+            var boundSelection: NSRange? = staleSelection
+            let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
+                source: stale, selection: staleSelection, enableWYSIWYG: true,
+                selectionBinding: Binding(get: { boundSelection }, set: { boundSelection = $0 })
+            )
+            let driver = EditorReconciledPresentationTestDriver(
+                fixture: fixture, selectionProvider: { boundSelection }
+            )
+            defer { driver.stop() }
+            let initial = driver.installInitialPresentation()
+            XCTAssertTrue(try XCTUnwrap(initial.foldPlan?.regions.first { $0.kind == .heading(level: 2) }).isRevealed)
+            fixture.model.source = restored
+            fixture.model.revision = 1
+            fixture.model.rejectsWriterActivations = rejected
+
+            XCTAssertFalse(fixture.coordinator.preflightTextMutation(in: fixture.textView))
+
+            let clamped = NSRange(location: (restored as NSString).length, length: 0)
+            XCTAssertEqual(boundSelection, clamped)
+            XCTAssertEqual(driver.selectionAtRequest, clamped, "The scheduler must see the published clamp")
+            XCTAssertEqual(driver.requestCount, 1)
+            try await driver.releaseAndWaitForApply()
+            try await EditorReconciledPresentationTestDriver.assertMatchesFreshParse(
+                in: fixture, presentation: driver.presentation, includesImage: false
+            )
+            let plan = try XCTUnwrap(fixture.coordinator.lastAppliedHighlightFoldPlan)
+            XCTAssertFalse(try XCTUnwrap(plan.regions.first { $0.kind == .heading(level: 2) }).isRevealed)
+            XCTAssertFalse(plan.foldedRanges.isEmpty)
+            XCTAssertEqual(fixture.model.publications, [])
+        }
+    }
+
     private func assertWriterActivationRestore(rejected: Bool) async throws {
         let stale = source + "\nStale suffix"
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
@@ -222,6 +263,13 @@ final class EditorReconciledSourcePresentationTests: XCTestCase {
         defer { driver.stop() }
         EditorReconciledPresentationTestDriver.configureImages(in: fixture)
         driver.installInitialPresentation()
+        // Reconcile only after the first image plan has settled, so changing no
+        // source length cannot accidentally stand in for presentationWasReset.
+        _ = try await WYSIWYGImageThumbnailGateSupport.waitForMarker(
+            in: fixture.textView,
+            range: (source as NSString).range(of: "![alt](fixture.png)"),
+            matching: { $0.visualState == .failed }
+        )
         let native = source + "\nUnpublished suffix"
         fixture.coordinator.isUpdating = true
         fixture.textView.text = native

@@ -95,7 +95,8 @@ enum EditorReplaceBatchSpikeSupport {
         source: String,
         selection: NSRange = NSRange(location: 0, length: 0),
         enableWYSIWYG: Bool = false,
-        makeWindow: ((NSRect) -> NSWindow)? = nil
+        makeWindow: ((NSRect) -> NSWindow)? = nil,
+        selectionBinding: Binding<NSRange?>? = nil
     ) throws -> Fixture {
         let model = Model(source: source)
         let contract = model.makeContract()
@@ -118,7 +119,7 @@ enum EditorReplaceBatchSpikeSupport {
         let representable = MarkdownTextView(
             text: textBinding,
             styledText: nil,
-            selection: .constant(selection),
+            selection: selectionBinding ?? .constant(selection),
             showsLineNumbers: false,
             documentIdentity: EditorDocumentIdentity(rawValue: "replace-r0"),
             documentBindingID: model.bindingID,

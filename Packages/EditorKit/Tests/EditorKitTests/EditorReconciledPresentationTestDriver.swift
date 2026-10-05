@@ -12,6 +12,8 @@ final class EditorReconciledPresentationTestDriver {
     let presentation: MarkdownEditorDevelopmentPresentation
     private let debounce = ReconciledPresentationDebounce()
     private let service = MarkdownHighlightService()
+    private let selectionProvider: () -> NSRange?
+    private(set) var selectionAtRequest: NSRange?
     private lazy var scheduler = EditorHighlightScheduler { [debounce] in
         await debounce.wait()
     }
@@ -23,10 +25,12 @@ final class EditorReconciledPresentationTestDriver {
 
     init(
         fixture: EditorReplaceBatchSpikeSupport.Fixture,
-        presentation: MarkdownEditorDevelopmentPresentation = .inlineFoldRevealWithLinkFolding
+        presentation: MarkdownEditorDevelopmentPresentation = .inlineFoldRevealWithLinkFolding,
+        selectionProvider: (() -> NSRange?)? = nil
     ) {
         self.fixture = fixture
         self.presentation = presentation
+        self.selectionProvider = selectionProvider ?? { fixture.textView.selectedRange() }
         fixture.coordinator.reconciledSourcePresentationInvalidationHandler = { [weak self] in
             guard let self else { return 0 }
             return restart()
@@ -170,11 +174,12 @@ final class EditorReconciledPresentationTestDriver {
 
     private func restart() -> Int {
         requestCount += 1
+        selectionAtRequest = selectionProvider()
         revision += 1
         scheduler.restart(revision: revision) { [weak self] revision in
             guard let self else { return }
             let source = fixture.model.source
-            let selection = fixture.textView.selectedRange()
+            let selection = selectionProvider()
             let result = await service.highlight(
                 source,
                 fileKind: .markdown,

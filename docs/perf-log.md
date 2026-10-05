@@ -2267,6 +2267,35 @@ package suites and required hosted slices, not a claim that all `make test` targ
 ran. Real keyboard/IME acceptance and absolute R9/§12 typing acceptance remain owner
 gates.
 
+### Handoff 21a review fixes
+
+The publication tests now wait for the initial failed thumbnail marker to settle
+before reconciliation. Omitting only `presentationWasReset` makes both accepted
+and rejected publication cases time out on the restored marker. Both hosted
+refusal tests assert Find markers across the current match before and after the
+restore; omitting all three Find-cache resets fails both tests at that assertion.
+These mutations were temporary and restored before the final positive runs.
+
+Writer-activation synchronization and rejection now publish a changed clamped
+selection before requesting presentation. The new heading-boundary test supplies
+the selection binding used by parsing and proves the callback sees that clamp;
+omitting publication fails both writer paths. Six lifecycle tests prove dismantle
+clears the handler, marked-text transitions retain the installed document's
+handler until completion, a superseded destination never installs its handler,
+and a callback inside a representable update runs after selection publication.
+Deferred requests coalesce and are cancelled by dismantle or a completed document
+transition; every highlight result stays blocked until the deferred request runs.
+
+Final review-fix verification: full EditorKit **433 tests, seven real-IME opt-in
+skips, zero failures**; full MarkdownCore **303 tests, zero failures**; all hosted
+`EditorFind*`/`EditorReplace*` classes and nine WYSIWYG policy tests **127 tests,
+two typing opt-in skips, zero failures**. Highlight-scheduler stress applied all
+**60 edits, zero drops**. `make build`, pinned SwiftFormat **0.62.1** `make lint`
+(zero serious violations), and `git diff --check` passed. Hosted/build validation
+held the shared xcodebuild lock. This is the required suite scope, not a full
+`make test` claim. No new typing measurement or additional gate closure is claimed;
+Keep Mine and the second-merge rejected Replace All hosted test remain follow-ups.
+
 ### Paired typing comparison under recorded load
 
 Compared clean merge-base `91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75` with the
@@ -2305,6 +2334,22 @@ metric met the rule requiring the entire CI above +0.5 ms and candidate worse in
 at least 8/10 pairs. CI widths are 1.368/1.437 ms for source-only median/p95 and
 6.733/1.605 ms for WYSIWYG. The wide WYSIWYG median CI limits sensitivity; smaller
 effects cannot be excluded, and these observations do not establish a speedup.
+
+The AB order always ran baseline first. Baseline exceeds 16 ms in 12%/11.67%
+of samples versus candidate 0%/1%; a hook that only adds work cannot explain that
+apparent gain. A systematic order or environment effect of roughly 1–3 ms could
+hide a regression of similar size. Samples are bimodal, clustering around 0.7 ms
+and 14–17 ms; the roughly −6.7 ms WYSIWYG median differences reflect switches
+between those modes, limiting interpretation of the median and its CI. Future
+comparisons should use counterbalanced ABBA ordering. These historical samples
+retain their original order.
+
+The stronger typing-path evidence is static: ordinary accepted input cannot reach
+the hook (`testOrdinaryNativeEditDoesNotRequestReconciliationPresentation`).
+Per-update work remains one closure allocation and O(1) revision/installation
+comparisons. Selection publication and deferred callback scheduling happen only
+on reconciliation.
+
 Five batches returned exit 65 solely for the probe's existing 16 ms assertion
 (baseline 1/2/4/7, candidate 1); all 20 batches had both complete 30-sample series,
 with no functional failures. The over-budget fractions remain observations under
@@ -2313,10 +2358,13 @@ load. Absolute §12/R9 typing acceptance and real keyboard/IME acceptance stay o
 Evidence: `docs/evidence/handoff21-reconciled-presentation-20261005-paired.json`
 contains every raw sample, per-pair difference, admission snapshot and exact product
 SHA. Raw logs, source manifests and xcresults remain at its printed paths under
-`/private/tmp/plainsong-h21-typing-evidence/`. The unchanged runner is saved as
-`docs/evidence/reconciled-source-presentation-paired.py` (SHA-256
-`8c95985b66c2429212d127bf1a8ed48add8b1e417eab27e9efeff03a3ee9817e`). Statistics
-were independently recomputed, and all 1,200 samples matched their raw logs.
+`/private/tmp/plainsong-h21-typing-evidence/`. The runner used for these measurements
+was saved at `31ff976` as
+`docs/evidence/reconciled-source-presentation-paired.py` (historical SHA-256
+`8c95985b66c2429212d127bf1a8ed48add8b1e417eab27e9efeff03a3ee9817e`). The current
+runner requires explicit baseline/candidate roots; its measurement logic is
+unchanged. Statistics were independently recomputed, and all 1,200 samples matched
+their raw logs.
 
 To reproduce, use clean isolated worktrees at the two exact implementation SHAs
 above, generate their projects and prebuild each under the shared lock. Leave the

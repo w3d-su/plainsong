@@ -19,8 +19,6 @@ import time
 sys.dont_write_bytecode = True
 
 BASELINE_SHA = "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75"
-DEFAULT_BASELINE = "/private/tmp/plainsong-h21-baseline"
-DEFAULT_CANDIDATE = "/Users/davis._.su/Documents/plainsong-reconciled-presentation"
 DEFAULT_LOCK = "/private/tmp/plainsong-xcodebuild-test.lock"
 TESTS = (
     "PlainsongTests/EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
@@ -67,8 +65,8 @@ def content_fingerprint(root):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline-root", default=DEFAULT_BASELINE)
-    parser.add_argument("--candidate-root", default=DEFAULT_CANDIDATE)
+    parser.add_argument("--baseline-root", required=True)
+    parser.add_argument("--candidate-root", required=True)
     parser.add_argument("--baseline-derived-data", required=True)
     parser.add_argument("--candidate-derived-data", required=True)
     parser.add_argument("--candidate-sha", required=True, help="Exact implementation commit that was prebuilt")

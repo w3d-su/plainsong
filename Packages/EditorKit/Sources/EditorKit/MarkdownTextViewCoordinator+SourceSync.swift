@@ -25,8 +25,14 @@ extension MarkdownTextViewCoordinator {
         let selection = textView.selectedRange()
         isUpdating = true
         textView.text = source
-        textView.textSelection = selection.clamped(toLength: (source as NSString).length)
+        let clampedSelection = selection.clamped(toLength: (source as NSString).length)
+        textView.textSelection = clampedSelection
         isUpdating = false
+        if clampedSelection != selection {
+            // Writer preflight can refuse the native edit, leaving no later selection
+            // notification to update the binding used by WYSIWYG parsing.
+            publishAppliedSelection(clampedSelection)
+        }
 
         // Whole-source assignment removes every presentation attribute. Retain the
         // applied revision so an older styledText value cannot be reused, but discard
@@ -39,6 +45,32 @@ extension MarkdownTextViewCoordinator {
             textView.replacePresentationSnapshot = nil
             imageThumbnailPresentationController.presentationWasReset(in: textView)
         }
-        minimumHighlightRevisionAfterReconciliation = reconciledSourcePresentationInvalidationHandler?()
+        requestReconciledSourcePresentation()
+    }
+
+    func invalidateDeferredReconciledSourcePresentation() {
+        reconciledSourcePresentationGeneration &+= 1
+        minimumHighlightRevisionAfterReconciliation = nil
+    }
+
+    private func requestReconciledSourcePresentation() {
+        reconciledSourcePresentationGeneration &+= 1
+        guard reconciledSourcePresentationInvalidationHandler != nil else {
+            minimumHighlightRevisionAfterReconciliation = nil
+            return
+        }
+        guard isInsideRepresentableUpdate else {
+            minimumHighlightRevisionAfterReconciliation = reconciledSourcePresentationInvalidationHandler?()
+            return
+        }
+
+        // Block every produced result until the callback can safely write SwiftUI
+        // state. Selection publication was enqueued first, so parsing sees its clamp.
+        minimumHighlightRevisionAfterReconciliation = Int.max
+        let generation = reconciledSourcePresentationGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self, reconciledSourcePresentationGeneration == generation else { return }
+            minimumHighlightRevisionAfterReconciliation = reconciledSourcePresentationInvalidationHandler?()
+        }
     }
 }

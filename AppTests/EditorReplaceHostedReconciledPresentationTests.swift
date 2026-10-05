@@ -57,6 +57,8 @@ extension EditorFindHostedGateTests {
         let bindingBefore = coordinator.currentDocumentBindingInstallation
         let findSessionBefore = appState.editorFindHost.controller.session
         let replacementSchedulesBefore = appState.editorFindHost.controller.replacementScheduleCount
+        let match = try XCTUnwrap(findSessionBefore?.currentMatch?.range)
+        assertReconciledFindDecoration(in: storage, match: match)
         let intercepted = ReconciledPublicationInterception()
         let observer = NotificationCenter.default.addObserver(
             forName: NSTextStorage.didProcessEditingNotification,
@@ -78,7 +80,6 @@ extension EditorFindHostedGateTests {
 
         let result = appState.performEditorReplace(replacement: replacement)
 
-        let match = try XCTUnwrap(findSessionBefore?.currentMatch?.range)
         XCTAssertEqual(intercepted.proposedSource,
                        (source as NSString).replacingCharacters(in: match, with: replacement))
         XCTAssertEqual(result, .delivered(.refused(.writeNotApplied)))
@@ -101,6 +102,7 @@ extension EditorFindHostedGateTests {
             coordinator.lastAppliedHighlightRevision != revisionBefore
                 && self.reconciledPresentation(editor).imageVisualStates == presentationBefore.imageVisualStates
         }
+        assertReconciledFindDecoration(in: storage, match: match)
         let restored = reconciledPresentation(editor)
         XCTAssertEqual(restored.syntax, presentationBefore.syntax)
         XCTAssertEqual(restored.foldedRanges, presentationBefore.foldedRanges)
@@ -115,6 +117,12 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(editor.undoManager?.canUndo == true)
         XCTAssertFalse(editor.undoManager?.canRedo == true)
         try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
+    }
+
+    private func assertReconciledFindDecoration(in storage: NSTextStorage, match: NSRange) {
+        storage.enumerateAttribute(EditorFindMatchHighlightMarker.attribute, in: match) { value, _, _ in
+            XCTAssertNotNil(value, "The current Find match must retain decoration after the restore")
+        }
     }
 
     private func assertReconciledPresentationMatchesFreshParse(
