@@ -374,14 +374,17 @@ extension AppState {
         // outright, so ⌘E reads the editor's *applied* selection instead
         // (`currentEditorSelectionUTF16`).
         // Reassign so SwiftUI/EditorKit observes a new command value.
-        editorNavigationCommand = nil
-        editorNavigationCommand = command
+        publishEditorNavigationCommand(nil)
+        publishEditorNavigationCommand(command)
     }
 
     /// Supersede any find (or other) navigation already on the shared channel with a newer cancel.
-    func cancelPublishedFindNavigationOnSharedChannel() {
+    func cancelPublishedFindNavigationOnSharedChannel(
+        file: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         let id = advanceEditorNavigationGeneration()
         editorFindHost.lastPublishedFindNavigationID = id
-        editorNavigationCommand = .cancel(id: id)
+        publishEditorNavigationCommand(.cancel(id: id), file: file, line: line)
     }
 }
