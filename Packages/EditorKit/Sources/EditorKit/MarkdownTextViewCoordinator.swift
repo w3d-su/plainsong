@@ -259,6 +259,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
     var reconciledSourcePresentationInvalidationHandler: (() -> Int)?
     var minimumHighlightRevisionAfterReconciliation: Int?
     var reconciledSourcePresentationGeneration: UInt64 = 0
+    var hasDeferredReconciliationPresentation = false
     /// Last successfully applied fold plan, retained in O(1) for hosted final-revision checks.
     var lastAppliedHighlightFoldPlan: WYSIWYGFoldPlan?
     /// Find-match decoration currently on the storage, so an unchanged request costs nothing.

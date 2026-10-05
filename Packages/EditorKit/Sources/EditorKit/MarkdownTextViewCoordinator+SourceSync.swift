@@ -14,7 +14,8 @@ extension MarkdownTextViewCoordinator {
     /// A captured pre-restore representable value may arrive even after the fresh
     /// parse applied. Keep this floor until the next reconciliation, so it stays raw.
     func canApplyHighlightRevision(_ revision: Int) -> Bool {
-        minimumHighlightRevisionAfterReconciliation.map { revision >= $0 } ?? true
+        !hasDeferredReconciliationPresentation
+            && (minimumHighlightRevisionAfterReconciliation.map { revision >= $0 } ?? true)
     }
 
     func applyReconciledSource(
@@ -50,11 +51,14 @@ extension MarkdownTextViewCoordinator {
 
     func invalidateDeferredReconciledSourcePresentation() {
         reconciledSourcePresentationGeneration &+= 1
-        minimumHighlightRevisionAfterReconciliation = nil
+        hasDeferredReconciliationPresentation = false
+        // Keep the numeric floor across document switches: a captured old view
+        // can still carry pre-restore styling whose source matches the new document.
     }
 
     private func requestReconciledSourcePresentation() {
         reconciledSourcePresentationGeneration &+= 1
+        hasDeferredReconciliationPresentation = false
         guard reconciledSourcePresentationInvalidationHandler != nil else {
             minimumHighlightRevisionAfterReconciliation = nil
             return
@@ -66,10 +70,11 @@ extension MarkdownTextViewCoordinator {
 
         // Block every produced result until the callback can safely write SwiftUI
         // state. Selection publication was enqueued first, so parsing sees its clamp.
-        minimumHighlightRevisionAfterReconciliation = Int.max
+        hasDeferredReconciliationPresentation = true
         let generation = reconciledSourcePresentationGeneration
         DispatchQueue.main.async { [weak self] in
             guard let self, reconciledSourcePresentationGeneration == generation else { return }
+            hasDeferredReconciliationPresentation = false
             minimumHighlightRevisionAfterReconciliation = reconciledSourcePresentationInvalidationHandler?()
         }
     }

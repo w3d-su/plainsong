@@ -132,6 +132,37 @@ extension EditorDocumentBindingLifecycleTests {
         XCTAssertEqual(calls, ["b"])
     }
 
+    func testCompletedSameSourceDocumentTransitionKeepsReconciliationRevisionFloor() throws {
+        let model = Model()
+        model.sourceB = model.sourceA
+        let viewA = representable(
+            text: Binding(get: { model.sourceA }, set: { model.sourceA = $0 }),
+            identity: EditorDocumentIdentity(rawValue: "a"),
+            bindingID: EditorDocumentBindingID(), model: model,
+            onReconciliation: { 17 }
+        )
+        let viewB = representable(
+            text: Binding(get: { model.sourceB }, set: { model.sourceB = $0 }),
+            identity: EditorDocumentIdentity(rawValue: "b"),
+            bindingID: EditorDocumentBindingID(), model: model,
+            onReconciliation: { 18 }
+        )
+        let fixture = try makeFixture(representable: viewA, source: model.sourceA)
+        defer {
+            fixture.window.orderOut(nil)
+            MarkdownTextView.dismantleNSView(fixture.scrollView, coordinator: fixture.coordinator)
+        }
+        fixture.coordinator.applyReconciledSource(model.sourceA, replacing: model.sourceA, in: fixture.textView)
+        XCTAssertFalse(fixture.coordinator.canApplyHighlightRevision(16))
+
+        viewB.updateRepresentedTextView(fixture.scrollView, coordinator: fixture.coordinator)
+
+        XCTAssertEqual(fixture.coordinator.minimumHighlightRevisionAfterReconciliation, 17)
+        XCTAssertFalse(fixture.coordinator.canApplyHighlightRevision(16),
+                       "A captured pre-restore highlight must stay inadmissible when source is unchanged")
+        XCTAssertTrue(fixture.coordinator.canApplyHighlightRevision(17))
+    }
+
     private func assertDeferredTransitionHandler(supersede: Bool) async throws {
         let model = Model()
         var calls: [String] = []

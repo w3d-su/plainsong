@@ -2279,14 +2279,17 @@ These mutations were temporary and restored before the final positive runs.
 Writer-activation synchronization and rejection now publish a changed clamped
 selection before requesting presentation. The new heading-boundary test supplies
 the selection binding used by parsing and proves the callback sees that clamp;
-omitting publication fails both writer paths. Six lifecycle tests prove dismantle
+omitting publication fails both writer paths. Seven lifecycle tests prove dismantle
 clears the handler, marked-text transitions retain the installed document's
 handler until completion, a superseded destination never installs its handler,
 and a callback inside a representable update runs after selection publication.
 Deferred requests coalesce and are cancelled by dismantle or a completed document
 transition; every highlight result stays blocked until the deferred request runs.
+The numeric revision floor survives completed document switches: a same-source
+transition must never readmit a captured pre-restore highlight. The new transition
+test failed when callback cancellation cleared that floor; preserving it passes.
 
-Final review-fix verification: full EditorKit **433 tests, seven real-IME opt-in
+Final review-fix verification: full EditorKit **434 tests, seven real-IME opt-in
 skips, zero failures**; full MarkdownCore **303 tests, zero failures**; all hosted
 `EditorFind*`/`EditorReplace*` classes and nine WYSIWYG policy tests **127 tests,
 two typing opt-in skips, zero failures**. Highlight-scheduler stress applied all
