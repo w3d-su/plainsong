@@ -134,6 +134,10 @@ public struct MarkdownEditorView: View {
             isWYSIWYGZeroWidthFoldingEnabled: developmentPresentation.enablesInlineFoldReveal,
             imageThumbnailPresentationConfiguration: developmentImageThumbnails,
             onWYSIWYGMechanismFailure: onWYSIWYGMechanismFailure,
+            onReconciledSourcePresentationInvalidated: {
+                scheduleHighlight()
+                return highlightRevision
+            },
             font: MarkdownSyntaxHighlighter.editorFont(named: fontName, size: fontSize)
         ) { range in
             Task { @MainActor in

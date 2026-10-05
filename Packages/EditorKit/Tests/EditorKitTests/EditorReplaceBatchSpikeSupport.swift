@@ -26,6 +26,7 @@ enum EditorReplaceBatchSpikeSupport {
         let bindingID = EditorDocumentBindingID()
         /// PR D publication knobs. Defaults keep the R0 accept-and-advance-by-one model.
         var rejectsPublications = false
+        var rejectsWriterActivations = false
         var revisionStep = 1
         /// Accepts a different source than published, as an App reconciliation would.
         var reconcilesPublication: ((String) -> String)?
@@ -53,6 +54,9 @@ enum EditorReplaceBatchSpikeSupport {
                 writer: { event in
                     switch event {
                     case let .activate(installation, base):
+                        if self.rejectsWriterActivations {
+                            return .rejected(self.snapshot)
+                        }
                         if base.revision != self.revision {
                             return .synchronize(self.snapshot)
                         }
@@ -91,7 +95,8 @@ enum EditorReplaceBatchSpikeSupport {
         source: String,
         selection: NSRange = NSRange(location: 0, length: 0),
         enableWYSIWYG: Bool = false,
-        makeWindow: ((NSRect) -> NSWindow)? = nil
+        makeWindow: ((NSRect) -> NSWindow)? = nil,
+        selectionBinding: Binding<NSRange?>? = nil
     ) throws -> Fixture {
         let model = Model(source: source)
         let contract = model.makeContract()
@@ -114,7 +119,7 @@ enum EditorReplaceBatchSpikeSupport {
         let representable = MarkdownTextView(
             text: textBinding,
             styledText: nil,
-            selection: .constant(selection),
+            selection: selectionBinding ?? .constant(selection),
             showsLineNumbers: false,
             documentIdentity: EditorDocumentIdentity(rawValue: "replace-r0"),
             documentBindingID: model.bindingID,

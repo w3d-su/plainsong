@@ -1458,8 +1458,10 @@ hosted: 117 tests, 3 skips, zero failures.
 `make build`, pinned SwiftFormat 0.62.1 `make lint` and `git diff --check` passed.
 The scheduler contract suite has five deterministic tests; no production timing changed.
 
-Known follow-up only: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
-removes presentation attributes until the next reparse. This branch does not repair it.
+Historical follow-up: PR D rejection restore (`applyReconciledSource` → `textView.text =`)
+removed presentation attributes until an unrelated reparse. Handoff 21's
+[reconciled-source fix](#reconciled-source-presentation--2026-10-05) requests an automatic
+fresh parse; the scheduler PR itself did not repair it.
 
 ## Replace PR F restack — 2026-10-01
 
@@ -1468,7 +1470,8 @@ main's authoritative nil-key-window override and the F WYSIWYG/asset helper. The
 `phase3-editor-highlight-schedule-fix`. No rebase, push or Find-controller changes.
 The scheduler bug-fix PR owns the cancellation/coalescing implementation; F's automatic
 presentation reparses now run on it. PR D's presentation-attribute reset on rejected
-publication remains a known follow-up, with no repair in either change.
+publication was a known follow-up in both changes; it is addressed separately by
+[Handoff 21](#reconciled-source-presentation--2026-10-05).
 
 Post-restack verification on the merged source tree: **EditorKit 411 tests**, seven
 real-IME opt-in skips, zero failures; **hosted EditorFind/EditorReplace plus all nine
@@ -2220,4 +2223,170 @@ export PLAINSONG_BASELINE_ROOT=/private/tmp/plainsong-h22-baseline
 export PLAINSONG_FIX_ROOT=/Users/davis._.su/Documents/plainsong-highlight-schedule-fix
 export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
+```
+
+## Reconciled-source presentation — 2026-10-05
+
+Handoff 21 starts from `91f0ebac` after #136/#137 merged. All four
+`applyReconciledSource` callers retain the whole-source assignment, selection clamp,
+writer/source reconciliation and undo semantics. Only that restore requests the
+normal `EditorHighlightScheduler` restart, including when App text is unchanged.
+The 20 ms debounce and off-main parse are unchanged; marked-text and native-editing
+apply guards remain intact. Ordinary accepted input does not invoke the new hook.
+The hook is installed only after the exact document transition succeeds and removed
+on dismantle, so a deferred destination cannot replace the old source's callback.
+
+While the new parse is pending, backing text is raw. A persistent revision floor
+blocks already-produced pre-restore highlights; cancelled scheduler work cannot
+apply later. Resetting image presentation advances its generation, cancels returning
+loads and clears cached plans even when source samples are identical. Replace's
+presentation snapshot and Find decoration materialisation are invalidated as well.
+
+Verification: full EditorKit **426 tests, seven real-IME opt-in skips, zero
+failures**; full MarkdownCore **303 tests, zero failures**. The nine named
+`EditorReconciledSourcePresentationTests` cover all four callers, clamped selection,
+raw pending projection, syntax/link/fold/image equivalence to an independent parse,
+marked-text deferral, an already-produced but unapplied stale revision, and no new
+reconciliation request on an ordinary native edit. The existing PR F rejection test
+now waits for the automatic scheduler pass without intervening input.
+
+Hosted Find/Replace and all nine WYSIWYG policy tests: **119 tests, two typing
+opt-in skips, zero failures**. Both new rejected-publication tests ran, checking
+unchanged App source/revision/binding, no undo/redo, restored syntax/folds and a ready
+image thumbnail. The opt-in highlight stress completed **0 drops in 60 operations**.
+Temporarily disabling only the restart hook reproduced the source-mode recovery
+timeout; restoring it passed. This is a source-mode negative control: WYSIWYG's
+internal selection-driven scheduler can also request a reparse. The independent
+oracle restores custom fold attributes from its own fresh plan after Foundation's
+AttributedString bridge, without applying anything to the live editor.
+
+`make build`, pinned SwiftFormat **0.62.1** `make lint` and `git diff --check` passed.
+Hosted xcresult reports six runtime warnings (Environment reads in existing test
+support and a QoS wait); this does not attribute their cause. These are the two full
+package suites and required hosted slices, not a claim that all `make test` targets
+ran. Real keyboard/IME acceptance and absolute R9/§12 typing acceptance remain owner
+gates.
+
+### Handoff 21a review fixes
+
+The publication tests now wait for the initial failed thumbnail marker to settle
+before reconciliation. Omitting only `presentationWasReset` makes both accepted
+and rejected publication cases time out on the restored marker. Both hosted
+refusal tests assert Find markers across the current match before and after the
+restore; omitting all three Find-cache resets fails both tests at that assertion.
+These mutations were temporary and restored before the final positive runs.
+
+Writer-activation synchronization and rejection now publish a changed clamped
+selection before requesting presentation. The new heading-boundary test supplies
+the selection binding used by parsing and proves the callback sees that clamp;
+omitting publication fails both writer paths. Seven lifecycle tests prove dismantle
+clears the handler, marked-text transitions retain the installed document's
+handler until completion, a superseded destination never installs its handler,
+and a callback inside a representable update runs after selection publication.
+Deferred requests coalesce and are cancelled by dismantle or a completed document
+transition; every highlight result stays blocked until the deferred request runs.
+The numeric revision floor survives completed document switches: a same-source
+transition must never readmit a captured pre-restore highlight. The new transition
+test failed when callback cancellation cleared that floor; preserving it passes.
+
+Final review-fix verification: full EditorKit **434 tests, seven real-IME opt-in
+skips, zero failures**; full MarkdownCore **303 tests, zero failures**; all hosted
+`EditorFind*`/`EditorReplace*` classes and nine WYSIWYG policy tests **127 tests,
+two typing opt-in skips, zero failures**. Highlight-scheduler stress applied all
+**60 edits, zero drops**. `make build`, pinned SwiftFormat **0.62.1** `make lint`
+(zero serious violations), and `git diff --check` passed. Hosted/build validation
+held the shared xcodebuild lock. This is the required suite scope, not a full
+`make test` claim. No new typing measurement or additional gate closure is claimed;
+Keep Mine and the second-merge rejected Replace All hosted test remain follow-ups.
+
+### Paired typing comparison under recorded load
+
+Compared clean merge-base `91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75` with the
+fixed implementation commit `e0f26ceb2f104106eb7e1ed34de7ead9ba16af70`. The evidence
+commit changes only documentation and measurement artifacts. Each Debug product was
+built once, then measured with `test-without-building`: AB interleaved, ten pairs
+per mode, 30 keystrokes per mode per batch, no documented warm-up discarded.
+Fixture, project manifest and typing-probe hashes matched. Source fingerprints and
+prebuilt executable hashes are recorded in the evidence.
+
+Every admitted batch held `/private/tmp/plainsong-xcodebuild-test.lock`, had no other
+build processes and began at one-minute load **4.963–5.989**, below the revised
+Handoff 22 ceiling of 6. End loads were **4.993–9.783**. The Mac was on AC power;
+27 rejected admission attempts were retained. This is recorded-load comparison,
+not an idle-machine claim.
+
+| Mode | Product | Samples | Median ms | p95 ms | Maximum ms | Over 16 ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Source-only | Baseline | 300 | 14.201 | 17.040 | 18.631 | 12.00% |
+| Source-only | Candidate | 300 | 14.191 | 14.757 | 15.803 | 0.00% |
+| WYSIWYG | Baseline | 300 | 14.259 | 17.169 | 20.461 | 11.67% |
+| WYSIWYG | Candidate | 300 | 14.235 | 14.657 | 20.157 | 1.00% |
+
+Per-pair `candidate − baseline` differences use the median of ten differences and a
+95% bootstrap CI (10,000 resamples, seed 20261004):
+
+| Mode / metric | Median difference ms | 95% CI ms | Candidate worse |
+| --- | ---: | --- | ---: |
+| Source-only median | -0.066 | [-1.380, -0.012] | 1/10 |
+| Source-only p95 | -0.049 | [-1.383, +0.054] | 3/10 |
+| WYSIWYG median | -2.803 | [-6.726, +0.008] | 3/10 |
+| WYSIWYG p95 | -0.281 | [-1.647, -0.041] | 2/10 |
+
+**No regression signal detected under recorded load** in either mode: neither
+metric met the rule requiring the entire CI above +0.5 ms and candidate worse in
+at least 8/10 pairs. CI widths are 1.368/1.437 ms for source-only median/p95 and
+6.733/1.605 ms for WYSIWYG. The wide WYSIWYG median CI limits sensitivity; smaller
+effects cannot be excluded, and these observations do not establish a speedup.
+
+The AB order always ran baseline first. Baseline exceeds 16 ms in 12%/11.67%
+of samples versus candidate 0%/1%; a hook that only adds work cannot explain that
+apparent gain. A systematic order or environment effect of roughly 1–3 ms could
+hide a regression of similar size. Samples are bimodal, clustering around 0.7 ms
+and 14–17 ms; the roughly −6.7 ms WYSIWYG median differences reflect switches
+between those modes, limiting interpretation of the median and its CI. Future
+comparisons should use counterbalanced ABBA ordering. These historical samples
+retain their original order.
+
+The stronger typing-path evidence is static: ordinary accepted input cannot reach
+the hook (`testOrdinaryNativeEditDoesNotRequestReconciliationPresentation`).
+Per-update work remains one closure allocation and O(1) revision/installation
+comparisons. Selection publication and deferred callback scheduling happen only
+on reconciliation.
+
+Five batches returned exit 65 solely for the probe's existing 16 ms assertion
+(baseline 1/2/4/7, candidate 1); all 20 batches had both complete 30-sample series,
+with no functional failures. The over-budget fractions remain observations under
+load. Absolute §12/R9 typing acceptance and real keyboard/IME acceptance stay open.
+
+Evidence: `docs/evidence/handoff21-reconciled-presentation-20261005-paired.json`
+contains every raw sample, per-pair difference, admission snapshot and exact product
+SHA. Raw logs, source manifests and xcresults remain at its printed paths under
+`/private/tmp/plainsong-h21-typing-evidence/`. The runner used for these measurements
+was saved at `31ff976` as
+`docs/evidence/reconciled-source-presentation-paired.py` (historical SHA-256
+`8c95985b66c2429212d127bf1a8ed48add8b1e417eab27e9efeff03a3ee9817e`). The current
+runner requires explicit baseline/candidate roots; its measurement logic is
+unchanged. Statistics were independently recomputed, and all 1,200 samples matched
+their raw logs.
+
+To reproduce, use clean isolated worktrees at the two exact implementation SHAs
+above, generate their projects and prebuild each under the shared lock. Leave the
+Mac on power and pause other builds/tests. Copy the runner outside those worktrees,
+then run with fresh output paths:
+
+```sh
+export PLAINSONG_XCODEBUILD_LOCK=/private/tmp/plainsong-xcodebuild-test.lock
+# Run once in each exact-SHA worktree, using its own derived-data directory:
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" make generate
+lockf -k "$PLAINSONG_XCODEBUILD_LOCK" xcodebuild -project Plainsong.xcodeproj \
+  -scheme Plainsong -configuration Debug -destination platform=macOS \
+  -derivedDataPath /private/tmp/h21-retry-PRODUCT-dd build-for-testing
+# Supply those two worktrees and prebuilt product directories:
+python3 /private/tmp/reconciled-source-presentation-paired.py \
+  --baseline-root /private/tmp/h21-retry-baseline \
+  --candidate-root /private/tmp/h21-retry-candidate \
+  --baseline-derived-data /private/tmp/h21-retry-baseline-dd \
+  --candidate-derived-data /private/tmp/h21-retry-candidate-dd \
+  --candidate-sha e0f26ceb2f104106eb7e1ed34de7ead9ba16af70 \
+  --evidence-dir /private/tmp/h21-retry-evidence
 ```
