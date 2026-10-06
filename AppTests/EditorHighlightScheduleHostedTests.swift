@@ -71,9 +71,15 @@ extension EditorFindHostedGateTests {
     }
 
     func makeHostedEditorWorkspace(source: String,
-                                   layoutMode: EditorLayoutMode) async throws -> HostedReplaceWorkspace
+                                   query: String? = nil,
+                                   localEdit: String? = nil,
+                                   assets: [String: Data] = [:],
+                                   layoutMode: EditorLayoutMode = .sourceOnly) async throws -> HostedReplaceWorkspace
     {
         let fixture = try makeWorkspaceFixture(files: ["post.md": source])
+        for (name, data) in assets {
+            try data.write(to: fixture.root.appendingPathComponent(name))
+        }
         let appState = fixture.appState
         if layoutMode == .wysiwyg {
             appState.preferences.setExperimentalWYSIWYGEnabled(true)
@@ -98,6 +104,15 @@ extension EditorFindHostedGateTests {
         let editor = try hostedEditor(hosted)
         XCTAssertTrue(window.makeFirstResponder(editor))
         editor.undoManager?.removeAllActions()
+        if let query {
+            designateReplaceKeyWindow(in: group)
+            if let localEdit {
+                appState.replaceDocumentText(localEdit)
+            }
+            openFindBar(appState, query: query)
+            try await focusEditorOnCurrentMatch(hosted, window: window)
+            try await waitForHostedReplaceObservationQuiescence(hosted)
+        }
         return hosted
     }
 

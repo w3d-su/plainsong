@@ -1,0 +1,84 @@
+{
+  "required_entries_present": true,
+  "resource_count": 67,
+  "resource_sha256_matches_source": true,
+  "intentional_failure_in_test_log": true,
+  "runtime_preflight_logged": true,
+  "build_for_testing_succeeded": true,
+  "environment_fields_present": true,
+  "artifact_directory": "/private/tmp/h23-probe-artifact-37176591675",
+  "bundle_path": "/Users/runner/work/_temp/plainsong-dd-37176591675-1/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest",
+  "digest": "sha256:815a3f08c33bf53eabde15b21a03d6473cd88f8516de85c73e7eee53b78ca221",
+  "expires_at": "2026-10-18T04:35:46Z",
+  "id": 11293738590,
+  "name": "plainsong-ci-failure-37176591675-1",
+  "size_in_bytes": 101436958,
+  "run_id": 37176591675,
+  "run_attempt": 1,
+  "probe_commit": "1afcfda8b0ab38203d8696af90825a88707acd4d",
+  "xcresult_summary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "d648febc11297408a9946a3cb981e005732660e7",
+          "deviceName": "My Mac",
+          "modelName": "Apple Virtual Machine 1",
+          "osBuildNumber": "24G830",
+          "osVersion": "15.7.9",
+          "platform": "macOS"
+        },
+        "expectedFailures": 0,
+        "failedTests": 2,
+        "passedTests": 755,
+        "skippedTests": 1,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "Plainsong \u00b7 Built with macOS 15.7.9",
+    "expectedFailures": 0,
+    "failedTests": 2,
+    "finishTime": 1791088533.969,
+    "passedTests": 755,
+    "result": "Failed",
+    "runtimeWarnings": [],
+    "skippedTests": 1,
+    "startTime": 1791088155.389,
+    "statistics": [],
+    "testFailures": [
+      {
+        "failureText": "failed: caught error: \"unreadable(Contents/Resources/Fixtures/perf-500kb.md -- file:///Users/runner/work/_temp/plainsong-dd-37176591675-1/Build/Products/Debug/Plainsong.app/Contents/PlugIns/PerformanceTests.xctest/)\"",
+        "targetName": "PerformanceTests",
+        "testIdentifier": 740,
+        "testIdentifierString": "PerformanceBudgetTests/testOpening500KBMarkdownToEditorFirstPaintStaysUnderBudget()",
+        "testIdentifierURL": "test://com.apple.xcode/Plainsong/PerformanceTests/PerformanceBudgetTests/testOpening500KBMarkdownToEditorFirstPaintStaysUnderBudget",
+        "testName": "testOpening500KBMarkdownToEditorFirstPaintStaysUnderBudget()"
+      },
+      {
+        "failureText": "failed - Intentional handoff 23 artifact-upload probe; revert this commit after verifying the failure artifact.",
+        "targetName": "PlainsongTests",
+        "testIdentifier": 341,
+        "testIdentifierString": "CIFailureArtifactUploadProbeTests/testIntentionalHostedFailureRetainsArtifacts()",
+        "testIdentifierURL": "test://com.apple.xcode/Plainsong/PlainsongTests/CIFailureArtifactUploadProbeTests/testIntentionalHostedFailureRetainsArtifacts",
+        "testName": "testIntentionalHostedFailureRetainsArtifacts()"
+      }
+    ],
+    "title": "Test - Plainsong",
+    "topInsights": [
+      {
+        "category": "Longest Test Runs",
+        "impact": "32% of duration",
+        "text": "1 longest test run with outlier durations exceeding 69.48s (three standard deviations)"
+      },
+      {
+        "category": "Longest Test Runs",
+        "impact": "58% of duration",
+        "text": "24 longest test runs with outlier durations exceeding 1.24s (three standard deviations)"
+      }
+    ],
+    "totalTestCount": 758
+  }
+}

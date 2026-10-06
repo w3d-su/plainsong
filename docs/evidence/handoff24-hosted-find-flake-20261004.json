@@ -1,0 +1,440 @@
+{
+  "date": "2026-10-04",
+  "scope": "Handoff 24 failure A: instrumented original and Find-first setup comparison",
+  "head": "08bfc042c1c80457808c6c2fe7d69b89136bfb34",
+  "classification": "Unreproduced and unexplained. No product or setup-order fix is claimed. The temporary Find-first helper was restored. Do not merge PR 137 until A is explained.",
+  "hostedFailures": [
+    {
+      "run": 36978229072,
+      "head": "90660a7",
+      "test": "testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine"
+    },
+    {
+      "run": 37203658993,
+      "head": "08bfc04",
+      "test": "testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo",
+      "timeouts": 2
+    }
+  ],
+  "sameMachineSameSessionInterleavedAB": [
+    {
+      "setup": "original",
+      "tests": {
+        "EditorFindHostedGateTests/testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "batches": [
+        {
+          "label": "a-serial-original-batch1",
+          "exit": 0,
+          "logSHA256": "821a25463b9cfc9c4a3f2ad69fd30c08b787c9c9ac845e938076e735590901cf",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        },
+        {
+          "label": "a-serial-original-batch2",
+          "exit": 0,
+          "logSHA256": "8ca6a13c7708aa4a318c5f11e7e49c7557422db4f7f57e8f7830af3a8e682f00",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        },
+        {
+          "label": "a-serial-original-batch3",
+          "exit": 0,
+          "logSHA256": "c8ccde2e3269dcaf6c5a7f2e5939798df2ff4b3dda0624d1a3430a0b4323ee4d",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        }
+      ]
+    },
+    {
+      "setup": "alternative",
+      "tests": {
+        "EditorFindHostedGateTests/testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        },
+        "EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+          "started": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0
+        }
+      },
+      "batches": [
+        {
+          "label": "a-serial-alternative-batch1",
+          "exit": 0,
+          "logSHA256": "f959f302df37902f9619b4f6ed7113437bce2f0f23fd6d519be2d5c29077098b",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        },
+        {
+          "label": "a-serial-alternative-batch2",
+          "exit": 0,
+          "logSHA256": "b9280f52846c87782b6dfff6b20d1b1a6423d77ed6b1a4259126c9f8ecc79830",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        },
+        {
+          "label": "a-serial-alternative-batch3",
+          "exit": 0,
+          "logSHA256": "c0e937563ab8b0a5cb2a20592f0600584f06cdd23f75df0ce0f2f63334f9b7ee",
+          "totals": {
+            "started": 20,
+            "passed": 20,
+            "failed": 0,
+            "skipped": 0
+          },
+          "skippedTests": []
+        }
+      ]
+    }
+  ],
+  "wholeOriginalClass": {
+    "classRuns": 10,
+    "failedRuns": 0,
+    "invocations": [
+      {
+        "label": "a-original-ordered-class02",
+        "exit": 0,
+        "logSHA256": "2e01ce67c0f59a84e8a30777ec83b23cbf5b9783a8116b914be906309516c675",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class03",
+        "exit": 0,
+        "logSHA256": "69a5b1cc8979447fd46f89fc88ec425bdecf93df00953ee40f8ca153b8174dff",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class04",
+        "exit": 0,
+        "logSHA256": "5373eb16739607c3927c98c29abbefffd0f4b2022efd9f2f3eb9b8d8857f114e",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class05",
+        "exit": 0,
+        "logSHA256": "6329fb6f7dc55caa8d3d18c3a9baa1a84d16abaa9a480eb32dfcef1d6d734e22",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class06",
+        "exit": 0,
+        "logSHA256": "3a92f656c144d2d1c28b8f6b390e0980735ff310cb4986190b0c233b8e783a69",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class07",
+        "exit": 0,
+        "logSHA256": "af0bf1771037eb07c4e3136e78242a7250cc9a02c6586e13e37f15153acc0a85",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class08",
+        "exit": 0,
+        "logSHA256": "6d9a8118840cd001864468c4f90049cfde1b8b7da5f76b3a205ce6477da1db90",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class09",
+        "exit": 0,
+        "logSHA256": "7360c61a8f71a86e82c018c511a76dcc710fd59689fe06afd9817c5bf2b61b2f",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class10",
+        "exit": 0,
+        "logSHA256": "61ec552c59f1925b7ffc2eeb8c3517aa2d59e584515c4c37ac6e517249800333",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      },
+      {
+        "label": "a-original-ordered-class11",
+        "exit": 0,
+        "logSHA256": "7480d39ce910365075321c91cb3c0668fe631db0f0acb6608f2a2dd7ce4adac0",
+        "totals": {
+          "started": 43,
+          "passed": 40,
+          "failed": 0,
+          "skipped": 3
+        },
+        "skippedTests": [
+          "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+          "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+          "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+        ]
+      }
+    ],
+    "note": "Ten separate invocations preserving method order. Three existing opt-in stress/typing skips per class. class01 excluded conservatively after an earlier orphaned build; class02-class11 are adopted."
+  },
+  "schedulerComparison": {
+    "productHead": "74321d9aa952566d3fe9bc344194a5ed18d8afb9",
+    "equivalence": "git diff ecf88f origin/main -- App Packages/EditorKit AppTests is empty before local test instrumentation/readiness changes.",
+    "tests": {
+      "EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+        "started": 30,
+        "passed": 30,
+        "failed": 0,
+        "skipped": 0
+      },
+      "EditorFindHostedGateTests/testHostedSchedulerComparisonImageFindSetup": {
+        "started": 30,
+        "passed": 30,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "invocation": {
+      "label": "c-scheduler-main-correct",
+      "exit": 0,
+      "logSHA256": "6d00bc137ee8de3d41b032b5ac0d9275e8c6bdc6c4dd688037c1885f7944ec56",
+      "totals": {
+        "started": 60,
+        "passed": 60,
+        "failed": 0,
+        "skipped": 0
+      },
+      "skippedTests": []
+    },
+    "limitations": "The PR F full image Replace test does not exist on main. Its Find/focus setup is reproduced in a temporary C probe, without claiming image Replace/Undo/Redo delivery on main. Main retains its original Find-before-editor-focus setup.",
+    "probeSourceSHA256": "e712b611d7a16d50dbc4033ee3476da29affd2f9f1f1689fcc81fd1dfc5ce5e4"
+  },
+  "deliveryVerification": {
+    "label": "a-delivery-find-replace-final",
+    "exit": 0,
+    "logSHA256": "38dfa0fdd2892247738b1aa72a5caef7e80030e272d72077b02d0b0745eb610b",
+    "totals": {
+      "started": 107,
+      "passed": 104,
+      "failed": 0,
+      "skipped": 3
+    },
+    "skippedTests": [
+      "EditorFindHostedGateTests/testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+      "EditorFindHostedGateTests/testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+      "EditorFindHostedGateTests/testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+    ]
+  },
+  "checks": {
+    "makeBuild": "passed under shared lock",
+    "makeFormat": "passed; zero existing files changed",
+    "makeLint": "passed with SHA256-verified SwiftFormat 0.62.1; pre-existing non-serious warnings",
+    "diffCheck": "passed"
+  },
+  "commands": {
+    "batchExample": [
+      "/usr/bin/lockf",
+      "-k",
+      "/private/tmp/plainsong-xcodebuild-test.lock",
+      "xcodebuild",
+      "test-without-building",
+      "-xctestrun",
+      "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+      "-destination",
+      "platform=macOS",
+      "-parallel-testing-enabled",
+      "NO",
+      "-test-iterations",
+      "10",
+      "-resultBundlePath",
+      "<EVIDENCE>/a-serial-original-batch1.xcresult",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo"
+    ],
+    "classExample": [
+      "/usr/bin/lockf",
+      "-k",
+      "/private/tmp/plainsong-xcodebuild-test.lock",
+      "xcodebuild",
+      "test-without-building",
+      "-xctestrun",
+      "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+      "-destination",
+      "platform=macOS",
+      "-parallel-testing-enabled",
+      "NO",
+      "-resultBundlePath",
+      "<EVIDENCE>/a-original-ordered-class02.xcresult",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests"
+    ],
+    "schedulerComparison": [
+      "/usr/bin/lockf",
+      "-k",
+      "/private/tmp/plainsong-xcodebuild-test.lock",
+      "xcodebuild",
+      "test-without-building",
+      "-xctestrun",
+      "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+      "-destination",
+      "platform=macOS",
+      "-parallel-testing-enabled",
+      "NO",
+      "-test-iterations",
+      "30",
+      "-resultBundlePath",
+      "<EVIDENCE>/c-scheduler-main-correct.xcresult",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedSchedulerComparisonImageFindSetup"
+    ],
+    "allFindReplace": [
+      "/usr/bin/lockf",
+      "-k",
+      "/private/tmp/plainsong-xcodebuild-test.lock",
+      "xcodebuild",
+      "test-without-building",
+      "-xctestrun",
+      "<PRODUCTS>/Plainsong_macosx27.0-arm64.xctestrun",
+      "-destination",
+      "platform=macOS",
+      "-parallel-testing-enabled",
+      "NO",
+      "-resultBundlePath",
+      "<EVIDENCE>/a-delivery-find-replace-final.xcresult",
+      "-only-testing:PlainsongTests/EditorFindHostedGateTests",
+      "-only-testing:PlainsongTests/EditorFindMatchHighlightAppTests",
+      "-only-testing:PlainsongTests/EditorFindUITests",
+      "-only-testing:PlainsongTests/EditorReplaceAuthorizationAppTests",
+      "-only-testing:PlainsongTests/EditorFindLifecycleCombinationTests",
+      "-only-testing:PlainsongTests/EditorFindReviewFixTests",
+      "-only-testing:PlainsongTests/EditorReplaceSingleReplaceAppTests",
+      "-only-testing:PlainsongTests/EditorReplaceBatchSpikeAppTests",
+      "-only-testing:PlainsongTests/EditorFindFocusReceiptTests"
+    ]
+  },
+  "exclusions": [
+    "Earlier batches overlapping an orphaned xcodebuild are discarded; only a-serial-* batches are adopted.",
+    "Invalid test-iterations=1 and missing test bundle invocations started no tests and are excluded.",
+    "The first C invocation did not include the new image probe in its generated target and is excluded; c-scheduler-main-correct ran both methods 30 times.",
+    "A green future CI run alone does not explain the historical failure.",
+    "No full make test, performance, real keyboard/IME or owner-only gate claim."
+  ],
+  "rawEvidence": "Instrumented logs, xcresults and product copies are retained locally. Portable command placeholders are PRODUCTS and EVIDENCE."
+}

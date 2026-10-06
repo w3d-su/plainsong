@@ -131,13 +131,51 @@ extension ExportArtifactWriterTests {
         let existing = try ExportArtifactWriter.inspectLeaf(at: fixture.destination).get()
         XCTAssertEqual(existing.state, try .regular(identity(at: fixture.destination)))
         XCTAssertEqual(existing.canonicalLeafURL, missing.canonicalLeafURL)
-        // A hard link is a different name for the same identity, not an alias: F_GETPATH keeps
-        // the name the leaf was opened by.
-        let link = fixture.directory.appendingPathComponent("link.md")
+    }
+
+    func testHardLinkInspectionUsesCurrentKernelSpelling() throws {
+        let fixture = try makeExportFixture(originalText: "existing")
+        let link = fixture.directory.appendingPathComponent("link.html")
         try FileManager.default.linkItem(at: fixture.destination, to: link)
-        let linked = try ExportArtifactWriter.inspectLeaf(at: link).get()
-        XCTAssertEqual(linked.state, existing.state)
-        XCTAssertEqual(linked.canonicalLeafURL.path(percentEncoded: false), link.path(percentEncoded: false))
+        let linkedIdentity = try identity(at: link)
+        XCTAssertEqual(linkedIdentity, fixture.originalIdentity)
+        let selection = try ExportArtifactSelection.parse(link, kind: nil).get()
+
+        // F_GETPATH consults the shared vnode name, not the descriptor's open-time name.
+        // Lookup either hard-link name immediately before F_GETPATH to control the observation.
+        for lookupURL in [link, fixture.destination] {
+            let lookupPath = lookupURL.path(percentEncoded: false)
+            let probe = ExportBoundaryProbe()
+            let record = probe.hooks().observer
+            let hooks = ExportArtifactWriterHooks(observer: { call in
+                record?(call)
+                guard call.operation == .getPath else { return }
+                let descriptor = lookupPath.withCString { Darwin.open($0, O_RDONLY | O_CLOEXEC) }
+                XCTAssertGreaterThanOrEqual(descriptor, 0)
+                if descriptor >= 0 { Darwin.close(descriptor) }
+            })
+            let inspection = ExportArtifactWriter.inspect(selection, hooks: hooks).map(\.inspection)
+
+            if lookupURL == link {
+                let inspected = try inspection.get()
+                XCTAssertEqual(inspected.state, .regular(linkedIdentity))
+                XCTAssertEqual(inspected.canonicalLeafURL.path(percentEncoded: false), link.path(percentEncoded: false))
+                XCTAssertEqual(inspected.parentIdentity, try identity(at: fixture.directory))
+            } else {
+                XCTAssertEqual(inspection, .failure(.destinationAlias))
+                XCTAssertEqual(
+                    export(to: link, disposition: .replaceConfirmed(linkedIdentity), probe: probe, hooks: hooks),
+                    .notCommitted(.destinationAlias)
+                )
+                XCTAssertFalse(probe.calls.isEmpty)
+                XCTAssertFalse(probe.createdStaging)
+            }
+            XCTAssertEqual(try identity(at: link), linkedIdentity)
+            XCTAssertEqual(try identity(at: fixture.destination), linkedIdentity)
+            XCTAssertEqual(try text(at: link), "existing")
+            XCTAssertEqual(try text(at: fixture.destination), "existing")
+            XCTAssertEqual(try entries(in: fixture.directory), ["export.html", "link.html", Self.sentinelName].sorted())
+        }
     }
 
     /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes

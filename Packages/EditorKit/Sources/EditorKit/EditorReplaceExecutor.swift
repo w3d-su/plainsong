@@ -2,7 +2,7 @@ import AppKit
 import MarkdownCore
 import STTextView
 
-/// Source-only single Replace. App passes a plain request and reads a plain
+/// Raw-source single Replace. App passes a plain request and reads a plain
 /// outcome; the concrete editor stays inside EditorKit.
 @MainActor
 extension MarkdownTextViewCoordinator {
@@ -25,15 +25,16 @@ extension MarkdownTextViewCoordinator {
         guard authorization.allowsCommit() else {
             return .refused(.unauthorized)
         }
-        if isWYSIWYGPresentationInstalled(textView) {
-            return .refused(.wysiwygPresentationInstalled)
-        }
         let selectionIsMatch = isPreparedDocumentInstalled
             && textView.selectedRange() == eligible.match.range
         guard selectionIsMatch else {
             controller.activateCurrentMatch()
             applyControllerNavigation(controller, in: textView)
+            revealReplaceImageAfterNavigation(eligible.match.range, in: textView)
             return .navigatedToCurrentMatch(eligible.match.range)
+        }
+        guard isReplaceRangeRevealed(eligible.match.range, in: textView) else {
+            return .refused(.wysiwygRangeNotRevealed)
         }
         return commitValidatedReplace(eligible, request: request, controller: controller, in: textView)
     }
@@ -202,10 +203,5 @@ extension MarkdownTextViewCoordinator {
     private struct EligibleReplace {
         let match: TextSearchMatch
         let source: String
-    }
-
-    private func isWYSIWYGPresentationInstalled(_ textView: STTextView) -> Bool {
-        guard let textView = textView as? MarkdownSTTextView else { return false }
-        return textView.wysiwygZeroWidthContentStorageDelegate != nil
     }
 }

@@ -153,7 +153,14 @@ extension EditorFindHostedGateTests {
             if try await predicate() { return }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
-        XCTFail("Timed out waiting for \(description)")
+        let report = (["Timed out waiting for \(description)"] + hostedTimeoutDiagnostics.map { $0() })
+            .joined(separator: "\n")
+        let attachment = XCTAttachment(string: report)
+        attachment.name = "Hosted Find timeout: \(description)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print(report)
+        XCTFail(report)
     }
 
     func makeWorkspaceFixture(files: [String: String]) throws -> WorkspaceFixture {
@@ -179,6 +186,10 @@ extension EditorFindHostedGateTests {
             shouldRestoreLastOpenedFile: false,
             userDefaults: defaults
         )
+        hostedTimeoutDiagnostics.append { [weak self, weak appState] in
+            guard let self, let appState else { return "Hosted AppState released" }
+            return hostedFindTimeoutState(appState)
+        }
         return WorkspaceFixture(
             root: root,
             appState: appState,

@@ -106,33 +106,23 @@ struct HostedReplaceWorkspace {
 
 @MainActor
 extension EditorFindHostedGateTests {
-    /// Opens `post.md`, mounts it in a designated key window, opens Find for `query`, and
-    /// waits until the hosted editor has applied the current match and holds focus.
-    func makeHostedReplaceWorkspace(
-        source: String,
-        query: String,
-        localEdit: String? = nil
-    ) async throws -> HostedReplaceWorkspace {
-        let fixture = try makeWorkspaceFixture(files: ["post.md": source])
-        let appState = fixture.appState
-        appState.setLayoutMode(.sourceOnly)
-        // A local edit must stay dirty when the disk changes, or Reload is silent.
-        appState.preferences.setAutosaveIntervalSeconds(30)
-        appState.openExternalFile(fixture.root)
-        try await waitUntil("workspace document opens") {
-            appState.currentDocument.fileURL?.lastPathComponent == "post.md"
+    /// Setup must finish self-triggered fixture inspections before a test injects its own
+    /// refusal state. This waits on external observation only, leaving every product fence intact.
+    func waitForHostedReplaceObservationQuiescence(_ hosted: HostedReplaceWorkspace) async throws {
+        let appState = hosted.appState
+        let session = appState.currentDocument
+        let identity = ObjectIdentifier(session)
+        try await waitUntil("hosted Replace setup has no pending external observation") {
+            guard appState.externalDiskInspectionTasks[identity] == nil,
+                  appState.externalReloadTasks[identity] == nil,
+                  appState.pendingExternalReloadApplications[identity] == nil,
+                  let url = appState.sessionStateURL(for: session)
+            else { return false }
+            return appState.pendingExternalTexts[url] == nil
+                && appState.pendingExternalFileVersions[url] == nil
+                && appState.deferredExternalChangeResolutions[url] == nil
+                && appState.externalChangePrompt?.fileURL != url
         }
-        let group = makeHostedWorkspaceGroup(fixture: fixture)
-        let window = mountDesignatedKeyWorkspace(in: group, appState: appState)
-        designateKeyWindow(window, in: group)
-        designateReplaceKeyWindow(in: group)
-        if let localEdit {
-            appState.replaceDocumentText(localEdit)
-        }
-        openFindBar(appState, query: query)
-        let hosted = HostedReplaceWorkspace(fixture: fixture, group: group, window: window)
-        try await focusEditorOnCurrentMatch(hosted, window: window)
-        return hosted
     }
 
     /// EditorKit reads the key window through the shared probe seam; point it at whichever

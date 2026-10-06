@@ -36,6 +36,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private let imageThumbnailPresentationConfiguration: EditorImageThumbnailConfiguration?
     private let onWYSIWYGMechanismFailure: ((String) -> Void)?
     private let onVisibleRangeChange: (NSRange) -> Void
+    private let onReconciledSourcePresentationInvalidated: (() -> Int)?
 
     init(
         text: Binding<String>,
@@ -57,6 +58,7 @@ struct MarkdownTextView: NSViewRepresentable {
         isWYSIWYGZeroWidthFoldingEnabled: Bool = false,
         imageThumbnailPresentationConfiguration: EditorImageThumbnailConfiguration? = nil,
         onWYSIWYGMechanismFailure: ((String) -> Void)? = nil,
+        onReconciledSourcePresentationInvalidated: (() -> Int)? = nil,
         font: NSFont = MarkdownSyntaxHighlighter.defaultFont,
         lineHeightMultiple: CGFloat = 1.25,
         onVisibleRangeChange: @escaping (NSRange) -> Void = { _ in }
@@ -80,6 +82,7 @@ struct MarkdownTextView: NSViewRepresentable {
         self.isWYSIWYGZeroWidthFoldingEnabled = isWYSIWYGZeroWidthFoldingEnabled
         self.imageThumbnailPresentationConfiguration = imageThumbnailPresentationConfiguration
         self.onWYSIWYGMechanismFailure = onWYSIWYGMechanismFailure
+        self.onReconciledSourcePresentationInvalidated = onReconciledSourcePresentationInvalidated
         self.font = font
         self.lineHeightMultiple = lineHeightMultiple
         self.onVisibleRangeChange = onVisibleRangeChange
@@ -283,6 +286,7 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     private func updateNonDocumentCoordinatorInputs(_ coordinator: Coordinator, for textView: MarkdownSTTextView) {
+        coordinator.reconciledSourcePresentationInvalidationHandler = onReconciledSourcePresentationInvalidated
         coordinator.attachScrollProxy(scrollProxy, to: textView)
         coordinator.attachCommandProxy(commandProxy, to: textView)
         coordinator.updateCompletionWorkspace(completionWorkspace)
@@ -306,6 +310,7 @@ struct MarkdownTextView: NSViewRepresentable {
     private func applyStyledTextIfNeeded(to textView: STTextView, coordinator: Coordinator) -> Bool {
         guard let styledText,
               styledText.revision != coordinator.lastAppliedHighlightRevision,
+              coordinator.canApplyHighlightRevision(styledText.revision),
               !coordinator.isUserEditing,
               !textView.hasMarkedText()
         else {

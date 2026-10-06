@@ -12,6 +12,9 @@ extension MarkdownTextView {
         coordinator.cancelPendingNavigationTasks()
         coordinator.invalidateDeferredSelectionPublication()
         coordinator.detachDeferredDocumentTransitionInstallationHandler()
+        coordinator.reconciledSourcePresentationInvalidationHandler = nil
+        coordinator.invalidateDeferredReconciledSourcePresentation()
+        coordinator.minimumHighlightRevisionAfterReconciliation = nil
         coordinator.revokeInstalledDocumentBinding()
         coordinator.detachImageThumbnailPresentation(from: textView)
         textView.textDelegate = nil
