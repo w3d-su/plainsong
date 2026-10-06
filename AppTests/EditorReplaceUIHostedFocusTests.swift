@@ -163,4 +163,52 @@ extension EditorFindHostedGateTests {
             app.editorFindHost.ui.focusAppliedID != pending && !self.isFindFieldFirstResponder(in: window)
         }
     }
+
+    /// Keyboard and assistive access, as far as an in-process test can drive it: every owned
+    /// row control is a real AppKit responder that keeps menus eligible, its accessibility
+    /// press action runs it, and moving focus onto Cancel does not supersede the plan it
+    /// cancels. The system Full Keyboard Access setting cannot be enabled in-process (AppKit
+    /// ignores Space on a focused button without it), so the physical FKA traversal stays in
+    /// the owner smoke.
+    func testHostedRowControlsAreFocusableRespondersAndPressingFocusedCancelCancelsThePlan() async throws {
+        let hosted = try await makeHostedReplaceRow(source: String(repeating: "hit ", count: 200))
+        let app = hosted.appState
+        let window = hosted.window
+        let editor = try hostedEditor(hosted)
+        let before = EditorReplaceEffectSnapshot(app, textView: editor)
+        for identifier in [EditorFindAccessibility.replaceDisclosure, EditorFindAccessibility.replaceButton,
+                           EditorFindAccessibility.replaceAllButton]
+        {
+            let control = try await waitForBarButton(identifier, in: window)
+            let generation = app.editorReplaceAuthorityGeneration
+            XCTAssertTrue(window.makeFirstResponder(control), identifier)
+            XCTAssertTrue(app.isEditorReplaceMenuCommandEligible(), "\(identifier) is bar provenance")
+            XCTAssertEqual(
+                app.editorReplaceAuthorityGeneration,
+                generation,
+                "\(identifier): focus is not a supersession"
+            )
+            XCTAssertFalse(control.accessibilityLabel()?.isEmpty ?? true, identifier)
+        }
+        let replaceAll = try XCTUnwrap(barButton(EditorFindAccessibility.replaceAllButton, in: window))
+        let hold = try await startHeldBarReplaceAll(hosted) {
+            XCTAssertTrue(window.makeFirstResponder(replaceAll))
+            // The press runs the action; its Bool is not meaningful without an AX client.
+            _ = replaceAll.accessibilityPerformPress()
+        }
+        let cancel = try await waitForBarButton(EditorFindAccessibility.replaceCancelButton, in: window)
+        XCTAssertEqual(cancel.accessibilityLabel(), "Cancel Replace All")
+        let generation = app.editorReplaceAuthorityGeneration
+        XCTAssertTrue(window.makeFirstResponder(cancel))
+        XCTAssertTrue(app.isEditorReplaceMenuCommandEligible())
+        XCTAssertTrue(app.editorFindHost.replaceBatch.isPreparing, "focusing Cancel keeps the plan alive")
+        XCTAssertEqual(app.editorReplaceAuthorityGeneration, generation)
+        _ = cancel.accessibilityPerformPress()
+        XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing, "the press ran Cancel")
+        hold.release()
+        await awaitBarReplaceAll(app)
+        XCTAssertEqual(app.editorFindHost.replaceBatch.lastResult, .cancelled, "explicit Cancel stays distinct")
+        XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "Replace All cancelled")
+        try assertHostedBatchDidNotWrite(hosted, since: before)
+    }
 }
