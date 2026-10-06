@@ -144,6 +144,67 @@ final class EditorKeepMinePresentationTests: XCTestCase {
         XCTAssertEqual(fixture.coordinator.currentInstalledSourceSnapshot, fixture.model.snapshot)
     }
 
+    /// Reload text with the same length, the same first and last 64 UTF-16 units and the same
+    /// image, differing by one character in the middle. The image controller's recorded-source
+    /// check is a length-plus-endpoints sample, so only an explicit reset after the whole-source
+    /// assignment makes it rebuild a marker that the assignment erased; the ordinary parse that
+    /// the App text change schedules is then enough, with no further input.
+    func testSameLengthMidDocumentReloadRestoresImageMarkerAfterTheNormalParse() async throws {
+        let original = Self.longSource(word: "wprd")
+        let reloaded = Self.longSource(word: "word")
+        let changed = (original as NSString).range(of: "wprd").location + 1
+        XCTAssertGreaterThan(changed, 128)
+        XCTAssertGreaterThan(original.utf16.count - changed, 128)
+        XCTAssertEqual(original.utf16.count, reloaded.utf16.count)
+        XCTAssertNotEqual(original, reloaded)
+        let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(
+            source: original, selection: NSRange(location: 3, length: 0), enableWYSIWYG: true
+        )
+        let driver = EditorReconciledPresentationTestDriver(fixture: fixture)
+        defer { driver.stop() }
+        EditorReconciledPresentationTestDriver.configureImages(in: fixture)
+        driver.installInitialPresentation()
+        let imageRange = (original as NSString).range(of: "![alt](fixture.png)")
+        _ = try await WYSIWYGImageThumbnailGateSupport.waitForMarker(
+            in: fixture.textView, range: imageRange, matching: { $0.visualState == .failed }
+        )
+        fixture.model.source = reloaded
+        fixture.model.revision = 1
+
+        XCTAssertTrue(try XCTUnwrap(fixture.model.sourceSynchronizer)(fixture.model.snapshot))
+
+        XCTAssertTrue(ExactUTF16Text.matches(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), reloaded))
+        try EditorReconciledPresentationTestDriver.assertRawPending(
+            in: fixture, source: reloaded, selection: NSRange(location: 3, length: 0)
+        )
+        XCTAssertEqual(driver.requestCount, 0, "Reload relies on the App text change, not the #144 request")
+        // The ordinary parse for the new App text, applied without any other input.
+        driver.installInitialPresentation()
+        try await EditorReconciledPresentationTestDriver.assertMatchesFreshParse(
+            in: fixture, presentation: driver.presentation
+        )
+    }
+
+    /// U+212B ANGSTROM SIGN and U+00C5 are one UTF-16 unit each and Swift treats them as equal;
+    /// the comparison is literal UTF-16, so the snapshot must still be installed.
+    func testSingleUnitCanonicallyEquivalentSnapshotStillReplacesNativeSource() throws {
+        let angstrom = "\u{212B} **bold**"
+        let aring = "\u{00C5} **bold**"
+        XCTAssertEqual(angstrom, aring)
+        XCTAssertEqual(angstrom.utf16.count, aring.utf16.count)
+        XCTAssertFalse(ExactUTF16Text.matches(angstrom, aring))
+        let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(source: angstrom)
+        fixture.model.source = aring
+        fixture.model.revision = 1
+
+        XCTAssertTrue(try XCTUnwrap(fixture.model.sourceSynchronizer)(fixture.model.snapshot))
+
+        let native = EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView)
+        XCTAssertTrue(ExactUTF16Text.matches(native, aring))
+        XCTAssertEqual(native.utf16.first, 0x00C5)
+        XCTAssertEqual(fixture.coordinator.currentInstalledSourceSnapshot, fixture.model.snapshot)
+    }
+
     /// Marked text defers synchronization exactly as before, including for an unchanged snapshot.
     func testUnchangedSnapshotWhileMarkedTextExistsStillDefers() throws {
         let fixture = try EditorReplaceBatchSpikeSupport.makeFixture(source: source)
@@ -162,6 +223,13 @@ final class EditorKeepMinePresentationTests: XCTestCase {
         XCTAssertEqual(EditorReplaceBatchSpikeSupport.viewText(in: fixture.textView), composed)
         XCTAssertEqual(fixture.textView.selectedRange(), composedSelection)
         XCTAssertEqual(fixture.coordinator.currentInstalledSourceSnapshot, snapshotBefore)
+    }
+
+    /// A document whose mid-document word sits more than 128 UTF-16 units from both ends.
+    private static func longSource(word: String) -> String {
+        String(repeating: "Lead paragraph with **bold** words. ", count: 6)
+            + "\nMiddle \(word) here.\n![alt](fixture.png)\n"
+            + String(repeating: "Tail paragraph with *italic* words. ", count: 6)
     }
 
     private func applyFindDecoration(

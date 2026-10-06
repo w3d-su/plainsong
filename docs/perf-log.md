@@ -2455,8 +2455,10 @@ Handoff 26 Part A, from `ccaf1f7`. Keep Mine delivers the unchanged session snap
 highlighting, folds, link folding, image markers and Find decoration with no reparse to
 follow. It now accepts the snapshot without touching the editor when native text equals it
 exactly (UTF-16); Reload with different text still assigns and re-derives through the normal
-text-change path. See the 2026-10-06 Decision Log row. The #144 reconciliation hook is not
-involved, so its revision floor and reset seams are unchanged.
+text-change path, after discarding the same presentation bookkeeping `applyReconciledSource`
+clears — the image controller's recorded-source sample would otherwise keep erased markers
+on a same-length, same-endpoints reload. See the 2026-10-06 Decision Log row. The #144
+reconciliation hook is not involved, so its revision floor and reset seams are unchanged.
 
 Typing path: nothing new runs per keystroke. The synchronizer's single caller is
 `AppState.synchronizePendingExternalReloadIfPossible` (external-change resolution); the
@@ -2465,12 +2467,14 @@ No scheduler hook, representable-update work or edit-path code changed, so no ty
 measurement is claimed and R9/§12 acceptance is unaffected.
 
 Verification (recorded load 19-92; this Mac was heavily contended by other worktrees):
-- EditorKit **451 tests, seven real-IME opt-in skips, zero failures**, including the six
+- EditorKit **453 tests, seven real-IME opt-in skips, zero failures**, including the eight
   `EditorKeepMinePresentationTests`; MarkdownCore **320 tests, zero failures**.
-- Hosted, under the shared xcodebuild lock: the three new hosted tests (two Keep Mine,
-  one changed-text Reload) pass. Forcing the old unconditional assignment fails both
-  Keep Mine tests (folds 24 to 0 indexes, image markers 19 to 0, Find decoration lost)
-  and three EditorKit tests; the Reload test passes either way.
+- Hosted, under the shared xcodebuild lock: the four new hosted tests (two Keep Mine, two
+  Reload — changed text and same-length, same-endpoints) pass. Forcing the old
+  unconditional assignment fails both Keep Mine tests (folds 24 to 0 indexes, image
+  markers 19 to 0, Find decoration lost) and three EditorKit tests; removing the
+  post-assignment bookkeeping discard fails the same-length Reload test, whose image
+  marker never rebuilds.
 - Broad hosted run (`EditorFindHostedGateTests`, Find/Replace App classes, `AppStateTests`,
   session-cleanup and workspace-integrity classes): 449 tests, four opt-in skips. Twelve
   failures were all "Timed out waiting for hosted PreviewController and WKWebView

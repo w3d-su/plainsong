@@ -35,9 +35,18 @@ extension MarkdownTextViewCoordinator {
             publishAppliedSelection(clampedSelection)
         }
 
-        // Whole-source assignment removes every presentation attribute. Retain the
-        // applied revision so an older styledText value cannot be reused, but discard
-        // plans and asynchronous image work that belong to the cleared presentation.
+        discardPresentationBookkeepingAfterWholeSourceAssignment(in: textView)
+        requestReconciledSourcePresentation()
+    }
+
+    /// Whole-source assignment removes every presentation attribute. Retain the applied
+    /// revision so an older styledText value cannot be reused, but discard plans, Find
+    /// decoration caches and asynchronous image work that belong to the cleared
+    /// presentation. Image ownership must be reset explicitly: its recorded-source check
+    /// is a length-plus-endpoints sample, so same-length text with the same ends would
+    /// otherwise keep markers the assignment erased. Call after the assignment, so the
+    /// controller records the new storage text. This never requests a parse itself.
+    func discardPresentationBookkeepingAfterWholeSourceAssignment(in textView: STTextView) {
         lastAppliedHighlightFoldPlan = nil
         appliedFindMatchHighlight = nil
         appliedFindMatchHighlightSpan = nil
@@ -46,7 +55,6 @@ extension MarkdownTextViewCoordinator {
             textView.replacePresentationSnapshot = nil
             imageThumbnailPresentationController.presentationWasReset(in: textView)
         }
-        requestReconciledSourcePresentation()
     }
 
     /// App's Reload / Keep Mine synchronizer for this exact installation.
@@ -57,8 +65,12 @@ extension MarkdownTextViewCoordinator {
     /// scheduled and the editor would stay raw until the next keystroke. When the native
     /// source already equals the snapshot exactly (UTF-16, no normalization) there is
     /// nothing to install: the snapshot is only accepted, and selection, undo and every
-    /// attribute stay untouched. A snapshot with different text (Reload) still assigns; the
-    /// changed App text then re-derives presentation through the normal text-change path.
+    /// attribute stay untouched. A snapshot with different text (Reload) still assigns and
+    /// then discards the same presentation bookkeeping as `applyReconciledSource` (fold
+    /// plan, presentation snapshot, Find caches, image ownership) without requesting a
+    /// parse: the App text change already schedules the ordinary one. The image reset is
+    /// required even then, because a same-length Reload with the same endpoints would
+    /// otherwise look like the recorded source and never rebuild its erased markers.
     /// The comparison runs only while an external-change resolution converges, never on
     /// the typing path. Marked text and a pending writer lease still defer unchanged.
     func synchronizeInstalledSource(
@@ -79,6 +91,7 @@ extension MarkdownTextViewCoordinator {
                 toLength: (snapshot.source as NSString).length
             )
             isUpdating = false
+            discardPresentationBookkeepingAfterWholeSourceAssignment(in: textView)
         }
         installedDocument.acceptSourceSnapshot(snapshot)
         isNativeSourceSynchronized = true

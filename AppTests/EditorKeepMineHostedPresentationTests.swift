@@ -102,6 +102,61 @@ extension EditorFindHostedGateTests {
         try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
     }
 
+    /// The Reload text has the same UTF-16 length, the same first and last 64 units and the same
+    /// image as the local source, differing by one character mid-document (a typo fix from
+    /// git). The image controller's recorded-source check is a sample, so the whole-source
+    /// assignment must reset image ownership explicitly or the thumbnail stays raw.
+    func testHostedSameLengthReloadRestoresImageThumbnailAndFoldsWithoutAnEdit() async throws {
+        let saved = keepMineLongSource(word: "wprd")
+        let local = keepMineLongSource(word: "wxrd")
+        let disk = keepMineLongSource(word: "word")
+        let changed = (local as NSString).range(of: "wxrd").location + 1
+        XCTAssertGreaterThan(changed, 128)
+        XCTAssertGreaterThan(local.utf16.count - changed, 128)
+        XCTAssertEqual(local.utf16.count, disk.utf16.count)
+        let hosted = try await makeHostedEditorWorkspace(
+            source: saved,
+            query: "Lead",
+            localEdit: local,
+            assets: ["fixture.png": reconciledFixturePNG()],
+            layoutMode: .wysiwyg
+        )
+        let appState = hosted.appState
+        let session = appState.currentDocument
+        let editor = try hostedEditor(hosted)
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
+        let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
+        try await waitUntil("the local source shows folds and a ready image thumbnail") {
+            storage.string == local && self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+        try await recordExternalConflict(hosted, disk: disk)
+
+        appState.reloadExternallyChangedFile()
+        try await waitUntil("Reload converges and completes") {
+            appState.externalChangePrompt == nil
+                && appState.externalReloadTasks.isEmpty
+                && appState.pendingExternalReloadApplications.isEmpty
+                && session.text == disk
+        }
+
+        // Observe only: no edit, selection change or manual scheduling restores the thumbnail.
+        try await waitUntil("the disk source is folded and its image thumbnail is ready again") {
+            storage.string == disk && self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+        XCTAssertTrue(ExactUTF16Text.matches(storage.string, disk))
+        XCTAssertFalse(editor.undoManager?.canUndo == true)
+        XCTAssertFalse(editor.undoManager?.canRedo == true)
+        try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
+    }
+
+    private func keepMineLongSource(word: String) -> String {
+        String(repeating: "Lead paragraph with **bold** words. ", count: 6)
+            + "\nMiddle \(word) here.\n![alt](fixture.png)\n"
+            + String(repeating: "Tail paragraph with *italic* words. ", count: 6)
+    }
+
     private func assertKeepMineRetainsPresentation(
         _ hosted: HostedReplaceWorkspace,
         disk: String,
