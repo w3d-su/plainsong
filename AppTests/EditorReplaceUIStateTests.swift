@@ -139,4 +139,17 @@ final class EditorReplaceUIStateTests: XCTestCase {
         XCTAssertEqual(ui.selectAllRequestID, before.selectAllRequestID)
         XCTAssertGreaterThanOrEqual(ui.focusSupersededID, ui.focusRequestID, "a remount cannot replay a token")
     }
+
+    func testReloadOrKeepMineCompletionClearsABlockedMessageButKeepsTheRow() {
+        let appState = makeAppState()
+        openExpandedRow(appState)
+        appState.editorFindHost.replaceStatus = EditorReplaceStatusText.blocked(.externalChangeAwaitingChoice)
+        let generation = appState.editorReplaceAuthorityGeneration
+        appState.editorReplaceExternalResolutionDidComplete(for: appState.currentDocument)
+        XCTAssertNil(appState.editorFindHost.replaceStatus)
+        XCTAssertGreaterThan(appState.editorReplaceAuthorityGeneration, generation)
+        XCTAssertTrue(appState.editorFindHost.ui.isReplaceRowActive)
+        XCTAssertEqual(appState.editorFindHost.ui.replacementText, "NEW")
+        XCTAssertEqual(appState.editorFindHost.ui.queryText, "hit")
+    }
 }

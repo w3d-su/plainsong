@@ -24,7 +24,8 @@ struct EditorFindBar: View {
         VStack(alignment: .leading, spacing: 6) {
             findRow
             if appState.editorFindHost.ui.isReplaceExpanded {
-                EditorReplaceRow()
+                EditorReplaceRow(model: EditorReplaceRowModel(appState: appState), appState: appState)
+                    .equatable()
             }
         }
         .padding(.horizontal, 12)

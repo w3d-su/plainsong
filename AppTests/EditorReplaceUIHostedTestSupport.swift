@@ -144,4 +144,27 @@ extension EditorFindHostedGateTests {
         XCTAssertFalse(hold.didRunOnMainThread)
         return hold
     }
+
+    /// §5.5: a composing owner refuses Replace with `.markedText` before App evaluates any
+    /// authorization, with zero effect and no authority input change.
+    func assertMarkedTextRefusal(
+        _ hosted: HostedReplaceWorkspace,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let appState = hosted.appState
+        let editor = try hostedEditor(hosted)
+        appState.editorFindHost.replaceAuthority.lastAuthorizationRecord = nil
+        let before = EditorReplaceEffectSnapshot(appState, textView: editor)
+        let generation = appState.editorReplaceAuthorityGeneration
+        XCTAssertEqual(appState.performEditorReplace(replacement: "HIT"), .markedText, file: file, line: line)
+        XCTAssertNil(
+            appState.editorFindHost.replaceAuthority.lastAuthorizationRecord,
+            "composition refuses before any authorization",
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(EditorReplaceEffectSnapshot(appState, textView: editor), before, file: file, line: line)
+        XCTAssertEqual(appState.editorReplaceAuthorityGeneration, generation, file: file, line: line)
+    }
 }

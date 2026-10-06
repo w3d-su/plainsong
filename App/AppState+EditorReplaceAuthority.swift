@@ -144,6 +144,8 @@ extension AppState {
     func editorReplaceExternalResolutionDidComplete(for session: DocumentSession) {
         advanceEditorReplaceAuthorityGeneration()
         guard session === currentDocument else { return }
+        // A "choose Reload or Keep Mine" refusal no longer describes the document.
+        clearEditorReplaceStatus()
         refreshEditorFindCounterFromAppSource()
     }
 

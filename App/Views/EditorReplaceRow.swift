@@ -2,6 +2,27 @@ import EditorKit
 import MarkdownCore
 import SwiftUI
 
+/// Everything the replacement row displays, as one comparable value.
+struct EditorReplaceRowModel: Equatable {
+    let replacementText: String
+    let replacementValidity: EditorReplaceValueValidity
+    let hasActiveQuery: Bool
+    let isTruncated: Bool
+    let activity: EditorReplaceActivity
+    let status: EditorReplaceStatus?
+
+    @MainActor
+    init(appState: AppState) {
+        let ui = appState.editorFindHost.ui
+        replacementText = ui.replacementText
+        replacementValidity = ui.replacementValidity
+        hasActiveQuery = ui.hasActiveQuery
+        isTruncated = ui.isTruncated
+        activity = appState.editorReplaceActivity
+        status = appState.editorFindHost.replaceStatus
+    }
+}
+
 /// The disclosed second row of the find bar (`docs/editor-replace-gates.md` §5.1).
 ///
 /// Every state is text plus a symbol, never color alone, and each has a stable
@@ -9,15 +30,24 @@ import SwiftUI
 /// (`EditorFindBarButton`) that call App intents directly, as Next / Previous / Done do. They
 /// stay enabled while a plan prepares, so a focused button never loses focus mid-action; a
 /// second Replace All supersedes the first, as in PR G.
-struct EditorReplaceRow: View {
-    @EnvironmentObject private var appState: AppState
+///
+/// The row is an `Equatable` view over `EditorReplaceRowModel` and deliberately does not
+/// observe `AppState`: unrelated publishes (editor keystrokes among them) compare one small
+/// value and never re-evaluate the row or update its AppKit views.
+struct EditorReplaceRow: View, Equatable {
+    let model: EditorReplaceRowModel
+    /// Intents only; never read for display.
+    let appState: AppState
+
+    nonisolated static func == (lhs: EditorReplaceRow, rhs: EditorReplaceRow) -> Bool {
+        lhs.model == rhs.model && lhs.appState === rhs.appState
+    }
 
     var body: some View {
-        let ui = appState.editorFindHost.ui
-        let activity = appState.editorReplaceActivity
-        let status = appState.editorFindHost.replaceStatus
-        let fieldError = EditorReplaceStatusText.fieldError(ui.replacementValidity)
-        let actionsDisabled = !ui.hasActiveQuery || fieldError != nil
+        let activity = model.activity
+        let status = model.status
+        let fieldError = EditorReplaceStatusText.fieldError(model.replacementValidity)
+        let actionsDisabled = !model.hasActiveQuery || fieldError != nil
 
         HStack(spacing: 8) {
             // Aligns the field under the query field (disclosure + magnifier column).
@@ -75,7 +105,7 @@ struct EditorReplaceRow: View {
                 statusView(status)
             }
 
-            if ui.hasActiveQuery, ui.isTruncated || status?.kind == .overflow {
+            if model.hasActiveQuery, model.isTruncated || status?.kind == .overflow {
                 symbol("exclamationmark.triangle")
                 EditorFindBarLabel(
                     text: EditorReplaceStatusText.overflow,
