@@ -60,7 +60,7 @@ final class EditorFindReviewFixTests: XCTestCase {
         let searchRange = (text as NSString).range(of: "three")
         let documentIdentity = try XCTUnwrap(appState.activeEditorDocumentIdentity)
         appState.notifyEditorFindWorkspaceSearchWillNavigate(to: searchRange)
-        appState.issueEditorNavigation(
+        appState.issueWorkspaceSearchEditorNavigation(
             documentIdentity: documentIdentity,
             selection: searchRange
         )

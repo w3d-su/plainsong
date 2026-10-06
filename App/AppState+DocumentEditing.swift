@@ -157,7 +157,7 @@ extension AppState {
             // activation never reaches `setCurrentDocument`, so this is the only place a find
             // match still in flight is stopped from overriding the search selection later.
             notifyEditorFindWorkspaceSearchWillNavigate(to: match.range)
-            issueEditorNavigation(
+            issueWorkspaceSearchEditorNavigation(
                 documentIdentity: activation.documentIdentity,
                 selection: match.range
             )
@@ -503,7 +503,11 @@ extension AppState {
         }
     }
 
-    func cancelPendingEditorNavigationIfNeeded(force: Bool = false) {
+    func cancelPendingEditorNavigationIfNeeded(
+        force: Bool = false,
+        file: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         if !force {
             guard let command = editorNavigationCommand,
                   case .navigate = command
@@ -512,10 +516,16 @@ extension AppState {
             }
         }
 
-        editorNavigationCommand = .cancel(id: advanceEditorNavigationGeneration())
+        publishEditorNavigationCommand(
+            .cancel(id: advanceEditorNavigationGeneration()), file: file, line: line
+        )
     }
 
-    func cancelPendingEditorNavigationIfNeeded(targeting session: DocumentSession) {
+    func cancelPendingEditorNavigationIfNeeded(
+        targeting session: DocumentSession,
+        file: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         guard case let .navigate(request)? = editorNavigationCommand,
               let documentIdentity = editorDocumentIdentity(for: session),
               request.documentIdentity == documentIdentity
@@ -523,7 +533,9 @@ extension AppState {
             return
         }
 
-        editorNavigationCommand = .cancel(id: advanceEditorNavigationGeneration())
+        publishEditorNavigationCommand(
+            .cancel(id: advanceEditorNavigationGeneration()), file: file, line: line
+        )
     }
 
     static func editorDocumentIdentity(for url: URL) -> EditorDocumentIdentity {
@@ -534,17 +546,19 @@ extension AppState {
         EditorDocumentIdentity(rawValue: url.absoluteString)
     }
 
-    func issueEditorNavigation(
+    func issueWorkspaceSearchEditorNavigation(
         documentIdentity: EditorDocumentIdentity,
         selection: NSRange,
         shouldFocusEditor: Bool = true
     ) {
-        editorNavigationCommand = .navigate(EditorNavigationRequest(
-            id: advanceEditorNavigationGeneration(),
+        let id = advanceEditorNavigationGeneration()
+        editorNavigationChannel.lastWorkspaceSearchNavigationID = id
+        publishEditorNavigationCommand(.navigate(EditorNavigationRequest(
+            id: id,
             documentIdentity: documentIdentity,
             selection: selection,
             shouldFocusEditor: shouldFocusEditor
-        ))
+        )))
     }
 
     @discardableResult

@@ -247,7 +247,7 @@ final class AppState: ObservableObject {
     var workspaceSearchTaskToken: UUID?
     var workspaceSearchQueryGeneration: UInt64 = 0
     var workspaceSearchRefreshIntent: WorkspaceSearchRefreshIntent?
-    var editorNavigationGeneration: UInt64 = 0
+    let editorNavigationChannel = EditorNavigationChannelState()
     var editorDocumentBindingIDs: [ObjectIdentifier: EditorDocumentBindingID] = [:]
     var editorDocumentBindingSessions: [EditorDocumentBindingID: DocumentSession] = [:]
     var editorBindingInstallations: [
