@@ -2482,3 +2482,20 @@ Verification (recorded load 19-92; this Mac was heavily contended by other workt
   Rerunning exactly those eleven under the lock passed 11/11 in 6.5 s.
 - `make build`, pinned SwiftFormat 0.62.1 `make lint` (zero serious; no new warning) and
   `git diff --check` pass. Not a full `make test` claim.
+
+Hosted fixture repair (CI run 37447057921 failed
+`testHostedSameLengthReloadRestoresImageThumbnailAndFoldsWithoutAnEdit` at its setup wait):
+the test's own local edit was a same-length replacement into the editor, so it hit the
+recorded-source sample and raced the initial thumbnail load. Sampling presentation every
+250 ms showed folds restored but zero image markers for the whole 8 s window in the failing
+runs, and the visible text range covered the entire document, which rules out a viewport
+layout cause. The local edit is now one unit longer than the saved text; only the Reload is
+same-length. Four consecutive runs pass; removing the post-assignment bookkeeping discard
+fails the post-Reload wait ("Timed out waiting for the disk source is folded and its image
+thumbnail is ready again") in two of two runs.
+
+Known follow-up, not fixed here: `MarkdownTextView.applyIncomingTextIfNeeded` assigns
+`textView.text` for an App-initiated text change without the presentation reset. A clean
+(conflict-free) external reload, or any App text replacement, with the same UTF-16 length
+and the same first and last 64 units therefore restores folds but leaves no image markers.
+A throwaway hosted test reproduced it two of two times (folds 36, markers 0 after 3 s).

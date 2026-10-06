@@ -106,14 +106,21 @@ extension EditorFindHostedGateTests {
     /// image as the local source, differing by one character mid-document (a typo fix from
     /// git). The image controller's recorded-source check is a sample, so the whole-source
     /// assignment must reset image ownership explicitly or the thumbnail stays raw.
+    ///
+    /// The local edit is deliberately one unit longer than the saved text. A same-length local
+    /// edit would make the fixture's own setup (`replaceDocumentText` into the editor) a
+    /// same-length replacement, which is a different path from the Reload synchronizer and is
+    /// timing-dependent against the initial thumbnail load. Only the Reload is same-length.
     func testHostedSameLengthReloadRestoresImageThumbnailAndFoldsWithoutAnEdit() async throws {
         let saved = keepMineLongSource(word: "wprd")
-        let local = keepMineLongSource(word: "wxrd")
-        let disk = keepMineLongSource(word: "word")
-        let changed = (local as NSString).range(of: "wxrd").location + 1
+        let local = keepMineLongSource(word: "wxxrd")
+        let disk = keepMineLongSource(word: "wxord")
+        let changed = (local as NSString).range(of: "wxxrd").location + 2
         XCTAssertGreaterThan(changed, 128)
         XCTAssertGreaterThan(local.utf16.count - changed, 128)
+        XCTAssertNotEqual(saved.utf16.count, local.utf16.count)
         XCTAssertEqual(local.utf16.count, disk.utf16.count)
+        XCTAssertNotEqual(local, disk)
         let hosted = try await makeHostedEditorWorkspace(
             source: saved,
             query: "Lead",
