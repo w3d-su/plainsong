@@ -1,10 +1,11 @@
 # Export PDF / Print — owner acceptance checklist
 
-**Not ready to run:** PR G is stopped before commands are implemented. See
-[the design-stop evidence](export-pdf-print-design-stop.md). Every box below is
-owner-only and remains unchecked; diagnostic or injected-panel tests cannot close it.
-After implementation, record date, macOS version, exact build commit, Debug/Release,
-destination, typed writer outcome, and any remaining paths in `export-gates.md`.
+**Ready for the owner.** Automated PDF/Print tests cover the offscreen capture, the
+save-panel seam, and print-panel configuration. Every box below still needs a real
+`NSSavePanel`, Print panel, or VoiceOver pass. Record date, macOS version, exact build
+commit, Debug/Release, destination, typed writer outcome, and any remaining paths in
+`export-gates.md`. The 2026-10-04 clipping note is historical:
+[design-stop evidence](export-pdf-print-design-stop.md).
 
 ## PDF: real NSSavePanel / Powerbox, sandboxed build
 

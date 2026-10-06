@@ -40,14 +40,18 @@ extension ExportHTMLCommandAppTests {
         available = true
         NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
         for _ in 0 ..< 100 {
-            if menu.snapshot.canExportHTML { break }
+            if menu.snapshot.canExportHTML {
+                break
+            }
             try await Task.sleep(nanoseconds: 1_000_000)
         }
         XCTAssertTrue(menu.snapshot.canExportHTML)
         available = false
         NotificationCenter.default.post(name: NSWindow.willCloseNotification, object: window)
         for _ in 0 ..< 100 {
-            if !menu.snapshot.canExportHTML { break }
+            if !menu.snapshot.canExportHTML {
+                break
+            }
             try await Task.sleep(nanoseconds: 1_000_000)
         }
         XCTAssertFalse(menu.snapshot.canExportHTML)
@@ -108,7 +112,10 @@ extension ExportHTMLCommandAppTests {
         // The hosted app builds its real SwiftUI command menu on the main run loop.
         for _ in 0 ..< 100 {
             if NSApp.mainMenu?.items.first(where: { $0.title == "File" })?.submenu?
-                .items.contains(where: { $0.title == "Export as HTML…" }) == true { break }
+                .items.contains(where: { $0.title == "Export as HTML…" }) == true
+            {
+                break
+            }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         let menu = try XCTUnwrap(NSApp.mainMenu?.items.first(where: { $0.title == "File" })?.submenu)
@@ -148,8 +155,8 @@ extension ExportHTMLCommandAppTests {
         let app = fixture.appState
         var messages: [String] = []
         app.exportHTMLOperations.announcementPoster = { messages.append($0) }
-        app.exportHTMLStatus = .exporting(operationID: 1, fileName: "post.html")
-        app.exportHTMLStatus = .exporting(operationID: 1, fileName: "Title.html")
+        app.exportHTMLStatus = .exporting(operationID: 1, fileName: "post.html", product: .html)
+        app.exportHTMLStatus = .exporting(operationID: 1, fileName: "Title.html", product: .html)
         XCTAssertEqual(messages, [ExportHTMLAccessibility.progressLabel(fileName: "post.html")])
         app.presentExportHTMLResult(.written(.notCommitted(.ownedDestination)), operationID: 1)
         XCTAssertEqual(messages.last, app.exportHTMLNotice?.accessibilityLabel)
@@ -158,7 +165,7 @@ extension ExportHTMLCommandAppTests {
         app.exportHTMLStatus = error
         app.cancelExportHTML()
         XCTAssertEqual(messages.count, 2)
-        app.exportHTMLStatus = .exporting(operationID: 2, fileName: "next.html")
+        app.exportHTMLStatus = .exporting(operationID: 2, fileName: "next.html", product: .html)
         let notice = ExportHTMLNotice(operationID: 2, group: .exported, severity: .success,
                                       title: "Exported as HTML", message: "Export complete", revealURL: nil)
         app.exportHTMLStatus = .notice(notice)

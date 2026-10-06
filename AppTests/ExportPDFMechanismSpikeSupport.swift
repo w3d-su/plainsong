@@ -197,27 +197,16 @@ final class E0OffscreenPDFProbe {
         guard !blocks.isEmpty else {
             throw E0ProbeError.invalidJavaScriptResult("empty pagination block bounds")
         }
-
-        for candidate in stride(from: 14400, through: minimumHeight, by: -1) {
-            let pageHeight = CGFloat(candidate)
-            var boundary = contentBounds.minY + pageHeight
-            var isSafe = true
-            while boundary < contentBounds.maxY - 0.5 {
-                if blocks.contains(where: {
-                    boundary >= $0.minY - boundaryClearance
-                        && boundary <= $0.maxY + boundaryClearance
-                }) {
-                    isSafe = false
-                    break
-                }
-                boundary += pageHeight
-            }
-            if isSafe {
-                return pageHeight
-            }
+        guard let pageHeight = ExportPDFPagePlanner.fixedHeight(
+            contentMinY: contentBounds.minY,
+            contentMaxY: contentBounds.maxY,
+            blocks: blocks.map { ExportPDFPagePlanner.Block(minY: $0.minY, maxY: $0.maxY) },
+            minimumHeight: minimumHeight,
+            boundaryClearance: boundaryClearance
+        ) else {
+            throw E0ProbeError.noSafeFixedPaginationHeight
         }
-
-        throw E0ProbeError.noSafeFixedPaginationHeight
+        return pageHeight
     }
 
     func scroll(toY offset: CGFloat) async throws {

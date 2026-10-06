@@ -88,6 +88,57 @@ extension ExportHTMLCommandAppTests {
         }
     }
 
+    func testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged() async throws {
+        for product in ["pdf", "print"] {
+            let source = (0 ..< 40).map { "## Visible block \($0)\n\nParagraph \($0)." }.joined(separator: "\n\n")
+            let fixture = try makeFixture(text: source)
+            fixture.session.replaceText(source + "\nUnsaved tail")
+            fixture.appState.cancelAutosave(for: fixture.session)
+            let mounted = try mountExportTestEditor(fixture)
+            defer { mounted.window.contentView = nil; mounted.window.orderOut(nil) }
+            mounted.textView.textSelection = NSRange(location: 3, length: 7)
+            mounted.scrollView.contentView.scroll(to: NSPoint(x: 0, y: 40))
+            mounted.scrollView.reflectScrolledClipView(mounted.scrollView.contentView)
+            let visible = PreviewController()
+            defer { visible.invalidate() }
+            visible.webView.frame = CGRect(x: 0, y: 0, width: 800, height: 300)
+            visible.setTheme("dark")
+            guard case let .completed(renderID) = await visible.renderForExport(fixture.session.currentTextChange)
+            else { return XCTFail("Visible preview must render") }
+            let previewBefore = try await visible.webView.evaluateJavaScript(
+                "JSON.stringify([window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
+            ) as? String
+            let documentBefore = DocumentState(fixture.session)
+            let selectionBefore = mounted.textView.textSelection
+            let scrollBefore = mounted.scrollView.contentView.bounds.origin
+            let recents = fixture.appState.recentItemURLs
+            let destination = fixture.exportsDirectory.appendingPathComponent("isolation.pdf")
+            if product == "pdf" {
+                _ = fixture.record(returning: [destination])
+                try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value
+                XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+            } else {
+                fixture.appState.exportHTMLOperations.destinationChooser = { _ in
+                    XCTFail("Print must not choose a file")
+                    return destination
+                }
+                fixture.appState.exportHTMLOperations.printOperationRunner = { _, _ in true }
+                try await XCTUnwrap(fixture.appState.printCurrentDocument()).value
+                XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+            }
+            XCTAssertEqual(DocumentState(fixture.session), documentBefore)
+            XCTAssertTrue(fixture.appState.currentDocument === fixture.session)
+            XCTAssertEqual(mounted.textView.textSelection, selectionBefore)
+            XCTAssertEqual(mounted.scrollView.contentView.bounds.origin, scrollBefore)
+            XCTAssertEqual(fixture.appState.recentItemURLs, recents)
+            XCTAssertEqual(visible.scrollDeliveryState.completedRenderID, renderID)
+            let previewAfter = try await visible.webView.evaluateJavaScript(
+                "JSON.stringify([window.scrollY, document.documentElement.dataset.theme, document.body.innerHTML])"
+            ) as? String
+            XCTAssertEqual(previewAfter, previewBefore)
+        }
+    }
+
     private func mountExportTestEditor(_ fixture: Fixture) throws -> MountedExportEditor {
         let binding = fixture.appState.editorDocumentBinding(for: fixture.session)
         let frame = NSRect(x: 0, y: 0, width: 640, height: 240)

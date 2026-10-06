@@ -1,6 +1,12 @@
 # Export PR G — wide-table design stop
 
-Handoff 20 stops before product implementation. PR #138 is merged at
+**Resolved 2026-10-06.** The owner chose export-only overflow expansion, then one
+uniform scale of the whole capture only when the contained width exceeds 14,400 pt.
+Print uses the same expansion and `NSPrintInfo` horizontal fit. The notes below are the
+2026-10-04 reproduction, kept so the unexpanded capture's clipping stays explained.
+Product capture no longer uses that unexpanded geometry.
+
+Handoff 20 stopped before product implementation. PR #138 is merged at
 `d666e64f7907c9d10b9e3037957141b0ea4b1caf`, the base of this investigation.
 The existing E0 **GO (paginated)** result remains accepted. Its 420-heading fixture
 is not evidence for arbitrary overflowing content. No E5–E9 box closes here.
