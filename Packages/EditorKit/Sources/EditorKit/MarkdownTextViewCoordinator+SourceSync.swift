@@ -49,6 +49,43 @@ extension MarkdownTextViewCoordinator {
         requestReconciledSourcePresentation()
     }
 
+    /// App's Reload / Keep Mine synchronizer for this exact installation.
+    ///
+    /// Keep Mine delivers the *unchanged* session snapshot. Whole-source assignment would
+    /// erase every presentation attribute (highlighting, WYSIWYG folds, link folding, image
+    /// markers, Find decoration) while the App text never changed, so no reparse would be
+    /// scheduled and the editor would stay raw until the next keystroke. When the native
+    /// source already equals the snapshot exactly (UTF-16, no normalization) there is
+    /// nothing to install: the snapshot is only accepted, and selection, undo and every
+    /// attribute stay untouched. A snapshot with different text (Reload) still assigns; the
+    /// changed App text then re-derives presentation through the normal text-change path.
+    /// The comparison runs only while an external-change resolution converges, never on
+    /// the typing path. Marked text and a pending writer lease still defer unchanged.
+    func synchronizeInstalledSource(
+        _ snapshot: EditorDocumentSourceSnapshot,
+        in textView: STTextView
+    ) -> Bool {
+        guard !hasPendingWriterLease,
+              !textView.hasMarkedText()
+        else {
+            return false
+        }
+
+        if !nativeTextMatches(textView, snapshot.source) {
+            let selectedRange = textView.selectedRange()
+            isUpdating = true
+            textView.text = snapshot.source
+            textView.textSelection = selectedRange.clamped(
+                toLength: (snapshot.source as NSString).length
+            )
+            isUpdating = false
+        }
+        installedDocument.acceptSourceSnapshot(snapshot)
+        isNativeSourceSynchronized = true
+        isUserEditing = false
+        return true
+    }
+
     func invalidateDeferredReconciledSourcePresentation() {
         reconciledSourcePresentationGeneration &+= 1
         hasDeferredReconciliationPresentation = false

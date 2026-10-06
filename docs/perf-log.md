@@ -2296,7 +2296,9 @@ two typing opt-in skips, zero failures**. Highlight-scheduler stress applied all
 (zero serious violations), and `git diff --check` passed. Hosted/build validation
 held the shared xcodebuild lock. This is the required suite scope, not a full
 `make test` claim. No new typing measurement or additional gate closure is claimed;
-Keep Mine and the second-merge rejected Replace All hosted test remain follow-ups.
+the second-merge rejected Replace All hosted test remains a follow-up. Keep Mine, which
+this note listed as a follow-up, is fixed by
+[Keep Mine presentation](#keep-mine-presentation--2026-10-06).
 
 ### Paired typing comparison under recorded load
 
@@ -2445,3 +2447,34 @@ publication and one undo. These loaded timings do not close R9 or any absolute
 latency budget; R6 real IME and R8/R10 also remain open. Earlier failed test-development
 runs are retained separately in that evidence, with their corrected assertions and
 injection conditions.
+
+## Keep Mine presentation — 2026-10-06
+
+Handoff 26 Part A, from `ccaf1f7`. Keep Mine delivers the unchanged session snapshot to
+`synchronizeInstalledSource`, whose unconditional whole-source assignment erased
+highlighting, folds, link folding, image markers and Find decoration with no reparse to
+follow. It now accepts the snapshot without touching the editor when native text equals it
+exactly (UTF-16); Reload with different text still assigns and re-derives through the normal
+text-change path. See the 2026-10-06 Decision Log row. The #144 reconciliation hook is not
+involved, so its revision floor and reset seams are unchanged.
+
+Typing path: nothing new runs per keystroke. The synchronizer's single caller is
+`AppState.synchronizePendingExternalReloadIfPossible` (external-change resolution); the
+O(n) exact comparison runs there once per live installation and only when lengths match.
+No scheduler hook, representable-update work or edit-path code changed, so no typing
+measurement is claimed and R9/§12 acceptance is unaffected.
+
+Verification (recorded load 19-92; this Mac was heavily contended by other worktrees):
+- EditorKit **451 tests, seven real-IME opt-in skips, zero failures**, including the six
+  `EditorKeepMinePresentationTests`; MarkdownCore **320 tests, zero failures**.
+- Hosted, under the shared xcodebuild lock: the three new hosted tests (two Keep Mine,
+  one changed-text Reload) pass. Forcing the old unconditional assignment fails both
+  Keep Mine tests (folds 24 to 0 indexes, image markers 19 to 0, Find decoration lost)
+  and three EditorKit tests; the Reload test passes either way.
+- Broad hosted run (`EditorFindHostedGateTests`, Find/Replace App classes, `AppStateTests`,
+  session-cleanup and workspace-integrity classes): 449 tests, four opt-in skips. Twelve
+  failures were all "Timed out waiting for hosted PreviewController and WKWebView
+  deallocate" in eleven `testHostedReplace*` cases that took 5-504 s each at load 85-92.
+  Rerunning exactly those eleven under the lock passed 11/11 in 6.5 s.
+- `make build`, pinned SwiftFormat 0.62.1 `make lint` (zero serious; no new warning) and
+  `git diff --check` pass. Not a full `make test` claim.

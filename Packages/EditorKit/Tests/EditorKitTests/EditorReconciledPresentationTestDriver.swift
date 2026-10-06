@@ -1,6 +1,7 @@
 import AppKit
 @testable import EditorKit
 import MarkdownCore
+import STTextView
 import XCTest
 
 /// Drives the production scheduler from the coordinator's reconciliation callback.
@@ -122,6 +123,7 @@ final class EditorReconciledPresentationTestDriver {
         presentation: MarkdownEditorDevelopmentPresentation,
         includesImage: Bool = true,
         assertsNoUndoStep: Bool = true,
+        findDecoration: EditorFindMatchHighlightRequest? = nil,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws {
@@ -135,6 +137,7 @@ final class EditorReconciledPresentationTestDriver {
         let expected = freshPresentation(source, selection: selection, revision: 1, presentation: presentation)
         if includesImage { configureImages(in: fresh) }
         XCTAssertTrue(MarkdownTextView.applyHighlightedText(expected, to: fresh.textView), file: file, line: line)
+        applyFindDecoration(findDecoration, to: fresh.textView)
         fresh.coordinator.applyImageThumbnailPresentation(
             foldPlan: expected.foldPlan,
             in: fresh.textView,
@@ -157,9 +160,11 @@ final class EditorReconciledPresentationTestDriver {
 
         let actual = try XCTUnwrap(MarkdownTextView.textStorage(of: fixture.textView), file: file, line: line)
         let expectedStorage = try XCTUnwrap(MarkdownTextView.textStorage(of: fresh.textView), file: file, line: line)
-        XCTAssertTrue(attributesWithoutImageMarkers(actual).isEqual(to: attributesWithoutImageMarkers(expectedStorage)),
-                      "Syntax, delimiter and link attributes must equal an independent fresh parse", file: file,
-                      line: line)
+        XCTAssertTrue(
+            attributesWithoutIdentityMarkers(actual).isEqual(to: attributesWithoutIdentityMarkers(expectedStorage)),
+            "Syntax, delimiter, link and Find decoration attributes must equal an independent fresh parse",
+            file: file, line: line
+        )
         XCTAssertEqual(fixture.textView.replacePresentationSnapshot?.styledText.foldPlan, expected.foldPlan,
                        file: file, line: line)
         XCTAssertEqual(projectedText(in: fixture.textView), projectedText(in: fresh.textView), file: file, line: line)
@@ -230,12 +235,18 @@ final class EditorReconciledPresentationTestDriver {
         return HighlightedText(revision: revision, range: result.range, text: result.text, foldPlan: result.foldPlan)
     }
 
-    private static func attributesWithoutImageMarkers(_ storage: NSAttributedString) -> NSAttributedString {
+    private static func applyFindDecoration(_ request: EditorFindMatchHighlightRequest?, to textView: STTextView) {
+        guard let request, let storage = MarkdownTextView.textStorage(of: textView) else { return }
+        _ = EditorFindMatchHighlight.apply(request, visibleRange: nil, previouslyDecorated: nil, to: storage)
+    }
+
+    /// Image and Find markers use object identity, so only their value-comparable effects
+    /// (fonts, colours, the covered background) take part in the equality oracle.
+    private static func attributesWithoutIdentityMarkers(_ storage: NSAttributedString) -> NSAttributedString {
         let result = NSMutableAttributedString(attributedString: storage)
-        result.removeAttribute(
-            WYSIWYGImagePresentationMarker.attribute,
-            range: NSRange(location: 0, length: result.length)
-        )
+        let full = NSRange(location: 0, length: result.length)
+        result.removeAttribute(WYSIWYGImagePresentationMarker.attribute, range: full)
+        result.removeAttribute(EditorFindMatchHighlightMarker.attribute, range: full)
         return result
     }
 
