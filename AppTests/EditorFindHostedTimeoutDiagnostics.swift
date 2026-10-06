@@ -21,6 +21,10 @@ extension EditorFindHostedGateTests {
             "replaceAuthorization=\(appState.editorReplaceAuthorizationDecision(for: session)) liveInstallations=\(appState.liveEditorDocumentBindingInstallations(for: session))",
             "actualKeyWindow=\(String(describing: NSApp.keyWindow?.windowNumber)) replaceKeyWindow=\(String(describing: EditorReplaceCommandDispatcher.keyWindow?.windowNumber))",
         ]
+        #if DEBUG
+            lines.append("navigationWrites (oldest first):")
+            lines.append(contentsOf: appState.editorNavigationChannel.writeHistory)
+        #endif
         for window in NSApp.windows {
             guard let editor = editorTextView(in: window) else { continue }
             let coordinator = editor.textDelegate as? MarkdownTextViewCoordinator

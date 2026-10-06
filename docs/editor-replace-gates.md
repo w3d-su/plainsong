@@ -1101,9 +1101,18 @@ hosted spike PR #112.
   `testRejectedPublicationWithWYSIWYGLeavesNoUndoStepRawSourceAndRederivablePresentation`
   covers `.refused(.writeNotApplied)` under WYSIWYG: no undo/redo step, unchanged
   source/copy/accessibility, no newly hidden range, and an unadvanced applied model.
-  PR D's rejection restore (`applyReconciledSource` → `textView.text =`, shared with
-  source mode) resets storage attributes, so the untouched fold returns only on the
-  next reparse; the test asserts that reparse re-derives the identical folded set.
+  Handoff 21's reconciled-source presentation fix restarts the normal 20 ms
+  highlight scheduler after PR D's rejection restore (`applyReconciledSource` →
+  `textView.text =`, shared with source mode). Pending presentation stays raw; the
+  automatic fresh parse restores the identical untouched fold set without another
+  edit or selection change. A reconciliation revision floor rejects pre-restore
+  results; image generations and Find decoration caches are invalidated with storage.
+  Hosted evidence:
+  `testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers`
+  and `testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange`
+  drive the normal App publication refusal and production scheduler. See
+  [reconciled-source verification](perf-log.md#reconciled-source-presentation--2026-10-05).
+  R5 batch, R6 real-IME and R9 performance acceptance remain open.
 - Production App evidence is in `EditorFindHostedGateTests`:
   `testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo`,
   `testHostedReplaceLinkDestinationThroughDispatcherWithoutURLNormalization`,

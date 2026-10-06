@@ -254,10 +254,12 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
     var isUpdating = false
     var isUserEditing = false
+    var lastAppliedHighlightRevision: Int?
+    /// Reconciliation-only restart; ordinary accepted edits keep their existing route.
     var reconciledSourcePresentationInvalidationHandler: (() -> Int)?
     var minimumHighlightRevisionAfterReconciliation: Int?
-
-    var lastAppliedHighlightRevision: Int?
+    var reconciledSourcePresentationGeneration: UInt64 = 0
+    var hasDeferredReconciliationPresentation = false
     /// Last successfully applied fold plan, retained in O(1) for hosted final-revision checks.
     var lastAppliedHighlightFoldPlan: WYSIWYGFoldPlan?
     /// Find-match decoration currently on the storage, so an unchanged request costs nothing.
@@ -443,6 +445,11 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
 
         clearDeferredDocumentTransition()
         preparedNativeSourceCandidateGeneration = nil
+        if currentDocumentIdentity != candidate.documentIdentity
+            || installedDocument.installedBindingID != candidate.documentBinding?.id
+        {
+            invalidateDeferredReconciledSourcePresentation()
+        }
         let (installation, bindingTransition) = installedDocument.install(candidate)
         // Any queued selection receipt addressed the binding that was installed before
         // this exact transition. Invalidate it before the new binding can be observed.

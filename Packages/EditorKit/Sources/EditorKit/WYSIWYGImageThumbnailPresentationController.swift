@@ -133,11 +133,14 @@ final class WYSIWYGImagePresentationController {
         beginNewSource(source, in: textView)
     }
 
-    /// Reset cached marker ownership even when the authoritative source is unchanged.
+    /// A whole-source restore clears markers even when the source matches our last
+    /// sample. Invalidate cached plans and returning loads until a fresh parse applies.
     func presentationWasReset(in textView: MarkdownSTTextView) {
         guard configuration != nil,
               let source = MarkdownTextView.textStorage(of: textView)?.string
-        else { return }
+        else {
+            return
+        }
         beginNewSource(source, in: textView)
     }
 

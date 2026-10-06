@@ -380,7 +380,7 @@ final class EditorDocumentBindingLifecycleTests: XCTestCase {
 }
 
 @MainActor
-private extension EditorDocumentBindingLifecycleTests {
+extension EditorDocumentBindingLifecycleTests {
     final class Model {
         var sourceA = "A composition: "
         var sourceB = "B destination"
@@ -414,7 +414,8 @@ private extension EditorDocumentBindingLifecycleTests {
         text: Binding<String>,
         identity: EditorDocumentIdentity,
         bindingID: EditorDocumentBindingID,
-        model: Model
+        model: Model,
+        onReconciliation: (() -> Int)? = nil
     ) -> MarkdownTextView {
         MarkdownTextView(
             text: text,
@@ -423,7 +424,8 @@ private extension EditorDocumentBindingLifecycleTests {
             showsLineNumbers: false,
             documentIdentity: identity,
             documentBindingID: bindingID,
-            onDocumentBindingLifecycle: { model.lifecycleEvents.append($0) }
+            onDocumentBindingLifecycle: { model.lifecycleEvents.append($0) },
+            onReconciledSourcePresentationInvalidated: onReconciliation
         )
     }
 

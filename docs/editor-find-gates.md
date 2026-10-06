@@ -519,6 +519,16 @@ after `BEGIN`; a production fix requires deliberately replacing it with a zero-w
   search (`AppState.editorNavigationGeneration`). When the provider is nil (unit tests),
   the controller uses a local sequence — safe only while nothing else shares the channel.
   Evidence: `EditorFindControllerLifecycleTests.testNavigationIDProviderUsesSharedDomain`
+  Workspace-search query replacement/clear and workspace generation advance cancel only
+  the last navigation published by workspace search. They preserve a newer, still-unapplied
+  Find command for unchanged source/document identity. Document/text lifecycle cancellations
+  and explicit search-result activation still supersede Find; activation fences Find before
+  issuing its own navigation. Evidence:
+  `EditorFindNavigationOwnershipTests.testSearchInvalidationPreservesUnappliedFindNavigation`,
+  `testSearchInvalidationStillCancelsItsOwnUnappliedNavigation`,
+  `testOldWorkspaceSearchOwnershipCannotCancelANewerFindPublication`,
+  `testDocumentSwitchRekeyWorkspaceCloseAndBarCloseStillCancelFind`, and hosted
+  `EditorFindHostedGateTests.testHostedFindNavigationSurvivesWorkspaceRefreshBeforeEditorAppliesIt`.
 - Evidence: **closed in PR B for exact-range + provider contract.** Production wiring of
   the provider shipped in merged PR #97 with the App find bar.
 

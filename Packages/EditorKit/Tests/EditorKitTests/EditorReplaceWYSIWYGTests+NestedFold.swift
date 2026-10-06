@@ -70,11 +70,9 @@ extension EditorReplaceWYSIWYGTests {
         XCTAssertEqual(ready.fixture.model.source, "# Title ![alt](fixture.png) WORD")
     }
 
-    /// PR E's undo contract under WYSIWYG: a rejected publication is `.writeNotApplied`
-    /// with no undo step and unchanged raw source. The presentation model is not advanced
-    /// and nothing becomes hidden. PR D's restore (`applyReconciledSource`, shared with
-    /// source mode) resets the storage attributes, so the folds come back through the
-    /// normal reparse rather than surviving in place.
+    /// A rejected publication is `.writeNotApplied` with no undo step and exact
+    /// authoritative source. The cleared presentation stays raw while the requested
+    /// scheduler pass re-derives the same folds without another edit or selection.
     func testRejectedPublicationWithWYSIWYGLeavesNoUndoStepRawSourceAndRederivablePresentation() async throws {
         let source = "Intro **one** and *two* tail"
         let ready = try await foldedReady(source: source, pattern: "one")
@@ -82,6 +80,8 @@ extension EditorReplaceWYSIWYGTests {
         let before = presentationState(ready)
         let emphasis = (source as NSString).range(of: "*two*")
         XCTAssertTrue(before.foldedRanges.contains(emphasis.location), "the untouched emphasis is folded")
+        let driver = EditorReconciledPresentationTestDriver(fixture: ready.fixture)
+        defer { driver.stop() }
         ready.fixture.model.rejectsPublications = true
 
         XCTAssertEqual(EditorReplaceSingleSupport.perform(ready, replacement: "ONE"), .refused(.writeNotApplied))
@@ -91,16 +91,17 @@ extension EditorReplaceWYSIWYGTests {
         XCTAssertEqual(ready.fixture.model.writerActivations, 1)
         XCTAssertFalse(ready.fixture.textView.undoManager?.canUndo == true, "no undo step")
         XCTAssertFalse(ready.fixture.textView.undoManager?.canRedo == true)
-        assertCanonical(ready, source: source)
-        let refused = presentationState(ready)
-        XCTAssertEqual(refused.revision, before.revision, "the applied presentation model is not advanced")
-        XCTAssertEqual(refused.sourceRevision, before.sourceRevision)
-        XCTAssertTrue(refused.foldedRanges.isSubset(of: before.foldedRanges), "a refused write hides nothing")
-        XCTAssertTrue(refused.imageMarkerRanges.isSubset(of: before.imageMarkerRanges))
+        let selection = ready.fixture.textView.selectedRange()
+        XCTAssertEqual(driver.requestCount, 1)
+        try EditorReconciledPresentationTestDriver.assertRawPending(
+            in: ready.fixture, source: source, selection: selection
+        )
 
-        _ = reparse(ready, selection: ready.fixture.textView.selectedRange())
+        try await driver.releaseAndWaitForApply()
         XCTAssertEqual(presentationState(ready).foldedRanges, before.foldedRanges,
-                       "the normal reparse re-derives the same presentation from the unchanged source")
+                       "The requested scheduler pass restores identical folds without further input")
+        XCTAssertEqual(ready.fixture.textView.selectedRange(), selection)
+        XCTAssertEqual(ready.fixture.textView.replacePresentationSnapshot?.sourceRevision, before.sourceRevision)
         assertCanonical(ready, source: source)
     }
 

@@ -1,0 +1,443 @@
+{
+  "date": "2026-10-05",
+  "base": "81cc5f5d10c70e57a3be73010659ecf09df47c4a",
+  "branch": "phase3-find-navigation-cancel-race",
+  "rootCause": {
+    "entryPoint": "refreshWorkspaceAfterFileSystemChange",
+    "chain": [
+      "scheduleWorkspaceReload",
+      "advanceWorkspaceGeneration",
+      "invalidateWorkspaceSearchForWorkspaceGenerationAdvance",
+      "cancelPendingEditorNavigationIfNeeded"
+    ],
+    "baselineCaller": "AppState+WorkspaceReload.swift:91",
+    "findNavigationID": 7,
+    "supersedingCancelID": 8,
+    "sourceRevision": 0,
+    "expectedSelection": {
+      "location": 7,
+      "length": 3
+    },
+    "actualSelection": {
+      "location": 0,
+      "length": 0
+    },
+    "writes": [
+      "Plainsong/AppState+EditorFindLifecycle.swift:131 previous=nil next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 1))",
+      "Plainsong/AppState+EditorFindLifecycle.swift:99 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 1)) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 2))",
+      "Plainsong/AppState+EditorFind.swift:35 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 2)) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 3))",
+      "Plainsong/AppState+EditorFind.swift:35 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 3)) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 4))",
+      "Plainsong/AppState+EditorFind.swift:262 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 4)) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 5))",
+      "Plainsong/AppState+EditorFind.swift:35 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 5)) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 6))",
+      "Plainsong/AppState+EditorFind.swift:377 previous=Optional(EditorKit.EditorNavigationCommand.cancel(id: 6)) next=nil",
+      "Plainsong/AppState+EditorFind.swift:378 previous=nil next=Optional(EditorKit.EditorNavigationCommand.navigate(EditorKit.EditorNavigationRequest(id: 7, documentIdentity: EditorKit.EditorDocumentIdentity(rawValue: \"file:///<fixture>/post.md\"), selection: {7, 3}, shouldFocusEditor: false)))",
+      "Plainsong/AppState+WorkspaceReload.swift:91 previous=Optional(EditorKit.EditorNavigationCommand.navigate(EditorKit.EditorNavigationRequest(id: 7, documentIdentity: EditorKit.EditorDocumentIdentity(rawValue: \"file:///<fixture>/post.md\"), selection: {7, 3}, shouldFocusEditor: false))) next=Optional(EditorKit.EditorNavigationCommand.cancel(id: 8))"
+    ],
+    "historicalCI": "https://github.com/w3d-su/plainsong/actions/runs/37262385680",
+    "historicalCallerUniquelyProven": false
+  },
+  "fix": "Search query/clear/reload cancellation applies only to the last workspace-search navigation ID. Document/text/rekey/close and explicit search activation retain general cancellation.",
+  "local": {
+    "hosted": {
+      "baseline-repetition": {
+        "log": "h25-baseline-repetition.log",
+        "sha256": "68e1949685200c0ecafbfaec43fb25254a6040a36e7fb4f3e0c896645f6cd47c",
+        "succeeded": true,
+        "totals": {
+          "started": 90,
+          "passed": 90,
+          "failed": 0,
+          "skipped": 0
+        },
+        "methods": {
+          "EditorFindHostedGateTests.testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "app-suites": {
+        "log": "h25-app-suites.log",
+        "sha256": "efe163cea33ae10ee8e2f412bde216d5090965da3e9de63241daad28f6316f20",
+        "succeeded": true,
+        "totals": {
+          "started": 758,
+          "passed": 753,
+          "failed": 0,
+          "skipped": 5
+        }
+      },
+      "fixed-repetition": {
+        "log": "h25-fixed-repetition.log",
+        "sha256": "eddaca8fb1b9ed456db0b6f38a27d5fe27b25ca16096a2467ca056de29a714ef",
+        "succeeded": true,
+        "totals": {
+          "started": 1323,
+          "passed": 1320,
+          "failed": 0,
+          "skipped": 3
+        }
+      },
+      "final-app-suites": {
+        "log": "h25-final-app-suites.log",
+        "sha256": "b35b8a6676240a4240d713cf77893bf9d212d2debb722c4db812f64498aa5ed4",
+        "succeeded": true,
+        "totals": {
+          "started": 758,
+          "passed": 753,
+          "failed": 0,
+          "skipped": 5
+        }
+      },
+      "final-repetition": {
+        "log": "h25-final-repetition.log",
+        "sha256": "04d4a71b5fcebb141c3d1ee32f255f64f4d66ebd361f26e59dfece3fbd1181bc",
+        "succeeded": true,
+        "totals": {
+          "started": 1323,
+          "passed": 1320,
+          "failed": 0,
+          "skipped": 3
+        },
+        "methods": {
+          "EditorFindHostedGateTests.testHostedDetachedSaveCopyRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedExternalReloadDropsAFindNavigationStillComputingBeforeIt": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFenceAppearingAfterPlanningDropsThePlanBeforeAnyUndoGroup": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFenceAppearingBeforeCommitRefusesAtTheCommitCheck": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFindAndSearchFocusReceiptsStayIndependentOnRealFirstResponders": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFindBarSurvivesExternalReloadAndUnmountsAfterMissingFileClose": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFindEligibleAfterSearchHandoffOnlyTheNewerFindRequestTakesFocus": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFindNavigationSurvivesWorkspaceRefreshBeforeEditorAppliesIt": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedFindToWorkspaceSearchHandoffSupersedesOlderFindFocusWhileHostIsIneligible": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedHighlightScheduleStressAppliesAfterEveryEdit": {
+            "started": 1,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 1
+          },
+          "EditorFindHostedGateTests.testHostedIndeterminateSaveCopyQuarantineRekeysFindAndCancelsAPublishedNavigation": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedKeepMineCompletionHookRecountsAStaleFindBinding": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedKeepMineKeepsTheFindBarOnTheLocalSourceWithoutNavigation": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget": {
+            "started": 1,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 1
+          },
+          "EditorFindHostedGateTests.testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget": {
+            "started": 1,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 1
+          },
+          "EditorFindHostedGateTests.testHostedMarkedTextCommandsStayInFindFieldAndDoNotMutateDocument": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedMissingFileCloseCancelsAPublishedNavigationAndUnmountsTheBar": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedRejectedReplaceAutomaticallyRestoresSourceHighlightWithoutTypingOrSelectionChange": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedRejectedReplaceAutomaticallyRestoresWYSIWYGFoldsLinksAndImageMarkers": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedRemountedBarCannotReplayASpentRequestAndANewOneLandsOnlyInTheKeyWindow": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedRenameRekeysFindWithoutAutoJumpAndCancelsAPublishedNavigation": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceChecksAuthorizationAtValidationAndAgainAtCommit": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceFoldedDelimiterThroughDispatcherAndAutomaticReparseUndoRedo": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceFromFindChromeUsesTheProductionFallbackCheck": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceFromTheQueryFieldUsesTheFindFallback": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceImageThroughDispatcherAndAutomaticThumbnailUndoRedo": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceInvalidImageRemainsRawEditableAfterAutomaticReparse": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceLinkDestinationThroughDispatcherWithoutURLNormalization": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceReachesOnlyTheKeyWindowsInstallation": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesAnUnavailableCheckAgainQuarantine": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesAReadableIndeterminateWriteQuarantine": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesARecoveryFencedDetachedSession": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesDuringAWorkspaceMutationWriteFence": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesPendingDiskInspectionWithZeroEffect": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesWhileAnExternalChangeAwaitsAChoice": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesWhileEditorSourceIsPending": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceSourceOnlyAndSourcePreviewPublishNormally": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedReplaceWaitsForEveryLiveEditorToConvergeAfterReload": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedSourcePreviewFindBypassesActivePreviewScrollOwner": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedSourcePreviewFindBypassesDisabledTypewriterSync": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedSpentFocusAndSelectAllCannotReplayInAnotherWindow": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          },
+          "EditorFindHostedGateTests.testHostedWriterRefusalAfterAuthorizationOnlyConverges": {
+            "started": 30,
+            "passed": 30,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    "EditorKit": {
+      "log": "h25-editorkit.log",
+      "tests": 434,
+      "skipped": 7,
+      "failures": 0,
+      "sha256": "ff32a3c1b3159dae8fd66025414bcddbcf55ed8e573548c2cdbb49fc8a1f7853"
+    },
+    "MarkdownCore": {
+      "log": "h25-markdowncore.log",
+      "tests": 303,
+      "skipped": 0,
+      "failures": 0,
+      "sha256": "86a156af882676866bb3b00d1012d9aa6c8fcc511cd960c10996a9980a0324f8"
+    },
+    "makeBuild": {
+      "passed": true
+    },
+    "pinnedLint": {
+      "version": "0.62.1",
+      "passed": true
+    },
+    "diffCheck": true
+  },
+  "excludedIntermediateRun": {
+    "log": "h25-fixed-focused.log",
+    "reason": "The first hosted predicate incorrectly waited for a retained completed Task handle to become nil. Diagnostics showed selectionMatches=true; the final test instead waits for the installed workspace generation. This run is retained but excluded from acceptance."
+  },
+  "hostedCI": {
+    "status": "pending after first push; read PR checks for current exact-head result"
+  },
+  "remainingOwnerGates": [
+    "F6 real IME",
+    "F7 Full Keyboard Access/two-window owner acceptance",
+    "formal idle performance"
+  ],
+  "boundaries": {
+    "ownerCheckoutEdited": false,
+    "mergePerformed": false,
+    "forcePushPerformed": false,
+    "hostedWindowKeyStatus": "Existing designated-key seam; first responders and production editor are real. No real key-window acceptance claimed."
+  }
+}

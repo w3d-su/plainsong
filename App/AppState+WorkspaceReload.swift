@@ -20,7 +20,7 @@ extension AppState {
            !isWorkspaceSearchReady
         {
             cancelWorkspaceSearchTask()
-            cancelPendingEditorNavigationIfNeeded()
+            cancelPendingWorkspaceSearchNavigationIfNeeded()
             workspaceSearchRefreshIntent = WorkspaceSearchRefreshIntent(
                 query: query,
                 rootURL: refreshIntent.rootURL,
@@ -39,7 +39,7 @@ extension AppState {
     func clearWorkspaceSearch() {
         workspaceSearchRefreshIntent = nil
         cancelWorkspaceSearchTask()
-        cancelPendingEditorNavigationIfNeeded()
+        cancelPendingWorkspaceSearchNavigationIfNeeded()
         workspaceSearchState = WorkspaceSearchState(
             queryGeneration: workspaceSearchQueryGeneration
         )
@@ -88,7 +88,7 @@ extension AppState {
 
     func invalidateWorkspaceSearchForWorkspaceGenerationAdvance() {
         cancelWorkspaceSearchTask()
-        cancelPendingEditorNavigationIfNeeded()
+        cancelPendingWorkspaceSearchNavigationIfNeeded()
         workspaceSearchState = WorkspaceSearchState(
             queryGeneration: workspaceSearchQueryGeneration
         )
@@ -600,7 +600,7 @@ extension AppState {
     ) {
         cancelWorkspaceSearchTask()
         if cancellingPendingEditorNavigation {
-            cancelPendingEditorNavigationIfNeeded()
+            cancelPendingWorkspaceSearchNavigationIfNeeded()
         }
 
         guard workspaceSnapshot != nil,

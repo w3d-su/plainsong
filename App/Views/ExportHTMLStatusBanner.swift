@@ -23,8 +23,7 @@ struct ExportHTMLStatusBanner: View {
         case nil:
             return
         }
-        if let post { post(message) }
-        else {
+        if let post { post(message) } else {
             NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
                                  userInfo: [.announcement: message,
                                             .priority: NSAccessibilityPriorityLevel.high.rawValue])
