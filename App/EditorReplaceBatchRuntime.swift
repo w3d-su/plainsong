@@ -27,6 +27,15 @@ final class EditorReplaceBatchCancellation: @unchecked Sendable {
     }
 }
 
+/// Replace All's in-flight state as the bar presents it (`docs/editor-replace-gates.md` §5.3).
+enum EditorReplaceActivity: Equatable {
+    case idle
+    /// Cancellable off-main preparation; `Preparing n / total`.
+    case preparing(completed: Int, total: Int)
+    /// The non-cancellable synchronous commit; `Applying…`, Cancel disabled.
+    case applying
+}
+
 @MainActor
 final class EditorReplaceBatchRuntime {
     private(set) var actionID: UInt64 = 0
@@ -38,8 +47,23 @@ final class EditorReplaceBatchRuntime {
     var onChunkForTesting: (@Sendable (EditorReplacePreparationChunk) -> Void)?
     var onProgressForTesting: ((EditorReplacePreparationProgress) -> Void)?
     var willCommitForTesting: (() -> Void)?
-    var isPreparing = false
-    var progress: [EditorReplacePreparationProgress] = []
+    var isPreparing = false {
+        didSet { if isPreparing != oldValue { onPresentationChange?() } }
+    }
+
+    /// The synchronous commit turn: nothing can render it, but the bar and tests read it.
+    var isApplying = false {
+        didSet { if isApplying != oldValue { onPresentationChange?() } }
+    }
+
+    var progress: [EditorReplacePreparationProgress] = [] {
+        didSet { onPresentationChange?() }
+    }
+
+    /// Retained match total of the plan being prepared, for `Preparing 0 / total`.
+    private(set) var preparationTotal = 0
+    /// App publishes the bar from here; never called per editor keystroke.
+    var onPresentationChange: (() -> Void)?
     var lastPreparationRanOffMain = false
     var preparationMilliseconds = 0.0
     var commitMilliseconds = 0.0
@@ -59,13 +83,34 @@ final class EditorReplaceBatchRuntime {
         return true
     }
 
-    func begin() -> EditorReplaceBatchCancellation {
+    func begin(total: Int = 0) -> EditorReplaceBatchCancellation {
         supersede()
         let token = EditorReplaceBatchCancellation()
         cancellation = token
-        isPreparing = true
+        preparationTotal = total
         progress = []
+        isPreparing = true
         return token
+    }
+
+    /// Stops a plan that has not reached its synchronous commit. Commit has already cleared
+    /// `isPreparing`, so this can never interrupt an admitted native write.
+    func supersedeIfPreparing() {
+        guard isPreparing else { return }
+        supersede()
+    }
+
+    /// What the replacement row shows while an action is in flight.
+    var activity: EditorReplaceActivity {
+        if isApplying {
+            return .applying
+        }
+        guard isPreparing else { return .idle }
+        let latest = progress.last
+        return .preparing(
+            completed: latest?.completedMatchCount ?? 0,
+            total: latest?.totalMatchCount ?? preparationTotal
+        )
     }
 
     func supersede() {

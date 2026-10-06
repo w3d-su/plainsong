@@ -51,4 +51,32 @@ final class EditorFindHost {
     /// Only *which window is key* is stubbed — the report-versus-key comparison that decides
     /// eligibility still runs, so a cross-window regression is observable.
     var keyWindowNumberOverride: Int?
+    /// Test seam: when non-`nil`, stands in for `NSApp.keyWindow` in the AppKit responder
+    /// branch of `isEditorFindCommandContextActive()`. The window's real first responder is
+    /// still inspected; only which window is key is designated (hosted tests cannot make a
+    /// window really key). An installed override is authoritative even when it returns `nil`.
+    var keyWindowOverride: (() -> NSWindow?)?
+
+    // MARK: Replacement row (Replace PR H)
+
+    /// Last result or refusal shown in the replacement row; `nil` when nothing applies.
+    var replaceStatus: EditorReplaceStatus?
+    /// Advanced by every row action and by every lifecycle reset, so a Replace All that
+    /// finishes after either never writes a stale message into the row.
+    var replaceStatusSerial: UInt64 = 0
+    /// The bar's own Replace All task. Cancellation goes through the batch runtime, not this.
+    var replaceAllTask: Task<Void, Never>?
+    /// Spoken copy of the last announced status, for tests; announcements are fire-and-forget.
+    var lastReplaceAnnouncement: String?
+    var didInstallReplacePresentation = false
+    var didAnnounceReplacePreparation = false
+    var isReplacePresentationPublishPending = false
+
+    init() {
+        // An authority advance supersedes every plan; a preparing one stops at once instead
+        // of draining to a refusal behind a still-visible progress label.
+        replaceAuthority.onAdvance = { [unowned replaceBatch] in
+            replaceBatch.supersedeIfPreparing()
+        }
+    }
 }

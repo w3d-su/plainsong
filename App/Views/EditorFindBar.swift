@@ -18,9 +18,63 @@ struct EditorFindBar: View {
     @StateObject private var windowBridge = EditorFindBarWindowBridge()
 
     var body: some View {
+        // The existing Find row is the first row of a compact stack; the disclosure reveals
+        // the replacement row below it (`docs/editor-replace-gates.md` §5.1). The first row
+        // keeps its structural position, so expanding never remounts the query field.
+        VStack(alignment: .leading, spacing: 6) {
+            findRow
+            if appState.editorFindHost.ui.isReplaceExpanded {
+                EditorReplaceRow()
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(.bar)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(EditorFindAccessibility.bar)
+        // Responder-chain Escape, not a key equivalent: a key equivalent outranks the field
+        // editor and would close the bar mid-IME-composition (see the Done button in `findRow`).
+        // This covers focus sitting on any bar control; editor focus is covered by
+        // `MarkdownSTTextView.cancelOperation` through `EditorFindActionHooks.cancelFind`.
+        .onExitCommand {
+            appState.closeEditorFindBarFromExitCommand()
+        }
+        .background(EditorFindBarWindowReader(bridge: windowBridge))
+        .onChange(of: chromeFocus) { _, focus in
+            appState.setEditorFindChromeFocus(focus, inWindowNumber: windowBridge.windowNumber)
+        }
+        .onChange(of: windowBridge.windowNumber) { previous, number in
+            // The window is published a turn late, so focus may already have been reported
+            // against no window (dropped) or against the previous one. Re-home it.
+            guard chromeFocus != nil else { return }
+            appState.setEditorFindChromeFocus(nil, inWindowNumber: previous)
+            appState.setEditorFindChromeFocus(chromeFocus, inWindowNumber: number)
+        }
+        .onDisappear {
+            // Scoped: this bar unmounting must not wipe another window's live report.
+            // Falls back to the last attached window because the probe may already have
+            // detached (publishing `nil`) before SwiftUI runs this.
+            appState.setEditorFindChromeFocus(
+                nil,
+                inWindowNumber: windowBridge.windowNumber ?? windowBridge.lastAttachedWindowNumber
+            )
+        }
+    }
+
+    private var findRow: some View {
         let ui = appState.editorFindHost.ui
 
-        HStack(spacing: 8) {
+        return HStack(spacing: 8) {
+            EditorFindBarButton(
+                title: "",
+                identifier: EditorFindAccessibility.replaceDisclosure,
+                accessibilityLabel: ui.isReplaceExpanded ? "Hide Replace" : "Show Replace",
+                style: .disclosure(isExpanded: ui.isReplaceExpanded)
+            ) {
+                appState.toggleEditorReplaceExpanded()
+            }
+            .fixedSize()
+
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
@@ -132,38 +186,6 @@ struct EditorFindBar: View {
             }
             .focused($chromeFocus, equals: .done)
             .accessibilityIdentifier(EditorFindAccessibility.doneButton)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.bar)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(EditorFindAccessibility.bar)
-        // Responder-chain Escape, not a key equivalent: a key equivalent outranks the field
-        // editor and would close the bar mid-IME-composition (see the Done button above).
-        // This covers focus sitting on any bar control; editor focus is covered by
-        // `MarkdownSTTextView.cancelOperation` through `EditorFindActionHooks.cancelFind`.
-        .onExitCommand {
-            appState.closeEditorFindBarFromExitCommand()
-        }
-        .background(EditorFindBarWindowReader(bridge: windowBridge))
-        .onChange(of: chromeFocus) { _, focus in
-            appState.setEditorFindChromeFocus(focus, inWindowNumber: windowBridge.windowNumber)
-        }
-        .onChange(of: windowBridge.windowNumber) { previous, number in
-            // The window is published a turn late, so focus may already have been reported
-            // against no window (dropped) or against the previous one. Re-home it.
-            guard chromeFocus != nil else { return }
-            appState.setEditorFindChromeFocus(nil, inWindowNumber: previous)
-            appState.setEditorFindChromeFocus(chromeFocus, inWindowNumber: number)
-        }
-        .onDisappear {
-            // Scoped: this bar unmounting must not wipe another window's live report.
-            // Falls back to the last attached window because the probe may already have
-            // detached (publishing `nil`) before SwiftUI runs this.
-            appState.setEditorFindChromeFocus(
-                nil,
-                inWindowNumber: windowBridge.windowNumber ?? windowBridge.lastAttachedWindowNumber
-            )
         }
     }
 }

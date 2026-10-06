@@ -20,6 +20,7 @@ extension AppState {
     func ensureEditorFindSessionObserverInstalled() {
         guard !editorFindHost.didInstallSessionObserver else { return }
         editorFindHost.didInstallSessionObserver = true
+        installEditorReplacePresentationIfNeeded()
         editorFindHost.controller.navigationIDProvider = { [weak self] in
             guard let self else { return 0 }
             return advanceEditorNavigationGeneration()
@@ -59,7 +60,7 @@ extension AppState {
         if editorFindHost.ui.isBarVisible, hasKeyWindowFindChromeFocus() {
             return true
         }
-        return EditorFindResponderSupport.keyWindowHasEditorOrFindField()
+        return EditorFindResponderSupport.keyWindowHasEditorOrFindField(override: editorFindHost.keyWindowOverride)
     }
 
     /// ⌘F — show or re-focus; never closes.
@@ -120,7 +121,7 @@ extension AppState {
     /// bubble up to this handler.
     func closeEditorFindBarFromExitCommand() {
         guard editorFindHost.ui.isBarVisible,
-              !EditorFindResponderSupport.keyWindowQueryFieldIsComposing()
+              !keyWindowFindFieldIsComposing()
         else {
             return
         }

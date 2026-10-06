@@ -26,11 +26,15 @@ final class EditorReplaceAuthorityState {
     /// Test seam: runs inside EditorKit's commit-time authorization call, before App
     /// evaluates it, so a test can make a fence appear between validation and commit.
     var willCheckCommitForTesting: (() -> Void)?
+    /// Runs after every advance. `EditorFindHost` uses it to stop a preparing Replace All at
+    /// once, so its progress and Cancel never outlive the authority that started it.
+    var onAdvance: (() -> Void)?
     private var keyWindowObservation: EditorReplaceKeyWindowObservation?
 
     func advance() {
         precondition(generation < .max, "Replace authority generation exhausted")
         generation += 1
+        onAdvance?()
     }
 
     /// Key-window changes supersede every outstanding plan. Installed with the first plan:
@@ -103,14 +107,25 @@ extension AppState {
         )
     }
 
-    /// Bar open/close and every find-focus token transition (⌘F request, key-window
-    /// receipt, ⇧⌘F supersession) supersede outstanding plans. Counter and query updates do
-    /// not: the query generation and source revision already fence those.
+    /// Bar open/close, replacement-row expand/collapse (PR H's collapse seam), and every
+    /// find-focus token transition (⌘F request, key-window receipt, ⇧⌘F supersession)
+    /// supersede outstanding plans. Counter and query updates do not advance the generation:
+    /// the query generation and source revision already fence those. A query or option change
+    /// still stops a *preparing* Replace All at once instead of letting it drain to a refusal.
     func noteEditorReplaceFindChromeTransition(
         from old: EditorFindUIState,
         to new: EditorFindUIState
     ) {
+        if old.queryText != new.queryText || old.matchCase != new.matchCase || old.wholeWord != new.wholeWord {
+            editorFindHost.replaceBatch.supersedeIfPreparing()
+        }
+        if old.isReplaceRowActive, !new.isReplaceRowActive {
+            // Close, collapse, and no-document all end the row's visible state; results and
+            // refusals from before do not describe the next time it is shown.
+            clearEditorReplaceStatus()
+        }
         guard old.isBarVisible != new.isBarVisible
+            || old.isReplaceExpanded != new.isReplaceExpanded
             || old.focusRequestID != new.focusRequestID
             || old.focusAppliedID != new.focusAppliedID
             || old.focusSupersededID != new.focusSupersededID

@@ -16,6 +16,7 @@ enum EditorReplaceBatchCommandResult: Equatable {
 
 private struct EditorReplaceBatchCapture {
     let plan: EditorReplacePlan
+    let invocation: EditorReplaceInvocation
     let actionID: UInt64
     let replacementGeneration: UInt64
     let navigationGeneration: UInt64
@@ -37,7 +38,10 @@ extension AppState {
 
     /// Two phases: a bounded worker prepares B1, then one synchronous turn commits it.
     /// Missing/recomputing sessions never retain an intent for a future Find result.
-    func performEditorReplaceAll(replacement: String) async -> EditorReplaceBatchCommandResult {
+    func performEditorReplaceAll(
+        replacement: String,
+        invocation: EditorReplaceInvocation = .menu
+    ) async -> EditorReplaceBatchCommandResult {
         setEditorReplaceReplacement(replacement)
         let plan: EditorReplacePlan
         switch makeEditorReplacePlan(replacement: replacement) {
@@ -45,9 +49,7 @@ extension AppState {
         case let .failure(.noKeyWindowEditor(reason)): return .notDelivered(reason)
         case let .success(value): plan = value
         }
-        if EditorReplaceCommandDispatcher.batchEditorHasMarkedText(matching: plan.editorStamp)
-            || editorFindHost.replaceMarkedTextOwners.hasMarkedText(in: plan.editorStamp.window)
-        {
+        if editorReplaceHasMarkedText(for: plan) {
             return .markedText
         }
         if case let .refused(reason) = editorReplaceAuthorizationDecision(for: plan.stamp, session: plan.session) {
@@ -70,9 +72,9 @@ extension AppState {
 
         let state = editorFindHost.replaceBatch
         let previousTask = state.preparationTask
-        let token = state.begin()
+        let token = state.begin(total: plan.request.session.total)
         let capture = EditorReplaceBatchCapture(
-            plan: plan, actionID: state.actionID,
+            plan: plan, invocation: invocation, actionID: state.actionID,
             replacementGeneration: state.replacementGeneration,
             navigationGeneration: editorNavigationGeneration
         )
@@ -178,6 +180,9 @@ extension AppState {
         capture: EditorReplaceBatchCapture
     ) -> EditorReplaceBatchCommandResult {
         let state = editorFindHost.replaceBatch
+        // Preparation is complete; from here to the native insert there is no suspension.
+        state.isApplying = true
+        defer { state.isApplying = false }
         state.willCommitForTesting?()
         guard isCurrentEditorReplaceBatch(capture) else { return .superseded }
         let record = EditorReplaceAuthorizationRecord()
@@ -206,7 +211,7 @@ extension AppState {
         let began = ContinuousClock.now
         var delivery = EditorReplaceCommandDispatcher.sendBatch(command)
         if delivery == EditorReplaceBatchDelivery.notDelivered(.noEditorOnResponderChain),
-           isEditorFindCommandContextActive()
+           capture.invocation == .barControl || isEditorFindCommandContextActive()
         {
             delivery = EditorReplaceCommandDispatcher.sendBatchToKeyWindowEditor(command)
         }

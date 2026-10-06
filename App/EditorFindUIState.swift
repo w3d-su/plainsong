@@ -38,6 +38,20 @@ struct EditorFindUIState: Equatable {
     var matchCounterText = ""
     var isTruncated = false
     var hasActiveQuery = false
+    /// Whether the replacement row is disclosed (`docs/editor-replace-gates.md` §5.1).
+    /// Escape / Done keeps it; collapse, no document, and workspace close clear it.
+    var isReplaceExpanded = false
+    /// Literal replacement value. Retained across close, collapse, and file switch;
+    /// cleared only on workspace close or switch.
+    var replacementText = ""
+    /// Validity of `replacementText`, computed when the value changes — never in a view body.
+    var replacementValidity: EditorReplaceValueValidity = .valid
+
+    /// Replace / Replace All may run only while the bar is visible **and** the row expanded.
+    /// Hidden retained replacement text can never execute.
+    var isReplaceRowActive: Bool {
+        isBarVisible && isReplaceExpanded
+    }
 
     mutating func requestFocusAndSelectAll() {
         focusRequestID &+= 1
@@ -132,6 +146,11 @@ struct EditorFindUIState: Equatable {
 /// "focus is in the sidebar". Observing SwiftUI's own focus is the only reliable signal.
 /// This is **observation only** — focus for the query field is still driven through the owned
 /// AppKit `NSTextField`, per the WS3C precedent against `FocusState`-driven focus.
+///
+/// The disclosure and the replacement row's buttons are owned AppKit controls instead, whose
+/// focus `EditorFindResponderSupport` reads directly; they never report here. Every report
+/// change advances the Replace authority generation, so reporting them would make Tab onto
+/// **Cancel** supersede the very plan the user is about to cancel.
 enum EditorFindChromeFocus: Hashable {
     case matchCase
     case wholeWord

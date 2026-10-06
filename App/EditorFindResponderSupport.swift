@@ -37,13 +37,17 @@ enum EditorFindAppliedSelectionPolicy {
 }
 
 enum EditorFindResponderSupport {
+    /// `override` is `EditorFindHost.keyWindowOverride`: when installed it is authoritative,
+    /// even when it designates no window, so a test host's real key window cannot leak in.
     @MainActor
-    static func keyWindowHasEditorOrFindField() -> Bool {
-        guard let window = NSApp.keyWindow else { return false }
+    static func keyWindowHasEditorOrFindField(override: (() -> NSWindow?)? = nil) -> Bool {
+        let keyWindow: NSWindow? = if let override { override() } else { NSApp.keyWindow }
+        guard let window = keyWindow else { return false }
         return windowHasEditorOrFindChrome(window)
     }
 
-    /// Whether `window`'s first responder is the editor or the owned find query field.
+    /// Whether `window`'s first responder is the editor or an owned find field (the query or
+    /// the replacement field; both count as provenance for that window, §5.1).
     ///
     /// This covers only what AppKit can actually answer. The bar's other controls (Aa,
     /// whole-word, Next, Previous, Done) are plain SwiftUI: macOS flattens them and the
@@ -64,39 +68,6 @@ enum EditorFindResponderSupport {
         }
         guard let first = window.firstResponder else { return false }
         return matchesEditorOrFindFieldResponder(first)
-    }
-
-    /// Whether the key window's owned find query field currently has IME marked text.
-    ///
-    /// Escape reaching find-bar chrome through the responder chain must not close the bar
-    /// mid-composition. A field editor that declines `cancelOperation:` lets the event bubble
-    /// past it, so the guard has to be re-checked where the bar handles it, against live
-    /// AppKit state rather than a cached flag.
-    @MainActor
-    static func keyWindowQueryFieldIsComposing() -> Bool {
-        guard let root = NSApp.keyWindow?.contentView,
-              let field = descendant(
-                  of: root,
-                  identifiedBy: EditorFindAccessibility.queryField
-              ) as? NSTextField,
-              let editor = field.currentEditor() as? NSTextView
-        else {
-            return false
-        }
-        return editor.hasMarkedText()
-    }
-
-    @MainActor
-    private static func descendant(of view: NSView, identifiedBy identifier: String) -> NSView? {
-        if view.accessibilityIdentifier() == identifier {
-            return view
-        }
-        for subview in view.subviews {
-            if let match = descendant(of: subview, identifiedBy: identifier) {
-                return match
-            }
-        }
-        return nil
     }
 
     @MainActor
@@ -121,9 +92,9 @@ enum EditorFindResponderSupport {
                 if matchesEditorOrFindField(current) { return true }
                 view = current.superview
             }
-            // Field editor owned by the find NSTextField.
+            // Field editor owned by an owned find NSTextField.
             if let field = textView.delegate as? NSTextField,
-               field.accessibilityIdentifier() == EditorFindAccessibility.queryField
+               isOwnedFindFieldIdentifier(field.accessibilityIdentifier())
             {
                 return true
             }
@@ -135,12 +106,25 @@ enum EditorFindResponderSupport {
     private static func matchesEditorOrFindField(_ view: NSView) -> Bool {
         let id = view.accessibilityIdentifier() ?? ""
         if id == EditorAccessibility.textViewIdentifier { return true }
-        if id == EditorFindAccessibility.queryField { return true }
+        if isOwnedFindFieldIdentifier(id) { return true }
         if let field = view as? NSTextField,
-           field.accessibilityIdentifier() == EditorFindAccessibility.queryField
+           isOwnedFindFieldIdentifier(field.accessibilityIdentifier())
         {
             return true
         }
         return false
+    }
+
+    /// The owned AppKit find chrome: both fields, the disclosure, and the replacement row's
+    /// buttons (`EditorFindBarButton`), which Full Keyboard Access focuses as real responders.
+    private static func isOwnedFindFieldIdentifier(_ identifier: String?) -> Bool {
+        switch identifier {
+        case EditorFindAccessibility.queryField, EditorFindAccessibility.replacementField,
+             EditorFindAccessibility.replaceDisclosure, EditorFindAccessibility.replaceButton,
+             EditorFindAccessibility.replaceAllButton, EditorFindAccessibility.replaceCancelButton:
+            true
+        default:
+            false
+        }
     }
 }

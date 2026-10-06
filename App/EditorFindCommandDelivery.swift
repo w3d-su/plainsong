@@ -75,6 +75,33 @@ enum EditorFindCommandDelivery {
         return true
     }
 
+    /// Edit ▸ Find and Replace…. Uses ⌘F's eligibility and the existing query-focus receipt;
+    /// there is no EditorKit selector because the App intent decides everything it needs.
+    @discardableResult
+    static func performShowFindAndReplace() -> Bool {
+        guard let appState = PlainsongAppServices.appState,
+              appState.hasOpenDocument,
+              appState.isEditorFindCommandContextActive()
+        else {
+            return false
+        }
+        appState.showOrRefocusEditorFindAndReplace()
+        return true
+    }
+
+    /// Edit ▸ Replace. Eligible only from the key window's editor or owned field editors with
+    /// the bar visible and the row expanded; delivery reaches only that window's editor.
+    @discardableResult
+    static func performReplace() -> Bool {
+        PlainsongAppServices.appState?.performEditorReplaceMenuCommand() != nil
+    }
+
+    /// Edit ▸ Replace All, with the same eligibility as Replace.
+    @discardableResult
+    static func performReplaceAll() -> Bool {
+        PlainsongAppServices.appState?.performEditorReplaceAllMenuCommand() ?? false
+    }
+
     @discardableResult
     static func performUseSelectionForFind() -> Bool {
         if EditorFindCommandDispatcher.send(.useSelection) {
