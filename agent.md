@@ -512,8 +512,11 @@ editor *folds* markdown tokens via rendering, not text mutation:
   the match or those owners' own delimiter/link chrome, and no image marker over the
   match or an overlapping image; untouched nested constructs may stay folded. Otherwise
   it refuses with zero effect (`wysiwygRangeNotRevealed`). Normal off-main reparse
-  restores presentation after the write and native Undo/Redo; Replace All remains
-  deferred (R5 partial).
+  restores presentation after the write and native Undo/Redo. Replace All prepares
+  a minimal raw enclosing slice off-main, suspends folds/image presentation once,
+  and commits in one synchronous authorized native insertion. Failed batch writes
+  reset presentation caches and request one fresh derivation; real-IME and full
+  performance acceptance remain open.
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
   / source only / WYSIWYG once it ships).
 

@@ -19,6 +19,7 @@ final class EditorReplaceRejectedWriteUndo {
     private weak var coordinator: MarkdownTextViewCoordinator?
     private let preWriteSource: String
     private let preWriteRevision: Int
+    private let onAppliedChange: () -> Void
     private var observer: NSObjectProtocol?
     private(set) var didSuppressUndoRegistration = false
 
@@ -26,12 +27,14 @@ final class EditorReplaceRejectedWriteUndo {
         textView: STTextView,
         coordinator: MarkdownTextViewCoordinator,
         preWriteSource: String,
-        preWriteRevision: Int
+        preWriteRevision: Int,
+        onAppliedChange: @escaping () -> Void = {}
     ) {
         self.textView = textView
         self.coordinator = coordinator
         self.preWriteSource = preWriteSource
         self.preWriteRevision = preWriteRevision
+        self.onAppliedChange = onAppliedChange
     }
 
     /// Runs `write` with the guard armed and always restores undo registration afterwards.
@@ -50,6 +53,14 @@ final class EditorReplaceRejectedWriteUndo {
     }
 
     private func textDidChange() {
+        defer {
+            if !didSuppressUndoRegistration,
+               let snapshot = coordinator?.currentInstalledSourceSnapshot,
+               snapshot.revision > preWriteRevision
+            {
+                onAppliedChange()
+            }
+        }
         guard !didSuppressUndoRegistration,
               let textView,
               let coordinator,
