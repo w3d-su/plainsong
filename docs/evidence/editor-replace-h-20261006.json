@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-06",
+  "branch": "phase3-editor-replace-ui",
+  "base": "ccaf1f7",
+  "codeCommits": [
+    "2f123d4 Phase 3 Replace PR H: add the replacement row, Edit-menu commands and owner-checked Replace",
+    "5f5763a Phase 3 Replace PR H: prove row controls are focusable responders and Cancel survives focus",
+    "2001326 Phase 3 Replace PR H: keep the row off unrelated publishes and order composition before fences"
+  ],
+  "delivery": "local commits only; no push, PR or merge",
+  "lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "machine": "shared M1 Pro; load averages 13-22 during the hosted run (other agents building)",
+  "markdownCore": {
+    "tests": 320,
+    "skipped": 0,
+    "failures": 0,
+    "command": "cd Packages/MarkdownCore && swift test"
+  },
+  "editorKit": {
+    "tests": 445,
+    "skipped": 7,
+    "failures": 0,
+    "command": "cd Packages/EditorKit && swift test",
+    "note": "seven skips are the PLAINSONG_RUN_ACTUAL_IME opt-in harness"
+  },
+  "hosted": {
+    "tests": 345,
+    "skipped": 3,
+    "failures": 0,
+    "selection": "every EditorFind*/EditorReplace* App test class (EditorFindHostedGateTests includes all hosted F, R0-R8 and WYSIWYG methods), F6/F7 focus receipts, MenuBarStateTests, PlainsongMenuKeyBindingTests and every WorkspaceSearch* class; serial Debug macOS through xcodebuild test under the shared lock",
+    "skippedTests": [
+      "testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+      "testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+      "testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+    ],
+    "skipReason": "opt-in wall-clock gates (PLAINSONG_RUN_HIGHLIGHT_SCHEDULE_STRESS, PLAINSONG_RUN_HOSTED_TYPING_GATE)",
+    "perClass": {
+      "EditorFindHostedGateTests": 107,
+      "EditorFindFocusReceiptTests": 19,
+      "EditorFindLifecycleCombinationTests": 5,
+      "EditorFindMatchHighlightAppTests": 4,
+      "EditorFindNavigationOwnershipTests": 4,
+      "EditorFindReviewFixTests": 8,
+      "EditorFindUITests": 18,
+      "EditorReplaceAuthorizationAppTests": 7,
+      "EditorReplaceBatchSpikeAppTests": 1,
+      "EditorReplaceSingleReplaceAppTests": 2,
+      "EditorReplaceStatusTextTests": 6,
+      "EditorReplaceUIStateTests": 6,
+      "MenuBarStateTests": 3,
+      "PlainsongMenuKeyBindingTests": 7,
+      "WorkspaceSearchActiveRefreshTests": 15,
+      "WorkspaceSearchAppStateTests": 115,
+      "WorkspaceSearchHostedActivationTests": 1,
+      "WorkspaceSearchResultsPresentationTests": 9,
+      "WorkspaceSearchSelectionTests": 8
+    },
+    "newHostedTests": [
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRowKeepsFindRowIdentifiersAndOwnsEveryReplaceIdentifier",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplacementOverLimitShowsFieldErrorAndDisablesBothActionsWhileEmptyStaysValid",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceButtonAndReturnReplaceThroughRealControlsAndKeepFieldFocus",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceAllButtonSpeaksChangedOfTotalAndNoChanges",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedOverflowAndBlockedStatesAreSpokenTextAndRefuseWithZeroEffect",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testEditMenuAddsFindAndReplaceReplaceAndReplaceAllWithoutShortcuts",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceMenuEligibilityMatrixReachesOnlyTheExpandedKeyWindowRow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceMenuFromABackgroundWindowCannotReachAnotherWindowsRow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedRemountedBarCannotReplayAFocusTokenOrAPreparingPlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedFindAndReplaceUsesTheQueryReceiptAndTabReachesReplacementWithoutAToken",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCommandFRefocusesAndSelectsTheQueryWithoutCollapsingAndCancelsThePlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedUseSelectionForFindAndFindNextPreviousLeaveTheReplacementAndSourceAlone",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedShiftCommandFCancelsThePlanAndSupersedesFindFocusWithoutConsumingReceipts",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedRowControlsAreFocusableRespondersAndPressingFocusedCancelCancelsThePlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedFileSwitchKeepsTheExpandedRowAndValuesAndDropsThePlanAndMessage",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedExternalReloadKeepsValuesAndExpansionCancelsProgressAndRecountsFirst",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEditorTypingWithTheRowOpenTouchesNoReplaceGenerationOrRowState",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedMarkedTextInEachOwnerRefusesReplaceAndReplaceAllWithZeroEffect",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplacementFieldReturnAndEscapeDeferToCompositionThenAFreshReturnReplacesOnce",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedMarkedTextBeginningDuringReplaceAllPlanningInvalidatesTheActionInEachOwner",
+        "result": "passed"
+      }
+    ],
+    "newUnitTests": [
+      {
+        "test": "EditorReplaceStatusTextTests/testReplaceAllResultsPresentNoChangesChangedOfTotalCancelAndOverflow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testProgressAndApplyingTextIsSpokenText",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testEveryAuthorizationRefusalIsABlockedSentenceAndTheInspectionWindowIsTransient",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testMarkedTextHasOneShapeAndOneSentenceForBothCommands",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testSingleReplaceNavigationAndCommitLeaveTheCounterToSpeakButIdenticalSaysNoChanges",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testFieldErrorsCoverLengthAndLineBreaksAndEmptyIsValid",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testCollapseAndExpandAreTheAuthoritySeamAndCollapseKeepsTheValue",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testReplacementValueEditsBumpOnlyTheReplacementSeamAndValidateOnce",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testEscapeDoneKeepsQueryReplacementAndExpansionButClearsTheRowMessage",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testNoDocumentClosesAndCollapsesKeepsValuesAndNeverResetsReceiptHighWaterMarks",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testWorkspaceCloseClearsBothValuesCollapsesAndKeepsReceiptHighWaterMarks",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testReloadOrKeepMineCompletionClearsABlockedMessageButKeepsTheRow",
+        "result": "passed"
+      }
+    ],
+    "adjustedR7Tests": [
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRefusesWhileEditorSourceIsPending",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource",
+        "result": "passed"
+      }
+    ]
+  },
+  "build": {
+    "command": "make build",
+    "result": "BUILD SUCCEEDED"
+  },
+  "lint": {
+    "command": "PATH=<pinned SwiftFormat 0.62.1>:$PATH make lint",
+    "result": "0/592 files require formatting; SwiftLint exit 0 (warnings only, none new in App)"
+  },
+  "diffCheck": "git diff --check clean",
+  "notRun": {
+    "PlainsongUITests": "XCUITest needs a foreground interactive session; menus are proven against the hosted app's real NSApp.mainMenu and the production dispatchers instead",
+    "PerformanceTests": "R9 scope (PR I)"
+  },
+  "openGates": [
+    "R6 owner Zhuyin/Pinyin bullets 5-6",
+    "R8 owner Full Keyboard Access smoke",
+    "R9",
+    "R10"
+  ]
+}
