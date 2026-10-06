@@ -19,6 +19,8 @@ struct EditorFindQueryField: NSViewRepresentable {
     var markSelectAllApplied: (UInt64) -> Void
     var onSubmit: () -> Void
     var onEscape: () -> Void
+    var onReplaceOwnerMount: (NSTextField) -> Void = { _ in }
+    var onReplaceOwnerUnmount: (NSTextField) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -46,6 +48,8 @@ struct EditorFindQueryField: NSViewRepresentable {
         field.isEditable = isEnabled
         field.isSelectable = true
         context.coordinator.field = field
+        context.coordinator.onReplaceOwnerUnmount = onReplaceOwnerUnmount
+        onReplaceOwnerMount(field)
         return field
     }
 
@@ -86,7 +90,8 @@ struct EditorFindQueryField: NSViewRepresentable {
         }
     }
 
-    static func dismantleNSView(_: NSTextField, coordinator: Coordinator) {
+    static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
+        coordinator.onReplaceOwnerUnmount(field)
         coordinator.cancelFocusAttempt()
     }
 
@@ -102,6 +107,7 @@ struct EditorFindQueryField: NSViewRepresentable {
         var markSelectAllApplied: (UInt64) -> Void
         var onSubmit: () -> Void
         var onEscape: () -> Void
+        var onReplaceOwnerUnmount: (NSTextField) -> Void = { _ in }
         weak var field: NSTextField?
         var isComposing = false
 

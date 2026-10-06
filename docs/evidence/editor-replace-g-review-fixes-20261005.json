@@ -1,0 +1,299 @@
+{
+  "date": "2026-10-05",
+  "branch": "phase3-editor-replace-all",
+  "base": "91f0ebaca7b15d8b0994ba9ac6cf0f89016f3a75",
+  "reviewedCommit": "59de63d",
+  "worktree": "/private/tmp/plainsong-replace-all",
+  "lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "delivery": "Review fixes added with a new commit; push and PR against main authorized by handoff 19a. No amend or force push.",
+  "markdownCore": {
+    "tests": 320,
+    "skipped": 0,
+    "failures": 0,
+    "log": "/private/tmp/replace-g-markdowncore.log"
+  },
+  "editorKit": {
+    "tests": 428,
+    "skipped": 7,
+    "failures": 0,
+    "log": "/private/tmp/replace-g-editorkit.log"
+  },
+  "hosted": {
+    "tests": 163,
+    "skipped": 3,
+    "failures": 0,
+    "log": "/private/tmp/replace-g-hosted.log",
+    "xcresult": "/private/tmp/replace-g-hosted-r4.xcresult",
+    "selection": "All EditorFind*/EditorReplace* classes, including R0 spike, plus nine AppState WYSIWYG policies; serial Debug macOS.",
+    "batchTests": [
+      {
+        "test": "testHostedReplaceAllActualEditorMarkedTextStartsNoPreparationOrAuthorization",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllActualQueryMarkedTextAtEntryStartsNoPlanProgressOrUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllAllIdenticalHasNoWriterRevisionUndoRescanSelectionOrOrdinalEffects",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllAllowsExactlyTenThousandAndRefusesOverflowWithoutMutation",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllBarCloseWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCallerTaskCancellationDrainsWithoutMutation",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCancellationAtSixtyFiveThousandFiveHundredThirtySixCopiedUnitsLeavesNoMutation",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCancellationAtSixtyFourMatchCheckpointLeavesNoMutation",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCancelWhilePreparingLeavesExactSourceSelectionOrdinalAndUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCanonicalEquivalentUnequalRangesMapsThirdMatchCaret",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCollapseLifecycleWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllCommitIsNonCancellableOnceNativeWriteStarts",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllEditorRemountWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllEditWhilePreparingCannotApplyOldSourcePlan",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllFinalFenceRecheckDropsPlanBeforeUndoGroup",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllFinalOwnedFieldMarkedTextRecheckRefusesBeforeWriter",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllFindNavigationWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllKeyWindowABAWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllLargeFixtureEightThousandNineHundredTwentyOneWithMaximumReplacement",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllMissingRecomputingAndStaleSessionNeverQueueIntent",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllMixedLiteralIdentityChangesOnlyDifferingRanges",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllNativeSelectionABAWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllNewFenceABADuringPreparationDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllOptionsABAWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllOversizedAndNewlineReplacementRefuseBeforeAnyWrite",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllPreparationIsOffMainAndProgressIsBoundedMonotonic",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllQueryABAWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllRebindWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllRejectedPublicationRestoresFoldsAndImagesExactlyOnce",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllRepeatedWorkspaceSearchFocusAfterFindFocusSupersededDropsPlan",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllReplacementABAWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllReplacementContainingQueryIsNotRecursivelyReplaced",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllSourceOnlyPublishesOnceRescansOnceAndUndoRedoSelection",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllSourcePreviewUsesNormalPublication",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllUndoDoesNotMergeWithPriorTyping",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllWorkspaceSearchActivationWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllWorkspaceSearchFocusWhilePreparingDropsPlanWithoutUndo",
+        "result": "passed"
+      },
+      {
+        "test": "testHostedReplaceAllWYSIWYGFoldLinkImageUsesCanonicalSourceAndAutomaticReparse",
+        "result": "passed"
+      }
+    ]
+  },
+  "preparationEvidence": {
+    "differential": "Fixed seed 0x19A_59DE63D; 2000 generated Unicode/case/whole-word cases with nonempty sessions compared, plus 33 surrogate-heavy documents crossing chunk boundaries; literal plan/slice/source and mapped selection checked against reference builders.",
+    "cancellation": "Both held hosted boundary tests retain the actual preparationTask and assert its own result is failure(cancelled), independently of caller cancellation.",
+    "growth": "Maximum growth guard is defensive and unreachable by construction: 10000 * (256 - 1) = 2550000 < 2560000."
+  },
+  "presentationEvidence": {
+    "acceptedBatch": "Every attribute-only transaction touching previous/current folds is observed, including partial ranges. Assert one suspension/reapplication after 250ms of quiescence.",
+    "failedBatch": "EditorKit covers rejected publication and not-applied insert; resets image ownership and requests exactly one derivation. Hosted rejection removes writer ownership after native admission and proves automatic fold/image recovery, zero source revision change and no undo.",
+    "cancel": "Settled fold/image fixture; exact fold ranges and image signatures included in effect snapshot.",
+    "PR144": "Still open at 81c15295f528577d76c4638b3d05bd962a05c5a8. G locally adopts additive reset/invalidation seams. Second merge must retain shared seams once and run combined hosted recovery coverage; batch fallback skips when reconciliation advances the reset revision."
+  },
+  "historicalReviewFixRuns": [
+    {
+      "xcresult": "/private/tmp/replace-g-hosted.xcresult",
+      "result": "Compilation refused: test used NSText.willChangeNotification rather than the verified native notification name."
+    },
+    {
+      "xcresult": "/private/tmp/replace-g-hosted-r2.xcresult",
+      "log": "/private/tmp/replace-g-hosted-r2.log",
+      "tests": 163,
+      "assertionFailures": 14,
+      "failedMethods": 2,
+      "cause": "New recount assertion incorrectly required nil ordinal; injected write fence does not revoke already-admitted publication. Fixed test expectations/injection; no product safety policy change."
+    },
+    {
+      "xcresult": "/private/tmp/replace-g-hosted-r3.xcresult",
+      "log": "/private/tmp/replace-g-hosted-r3.log",
+      "tests": 163,
+      "assertionFailures": 2,
+      "failedMethods": 2,
+      "cause": "Recount cancels old navigation rather than preserving the old command; rejected native insertion temporarily contains the complete proposed raw source before reconciliation. Assertions now allow navigation cancellation and the exact complete attempted raw source."
+    }
+  ],
+  "typingPath": "No preparation/progress/reset work on keystrokes. Reset only on non-replaced explicit batches. Additive floor check is O(1) at highlight apply; no idle typing/performance acceptance claim.",
+  "openGates": [
+    "R6 owner real IME",
+    "R8 PR H UI/focus/messages including collapse wiring",
+    "R9 performance acceptance",
+    "R10 final release acceptance"
+  ],
+  "testedSwiftSHA256": {
+    "App/AppState+EditorReplaceBatch.swift": "a8e1527b4dd4c3866b33002fa9d4abeb6efb57dcbe9496c427555e9ecb1a2f44",
+    "App/AppState+WorkspaceSearchUI.swift": "0e5e5fb507f8bebedd10cca3512243a64a81effc461d91dd95914cc694ba3acc",
+    "App/EditorReplaceBatchRuntime.swift": "a88a4cfc27e4462ceeab5c03ef6c7adf3bf7b75f62cf21d98a027514256d5915",
+    "AppTests/EditorReplaceBatchHostedCommitGateTests.swift": "a8c48bd7f94e2e9e90c834b0277775b88231137c1b6366f72dba8aa5cc1d5542",
+    "AppTests/EditorReplaceBatchHostedCorrectnessTests.swift": "eaf0c7db610bf58a06c039dc3a6102e130e618c5ccd3c89bafcb9619af7201a6",
+    "AppTests/EditorReplaceBatchHostedRecoveryTests.swift": "828cb93798cd0ab0443eba5ccde3db9a55f85cd5f69ceef7cc658dce61cd2f7e",
+    "AppTests/EditorReplaceBatchHostedSupersessionTests.swift": "bf0fb3718c71202f3838eddf0c644c48f97070835c65a9a0b0e0a4c93f8d2282",
+    "AppTests/EditorReplaceBatchHostedTestSupport.swift": "727747a5d74c061e9ea7254e2bef156f213ee760fc42a15efeba335f03f65d04",
+    "AppTests/EditorReplaceHostedGateTestSupport.swift": "65a0aa5aea5863c2d457c6d6b58be6d16f5b1e71a5e17524331451a976942c0a",
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchWorker.swift": "d7096b9f19fdb616c9e5dd543a61c663dc2315fa5a75a76034ce06c28d50adb3",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor+WYSIWYG.swift": "350a8309aaf80795eb913508f730143d8e03fd1663f2a58740a52b00ed0fbcff",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor.swift": "3956d28b2ea9b4620585efbc93a1a4dd23698805638016cd3439eb4f4bda3d2a",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchSpike.swift": "62de8a83321e88fb4bf9392f7f23e6e018c281895d05f172fa75bc64359367d4",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchTypes.swift": "cd7774b183f3e05b4d839e0a080531cfcfdd5559808ac994a03e89a99274961a",
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift": "cdd02116468d54b437ac1fbec321904daecc876b440405cc710dc1385430600e",
+    "Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift": "7b332b8da4d809e1dc92fe771518534749588708469b3e943718b3a08ab99030",
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift": "135629d89187e079787340eb8c401fa3ddfbd2d3c7593f6fac5c6b37748d5158",
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+SourceSync.swift": "5292ef573aae86eaa29280cc8fae73c8b18ca555d7654558805499c980f50156",
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator.swift": "5ba6a43539680bea2d67fa76c38f48c4c871924864cf3a2763506ddfd9ed2390",
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGImageThumbnailPresentationController.swift": "9c10bcf9212441946d683352ce9e86b8c2e0e74c12f1ff97fcd058e86980994d",
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchWYSIWYGRecoveryTests.swift": "4a78dca6dff51db3452feaee9e1f5d3cc5393cb9e46669c481865b4544c7b3dd",
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchDifferentialTests.swift": "7a7f1c1d62c68c6ff88b90c9ac38342017ded16572f7a9b7870ad22f09f2adc8"
+  },
+  "lineCounts": {
+    "App/AppState+EditorReplaceBatch.swift": 239,
+    "App/AppState+WorkspaceSearchUI.swift": 226,
+    "App/EditorReplaceBatchRuntime.swift": 91,
+    "AppTests/EditorReplaceBatchHostedCommitGateTests.swift": 217,
+    "AppTests/EditorReplaceBatchHostedCorrectnessTests.swift": 239,
+    "AppTests/EditorReplaceBatchHostedRecoveryTests.swift": 59,
+    "AppTests/EditorReplaceBatchHostedSupersessionTests.swift": 207,
+    "AppTests/EditorReplaceBatchHostedTestSupport.swift": 219,
+    "AppTests/EditorReplaceHostedGateTestSupport.swift": 231,
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchWorker.swift": 127,
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor+WYSIWYG.swift": 45,
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor.swift": 180,
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchSpike.swift": 190,
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchTypes.swift": 63,
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift": 213,
+    "Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift": 313,
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift": 400,
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+SourceSync.swift": 30,
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator.swift": 970,
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGImageThumbnailPresentationController.swift": 503,
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchWYSIWYGRecoveryTests.swift": 107,
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchDifferentialTests.swift": 87
+  },
+  "lint": {
+    "command": "PATH=/private/tmp/plainsong-swiftformat-0.62.1:/opt/homebrew/bin:$PATH make lint",
+    "swiftformatVersion": "0.62.1",
+    "exit": 0,
+    "log": "/private/tmp/replace-g-lint.log",
+    "seriousViolations": 0
+  },
+  "informationalTimings": [
+    "Replace All informational timing: preparation=321.354834 ms commit=20.717667 ms rescan-drain=58.78794193267822 ms presentation-drain=0.00095367431640625 ms",
+    "Replace All informational Cancel-to-drain: 0.21600723266601562 ms",
+    "Replace All informational timing: preparation=0.314792 ms commit=1.091042 ms rescan-drain=38.47801685333252 ms presentation-drain=0.0 ms",
+    "Replace All informational timing: preparation=22.720625 ms commit=87.523334 ms rescan-drain=316.1829710006714 ms presentation-drain=0.0 ms",
+    "Replace All informational timing: preparation=4.975833 ms commit=0.737375 ms rescan-drain=31.517982482910156 ms presentation-drain=0.0 ms",
+    "Replace All informational timing: preparation=3.316667 ms commit=0.938041 ms rescan-drain=29.226064682006836 ms presentation-drain=0.0 ms",
+    "Replace All informational timing: preparation=0.188625 ms commit=0.780041 ms rescan-drain=27.666091918945312 ms presentation-drain=0.0010728836059570312 ms",
+    "Replace All informational timing: preparation=0.289917 ms commit=0.890333 ms rescan-drain=27.944087982177734 ms presentation-drain=21.078944206237793 ms"
+  ],
+  "loadAtVerificationStart": "11:58  up 22:25, 2 users, load averages: 6.09 5.54 5.02",
+  "build": {
+    "command": "make build (under shared lock)",
+    "exit": 0,
+    "log": "/private/tmp/replace-g-build.log"
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "exit": 0
+  },
+  "lineCountScope": "All new/batch files, MarkdownTextView, and EditorFindController are at most 400 lines. Existing coordinator and image presentation controller already exceeded that size; only additive reset/callback state was added."
+}

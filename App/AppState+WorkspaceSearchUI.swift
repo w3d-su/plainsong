@@ -40,6 +40,7 @@ extension AppState {
     /// token so callers can explicitly re-focus the field even when already in Search mode.
     func focusWorkspaceSearch() {
         guard canUseWorkspaceSearch else { return }
+        advanceEditorReplaceAuthorityGeneration()
         var ui = workspaceSearchUI
         ui.mode = .search
         ui.focusRequestID &+= 1

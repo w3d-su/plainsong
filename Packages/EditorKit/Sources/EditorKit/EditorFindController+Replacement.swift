@@ -42,7 +42,24 @@ extension EditorFindController {
     ) -> Bool {
         guard armedReplacementPublication != nil else { return false }
         armedReplacementPublication = nil
-        startReplacementGeneration(plan: plan, text: text, revision: revision)
+        startReplacementGeneration(work: .one(plan), text: text, revision: revision)
+        return true
+    }
+
+    func admitBatchReplacementPublication(
+        plan: MarkdownCore.EditorReplaceBatchPlan,
+        text: String,
+        revision: UInt64,
+        preWriteCurrentMatch: TextSearchMatch?,
+        preWriteCaretUTF16: Int,
+        mappedAnchorUTF16: Int
+    ) -> Bool {
+        guard armedReplacementPublication != nil else { return false }
+        armedReplacementPublication = nil
+        startReplacementGeneration(
+            work: .batch(plan, preWriteCurrentMatch, preWriteCaretUTF16, mappedAnchorUTF16),
+            text: text, revision: revision
+        )
         return true
     }
 

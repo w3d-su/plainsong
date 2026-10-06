@@ -8,10 +8,12 @@ import STTextView
 /// change since planning drops the command before the executor runs. No STTextView type
 /// crosses this boundary.
 public struct EditorReplaceEditorStamp: Equatable, Sendable {
-    let window: ObjectIdentifier
+    /// App checks owned query/replacement field composition in this exact window.
+    public let window: ObjectIdentifier
     let installation: EditorDocumentBindingInstallation
     let sourceRevision: Int?
-    let selection: NSRange
+    /// App captures the raw pre-write selection for off-main batch caret mapping.
+    public let selection: NSRange
 }
 
 /// One Replace command App routes to the installed editor of the key window.

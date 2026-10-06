@@ -1802,7 +1802,6 @@ export PLAINSONG_STACK_ROOT=/private/tmp/plainsong-replace-wysiwyg
 /usr/bin/python3 "$PLAINSONG_FIX_ROOT/docs/evidence/editor-highlight-schedule-paired.py"
 ```
 
-
 ## Paired typing comparison under recorded load - 2026-10-04 (PR #136)
 
 **Still pending: two complete pairs out of the required ten per mode.** This
@@ -2390,3 +2389,59 @@ python3 /private/tmp/reconciled-source-presentation-paired.py \
   --candidate-sha e0f26ceb2f104106eb7e1ed34de7ead9ba16af70 \
   --evidence-dir /private/tmp/h21-retry-evidence
 ```
+
+## Replace All PR G informational timing — 2026-10-05
+
+One Debug correctness run, under the shared Xcode lock, passed the selected
+hosted Find/Replace/R0 and nine WYSIWYG policy tests: 153 tests, three opt-in
+skips, zero failures. Full MarkdownCore 318 and EditorKit 426 (seven opt-in
+skips) also pass. [Verification record](evidence/editor-replace-g-20261005.json)
+retains named batch results, log/xcresult paths and source hashes.
+
+| Hosted fixture | Preparation ms | Synchronous commit ms | Rescan drain ms | Presentation drain ms |
+|---|---:|---:|---:|---:|
+| source-only, two matches | 4.801 | 0.704 | 26.854 | n/a |
+| source+preview, two matches | 0.191 | 0.762 | 25.234 | n/a |
+| exact 10,000 matches | 225.793 | 18.072 | 30.037 | n/a |
+| `large-1mb.md`, `an` x 8,921, replacement 256 UTF-16 units | 17.080 | 83.003 | 260.050 | n/a |
+| WYSIWYG fold/link/image plus untouched folded owner | 5.123 | 0.927 | 31.021 | 22.112 |
+
+The large correctness test asserts exact post-write source, one publication,
+one rescan and one native Undo/Redo with exact source/selection/dirty baseline.
+The WYSIWYG test counts one full-range attribute suspension and one post-write
+fold reapplication, with canonical backing source, copy and accessibility.
+Cancel-to-drain from release of an already-held preparation checkpoint was
+0.128 ms; this excludes time deliberately held by the test and is not a
+production cancellation latency measurement. Preparation/commit use the
+continuous clock; the test observes rescan and presentation drain sequentially
+with predicate waits, so those figures include scheduling/observation delay
+and are not isolated parse CPU times.
+
+The host was loaded: load averages 10.41 / 13.82 / 10.13 during the final run.
+These are informational correctness timings, not qualified idle Debug/Release
+performance samples. The hosted typing tests remain opt-in/skipped. R9 is open.
+
+Nothing new runs per keystroke: `MarkdownEditorView`, native input/selection
+handlers and highlight apply are unchanged. Detached plan/progress tasks start
+only in explicit `performEditorReplaceAll`; its temporary selection observer is
+removed before commit. Query marked-text owners register on mount/unmount only.
+This is structural typing-path evidence; it does not replace PR I's measurements.
+
+## Replace All PR G review-fix verification — 2026-10-05
+
+The review-fix run is correctness evidence only. MarkdownCore 320 tests, EditorKit
+428 tests (seven opt-in skips), and serial hosted Find/Replace/R0 plus nine WYSIWYG
+policies 163 tests (three opt-in skips) pass with zero failures. Preparation remains
+off-main and no new preparation/progress/reset work runs per keystroke. The shared
+highlight floor is an O(1) apply check; failed explicit batches request a new parse.
+
+Recorded load at verification start: `11:58  up 22:25, 2 users, load averages: 6.09 5.54 5.02`.
+Per-case preparation, native commit, rescan/presentation drain and Cancel-to-drain
+values are retained verbatim in the [review-fix evidence](evidence/editor-replace-g-review-fixes-20261005.json).
+The WYSIWYG presentation counts now include partial-range transactions and wait for
+quiescence; rejected publication automatically restores folds/images exactly once.
+The 8,921-match large fixture still uses a 256-unit replacement, exact source, one
+publication and one undo. These loaded timings do not close R9 or any absolute
+latency budget; R6 real IME and R8/R10 also remain open. Earlier failed test-development
+runs are retained separately in that evidence, with their corrected assertions and
+injection conditions.

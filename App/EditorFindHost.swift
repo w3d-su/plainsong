@@ -23,6 +23,8 @@ final class EditorFindHost {
     let controller = EditorFindController()
     /// Monotonic Replace authority generation and its diagnostics (Replace PR E).
     let replaceAuthority = EditorReplaceAuthorityState()
+    let replaceBatch = EditorReplaceBatchRuntime()
+    let replaceMarkedTextOwners = EditorReplaceMarkedTextOwners()
     var ui = EditorFindUIState()
     /// Materialized once per controller session change so ordinary SwiftUI updates do not map
     /// the retained (up to 10,000) match list back into `NSRange`s again.

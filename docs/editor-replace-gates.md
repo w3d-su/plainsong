@@ -46,9 +46,11 @@
 > fallback exactly where Find uses it. Reload / Keep Mine completion supersedes
 > every plan and recounts Find counter-only. A write that is not applied
 > (`.refused(.writeNotApplied)`) now leaves no undo step. There is still no product
-> UI or Replace All; R4–R6 and R8–R10 stay open. The controller split reduces
+> UI; the PR G Replace All pipeline is implemented behind plain command seams,
+> R4/R5 now have PR G product evidence; R6 and R8–R10 stay open.
+> The controller split keeps
 > `EditorFindController.swift` to 400 lines, with private task/fence ownership in
-> `EditorFindMatchWorker.swift` (110 lines), private step intent ownership in
+> `EditorFindMatchWorker.swift` (127 lines after PR G), private step intent ownership in
 > `EditorFindStepIntentState.swift` (114 lines), and the unchanged top-level types in
 > `EditorFindDocumentBinding.swift` (17 lines) and `EditorFindScheduleReason.swift`
 > (21 lines). Private state and helpers retain private access; no gate changes.
@@ -72,8 +74,27 @@
 > Native input, the editing/marked-text apply guards, and
 > selection-driven reveal are unchanged; the only edit-path addition is an O(1)
 > record of each applied highlight. App authorization, writer activation, and
-> replacement publication retain PR D/E's path. R5 stays open for Replace All;
-> R6 and R9 stay open.
+> replacement publication retain PR D/E's path. PR G supplies the remaining
+> R5 batch evidence below; R6 and R9 stay open.
+> **PR G (`phase3-editor-replace-all`, review fixes) adds the product
+> Candidate B1 Replace All pipeline.** MarkdownCore builds the exact minimal
+> enclosing slice off-main with checked UTF-16 growth, bounded cancellation and
+> bounded progress. EditorKit commits it through one writer activation/native
+> insertion, records one replacement-aware publication, and restores the mapped
+> selection through native Undo/Redo. App owns the action/lifecycle tuple,
+> selection observation, marked-text owner seam, and final synchronous recheck.
+> The R0 spike remains as hosted mechanism evidence with its enum renamed
+> `EditorReplaceBatchSpikePlan`; product tests use a separate executor. The
+> batch WYSIWYG path clears fold/image attributes once and relies on the normal
+> authoritative reparse; failed writes reset caches and request a fresh derivation.
+> Full MarkdownCore 320 tests, full EditorKit 428 tests (seven opt-in skips),
+> and the selected hosted Find/Replace/R0 plus nine WYSIWYG policy tests
+> (163 tests, three opt-in skips) pass with zero failures.
+> R4 and R5 close, with product evidence for the Replace All portions of R2/R3.
+> R6, R8, R9 and R10 remain open; PR H owns user-facing controls/messages.
+> Build, pinned lint and diff checks pass. See
+> [initial PR G verification](evidence/editor-replace-g-20261005.json) and
+> [review-fix verification](evidence/editor-replace-g-review-fixes-20261005.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -867,7 +888,8 @@ hosted spike PR #112.
   `testTypingAfterReplaceIsASeparateUndoStep` proves key-event typing after
   Replace is its own undo group (one Undo keeps the replacement).
   WYSIWYG presentation installed is refused with zero effect
-  (`testWYSIWYGPresentationRefusesWithZeroEffect`); R5 stays open for PR F.
+  (`testWYSIWYGPresentationRefusesWithZeroEffect`); PR F/G evidence below
+  supplies the later R5 closure.
 
 ### R3 — Post-write rescan and ordinal
 
@@ -939,45 +961,92 @@ hosted spike PR #112.
   the same post-write offset. `EditorReplaceSourceConstructionTests` also proves
   offset mapping rejects malformed suffixes even when the caret precedes them.
   PR D closes the publication, writer, revision, undo, and literal-identical
-  integration bullets above. Replace All's writer/rescan half remains PR G.
+  integration bullets above. PR G product evidence: `EditorReplaceBatchExecutorTests`
+  (`testProductB1OneEditPublicationUndoRedoAndPriorTypingSeparation`,
+  `testCanonicalUnequalRangesAreChangedOnceAndInsertedQueryIsNotRecursive`,
+  `testMixedIdenticalCountsAnd256UnitReplacement`,
+  `testNoChangesPreservesSourceSelectionOrdinalRevisionUndoAndRescan`,
+  `testRejectedWriteLeavesNoSelectionUndoAndPreservesPriorTyping`) and hosted
+  `testHostedReplaceAllSourceOnlyPublishesOnceRescansOnceAndUndoRedoSelection`,
+  `testHostedReplaceAllUndoDoesNotMergeWithPriorTyping`,
+  `testHostedReplaceAllCanonicalEquivalentUnequalRangesMapsThirdMatchCaret`,
+  `testHostedReplaceAllReplacementContainingQueryIsNotRecursivelyReplaced`,
+  `testHostedReplaceAllLargeFixtureEightThousandNineHundredTwentyOneWithMaximumReplacement`.
+  The executor fixture counts one activation/native edit/publication; hosted
+  checks the App revision, replacement publication/schedule/engine invocation,
+  exact source, mapped anchor, native Undo/Redo selection and dirty baseline.
+  The large fixture retains `an` x 8,921 and a 256-UTF-16-unit replacement.
 
 ### R4 — Replace All ceiling, cancellation, and progress
 
-- [ ] Exact non-truncated sets through 10,000 are eligible; 10,001 overflow
-  refuses with explicit non-color-only text and zero mutation.
-- [ ] A stale/missing/recomputing session refuses; it does not retain a pending
+- [x] Exact non-truncated sets through 10,000 are eligible; 10,001 overflow
+  refuses with a typed reason and zero mutation. Non-color-only user-visible
+  text is R8 / PR H scope.
+- [x] A stale/missing/recomputing session refuses; it does not retain a pending
   batch intent.
-- [ ] Final-source/plan preparation runs off-main, checks cancellation after at
+- [x] Final-source/plan preparation runs off-main, checks cancellation after at
   most 64 matches or 65,536 copied UTF-16 code units (whichever comes first),
   and emits at most 100 monotonic progress updates.
-- [ ] Replacement is at most 256 UTF-16 code units. Checked projected-length
+- [x] Replacement is at most 256 UTF-16 code units. Checked projected-length
   math bounds growth to 2,560,000 code units; invalid length or integer
-  overflow refuses before allocation/writer activation. No recoverable Swift
-  allocation-failure promise is made.
-- [ ] A monotonic action ID and authority/lifecycle generation fence the exact
+  overflow refuses before allocation/writer activation. The maximum-growth
+  guard is defensive and unreachable by construction: 10,000 positive-length
+  matches × at most 255 units of net growth = 2,550,000 < 2,560,000.
+  No recoverable Swift allocation-failure promise is made.
+- [x] A monotonic action ID and authority/lifecycle generation fence the exact
   identity/revision/query/options/replacement generation, current ordinal,
   applied selection, key window, and editor installation.
-- [ ] Query/options/replacement changes, edits/rebinds, navigation/selection,
-  key-window/remount, workspace-search focus/activation, close/collapse,
-  Cancel, or a new fence bumps a monotonic token and supersedes the plan even
-  if values later return.
-- [ ] Immediately before writer activation, with no suspension before
+- [x] Query/options/replacement changes, edits/rebinds, navigation/selection,
+  key-window/remount, workspace-search focus/activation, close, Cancel, or a new
+  fence bumps a monotonic token and supersedes the plan even if values later
+  return. Collapse is a tested authority-generation seam; PR H must call it
+  from the real disclosure UI and add its UI-level test under R8.
+- [x] Immediately before writer activation, with no suspension before
   mutation, commit rechecks the full tuple, App authorization, and marked text
   in editor/query/replacement fields.
-- [ ] Commit uses only the R0-approved single-undo mechanism and is explicitly
+- [x] Commit uses only the R0-approved single-undo mechanism and is explicitly
   non-cancellable once its synchronous native closure starts.
-- [ ] Cancel before commit leaves exact source, selection, ordinal, undo, and
+- [x] Cancel before commit leaves exact source, selection, ordinal, undo, and
   presentation unchanged; task cancellation is observed at the deterministic
   R4 work-chunk boundaries.
-- [ ] All-literal-identical batches report “No changes” with no writer,
+- [x] All-literal-identical batches report “No changes” with no writer,
   revision, undo, rescan, selection, or ordinal change. Mixed batches change
-  only differing ranges in one undo and report “Changed X of Y matches.”
-- Evidence: executor gates remain _open_. Pure model support is covered by
-  `EditorReplaceBatchPlanTests.testNonDivisibleProgressMilestonesUseEveryBoundedInterval`:
-  N=250 emits exactly 3, 6, …, 150, 152, 154, …, 250 (100 milestones),
-  independently of the cancellation cadence. Replacement and growth defaults
-  are pinned in `EditorReplaceValidationTests`; the growth limit derives from
-  the retained-match ceiling times the independently owned replacement cap.
+  only differing ranges in one undo and return changed/total counts.
+  “No changes” / “Changed X of Y matches” presentation belongs to R8 / PR H.
+- Evidence: full `EditorReplaceBatchPreparationTests` (15 tests) and
+  `EditorReplaceBatchExecutorTests` (nine tests) pass. Preparation tests name
+  exact 10,000 / 10,001 refusal, deterministic 64-match and 65,536-unit
+  cancellation (including prefix/suffix construction and surrogate boundaries),
+  at-most-100 monotonic progress, invalid replacement/range/overflow refusals,
+  no changes and mixed literal identity. Checked growth additionally reuses
+  `EditorReplaceValidationTests` and `EditorReplaceBatchPlanTests`.
+  The hosted methods in `EditorReplaceBatchHostedCorrectnessTests`,
+  `EditorReplaceBatchHostedSupersessionTests`, and
+  `EditorReplaceBatchHostedCommitGateTests` execute as `EditorFindHostedGateTests`.
+  Named event-family tests cover query/options/replacement ABA, edit/rebind,
+  navigation/native-selection ABA, key-window ABA/remount, workspace-search
+  focus/activation (including an already-superseded Find focus token with no
+  command-context override), close, the future collapse seam, explicit
+  Cancel/caller cancellation and fence ABA,
+  each with zero batch write and no new undo. Final fence and owned-field
+  marked-text rechecks refuse before writer/undo; real native editor and query
+  `setMarkedText` at entry start no preparation. Product EditorKit additionally
+  tests marked text appearing after preparation and authorization refusal.
+  `testHostedReplaceAllCommitIsNonCancellableOnceNativeWriteStarts` cancels
+  during the authorized native write and still admits one coherent batch.
+  Missing/recomputing/stale sessions keep no pending intent; the off-main/progress
+  and both held cancellation-boundary hosted methods assert the worker result
+  itself is `.failure(.cancelled)`, beyond the caller result. Explicit Cancel
+  returns `.cancelled`; marked text and supersession each have one App result
+  shape regardless of the refusing layer. A stale retained session requests
+  counter-only recomputation. The WYSIWYG Cancel fixture contains settled
+  folds/images and compares their ranges and image signatures.
+  `EditorReplaceBatchDifferentialTests` compares the checkpointed plan, slice,
+  exact expected source and mapped selection with the reference builders on
+  fixed-seed Unicode/case/whole-word cases and 33 surrogate-heavy documents.
+  Refusals/outcomes/progress are typed plain values for PR H's non-color-only
+  messages. The absent replacement field plugs into the same marked-text owner
+  registry in PR H; owner real-IME acceptance stays under open R6.
 
 ### R5 — Experimental WYSIWYG raw-source replacement
 
@@ -989,11 +1058,11 @@ hosted spike PR #112.
   source, and never mutates projected U+FFFC/U+200B text.
 - [x] Valid post-write constructs may fold/thumbnail again only after reparse;
   invalid constructs remain raw and editable.
-- [ ] Replace All suspends/reapplies presentation once per batch, not once per
+- [x] Replace All suspends/reapplies presentation once per batch, not once per
   match; backing source, copy, selection, and accessibility remain canonical.
 - [x] Source-only and source+preview publish through the normal document/
   preview path; no preview DOM mutation.
-- Evidence (PR F; R5 remains **open overall**, Replace All belongs to PR G):
+- Evidence (PR F single Replace; PR G closes the remaining batch bullet below):
   `EditorReplaceWYSIWYGTests.testFoldedDelimitersNavigateThenReplaceExactSpanAndUndoRedo`
   covers emphasis/strong/heading/strike/code, CJK/emoji UTF-16 spans, the literal
   post-write source, and the fold kinds the parser derives from it (`*字🦊**` is
@@ -1084,6 +1153,38 @@ hosted spike PR #112.
   [verification record](evidence/editor-replace-f-restack-20261001.json).
   The reveal proof runs only on explicit Replace. These synthetic native-input
   probes do not close R9 or real IME.
+
+  PR G adds `EditorReplaceBatchExecutor+WYSIWYG.swift` and the hosted
+  `testHostedReplaceAllWYSIWYGFoldLinkImageUsesCanonicalSourceAndAutomaticReparse`;
+  the implementation performs one attribute-only suspension before the one raw
+  insertion and leaves reapplication to the normal post-write highlight/reparse.
+  `HostedBatchPresentationObservation` observes TextKit attribute transactions
+  during this explicit test only: every attribute-only transaction touching old
+  or new fold ranges is counted, including partial-range transactions. After
+  presentation quiescence there is exactly one suspension and one authoritative
+  post-write fold reapplication, with raw backing text throughout.
+  The fixture includes folded delimiters, link destinations, an image, and an
+  untouched folded owner; no per-match reveal/reparse is requested. Hosted tests
+  also assert canonical copy, raw selection/accessibility, exact Undo/Redo source
+  and normal source+preview publication.
+  `EditorReplaceBatchWYSIWYGRecoveryTests` covers rejected publication and native
+  insertion refusal after suspension: image-cache ownership resets even if source
+  is unchanged, and one fresh derivation restores folds and markers without a
+  forced marker reapply. The hosted rejected-publication case verifies the normal
+  scheduler automatically restores folds/images exactly once after quiescence.
+  R5 is closed overall for this pipeline; UI and owner gates remain separate.
+  #144 is still open as of this review-fix run. G adopts its additive reset and
+  invalidation seams locally; after both merge, retain each shared seam once.
+  If `applyReconciledSource` already advances the reset revision, G skips its
+  fallback request. The PR landing second must re-run the combined rejected-write
+  test on that integration and retain the not-applied-insert coverage.
+  No new preparation, progress, or reset work runs per keystroke: the new selection
+  observer is installed only during explicit preparation and removed before
+  commit; query-owner registration runs on mount/unmount only. Preparation and
+  progress tasks begin only in `performEditorReplaceAll`. The additive stale
+  highlight floor is a constant-time apply check shared with #144, and reset
+  callbacks run only after a failed explicit batch. This is structural
+  typing-path evidence, not an idle-machine latency measurement; R9 stays open.
 
 ### R6 — Marked text + real Zhuyin/Pinyin boundaries
 
@@ -1201,11 +1302,11 @@ hosted spike PR #112.
     `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`)
     and `externalResolutionIntentCaptures` are not hooked and are covered by the
     rekey notification, the write-fence `didSet`, and the live evaluation at
-    commit. **Note for PR G:** the editor stamp compares selection and in-window
-    focus by value, not by a monotonic generation, so an A→B→A change between
-    planning and commit passes; that is harmless for single Replace (planned and
-    committed in one turn, and the executor re-proves the applied selection), and
-    PR G must decide whether it matters for off-main Replace All planning.
+    commit. PR G adds a preparation-only native-selection observer that advances
+    this same authority generation, so selection A→B→A drops the batch even if
+    the final editor stamp is equal. Existing App focus/key-window generations
+    fence their ABA transitions. Named hosted supersession tests prove both;
+    no permanent per-keystroke or selection-path hook is added.
   - Resolution: `testHostedReloadCompletionRecountsCounterOnlyAndRequiresAFreshReplace`,
     `testHostedKeepMineCompletionRevalidatesAndRequiresAFreshReplace` (Keep Mine
     keeps identity, revision, and source, so the retained session is the recount:
