@@ -69,6 +69,21 @@ final class ExportHTMLFeedbackAppTests: XCTestCase {
         }
     }
 
+    /// `F_GETPATH` reports the current vnode name, which can be another hard-link name, so a
+    /// `destinationAlias` refusal can mean the destination is a hard link. The notice must say
+    /// so, in the message and in what VoiceOver speaks (#141).
+    func testDestinationAliasMessageExplainsTheHardLinkCase() throws {
+        let notice = try XCTUnwrap(ExportHTMLNoticeMapper.notice(
+            for: .written(.notCommitted(.destinationAlias)),
+            operationID: 1
+        ))
+        XCTAssertEqual(notice.group, .destinationAlias)
+        XCTAssertTrue(notice.message.contains("capitalization"))
+        XCTAssertTrue(notice.message.contains("spelled differently"))
+        XCTAssertTrue(notice.message.contains("hard-link name"))
+        XCTAssertTrue(notice.accessibilityLabel.contains("hard-link name"))
+    }
+
     func testCancelSupersessionAndCancelledWriterAreSilent() {
         for result in [ExportHTMLOperationResult.stopped(.cancelled), .stopped(.superseded),
                        .written(.notCommitted(.cancelled)), .stopped(.destinationRefused(.cancelled))]
