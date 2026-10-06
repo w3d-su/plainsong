@@ -81,12 +81,15 @@ final class EditorReplaceStatusTextTests: XCTestCase {
         )
     }
 
-    func testSingleReplaceNavigationAndCommitLeaveTheCounterToSpeakButIdenticalSaysNoChanges() throws {
+    func testSingleReplaceNavigationIsSilentCommitSaysReplacedAndIdenticalSaysNoChanges() throws {
         let match = NSRange(location: 0, length: 3)
         XCTAssertNil(EditorReplaceStatusText.status(for: .delivered(.navigatedToCurrentMatch(match))))
         let session = EditorFindSession.search(in: "hit", query: TextSearchQuery(pattern: "hit"))
         let one = try EditorReplacePlanner.planOneMatch(session: session, source: "hit", replacement: "new").get()
-        XCTAssertNil(EditorReplaceStatusText.status(for: .delivered(.replaced(one))))
+        XCTAssertEqual(
+            EditorReplaceStatusText.status(for: .delivered(.replaced(one))),
+            EditorReplaceStatus(kind: .result, text: "Replaced 1 match")
+        )
         let continuation = EditorReplaceContinuationPlanning.afterLiteralIdentical(plan: one, session: session)
         XCTAssertEqual(
             EditorReplaceStatusText.status(for: .delivered(.advancedIdentical(continuation)))?.text,
@@ -102,7 +105,7 @@ final class EditorReplaceStatusTextTests: XCTestCase {
         let overLimit = String(repeating: "🦊", count: 129)
         XCTAssertEqual(
             EditorReplaceStatusText.fieldError(EditorReplacePlanning.validateReplacement(overLimit)),
-            "Replacement is longer than 256 characters"
+            "Replacement is too long: the limit is 256 text units, and most emoji count as 2"
         )
         XCTAssertEqual(
             EditorReplaceStatusText.fieldError(EditorReplacePlanning.validateReplacement("a\nb")),

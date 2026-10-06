@@ -85,7 +85,9 @@ extension EditorFindHostedGateTests {
         installProductionKeyWindowSeams(hosted.appState, group: hosted.group)
         routeMenuCommands(to: hosted.appState)
         let disclosure = try await waitForBarButton(EditorFindAccessibility.replaceDisclosure, in: hosted.window)
-        disclosure.performClick(nil)
+        if !hosted.appState.editorFindHost.ui.isReplaceExpanded {
+            disclosure.performClick(nil)
+        }
         XCTAssertTrue(hosted.appState.editorFindHost.ui.isReplaceExpanded)
         _ = try await waitForReplacementField(in: hosted.window)
         if let replacement {

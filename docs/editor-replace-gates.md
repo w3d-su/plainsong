@@ -104,9 +104,15 @@
 > Replace All entry and the final pre-commit recheck refuse while any owner
 > composes, with one `.markedText` result. Collapse is the real authority seam,
 > and any authority advance or query/option edit stops a preparing plan at once.
-> R8 and R6 deterministic bullets 1–4 close; R6's owner Zhuyin/Pinyin bullets,
-> the physical Full Keyboard Access smoke (new R8 owner bullet), R9 and R10 stay
-> open. See [PR H verification](evidence/editor-replace-h-20261006.json).
+> Bar Replace/Replace All presses run the same key-window gating as the menus;
+> Replace All renders one frame of `Applying…` before the no-suspension final
+> recheck; a focused owned control that unmounts hands focus to a surviving bar
+> control through direct `makeFirstResponder` routing; a transient blocked
+> message withdraws once its inspection settles; and a single Replace speaks
+> "Replaced 1 match". R8 and R6 deterministic bullets 1–4 close; R6's owner
+> Zhuyin/Pinyin bullets, the physical Full Keyboard Access smoke (new R8 owner
+> bullet), R9 and R10 stay open. See
+> [PR H verification](evidence/editor-replace-h-20261006.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -1261,6 +1267,10 @@ hosted spike PR #112.
     either way no writer activation, mutation or undo occurs, and nothing fires
     after composition ends. EditorKit's own final editor check is
     `EditorReplaceBatchExecutorTests.testMarkedTextAppearingAfterPreparationRefusesBeforeAuthorizationOrUndo`.
+    `testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame`
+    proves the recheck still runs on the main actor one frame after `Applying…`
+    is published, so a state arriving in that frame — marked text or a
+    selection move — is caught before the writer activates.
   - Owner harness prepared for PR I (not run here): the editor owner keeps the
     §5.5 command,
     `cd Packages/EditorKit && PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter EditorReplaceActualIMEGateTests`;
@@ -1427,8 +1437,8 @@ hosted spike PR #112.
 - [x] Replace/Replace All menus are eligible from either owned field editor
   only while the bar is visible and replacement row expanded; close/collapse
   cancels planning and hidden retained text cannot execute.
-- [x] Menu commands target only the installed editor in the key window;
-  background/remounted bars cannot replay focus or mutation.
+- [x] Menu commands and bar presses target only the installed editor in the key
+  window; background/remounted bars cannot replay focus or mutation.
 - [x] Full Keyboard Access can invoke every bar control; progress, blocked, and
   overflow states are spoken and not color-only.
 - [x] Escape closes/cancels only after marked-text refusal; query and
@@ -1486,18 +1496,56 @@ hosted spike PR #112.
     never replays the spent receipt), `testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue`
     (the real collapse seam PR G left, now driven from the disclosure) and
     `EditorReplaceUIStateTests.testCollapseAndExpandAreTheAuthoritySeamAndCollapseKeepsTheValue`.
+  - Key-window gating of bar presses:
+    `testHostedBackgroundWindowBarPressesCannotReachTheKeyWindowsEditor` clicks
+    Replace, Replace All and Return in a background window's bar: no task
+    starts, nothing is validated, and the key window's editor is untouched;
+    the key window's own bar still works.
+  - One-frame `Applying…` before the final recheck:
+    `testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame`
+    observes `Applying…` rendered (with Cancel withdrawn) inside
+    `willCommitForTesting`, then proves a selection that leaves and returns
+    during that frame still fails the recheck with `.superseded` and no write.
+  - Focus hand-off on unmount:
+    `testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField` covers
+    focused Cancel leaving while the row stays — after a press, after commit,
+    and after supersession with Replace All disabled — with focus landing on
+    Replace All, or on the replacement field when Replace All is ineligible;
+    `testHostedCollapseWhileARowControlHasFocusHandsFocusToTheQueryField` covers
+    a focused replacement field and a focused row button collapsing to the
+    query field, after which every Find command stays eligible. Routing is a
+    direct `makeFirstResponder` hand-off: no focus token is minted and nothing
+    replays. A focused owned button hands off before being disabled, and the
+    owned field tracks its field-editor editing state so a teardown order that
+    resigns the editor before `viewWillMove(toWindow:)` still hands focus off.
+  - Escape on a focused row button:
+    `testHostedEscapeOnAFocusedRowButtonClosesTheBarAndCancelsThePlan` — AppKit
+    buttons consume Escape themselves, so the owned button routes it to the
+    bar's exit command, which closes the bar and cancels the held plan with no
+    write.
+  - Transient blocked withdrawal:
+    `testHostedTransientBlockedMessageIsWithdrawnWhenTheInspectionSettles` —
+    the autosave disk-inspection fence shows the clock-style blocked text while
+    pending, and the message withdraws once the inspection settles. Withdrawal
+    re-evaluates the §5.6 decision on a later main turn and clears the status
+    only when that same reason no longer refuses, so a still-fenced document
+    keeps its blocked message.
   - Keyboard/assistive access and speech:
     `testHostedRowControlsAreFocusableRespondersAndPressingFocusedCancelCancelsThePlan`
     (each owned control is a real responder that keeps the menus eligible without
     advancing the authority generation, its accessibility press runs it, and
     focusing Cancel keeps the plan alive until pressing it returns `.cancelled`).
-    All row states are text in owned AppKit labels whose accessibility label is
-    the same text, with decorative symbols hidden from accessibility; results,
+    All row states are text in owned AppKit labels that VoiceOver speaks as the
+    label's value (no separate accessibility label, so nothing is said twice),
+    with decorative symbols hidden from accessibility; results,
     refusals, blocked, overflow and the start of preparation are also posted as
     accessibility announcements (`lastReplaceAnnouncement` asserts the spoken
     text). `EditorReplaceStatusTextTests` maps every plain PR D–G result to one
     sentence, including the transient `externalObservationPending` ("try again in
-    a moment", shown as blocked, not as a failure) and a distinct Cancel.
+    a moment", shown as blocked, not as a failure) and a distinct Cancel. A
+    single Replace speaks "Replaced 1 match":
+    `testHostedOverflowAndBlockedStatesAreSpokenTextAndRefuseWithZeroEffect`
+    asserts the row label and the announcement use the singular text.
   - Escape and lifecycle: `testHostedReplacementFieldReturnAndEscapeDeferToCompositionThenAFreshReturnReplacesOnce`,
     `testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen`,
     `testHostedFileSwitchKeepsTheExpandedRowAndValuesAndDropsThePlanAndMessage`,

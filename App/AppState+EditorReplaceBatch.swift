@@ -124,14 +124,31 @@ extension AppState {
         } onCancel: {
             token.cancel()
         }
-        observation?.stop()
         if state.preparationActionID == capture.actionID {
             state.preparationMilliseconds = elapsedMilliseconds(since: began)
         }
+        if case .success = prepared, !token.isCancelled, isCurrentEditorReplaceBatch(capture) {
+            await presentEditorReplaceApplying(state)
+        }
+        // The selection observer covers the frame above; the final recheck takes over from here.
+        observation?.stop()
         let result = finishEditorReplaceBatchPreparation(prepared, capture: capture, token: token)
+        state.isApplying = false
         state.finish(action: capture.actionID, result: result)
         return result
     }
+
+    /// Shows `Applying…` (Cancel withdrawn) and yields one frame so it can render. This is
+    /// before the final recheck, where the no-suspension rule starts: anything that changes
+    /// during the frame — an edit, selection, fence, close, or composition — still fails it.
+    private func presentEditorReplaceApplying(_ state: EditorReplaceBatchRuntime) async {
+        state.beginApplying()
+        objectWillChange.send()
+        try? await Task.sleep(nanoseconds: Self.editorReplaceApplyingFrameNanoseconds)
+    }
+
+    /// One display frame at 60 Hz.
+    static let editorReplaceApplyingFrameNanoseconds: UInt64 = 16_000_000
 
     private func finishEditorReplaceBatchPreparation(
         _ prepared: Result<EditorReplacePreparedBatch, EditorReplaceBatchPreparationFailure>,
@@ -180,9 +197,7 @@ extension AppState {
         capture: EditorReplaceBatchCapture
     ) -> EditorReplaceBatchCommandResult {
         let state = editorFindHost.replaceBatch
-        // Preparation is complete; from here to the native insert there is no suspension.
-        state.isApplying = true
-        defer { state.isApplying = false }
+        // From here to the native insert there is no suspension.
         state.willCommitForTesting?()
         guard isCurrentEditorReplaceBatch(capture) else { return .superseded }
         let record = EditorReplaceAuthorizationRecord()

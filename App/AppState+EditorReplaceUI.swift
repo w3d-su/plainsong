@@ -74,9 +74,16 @@ extension AppState {
         var ui = editorFindHost.ui
         ui.replacementText = text
         ui.replacementValidity = EditorReplacePlanning.validateReplacement(text)
+        let previousValidity = editorFindHost.ui.replacementValidity
         setEditorFindUI(ui)
         setEditorReplaceReplacement(text)
         clearEditorReplaceStatus()
+        // The error is also the field's accessibility help; speak it when it first appears.
+        if ui.replacementValidity != previousValidity,
+           let error = EditorReplaceStatusText.fieldError(ui.replacementValidity)
+        {
+            announceEditorReplaceStatus(error)
+        }
     }
 
     /// Lifecycle resets and value edits drop the row's last message. The serial also makes a
@@ -123,22 +130,29 @@ extension AppState {
 
     // MARK: - Bar controls
 
-    /// The Replace button and Return in the replacement field. Like Next / Previous, the
-    /// bar's own controls skip the menu's responder-context guard, but still require the row.
+    /// The Replace button and Return in the replacement field, from the bar in `window`.
+    /// Like Next / Previous, the bar's own controls skip the menu's responder-context guard,
+    /// but they still require the row, a valid value, and that `window` is the key window:
+    /// `AppState` is shared, so a press in a background window's bar (VoiceOver can press it
+    /// without making it key) must never reach the key window's editor.
     @discardableResult
-    func replaceFromEditorReplaceBar() -> EditorReplaceCommandResult? {
-        guard hasOpenDocument, editorFindHost.ui.isReplaceRowActive,
-              editorFindHost.ui.replacementValidity == .valid
-        else { return nil }
+    func replaceFromEditorReplaceBar(in window: NSWindow?) -> EditorReplaceCommandResult? {
+        guard isEditorReplaceBarActionAllowed(from: window) else { return nil }
         return runEditorReplace(invocation: .barControl)
     }
 
     @discardableResult
-    func replaceAllFromEditorReplaceBar() -> Bool {
-        guard hasOpenDocument, editorFindHost.ui.isReplaceRowActive,
-              editorFindHost.ui.replacementValidity == .valid
-        else { return false }
+    func replaceAllFromEditorReplaceBar(in window: NSWindow?) -> Bool {
+        guard isEditorReplaceBarActionAllowed(from: window) else { return false }
         return startEditorReplaceAll(invocation: .barControl)
+    }
+
+    private func isEditorReplaceBarActionAllowed(from window: NSWindow?) -> Bool {
+        guard hasOpenDocument, editorFindHost.ui.isReplaceRowActive,
+              editorFindHost.ui.replacementValidity == .valid,
+              let window, let keyWindow = editorFindKeyWindow()
+        else { return false }
+        return window === keyWindow
     }
 
     /// Explicit Cancel while preparing; a distinct `.cancelled` result (PR G review fix 6).
@@ -210,22 +224,5 @@ extension AppState {
                 .priority: NSAccessibilityPriorityLevel.high.rawValue,
             ]
         )
-    }
-}
-
-@MainActor
-extension AppState {
-    /// Escape reaching find-bar chrome through the responder chain must not close the bar
-    /// while **either** owned field composes. A field editor that declines `cancelOperation:`
-    /// lets the event bubble past it, so the guard is re-checked here against live AppKit
-    /// state (the marked-text owner registry), never a cached flag.
-    func keyWindowFindFieldIsComposing() -> Bool {
-        let keyWindow: NSWindow? = if let override = editorFindHost.keyWindowOverride {
-            override()
-        } else {
-            NSApp.keyWindow
-        }
-        guard let keyWindow else { return false }
-        return editorFindHost.replaceMarkedTextOwners.hasMarkedText(in: ObjectIdentifier(keyWindow))
     }
 }

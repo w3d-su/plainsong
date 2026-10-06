@@ -20,6 +20,13 @@ struct EditorReplaceStatus: Equatable {
 
     let kind: Kind
     let text: String
+    /// The §5.6 fence behind a `.blocked` message, so it can be withdrawn once the fence clears.
+    var blockedReason: EditorReplaceAuthorizationRefusal?
+
+    /// The in-flight disk inspection after an autosave: momentary, not a lock.
+    var isTransient: Bool {
+        blockedReason == .externalObservationPending
+    }
 }
 
 /// Pure mapping from plain Replace results to row text. No AppKit, no state.
@@ -29,6 +36,7 @@ enum EditorReplaceStatusText {
     static let overflow = "More than 10,000 matches; narrow the search."
     static let cancelled = "Replace All cancelled"
     static let markedText = "Finish text input before replacing"
+    static let replacedOne = "Replaced 1 match"
 
     static func preparing(completed: Int, total: Int) -> String {
         "Preparing \(completed) / \(total)"
@@ -52,7 +60,9 @@ enum EditorReplaceStatusText {
         case .valid:
             nil
         case .exceedsMaximumUTF16Length:
-            "Replacement is longer than \(EditorReplaceLimits.maximumReplacementUTF16Length) characters"
+            // The limit is in UTF-16 code units; most emoji and some CJK characters use two.
+            "Replacement is too long: the limit is \(EditorReplaceLimits.maximumReplacementUTF16Length) "
+                + "text units, and most emoji count as 2"
         case .containsNewline:
             "Replacement must be a single line"
         }
@@ -117,7 +127,7 @@ enum EditorReplaceStatusText {
         case .pendingEditorSource:
             "The editor is still publishing changes; try again"
         }
-        return EditorReplaceStatus(kind: .blocked, text: text)
+        return EditorReplaceStatus(kind: .blocked, text: text, blockedReason: reason)
     }
 
     private static let interrupted = EditorReplaceStatus(
@@ -136,15 +146,16 @@ enum EditorReplaceStatusText {
 
     private static func ineligible(_ reason: EditorReplaceIneligibility) -> EditorReplaceStatus {
         switch reason {
-        case .findBarHidden: refusal("Show Find and Replace first")
+        case .findBarHidden, .replaceRowCollapsed: refusal("Show Find and Replace first")
         case .noFindSession: refusal(searchUpdating)
         }
     }
 
     private static func status(for outcome: EditorReplaceOutcome) -> EditorReplaceStatus? {
         switch outcome {
-        // The counter and the selected match already say what happened.
-        case .navigatedToCurrentMatch, .replaced: nil
+        // The first action only selects the match; the counter and selection say so.
+        case .navigatedToCurrentMatch: nil
+        case .replaced: EditorReplaceStatus(kind: .result, text: replacedOne)
         case .advancedIdentical: EditorReplaceStatus(kind: .result, text: noChanges)
         case .unverifiedWrite: unverified
         case let .refused(reason): singleRefusal(reason)

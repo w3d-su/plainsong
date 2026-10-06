@@ -31,6 +31,33 @@ extension EditorFindHostedGateTests {
         )
         let appState = hosted.appState
         try await recordExternalConflict(hosted, disk: "hit disk")
+        // Pending editor source with no composition, so each refusal below goes through the
+        // production command path to App's §5.6 decision.
+        let installation = try XCTUnwrap(editorCoordinator(in: hosted.window)?.currentDocumentBindingInstallation)
+        appState.pendingEditorSourceInstallations[installation] = appState.currentDocument
+        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
+        try assertAppRefusal(hosted, .pendingEditorSource)
+
+        appState.reloadExternallyChangedFile()
+        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.currentDocument))
+        XCTAssertEqual(appState.deferredExternalChangeResolutions[stateURL], .reload)
+        XCTAssertTrue(appState.externalReloadTasks.isEmpty, "the Reload read is suspended")
+
+        try assertAppRefusal(hosted, .externalResolutionSuspended)
+        appState.pendingEditorSourceInstallations[installation] = nil
+    }
+
+    /// The realistic cause of pending editor source is IME composition in the editor. App's
+    /// §5.6 decision still reports each fence, but the command refuses the composition first
+    /// (§5.5, Replace PR H), before any authorization is evaluated.
+    func testHostedComposingEditorRefusesMarkedTextFirstWhileReloadIsSuspended() async throws {
+        let hosted = try await makeHostedEditorWorkspace(
+            source: "hit one",
+            query: "hit",
+            localEdit: "hit local hit local"
+        )
+        let appState = hosted.appState
+        try await recordExternalConflict(hosted, disk: "hit disk")
         let editor = try hostedEditor(hosted)
         editor.setMarkedText(
             "ㄅ",
@@ -38,9 +65,6 @@ extension EditorFindHostedGateTests {
             replacementRange: .notFound
         )
         XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
-        // Composition is what leaves editor source pending here. App's §5.6 decision reports
-        // the fence; since Replace PR H the command refuses the composition first (§5.5),
-        // before any authorization is evaluated.
         XCTAssertEqual(
             appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
             .refused(.pendingEditorSource)
@@ -48,10 +72,6 @@ extension EditorFindHostedGateTests {
         try assertMarkedTextRefusal(hosted)
 
         appState.reloadExternallyChangedFile()
-        let stateURL = try XCTUnwrap(appState.sessionStateURL(for: appState.currentDocument))
-        XCTAssertEqual(appState.deferredExternalChangeResolutions[stateURL], .reload)
-        XCTAssertTrue(appState.externalReloadTasks.isEmpty, "the Reload read is suspended")
-
         XCTAssertEqual(
             appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
             .refused(.externalResolutionSuspended)

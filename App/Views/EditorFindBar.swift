@@ -70,8 +70,9 @@ struct EditorFindBar: View {
                 title: "",
                 identifier: EditorFindAccessibility.replaceDisclosure,
                 accessibilityLabel: ui.isReplaceExpanded ? "Hide Replace" : "Show Replace",
-                style: .disclosure(isExpanded: ui.isReplaceExpanded)
-            ) {
+                style: .disclosure(isExpanded: ui.isReplaceExpanded),
+                onEscape: { appState.closeEditorFindBarFromExitCommand() }
+            ) { _ in
                 appState.toggleEditorReplaceExpanded()
             }
             .fixedSize()

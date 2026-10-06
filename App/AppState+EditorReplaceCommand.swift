@@ -17,6 +17,9 @@ struct EditorReplacePlan {
 /// Why no plan could be made. Nothing was validated against the editor or changed.
 enum EditorReplaceIneligibility: Equatable, Sendable {
     case findBarHidden
+    /// The bar is visible but its replacement row is collapsed: hidden retained replacement
+    /// text never executes (`docs/editor-replace-gates.md` §5.1).
+    case replaceRowCollapsed
     /// No retained Find session (no query, or the match is recomputing).
     case noFindSession
 }
@@ -88,6 +91,9 @@ extension AppState {
     ) -> Result<EditorReplacePlan, EditorReplacePlanFailure> {
         guard editorFindHost.ui.isBarVisible else {
             return .failure(.ineligible(.findBarHidden))
+        }
+        guard editorFindHost.ui.isReplaceExpanded else {
+            return .failure(.ineligible(.replaceRowCollapsed))
         }
         let controller = editorFindHost.controller
         guard let findSession = controller.session else {

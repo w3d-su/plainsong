@@ -39,8 +39,13 @@ final class EditorReplaceUIStateTests: XCTestCase {
         XCTAssertFalse(MenuBarSnapshot(appState: appState).canReplace)
         XCTAssertNil(appState.performEditorReplaceMenuCommand())
         XCTAssertFalse(appState.performEditorReplaceAllMenuCommand())
-        XCTAssertNil(appState.replaceFromEditorReplaceBar(), "hidden retained text cannot execute")
-        XCTAssertFalse(appState.replaceAllFromEditorReplaceBar())
+        XCTAssertEqual(
+            appState.performEditorReplace(replacement: "NEW"),
+            .ineligible(.replaceRowCollapsed),
+            "the collapsed row is structural at the plan, not only at the menu and bar"
+        )
+        XCTAssertNil(appState.replaceFromEditorReplaceBar(in: nil), "hidden retained text cannot execute")
+        XCTAssertFalse(appState.replaceAllFromEditorReplaceBar(in: nil))
         XCTAssertEqual(appState.editorFindHost.ui.replacementText, "NEW")
         XCTAssertTrue(appState.editorFindHost.ui.isBarVisible, "collapse keeps the bar and query")
 
@@ -62,8 +67,8 @@ final class EditorReplaceUIStateTests: XCTestCase {
         XCTAssertGreaterThan(appState.editorFindHost.replaceBatch.replacementGeneration, replacementGeneration)
         XCTAssertFalse(appState.isEditorReplaceMenuCommandEligible(), "an invalid value disables both actions")
         XCTAssertFalse(MenuBarSnapshot(appState: appState).canReplace)
-        XCTAssertNil(appState.replaceFromEditorReplaceBar())
-        XCTAssertFalse(appState.replaceAllFromEditorReplaceBar())
+        XCTAssertNil(appState.replaceFromEditorReplaceBar(in: nil))
+        XCTAssertFalse(appState.replaceAllFromEditorReplaceBar(in: nil))
 
         // A literal-identical edit (by UTF-16 units) changes nothing.
         let unchanged = appState.editorReplaceAuthorityGeneration

@@ -24,7 +24,7 @@
     "note": "seven skips are the PLAINSONG_RUN_ACTUAL_IME opt-in harness"
   },
   "hosted": {
-    "tests": 345,
+    "tests": 352,
     "skipped": 3,
     "failures": 0,
     "selection": "every EditorFind*/EditorReplace* App test class (EditorFindHostedGateTests includes all hosted F, R0-R8 and WYSIWYG methods), F6/F7 focus receipts, MenuBarStateTests, PlainsongMenuKeyBindingTests and every WorkspaceSearch* class; serial Debug macOS through xcodebuild test under the shared lock",
@@ -35,7 +35,7 @@
     ],
     "skipReason": "opt-in wall-clock gates (PLAINSONG_RUN_HIGHLIGHT_SCHEDULE_STRESS, PLAINSONG_RUN_HOSTED_TYPING_GATE)",
     "perClass": {
-      "EditorFindHostedGateTests": 107,
+      "EditorFindHostedGateTests": 114,
       "EditorFindFocusReceiptTests": 19,
       "EditorFindLifecycleCombinationTests": 5,
       "EditorFindMatchHighlightAppTests": 4,
@@ -143,6 +143,41 @@
       {
         "test": "EditorFindHostedGateTests/testHostedMarkedTextBeginningDuringReplaceAllPlanningInvalidatesTheActionInEachOwner",
         "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedComposingEditorRefusesMarkedTextFirstWhileReloadIsSuspended",
+        "result": "passed",
+        "hardening": "marked-text refusal is checked before the reload-suspension fence"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCollapseWhileARowControlHasFocusHandsFocusToTheQueryField",
+        "result": "passed",
+        "hardening": "a focused field or focused row button collapsing hands focus to the query field"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField",
+        "result": "passed",
+        "hardening": "focused Cancel unmounting hands focus to Replace All, or the replacement field when Replace All is ineligible"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame",
+        "result": "passed",
+        "hardening": "one Applying frame is published before the no-suspension final recheck"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedBackgroundWindowBarPressesCannotReachTheKeyWindowsEditor",
+        "result": "passed",
+        "hardening": "bar Replace/Replace All/Return presses are key-window gated like the menus"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEscapeOnAFocusedRowButtonClosesTheBarAndCancelsThePlan",
+        "result": "passed",
+        "hardening": "Escape on a focused AppKit row button routes to the bar exit command"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedTransientBlockedMessageIsWithdrawnWhenTheInspectionSettles",
+        "result": "passed",
+        "hardening": "the transient disk-inspection blocked text withdraws when the inspection settles clear"
       }
     ],
     "newUnitTests": [
@@ -163,7 +198,7 @@
         "result": "passed"
       },
       {
-        "test": "EditorReplaceStatusTextTests/testSingleReplaceNavigationAndCommitLeaveTheCounterToSpeakButIdenticalSaysNoChanges",
+        "test": "EditorReplaceStatusTextTests/testSingleReplaceNavigationIsSilentCommitSaysReplacedAndIdenticalSaysNoChanges",
         "result": "passed"
       },
       {
@@ -212,7 +247,29 @@
   },
   "lint": {
     "command": "PATH=<pinned SwiftFormat 0.62.1>:$PATH make lint",
-    "result": "0/592 files require formatting; SwiftLint exit 0 (warnings only, none new in App)"
+    "result": "0/595 files require formatting; SwiftLint exit 0 (331 pre-existing warnings, 0 serious)"
+  },
+  "hardeningPass": {
+    "state": "uncommitted at record time; lead commits",
+    "behaviors": [
+      "bar Replace/Replace All presses gated on the bar's window being key",
+      "focused owned controls hand off via makeFirstResponder before unmount or disable",
+      "Escape on a focused row button routes to the bar exit command",
+      "one Applying frame renders before the no-suspension final recheck",
+      "replaceRowCollapsed makes bar actions ineligible",
+      "transient blocked status withdraws when the inspection settles",
+      "replacement field error is setAccessibilityHelp; .replaced speaks 'Replaced 1 match'"
+    ],
+    "fixesDuringVerification": [
+      "EditorReplaceRowModel derives hasActiveQuery from controller.query presence, not the transient session, so a focused Replace All is not disabled during the post-commit recount",
+      "EditorFindOwnedTextField tracks field-editor editing from controlTextDidBeginEditing so a teardown order that resigns the editor before viewWillMove(toWindow:) still hands focus off",
+      "EditorFindBarButton hands focus off before isEnabled=false strands a focused button",
+      "stale assertion in testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen corrected"
+    ],
+    "flakes": [
+      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField timed out once waiting for Cancel to mount in a mixed run under machine load; passed in isolation (1 test, 0 failures) and in the rerun six-test selection (6/6)"
+    ],
+    "evidence": "/private/tmp/plainsong-prh-hardening/focushandoff.xcresult"
   },
   "diffCheck": "git diff --check clean",
   "notRun": {

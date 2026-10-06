@@ -151,6 +151,10 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedReplaceRow()
         let app = hosted.appState
         let editor = try hostedEditor(hosted)
+        // The production 150 ms Find debounce, so the recount lands after the keystrokes.
+        let controller = app.editorFindHost.controller
+        controller.debounceNanoseconds = EditorFindController(documentBinding: controller.documentBinding)
+            .debounceNanoseconds
         XCTAssertTrue(hosted.window.makeFirstResponder(editor))
         editor.textSelection = NSRange(location: 15, length: 0)
         let authority = app.editorReplaceAuthorityGeneration
@@ -167,5 +171,17 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(app.editorFindHost.ui.replacementText, ui.replacementText)
         XCTAssertEqual(app.editorFindHost.ui.replacementValidity, ui.replacementValidity)
         XCTAssertFalse(app.editorFindHost.replaceBatch.isPreparing)
+
+        // The debounced recount publishes Find chrome; it still touches no Replace state.
+        try await waitUntil("the debounced Find recount lands for the typed revision") {
+            controller.documentBinding.revision == UInt64(app.currentDocument.version)
+                && controller.session?.total == 2
+                && app.editorFindHost.ui.matchCounterText.hasSuffix("/ 2")
+        }
+        XCTAssertEqual(app.editorReplaceAuthorityGeneration, authority, "the recount is not a supersession")
+        XCTAssertEqual(app.editorFindHost.replaceBatch.replacementGeneration, replacement)
+        XCTAssertEqual(app.editorFindHost.replaceStatusSerial, serial)
+        XCTAssertEqual(app.editorFindHost.ui.replacementText, ui.replacementText)
+        XCTAssertNil(app.editorFindHost.replaceStatus)
     }
 }

@@ -15,6 +15,7 @@ extension EditorFindHostedGateTests {
         let window = hosted.window
         installProductionKeyWindowSeams(app, group: hosted.group)
         routeMenuCommands(to: app)
+        app.setEditorReplaceExpanded(false)
         app.handleEditorFindQueryTextChange("hit one")
         let editor = try hostedEditor(hosted)
         XCTAssertTrue(window.makeFirstResponder(editor))

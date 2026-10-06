@@ -70,13 +70,14 @@ final class EditorFindHost {
     var lastReplaceAnnouncement: String?
     var didInstallReplacePresentation = false
     var didAnnounceReplacePreparation = false
+    var isBlockedStatusCheckPending = false
     var isReplacePresentationPublishPending = false
 
     init() {
         // An authority advance supersedes every plan; a preparing one stops at once instead
         // of draining to a refusal behind a still-visible progress label.
-        replaceAuthority.onAdvance = { [unowned replaceBatch] in
-            replaceBatch.supersedeIfPreparing()
+        replaceAuthority.onAdvance = { [weak replaceBatch] in
+            replaceBatch?.supersedeIfPreparing()
         }
     }
 }

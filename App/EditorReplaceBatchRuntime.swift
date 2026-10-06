@@ -51,7 +51,8 @@ final class EditorReplaceBatchRuntime {
         didSet { if isPreparing != oldValue { onPresentationChange?() } }
     }
 
-    /// The synchronous commit turn: nothing can render it, but the bar and tests read it.
+    /// From the end of preparation through the synchronous commit; rendered during the one
+    /// frame `performEditorReplaceAll` yields before its final recheck.
     var isApplying = false {
         didSet { if isApplying != oldValue { onPresentationChange?() } }
     }
@@ -92,6 +93,17 @@ final class EditorReplaceBatchRuntime {
         isPreparing = true
         return token
     }
+
+    /// Preparation finished for the current plan: Cancel is withdrawn and `Applying…` shows
+    /// for the one frame before the final recheck and the synchronous commit.
+    func beginApplying() {
+        isPreparing = false
+        isApplying = true
+        didBeginApplyingForTesting?()
+    }
+
+    /// Test seam: runs as `Applying…` is published, before the one-frame yield.
+    var didBeginApplyingForTesting: (() -> Void)?
 
     /// Stops a plan that has not reached its synchronous commit. Commit has already cleared
     /// `isPreparing`, so this can never interrupt an admitted native write.

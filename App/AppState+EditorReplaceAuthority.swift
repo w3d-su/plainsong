@@ -90,6 +90,7 @@ extension AppState {
     /// write-fence `didSet`, and the live evaluation at commit.
     func noteEditorReplaceAuthorityInputDidChange() {
         advanceEditorReplaceAuthorityGeneration()
+        scheduleStaleEditorReplaceBlockedStatusCheck()
     }
 
     /// Rebind, reload, rekey, focus, and bar transitions call this directly.

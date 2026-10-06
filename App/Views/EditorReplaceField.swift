@@ -13,19 +13,23 @@ import SwiftUI
 /// validation with an explicit field error instead of being converted silently.
 struct EditorReplaceField: NSViewRepresentable {
     @Binding var text: String
-    /// Return without marked text.
-    var onSubmit: () -> Void
+    /// The field error, tied to the field for VoiceOver as its help text.
+    var errorText: String?
+    /// Return without marked text, with the window hosting this field.
+    var onSubmit: (NSWindow?) -> Void
     /// Escape without marked text.
     var onEscape: () -> Void
     var onOwnerMount: (NSTextField) -> Void
     var onOwnerUnmount: (NSTextField) -> Void
+    /// Focus hand-off when the field leaves its window while it (or its field editor) has focus.
+    var onRemovalWhileFocused: (NSWindow) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onSubmit: onSubmit, onEscape: onEscape)
     }
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField(string: text)
+        let field = EditorFindOwnedTextField(string: text)
         field.isBordered = true
         field.isBezeled = true
         field.bezelStyle = .roundedBezel
@@ -43,6 +47,8 @@ struct EditorReplaceField: NSViewRepresentable {
         field.isSelectable = true
         context.coordinator.field = field
         context.coordinator.onOwnerUnmount = onOwnerUnmount
+        field.onRemovalWhileFocused = onRemovalWhileFocused
+        field.setAccessibilityHelp(errorText)
         onOwnerMount(field)
         return field
     }
@@ -53,6 +59,10 @@ struct EditorReplaceField: NSViewRepresentable {
         coordinator.field = field
         coordinator.onSubmit = onSubmit
         coordinator.onEscape = onEscape
+        (field as? EditorFindOwnedTextField)?.onRemovalWhileFocused = onRemovalWhileFocused
+        if field.accessibilityHelp() != errorText {
+            field.setAccessibilityHelp(errorText)
+        }
         // Never overwrite the field while IME marked text is active (Zhuyin/Pinyin).
         let isComposing = (field.currentEditor() as? NSTextView)?.hasMarkedText() == true
             || coordinator.isComposing
@@ -68,13 +78,13 @@ struct EditorReplaceField: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var text: Binding<String>
-        var onSubmit: () -> Void
+        var onSubmit: (NSWindow?) -> Void
         var onEscape: () -> Void
         var onOwnerUnmount: (NSTextField) -> Void = { _ in }
         weak var field: NSTextField?
         var isComposing = false
 
-        init(text: Binding<String>, onSubmit: @escaping () -> Void, onEscape: @escaping () -> Void) {
+        init(text: Binding<String>, onSubmit: @escaping (NSWindow?) -> Void, onEscape: @escaping () -> Void) {
             self.text = text
             self.onSubmit = onSubmit
             self.onEscape = onEscape
@@ -94,8 +104,13 @@ struct EditorReplaceField: NSViewRepresentable {
             }
         }
 
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            (obj.object as? EditorFindOwnedTextField)?.fieldEditorIsActive = true
+        }
+
         func controlTextDidEndEditing(_ obj: Notification) {
             guard let field = obj.object as? NSTextField else { return }
+            (field as? EditorFindOwnedTextField)?.fieldEditorIsActive = false
             isComposing = false
             if text.wrappedValue != field.stringValue {
                 text.wrappedValue = field.stringValue
@@ -116,7 +131,7 @@ struct EditorReplaceField: NSViewRepresentable {
                 return false
             }
             if isNewline {
-                onSubmit()
+                onSubmit(textView.window)
                 return true
             }
             if isEscape {

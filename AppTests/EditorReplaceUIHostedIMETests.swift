@@ -70,7 +70,7 @@ extension EditorFindHostedGateTests {
             let ordinal = app.editorFindHost.controller.session?.currentOrdinal
 
             XCTAssertEqual(app.performEditorReplace(replacement: "NEW"), .markedText, "\(owner)")
-            XCTAssertEqual(app.replaceFromEditorReplaceBar(), .markedText, "\(owner): bar / Return")
+            XCTAssertEqual(app.replaceFromEditorReplaceBar(in: hosted.window), .markedText, "\(owner): bar / Return")
             let result = await app.performEditorReplaceAll(replacement: "NEW")
             XCTAssertEqual(result, .markedText, "\(owner)")
             // The replacement or query field is first responder: menus are eligible.
@@ -164,9 +164,10 @@ extension EditorFindHostedGateTests {
                 // live owner recheck at commit can see it.
                 XCTAssertEqual(result, .markedText, "\(owner)")
             case .editor:
-                // Native marked text also moves the editor selection, which the preparation-
-                // only selection observer reports first; either way the plan is dropped.
-                XCTAssertTrue([.markedText, .superseded].contains(result), "\(owner): \(result)")
+                // STTextView posts `didChangeSelection` synchronously from `setMarkedText`, so
+                // PR G's preparation-only selection observer advances the authority generation
+                // and cancels the token before the plan reaches its final recheck.
+                XCTAssertEqual(result, .superseded, "\(owner)")
             }
             XCTAssertEqual(app.editorWriterInstallations, writers, "\(owner): no writer activation")
             XCTAssertEqual(app.currentDocument.text, before.appText, "\(owner)")

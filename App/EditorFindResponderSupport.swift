@@ -70,6 +70,20 @@ enum EditorFindResponderSupport {
         return matchesEditorOrFindFieldResponder(first)
     }
 
+    /// The owned find-bar view with `identifier` under `root` (fields, row buttons).
+    @MainActor
+    static func ownedView(_ identifier: String, under root: NSView) -> NSView? {
+        if root.accessibilityIdentifier() == identifier {
+            return root
+        }
+        for subview in root.subviews {
+            if let match = ownedView(identifier, under: subview) {
+                return match
+            }
+        }
+        return nil
+    }
+
     @MainActor
     private static func matchesEditorOrFindFieldResponder(_ first: NSResponder) -> Bool {
         if let view = first as? NSView, matchesEditorOrFindField(view) {

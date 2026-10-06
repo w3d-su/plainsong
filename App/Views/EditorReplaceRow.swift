@@ -1,3 +1,4 @@
+import AppKit
 import EditorKit
 import MarkdownCore
 import SwiftUI
@@ -16,7 +17,13 @@ struct EditorReplaceRowModel: Equatable {
         let ui = appState.editorFindHost.ui
         replacementText = ui.replacementText
         replacementValidity = ui.replacementValidity
-        hasActiveQuery = ui.hasActiveQuery
+        // The session is nil while matches recompute — including the recount inside a
+        // committed Replace — so a session-derived flag would flap disabled and force a
+        // focused row button to resign first responder mid-action. The committed query is
+        // stable across recomputes, matching menu eligibility (`isReplaceRowActive` never
+        // consults session state either).
+        hasActiveQuery = appState.editorFindHost.controller.query.map { !$0.pattern.isEmpty }
+            ?? false
         isTruncated = ui.isTruncated
         activity = appState.editorReplaceActivity
         status = appState.editorFindHost.replaceStatus
@@ -60,7 +67,8 @@ struct EditorReplaceRow: View, Equatable {
                     get: { appState.editorFindHost.ui.replacementText },
                     set: { appState.handleEditorReplaceTextChange($0) }
                 ),
-                onSubmit: { appState.replaceFromEditorReplaceBar() },
+                errorText: fieldError,
+                onSubmit: { window in appState.replaceFromEditorReplaceBar(in: window) },
                 onEscape: { appState.closeEditorFindBar() },
                 onOwnerMount: { field in
                     appState.editorFindHost.replaceMarkedTextOwners.register(field)
@@ -69,6 +77,11 @@ struct EditorReplaceRow: View, Equatable {
                 onOwnerUnmount: { field in
                     appState.editorFindHost.replaceMarkedTextOwners.unregister(field)
                     appState.advanceEditorReplaceAuthorityGeneration()
+                },
+                onRemovalWhileFocused: { window in
+                    appState.handOffEditorReplaceFocus(
+                        fromRemoved: EditorFindAccessibility.replacementField, in: window
+                    )
                 }
             )
             .frame(minWidth: 160, idealWidth: 220, maxWidth: 320)
@@ -83,9 +96,11 @@ struct EditorReplaceRow: View, Equatable {
                 title: "Replace",
                 identifier: EditorFindAccessibility.replaceButton,
                 accessibilityHelp: "Replaces the current match and moves to the next",
-                isEnabled: !actionsDisabled
-            ) {
-                appState.replaceFromEditorReplaceBar()
+                isEnabled: !actionsDisabled,
+                onRemovalWhileFocused: handOff(EditorFindAccessibility.replaceButton),
+                onEscape: escape
+            ) { window in
+                appState.replaceFromEditorReplaceBar(in: window)
             }
             .fixedSize()
 
@@ -93,9 +108,11 @@ struct EditorReplaceRow: View, Equatable {
                 title: "Replace All",
                 identifier: EditorFindAccessibility.replaceAllButton,
                 accessibilityHelp: "Replaces every match in this document as one undo step",
-                isEnabled: !actionsDisabled
-            ) {
-                appState.replaceAllFromEditorReplaceBar()
+                isEnabled: !actionsDisabled,
+                onRemovalWhileFocused: handOff(EditorFindAccessibility.replaceAllButton),
+                onEscape: escape
+            ) { window in
+                appState.replaceAllFromEditorReplaceBar(in: window)
             }
             .fixedSize()
 
@@ -119,6 +136,14 @@ struct EditorReplaceRow: View, Equatable {
         .accessibilityIdentifier(EditorFindAccessibility.replaceRow)
     }
 
+    private var escape: () -> Void {
+        { [appState] in appState.closeEditorFindBarFromExitCommand() }
+    }
+
+    private func handOff(_ identifier: String) -> (NSWindow) -> Void {
+        { [appState] window in appState.handOffEditorReplaceFocus(fromRemoved: identifier, in: window) }
+    }
+
     /// Decorative: the adjacent label's text carries the whole meaning.
     private func symbol(_ name: String) -> some View {
         Image(systemName: name)
@@ -140,8 +165,12 @@ struct EditorReplaceRow: View, Equatable {
                 EditorFindBarButton(
                     title: "Cancel",
                     identifier: EditorFindAccessibility.replaceCancelButton,
-                    accessibilityLabel: "Cancel Replace All"
-                ) {
+                    accessibilityLabel: "Cancel Replace All",
+                    onRemovalWhileFocused: handOff(EditorFindAccessibility.replaceCancelButton),
+                    onEscape: escape
+                ) { _ in
+                    // Cancel has no mutation to protect, so a press in any window may stop
+                    // the shared plan; only Replace and Replace All require the key window.
                     appState.cancelEditorReplaceAllFromBar()
                 }
                 .fixedSize()
@@ -154,7 +183,8 @@ struct EditorReplaceRow: View, Equatable {
         switch status?.kind {
         case .blocked?:
             if let status {
-                symbol("lock")
+                // The autosave's own disk inspection is momentary: a clock, not a lock.
+                symbol(status.isTransient ? "clock" : "lock")
                 EditorFindBarLabel(text: status.text, identifier: EditorFindAccessibility.replaceBlockedReason)
             }
         case .result?, .refusal?:

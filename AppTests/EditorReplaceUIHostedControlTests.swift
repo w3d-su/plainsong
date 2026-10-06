@@ -82,14 +82,17 @@ extension EditorFindHostedGateTests {
         try typeReplacement(String(repeating: "🦊", count: 129), in: window)
         try await waitUntil("the over-limit error is shown and both actions disable") {
             self.label(EditorFindAccessibility.replacementFieldError, in: window)?.stringValue
-                == "Replacement is longer than 256 characters"
+                == "Replacement is too long: the limit is 256 text units, and most emoji count as 2"
                 && !replace.isEnabled && !replaceAll.isEnabled
         }
+        let tooLong = "Replacement is too long: the limit is 256 text units, and most emoji count as 2"
+        XCTAssertEqual(replacementField(in: window)?.accessibilityHelp(), tooLong, "the error is tied to the field")
+        XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, tooLong, "and spoken when it appears")
         let before = EditorReplaceEffectSnapshot(app, textView: editor)
         XCTAssertFalse(EditorFindCommandDelivery.performReplace())
         XCTAssertFalse(EditorFindCommandDelivery.performReplaceAll())
         XCTAssertFalse(MenuBarSnapshot(appState: app).canReplace)
-        XCTAssertNil(app.replaceFromEditorReplaceBar())
+        XCTAssertNil(app.replaceFromEditorReplaceBar(in: window))
         XCTAssertNil(app.editorFindHost.replaceAllTask)
         XCTAssertEqual(EditorReplaceEffectSnapshot(app, textView: editor), before)
 
@@ -161,7 +164,7 @@ extension EditorFindHostedGateTests {
             self.label(EditorFindAccessibility.replaceStatus, in: window)?.stringValue == "Changed 2 of 3 matches"
         }
         XCTAssertEqual(
-            label(EditorFindAccessibility.replaceStatus, in: window)?.accessibilityLabel(),
+            label(EditorFindAccessibility.replaceStatus, in: window)?.accessibilityValue() as? String,
             "Changed 2 of 3 matches"
         )
 
@@ -207,7 +210,12 @@ extension EditorFindHostedGateTests {
         before = EditorReplaceEffectSnapshot(app, textView: editor)
         try await click(EditorFindAccessibility.replaceButton, in: window)
         let transient = "Checking the file for outside changes; try again in a moment"
-        XCTAssertEqual(app.editorFindHost.replaceStatus, EditorReplaceStatus(kind: .blocked, text: transient))
+        XCTAssertEqual(
+            app.editorFindHost.replaceStatus,
+            EditorReplaceStatus(
+                kind: .blocked, text: transient, blockedReason: .externalObservationPending
+            )
+        )
         XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, transient)
         try await waitUntil("the blocked reason is shown as text") {
             self.label(EditorFindAccessibility.replaceBlockedReason, in: window)?.stringValue == transient
@@ -220,7 +228,8 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(app.currentDocument.text, before.appText)
         try await click(EditorFindAccessibility.replaceButton, in: window)
         XCTAssertNotEqual(app.currentDocument.text, before.appText)
-        XCTAssertNil(app.editorFindHost.replaceStatus)
+        XCTAssertEqual(app.editorFindHost.replaceStatus, EditorReplaceStatus(kind: .result, text: "Replaced 1 match"))
+        XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "Replaced 1 match")
     }
 
     /// An owned AppKit status label in `window`.
