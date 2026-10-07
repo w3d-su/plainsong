@@ -1,104 +1,49 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import WorkspaceKit
 
-/// Existing Files tree, file info, and frontmatter panel (WS3C Files mode).
+/// Files mode: workspace tree, frontmatter inspector, and the sidebar bottom bar (WS3C Files mode).
+///
+/// The tree is a native source list: selection, keyboard navigation, and the inactive-window
+/// highlight come from `List(selection:)`. Only editable Markdown rows are selectable, and
+/// selecting one goes through `selectWorkspaceNode(id:)` exactly like the former row button.
 struct WorkspaceFilesSidebar: View {
     @EnvironmentObject private var appState: AppState
-    @State private var creationMode: CreationMode?
+    @State private var creationRequest: CreationRequest?
     @State private var itemName = ""
     @State private var renameTarget: WorkspaceFileNode?
     @State private var renameName = ""
+    @State private var isWorkspaceSectionExpanded = true
+    @State private var isFrontmatterSectionExpanded = true
 
     var body: some View {
-        List {
-            if let tree = appState.workspaceTree {
-                Section {
-                    Toggle("Show All Files", isOn: showAllFilesBinding)
-                    HStack(spacing: 8) {
-                        Button {
-                            itemName = "Untitled.md"
-                            creationMode = .file
-                        } label: {
-                            Label("New File", systemImage: "doc.badge.plus")
-                        }
-                        .labelStyle(.iconOnly)
-                        .help("New File")
-
-                        Button {
-                            itemName = "New Folder"
-                            creationMode = .folder
-                        } label: {
-                            Label("New Folder", systemImage: "folder.badge.plus")
-                        }
-                        .labelStyle(.iconOnly)
-                        .help("New Folder")
-                    }
-                    .buttonStyle(.borderless)
-                } header: {
-                    Text(appState.workspaceRootURL?.lastPathComponent ?? "Workspace")
-                }
-
-                Section {
-                    ForEach(tree.root.children) { node in
-                        WorkspaceTreeNodeRow(
-                            node: node,
-                            selectedNodeID: tree.selectedNodeID,
-                            onRename: beginRename(_:)
-                        )
-                    }
-                }
+        VStack(spacing: 0) {
+            if appState.workspaceTree == nil, !appState.hasOpenDocument {
+                noFolderState
             } else {
-                Section("Workspace") {
-                    Label("No folder open", systemImage: "sidebar.left")
-                        .foregroundStyle(.secondary)
-                }
+                list
             }
 
-            Section("File") {
-                if let fileURL = appState.currentDocument.fileURL {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(fileURL.lastPathComponent)
-                            .lineLimit(1)
-                        Text(fileURL.deletingLastPathComponent().path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .padding(.vertical, 2)
-                } else {
-                    Text("No file open")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if appState.hasOpenDocument {
-                Section {
-                    let session = appState.currentDocument
-                    FrontmatterPanel(session: session) { newText in
-                        appState.replaceDocumentText(newText, in: session)
-                    }
-                }
+            if appState.workspaceTree != nil {
+                bottomBar
             }
         }
-        .alert("Create Item", isPresented: createAlertIsPresented) {
+        .alert(creationRequest?.kind.title ?? "New Item", isPresented: createAlertIsPresented) {
             TextField("Name", text: $itemName)
             Button("Create") {
-                switch creationMode {
-                case .file:
-                    appState.createWorkspaceFile(named: itemName, inDirectoryID: selectedDirectoryID)
-                case .folder:
-                    appState.createWorkspaceFolder(named: itemName, inDirectoryID: selectedDirectoryID)
-                case .none:
-                    break
+                if let creationRequest {
+                    create(creationRequest)
                 }
-                creationMode = nil
+                creationRequest = nil
             }
             Button("Cancel", role: .cancel) {
-                creationMode = nil
+                creationRequest = nil
             }
+        } message: {
+            Text(creationRequest?.kind.prompt ?? "")
         }
-        .alert("Rename", isPresented: renameAlertIsPresented) {
+        .alert("Rename “\(renameTarget?.name ?? "")”", isPresented: renameAlertIsPresented) {
             TextField("Name", text: $renameName)
             Button("Rename") {
                 if let renameTarget {
@@ -112,19 +57,135 @@ struct WorkspaceFilesSidebar: View {
         }
     }
 
+    private var list: some View {
+        List(selection: selectionBinding) {
+            if let tree = appState.workspaceTree {
+                Section(isExpanded: $isWorkspaceSectionExpanded) {
+                    ForEach(tree.root.children) { node in
+                        WorkspaceTreeNodeRow(
+                            node: node,
+                            rootURL: appState.workspaceRootURL,
+                            onRename: beginRename(_:),
+                            onCreate: beginCreation(_:inDirectoryID:)
+                        )
+                    }
+                } header: {
+                    Text(appState.workspaceRootURL?.lastPathComponent ?? "Workspace")
+                }
+            } else {
+                Section("Folder") {
+                    Button {
+                        appState.openFile()
+                    } label: {
+                        Label("Open Folder…", systemImage: "folder.badge.plus")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Open a folder to browse its Markdown files")
+                }
+            }
+
+            if appState.hasOpenDocument {
+                Section(isExpanded: $isFrontmatterSectionExpanded) {
+                    let session = appState.currentDocument
+                    FrontmatterPanel(session: session) { newText in
+                        appState.replaceDocumentText(newText, in: session)
+                    }
+                } header: {
+                    Text("Frontmatter")
+                }
+            }
+        }
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+    }
+
+    private var noFolderState: some View {
+        ContentUnavailableView {
+            Label("No Folder Open", systemImage: "folder")
+        } description: {
+            Text("Open a folder to browse and edit its Markdown and MDX files.")
+        } actions: {
+            Button("Open…") {
+                appState.openFile()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var bottomBar: some View {
+        HStack(spacing: 4) {
+            Menu {
+                Button("New File") {
+                    beginCreation(.file, inDirectoryID: selectedDirectoryID)
+                }
+                Button("New Folder") {
+                    beginCreation(.folder, inDirectoryID: selectedDirectoryID)
+                }
+            } label: {
+                Label("Add", systemImage: "plus")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Add a file or folder")
+
+            Spacer()
+
+            Menu {
+                Picker("Show", selection: showAllFilesBinding) {
+                    Text("Markdown Files Only").tag(false)
+                    Text("All Files").tag(true)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } label: {
+                Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(appState.showAllFiles ? "Showing all files" : "Showing Markdown files only")
+            .accessibilityValue(appState.showAllFiles ? "All Files" : "Markdown Files Only")
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .overlay(alignment: .top) {
+            Divider()
+        }
+    }
+
+    private var selectionBinding: Binding<WorkspaceFileNode.ID?> {
+        Binding(
+            get: { appState.workspaceTree?.selectedNodeID },
+            set: { newValue in
+                // Clicking empty space or a non-file row must not drop the open file's highlight.
+                guard let newValue, newValue != appState.workspaceTree?.selectedNodeID else { return }
+                appState.selectWorkspaceNode(id: newValue)
+            }
+        )
+    }
+
     private var showAllFilesBinding: Binding<Bool> {
         Binding(
             get: { appState.showAllFiles },
-            set: { _ in appState.toggleShowAllFiles() }
+            set: { showsAllFiles in
+                if showsAllFiles != appState.showAllFiles {
+                    appState.toggleShowAllFiles()
+                }
+            }
         )
     }
 
     private var createAlertIsPresented: Binding<Bool> {
         Binding(
-            get: { creationMode != nil },
+            get: { creationRequest != nil },
             set: { isPresented in
                 if !isPresented {
-                    creationMode = nil
+                    creationRequest = nil
                 }
             }
         )
@@ -146,14 +207,60 @@ struct WorkspaceFilesSidebar: View {
         return selectedNode.isDirectory ? selectedNode.id : nil
     }
 
+    private func beginCreation(_ kind: WorkspaceSidebarCreationKind, inDirectoryID directoryID: WorkspaceFileNode.ID?) {
+        itemName = kind.defaultName
+        creationRequest = CreationRequest(kind: kind, directoryID: directoryID)
+    }
+
+    private func create(_ request: CreationRequest) {
+        switch request.kind {
+        case .file:
+            appState.createWorkspaceFile(named: itemName, inDirectoryID: request.directoryID)
+        case .folder:
+            appState.createWorkspaceFolder(named: itemName, inDirectoryID: request.directoryID)
+        }
+    }
+
     private func beginRename(_ node: WorkspaceFileNode) {
         renameTarget = node
         renameName = node.name
     }
 
-    private enum CreationMode {
-        case file
-        case folder
+    private struct CreationRequest {
+        let kind: WorkspaceSidebarCreationKind
+        let directoryID: WorkspaceFileNode.ID?
+    }
+}
+
+enum WorkspaceSidebarCreationKind {
+    case file
+    case folder
+
+    var title: String {
+        switch self {
+        case .file:
+            "New File"
+        case .folder:
+            "New Folder"
+        }
+    }
+
+    var prompt: String {
+        switch self {
+        case .file:
+            "Enter a name for the new file."
+        case .folder:
+            "Enter a name for the new folder."
+        }
+    }
+
+    var defaultName: String {
+        switch self {
+        case .file:
+            "Untitled.md"
+        case .folder:
+            "New Folder"
+        }
     }
 }
 
@@ -161,8 +268,9 @@ struct WorkspaceTreeNodeRow: View {
     @EnvironmentObject private var appState: AppState
 
     let node: WorkspaceFileNode
-    let selectedNodeID: WorkspaceFileNode.ID?
+    let rootURL: URL?
     let onRename: (WorkspaceFileNode) -> Void
+    let onCreate: (WorkspaceSidebarCreationKind, WorkspaceFileNode.ID?) -> Void
 
     var body: some View {
         if node.isDirectory {
@@ -170,8 +278,9 @@ struct WorkspaceTreeNodeRow: View {
                 ForEach(node.children) { child in
                     WorkspaceTreeNodeRow(
                         node: child,
-                        selectedNodeID: selectedNodeID,
-                        onRename: onRename
+                        rootURL: rootURL,
+                        onRename: onRename,
+                        onCreate: onCreate
                     )
                 }
             } label: {
@@ -186,32 +295,53 @@ struct WorkspaceTreeNodeRow: View {
     }
 
     private var rowLabel: some View {
-        Button {
-            if node.isEditableMarkdown {
-                appState.selectWorkspaceNode(id: node.id)
-            }
-        } label: {
-            Label(node.name, systemImage: iconName)
+        Label {
+            Text(node.name)
                 .lineLimit(1)
-                .foregroundStyle(node.isEditableMarkdown ? .primary : .secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .truncationMode(.middle)
+        } icon: {
+            Image(systemName: iconName)
         }
-        .buttonStyle(.plain)
-        .padding(.vertical, 1)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(selectedNodeID == node.id ? Color.accentColor.opacity(0.18) : Color.clear)
-        )
+        .foregroundStyle(isDimmed ? .secondary : .primary)
+        .tag(node.id)
+        .selectionDisabled(!node.isEditableMarkdown)
         .draggable(node.id)
+        .help(node.relativePath)
         .contextMenu {
-            Button("Rename") {
+            if node.isDirectory {
+                Button("New File") {
+                    onCreate(.file, node.id)
+                }
+                Button("New Folder") {
+                    onCreate(.folder, node.id)
+                }
+                Divider()
+            }
+
+            Button("Rename…") {
                 onRename(node)
             }
+
+            if let itemURL {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([itemURL])
+                }
+            }
+
+            Divider()
 
             Button("Move to Trash", role: .destructive) {
                 appState.trashWorkspaceItem(id: node.id)
             }
         }
+    }
+
+    private var isDimmed: Bool {
+        !node.isDirectory && !node.isEditableMarkdown
+    }
+
+    private var itemURL: URL? {
+        rootURL?.appending(path: node.relativePath, directoryHint: node.isDirectory ? .isDirectory : .notDirectory)
     }
 
     private var expandedBinding: Binding<Bool> {

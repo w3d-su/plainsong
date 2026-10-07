@@ -1,23 +1,19 @@
 import MarkdownCore
 import SwiftUI
 
+/// Frontmatter inspector rows; the hosting sidebar section supplies the header.
 struct FrontmatterPanel: View {
     @ObservedObject var session: DocumentSession
     let onReplaceText: (String) -> Void
 
     @State private var textSnapshot: String?
-    @State private var isExpanded = true
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            content
-                .padding(.top, 6)
-        } label: {
-            Label("Frontmatter", systemImage: "tag")
-        }
-        .task(id: ObjectIdentifier(session)) {
-            await observeSession()
-        }
+        content
+            .padding(.vertical, 4)
+            .task(id: ObjectIdentifier(session)) {
+                await observeSession()
+            }
     }
 
     @ViewBuilder
@@ -70,8 +66,8 @@ private struct FrontmatterFieldsPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if fields.isEmpty {
-                Text("Empty frontmatter")
-                    .font(.caption)
+                Text("The frontmatter block is empty.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(fields) { field in
@@ -89,16 +85,27 @@ private struct FrontmatterFieldEditor: View {
     var body: some View {
         switch field.value {
         case let .bool(value):
-            Toggle(field.key, isOn: boolBinding(value))
-                .controlSize(.small)
+            LabeledContent {
+                Toggle(field.key, isOn: boolBinding(value))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            } label: {
+                FieldKeyLabel(key: field.key)
+            }
         case let .date(value):
             if Frontmatter.isPlainCalendarDate(value) {
-                DatePicker(
-                    field.key,
-                    selection: dateBinding(value),
-                    displayedComponents: .date
-                )
-                .controlSize(.small)
+                LabeledContent {
+                    DatePicker(
+                        field.key,
+                        selection: dateBinding(value),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .controlSize(.small)
+                } label: {
+                    FieldKeyLabel(key: field.key)
+                }
             } else {
                 LabeledTextField(key: field.key, value: value) { newValue in
                     update(field.key, .date(newValue))
@@ -137,11 +144,10 @@ private struct LabeledTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(key)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            FieldKeyLabel(key: key)
 
             TextField(key, text: binding)
+                .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
         }
@@ -161,14 +167,10 @@ private struct ReadOnlyFrontmatterField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(key)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            FieldKeyLabel(key: key)
 
-            TextEditor(text: .constant(value))
-                .font(.system(.caption, design: .monospaced))
-                .frame(minHeight: 64, maxHeight: 120)
-                .disabled(true)
+            RawYAMLView(text: value, lineLimit: 8)
+                .help("This value can only be edited in the source.")
         }
     }
 }
@@ -180,25 +182,28 @@ private struct TagsField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(key)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            FieldKeyLabel(key: key)
 
-            TextField(key, text: tagsBinding)
+            TextField(key, text: tagsBinding, prompt: Text("Comma-separated"))
+                .labelsHidden()
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
 
             if !values.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
+                TagFlowLayout {
                     ForEach(values, id: \.self) { tag in
                         Text(tag)
-                            .font(.caption2)
+                            .font(.caption)
                             .lineLimit(1)
-                            .padding(.horizontal, 6)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.tint)
+                            .padding(.horizontal, 7)
                             .padding(.vertical, 2)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                            .background(.tint.opacity(0.14), in: Capsule())
                     }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Tags: \(values.joined(separator: ", "))")
             }
         }
     }
@@ -223,14 +228,12 @@ private struct MissingFrontmatterPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No frontmatter")
-                .font(.caption)
+            Text("This document has no frontmatter.")
+                .font(.callout)
                 .foregroundStyle(.secondary)
 
-            Button(action: insert) {
-                Label("Insert", systemImage: "plus")
-            }
-            .controlSize(.small)
+            Button("Add Frontmatter", action: insert)
+                .controlSize(.small)
         }
     }
 }
@@ -240,20 +243,51 @@ private struct MalformedFrontmatterPanel: View {
     let message: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("YAML error", systemImage: "exclamationmark.triangle")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 6) {
+            Label {
+                Text("Invalid YAML")
+                    .font(.callout.weight(.semibold))
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .symbolRenderingMode(.multicolor)
+            }
 
             Text(message)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
 
-            TextEditor(text: .constant(rawYAML))
-                .font(.system(.caption, design: .monospaced))
-                .frame(minHeight: 90, maxHeight: 140)
-                .disabled(true)
+            RawYAMLView(text: rawYAML, lineLimit: 12)
         }
+    }
+}
+
+private struct FieldKeyLabel: View {
+    let key: String
+
+    var body: some View {
+        Text(key)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+}
+
+/// Read-only YAML shown as selectable monospaced text; the source stays the only editor.
+private struct RawYAMLView: View {
+    let text: String
+    let lineLimit: Int
+
+    var body: some View {
+        Text(text)
+            .font(.system(.caption, design: .monospaced))
+            .lineLimit(lineLimit)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+            .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

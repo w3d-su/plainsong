@@ -87,7 +87,7 @@ blogeditor/
 │   ├── package.json
 │   ├── src/index.ts          # bridge protocol impl, render(), morphdom patching, scroll sync
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
-│   ├── src/styles/           # preview CSS themes (github-light/dark, etc.)
+│   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
 └── .github/workflows/ci.yml  # macOS runner: swiftformat --lint, swiftlint, swift test, xcodebuild test, npm test
 ```
