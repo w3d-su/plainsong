@@ -260,8 +260,8 @@ enum ExportHTMLNoticeMapper {
             nil
         case .destinationAlias:
             (.destinationAlias, "A file or folder there has the same name with different capitalization or " +
-                "accents, or the folder path is spelled differently on disk. Choose the existing name, or " +
-                "a different name.")
+                "accents, the folder path is spelled differently on disk, or the file has another " +
+                "hard-link name. Choose the existing name, or a different name.")
         case let .destinationUnreadable(code):
             (.destinationUnreadable, "The existing file can’t be read (\(posixDescription(code))), so it " +
                 "can’t be replaced safely. Choose a different name.")

@@ -199,9 +199,13 @@ final class WorkspaceFileTreeTests: XCTestCase {
             snapshot: WorkspaceFileSnapshot(entries: entries),
             options: .init(showAllFiles: false)
         )
-        let elapsedSeconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
+        let elapsedMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
 
-        XCTAssertLessThan(elapsedSeconds, 0.05)
+        assertPerformanceBudget(
+            elapsedMilliseconds,
+            lessThanOrEqualTo: 50,
+            metric: "WorkspaceFileTree.reconcile 2000 files"
+        )
     }
 
     private func entry(
