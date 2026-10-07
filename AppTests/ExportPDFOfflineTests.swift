@@ -23,7 +23,15 @@ final class ExportPDFOfflineTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let proxy = try ExportHTTPProxyClient()
         let port = try XCTUnwrap(NWEndpoint.Port(rawValue: proxy.port))
-        try await assertNoRequests(proxy)
+        // The external recorder appends for the whole xcodebuild run (the HTML offline
+        // test's positive control contributes CONNECTs), so only a baseline diff can
+        // prove this test issued nothing.
+        let baselineCount = try await proxy.requests().count
+        func assertNoNewRequests() async throws {
+            let requests = try await proxy.requests()
+            XCTAssertEqual(requests.count, baselineCount)
+        }
+        try await assertNoNewRequests()
         let proxies = [ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: port))]
         fixture.appState.preferences.setAllowsRemoteImages(true)
         let destination = fixture.exportsDirectory.appendingPathComponent("offline.pdf")
@@ -35,14 +43,14 @@ final class ExportPDFOfflineTests: XCTestCase {
         fixture.appState.exportHTMLOperations.websiteDataStoreProvider = proxyDataStore
         fixture.appState.exportHTMLOperations.destinationChooser = { _ in destination }
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value
-        try await assertNoRequests(proxy)
+        try await assertNoNewRequests()
         fixture.appState.exportHTMLOperations.destinationChooser = { _ in
             XCTFail("Print must not open a save panel")
             return nil
         }
         fixture.appState.exportHTMLOperations.printOperationRunner = { _, _ in true }
         try await XCTUnwrap(fixture.appState.printCurrentDocument()).value
-        try await assertNoRequests(proxy)
+        try await assertNoNewRequests()
         XCTAssertTrue(fixture.appState.preferences.allowsRemoteImages)
         let data = try Data(contentsOf: destination)
         XCTAssertTrue(data.starts(with: Data("%PDF".utf8)))
@@ -67,10 +75,5 @@ final class ExportPDFOfflineTests: XCTestCase {
             requests = try await proxy.requests()
         }
         XCTAssertTrue(requests.contains { $0.contains("plainsong-app-export.invalid") })
-    }
-
-    private func assertNoRequests(_ proxy: ExportHTTPProxyClient) async throws {
-        let requests = try await proxy.requests()
-        XCTAssertEqual(requests, [])
     }
 }

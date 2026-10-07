@@ -122,21 +122,18 @@ final class ExportPDFMechanismSpikeTests: XCTestCase {
             return
         }
 
-        let pageHeight: CGFloat
+        let pageRects: [CGRect]
         do {
-            pageHeight = try await probe.chooseFixedPaginationHeight(contentBounds: geometry.contentBounds)
+            pageRects = try await probe.planPagination(contentBounds: geometry.contentBounds)
         } catch {
-            XCTFail("Fixed-height planning failed: \(error)")
+            XCTFail("A1 page planning failed: \(error)")
             return
         }
         let pages: [E0PDFSnapshot]
         do {
-            pages = try await probe.captureFixedHeightPages(
-                contentBounds: geometry.contentBounds,
-                pageHeight: pageHeight
-            )
+            pages = try await probe.capturePlannedPages(rects: pageRects)
         } catch {
-            XCTFail("Fixed-height capture failed at pageHeight \(pageHeight): \(error)")
+            XCTFail("Planned capture failed: \(error)")
             return
         }
         XCTAssertGreaterThan(pages.count, 1)
@@ -145,12 +142,12 @@ final class ExportPDFMechanismSpikeTests: XCTestCase {
         XCTAssertTrue(pages.allSatisfy { page in
             page.pageClaims.count == 1
                 && page.pageClaims[0].hasValidDefaultUserSpace
-                && page.pageClaims[0].mediaBox.height <= pageHeight + 0.5
         })
-        print("E0 TALL fallback=GO(paginated) pageHeight=\(pageHeight) pages=\(pages.count)")
+        let maximumPageHeight = pageRects.map(\.height).max() ?? 0
+        print("E0 TALL fallback=GO(paginated) maxPageHeight=\(maximumPageHeight) pages=\(pages.count)")
         XCTContext.runActivity(named: String(
-            format: "E0 fallback GO paginated pageHeight=%.1f pages=%d sentinels=%d",
-            pageHeight,
+            format: "E0 fallback GO paginated maxPageHeight=%.1f pages=%d sentinels=%d",
+            maximumPageHeight,
             pages.count,
             fixture.sentinels.count
         )) { _ in }

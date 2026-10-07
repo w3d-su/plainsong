@@ -88,6 +88,12 @@ extension ExportHTMLCommandAppTests {
         }
     }
 
+    /// The app's live preview is a `@StateObject` inside `WorkspaceWindow`, unreachable
+    /// from the hosted harness. A standalone `PreviewController` is equivalent here
+    /// because isolation does not depend on which object owns the WebView: the export
+    /// runs on a dedicated `makeHTMLExportController` and this test proves no state on
+    /// *any* other controller — scroll offset, theme, DOM, delivered render ID — is
+    /// touched by PDF capture or the PDFKit print path.
     func testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged() async throws {
         for product in ["pdf", "print"] {
             let source = (0 ..< 40).map { "## Visible block \($0)\n\nParagraph \($0)." }.joined(separator: "\n\n")

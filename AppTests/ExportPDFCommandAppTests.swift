@@ -39,15 +39,15 @@ final class ExportPDFCommandAppTests: XCTestCase {
         fixture.appState.exportHTMLOperations.printOperationRunner = { operation, _ in
             printed = true
             XCTAssertTrue(operation.showsPrintPanel)
-            XCTAssertEqual(operation.printInfo.horizontalPagination, .fit)
-            XCTAssertTrue(operation.printPanel.options.contains(.showsScaling))
+            XCTAssertTrue(operation.showsProgressPanel)
             XCTAssertNil(fixture.appState.exportHTMLOperations.offscreenController?.webView.window)
             return true
         }
         try await XCTUnwrap(fixture.appState.printCurrentDocument()).value
         XCTAssertEqual(savePanelCalls, 0)
         XCTAssertTrue(printed)
-        XCTAssertEqual(fixture.appState.exportHTMLNotice?.title, "Sent to Print")
+        // B1: a completed print is silent — no "Sent to Print" notice.
+        XCTAssertNil(fixture.appState.exportHTMLNotice)
         XCTAssertEqual(ExportHTMLCommandAppTests.DocumentState(fixture.session), before)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(
             at: fixture.exportsDirectory, includingPropertiesForKeys: nil
@@ -133,23 +133,26 @@ final class ExportPDFCommandAppTests: XCTestCase {
         XCTAssertNotEqual(ExportPDFAccessibility.printCommand, ExportHTMLAccessibility.progress)
     }
 
-    func testFileMenuContainsPDFAndPrintWithoutShortcuts() async throws {
+    func testFileMenuHasExactlyOnePrintWithCommandP() async throws {
         for _ in 0 ..< 100 {
             let file = NSApp.mainMenu?.items.first { $0.title == "File" }?.submenu
-            if file?.items.contains(where: { $0.title == "Export as PDF…" }) == true {
+            if file?.items.contains(where: { $0.title == "Print…" }) == true {
                 break
             }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         let items = try XCTUnwrap(NSApp.mainMenu?.items.first { $0.title == "File" }?.submenu).items
-        let html = try XCTUnwrap(items.firstIndex { $0.title == "Export as HTML…" })
-        let pdf = try XCTUnwrap(items.firstIndex { $0.title == "Export as PDF…" })
-        XCTAssertEqual(pdf, html + 1)
-        XCTAssertEqual(items[pdf].keyEquivalent, "")
-        XCTAssertEqual(items.filter { $0.title == "Export as PDF…" }.count, 1)
-        let prints = items.filter { $0.title == "Print…" && $0.keyEquivalent.isEmpty }
+        XCTAssertTrue(items.contains { $0.title == "Export as HTML…" })
+        XCTAssertTrue(items.contains { $0.title == "Export as PDF…" })
+        let prints = items.filter { $0.title == "Print…" }
         XCTAssertEqual(prints.count, 1)
-        XCTAssertEqual(items.firstIndex { $0.title == "Print…" && $0.keyEquivalent.isEmpty }, pdf + 1)
+        let printItem = try XCTUnwrap(prints.first)
+        XCTAssertEqual(printItem.keyEquivalent, "p")
+        XCTAssertEqual(printItem.keyEquivalentModifierMask, .command)
+        XCTAssertFalse(items.contains { $0.title == "Page Setup…" })
+        for item in items where item !== printItem {
+            XCTAssertNotEqual(item.action, NSSelectorFromString("print:"))
+        }
     }
 
     func testThemesAndLayoutsProduceTheSamePDFText() async throws {
@@ -180,6 +183,66 @@ final class ExportPDFCommandAppTests: XCTestCase {
         }
         XCTAssertEqual(Set(texts).count, 1)
         XCTAssertTrue(texts[0].contains("Layout theme sentinel"))
+    }
+
+    func testPDFCaptureErrorAndMidCaptureCancelWriteNothingAndStaySilent() async throws {
+        for injected in [true, false] {
+            let support = ExportHTMLCommandAppTests()
+            let fixture = try support.makeFixture()
+            defer { try? FileManager.default.removeItem(at: fixture.root) }
+            let before = ExportHTMLCommandAppTests.DocumentState(fixture.session)
+            let destination = fixture.exportsDirectory.appendingPathComponent("capture.pdf")
+            var results: [(UInt64, ExportHTMLOperationResult)] = []
+            fixture.appState.exportHTMLOperations.didFinishOperation = { operationID, result in
+                results.append((operationID, result))
+            }
+            fixture.appState.exportHTMLOperations.destinationChooser = { _ in
+                if injected {
+                    fixture.appState.exportHTMLOperations.offscreenController?
+                        .exportPDFCaptureWillCaptureHook = { _ in
+                            throw ExportPDFCaptureError.captureFailed("injected")
+                        }
+                } else {
+                    fixture.appState.exportHTMLOperations.offscreenController?
+                        .exportPDFCaptureWillCaptureHook = { index in
+                            if index == 0 { throw CancellationError() }
+                        }
+                }
+                return destination
+            }
+            try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value
+            XCTAssertEqual(results.count, 1)
+            if injected {
+                XCTAssertEqual(
+                    results.first?.1,
+                    .stopped(.captureFailed(.captureFailed("injected")))
+                )
+                XCTAssertEqual(fixture.appState.exportHTMLNotice?.group, .renderFailed)
+            } else {
+                XCTAssertEqual(results.first?.1, .stopped(.cancelled))
+                XCTAssertNil(fixture.appState.exportHTMLNotice)
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+            XCTAssertEqual(ExportHTMLCommandAppTests.DocumentState(fixture.session), before)
+        }
+    }
+
+    func testOversizeAtomicBoxNoticeNamesTheCause() {
+        let notice = ExportHTMLNoticeMapper.notice(
+            for: .stopped(.captureFailed(.oversizeAtomicBox(heightPoints: 20000))),
+            operationID: 7,
+            product: .pdf
+        )
+        XCTAssertEqual(notice?.title, "Could Not Export as PDF")
+        XCTAssertTrue(notice?.message.contains(
+            "A diagram, image, or formula is taller than a PDF page can hold (200 inches)"
+        ) == true)
+        let printNotice = ExportHTMLNoticeMapper.notice(
+            for: .stopped(.captureFailed(.oversizeAtomicBox(heightPoints: 20000))),
+            operationID: 7,
+            product: .print
+        )
+        XCTAssertEqual(printNotice?.title, "Could Not Print")
     }
 
     func testPrintFocusDoesNotFlushTheDirtyBaseline() async throws {

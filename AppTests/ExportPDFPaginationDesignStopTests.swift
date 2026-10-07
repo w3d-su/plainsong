@@ -52,10 +52,8 @@ final class ExportPDFPaginationDesignStopTests: XCTestCase {
         XCTAssertEqual(widths.count, 3)
         XCTAssertGreaterThan(widths[1], widths[0])
         XCTAssertLessThanOrEqual(widths[2], geometry.contentBounds.width)
-        let height = try await probe.chooseFixedPaginationHeight(contentBounds: geometry.contentBounds)
-        let pages = try await probe.captureFixedHeightPages(
-            contentBounds: geometry.contentBounds, pageHeight: height
-        )
+        let pageRects = try await probe.planPagination(contentBounds: geometry.contentBounds)
+        let pages = try await probe.capturePlannedPages(rects: pageRects)
         XCTAssertGreaterThan(pages.count, 1)
         XCTAssertTrue(pages.flatMap(\.pageClaims).allSatisfy(\.hasValidDefaultUserSpace))
         let capturedText = pages.map(\.extractedText).joined(separator: "\n")
@@ -66,7 +64,7 @@ final class ExportPDFPaginationDesignStopTests: XCTestCase {
         XCTAssertFalse(capturedText.contains(columns[11]), "Reassess design stop if WebKit no longer clips")
         let missing = columns.filter { !capturedText.contains($0) }
         print("G DESIGN STOP width=\(geometry.contentBounds.width) tableWidths=\(widths) "
-            + "height=\(geometry.contentBounds.height) pageHeight=\(height) "
+            + "height=\(geometry.contentBounds.height) "
             + "pages=\(pages.count) missing=\(missing)")
         attach(pages[0].data, name: "G-original-clipped-table.pdf")
 

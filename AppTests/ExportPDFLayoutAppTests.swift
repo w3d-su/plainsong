@@ -4,7 +4,8 @@ import PDFKit
 @testable import PreviewKit
 import XCTest
 
-/// Production Export as PDF… layout: export-only overflow, uniform scale, and fixed-height pages.
+/// Production Export as PDF… layout: export-only overflow, uniform scale, and the A1
+/// variable-height page plan (`docs/export-gates.md` D4).
 @MainActor
 final class ExportPDFLayoutAppTests: XCTestCase {
     func testWideTableCodeMathAndMermaidStayInsideTheCapture() async throws {
@@ -12,15 +13,31 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         let table = Self.tableSource(columns, cell: "value")
         let code = "```\n" + String(repeating: "W", count: 180) + "CODERIGHTSENTINEL\n```\n"
         let math = "$$\n" + (0 ..< 12).map { "\\text{KATEX\($0)SENTINEL}+" }.joined() + "x\n$$\n"
-        let mermaid = "```mermaid\nflowchart LR\n  A[MERMAIDRIGHTSENTINEL] --> B[END]\n```\n"
+        // A genuinely wide diagram: 30 chained nodes push the rendered SVG several
+        // thousand points wide, well past the 800 pt export viewport.
+        let mermaidNodes = (0 ..< 30).map {
+            "N\($0)[MERMAIDNODE\($0)SENTINEL]"
+        }.joined(separator: " --> ")
+        let mermaid = "```mermaid\nflowchart LR\n  \(mermaidNodes)\n```\n"
         let source = [table, code, math, mermaid, "AFTERALLSENTINEL"].joined(separator: "\n")
         let (controller, pdf) = try await capture(source)
         defer { controller.invalidate() }
         XCTAssertEqual(pdf.scale, 1, "This fixture must stay under 14,400 pt so scale stays 1")
         XCTAssertLessThanOrEqual(pdf.contentSize.width, ExportPDFPagePlanner.maximumSide + 0.5)
         let text = Self.text(of: pdf.data)
-        for marker in columns + ["CODERIGHTSENTINEL", "AFTERALLSENTINEL"] {
+        // The KaTeX and Mermaid sentinels must survive as extractable PDF text, proving
+        // the formula and the diagram drew instead of clipping inside the viewport.
+        for marker in columns + ["CODERIGHTSENTINEL", "AFTERALLSENTINEL",
+                                 "MERMAIDNODE0SENTINEL", "MERMAIDNODE29SENTINEL"]
+        {
             XCTAssertEqual(text.components(separatedBy: marker).count - 1, 1, marker)
+        }
+        // KaTeX emits the formula once in the visible span and once inside the hidden
+        // MathML accessibility annotation, so extraction legitimately carries it twice.
+        for marker in ["KATEX0SENTINEL", "KATEX11SENTINEL"] {
+            XCTAssertGreaterThanOrEqual(
+                text.components(separatedBy: marker).count - 1, 1, marker
+            )
         }
         let order = columns + ["CODERIGHTSENTINEL", "AFTERALLSENTINEL"]
         var search = text.startIndex
@@ -30,12 +47,14 @@ final class ExportPDFLayoutAppTests: XCTestCase {
             }
             search = range.upperBound
         }
+        // Every selector must exist in the export DOM — a missing one must fail rather
+        // than silently skip the edge assertion.
         let edges = try await controller.webView.evaluateJavaScript("""
         (() => {
           const width = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
           const box = (selector) => {
             const node = document.querySelector(selector);
-            if (!node) return 0;
+            if (!node) return -1;
             const rect = node.getBoundingClientRect();
             return rect.right + window.scrollX;
           };
@@ -44,17 +63,18 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         """)
         let values = try XCTUnwrap(edges as? [Double])
         XCTAssertEqual(values.count, 5)
-        for edge in values.dropFirst() where edge > 0 {
+        for (index, edge) in values.dropFirst().enumerated() {
+            XCTAssertGreaterThanOrEqual(edge, 0, "selector \(index) missing from the export DOM")
             XCTAssertLessThanOrEqual(edge, values[0] + 1)
         }
         XCTAssertGreaterThan(values[1], 800, "The table must extend past the 800 pt export viewport")
+        XCTAssertGreaterThan(values[4], 800, "The Mermaid diagram must be genuinely wide")
         Self.assertPagesFit(pdf)
     }
 
     func testWideButFittingCaptureIsNotScaled() async throws {
-        // A still-wider table lays out past the width that terminates this WebKit process,
-        // so the over-maximum factor is pinned in ExportPDFPagePlannerTests. This capture
-        // is the hosted proof that a wide, in-range document stays at scale 1.
+        // A still-wider table lays out near but below the default user space; the hosted
+        // proof that a wide, in-range document stays at scale 1.
         let columns = (0 ..< 200).map { String(format: "C%02d", $0) } + ["SCALERIGHTSENTINEL"]
         let source = Self.tableSource(columns, cell: "x")
         let (controller, pdf) = try await capture(source)
@@ -67,13 +87,35 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         XCTAssertNil(controller.webView.window)
     }
 
+    func testOverMaximumWidthScalesInPDFSpaceWithEveryColumnOnce() async throws {
+        // ~25,000 pt wide: the capture runs at full size and the joiner scales down, so
+        // scale < 1 while every media box fits the 14,400 pt default user space.
+        let columns = (0 ..< 64).map { String(format: "WIDECOLUMN%02dSENTINEL", $0) }
+        let source = Self.tableSource(columns, cell: String(repeating: "x", count: 60))
+        let (controller, pdf) = try await capture(source)
+        defer { controller.invalidate() }
+        XCTAssertGreaterThan(pdf.contentSize.width, 20000)
+        XCTAssertLessThan(pdf.scale, 1)
+        let text = Self.text(of: pdf.data)
+        for marker in columns {
+            XCTAssertEqual(text.components(separatedBy: marker).count - 1, 1, marker)
+        }
+        guard let document = PDFDocument(data: pdf.data) else { return XCTFail("empty pdf") }
+        for index in 0 ..< document.pageCount {
+            let box = document.page(at: index)?.bounds(for: .mediaBox) ?? .zero
+            XCTAssertLessThanOrEqual(box.width, 14400.5)
+            XCTAssertLessThanOrEqual(box.height, 14400.5)
+        }
+        Self.assertPagesFit(pdf)
+    }
+
     func testProductionTallCaptureKeepsEverySentinelOnceInOrder() async throws {
         let fixture = ExportPDFMechanismSpikeTests.tallFixture
         let (controller, pdf) = try await capture(fixture.markdown)
         defer { controller.invalidate() }
         XCTAssertGreaterThan(pdf.contentSize.height, 14400)
         XCTAssertGreaterThan(pdf.pageCount, 1)
-        XCTAssertLessThanOrEqual(pdf.pageHeight, 14400)
+        XCTAssertLessThanOrEqual(pdf.maximumPageHeight, 14400)
         try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
             fixture.sentinels, in: Self.text(of: pdf.data)
         )
@@ -81,15 +123,25 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         XCTAssertNil(controller.webView.window)
     }
 
-    func testPrintOperationStaysUnmountedAndFitsPaperWidth() async throws {
-        let (controller, _) = try await prepared("# Print sentinel\n")
+    func testPrintAspectBoundsPageHeightForThePaper() async throws {
+        // The B1 path: the same planner with the paper imageable aspect bounds each page.
+        let fixture = ExportPDFMechanismSpikeTests.tallFixture
+        let controller = try await preparedController(fixture.markdown)
         defer { controller.invalidate() }
-        let operation = try await controller.makeExportPrintOperation()
+        let aspect: CGFloat = 1.294 // ~Letter portrait imageable ratio
+        let pdf = try await controller.captureExportPDF(pageAspect: aspect)
+        XCTAssertGreaterThan(pdf.pageCount, 1)
+        let aspectBudget = pdf.contentSize.width * aspect
+        XCTAssertLessThanOrEqual(pdf.maximumPageHeight, max(aspectBudget, 0.5) + 0.5)
+        guard let document = PDFDocument(data: pdf.data) else { return XCTFail("empty pdf") }
+        for index in 0 ..< document.pageCount {
+            let box = document.page(at: index)?.bounds(for: .mediaBox) ?? .zero
+            XCTAssertLessThanOrEqual(box.height, max(aspectBudget, 0.5) + 0.5)
+        }
+        try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
+            fixture.sentinels, in: Self.text(of: pdf.data)
+        )
         XCTAssertNil(controller.webView.window)
-        XCTAssertTrue(operation.showsPrintPanel)
-        XCTAssertEqual(operation.printInfo.horizontalPagination, .fit)
-        XCTAssertEqual(operation.printInfo.verticalPagination, .automatic)
-        XCTAssertTrue(operation.printPanel.options.contains(.showsScaling))
     }
 
     func testExportOverflowStyleDoesNotChangeAnotherController() async throws {
@@ -114,14 +166,37 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         XCTAssertNil(live.webView.window)
     }
 
+    func testCaptureErrorAndMidCaptureCancelPropagateTyped() async throws {
+        let controller = try await preparedController("# Hook probe\n")
+        defer { controller.invalidate() }
+        struct Injected: Error {}
+        controller.exportPDFCaptureWillCaptureHook = { _ in throw Injected() }
+        do {
+            _ = try await controller.captureExportPDF()
+            XCTFail("Expected the injected error")
+        } catch is Injected {}
+        controller.exportPDFCaptureWillCaptureHook = { index in
+            if index == 0 { throw CancellationError() }
+        }
+        do {
+            _ = try await controller.captureExportPDF()
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {}
+    }
+
     private func capture(_ markdown: String) async throws -> (PreviewController, ExportPDFDocument) {
+        let controller = try await preparedController(markdown)
+        let pdf = try await controller.captureExportPDF()
+        return (controller, pdf)
+    }
+
+    private func preparedController(_ markdown: String) async throws -> PreviewController {
         let (controller, ready) = try await prepared(markdown)
         guard case .ready = ready else {
             controller.invalidate()
             throw ExportPDFCaptureError.captureFailed("barrier")
         }
-        let pdf = try await controller.captureExportPDF()
-        return (controller, pdf)
+        return controller
     }
 
     private func prepared(
@@ -154,7 +229,8 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         for index in 0 ..< document.pageCount {
             let box = document.page(at: index)?.bounds(for: .mediaBox) ?? .zero
             XCTAssertLessThanOrEqual(box.width, 14400.5, file: file, line: line)
-            XCTAssertLessThanOrEqual(box.height, pdf.pageHeight + 0.5, file: file, line: line)
+            XCTAssertLessThanOrEqual(box.height, 14400.5, file: file, line: line)
+            XCTAssertLessThanOrEqual(box.height, pdf.maximumPageHeight + 0.5, file: file, line: line)
             XCTAssertGreaterThan(box.width, 0, file: file, line: line)
             XCTAssertGreaterThan(box.height, 0, file: file, line: line)
         }
