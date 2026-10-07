@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 import MarkdownCore
 import PreviewKit
-import UniformTypeIdentifiers
 import WebKit
 import WorkspaceKit
 
@@ -31,13 +30,19 @@ extension AppState {
 
     /// An installed test provider, including nil, is authoritative.
     var exportHTMLDocumentWindow: NSWindow? {
-        if let provider = exportHTMLOperations.panelWindowProvider { return provider() }
+        if let provider = exportHTMLOperations.panelWindowProvider {
+            return provider()
+        }
         return Self.exportHTMLDocumentWindow(key: NSApp.keyWindow, main: NSApp.mainWindow)
     }
 
     static func exportHTMLDocumentWindow(key: NSWindow?, main: NSWindow?) -> NSWindow? {
-        if let key, key.identifier == exportHTMLWorkspaceWindowIdentifier { return key }
-        if let main, main.identifier == exportHTMLWorkspaceWindowIdentifier { return main }
+        if let key, key.identifier == exportHTMLWorkspaceWindowIdentifier {
+            return key
+        }
+        if let main, main.identifier == exportHTMLWorkspaceWindowIdentifier {
+            return main
+        }
         return nil
     }
 
@@ -45,9 +50,16 @@ extension AppState {
     /// task so hosted tests can await it; the menu command discards it.
     @discardableResult
     func exportCurrentDocumentAsHTML() -> Task<Void, Never>? {
+        beginExport(.html)
+    }
+
+    /// Starts one export or print. HTML and PDF share the panel-first path; Print renders
+    /// first and then shows the standard print panel.
+    @discardableResult
+    func beginExport(_ product: ExportCommandProduct) -> Task<Void, Never>? {
         supersedeActiveExportHTMLOperation()
         let snapshot: ExportHTMLOperationSnapshot
-        switch captureExportHTMLSnapshot() {
+        switch captureExportHTMLSnapshot(product: product) {
         case let .success(captured):
             snapshot = captured
         case let .failure(reason):
@@ -62,7 +74,9 @@ extension AppState {
                 .sink { [weak self] _ in self?.noteExportHTMLContextChange(.documentChanged) }
         }
 
-        exportHTMLStatus = .exporting(operationID: snapshot.operationID, fileName: snapshot.defaultFileName)
+        exportHTMLStatus = .exporting(
+            operationID: snapshot.operationID, fileName: snapshot.defaultFileName, product: product
+        )
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
             let result: ExportHTMLOperationResult
@@ -87,13 +101,17 @@ extension AppState {
         return task
     }
 
-    func captureExportHTMLSnapshot() -> Result<ExportHTMLOperationSnapshot, ExportHTMLStopReason> {
+    func captureExportHTMLSnapshot(
+        product: ExportCommandProduct = .html
+    ) -> Result<ExportHTMLOperationSnapshot, ExportHTMLStopReason> {
         let session = currentDocument
         guard isExportHTMLFileBacked else {
             return .failure(.untitledDocument)
         }
         guard let window = exportHTMLDocumentWindow else { return .failure(.documentChanged) }
-        if let reason = exportHTMLOwnershipStopReason() { return .failure(reason) }
+        if let reason = exportHTMLOwnershipStopReason() {
+            return .failure(reason)
+        }
         guard !hasPendingEditorSource(for: session) else {
             return .failure(.pendingEditorSource)
         }
@@ -108,6 +126,7 @@ extension AppState {
                 preferences.previewTheme,
                 appearance: NSApplication.shared.effectiveAppearance
             ),
+            product: product,
             window: window
         ))
     }
@@ -119,8 +138,12 @@ extension AppState {
             return .superseded
         }
         guard !Task.isCancelled else { return .cancelled }
-        if let reason = exportHTMLOperations.contextStopReason { return reason }
-        if snapshot.requiresWindow, snapshot.window == nil { return .documentChanged }
+        if let reason = exportHTMLOperations.contextStopReason {
+            return reason
+        }
+        if snapshot.requiresWindow, snapshot.window == nil {
+            return .documentChanged
+        }
         guard let session = snapshot.session,
               session === currentDocument,
               session.version == snapshot.textChange.version,
@@ -154,20 +177,27 @@ extension AppState {
         exportHTMLOperations.offscreenController?.invalidate()
         // Ends an older operation's sheet as a cancel; its fence then reports supersession.
         exportHTMLOperations.presentedPanel?.cancel(nil)
+        dismissExportPrintSheet()
     }
 
     private func runExportHTMLOperation(
         _ snapshot: ExportHTMLOperationSnapshot,
         controller: PreviewController
     ) async -> ExportHTMLOperationResult {
+        if snapshot.product == .print {
+            return await runExportPrint(snapshot, controller: controller)
+        }
         let destinationURL = await chooseExportHTMLDestination(for: snapshot)
-        if let stop = exportHTMLStopReason(for: snapshot) { return .stopped(stop) }
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .stopped(stop)
+        }
         guard let destinationURL else { return .stopped(.cancelled) }
 
         // D5: the identity the panel approved is observed immediately after it returns and
         // becomes the only identity a confirmed overwrite may replace.
+        let kind: ExportArtifactKind = snapshot.product == .pdf ? .pdf : .html
         let disposition: ExportArtifactDisposition
-        switch ExportArtifactWriter.inspectDestination(at: destinationURL, kind: .html) {
+        switch ExportArtifactWriter.inspectDestination(at: destinationURL, kind: kind) {
         case .newLeaf:
             disposition = .createNew
         case let .existingRegularFile(identity):
@@ -176,8 +206,12 @@ extension AppState {
             return .stopped(.destinationRefused(failure))
         }
 
-        if let pause = exportHTMLOperations.didInspectDestination { await pause() }
-        if let stop = exportHTMLStopReason(for: snapshot) { return .stopped(stop) }
+        if let pause = exportHTMLOperations.didInspectDestination {
+            await pause()
+        }
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .stopped(stop)
+        }
 
         let export: PreviewHTMLExportResult
         switch await renderStaticExportHTML(snapshot, controller: controller) {
@@ -187,10 +221,20 @@ extension AppState {
             return .stopped(stop)
         }
 
-        if let pause = exportHTMLOperations.didPrepareArtifact { await pause() }
+        if snapshot.product == .pdf {
+            return await writeExportPDF(
+                snapshot, controller: controller, destinationURL: destinationURL,
+                disposition: disposition, export: export
+            )
+        }
+        if let pause = exportHTMLOperations.didPrepareArtifact {
+            await pause()
+        }
 
         // Final fence: no suspension separates it from this synchronous one-shot write.
-        if let stop = exportHTMLStopReason(for: snapshot) { return .stopped(stop) }
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .stopped(stop)
+        }
         guard case let .ready(html, _, _) = export else {
             return .stopped(.renderFailed(reason: "missing-export-result"))
         }
@@ -213,12 +257,14 @@ extension AppState {
 
     /// Renders the snapshot on the dedicated controller, waits for that exact `renderComplete`,
     /// then runs the D2 barrier. Fences after each suspension; the last fence is the final one.
-    private func renderStaticExportHTML(
+    func renderStaticExportHTML(
         _ snapshot: ExportHTMLOperationSnapshot,
         controller: PreviewController
     ) async -> Result<PreviewHTMLExportResult, ExportHTMLStopReason> {
         let render = await controller.renderForExport(snapshot.textChange)
-        if let stop = exportHTMLStopReason(for: snapshot) { return .failure(stop) }
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .failure(stop)
+        }
         let renderID: Int
         switch render {
         case let .completed(completedRenderID):
@@ -228,7 +274,9 @@ extension AppState {
         }
 
         let export = await controller.exportHTML(matchingRenderID: renderID)
-        if let stop = exportHTMLStopReason(for: snapshot) { return .failure(stop) }
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .failure(stop)
+        }
         switch export {
         case .ready:
             return .success(export)
@@ -252,8 +300,11 @@ extension AppState {
     private func chooseExportHTMLDestination(for snapshot: ExportHTMLOperationSnapshot) async -> URL? {
         let source = snapshot.textChange.text
         let sourceURL = snapshot.textChange.fileURL
+        let pathExtension = snapshot.product.pathExtension
         let filenameTask = Task.detached(priority: .userInitiated) {
-            ExportHTMLOperationSnapshot.defaultFileName(for: sourceURL, source: source)
+            ExportHTMLOperationSnapshot.defaultFileName(
+                for: sourceURL, source: source, pathExtension: pathExtension
+            )
         }
         let filename = await withTaskCancellationHandler {
             await filenameTask.value
@@ -261,7 +312,9 @@ extension AppState {
             filenameTask.cancel()
         }
         guard exportHTMLStopReason(for: snapshot) == nil else { return nil }
-        exportHTMLStatus = .exporting(operationID: snapshot.operationID, fileName: filename)
+        exportHTMLStatus = .exporting(
+            operationID: snapshot.operationID, fileName: filename, product: snapshot.product
+        )
         exportHTMLOperations.panelOperationID = snapshot.operationID
         defer {
             if exportHTMLOperations.panelOperationID == snapshot.operationID {
@@ -270,45 +323,13 @@ extension AppState {
         }
         let request = ExportHTMLDestinationRequest(
             defaultFileName: filename,
-            directoryURL: snapshot.defaultDirectoryURL
+            directoryURL: snapshot.defaultDirectoryURL,
+            allowedExtension: snapshot.product.pathExtension
         )
         if let chooser = exportHTMLOperations.destinationChooser {
             return await chooser(request)
         }
         return await presentExportHTMLSavePanel(request, window: snapshot.window)
-    }
-
-    /// A fresh panel per operation. Its URL is used once and never bookmarked or reused.
-    func presentExportHTMLSavePanel(
-        _ request: ExportHTMLDestinationRequest, window: NSWindow?
-    ) async -> URL? {
-        let panel = NSSavePanel()
-        panel.title = "Export as HTML"
-        panel.prompt = "Export"
-        panel.allowedContentTypes = UTType(filenameExtension: request.allowedExtension).map { [$0] } ?? []
-        panel.nameFieldStringValue = request.defaultFileName
-        panel.directoryURL = request.directoryURL
-        panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
-        panel.setAccessibilityLabel(request.accessibilityLabel)
-        exportHTMLOperations.presentedPanel = panel
-        defer {
-            if exportHTMLOperations.presentedPanel === panel {
-                exportHTMLOperations.presentedPanel = nil
-            }
-        }
-        // Attach only to the workspace window captured at invocation; Settings/About are excluded.
-        guard let window else {
-            return nil
-        }
-        if let presenter = exportHTMLOperations.savePanelPresenter {
-            return await presenter(panel, window)
-        }
-        return await withCheckedContinuation { continuation in
-            panel.beginSheetModal(for: window) { response in
-                continuation.resume(returning: response == .OK ? panel.url : nil)
-            }
-        }
     }
 
     private func finishExportHTMLOperation(
@@ -321,20 +342,23 @@ extension AppState {
             exportHTMLOperations.activeTask = nil
             exportHTMLOperations.offscreenController = nil
             exportHTMLOperations.windowCloseObserver = nil
-            presentExportHTMLResult(result, operationID: snapshot.operationID)
+            presentExportHTMLResult(result, operationID: snapshot.operationID, product: snapshot.product)
         }
         exportHTMLOperations.didFinishOperation?(snapshot.operationID, result)
     }
 
-    func presentExportHTMLResult(_ result: ExportHTMLOperationResult, operationID: UInt64 = 0) {
-        exportHTMLStatus = ExportHTMLNoticeMapper.notice(for: result, operationID: operationID).map {
-            .notice($0)
-        }
+    func presentExportHTMLResult(
+        _ result: ExportHTMLOperationResult, operationID: UInt64 = 0, product: ExportCommandProduct = .html
+    ) {
+        exportHTMLStatus = ExportHTMLNoticeMapper.notice(
+            for: result, operationID: operationID, product: product
+        ).map { .notice($0) }
     }
 
     func cancelExportHTML() {
         exportHTMLOperations.activeTask?.cancel()
         exportHTMLOperations.presentedPanel?.cancel(nil)
+        dismissExportPrintSheet()
         exportHTMLOperations.offscreenController?.invalidate()
         exportHTMLStatus = nil
     }
@@ -347,32 +371,8 @@ extension AppState {
     }
 
     func dismissExportHTMLNotice() {
-        if case .notice = exportHTMLStatus { exportHTMLStatus = nil }
-    }
-
-    private func exportHTMLOwnershipStopReason() -> ExportHTMLStopReason? {
-        if hasWorkspaceMutationRecoveryLoadFailure { return .recoveryStoresUnavailable }
-        for session in workspaceSaveCopyOwnershipCandidates() {
-            let identity = ObjectIdentifier(session)
-            if anchoredSessionFileBinding(for: session) == nil,
-               indeterminateSessionWriteContexts[identity] == nil
-            {
-                guard case .proven? = unanchoredManagedSessionOwnershipProofs[identity] else {
-                    return .unprovenDocumentOwnership
-                }
-            }
-        }
-        return nil
-    }
-
-    private func exportHTMLURLsMatch(_ lhs: URL?, _ rhs: URL?) -> Bool {
-        switch (lhs, rhs) {
-        case (nil, nil):
-            true
-        case let (lhs?, rhs?):
-            exactFileURLSpellingMatches(lhs, rhs)
-        default:
-            false
+        if case .notice = exportHTMLStatus {
+            exportHTMLStatus = nil
         }
     }
 }

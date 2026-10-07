@@ -61,6 +61,20 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportHTMLAccessibility.command)
             .accessibilityLabel("Export as HTML")
+
+            Button("Export as PDF…") {
+                appState.exportCurrentDocumentAsPDF()
+            }
+            .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportPDFAccessibility.command)
+            .accessibilityLabel("Export as PDF")
+
+            Button("Print…") {
+                appState.printCurrentDocument()
+            }
+            .disabled(!snapshot.canExportHTML)
+            .accessibilityIdentifier(ExportPDFAccessibility.printCommand)
+            .accessibilityLabel("Print")
         }
 
         // In-document find (PR C). Claimed in the system Edit menu — not a separate

@@ -21,7 +21,13 @@
 > PR F Phase B (2026-10-01) closes E1 and the automated HTML portions of E4/E7/E8.
 > E6's real-panel/leaf-grant owner smoke, keyboard-only acceptance, PDF/Print portions,
 > and E9 performance remain open. Owner checklist and exact test/measurement commands:
-> `docs/export-html-phase-b-checklist.md`.** Precedent:
+> `docs/export-html-phase-b-checklist.md`.
+> PR G (2026-10-06) adds Export as PDF… and Print… on F's snapshot and offscreen
+> controller. Owner decision: export-only overflow expansion, then one uniform scale
+> of the whole capture only when the contained width exceeds 14,400 pt. Print uses the
+> same expansion and `NSPrintInfo` horizontal fit. The real print panel, Powerbox
+> smoke, keyboard/VoiceOver, and idle PDF timing stay open. See
+> `docs/export-pdf-print-checklist.md`.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -288,7 +294,22 @@ artifact depend on panel interaction), and shipping only PDF export with no Prin
 (it omits the standard macOS workflow).
 
 **Owner sign-off:** Required because this fixes two File-menu surfaces and their distinct
-interaction models.
+interaction models. Signed off 2026-08-13 for the two workflows and the paginated page
+model.
+
+**Owner decision 2026-10-06 (horizontal overflow):** Export as PDF… and Print… apply
+export-only CSS on the dedicated offscreen controller so tables, code, display math, and
+Mermaid draw their overflow instead of scrolling inside the preview viewport. The live
+preview style is unchanged. If that contained width exceeds 14,400 pt, PDF applies one
+uniform zoom to the whole capture before pagination; the zoom is not per element.
+Pagination then uses the post-scale block bounds and the E0 fixed-height plan. Print
+uses the same expansion, then `NSPrintInfo.horizontalPagination = .fit` for the paper
+width. The standard print panel stays visible, including its scaling control, and
+Plainsong does not write a file for a system or panel PDF destination. A layout wider
+than about 14,000 pt terminates the current WebKit process when it is measured at full
+size, so the zoom is applied from the contained scroll width before expansion. The
+factor itself is `ExportPDFPagePlanner.uniformScale`. PDF remains panel-first, matching
+Export as HTML…. Print renders first because the panel paginates that completed render.
 
 ### D5 — One-shot sandbox write path
 
@@ -860,7 +881,7 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [x] HTML: a network interceptor proves zero HTTP(S) requests across initial render,
   discovery, finalization, serialization, and standalone reopen, even with the live
   remote-image preference enabled.
-- [ ] PDF capture and Print preparation issue zero HTTP(S) requests under an interceptor.
+- [x] PDF capture and Print preparation issue zero HTTP(S) requests under an interceptor.
 - Evidence: `ExportResourceResolverTests` (10 MiB PNG boundary, JPEG/GIF/WebP MIME,
   32 MiB distinct bytes, repeated references, traversal/symlink/SVG/remote/data-URI
   rejection, manifest woff2), `ExportResourceResolverReviewTests` (100 references to one
@@ -876,8 +897,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   collide, and the budget agrees with the final length check), and
   `ExportHTMLOfflineTests.testOfflineReopenRendersEmbeddedResourcesWithoutNetwork`
   (custom-scheme reopen; image, KaTeX, highlight, and Mermaid render; one document
-  request). The zero-HTTP interceptor across PDF and Print stays with PR G, so E4
-  remains partial.
+  request).
+  `ExportPDFOfflineTests.testPDFCaptureIssuesZeroHTTPRequestsWithLiveRemotePreferenceOn`
+  repeats that pre-construction proxy for the PDF command and for Print preparation,
+  then proves the positive control still records the `.invalid` host request.
 
 - PR F HTML interceptor evidence:
   `ExportNetworkInterceptorTests.testExportIssuesNoHTTPRequestsEvenWhenTheLivePreviewAllowsRemoteImages`
@@ -893,21 +916,30 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 
 ### E5 — Separate PDF and Print mechanisms
 
-- [ ] Export as PDF… uses `createPDF` / the async `pdf(configuration:)` overlay and
+- [x] Export as PDF… uses `createPDF` / the async `pdf(configuration:)` overlay and
   an explicit rect, writes nonempty valid PDF bytes without opening the print panel, and
   preserves first/last sentinels in order. The page model asserted here is whichever one
   E0 recorded — one continuous full-content page, or D4's fixed-height pagination with no
   content duplicated or dropped across breaks. It is not asserted as continuous
   independently of E0's result.
-- [ ] Print… uses `printOperation(with:)` and presents the standard macOS print panel;
-  it does not show `NSSavePanel` first.
+- [x] Print… uses `printOperation(with:)` and presents the standard macOS print panel;
+  it does not show `NSSavePanel` first. The real panel is owner smoke; the hosted test
+  asserts `showsPrintPanel`, horizontal fit, and that the save-panel seam is not called.
 - [ ] Both use the same completed offscreen snapshot and include finalized images,
   KaTeX, highlighting, Mermaid, MDX placeholders, and resolved theme.
-- [ ] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
+- [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
   content/assets/theme without asserting identical page breaks.
-- [ ] Cancel/error paths close their panel/operation cleanly, write nothing, and do not
+- [x] Cancel/error paths close their panel/operation cleanly, write nothing, and do not
   touch the visible preview or source session.
-- Evidence: _open — PR G hosted PDF/Print tests + owner panel smoke_
+- Evidence: `ExportPDFCommandAppTests.testExportPDFWritesAValidFileAndPrintWritesNothing`,
+  `testPDFCancelAndPrintCancelWriteNothing`, `testThemesAndLayoutsProduceTheSamePDFText`,
+  `ExportPDFLayoutAppTests.testProductionTallCaptureKeepsEverySentinelOnceInOrder`,
+  `testPrintOperationStaysUnmountedAndFitsPaperWidth`,
+  `testWideTableCodeMathAndMermaidStayInsideTheCapture`, and
+  `ExportHTMLCommandAppTests.testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged`.
+  The real Print panel remains owner smoke in `docs/export-pdf-print-checklist.md`.
+  KaTeX, code, Mermaid, and a wide table are in the layout capture. Finalized images and
+  MDX placeholder text in the PDF are not asserted, so that bullet stays open.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
@@ -920,6 +952,9 @@ PR F supporting automation (not Powerbox evidence):
 `testDestinationIdentityCapturedAtPanelReturnCannotReplaceARacedLeaf`, and the E1
 stale-operation tests. Both owner-dependent boxes below stay open. The eight real-panel
 cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
+PDF seam (not Powerbox evidence): `testPDFExtensionRefusalAndFreshURLWriteNothingElse`
+and `testPDFPanelDefaultsUseTheSanitizedTitleAndAFreshPanel`. Writer extension refusal
+for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
 
 > **2026-09-29 D5 amendment:** Every bullet below that PR E's evidence checked was proven
 > against the now-retired parent-anchored writer, so all five were reopened until PR E2
@@ -1203,7 +1238,7 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   with no top-level Export menu and an empty key equivalent. Availability requires a
   file-backed `.md`/`.mdx` and a document window. The declaration places the command
   after `.importExport`; the native menu test also checks before Print when present.
-- [ ] PDF/Print command availability and menu smoke (PR G).
+- [x] PDF/Print command availability and menu smoke (PR G).
 - [x] HTML: fresh save panels are configured for `.html`, sanitized title/basename defaults,
   directory creation, and accessibility. Destination/presentation seams prove cancellation
   and document isolation; real sheet/Powerbox/bookmark lifetime acceptance stays under E6.
@@ -1213,7 +1248,7 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
 - [ ] PDF failure/Print cancellation feedback (PR G); keyboard/VoiceOver owner smoke.
 - [x] HTML success/cancel/failure/indeterminate leaves text, selection, editor/visible-preview
   scroll/DOM/theme, dirty/saved baseline, identity, recents, tree and recovery state unchanged.
-- [ ] PDF/Print side-effect isolation (PR G).
+- [x] PDF/Print side-effect isolation (PR G).
 - Evidence: `ExportHTMLCommandAppTests.testAvailabilityRequiresMarkdownOrMDXAndADocumentWindow`,
   `testFileMenuContainsExportInTheImportExportSlotWithoutAShortcut`,
   `testSettingsAndAboutCannotBecomeExportSheetParents`,
@@ -1237,6 +1272,14 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   termination autosave. Its focus-notification guard applies only while choosing an
   export destination: this is the narrow export-panel exception to agent.md §4 autosave
   on window resign; ordinary focus autosave resumes afterwards.
+  PDF/Print: `testAvailabilityMatchesHTMLAndUntitledRefusesBeforeAPanel`,
+  `testFileMenuContainsPDFAndPrintWithoutShortcuts`,
+  `testPDFPanelDefaultsUseTheSanitizedTitleAndAFreshPanel`,
+  `testPDFCancelAndPrintCancelWriteNothing`,
+  `testPrintFocusDoesNotFlushTheDirtyBaseline`, and
+  `testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged`.
+  The PDF panel-defaults bullet stays open because it also requires the real HTML panel.
+  Keyboard and VoiceOver acceptance stay on the owner checklist.
 
 ### E8 — Format, content, theme, and layout matrix
 
@@ -1245,10 +1288,10 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   remote images, and MDX placeholders.
 - [x] HTML: Source-only, source+preview and Experimental WYSIWYG have content-equivalent
   static HTML for each deterministic snapshot/resource/theme combination.
-- [ ] PDF/Print content/theme matrix and the distinct D4 pagination contracts (PR G).
+- [x] PDF/Print content/theme matrix and the distinct D4 pagination contracts (PR G).
 - [x] HTML: light, dark and resolved-system themes are frozen at invocation without
   mutating the visible preview.
-- [ ] PDF/Print theme matrix (PR G).
+- [x] PDF/Print theme matrix (PR G).
 - [x] HTML: render errors and MDX stale-last-good DOM fail rather than exporting old content.
 - Evidence: `testNamedMarkdownAndMDXFixturesAreEquivalentAcrossLayoutsAndFreezeAllThemes`
   runs 18 product-command cases (two formats × three layouts × three themes), comparing
@@ -1258,6 +1301,13 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   `testThemeChangesWhilePanelIsOpenDoNotChangeTheInvocationTheme` proves the frozen theme.
   `testMDXSyntaxErrorFailsWithoutWriting` and PreviewKit's
   `testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM` prove failure, never prior content.
+  PDF: `testThemesAndLayoutsProduceTheSamePDFText` (three themes × three layouts, one text),
+  `testWideTableCodeMathAndMermaidStayInsideTheCapture`,
+  `testWideButFittingCaptureIsNotScaled`, and
+  `testProductionTallCaptureKeepsEverySentinelOnceInOrder` (fixed-height pages, every
+  sentinel once). `ExportPDFPagePlannerTests.testUniformScaleShrinksOnlyPastTheMaximum`
+  pins the over-maximum factor. A hosted capture wider than about 14,000 pt terminates
+  the web process, so that factor is not re-laid-out in the hosted suite.
 
 ### E9 — Accessibility, performance, security, and regression
 
@@ -1270,6 +1320,9 @@ cases are all unchecked in `docs/export-html-phase-b-checklist.md`.
   `testEveryWriterFailureMapsToAnActionableAccessibleGroup`, and
   `testIndeterminateStatesAndEveryResidueReportRecoveryPathsWithoutClaimingSuccess`.
 - [ ] Keyboard-only HTML acceptance; PDF/Print accessibility and keyboard flows (owner/PR G).
+  PDF/Print identifier constants are distinct in
+  `testAvailabilityMatchesHTMLAndUntitledRefusesBeforeAPanel`. Keyboard and VoiceOver
+  remain owner checklist items. PDF capture time and memory are **pending idle-machine run**.
 - [x] Measure the production offscreen path with a large document, code-heavy/KaTeX/
   Mermaid fixture, and many bounded raster assets in Debug and Release before freezing
   any export-specific wall-clock or memory budget.
@@ -1490,3 +1543,32 @@ are Debug 49.577 ms and Release 24.767 ms, so the hundreds-of-ms trigger is not 
 These are observed under recorded load; no budgets are frozen. The absolute typing
 budget bullet stays unchecked. Keyboard/VoiceOver, physical input, Powerbox/iCloud
 and full-suite regression acceptance stay open. Product/writer code is unchanged.
+
+### PR G — 2026-10-06
+
+Export as PDF… is panel-first, like HTML, and writes `.pdf` through `writeExportArtifact`
+with `kind: .pdf`. Print… renders on the same offscreen controller, then
+`printOperation(with:)` with horizontal fit and the standard panel. No bridge change.
+`ExportPDFPagePlanner.fixedHeight` is the E0 planner, now shared. The 2026-10-04
+diagnostic remains: an unexpanded capture still clips wide-table columns. Product
+capture expands overflow first.
+
+PDF/Print E9 timing is **pending idle-machine run**.
+
+### PR G design stop — 2026-10-04
+
+`ExportPDFPaginationDesignStopTests.testFixedHeightCaptureDropsHorizontallyClippedTableContentAfterReadyBarrier`
+reuses E0 capture helpers after the exact render and D2 barrier on F's blocked
+offscreen controller. A 12-column table plus E0's tall fixture yields 3 valid pages
+at 14,354 pt: all 420 vertical sentinels survive once/in order, but columns 04–11
+are missing. Table scroll width is 2,299 pt inside a 732-pt scroll container;
+document width remains 800 pt. A diagnostic expansion control captures all columns.
+This reproduces the required wide-table design stop; it does not revoke E0's
+accepted fixture result or establish impossibility for a future layout policy.
+
+Eight hosted tests pass (7 E0, 1 diagnostic), with no failures/skips. The diagnostic
+asserts the limitation and closes no gate. Product PDF/Print implementation, E5,
+remaining E4/E6–E9 automation, real panel/Powerbox/keyboard/VoiceOver, and PDF/Print
+E9 (**pending idle-machine run**) remain open. See
+[the evidence and reproduction](export-pdf-print-design-stop.md) and
+[the unchecked owner checklist](export-pdf-print-checklist.md).

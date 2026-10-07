@@ -1,0 +1,34 @@
+{
+  "base": "d666e64f7907c9d10b9e3037957141b0ea4b1caf",
+  "date": "2026-10-04T22:59:25+08:00",
+  "macOS": "27.0 (26A428)",
+  "configuration": "Debug",
+  "test": "ExportPDFPaginationDesignStopTests/testFixedHeightCaptureDropsHorizontallyClippedTableContentAfterReadyBarrier",
+  "result": "design stop reproduced; diagnostic passes; no product acceptance",
+  "width": 800,
+  "tableClientWidth": 732,
+  "tableScrollWidth": 2299,
+  "height": 28890,
+  "fixedPageHeight": 14354,
+  "pageCount": 3,
+  "verticalSentinelsOnceInOrder": 420,
+  "missingTableSentinels": [
+    "GCOLUMN04SENTINEL",
+    "GCOLUMN05SENTINEL",
+    "GCOLUMN06SENTINEL",
+    "GCOLUMN07SENTINEL",
+    "GCOLUMN08SENTINEL",
+    "GCOLUMN09SENTINEL",
+    "GCOLUMN10SENTINEL",
+    "GCOLUMN11SENTINEL"
+  ],
+  "controlWidth": 2333,
+  "controlTableSentinelsPresent": 12,
+  "hostedTests": 8,
+  "failures": 0,
+  "sha256": {
+    "original-clipped-table.pdf": "6505a15e596f068caa56dc02561782b0bdd9c9951bb1e15ca75d1055d4b5b10a",
+    "expanded-table-control.pdf": "780687e06929bddab400988ab42752a17aa6bed54f737291c2170b963ce66fd9"
+  },
+  "testSourceSHA256": "9bef90bc2c5b584f31903be72b9eae7ec341a81f3e6e5d0fb389834083ece94a"
+}

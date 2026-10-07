@@ -13,7 +13,19 @@ enum ExportHTMLAccessibility {
         "export-html-notice-\(group.rawValue)"
     }
 
-    static func progressLabel(fileName: String) -> String {
-        "Exporting \(fileName) as HTML. Cancel to stop the export."
+    static func progressLabel(fileName: String, product: ExportCommandProduct = .html) -> String {
+        switch product {
+        case .html:
+            "Exporting \(fileName) as HTML. Cancel to stop the export."
+        case .pdf:
+            "Exporting \(fileName) as PDF. Cancel to stop the export."
+        case .print:
+            "Printing \(fileName). Cancel to stop printing."
+        }
     }
+}
+
+enum ExportPDFAccessibility {
+    static let command = "export-pdf-command"
+    static let printCommand = "export-print-command"
 }

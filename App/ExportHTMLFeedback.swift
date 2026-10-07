@@ -5,7 +5,7 @@ import WorkspaceKit
 /// What the Export as HTML… status banner shows: progress with Cancel while the operation
 /// renders and writes, then one result notice. Cancel and supersession are silent.
 enum ExportHTMLStatus: Equatable {
-    case exporting(operationID: UInt64, fileName: String)
+    case exporting(operationID: UInt64, fileName: String, product: ExportCommandProduct)
     case notice(ExportHTMLNotice)
 }
 
@@ -85,29 +85,38 @@ enum ExportHTMLNoticeMapper {
 
     static func notice(
         for result: ExportHTMLOperationResult,
-        operationID: UInt64
+        operationID: UInt64,
+        product: ExportCommandProduct = .html
     ) -> ExportHTMLNotice? {
         switch result {
         case .stopped(.cancelled), .stopped(.superseded),
              .written(.notCommitted(.cancelled)), .stopped(.destinationRefused(.cancelled)):
             nil
+        case .printed:
+            ExportHTMLNotice(
+                operationID: operationID, group: .exported, severity: .success,
+                title: "Sent to Print",
+                message: "Printing finished. Plainsong did not write a file.",
+                revealURL: nil
+            )
         case let .stopped(reason):
-            stopped(reason, operationID: operationID)
+            stopped(reason, operationID: operationID, product: product)
         case let .written(.notCommitted(failure)):
-            notCommitted(failure, operationID: operationID)
+            notCommitted(failure, operationID: operationID, product: product)
         case let .written(.indeterminate(write)):
-            indeterminate(write, operationID: operationID)
+            indeterminate(write, operationID: operationID, product: product)
         case let .exported(commit, omittedImageCount):
-            exported(commit, omittedImageCount: omittedImageCount, operationID: operationID)
+            exported(commit, omittedImageCount: omittedImageCount, operationID: operationID, product: product)
         case let .written(.committed(commit)):
-            exported(commit, omittedImageCount: 0, operationID: operationID)
+            exported(commit, omittedImageCount: 0, operationID: operationID, product: product)
         }
     }
 
     static func exported(
         _ commit: ExportArtifactCommit,
         omittedImageCount: Int,
-        operationID: UInt64
+        operationID: UInt64,
+        product: ExportCommandProduct = .html
     ) -> ExportHTMLNotice {
         let name = commit.selectedURL.lastPathComponent
         let folder = commit.selectedURL.deletingLastPathComponent().path(percentEncoded: false)
@@ -117,7 +126,7 @@ enum ExportHTMLNoticeMapper {
                 operationID: operationID,
                 group: .exported,
                 severity: .success,
-                title: "Exported as HTML",
+                title: product == .pdf ? "Exported as PDF" : "Exported as HTML",
                 message: message,
                 revealURL: commit.selectedURL
             )
@@ -132,56 +141,60 @@ enum ExportHTMLNoticeMapper {
             operationID: operationID,
             group: .exportedWithPlaceholders,
             severity: .warning,
-            title: "Exported as HTML with Image Placeholders",
+            title: product == .pdf
+                ? "Exported as PDF with Image Placeholders"
+                : "Exported as HTML with Image Placeholders",
             message: message,
             revealURL: commit.selectedURL
         )
     }
 
-    static func stopped(_ reason: ExportHTMLStopReason, operationID: UInt64) -> ExportHTMLNotice? {
+    static func stopped(
+        _ reason: ExportHTMLStopReason, operationID: UInt64, product: ExportCommandProduct = .html
+    ) -> ExportHTMLNotice? {
         let (group, title, detail): (ExportHTMLNoticeGroup, String, String)
         switch reason {
         case .cancelled, .superseded, .destinationRefused(.cancelled):
             return nil
         case let .destinationRefused(failure):
-            return notCommitted(failure, operationID: operationID)
+            return notCommitted(failure, operationID: operationID, product: product)
         case .untitledDocument, .unprovenDocumentOwnership:
             (group, title, detail) = (
                 .saveDocumentFirst,
                 "Save the Document First",
-                "Save the document first, then export it as HTML. Plainsong can’t check an export " +
+                "Save the document first, then \(product.saveFirstVerb). Plainsong can’t check an export " +
                     "destination against an unsaved or recovered document."
             )
         case .recoveryStoresUnavailable:
             (group, title, detail) = (
                 .recoveryUnavailable,
-                failureTitle,
+                failureTitle(for: product),
                 "Plainsong couldn’t load its workspace recovery records, so it can’t confirm that a " +
                     "destination is safe to write."
             )
         case .documentChanged:
             (group, title, detail) = (
                 .documentChanged,
-                failureTitle,
+                failureTitle(for: product),
                 "The document was edited, switched, moved, or closed while it was being exported. " +
                     "Export again to include the latest version."
             )
         case .workspaceChanged:
             (group, title, detail) = (
                 .workspaceChanged,
-                failureTitle,
+                failureTitle(for: product),
                 "The workspace was closed or switched while the document was being exported."
             )
         case .pendingEditorSource:
             (group, title, detail) = (
                 .editorBusy,
-                failureTitle,
+                failureTitle(for: product),
                 "The editor was still applying your latest typing. Try again."
             )
         case .renderFailed(reason: "mdx-stale-or-error"):
             (group, title, detail) = (
                 .mdxError,
-                failureTitle,
+                failureTitle(for: product),
                 "The MDX document has a syntax error, so it can’t be exported. Fix the error shown in " +
                     "the preview, then export again."
             )
@@ -190,17 +203,19 @@ enum ExportHTMLNoticeMapper {
                  .contains(reason):
             (group, title, detail) = (
                 .resourceFailed,
-                failureTitle,
+                failureTitle(for: product),
                 reason == "html-too-large"
                     ? "The exported HTML exceeds the 64 MiB limit. Reduce the document’s images or content, then try again."
                     : "The document’s images or fonts couldn’t be prepared for export. Try again."
             )
         case .renderFailed(reason: "timeout"):
-            (group, title, detail) = (.renderFailed, failureTitle, "The export took too long. Try again.")
+            (group, title, detail) = (
+                .renderFailed, failureTitle(for: product), "The export took too long. Try again."
+            )
         case .renderFailed:
             (group, title, detail) = (
                 .renderFailed,
-                failureTitle,
+                failureTitle(for: product),
                 "The document couldn’t be rendered for export. Try again."
             )
         }
@@ -214,13 +229,23 @@ enum ExportHTMLNoticeMapper {
         )
     }
 
-    static func notCommitted(_ failure: ExportArtifactFailure, operationID: UInt64) -> ExportHTMLNotice? {
-        guard let (group, detail) = notCommittedDetail(failure) else { return nil }
+    static func failureTitle(for product: ExportCommandProduct) -> String {
+        switch product {
+        case .html: failureTitle
+        case .pdf: "Could Not Export as PDF"
+        case .print: "Could Not Print"
+        }
+    }
+
+    static func notCommitted(
+        _ failure: ExportArtifactFailure, operationID: UInt64, product: ExportCommandProduct = .html
+    ) -> ExportHTMLNotice? {
+        guard let (group, detail) = notCommittedDetail(failure, product: product) else { return nil }
         return ExportHTMLNotice(
             operationID: operationID,
             group: group,
             severity: .failure,
-            title: failureTitle,
+            title: failureTitle(for: product),
             message: "\(nothingWritten) \(detail)",
             revealURL: nil
         )
@@ -228,7 +253,7 @@ enum ExportHTMLNoticeMapper {
 
     // swiftlint:disable:next cyclomatic_complexity
     static func notCommittedDetail(
-        _ failure: ExportArtifactFailure
+        _ failure: ExportArtifactFailure, product: ExportCommandProduct = .html
     ) -> (ExportHTMLNoticeGroup, String)? {
         switch failure {
         case .cancelled:
@@ -259,8 +284,11 @@ enum ExportHTMLNoticeMapper {
             (.coordinationFailed, "iCloud Drive didn’t allow the file to be written right now. Try again " +
                 "in a moment.")
         case .invalidDestinationURL, .unsupportedExtension:
-            (.invalidName, "That name or location can’t be used for an HTML file. Choose a name ending " +
-                "in .html.")
+            product == .pdf
+                ? (.invalidName, "That name or location can’t be used for a PDF file. Choose a name ending " +
+                    "in .pdf.")
+                : (.invalidName, "That name or location can’t be used for an HTML file. Choose a name ending " +
+                    "in .html.")
         case let .stagingUnavailable(code):
             (.writeFailed, "Writing failed (\(posixDescription(code))). Nothing was published.")
         case let .writeFailed(error):
@@ -270,12 +298,15 @@ enum ExportHTMLNoticeMapper {
 
     static func indeterminate(
         _ write: ExportArtifactIndeterminateWrite,
-        operationID: UInt64
+        operationID: UInt64,
+        product: ExportCommandProduct = .html
     ) -> ExportHTMLNotice {
         var lines = ["Plainsong couldn’t confirm the export to \(path(write.selectedURL))."]
         switch write.destinationState {
         case .holdsWriterBytes:
-            lines.append("That file now holds the exported HTML, but cleanup couldn’t be confirmed.")
+            lines.append(
+                "That file now holds the \(product.artifactNoun), but cleanup couldn’t be confirmed."
+            )
         case .provenUnchanged:
             lines.append("That file was not changed.")
         case .unknown:
@@ -293,7 +324,7 @@ enum ExportHTMLNoticeMapper {
             lines.append(line)
             revealURL = url
         case let .retained(url, .writerBytes):
-            lines.append("A copy of the exported HTML remains at \(path(url)).")
+            lines.append("A copy of the \(product.artifactNoun) remains at \(path(url)).")
             revealURL = url
         case let .retained(url, .unknown):
             lines.append("An unexpected item remains at \(path(url)). It may be your data; inspect it " +
