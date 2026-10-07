@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WorkspaceKit
 
-/// Files mode: workspace tree, frontmatter inspector, and the sidebar bottom bar (WS3C Files mode).
+/// Files navigator: workspace tree with glass Add/Filter controls (WS3C Files mode).
 ///
 /// The tree is a native source list: selection, keyboard navigation, and the inactive-window
 /// highlight come from `List(selection:)`. Only editable Markdown rows are selectable, and
@@ -14,19 +14,17 @@ struct WorkspaceFilesSidebar: View {
     @State private var itemName = ""
     @State private var renameTarget: WorkspaceFileNode?
     @State private var renameName = ""
-    @State private var isWorkspaceSectionExpanded = true
-    @State private var isFrontmatterSectionExpanded = true
+    @State private var isRootExpanded = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            if appState.workspaceTree == nil, !appState.hasOpenDocument {
-                noFolderState
+        Group {
+            if let tree = appState.workspaceTree {
+                list(tree)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        bottomControls
+                    }
             } else {
-                list
-            }
-
-            if appState.workspaceTree != nil {
-                bottomBar
+                noFolderState
             }
         }
         .alert(creationRequest?.kind.title ?? "New Item", isPresented: createAlertIsPresented) {
@@ -57,47 +55,51 @@ struct WorkspaceFilesSidebar: View {
         }
     }
 
-    private var list: some View {
+    private func list(_ tree: WorkspaceFileTree) -> some View {
         List(selection: selectionBinding) {
-            if let tree = appState.workspaceTree {
-                Section(isExpanded: $isWorkspaceSectionExpanded) {
-                    ForEach(tree.root.children) { node in
-                        WorkspaceTreeNodeRow(
-                            node: node,
-                            rootURL: appState.workspaceRootURL,
-                            onRename: beginRename(_:),
-                            onCreate: beginCreation(_:inDirectoryID:)
-                        )
-                    }
-                } header: {
-                    Text(appState.workspaceRootURL?.lastPathComponent ?? "Workspace")
+            DisclosureGroup(isExpanded: $isRootExpanded) {
+                ForEach(tree.root.children) { node in
+                    WorkspaceTreeNodeRow(
+                        node: node,
+                        rootURL: appState.workspaceRootURL,
+                        onRename: beginRename(_:),
+                        onCreate: beginCreation(_:inDirectoryID:)
+                    )
                 }
-            } else {
-                Section("Folder") {
-                    Button {
-                        appState.openFile()
-                    } label: {
-                        Label("Open Folder…", systemImage: "folder.badge.plus")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help("Open a folder to browse its Markdown files")
-                }
-            }
-
-            if appState.hasOpenDocument {
-                Section(isExpanded: $isFrontmatterSectionExpanded) {
-                    let session = appState.currentDocument
-                    FrontmatterPanel(session: session) { newText in
-                        appState.replaceDocumentText(newText, in: session)
-                    }
-                } header: {
-                    Text("Frontmatter")
-                }
+            } label: {
+                rootLabel
             }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
+    }
+
+    /// Workspace root as the navigator's top row, like the project row in Xcode.
+    private var rootLabel: some View {
+        Label {
+            Text(appState.workspaceRootURL?.lastPathComponent ?? "Workspace")
+                .fontWeight(.semibold)
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: "folder.fill")
+                .foregroundStyle(.tint)
+        }
+        .selectionDisabled()
+        .help(appState.workspaceRootURL?.path(percentEncoded: false) ?? "")
+        .contextMenu {
+            Button("New File") {
+                beginCreation(.file, inDirectoryID: nil)
+            }
+            Button("New Folder") {
+                beginCreation(.folder, inDirectoryID: nil)
+            }
+            if let rootURL = appState.workspaceRootURL {
+                Divider()
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([rootURL])
+                }
+            }
+        }
     }
 
     private var noFolderState: some View {
@@ -113,8 +115,9 @@ struct WorkspaceFilesSidebar: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var bottomBar: some View {
-        HStack(spacing: 4) {
+    /// Glass controls floating over the bottom of the tree (Xcode navigator footer).
+    private var bottomControls: some View {
+        HStack {
             Menu {
                 Button("New File") {
                     beginCreation(.file, inDirectoryID: selectedDirectoryID)
@@ -129,6 +132,8 @@ struct WorkspaceFilesSidebar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .frame(width: 30, height: 30)
+            .plainsongGlass(in: Circle())
             .help("Add a file or folder")
 
             Spacer()
@@ -141,21 +146,19 @@ struct WorkspaceFilesSidebar: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } label: {
-                Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+                Label("Filter", systemImage: "line.3.horizontal.decrease")
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .frame(width: 30, height: 30)
+            .plainsongGlass(in: Circle())
             .help(appState.showAllFiles ? "Showing all files" : "Showing Markdown files only")
             .accessibilityValue(appState.showAllFiles ? "All Files" : "Markdown Files Only")
         }
-        .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .overlay(alignment: .top) {
-            Divider()
-        }
+        .padding(.vertical, 8)
     }
 
     private var selectionBinding: Binding<WorkspaceFileNode.ID?> {

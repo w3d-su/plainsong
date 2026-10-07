@@ -323,7 +323,7 @@ is left behind.
 | Entry point | Today | Target |
 |---|---|---|
 | Finder Open With, Dock drop, `open -a` (`onOpenURL`) | `App/PlainsongApp.swift:51-53`; SwiftUI may also create a scene (W0) | Same rule as Open. |
-| File › Open… ⌘O, toolbar Open, empty-state Open | `App/AppState.swift:575-604` | Same rule as Open. The panel is window-modal for the active window, or app-modal when there is none. |
+| File › Open… ⌘O, empty-state Open (PR L removed toolbar Open) | `App/AppState.swift:575-604` | Same rule as Open. The panel is window-modal for the active window, or app-modal when there is none. |
 | Open Recent | `App/PlainsongCommands.swift:34-44` | Same rule as Open. |
 | Sidebar click | `App/AppState+Workspace.swift:282-299` | Same window. WD1 focus if the file is current elsewhere. |
 | Preview relative link | `App/AppState+DocumentEditing.swift:105-110` | A workspace link opens in the same window; an external file follows the Open rule. |
@@ -490,9 +490,12 @@ The registry publishes no text changes; menus observe deduplicated facts. W12 me
 
 ## 8. Accessibility and UI-test implications
 
-- **Titles:** today root name else file name (`App/AppState.swift:827-829`), with represented
-  URL/edited dot (`App/Views/WorkspaceWindow.swift:439-460`). Use document name, else root,
-  else Plainsong; root subtitle; append root name for duplicate filenames. Tab titles follow.
+- **Titles:** PR L (§10.1) moved the title to SwiftUI `navigationTitle` /
+  `navigationSubtitle`: document name, else root, else Plainsong, with the root (or a single
+  file's parent folder) as subtitle. `WindowMetadataAccessor` keeps the represented URL and
+  edited dot (`App/Views/WindowMetadataAccessor.swift`). `AppState.windowTitle` no longer
+  drives the window; C removes it with the singleton. Still open for C/F: append the root
+  name for duplicate filenames, and tab titles follow.
 - **Selectors:** identifiers stay stable but queries scope to a uniquely titled window.
   App-wide queries/first hittable window in `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`
   and `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` must change.
@@ -531,6 +534,7 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 |---|---|---|---|
 | **A — this spec** | Two docs only; no checked box. | None | No |
 | **B1 — types and forwarding** | Registry/root/window types and behavior-neutral forwarding façade; preserve all authority hooks, 286 direct AppTests initializers, and existing APIs. No inventory logic change or new publish; still shared one-window behavior. | W0 inventory; W1 partition/hooks/regressions | **Yes**: authority/recovery storage moves |
+| **L — window chrome** | Native `NavigationSplitView` sidebar, document column, Xcode-style inspector and toolbar (§10.1). Views only: no `AppState`, menu, Find, or export-banner file changes; chrome visibility is scene state. | R17 launch stability; hosted suite unchanged | No |
 | **B2 — registry enumeration** | Migrate all session consumers under I2, with explicit list extras and operation filters. Preserve one-window behavior; prove no missed direct reads by grep. | W1 enumerator/grep; W3 registry fixtures | **Yes**: ownership, pruning, fences |
 | **C — independent state/routing, creation guarded** | Per-window state; deduplicated menus; remove singleton; route hot key and all Find hooks, including Escape. Disallow native tabs until F. Close W0 bullet 2; disable or route **every** W0-bullet-1 path to the existing window, including system menus and onOpenURL scene creation. Any unavoidable second WindowState fails closed on **any** file/root open until D2. Hosted test fixtures may bypass only creation guards. | W0 external-open + creation-guard/close probes; W2/W3/W5 hosted bullets | **Yes**: cross-window authority |
 | **D1 — root/session lifecycle** | Root reference counts; per-window filtered trees; scoped release/prune; per-root deferred refresh/image placement; WD2 overlap policy; separate installed/warm LRU capacity. No user window creation yet; retain C guards. | W6; W4 adoption; W11 LRU | **Yes**: mutation, retirement, quarantine |
@@ -539,9 +543,59 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 | **E — restoration** | After F: restoration/migration, missing-item handling, tab-group/order records and restoration. | W9 | **Yes (light)**: bookmarks |
 | **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W11; W12; W13 | No |
 
-Order: B1 → B2 → C → D1 → D2 → F → E → G. E follows F because it restores tab order.
+Order: B1 → L → B2 → C → D1 → D2 → F → E → G. E follows F because it restores tab order.
+L touches no `AppState` file, so it can also land before B1; it must land before C.
 Implementation completion requires relevant package/hosted tests, `make format`, `make lint`,
 `make test`, `make build`, and `git diff --check`; PR bodies name closed and open gates.
+
+### 10.1 Window chrome (PR L)
+
+PR L rebuilds the workspace window's chrome ahead of C so that C splits state under the
+final layout instead of a layout that is about to move. It changes views only.
+
+```
+┌──────────────┬──────────────────────────────────────┬──────────────┐
+│ ● ● ●   [⊟]  │ post.md · blog       [▤|◫|✦]  [⊟]   │              │  toolbar: title + subtitle,
+│ [🗂] [🔍]     │ 📁 blog › posts › 📄 post.md    MDX  │ Frontmatter  │  layout picker, inspector toggle
+│ ▾ 📁 blog    │ ╭ ⚠ File changed on disk   [Reload] ╮│  title …     │  jump bar; glass notice cards
+│    📄 a.md   │  editor            │ preview         │ File         │
+│ (+) (⌯)      │ 188 lines · 432 words                │  name, type… │  status bar
+└──────────────┴──────────────────────────────────────┴──────────────┘
+   sidebar column           detail column               inspector
+```
+
+- **Shell.** `WorkspaceWindow` is a `NavigationSplitView` (sidebar ideal width 256, range
+  220–320). The detail column holds the document and, trailing it, `InspectorColumn`
+  (default 280, drag-resizable 240–360). SwiftUI's `.inspector` is not used: with it
+  mounted, even with static content, the editor's SwiftUI updates intermittently stalled in
+  the hosted Find/Replace gates (decision log, PR L). On macOS 26+ the system draws the
+  sidebar and toolbar as Liquid Glass; custom surfaces use
+  `plainsongGlass` with a material fallback for macOS 14–15.
+- **R17.** The detail content sits inside a `GeometryReader` so the split column's minimum
+  size never follows the editor or web view. Without it the window re-entered Update
+  Constraints until AppKit threw (20 of 20 restore launches); with it, 30 of 30 launches were
+  clean (`docs/risk-register.md` R17).
+- **Per-window chrome state.** Sidebar column visibility is view `@State`; inspector
+  visibility and width are `@SceneStorage` (`plainsong.inspectorPresented`,
+  `plainsong.inspectorWidth`), shown by default and hidden
+  while no document is open. Neither lives in `AppState`, so C inherits per-window chrome
+  without moving it. Toggle Sidebar (⌃⌘S) comes from `SidebarCommands`. Show/Hide
+  Inspector (⌃⌘I) is `InspectorToggleCommands`, which reads the key window's
+  `focusedSceneValue(\.inspectorVisibility)` binding; it changes only on a toggle, so it
+  adds no high-churn menu observation (§5.1).
+- **Entry points.** The toolbar holds only the layout picker and the inspector toggle.
+  Open and Save leave the toolbar; File › Open… ⌘O, Save ⌘S, and the empty-state Open… and
+  recent items remain (§5.2).
+- **Stable identifiers.** `plainsong.editor.fileName` (now the jump bar's document segment,
+  same label and value), `plainsong.workspaceSearch.mode` (the navigator selector container,
+  with Files and Search buttons), `plainsong.workspaceSearch.queryField` (still an owned
+  `NSTextField`), `plainsong.editor.textView`, `plainsong.editorFind.*`, and the window
+  identifier with its `exportHTMLWindowRegistered` post. The Search sidebar still unmounts in
+  Files mode, the Find bar stays in the document column of the same `NSWindow`, and the
+  sidebar stays left of x = 280 for the hosted Search activation test.
+- **C builds on L.** C replaces `@EnvironmentObject AppState` in these views with the
+  window's state; the view split (`WorkspaceDetail`, `DocumentJumpBar`, `WorkspaceToolbar`,
+  `WorkspaceInspector`, `WorkspaceStatusBar`, `EmptyEditorState`) keeps those edits local.
 
 ## 11. Gates
 

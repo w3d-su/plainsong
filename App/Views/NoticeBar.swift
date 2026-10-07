@@ -1,21 +1,33 @@
 import SwiftUI
 
-/// Inline notification bar shown above the editor (Safari/Xcode style).
+/// Inline notice shown as a floating glass card above the editor.
 ///
-/// Message leads and actions trail, so every editor notice reads the same way. The bar keeps
-/// the window's bar material and only washes it with the tone color, so it stays legible on
-/// both appearances and under Increase Contrast.
+/// Message leads and actions trail (primary action last), so every editor notice reads the
+/// same way. The card sits in the layout rather than over the text, so it never hides
+/// content.
 struct NoticeBar<Actions: View>: View {
     enum Tone {
+        case neutral
         case caution
         case critical
 
         var tint: Color {
             switch self {
+            case .neutral:
+                .secondary
             case .caution:
                 .orange
             case .critical:
                 .red
+            }
+        }
+
+        var glassTint: Color? {
+            switch self {
+            case .neutral:
+                nil
+            case .caution, .critical:
+                tint.opacity(0.18)
             }
         }
     }
@@ -45,13 +57,11 @@ struct NoticeBar<Actions: View>: View {
             .fixedSize()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background {
-            ZStack {
-                Rectangle().fill(.bar)
-                Rectangle().fill(tone.tint.opacity(0.1))
-            }
-        }
+        .padding(.vertical, 9)
+        .plainsongGlass(tint: tone.glassTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
         .accessibilityElement(children: .contain)
     }
 }

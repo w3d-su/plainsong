@@ -70,7 +70,7 @@ struct WorkspaceSearchSidebar: View {
                 optionToggles
             }
             .padding(.horizontal, 10)
-            .padding(.top, 4)
+            .padding(.top, 8)
             .padding(.bottom, 8)
 
             WorkspaceSearchResultsList(
@@ -290,12 +290,9 @@ struct WorkspaceSearchSidebar: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.quaternary)
-        )
+        .background(Capsule().fill(.quaternary))
     }
 
     private var optionToggles: some View {

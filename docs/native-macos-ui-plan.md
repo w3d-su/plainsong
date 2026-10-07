@@ -2,9 +2,14 @@
 
 Goal: Plainsong should look and behave like an app Apple ships on macOS 26/27: system
 materials, stock controls, SF Symbols, semantic colors, and the HIG's placement rules. We
-get Liquid Glass by using standard controls (segmented pickers, toolbars, menus, sidebars,
-grouped forms), never by imitating it with custom shapes. The deployment target stays
-macOS 14, so any macOS 26-only API needs an `if #available` fallback.
+get Liquid Glass mostly by using standard containers and controls (`NavigationSplitView`,
+toolbars, segmented pickers, menus, grouped forms). The few custom floating
+surfaces (notice cards, sidebar bottom buttons) use `plainsongGlass`, which wraps
+`glassEffect` and falls back to a system material. The deployment target stays macOS 14,
+so any macOS 26-only API needs an `if #available` fallback.
+
+Reference apps: Xcode 27 (navigator selector, jump bar, inspector) and Notes (full-height
+glass sidebar, minimal glass toolbar).
 
 ## Rules
 
@@ -13,21 +18,34 @@ macOS 14, so any macOS 26-only API needs an `if #available` fallback.
 - Colors come from semantic styles (`.primary`, `.secondary`, `.tint`, `.bar`,
   `.quaternary`) or the Apple system palette. No hard-coded GitHub-style hex values in
   chrome.
-- Inline notices use `NoticeBar`: message leading, actions trailing, primary action last.
+- Inline notices use `NoticeBar`, a floating glass card: message leading, actions
+  trailing, primary action last.
+- No SwiftUI `.inspector` in the workspace window. With it mounted (on the detail column
+  or the split view, even with static content), the editor's SwiftUI updates intermittently
+  stalled in the hosted Find/Replace gates, so Find navigation and WYSIWYG reveal never
+  applied. The inspector is `InspectorColumn` inside the document column, with plain
+  sections (`InspectorSection` / `InspectorRow`) as in Xcode. A grouped `Form` there made
+  the stall deterministic; Settings, a separate window, keeps its grouped forms.
 - Presentation-only changes must not move focus, responder, or accessibility identities.
   Workspace Search keeps its owned `NSTextField`, key routing, and the F6/F7 gates.
-- R17 still holds: the sidebar stays inside the fixed-width `HStack`. It draws the system
-  sidebar material (`SidebarMaterialBackground`) instead of becoming a split view.
+- R17: the main window is a `NavigationSplitView` again. Its detail content must stay
+  inside the `GeometryReader` in `WorkspaceWindow`, or the split column's min-size updates
+  loop until AppKit throws (`docs/risk-register.md` R17).
 
 ## Landed (phase3-native-macos-polish)
 
 | Surface | Change |
 |---|---|
-| Sidebar shell | System sidebar material. The mode picker no longer has a hard divider under it. |
-| Files sidebar | Native source list: `List(selection:)` highlight (including inactive-window gray), collapsible workspace and Frontmatter sections, `ContentUnavailableView` when nothing is open, and a bottom bar with Add (+) and Filter menus replacing the in-list toggle row. The context menu adds New File/New Folder (folders) and Show in Finder. The redundant "File" section is gone. |
-| Frontmatter | Inspector rows: switches for booleans, inline date pickers, wrapping tag chips, a multicolor warning for invalid YAML, selectable raw YAML. |
+| Window shell (PR L) | `NavigationSplitView`: full-height floating glass sidebar on macOS 26+, user-resizable (220–320 pt) and collapsible (⌃⌘S). Per-window scene state; layout recorded in `docs/window-state-gates.md` §10.1. |
+| Toolbar | Liquid Glass: title = document name, subtitle = workspace folder; a Source / Split / WYSIWYG segmented picker (⌘⇧P still cycles) and an inspector toggle. Open and Save stay in the File menu and the empty state. |
+| Navigator selector | Xcode-style icon row (Files, Search) replaces the segmented picker; the selected icon is filled and tinted. Same accessibility identifier and Search unmount behavior. |
+| Jump bar | Replaces `DocumentHeader`: workspace › folders › document, file kind badge, saving spinner. Keeps the `plainsong.editor.fileName` identity. |
+| Inspector | Right column (⌃⌘I), Xcode-style plain sections (bold header, trailing-aligned labels, small controls): Frontmatter (switches, date pickers, wrapping tag chips, invalid-YAML warning with selectable raw YAML) and File (name, type, location, Show in Finder). Replaces the sidebar Frontmatter section. |
+| Files sidebar | Native source list: `List(selection:)` highlight (including inactive-window gray), the workspace root as an Xcode-style bold top row, `ContentUnavailableView` when nothing is open, and floating glass Add (+) and Filter buttons. The context menu adds New File/New Folder and Show in Finder. |
+| Empty state | `ContentUnavailableView` with **Open…** and up to five recent items. |
+| Status bar | Line, word, and character counts in caption type with monospaced digits. |
 | Settings | System Settings idiom: grouped forms, sections, explanatory footers, and value-then-stepper rows. |
-| Banners | Missing file, uncertain save, and workspace recovery banners use `NoticeBar`. |
+| Banners | Every editor notice (missing file, uncertain save, workspace recovery, external change, WYSIWYG fallback) is a `NoticeBar` glass card. |
 | Workspace Search | Appearance only: filled search-field capsule, compact option toggles, Xcode Find-navigator style file headers (name, dimmed folder, count badge). |
 | Preview CSS | Apple system palette. Dark background is `#1e1e1e` so it matches the editor. Xcode Default (Light/Dark) syntax colors replace highlight.js `github.css`, which painted a white nested box inside every code block in dark mode. |
 
@@ -36,26 +54,11 @@ macOS 14, so any macOS 26-only API needs an `if #available` fallback.
 These were left untouched on purpose, to avoid conflicts. Fold each into the named PR or
 do it right after it merges.
 
-### Main window (`WorkspaceWindow`, `AppState`): after #139 B1 / C
+### Main window: per-window state after #139 C
 
-Do these as part of the per-window scene and menu work. Each window then owns its title,
-toolbar, and banners.
-
-1. **Drop `DocumentHeader`.** The window title, document proxy icon (`representedURL`), and
-   edited dot (`isDocumentEdited`) already say the same thing. Move the parent path and
-   file kind into `navigationSubtitle`.
-2. **Toolbar per HIG.** Put a sidebar toggle at `.navigation`. Show the layout mode as a
-   segmented control (Source / Split / WYSIWYG once it ships) with the ⌘⇧P cycle kept.
-   Open and Save live in the File menu; Apple's document editors do not repeat them in the
-   toolbar.
-3. **Empty state.** `ContentUnavailableView` with **Open…** and the recent items.
-4. **Status bar.** Keep it, but use monospaced digits, and add a Pages-style word-count
-   popover if wanted.
-5. **Banners.** Move `ExternalChangeBanner` and `WYSIWYGFallbackBanner` to `NoticeBar` so
-   every editor notice matches.
-6. **Native sidebar (R17).** Spike an `NSSplitViewController` sidebar item (floating Liquid
-   Glass sidebar, user-resizable, ⌃⌘S) in a separate PR, with launch-stability evidence.
-   Do not attempt it inside the window-state split.
+The chrome landed as PR L. C replaces the views' shared `AppState` with each window's
+state; no further layout move is planned. Still open: a Pages-style word-count popover on
+the status bar, if wanted.
 
 ### Find / Replace bar and Edit menu: after #151
 

@@ -86,7 +86,6 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
   list/quote styling). Links, images, tables, and code fences stay as raw Markdown in the
   editor; the preview pane renders everything.
-- **The sidebar is fixed-width** for now.
 - **No auto-update:** alpha builds are manual downloads.
 
 ## License

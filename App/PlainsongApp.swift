@@ -55,8 +55,10 @@ struct PlainsongApp: App {
                     appState.flushAutosaveIfNeeded()
                 }
         }
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: 1280, height: 800)
         .commands {
+            SidebarCommands()
+            InspectorToggleCommands()
             PlainsongCommands(appState: appState, menuBarState: menuBarState)
         }
         .onChange(of: scenePhase) { _, newPhase in
