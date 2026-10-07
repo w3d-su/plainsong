@@ -580,14 +580,18 @@ final layout instead of a layout that is about to move. It changes views only.
   `plainsong.inspectorWidth`), shown by default and hidden
   while no document is open. Neither lives in `AppState`, so C inherits per-window chrome
   without moving it. Toggle Sidebar (⌃⌘S) comes from `SidebarCommands`. Show/Hide
-  Inspector (⌃⌘I) is `InspectorToggleCommands`, which reads the key window's
-  `focusedSceneValue(\.inspectorVisibility)` binding; it changes only on a toggle, so it
-  adds no high-churn menu observation (§5.1).
+  Inspector (⌃⌘I) is `InspectorToggleCommands`, which observes the app-global
+  `InspectorMenuState`: each window's `InspectorVisibility` registers there while its window
+  is key (become/resign-key notifications), so the command disables when no workspace window
+  is key and never falls back (§5.1). It changes only on key changes and toggles. SwiftUI
+  focused values are deliberately not used: any `focusedSceneValue` or `focusedSceneObject`
+  on the workspace window delayed the editor's own updates in the hosted gates. C should
+  fold `InspectorMenuState` into `KeyWindowRouter`.
 - **Entry points.** The toolbar holds only the layout picker and the inspector toggle.
   Open and Save leave the toolbar; File › Open… ⌘O, Save ⌘S, and the empty-state Open… and
   recent items remain (§5.2).
 - **Stable identifiers.** `plainsong.editor.fileName` (now the jump bar's document segment,
-  same label and value), `plainsong.workspaceSearch.mode` (the navigator selector container,
+  same label and value; its menu is a separate pop-up button laid over it), `plainsong.workspaceSearch.mode` (the navigator selector container,
   with Files and Search buttons), `plainsong.workspaceSearch.queryField` (still an owned
   `NSTextField`), `plainsong.editor.textView`, `plainsong.editorFind.*`, and the window
   identifier with its `exportHTMLWindowRegistered` post. The Search sidebar still unmounts in

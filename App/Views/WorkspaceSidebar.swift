@@ -16,10 +16,7 @@ struct WorkspaceSidebar: View {
                 select: { appState.selectWorkspaceSidebarMode($0) }
             )
             .padding(.horizontal, 10)
-            .padding(.bottom, 4)
-
-            Divider()
-                .padding(.horizontal, 10)
+            .padding(.bottom, 6)
 
             Group {
                 switch appState.workspaceSearchUI.mode {
@@ -34,19 +31,24 @@ struct WorkspaceSidebar: View {
     }
 }
 
-/// Row of navigator icons, like the top of Xcode's navigator area.
+/// Navigator icons in a small Liquid Glass capsule, like Xcode's navigator bar: outlined
+/// symbols, the selected one full-strength on a sliding highlight.
 private struct NavigatorSelector: View {
     let selection: WorkspaceSidebarMode
     let isSearchEnabled: Bool
     let select: (WorkspaceSidebarMode) -> Void
 
+    @Namespace private var highlight
+
     var body: some View {
         HStack(spacing: 2) {
             item(.files, title: "Files", systemImage: "folder", isEnabled: true)
             item(.search, title: "Search", systemImage: "magnifyingglass", isEnabled: isSearchEnabled)
-            Spacer(minLength: 0)
         }
-        .frame(height: 28)
+        .padding(3)
+        .plainsongGlass(in: Capsule())
+        .animation(.snappy(duration: 0.25), value: selection)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Sidebar Mode")
         .accessibilityIdentifier(WorkspaceSearchAccessibility.modePicker)
@@ -63,13 +65,19 @@ private struct NavigatorSelector: View {
             select(mode)
         } label: {
             Image(systemName: systemImage)
-                .symbolVariant(isSelected ? .fill : .none)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .frame(width: 30, height: 24)
-                .contentShape(Rectangle())
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: 32, height: 24)
+                .background {
+                    if isSelected {
+                        Capsule()
+                            .fill(.primary.opacity(0.16))
+                            .matchedGeometryEffect(id: "selection", in: highlight)
+                    }
+                }
+                .contentShape(Capsule())
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
         .disabled(!isEnabled)
         .help(isEnabled || mode == .files ? title : "Open a folder workspace to use Search")
         .accessibilityLabel(title)

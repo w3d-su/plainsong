@@ -20,6 +20,9 @@ glass sidebar, minimal glass toolbar).
   chrome.
 - Inline notices use `NoticeBar`, a floating glass card: message leading, actions
   trailing, primary action last.
+- No SwiftUI focused values (`focusedSceneValue`, `focusedSceneObject`) on the workspace
+  window; they delayed the editor's own updates in the hosted gates. Window-scoped menu
+  commands go through a key-window registry such as `InspectorMenuState`.
 - No SwiftUI `.inspector` in the workspace window. With it mounted (on the detail column
   or the split view, even with static content), the editor's SwiftUI updates intermittently
   stalled in the hosted Find/Replace gates, so Find navigation and WYSIWYG reveal never
@@ -38,8 +41,8 @@ glass sidebar, minimal glass toolbar).
 |---|---|
 | Window shell (PR L) | `NavigationSplitView`: full-height floating glass sidebar on macOS 26+, user-resizable (220–320 pt) and collapsible (⌃⌘S). Per-window scene state; layout recorded in `docs/window-state-gates.md` §10.1. |
 | Toolbar | Liquid Glass: title = document name, subtitle = workspace folder; a Source / Split / WYSIWYG segmented picker (⌘⇧P still cycles) and an inspector toggle. Open and Save stay in the File menu and the empty state. |
-| Navigator selector | Xcode-style icon row (Files, Search) replaces the segmented picker; the selected icon is filled and tinted. Same accessibility identifier and Search unmount behavior. |
-| Jump bar | Replaces `DocumentHeader`: workspace › folders › document, file kind badge, saving spinner. Keeps the `plainsong.editor.fileName` identity. |
+| Navigator selector | Xcode-style navigator bar replaces the segmented picker: a small Liquid Glass capsule of outlined icons (Files, Search), the selected one full-strength on a sliding highlight. Same accessibility identifier and Search unmount behavior. |
+| Jump bar | Replaces `DocumentHeader`: workspace › folders › document, file kind badge, saving spinner. As in Xcode, a folder segment lists its contents (subfolders as submenus) and the document segment lists its siblings; choosing a file opens it like a sidebar click. Right-click copies the name, path, or workspace-relative path, or shows it in Finder. Keeps the `plainsong.editor.fileName` identity. |
 | Inspector | Right column (⌃⌘I), Xcode-style plain sections (bold header, trailing-aligned labels, small controls): Frontmatter (switches, date pickers, wrapping tag chips, invalid-YAML warning with selectable raw YAML) and File (name, type, location, Show in Finder). Replaces the sidebar Frontmatter section. |
 | Files sidebar | Native source list: `List(selection:)` highlight (including inactive-window gray), the workspace root as an Xcode-style bold top row, `ContentUnavailableView` when nothing is open, and floating glass Add (+) and Filter buttons. The context menu adds New File/New Folder and Show in Finder. |
 | Empty state | `ContentUnavailableView` with **Open…** and up to five recent items. |

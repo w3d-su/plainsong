@@ -16,7 +16,9 @@ struct EditorWorkspace: View {
                 rootURL: appState.workspaceRootURL,
                 fileURL: appState.currentDocument.fileURL,
                 fileKind: appState.currentDocument.fileKind,
-                isSaving: appState.isSaving
+                isSaving: appState.isSaving,
+                workspaceTree: { appState.workspaceTree },
+                openNode: { appState.selectWorkspaceNode(id: $0) }
             )
 
             if appState.workspaceMutationRecoveryBannerPlacement == .editor {

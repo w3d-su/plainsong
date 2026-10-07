@@ -27,6 +27,7 @@ struct PlainsongApp: App {
     /// Menu enablement observes this deduplicated snapshot, never `AppState` directly
     /// (see `MenuBarState` for why the menu must not track high-churn publishes).
     @StateObject private var menuBarState: MenuBarState
+    @StateObject private var inspectorMenuState = InspectorMenuState.shared
 
     init() {
         let state = makePlainsongAppState()
@@ -58,7 +59,7 @@ struct PlainsongApp: App {
         .defaultSize(width: 1280, height: 800)
         .commands {
             SidebarCommands()
-            InspectorToggleCommands()
+            InspectorToggleCommands(menuState: inspectorMenuState)
             PlainsongCommands(appState: appState, menuBarState: menuBarState)
         }
         .onChange(of: scenePhase) { _, newPhase in

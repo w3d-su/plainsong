@@ -8,6 +8,8 @@ import SwiftUI
 struct WindowMetadataAccessor: NSViewRepresentable {
     let representedURL: URL?
     let isDocumentEdited: Bool
+    /// Hands the hosting window to window-scoped chrome (the inspector's menu routing).
+    var onWindow: (NSWindow) -> Void = { _ in }
 
     func makeNSView(context _: Context) -> MetadataView {
         let view = MetadataView()
@@ -28,6 +30,7 @@ struct WindowMetadataAccessor: NSViewRepresentable {
         }
         window.representedURL = representedURL
         window.isDocumentEdited = isDocumentEdited
+        onWindow(window)
     }
 
     final class MetadataView: NSView {

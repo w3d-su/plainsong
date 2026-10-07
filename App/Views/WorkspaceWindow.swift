@@ -9,7 +9,8 @@ import SwiftUI
 struct WorkspaceWindow: View {
     @EnvironmentObject private var appState: AppState
     @State private var columnVisibility = NavigationSplitViewVisibility.all
-    @SceneStorage("plainsong.inspectorPresented") private var isInspectorPresented = true
+    @SceneStorage("plainsong.inspectorPresented") private var storedInspectorPresented = true
+    @StateObject private var inspectorVisibility = InspectorVisibility()
     @SceneStorage("plainsong.inspectorWidth") private var inspectorWidth = InspectorLayout.defaultWidth
 
     var body: some View {
@@ -29,9 +30,14 @@ struct WorkspaceWindow: View {
         .navigationTitle(documentTitle)
         .navigationSubtitle(documentSubtitle)
         .toolbar {
-            WorkspaceToolbar(appState: appState, isInspectorPresented: $isInspectorPresented)
+            WorkspaceToolbar(appState: appState, isInspectorPresented: $inspectorVisibility.isPresented)
         }
-        .focusedSceneValue(\.inspectorVisibility, $isInspectorPresented)
+        .onAppear {
+            inspectorVisibility.isPresented = storedInspectorPresented
+        }
+        .onChange(of: inspectorVisibility.isPresented) { _, isPresented in
+            storedInspectorPresented = isPresented
+        }
         .frame(minWidth: 760, minHeight: 420)
         .alert(
             appState.presentedError?.title ?? "Error",
@@ -46,7 +52,8 @@ struct WorkspaceWindow: View {
         .background(
             WindowMetadataAccessor(
                 representedURL: appState.currentDocument.fileURL,
-                isDocumentEdited: appState.currentDocument.isDirty
+                isDocumentEdited: appState.currentDocument.isDirty,
+                onWindow: { inspectorVisibility.attach(to: $0) }
             )
         )
         .task {
@@ -85,7 +92,7 @@ struct WorkspaceWindow: View {
     }
 
     private var showsInspector: Bool {
-        isInspectorPresented && appState.hasOpenDocument
+        inspectorVisibility.isPresented && appState.hasOpenDocument
     }
 
     private var documentTitle: String {
