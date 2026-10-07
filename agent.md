@@ -169,8 +169,8 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
   is reserved for Apple).
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
-  (Files / Search navigators), the document column, and a right inspector for frontmatter
-  and file details. Sidebar and inspector visibility are per-window scene state
+  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (R17), then the document column and a right inspector for frontmatter and file details. Sidebar and inspector visibility are per-window scene state
   (`docs/window-state-gates.md` §10.1).
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
@@ -266,7 +266,7 @@ replacement local to EditorKit.
 | Quote | ⌘⇧Q | toggle `> ` |
 | Code fence | ⌘⇧K | wrap selection in fences |
 | Toggle preview pane | ⌘⇧P | show/hide right pane |
-| Toggle sidebar | ⌃⌘S | native View › Show/Hide Sidebar (`SidebarCommands`) |
+| Toggle sidebar | ⌃⌘S | native View › Show/Hide Sidebar (`SidebarCommands`; macOS 27+ split view only) |
 | Toggle inspector | ⌃⌘I | View › Show/Hide Inspector (`InspectorToggleCommands`, key window) |
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |

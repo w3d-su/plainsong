@@ -31,15 +31,16 @@ glass sidebar, minimal glass toolbar).
   the stall deterministic; Settings, a separate window, keeps its grouped forms.
 - Presentation-only changes must not move focus, responder, or accessibility identities.
   Workspace Search keeps its owned `NSTextField`, key routing, and the F6/F7 gates.
-- R17: the main window is a `NavigationSplitView` again. Its detail content must stay
-  inside the `GeometryReader` in `WorkspaceWindow`, or the split column's min-size updates
-  loop until AppKit throws (`docs/risk-register.md` R17).
+- R17: the main window is a `NavigationSplitView` on macOS 27+ only; earlier systems keep
+  the fixed `HStack` shell because macOS 15 still loops Update Constraints in the split view.
+  The detail content must stay inside the `GeometryReader` in `WorkspaceWindow`
+  (`docs/risk-register.md` R17).
 
 ## Landed (phase3-native-macos-polish)
 
 | Surface | Change |
 |---|---|
-| Window shell (PR L) | `NavigationSplitView`: full-height floating glass sidebar on macOS 26+, user-resizable (220–320 pt) and collapsible (⌃⌘S). Per-window scene state; layout recorded in `docs/window-state-gates.md` §10.1. |
+| Window shell (PR L) | `NavigationSplitView` on macOS 27+: full-height glass sidebar, user-resizable (220–320 pt) and collapsible (⌃⌘S). macOS 14–26: fixed 256 pt sidebar on the system sidebar material (R17). Per-window scene state; layout recorded in `docs/window-state-gates.md` §10.1. |
 | Toolbar | Liquid Glass: title = document name, subtitle = workspace folder; a Source / Split / WYSIWYG segmented picker (⌘⇧P still cycles) and an inspector toggle. Open and Save stay in the File menu and the empty state. |
 | Navigator selector | Xcode-style navigator bar replaces the segmented picker: a small Liquid Glass capsule of outlined icons (Files, Search), the selected one full-strength on a sliding highlight. Same accessibility identifier and Search unmount behavior. |
 | Jump bar | Replaces `DocumentHeader`: workspace › folders › document, file kind badge, saving spinner. As in Xcode, a folder segment lists its contents (subfolders as submenus) and the document segment lists its siblings; choosing a file opens it like a sidebar click. Right-click copies the name, path, or workspace-relative path, or shows it in Finder. Keeps the `plainsong.editor.fileName` identity. |

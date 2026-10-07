@@ -564,17 +564,19 @@ final layout instead of a layout that is about to move. It changes views only.
    sidebar column           detail column               inspector
 ```
 
-- **Shell.** `WorkspaceWindow` is a `NavigationSplitView` (sidebar ideal width 256, range
-  220–320). The detail column holds the document and, trailing it, `InspectorColumn`
+- **Shell.** On macOS 27+ `WorkspaceWindow` is a `NavigationSplitView` (sidebar ideal width
+  256, range 220–320); macOS 14–26 keep the fixed-width (256) `HStack` shell with the system
+  sidebar material, because macOS 15 still hits R17 in the split view (below). The detail column holds the document and, trailing it, `InspectorColumn`
   (default 280, drag-resizable 240–360). SwiftUI's `.inspector` is not used: with it
   mounted, even with static content, the editor's SwiftUI updates intermittently stalled in
-  the hosted Find/Replace gates (decision log, PR L). On macOS 26+ the system draws the
-  sidebar and toolbar as Liquid Glass; custom surfaces use
-  `plainsongGlass` with a material fallback for macOS 14–15.
+  the hosted Find/Replace gates (decision log, PR L). On macOS 27 the system draws the
+  sidebar and toolbar as Liquid Glass; custom surfaces use `plainsongGlass` (glass on
+  macOS 26+, a material fallback before).
 - **R17.** The detail content sits inside a `GeometryReader` so the split column's minimum
   size never follows the editor or web view. Without it the window re-entered Update
   Constraints until AppKit threw (20 of 20 restore launches); with it, 30 of 30 launches were
-  clean (`docs/risk-register.md` R17).
+  clean on macOS 27. On the macOS 15 CI runner the split view still threw, from STTextView's
+  layout requesting constraint updates, hence the version split (`docs/risk-register.md` R17).
 - **Per-window chrome state.** Sidebar column visibility is view `@State`; inspector
   visibility and width are `@SceneStorage` (`plainsong.inspectorPresented`,
   `plainsong.inspectorWidth`), shown by default and hidden
