@@ -5,10 +5,11 @@ import Foundation
 
 public enum ExportPDFCaptureError: Error, Equatable, Sendable {
     case invalidated
+    case webContentProcessTerminated
     case geometryUnstable
-    case widerThanMaximum
-    case unsplittableBlock
-    case noSafePageHeight
+    /// One unbreakable run (line/atomic box chain) exceeds the page budget; the value is
+    /// its height in PDF points after the uniform scale.
+    case oversizeAtomicBox(heightPoints: CGFloat)
     case captureFailed(String)
     case emptyDocument
 }
@@ -17,219 +18,76 @@ public enum ExportPDFCaptureError: Error, Equatable, Sendable {
 public struct ExportPDFDocument: Equatable, Sendable {
     public let data: Data
     public let pageCount: Int
-    /// The operation-fixed height. The last page may be shorter.
-    public let pageHeight: CGFloat
-    /// 1 unless the laid-out width exceeded 14,400 pt, in which case the whole capture
-    /// was scaled uniformly before pagination.
+    /// The tallest output page in PDF points (≤ 14,400 by construction).
+    public let maximumPageHeight: CGFloat
+    /// 1 unless the laid-out width exceeded 14,400 pt, in which case every page was
+    /// scaled down by this factor in PDF space while joining.
     public let scale: CGFloat
     public let contentSize: CGSize
 }
 
 extension PreviewController {
-    /// Export-only overflow expansion, then one uniform zoom when the width exceeds
-    /// 14,400 pt. Pagination uses the post-scale block bounds. The live preview is a
-    /// different controller and never receives this style.
-    public func captureExportPDF() async throws -> ExportPDFDocument {
-        guard !isInvalidated else { throw ExportPDFCaptureError.invalidated }
-        // Read overflow scroll widths before expanding. Expanding a document wider than
-        // about 14,000 pt tears this WebKit process down, so zoom is applied first and
-        // only when that contained width already exceeds 14,400 pt.
-        let containedWidth = try await measureContainedOverflowWidth()
-        let scale = ExportPDFPagePlanner.uniformScale(containedWidth: containedWidth)
-        if scale < 1 {
-            try await setExportZoom(scale)
-        }
+    /// Export-only overflow expansion, then A1 variable-height pagination
+    /// (`docs/export-gates.md` D4). Everything happens at full size: no zoom and no
+    /// width ceiling; an over-maximum width is folded into the uniform PDF-space scale
+    /// the joiner applies to every page. `pageAspect` — the paper imageable
+    /// `height / width` — bounds page height for Print; nil plans plain PDF pages.
+    public func captureExportPDF(pageAspect: CGFloat? = nil) async throws -> ExportPDFDocument {
+        try checkExportAlive()
         try await applyExportOverflowStyle()
         let geometry = try await settleExportGeometry()
-        guard geometry.width <= ExportPDFPagePlanner.maximumSide + 0.5 else {
-            throw ExportPDFCaptureError.widerThanMaximum
+        try checkExportAlive()
+        let scale = ExportPDFPagePlanner.uniformScale(containedWidth: geometry.width)
+        let measured = try await measureUnsplittableSpans()
+        try checkExportAlive()
+        let plan = try ExportPDFPagePlanner.plan(
+            contentSize: geometry,
+            unsplittable: measured.spans,
+            scale: scale,
+            targetAspect: pageAspect
+        )
+        // A fixed/sticky/transformed/floated box cannot be proven safe across a break
+        // (the A1 design stop): fail typed only when a planned break would cross one.
+        for rect in plan.pageRects.dropLast() {
+            if let offender = measured.offenders.first(where: {
+                $0.minY + 0.5 < rect.maxY && rect.maxY < $0.maxY - 0.5
+            }) {
+                throw ExportPDFCaptureError.captureFailed(
+                    "break-crosses-positioned-content: \(offender.tag).\(offender.className)"
+                )
+            }
         }
-        let blocks = try await exportPaginationBlocks()
-        if blocks.contains(where: { $0.height > ExportPDFPagePlanner.maximumSide }) {
-            throw ExportPDFCaptureError.unsplittableBlock
-        }
-        let content = CGRect(origin: .zero, size: geometry)
-        guard let pageHeight = ExportPDFPagePlanner.fixedHeight(
-            contentMinY: content.minY, contentMaxY: content.maxY, blocks: blocks
-        ) else { throw ExportPDFCaptureError.noSafePageHeight }
-        let pages = try await captureExportPages(contentBounds: content, pageHeight: pageHeight)
-        let data = try ExportPDFPageJoiner.join(pages)
-        guard let provider = CGDataProvider(data: data as CFData),
-              let document = CGPDFDocument(provider),
-              document.numberOfPages > 0
-        else { throw ExportPDFCaptureError.emptyDocument }
+        let pieces = try await captureExportPages(plan.pageRects, inside: geometry)
+        let joined = try await joinAndReparse(pieces, scale: scale)
         return ExportPDFDocument(
-            data: data, pageCount: document.numberOfPages, pageHeight: pageHeight,
-            scale: scale, contentSize: geometry
+            data: joined.data,
+            pageCount: joined.pageCount,
+            maximumPageHeight: (plan.pageRects.map(\.height).max() ?? 0) * scale,
+            scale: scale,
+            contentSize: geometry
         )
     }
 
-    /// Same overflow expansion as PDF, with no 14,400 pt zoom. Paper width is
-    /// `NSPrintInfo.horizontalPagination = .fit`. The standard panel, including its
-    /// scaling control, stays in place. The web view is not placed in a window.
-    public func makeExportPrintOperation() async throws -> NSPrintOperation {
+    /// Guarded between every WebKit await so a mid-capture teardown fails typed rather
+    /// than hanging on a dead renderer.
+    func checkExportAlive() throws {
         guard !isInvalidated else { throw ExportPDFCaptureError.invalidated }
-        guard webView.window == nil else { throw ExportPDFCaptureError.captureFailed("mounted-webview") }
-        try await applyExportOverflowStyle()
-        webView.layoutSubtreeIfNeeded()
-        guard webView.window == nil else { throw ExportPDFCaptureError.captureFailed("mounted-webview") }
-        guard let info = NSPrintInfo.shared.copy() as? NSPrintInfo else {
-            throw ExportPDFCaptureError.captureFailed("print-info")
+        guard !webContentProcessTerminated else {
+            throw ExportPDFCaptureError.webContentProcessTerminated
         }
-        info.horizontalPagination = .fit
-        info.verticalPagination = .automatic
-        info.isHorizontallyCentered = true
-        let operation = webView.printOperation(with: info)
-        operation.showsPrintPanel = true
-        operation.showsProgressPanel = true
-        if !operation.printPanel.options.contains(.showsScaling) {
-            operation.printPanel.options.insert(.showsScaling)
-        }
-        return operation
     }
 
-    func applyExportOverflowStyle() async throws {
-        let script = """
-        (() => {
-          const id = "plainsong-export-layout";
-          let style = document.getElementById(id);
-          if (!style) {
-            style = document.createElement("style");
-            style.id = id;
-            document.head.appendChild(style);
-          }
-          style.textContent = `
-            #preview-root table,
-            #preview-root pre,
-            #preview-root pre code,
-            #preview-root .plainsong-math-block,
-            #preview-root .plainsong-math-block > .katex-display,
-            #preview-root .mermaid-rendered,
-            #preview-root .mermaid-rendered svg {
-              overflow: visible !important;
-              max-width: none !important;
-            }
-            #preview-root table,
-            #preview-root pre,
-            #preview-root pre code,
-            #preview-root .plainsong-math-block > .katex-display {
-              width: max-content !important;
-            }
-            #preview-root pre,
-            #preview-root pre code {
-              white-space: pre !important;
-            }
-            #preview-root .plainsong-math-block > .katex-display {
-              min-width: 0 !important;
-            }
-          `;
-          return true;
-        })()
-        """
-        _ = try await evaluateExportJavaScript(script, label: "export overflow style")
-    }
-
-    private func measureContainedOverflowWidth() async throws -> CGFloat {
-        let script = """
-        (() => {
-          const nodes = document.querySelectorAll([
-            "#preview-root table", "#preview-root pre",
-            "#preview-root .plainsong-math-block", "#preview-root .mermaid-rendered"
-          ].join(", "));
-          let width = 0;
-          for (const node of nodes) width = Math.max(width, node.scrollWidth);
-          return width;
-        })()
-        """
-        guard let width = try await evaluateExportJavaScript(script, label: "contained overflow width") as? Double,
-              width.isFinite, width >= 0
-        else { throw ExportPDFCaptureError.geometryUnstable }
-        return width
-    }
-
-    private func setExportZoom(_ scale: CGFloat) async throws {
-        let literal = String(format: "%.8f", scale)
-        _ = try await evaluateExportJavaScript(
-            "document.documentElement.style.zoom = '\(literal)'; true",
-            label: "export zoom"
-        )
-    }
-
-    private func settleExportGeometry(timeoutNanoseconds: UInt64 = 10_000_000_000) async throws -> CGSize {
-        guard webView.bounds.width > 0, webView.bounds.height > 0 else {
-            throw ExportPDFCaptureError.geometryUnstable
-        }
-        let start = DispatchTime.now().uptimeNanoseconds
-        var previous: CGSize?
-        while DispatchTime.now().uptimeNanoseconds &- start < timeoutNanoseconds {
-            try Task.checkCancellation()
-            let measured = try await measureExportContentSize()
-            guard measured.width <= ExportPDFPagePlanner.maximumSide + 0.5 else {
-                throw ExportPDFCaptureError.widerThanMaximum
-            }
-            webView.frame = CGRect(origin: .zero, size: measured)
-            webView.layoutSubtreeIfNeeded()
-            let remeasured = try await measureExportContentSize()
-            if let previous, sizesMatch(previous, remeasured), sizesMatch(webView.bounds.size, remeasured) {
-                return remeasured
-            }
-            previous = remeasured
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
-        throw ExportPDFCaptureError.geometryUnstable
-    }
-
-    private func measureExportContentSize() async throws -> CGSize {
-        let script = """
-        JSON.stringify({
-          width: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth,
-            document.documentElement.clientWidth, document.body.clientWidth),
-          height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight,
-            document.documentElement.clientHeight, document.body.clientHeight)
-        })
-        """
-        guard let json = try await evaluateExportJavaScript(script, label: "export content size") as? String,
-              let data = json.data(using: .utf8),
-              let measurement = try? JSONDecoder().decode(ExportContentMeasurement.self, from: data),
-              measurement.width.isFinite, measurement.height.isFinite,
-              measurement.width > 0, measurement.height > 0
-        else { throw ExportPDFCaptureError.geometryUnstable }
-        return CGSize(width: measurement.width, height: measurement.height)
-    }
-
-    private func exportPaginationBlocks() async throws -> [ExportPDFPagePlanner.Block] {
-        let script = """
-        JSON.stringify(Array.from(document.querySelectorAll(
-          "#preview-root [data-line], #preview-root table, #preview-root pre, " +
-          "#preview-root .katex-display, #preview-root .plainsong-math-block, #preview-root .mermaid-rendered"
-        )).map(element => {
-          const rect = element.getBoundingClientRect();
-          return { minY: rect.top + window.scrollY, maxY: rect.bottom + window.scrollY };
-        }))
-        """
-        guard let json = try await evaluateExportJavaScript(script, label: "export block bounds") as? String,
-              let data = json.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([ExportBlockMeasurement].self, from: data)
-        else { throw ExportPDFCaptureError.geometryUnstable }
-        let blocks = decoded.map { ExportPDFPagePlanner.Block(minY: $0.minY, maxY: $0.maxY) }
-        if blocks.isEmpty {
-            let size = webView.bounds.size
-            return [ExportPDFPagePlanner.Block(minY: 0, maxY: size.height)]
-        }
-        return blocks
-    }
-
-    private func captureExportPages(contentBounds: CGRect, pageHeight: CGFloat) async throws -> [Data] {
-        guard pageHeight > 0, pageHeight <= ExportPDFPagePlanner.maximumSide else {
-            throw ExportPDFCaptureError.noSafePageHeight
-        }
+    private func captureExportPages(_ rects: [CGRect], inside contentSize: CGSize) async throws -> [Data] {
+        let contentBounds = CGRect(origin: .zero, size: contentSize)
         var pages: [Data] = []
-        var offset = contentBounds.minY
-        while offset < contentBounds.maxY - 0.5 {
+        pages.reserveCapacity(rects.count)
+        for (index, rect) in rects.enumerated() {
+            try checkExportAlive()
             try Task.checkCancellation()
-            let height = min(pageHeight, contentBounds.maxY - offset)
-            let rect = CGRect(x: contentBounds.minX, y: offset, width: contentBounds.width, height: height)
-            guard webView.bounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) else {
+            if let hook = exportPDFCaptureWillCaptureHook {
+                try await hook(index)
+            }
+            guard contentBounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) else {
                 throw ExportPDFCaptureError.captureFailed("rect-outside-view")
             }
             let configuration = WKPDFConfiguration()
@@ -237,34 +95,34 @@ extension PreviewController {
             do {
                 try await pages.append(webView.pdf(configuration: configuration))
             } catch {
+                try checkExportAlive()
                 throw ExportPDFCaptureError.captureFailed(error.localizedDescription)
             }
-            offset += height
         }
         guard !pages.isEmpty else { throw ExportPDFCaptureError.emptyDocument }
         return pages
     }
 
-    private func evaluateExportJavaScript(_ script: String, label: String) async throws -> Any? {
-        try Task.checkCancellation()
-        do {
-            return try await webView.evaluateJavaScript(script)
-        } catch {
-            throw ExportPDFCaptureError.captureFailed("\(label): \(error.localizedDescription)")
+    /// Joining and re-parsing is pure CoreGraphics on `Data`, so it runs off the main
+    /// actor; WebKit calls stay on main. Cancellation is forwarded into the worker.
+    private func joinAndReparse(
+        _ pieces: [Data],
+        scale: CGFloat
+    ) async throws -> (data: Data, pageCount: Int) {
+        let task = Task.detached(priority: .userInitiated) { () throws -> (Data, Int) in
+            try Task.checkCancellation()
+            let data = try ExportPDFPageJoiner.join(pieces, scale: scale)
+            try Task.checkCancellation()
+            guard let provider = CGDataProvider(data: data as CFData),
+                  let document = CGPDFDocument(provider),
+                  document.numberOfPages > 0
+            else { throw ExportPDFCaptureError.emptyDocument }
+            return (data, document.numberOfPages)
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
-
-    private func sizesMatch(_ lhs: CGSize, _ rhs: CGSize) -> Bool {
-        abs(lhs.width - rhs.width) <= 0.5 && abs(lhs.height - rhs.height) <= 0.5
-    }
-}
-
-private struct ExportContentMeasurement: Codable {
-    let width: Double
-    let height: Double
-}
-
-private struct ExportBlockMeasurement: Codable {
-    let minY: CGFloat
-    let maxY: CGFloat
 }

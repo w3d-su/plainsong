@@ -29,6 +29,12 @@ public final class PreviewController: NSObject, ObservableObject {
     var exportSourceText = ""
     var exportTimeoutNanoseconds: UInt64 = 15_000_000_000
     private(set) var isInvalidated = false
+    /// Set when `webViewWebContentProcessDidTerminate` fires; capture steps check it
+    /// between awaits so a mid-capture teardown fails typed rather than hanging.
+    private(set) var webContentProcessTerminated = false
+    /// Test seam for `captureExportPDF`: invoked with the page index before each page
+    /// capture so hosted tests can inject errors, cancellation, or record weak refs.
+    var exportPDFCaptureWillCaptureHook: (@MainActor (Int) async throws -> Void)?
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
     private var theme = "system"
@@ -273,6 +279,7 @@ public final class PreviewController: NSObject, ObservableObject {
 extension PreviewController: WKNavigationDelegate {
     public func webViewWebContentProcessDidTerminate(_: WKWebView) {
         isReady = false
+        webContentProcessTerminated = true
         failPendingExportWork(reason: "web-content-process-terminated")
         scrollDeliveryState.failPendingDelivery()
         scrollDeliveryState = PreviewScrollDeliveryState()
