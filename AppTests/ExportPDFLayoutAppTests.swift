@@ -9,9 +9,7 @@ import XCTest
 final class ExportPDFLayoutAppTests: XCTestCase {
     func testWideTableCodeMathAndMermaidStayInsideTheCapture() async throws {
         let columns = (0 ..< 12).map { String(format: "GCOLUMN%02dSENTINEL", $0) }
-        let table = "| " + columns.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "---" }.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "value" }.joined(separator: " | ") + " |\n"
+        let table = Self.tableSource(columns, cell: "value")
         let code = "```\n" + String(repeating: "W", count: 180) + "CODERIGHTSENTINEL\n```\n"
         let math = "$$\n" + (0 ..< 12).map { "\\text{KATEX\($0)SENTINEL}+" }.joined() + "x\n$$\n"
         let mermaid = "```mermaid\nflowchart LR\n  A[MERMAIDRIGHTSENTINEL] --> B[END]\n```\n"
@@ -58,9 +56,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         // so the over-maximum factor is pinned in ExportPDFPagePlannerTests. This capture
         // is the hosted proof that a wide, in-range document stays at scale 1.
         let columns = (0 ..< 200).map { String(format: "C%02d", $0) } + ["SCALERIGHTSENTINEL"]
-        let source = "| " + columns.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "---" }.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "x" }.joined(separator: " | ") + " |\n"
+        let source = Self.tableSource(columns, cell: "x")
         let (controller, pdf) = try await capture(source)
         defer { controller.invalidate() }
         XCTAssertEqual(pdf.scale, 1)
@@ -162,5 +158,17 @@ final class ExportPDFLayoutAppTests: XCTestCase {
             XCTAssertGreaterThan(box.width, 0, file: file, line: line)
             XCTAssertGreaterThan(box.height, 0, file: file, line: line)
         }
+    }
+
+    /// Header, delimiter and one body row. Built from typed pieces: a single long `+` chain
+    /// with closures exceeds the hosted CI compiler's type-check time limit.
+    private static func tableSource(_ columns: [String], cell: String) -> String {
+        let delimiter = [String](repeating: "---", count: columns.count)
+        let body = [String](repeating: cell, count: columns.count)
+        return [columns, delimiter, body].map(tableRow).joined()
+    }
+
+    private static func tableRow(_ cells: [String]) -> String {
+        "| " + cells.joined(separator: " | ") + " |\n"
     }
 }
