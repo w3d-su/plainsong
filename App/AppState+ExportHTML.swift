@@ -18,7 +18,7 @@ extension AppState {
     /// Enabled only while a file-backed `.md`/`.mdx` document is current; untitled documents
     /// refuse export, as Save Copy does (`docs/export-gates.md` owner decision 2).
     var canExportCurrentDocumentAsHTML: Bool {
-        isExportHTMLFileBacked && exportHTMLDocumentWindow != nil
+        isExportHTMLFileBacked && !isExportPrintSheetActive && exportHTMLDocumentWindow != nil
     }
 
     private var isExportHTMLFileBacked: Bool {
@@ -33,7 +33,10 @@ extension AppState {
         if let provider = exportHTMLOperations.panelWindowProvider {
             return provider()
         }
-        return Self.exportHTMLDocumentWindow(key: NSApp.keyWindow, main: NSApp.mainWindow)
+        let window = Self.exportHTMLDocumentWindow(key: NSApp.keyWindow, main: NSApp.mainWindow)
+        // The window hosting the print sheet cannot parent a new export sheet.
+        guard window !== exportHTMLOperations.printHostWindow else { return nil }
+        return window
     }
 
     static func exportHTMLDocumentWindow(key: NSWindow?, main: NSWindow?) -> NSWindow? {
@@ -57,6 +60,8 @@ extension AppState {
     /// first and then shows the standard print panel.
     @discardableResult
     func beginExport(_ product: ExportCommandProduct) -> Task<Void, Never>? {
+        // While the print sheet is up its window is busy: refuse without superseding.
+        guard !isExportPrintSheetActive else { return nil }
         supersedeActiveExportHTMLOperation()
         let snapshot: ExportHTMLOperationSnapshot
         switch captureExportHTMLSnapshot(product: product) {
@@ -122,10 +127,14 @@ extension AppState {
             stateURL: sessionStateURL(for: session),
             workspaceRootURL: workspaceRootURL,
             workspaceAccess: workspaceAccess,
-            theme: ExportHTMLTheme.resolve(
-                preferences.previewTheme,
-                appearance: NSApplication.shared.effectiveAppearance
-            ),
+            // B1: paper is white and dark backgrounds are not printed, so Print always
+            // renders light. PDF keeps the invocation theme (E8 frozen-theme semantics).
+            theme: product == .print
+                ? .light
+                : ExportHTMLTheme.resolve(
+                    preferences.previewTheme,
+                    appearance: NSApplication.shared.effectiveAppearance
+                ),
             product: product,
             window: window
         ))

@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import PreviewKit
 import WorkspaceKit
 
 /// What the Export as HTML… status banner shows: progress with Cancel while the operation
@@ -89,16 +90,9 @@ enum ExportHTMLNoticeMapper {
         product: ExportCommandProduct = .html
     ) -> ExportHTMLNotice? {
         switch result {
-        case .stopped(.cancelled), .stopped(.superseded),
+        case .stopped(.cancelled), .stopped(.superseded), .printed,
              .written(.notCommitted(.cancelled)), .stopped(.destinationRefused(.cancelled)):
             nil
-        case .printed:
-            ExportHTMLNotice(
-                operationID: operationID, group: .exported, severity: .success,
-                title: "Sent to Print",
-                message: "Printing finished. Plainsong did not write a file.",
-                revealURL: nil
-            )
         case let .stopped(reason):
             stopped(reason, operationID: operationID, product: product)
         case let .written(.notCommitted(failure)):
@@ -176,14 +170,25 @@ enum ExportHTMLNoticeMapper {
             (group, title, detail) = (
                 .documentChanged,
                 failureTitle(for: product),
-                "The document was edited, switched, moved, or closed while it was being exported. " +
+                product == .print
+                    ? "The document was edited, switched, moved, or closed while it was being printed. " +
+                    "Print again to include the latest version."
+                    : "The document was edited, switched, moved, or closed while it was being exported. " +
                     "Export again to include the latest version."
             )
         case .workspaceChanged:
             (group, title, detail) = (
                 .workspaceChanged,
                 failureTitle(for: product),
-                "The workspace was closed or switched while the document was being exported."
+                product == .print
+                    ? "The workspace was closed or switched while the document was being printed."
+                    : "The workspace was closed or switched while the document was being exported."
+            )
+        case let .captureFailed(error):
+            (group, title, detail) = (
+                .renderFailed,
+                failureTitle(for: product),
+                Self.captureDetail(error)
             )
         case .pendingEditorSource:
             (group, title, detail) = (
@@ -205,7 +210,7 @@ enum ExportHTMLNoticeMapper {
                 .resourceFailed,
                 failureTitle(for: product),
                 reason == "html-too-large"
-                    ? "The exported HTML exceeds the 64 MiB limit. Reduce the document’s images or content, then try again."
+                    ? Self.tooLargeDetail(for: product)
                     : "The document’s images or fonts couldn’t be prepared for export. Try again."
             )
         case .renderFailed(reason: "timeout"):
@@ -227,14 +232,6 @@ enum ExportHTMLNoticeMapper {
             message: "\(nothingWritten) \(detail)",
             revealURL: nil
         )
-    }
-
-    static func failureTitle(for product: ExportCommandProduct) -> String {
-        switch product {
-        case .html: failureTitle
-        case .pdf: "Could Not Export as PDF"
-        case .print: "Could Not Print"
-        }
     }
 
     static func notCommitted(

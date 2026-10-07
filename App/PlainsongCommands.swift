@@ -68,10 +68,15 @@ struct PlainsongCommands: Commands {
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportPDFAccessibility.command)
             .accessibilityLabel("Export as PDF")
+        }
 
+        // Replaces the system group, which also carried "Page Setup…" — accepted per D4;
+        // the standard print panel covers paper changes.
+        CommandGroup(replacing: .printItem) {
             Button("Print…") {
                 appState.printCurrentDocument()
             }
+            .keyboardShortcut("p", modifiers: .command)
             .disabled(!snapshot.canExportHTML)
             .accessibilityIdentifier(ExportPDFAccessibility.printCommand)
             .accessibilityLabel("Print")

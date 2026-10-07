@@ -1,12 +1,15 @@
 import AppKit
 import Foundation
+import PDFKit
 import PreviewKit
 import UniformTypeIdentifiers
 import WorkspaceKit
 
 /// Export PR G: File › Export as PDF… and Print… on PR F's snapshot, offscreen controller,
-/// and one-shot writer. PDF is panel-first, like HTML. Print renders first, then shows
-/// the standard panel; AppKit owns system destinations, including the panel's PDF actions.
+/// and one-shot writer. PDF is panel-first, like HTML. Print renders the same snapshot in
+/// the light theme, captures it with the A1 planner at the paper's imageable aspect, and
+/// prints the resulting PDF through PDFKit's standard panel; AppKit owns system
+/// destinations, including the panel's PDF actions (B1, `docs/export-gates.md` D4).
 @MainActor
 extension AppState {
     @discardableResult
@@ -19,12 +22,32 @@ extension AppState {
         beginExport(.print)
     }
 
+    /// While the print sheet is up the document window is busy hosting it: File ›
+    /// Export…/Print… stay ineligible and `beginExport` refuses without superseding.
+    var isExportPrintSheetActive: Bool {
+        exportHTMLOperations.printHostWindow != nil
+            || exportHTMLOperations.printCompletions.values.contains { !$0.isResolved }
+    }
+
     func dismissExportPrintSheet() {
         if let window = exportHTMLOperations.printHostWindow, let sheet = window.attachedSheet {
             window.endSheet(sheet, returnCode: .cancel)
         }
-        exportHTMLOperations.printHostWindow = nil
-        exportHTMLOperations.printCompletion = nil
+        setExportPrintHostWindow(nil)
+        // Finish the waiting task even if AppKit's didRun is late or never arrives; the
+        // completion stays retained until didRun since the operation holds the delegate
+        // weakly.
+        for completion in exportHTMLOperations.printCompletions.values where !completion.isResolved {
+            completion.resolve(false)
+        }
+    }
+
+    /// Setting the host window changes export eligibility, so post the notification the
+    /// menu snapshot listens for.
+    private func setExportPrintHostWindow(_ window: NSWindow?) {
+        guard exportHTMLOperations.printHostWindow !== window else { return }
+        exportHTMLOperations.printHostWindow = window
+        NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
     }
 
     func runExportPrint(
@@ -44,19 +67,37 @@ extension AppState {
         if let stop = exportHTMLStopReason(for: snapshot) {
             return .stopped(stop)
         }
-        let operation: NSPrintOperation
+        guard let printInfo = exportPrintInfo() else {
+            return .stopped(.renderFailed(reason: "print-info"))
+        }
+        let document: ExportPDFDocument
         do {
-            operation = try await controller.makeExportPrintOperation()
+            document = try await controller.captureExportPDF(
+                pageAspect: exportPrintPageAspect(printInfo)
+            )
         } catch {
-            return .stopped(.renderFailed(reason: "print-prepare: \(error)"))
+            return exportPDFCaptureFailure(error, for: snapshot)
+        }
+        if let pause = exportHTMLOperations.didPrepareArtifact {
+            await pause()
         }
         if let stop = exportHTMLStopReason(for: snapshot) {
             return .stopped(stop)
         }
-        guard let window = snapshot.window else { return .stopped(.documentChanged) }
-        guard controller.webView.window == nil else {
-            return .stopped(.renderFailed(reason: "print-mounted-webview"))
+        guard let pdfDocument = PDFDocument(data: document.data) else {
+            return .stopped(.renderFailed(reason: "print-document"))
         }
+        guard let window = snapshot.window else { return .stopped(.documentChanged) }
+        guard let operation = pdfDocument.printOperation(
+            for: printInfo,
+            scalingMode: .pageScaleToFit,
+            autoRotate: false
+        ) else {
+            return .stopped(.renderFailed(reason: "print-operation"))
+        }
+        let suppressPanels = exportHTMLOperations.printPanelSuppressedForTesting
+        operation.showsPrintPanel = !suppressPanels
+        operation.showsProgressPanel = !suppressPanels
         exportHTMLOperations.panelOperationID = snapshot.operationID
         defer {
             if exportHTMLOperations.panelOperationID == snapshot.operationID {
@@ -64,10 +105,51 @@ extension AppState {
             }
         }
         let succeeded = await runExportPrintPanel(operation, window: window)
+        if succeeded {
+            // The job is done; an edit made while the panel was up must not read as a
+            // mid-operation document change.
+            return .printed
+        }
         if let stop = exportHTMLStopReason(for: snapshot) {
             return .stopped(stop)
         }
-        return succeeded ? .printed : .stopped(.cancelled)
+        return .stopped(.cancelled)
+    }
+
+    /// A copy of the shared print info — or the test seam's — with the imageable area
+    /// the planner's page aspect comes from.
+    private func exportPrintInfo() -> NSPrintInfo? {
+        if let provider = exportHTMLOperations.printInfoProvider {
+            return provider()
+        }
+        return NSPrintInfo.shared.copy() as? NSPrintInfo
+    }
+
+    /// Imageable height / width, orientation-aware: `imageablePageBounds` is expressed
+    /// in unrotated paper space, so landscape swaps the ratio.
+    private func exportPrintPageAspect(_ printInfo: NSPrintInfo) -> CGFloat {
+        let bounds = printInfo.imageablePageBounds
+        guard bounds.width > 0, bounds.height > 0 else { return 1 }
+        let aspect = bounds.height / bounds.width
+        return printInfo.orientation == .landscape ? 1 / aspect : aspect
+    }
+
+    /// Typed mapping for PDF capture errors: supersede/cancel first (silent), then each
+    /// `ExportPDFCaptureError` case.
+    func exportPDFCaptureFailure(
+        _ error: Error,
+        for snapshot: ExportHTMLOperationSnapshot
+    ) -> ExportHTMLOperationResult {
+        if let stop = exportHTMLStopReason(for: snapshot) {
+            return .stopped(stop)
+        }
+        if error is CancellationError {
+            return .stopped(.cancelled)
+        }
+        if let captureError = error as? ExportPDFCaptureError {
+            return .stopped(.captureFailed(captureError))
+        }
+        return .stopped(.renderFailed(reason: "pdf-capture: \(error.localizedDescription)"))
     }
 
     func writeExportPDF(
@@ -81,7 +163,7 @@ extension AppState {
         do {
             document = try await controller.captureExportPDF()
         } catch {
-            return .stopped(.renderFailed(reason: "pdf-capture"))
+            return exportPDFCaptureFailure(error, for: snapshot)
         }
         if let pause = exportHTMLOperations.didPrepareArtifact {
             await pause()
@@ -90,7 +172,7 @@ extension AppState {
             return .stopped(stop)
         }
         guard !document.data.isEmpty else {
-            return .stopped(.renderFailed(reason: "pdf-capture"))
+            return .stopped(.captureFailed(.emptyDocument))
         }
         let request = ExportArtifactWriteRequest(
             destinationURL: destinationURL, kind: .pdf, disposition: disposition, bytes: document.data
@@ -169,12 +251,19 @@ extension AppState {
         if let runner = exportHTMLOperations.printOperationRunner {
             return await runner(operation, window)
         }
-        exportHTMLOperations.printHostWindow = window
+        setExportPrintHostWindow(window)
+        // Whether didRun, a cancel, or a supersede ended the sheet, the window is free
+        // to host the next export panel again.
+        defer { setExportPrintHostWindow(nil) }
         return await withCheckedContinuation { continuation in
             let completion = ExportPrintCompletion { success in
                 continuation.resume(returning: success)
             }
-            exportHTMLOperations.printCompletion = completion
+            let key = ObjectIdentifier(completion)
+            completion.onDidRun = { [weak self] in
+                self?.exportHTMLOperations.printCompletions.removeValue(forKey: key)
+            }
+            exportHTMLOperations.printCompletions[key] = completion
             operation.runModal(
                 for: window,
                 delegate: completion,
@@ -185,17 +274,30 @@ extension AppState {
     }
 }
 
-/// Retains the print sheet's completion until AppKit calls back. The registry holds it.
+/// The print sheet's modal callback. `resolve` resumes the awaiting task exactly once —
+/// whether through AppKit's `didRun`, `dismissExportPrintSheet`, or the task's own
+/// cancellation — while the registry retains the object until `didRun` actually arrives
+/// because `NSPrintOperation` does not retain its delegate.
 final class ExportPrintCompletion: NSObject {
     private let finish: (Bool) -> Void
+    private(set) var isResolved = false
+    /// Unregisters the completion from the registry; invoked only on AppKit's didRun.
+    var onDidRun: (() -> Void)?
 
     init(_ finish: @escaping (Bool) -> Void) {
         self.finish = finish
     }
 
+    func resolve(_ success: Bool) {
+        guard !isResolved else { return }
+        isResolved = true
+        finish(success)
+    }
+
     @objc func printOperationDidRun(
         _: NSPrintOperation, success: Bool, contextInfo _: UnsafeMutableRawPointer?
     ) {
-        finish(success)
+        onDidRun?()
+        resolve(success)
     }
 }

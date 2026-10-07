@@ -181,6 +181,8 @@ enum ExportHTMLStopReason: Error, Equatable {
     case pendingEditorSource
     /// The offscreen render or the D2 export barrier failed (for example `mdx-stale-or-error`).
     case renderFailed(reason: String)
+    /// The PDF capture after the barrier failed with a typed cause.
+    case captureFailed(ExportPDFCaptureError)
     /// `ExportArtifactWriter.inspectDestination` refused the panel URL before any write.
     case destinationRefused(ExportArtifactFailure)
 }
@@ -224,6 +226,13 @@ struct ExportHTMLOperationRegistry {
     var didFinishOperation: (@MainActor (UInt64, ExportHTMLOperationResult) -> Void)?
     /// Test seam: replaces the standard print panel. Return false for cancellation.
     var printOperationRunner: (@MainActor (NSPrintOperation, NSWindow) async -> Bool)?
+    /// Test seam: the print info the real path copies (for job disposition / save URL).
+    var printInfoProvider: (@MainActor () -> NSPrintInfo)?
+    /// Test seam: keeps the real runModal path but suppresses both panels so a hosted
+    /// print job completes without user interaction.
+    var printPanelSuppressedForTesting = false
     weak var printHostWindow: NSWindow?
-    var printCompletion: ExportPrintCompletion?
+    /// Retained until AppKit's `didRun` arrives — `NSPrintOperation` does not retain its
+    /// delegate, so a completion must never dangle between `runModal` and the callback.
+    var printCompletions: [ObjectIdentifier: ExportPrintCompletion] = [:]
 }
