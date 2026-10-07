@@ -2445,3 +2445,32 @@ publication and one undo. These loaded timings do not close R9 or any absolute
 latency budget; R6 real IME and R8/R10 also remain open. Earlier failed test-development
 runs are retained separately in that evidence, with their corrected assertions and
 injection conditions.
+
+## Export PR G — PDF capture acceptance timings (recorded load) — 2026-10-07
+
+Informational correctness timings from the hosted `ExportPDFAcceptanceAppTests`
+runs under the shared Xcode lock (`/private/tmp/plainsong-xcodebuild-test.lock`),
+Debug configuration. These are recorded-load observations, not idle-machine samples;
+E9 remains open.
+
+Recorded load: `{ 8.08 7.41 7.47 }` at the start of the opt-in run; the full
+acceptance suite ran at comparable host load.
+
+| Fixture | Pages | Max page height (pt) | Scale | Capture time |
+|---|---:|---:|---:|---:|
+| 700-item list (generated) | 2 | 14,389.0 | 1.000 | 0.10 s |
+| 800-line code (generated) | 2 | 14,391.0 | 1.000 | 0.12 s |
+| 2,000-row table (generated) | 6 | 14,391.2 | 1.000 | 0.30 s |
+| `perf-100kb.md` | 2 | 14,400.0 | 1.000 | 0.21 s |
+| `perf-500kb.md` | 11 | 14,400.0 | 1.000 | 1.06 s |
+| `math-dense-100kb.md` | 8 | 14,400.0 | 1.000 | 1.60 s |
+| `kitchen-sink.md` | 1 | 5,311.0 | 1.000 | 0.08 s |
+| `kitchen-sink.mdx` | 1 | 2,071.0 | 1.000 | 0.06 s |
+| `math.md` | 1 | 1,067.0 | 1.000 | 0.06 s |
+| `large-1mb.md` (opt-in, `TEST_RUNNER_PLAINSONG_PDF_ACCEPTANCE_1MB=1`) | 56 | 14,400.0 | 1.000 | 18.37 s |
+
+The 1 MB capture is dominated by 56 per-page `WKPDFConfiguration` snapshots plus the
+full-size measure/resize iterations; `testCaptureEachPlannedPageWithWKPDFConfiguration`
+bounds the page count so per-page capture stays linear. Result bundles:
+`/private/tmp/plainsong-export-g-20a-run4.xcresult` (full matrix),
+`/private/tmp/plainsong-export-g-20a-1mb.xcresult` (opt-in run).

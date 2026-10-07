@@ -27,7 +27,11 @@
 > of the whole capture only when the contained width exceeds 14,400 pt. Print uses the
 > same expansion and `NSPrintInfo` horizontal fit. The real print panel, Powerbox
 > smoke, keyboard/VoiceOver, and idle PDF timing stay open. See
-> `docs/export-pdf-print-checklist.md`.** Precedent:
+> `docs/export-pdf-print-checklist.md`.
+> PR G continuation (2026-10-07) implements the amended D4: A1 variable-height
+> pagination, PDF-space scaling, and B1 printing of the captured PDF through the
+> standard panel — which required `com.apple.security.print` — with File › Print…
+> on ⌘P. Real panel/Powerbox, keyboard/VoiceOver, and idle PDF timing stay open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -310,6 +314,49 @@ than about 14,000 pt terminates the current WebKit process when it is measured a
 size, so the zoom is applied from the contained scroll width before expansion. The
 factor itself is `ExportPDFPagePlanner.uniformScale`. PDF remains panel-first, matching
 Export as HTML…. Print renders first because the panel paginates that completed render.
+
+**Amended 2026-10-07 (A1 page plan; B1 print path).** Two implementation choices made
+under the same sign-off replace the pieces above that proved unworkable; every other D4
+term stands — same completed offscreen render, same barrier, `createPDF` for the app-owned
+artifact, a real standard panel for Print, no destination write for system or panel PDF
+destinations, panel-first PDF.
+
+- **A1 — variable-height pagination replaces the E0 fixed-height plan.** After the
+  export-only overflow style settles full-size geometry, the export controller measures
+  every *unsplittable span* in document coordinates: each atomic box (image, SVG, media,
+  control, rule, table row, KaTeX, Mermaid) and each line box
+  (`Range.getClientRects` over non-whitespace text nodes). A safe break is any vertical
+  position not strictly inside a merged unsplittable interval; gaps between blocks,
+  items, rows, and lines fall out of the complement with no container classification.
+  `ExportPDFPagePlanner.plan` ends each page at the last safe break within a CSS-point
+  budget of `14,400 / scale` for PDF — and, for Print, additionally the paper imageable
+  `width × aspect`. Spans that merely touch keep their shared edge; only an overlap
+  greater than 0.5 pt merges. One unbreakable run taller than the budget fails typed as
+  `oversizeAtomicBox` with its post-scale height. Fixed/sticky/transformed/floated
+  elements are reported as offenders; a planned break that would cross one fails typed
+  (`break-crosses-positioned-content`) rather than slicing it — this is the A1 design
+  stop referenced from `ExportPDFMeasurement`. Capture then runs at full size, one
+  `pdf(configuration:)` call per planned rect, and `ExportPDFPageJoiner` concatenates
+  the pieces through `CGContext` PDF pages. When the contained width exceeds 14,400 pt
+  the joiner scales every media box and its drawing by `uniformScale` in PDF space, so
+  text stays vector and extractable and every page stays inside the default user space.
+  This replaces the recorded "uniform zoom before pagination": no WebKit zoom is
+  applied, and the 14,000 pt termination claim that motivated it is revised — under A1
+  the hosted suite measures and captures a contained width greater than 20,000 pt at
+  full size (`testOverMaximumWidthScalesInPDFSpaceWithEveryColumnOnce`). The earlier
+  observation belonged to the pre-A1 measurement path and is retained as a historical
+  caution, not a current bound.
+- **B1 — Print prints the captured PDF, not `printOperation(with:)`.** Print renders
+  the same snapshot in the light theme (paper is white and dark backgrounds are not
+  printed; PDF keeps the invocation theme), plans pages bounded by the paper's
+  imageable aspect, and presents `PDFDocument.printOperation(for:scalingMode:
+  autoRotate:)` with `.pageScaleToFit` through `runModal` on the document window. The
+  standard panel stays fully visible, including its scaling control. The sandbox gains
+  `com.apple.security.print`: without it a sandboxed build cannot enumerate CUPS
+  destinations and `runModal` raises the system no-printers alert for users exactly as
+  it did in hosted testing. A completed print reports no banner, and File › Print…
+  carries ⌘P — the command replaces the system `.printItem` group, whose Page Setup…
+  item is dropped because the standard panel owns paper changes.
 
 ### D5 — One-shot sandbox write path
 
@@ -919,12 +966,15 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [x] Export as PDF… uses `createPDF` / the async `pdf(configuration:)` overlay and
   an explicit rect, writes nonempty valid PDF bytes without opening the print panel, and
   preserves first/last sentinels in order. The page model asserted here is whichever one
-  E0 recorded — one continuous full-content page, or D4's fixed-height pagination with no
-  content duplicated or dropped across breaks. It is not asserted as continuous
-  independently of E0's result.
-- [x] Print… uses `printOperation(with:)` and presents the standard macOS print panel;
-  it does not show `NSSavePanel` first. The real panel is owner smoke; the hosted test
-  asserts `showsPrintPanel`, horizontal fit, and that the save-panel seam is not called.
+  E0 recorded — one continuous full-content page, or D4's paginated plan (now the A1
+  variable-height plan) with no content duplicated or dropped across breaks. It is not
+  asserted as continuous independently of E0's result.
+- [x] Print… prints the captured PDF through `PDFDocument.printOperation(for:
+  scalingMode:autoRotate:)` (B1) and presents the standard macOS print panel; it does
+  not show `NSSavePanel` first. The hosted tests assert `showsPrintPanel`,
+  `showsProgressPanel`, and that the save-panel seam is not called; a suppressed-panel
+  real `runModal` job produces a readable PDF, and real-sheet cancel/supersede unwind
+  the operation.
 - [ ] Both use the same completed offscreen snapshot and include finalized images,
   KaTeX, highlighting, Mermaid, MDX placeholders, and resolved theme.
 - [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
@@ -933,13 +983,21 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   touch the visible preview or source session.
 - Evidence: `ExportPDFCommandAppTests.testExportPDFWritesAValidFileAndPrintWritesNothing`,
   `testPDFCancelAndPrintCancelWriteNothing`, `testThemesAndLayoutsProduceTheSamePDFText`,
+  `testPDFCaptureErrorAndMidCaptureCancelWriteNothingAndStaySilent`,
   `ExportPDFLayoutAppTests.testProductionTallCaptureKeepsEverySentinelOnceInOrder`,
-  `testPrintOperationStaysUnmountedAndFitsPaperWidth`,
-  `testWideTableCodeMathAndMermaidStayInsideTheCapture`, and
+  `testPrintAspectBoundsPageHeightForThePaper`,
+  `testWideTableCodeMathAndMermaidStayInsideTheCapture`,
+  `testCaptureErrorAndMidCaptureCancelPropagateTyped`,
+  `ExportPrintSheetAppTests.testRealPrintJobProducesLightThemePDFWithEverySentinelOnce`,
+  `testCancelDuringRealPrintSheetIsSilent`,
+  `testSupersedeDuringRealPrintSheetFinishesAndReleasesObjects`,
+  `testPrintCompletionResolvesExactlyOnceAndIsRetainedUntilDidRun`,
+  `ExportPDFMatrixAppTests.testPDFAndPrintMatrixAcrossThemesAndFixtures`, and
   `ExportHTMLCommandAppTests.testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged`.
-  The real Print panel remains owner smoke in `docs/export-pdf-print-checklist.md`.
-  KaTeX, code, Mermaid, and a wide table are in the layout capture. Finalized images and
-  MDX placeholder text in the PDF are not asserted, so that bullet stays open.
+  The interactive Print panel remains owner smoke in `docs/export-pdf-print-checklist.md`.
+  KaTeX, code, Mermaid, MDX placeholders, a wide table, and the light print theme are in
+  the hosted capture/print job; finalized raster images and highlighted-code styling in
+  the PDF are still not asserted, so that bullet stays open.
 
 ### E6 — One-shot sandbox write and refusal matrix
 
@@ -1273,7 +1331,8 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   export destination: this is the narrow export-panel exception to agent.md §4 autosave
   on window resign; ordinary focus autosave resumes afterwards.
   PDF/Print: `testAvailabilityMatchesHTMLAndUntitledRefusesBeforeAPanel`,
-  `testFileMenuContainsPDFAndPrintWithoutShortcuts`,
+  `testFileMenuHasExactlyOnePrintWithCommandP` (Print… replaces the system group on ⌘P;
+  Page Setup… is dropped per B1),
   `testPDFPanelDefaultsUseTheSanitizedTitleAndAFreshPanel`,
   `testPDFCancelAndPrintCancelWriteNothing`,
   `testPrintFocusDoesNotFlushTheDirtyBaseline`, and
@@ -1302,12 +1361,23 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `testMDXSyntaxErrorFailsWithoutWriting` and PreviewKit's
   `testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM` prove failure, never prior content.
   PDF: `testThemesAndLayoutsProduceTheSamePDFText` (three themes × three layouts, one text),
+  `ExportPDFMatrixAppTests.testPDFAndPrintMatrixAcrossThemesAndFixtures` (three named
+  fixtures × three themes × both products; PDF freezes the resolved invocation theme,
+  Print renders light under every preference),
   `testWideTableCodeMathAndMermaidStayInsideTheCapture`,
-  `testWideButFittingCaptureIsNotScaled`, and
-  `testProductionTallCaptureKeepsEverySentinelOnceInOrder` (fixed-height pages, every
-  sentinel once). `ExportPDFPagePlannerTests.testUniformScaleShrinksOnlyPastTheMaximum`
-  pins the over-maximum factor. A hosted capture wider than about 14,000 pt terminates
-  the web process, so that factor is not re-laid-out in the hosted suite.
+  `testWideButFittingCaptureIsNotScaled`,
+  `testOverMaximumWidthScalesInPDFSpaceWithEveryColumnOnce` (a contained width greater
+  than 20,000 pt measured and captured at full size, scaled in PDF space), and
+  `testProductionTallCaptureKeepsEverySentinelOnceInOrder` (A1 variable-height pages,
+  every sentinel once). `ExportPDFAcceptanceAppTests` captures every named fixture plus
+  generated 700-item list, 800-line code, and 2000-row table sources with every marker
+  once and every page inside the default user space. `ExportPDFPagePlannerTests` pins
+  the invariants on synthetic geometry: safe breaks between line boxes, items, and
+  table rows, the scale and Print-aspect budgets, and the typed `oversizeAtomicBox`.
+  The 2026-10-06 note that a hosted capture wider than about 14,000 pt terminates the
+  web process is revised per the D4 amendment: the A1 full-size path does not
+  reproduce it, so the over-maximum factor is exercised hosted rather than only
+  unit-pinned (`testUniformScaleShrinksOnlyPastTheMaximum` still pins the formula).
 
 ### E9 — Accessibility, performance, security, and regression
 
@@ -1544,17 +1614,6 @@ These are observed under recorded load; no budgets are frozen. The absolute typi
 budget bullet stays unchecked. Keyboard/VoiceOver, physical input, Powerbox/iCloud
 and full-suite regression acceptance stay open. Product/writer code is unchanged.
 
-### PR G — 2026-10-06
-
-Export as PDF… is panel-first, like HTML, and writes `.pdf` through `writeExportArtifact`
-with `kind: .pdf`. Print… renders on the same offscreen controller, then
-`printOperation(with:)` with horizontal fit and the standard panel. No bridge change.
-`ExportPDFPagePlanner.fixedHeight` is the E0 planner, now shared. The 2026-10-04
-diagnostic remains: an unexpanded capture still clips wide-table columns. Product
-capture expands overflow first.
-
-PDF/Print E9 timing is **pending idle-machine run**.
-
 ### PR G design stop — 2026-10-04
 
 `ExportPDFPaginationDesignStopTests.testFixedHeightCaptureDropsHorizontallyClippedTableContentAfterReadyBarrier`
@@ -1572,3 +1631,70 @@ remaining E4/E6–E9 automation, real panel/Powerbox/keyboard/VoiceOver, and PDF
 E9 (**pending idle-machine run**) remain open. See
 [the evidence and reproduction](export-pdf-print-design-stop.md) and
 [the unchecked owner checklist](export-pdf-print-checklist.md).
+
+### PR G — 2026-10-06
+
+Export as PDF… is panel-first, like HTML, and writes `.pdf` through `writeExportArtifact`
+with `kind: .pdf`. Print… renders on the same offscreen controller and then prints the
+captured PDF through `PDFDocument.printOperation` and the standard panel (B1; the
+originally sketched `printOperation(with:)` + horizontal fit is superseded by the D4
+amendment). No bridge change. `ExportPDFPagePlanner` now implements the A1
+variable-height plan; `fixedHeight` is retired. The 2026-10-04 diagnostic remains: an
+unexpanded capture still clips wide-table columns. Product capture expands overflow
+first.
+
+PDF/Print E9 timing is **pending idle-machine run**.
+
+### PR G A1/B1 implementation — 2026-10-07
+
+- Mechanism: `ExportPDFMeasurement` injects the export-only overflow style, settles
+  full-size geometry (no width ceiling), and measures every unsplittable span —
+  atomic boxes and text line boxes — plus fixed/sticky/transformed/floated offenders.
+  `ExportPDFPagePlanner.plan` splits at safe breaks within `14,400 / scale` (or the
+  paper imageable aspect for Print); an unbreakable run taller than the budget throws
+  `oversizeAtomicBox`, and a break crossing an offender throws
+  `break-crosses-positioned-content`. `ExportPDFPageJoiner` concatenates the per-page
+  `pdf(configuration:)` captures, scaling media boxes and drawing by `uniformScale`
+  in PDF space when the contained width exceeds 14,400 pt.
+- Print (B1): the same snapshot renders light, the planner bounds pages by the
+  imageable aspect, and `PDFDocument.printOperation(.pageScaleToFit)` runs the real
+  standard panel. `com.apple.security.print` is required — without it the sandboxed
+  app sees no CUPS destinations and `runModal` raises the system no-printers alert.
+  File › Print… replaces the system `.printItem` group on ⌘P; Page Setup… is dropped.
+- Lifecycle: the print-sheet host window blocks every export command while up; a
+  supersede or cancel ends the sheet and resolves the awaiting task exactly once;
+  `ExportPrintCompletion` is registry-retained until `didRun` because
+  `NSPrintOperation` does not retain its delegate. `checkExportAlive` runs between
+  every WebKit await so a mid-capture WebContent teardown fails typed.
+- Feedback: `ExportHTMLStopReason.captureFailed(ExportPDFCaptureError)` maps each
+  case to an actionable notice; `oversizeAtomicBox` names the 200-inch limit. A
+  completed print posts no banner.
+- Verification on this worktree (macOS 27.0 26A428, Debug, Xcode beta): PreviewKit 87,
+  MarkdownCore 320, EditorKit 445 (7 skips), zero failures; locked `make build`
+  passes. Hosted matrix under `PLAINSONG_XCODEBUILD_LOCK` with a fresh loopback
+  recorder: 97 tests, 1 expected opt-in skip, zero failures — covering
+  `ExportPDFAcceptanceAppTests`, `ExportPDFCommandAppTests`, `ExportPDFLayoutAppTests`,
+  `ExportPDFMatrixAppTests`, `ExportPDFMechanismSpikeTests`, `ExportPDFOfflineTests`,
+  `ExportPDFPaginationDesignStopTests`, `ExportPrintSheetAppTests`,
+  `ExportHTMLCommandAppTests`, `ExportHTMLFeedbackAppTests`, `ExportHTMLOfflineTests`,
+  `ExportDestinationOwnershipAppTests`, `MenuBarStateTests`, and
+  `PlainsongMenuKeyBindingTests`; the ExportPDF* set was run a second time green.
+  Result bundles: `/private/tmp/plainsong-export-g-20a-run4.xcresult` (clean full
+  matrix), `/private/tmp/plainsong-export-g-20a-run3.xcresult` (ExportPDF* stability
+  rerun; its only failure is `ExportHTMLOfflineTests` tripping its strict
+  empty-recorder assert on a recorder reused from the prior run — it passed against a
+  fresh recorder in both full runs), `/private/tmp/plainsong-export-g-20a-print.xcresult`
+  (real-sheet isolation run), and `/private/tmp/plainsong-export-g-20a-1mb.xcresult`
+  (opt-in `large-1mb.md`). The real print job artifact is
+  `/private/tmp/plainsong-export-g-20a-print-job.pdf`.
+- A1 acceptance per fixture (pages / max page height / scale / capture time under
+  recorded load): see `docs/perf-log.md`. `large-1mb.md` stays opt-in.
+- Environment note: the hosted real-print path needs a configured CUPS destination
+  inside the sandbox; the sheet tests skip with a reason when
+  `NSPrinter.printerNames` is empty. The offline tests need the external loopback
+  recorder (`TEST_RUNNER_PLAINSONG_EXPORT_TEST_PROXY_PORT`); reusing a recorder
+  across `xcodebuild` invocations breaks `ExportHTMLOfflineTests`'s strict
+  empty-recorder assert, so each run gets a fresh proxy.
+- Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud, keyboard-only
+  and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine run**), and the
+  E5 finalized-images/highlighted-code assertions.
