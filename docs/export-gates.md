@@ -357,6 +357,10 @@ destinations, panel-first PDF.
   it did in hosted testing. A completed print reports no banner, and File › Print…
   carries ⌘P — the command replaces the system `.printItem` group, whose Page Setup…
   item is dropped because the standard panel owns paper changes.
+  **Documented limitation:** pages are planned for the imageable aspect captured when
+  the panel opens. If the user changes paper size or orientation in the panel, the
+  pre-planned pages scale to fit and may show extra margins; re-planning on panel
+  changes is out of scope.
 
 ### D5 — One-shot sandbox write path
 

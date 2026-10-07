@@ -24,6 +24,11 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   exact refusal and residue paths. Check unsupported filesystem refusal separately.
 - [ ] Q3 modes: new `0644` with default umask, overwrite preserving `0640` and
   `0755`, unreadable `0200` refusal; no privilege-bit inheritance.
+- [ ] Export a long post (a `perf-500kb.md`-scale document): many pages, each
+  ending at a clean break — no clipped lines or split rows — and a document with
+  an atomic element taller than the page budget (a very tall diagram, image, or
+  formula) shows the dedicated "taller than a PDF page can hold (200 inches)"
+  notice, not the generic render error.
 - [ ] Cancel destination/progress and inspect failure feedback: no destination
   publication and no source, selection, scroll, baseline, identity, recents, tree,
   recovery or visible-preview change; panel focus causes no source autosave.
@@ -35,6 +40,9 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   `showsPrintPanel` on the real operation, `runModal` path exercised.)
 - [ ] Paper size/orientation/pagination and system PDF actions work through
   AppKit; Plainsong performs no artifact write for these system destinations.
+  Known limitation: pages are planned to the imageable aspect at panel-open, so
+  changing paper size or orientation in the panel makes the pre-planned pages
+  scale to fit and may show extra margins (re-planning is out of scope).
 - [ ] Cancel and error release the operation and controller, with correct
   feedback and unchanged document/session/visible-preview state. (Hosted:
   `testCancelDuringRealPrintSheetIsSilent`,
@@ -45,6 +53,8 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   table/code/KaTeX/Mermaid sentinels once, dark ink on light paper.)
 - [ ] Print… is on ⌘P and there is exactly one Print item and no Page Setup…
   item in the File menu. (Hosted: `testFileMenuHasExactlyOnePrintWithCommandP`.)
+- [ ] Print a long post: multiple paper pages, and the output is dark ink on
+  white paper even when the app is in dark theme (B1 always prints light).
 
 ## Keyboard and VoiceOver
 
