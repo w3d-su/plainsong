@@ -24,9 +24,11 @@ struct WorkspaceToolbar: ToolbarContent {
             .help(appState.layoutModeToolbarHelp)
         }
 
-        if #available(macOS 26.0, *) {
-            ToolbarSpacer(.fixed, placement: .primaryAction)
-        }
+        #if compiler(>=6.2)
+            if #available(macOS 26.0, *) {
+                ToolbarSpacer(.fixed, placement: .primaryAction)
+            }
+        #endif
 
         ToolbarItem(placement: .primaryAction) {
             Button {
