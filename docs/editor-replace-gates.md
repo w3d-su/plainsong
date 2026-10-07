@@ -109,9 +109,9 @@
 > recheck; a focused owned control that unmounts hands focus to a surviving bar
 > control through direct `makeFirstResponder` routing; a transient blocked
 > message withdraws once its inspection settles; and a single Replace speaks
-> "Replaced 1 match". R8 and R6 deterministic bullets 1–4 close; R6's owner
-> Zhuyin/Pinyin bullets, the physical Full Keyboard Access smoke (new R8 owner
-> bullet), R9 and R10 stay open. See
+> "Replaced 1 match". R8's in-process bullets and R6 deterministic bullets 1–4
+> close; R8 itself stays open on its owner Full Keyboard Access smoke, and R6's
+> owner Zhuyin/Pinyin bullets, R9 and R10 stay open. See
 > [PR H verification](evidence/editor-replace-h-20261006.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
@@ -1439,8 +1439,10 @@ hosted spike PR #112.
   cancels planning and hidden retained text cannot execute.
 - [x] Menu commands and bar presses target only the installed editor in the key
   window; background/remounted bars cannot replay focus or mutation.
-- [x] Full Keyboard Access can invoke every bar control; progress, blocked, and
-  overflow states are spoken and not color-only.
+- [x] Every owned bar control is an AppKit responder that takes keyboard focus
+  and responds to an accessibility press; progress, blocked, and overflow states
+  are spoken and not color-only. (In-process half. Full Keyboard Access Tab/Space
+  traversal is the owner bullet below.)
 - [x] Escape closes/cancels only after marked-text refusal; query and
   replacement values follow the documented file/workspace lifecycle; pending
   focus/reports are superseded without resetting monotonic receipt high-water
