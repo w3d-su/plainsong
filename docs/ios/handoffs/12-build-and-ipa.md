@@ -79,7 +79,13 @@ L3 reviewer／Claude 核對 Mac manifest／命令未變、套件平台分離、�
 
 ## Evidence（由執行者填寫）
 
-尚未執行；基線沒有這些 iOS 命令／target，本文件沒有 simulator build、device archive、IPA 或安裝通過證據。
+2026-10-08（`phase3-ios-build-and-ipa`，base `2144c46` packet head）：**C0 未交付、
+13→12 全域 manifest 未交接**，故僅完成 pre-C0 項目——本機 toolchain preflight
+（Xcode 27.0β／iphoneos27.0 SDK、**零 iOS simulator runtime**、工具與鎖 inventory）、
+四個固定入口的完整設計、可語法驗證的 draft 腳本與 ios.yml（`bash -n` 6/6 PASS）、
+負向測試計畫與給 13 的 wiring requests。全部證據在 `docs/ios/evidence/lane-12/`。
+全域檔案（project.yml／Makefile／Scripts/ios／ios.yml）未修改。正式 build／IPA
+證據待交接與 providers 到位後補；**BUILD PASS / INSTALL OPEN 仍全 OPEN**。
 
 ## 可直接貼給 agent
 
