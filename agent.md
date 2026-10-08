@@ -26,7 +26,12 @@ projects such as Astro/Next.js content directories).
 
 ### Non-Goals (for now)
 
-- iOS/iPadOS version (keep core packages platform-portable, but do not build UI for it).
+- iOS/iPadOS UI is outside the macOS roadmap. The separately authorized iOS/iPadOS 26+
+  source-editor and preview work follows [`docs/ios/README.md`](docs/ios/README.md):
+  12 parallel implementation lanes and one integration owner, frozen C0 interfaces,
+  isolated worktrees, and M0 real-device gates before production composition.
+  The current handoff packet is a specification; it does not close any iOS build,
+  device, persistence, performance, or IPA-installation gate.
 - Cloud sync, accounts, collaboration.
 - Full MDX component *execution* with user project bundling (placeholder rendering instead; see §9).
 - Plugin system for third parties.
