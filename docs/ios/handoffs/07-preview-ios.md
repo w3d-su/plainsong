@@ -58,7 +58,7 @@
 
 ## Evidence（由執行者填寫）
 
-2026-10-09。Branch `phase3-ios-preview-ios`，base `642cb212703220409874a2741c5adbfb8c80fe8a`（`ios-c0-v1`），契約 IOS-C0-v1。詳細命令、negative probe 與未閉關卡見 [lane-07 verification](../evidence/lane-07/verification.md)。
+2026-10-09。Branch `phase3-ios-preview-ios`，base `642cb212703220409874a2741c5adbfb8c80fe8a`（`ios-c0-v1`），implementation `49e8c4113134a7635c576c0f83490f8b8a367a09`，PR https://github.com/w3d-su/plainsong/pull/162 。契約 IOS-C0-v1。詳細命令、negative probe 與未閉關卡見 [lane-07 verification](../evidence/lane-07/verification.md)。
 
 Mac `swift test --package-path Packages/PreviewKit`：91 tests，0 failures，含既有 export／resource／lifecycle 與新的 fence、identity、hosted 測試。iOS 27.0 / iPhone 17：`PreviewAssetFenceTests` 12 通過；`PreviewIdentityTests` 6 通過；temp-page hosted ready／render／checkbox 通過。`testBundledKitchenSinkAndMDXStayVisible` 在 iOS skip，因為 simulator `loadFileURL` 讀 Mac repo preview bundle 不會 ready；該 fixture 由 Mac suite 執行。
 
