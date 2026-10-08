@@ -2494,8 +2494,14 @@ same-length. Four consecutive runs pass; removing the post-assignment bookkeepin
 fails the post-Reload wait ("Timed out waiting for the disk source is folded and its image
 thumbnail is ready again") in two of two runs.
 
-Known follow-up, not fixed here: `MarkdownTextView.applyIncomingTextIfNeeded` assigns
-`textView.text` for an App-initiated text change without the presentation reset. A clean
-(conflict-free) external reload, or any App text replacement, with the same UTF-16 length
-and the same first and last 64 units therefore restores folds but leaves no image markers.
-A throwaway hosted test reproduced it two of two times (folds 36, markers 0 after 3 s).
+Known follow-up, fixed in `phase3-incoming-text-presentation`:
+`MarkdownTextView.applyIncomingTextIfNeeded` used to assign `textView.text` for an
+App-initiated text change without the presentation reset, so a clean (conflict-free)
+external reload, or any App text replacement, with the same UTF-16 length and the same
+first and last 64 units restored folds but left no image markers. A throwaway hosted
+test reproduced it two of two times (folds 36, markers 0 after 3 s). The fix routes
+every whole-source assignment — this path, the deferred document-transition retry, the
+reconciled-source restore and the Reload/Keep Mine synchronizer — through one
+`assignWholeSource` helper that discards the bookkeeping (including image ownership)
+after the write; hosted tests now pin the silent same-length reload and the same-length
+local edit directly.

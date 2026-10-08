@@ -158,6 +158,106 @@ extension EditorFindHostedGateTests {
         try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
     }
 
+    /// A clean document's external change takes the silent reload — no conflict prompt — and
+    /// reaches the editor as an incoming App text change. Disk text with the same UTF-16
+    /// length, the same first and last 64 units and the same image is invisible to the image
+    /// controller's length-plus-endpoints recorded-source sample, so the whole-source
+    /// assignment's bookkeeping reset is the only thing that lets the ordinary parse rebuild
+    /// the thumbnail.
+    func testHostedSilentSameLengthReloadRestoresImageThumbnailAndFoldsWithoutAnEdit() async throws {
+        let saved = keepMineLongSource(word: "wprd")
+        let disk = keepMineLongSource(word: "wxrd")
+        let changed = (saved as NSString).range(of: "wprd").location + 1
+        XCTAssertGreaterThan(changed, 128)
+        XCTAssertGreaterThan(saved.utf16.count - changed, 128)
+        XCTAssertEqual(saved.utf16.count, disk.utf16.count)
+        XCTAssertNotEqual(saved, disk)
+        let hosted = try await makeHostedEditorWorkspace(
+            source: saved,
+            query: "Lead",
+            assets: ["fixture.png": reconciledFixturePNG()],
+            layoutMode: .wysiwyg
+        )
+        let appState = hosted.appState
+        let session = appState.currentDocument
+        let editor = try hostedEditor(hosted)
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
+        let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
+        try await waitUntil("the saved source shows folds and a ready image thumbnail") {
+            storage.string == saved && self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+
+        // The drive the FSEvents watcher would make for a clean document: silent reload,
+        // never a conflict prompt.
+        appState.workspaceWatcher?.stop()
+        try disk.write(to: hosted.postURL, atomically: true, encoding: .utf8)
+        appState.refreshWorkspaceAfterFileSystemChange()
+        try await waitUntil("the clean reload reaches App and the hosted editor") {
+            session.text == disk && storage.string == disk
+                && appState.externalDiskInspectionTasks.isEmpty
+        }
+        XCTAssertNil(appState.externalChangePrompt)
+
+        // Observe only: no edit, selection change or manual scheduling restores the thumbnail.
+        try await waitUntil("the disk source is folded and its image thumbnail is ready again") {
+            self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+        XCTAssertTrue(ExactUTF16Text.matches(storage.string, disk))
+        XCTAssertEqual(session.text, disk)
+        XCTAssertFalse(editor.undoManager?.canUndo == true)
+        XCTAssertFalse(editor.undoManager?.canRedo == true)
+        try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
+    }
+
+    /// #150's fixture made the local edit one unit longer deliberately: a same-length
+    /// `replaceDocumentText` is itself an incoming App text change whose whole-source
+    /// assignment erases the ready thumbnail. With the reset in place that path is
+    /// deterministic, so this pins it: apply the same-length edit only after the initial
+    /// thumbnail is ready, then observe — with no further input — folds and the ready
+    /// thumbnail return.
+    func testHostedSameLengthLocalEditRestoresImageThumbnailAndFoldsWithoutAnEdit() async throws {
+        let saved = keepMineLongSource(word: "wprd")
+        let local = keepMineLongSource(word: "wxrd")
+        let changed = (saved as NSString).range(of: "wprd").location + 1
+        XCTAssertGreaterThan(changed, 128)
+        XCTAssertGreaterThan(saved.utf16.count - changed, 128)
+        XCTAssertEqual(saved.utf16.count, local.utf16.count)
+        XCTAssertNotEqual(saved, local)
+        let hosted = try await makeHostedEditorWorkspace(
+            source: saved,
+            query: "Lead",
+            assets: ["fixture.png": reconciledFixturePNG()],
+            layoutMode: .wysiwyg
+        )
+        let appState = hosted.appState
+        let editor = try hostedEditor(hosted)
+        let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: editor))
+        let coordinator = try XCTUnwrap(editor.textDelegate as? MarkdownTextViewCoordinator)
+        try await waitUntil("the saved source shows folds and a ready image thumbnail") {
+            storage.string == saved && self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+
+        appState.replaceDocumentText(local)
+        try await waitUntil("the same-length App replacement reaches the editor") {
+            storage.string == local
+        }
+
+        // Observe only: no edit, selection change or manual scheduling restores the thumbnail.
+        try await waitUntil("the local source is folded and its image thumbnail is ready again") {
+            self.hasFoldsAndReadyImage(self.reconciledPresentation(editor))
+        }
+        try await settleReconciledHighlight(coordinator)
+        XCTAssertTrue(ExactUTF16Text.matches(storage.string, local))
+        XCTAssertEqual(appState.currentDocument.text, local)
+        XCTAssertNil(appState.externalChangePrompt)
+        XCTAssertFalse(editor.undoManager?.canUndo == true)
+        XCTAssertFalse(editor.undoManager?.canRedo == true)
+        try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
+    }
+
     private func keepMineLongSource(word: String) -> String {
         String(repeating: "Lead paragraph with **bold** words. ", count: 6)
             + "\nMiddle \(word) here.\n![alt](fixture.png)\n"

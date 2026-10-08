@@ -24,19 +24,37 @@ extension MarkdownTextViewCoordinator {
         in textView: STTextView
     ) {
         let selection = textView.selectedRange()
-        isUpdating = true
-        textView.text = source
-        let clampedSelection = selection.clamped(toLength: (source as NSString).length)
-        textView.textSelection = clampedSelection
-        isUpdating = false
+        let clampedSelection = assignWholeSource(source, to: textView)
         if clampedSelection != selection {
             // Writer preflight can refuse the native edit, leaving no later selection
             // notification to update the binding used by WYSIWYG parsing.
             publishAppliedSelection(clampedSelection)
         }
 
-        discardPresentationBookkeepingAfterWholeSourceAssignment(in: textView)
         requestReconciledSourcePresentation()
+    }
+
+    /// The single whole-source assignment. `textView.text =` erases every storage
+    /// attribute — highlighting, WYSIWYG folds, link folding, image markers and Find
+    /// decoration — so every call site routes through here: `isUpdating` covers the
+    /// write, the previous selection is restored clamped to the new length, and the
+    /// presentation bookkeeping whose attributes are now gone is discarded. The image
+    /// reset is mandatory: `WYSIWYGImagePresentationController.documentTextDidChange`
+    /// samples only UTF-16 length plus the first and last 64 units, so a same-length
+    /// replacement with identical ends would otherwise keep markers the assignment
+    /// erased. Returns the clamped selection for callers that must publish it.
+    /// This never requests a parse; each site knows whether its change already
+    /// schedules one.
+    @discardableResult
+    func assignWholeSource(_ source: String, to textView: STTextView) -> NSRange {
+        let selection = textView.selectedRange()
+        isUpdating = true
+        textView.text = source
+        let clampedSelection = selection.clamped(toLength: (source as NSString).length)
+        textView.textSelection = clampedSelection
+        isUpdating = false
+        discardPresentationBookkeepingAfterWholeSourceAssignment(in: textView)
+        return clampedSelection
     }
 
     /// Whole-source assignment removes every presentation attribute. Retain the applied
@@ -84,14 +102,7 @@ extension MarkdownTextViewCoordinator {
         }
 
         if !nativeTextMatches(textView, snapshot.source) {
-            let selectedRange = textView.selectedRange()
-            isUpdating = true
-            textView.text = snapshot.source
-            textView.textSelection = selectedRange.clamped(
-                toLength: (snapshot.source as NSString).length
-            )
-            isUpdating = false
-            discardPresentationBookkeepingAfterWholeSourceAssignment(in: textView)
+            assignWholeSource(snapshot.source, to: textView)
         }
         installedDocument.acceptSourceSnapshot(snapshot)
         isNativeSourceSynchronized = true

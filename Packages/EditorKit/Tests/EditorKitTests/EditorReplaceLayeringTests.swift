@@ -83,6 +83,40 @@ final class EditorReplaceLayeringTests: XCTestCase {
         }
     }
 
+    /// Every whole-source `textView.text =` write must route through
+    /// `MarkdownTextViewCoordinator.assignWholeSource`, which restores the selection and
+    /// discards the presentation bookkeeping the assignment erased — image ownership in
+    /// particular, whose recorded-source check is only a length-plus-endpoints sample.
+    /// Exceptions: the helper itself, `makeNSView`'s first install (nothing is presented
+    /// yet) and the performance probe's bare driver views.
+    func testWholeSourceTextAssignmentsRouteThroughAssignWholeSource() throws {
+        let root = repoRoot.appendingPathComponent("Packages/EditorKit/Sources/EditorKit")
+        let allowed: [String: [String]] = [
+            // `assignWholeSource` itself.
+            "MarkdownTextViewCoordinator+SourceSync.swift": ["textView.text = source"],
+            // `makeNSView`: the view is empty — no presentation exists to discard.
+            "MarkdownTextView.swift": ["textView.text = text"],
+        ]
+        var failures: [String] = []
+        for file in try swiftFiles(under: root)
+            where file.lastPathComponent != "EditorPerformanceProbe.swift"
+        {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            var found: [String] = []
+            for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                let code = Self.strippingLineComment(String(line))
+                    .trimmingCharacters(in: .whitespaces)
+                if code.contains("textView.text =") || code.contains("TextView.text =") {
+                    found.append(code)
+                }
+            }
+            if found != allowed[file.lastPathComponent] ?? [] {
+                failures.append("\(file.lastPathComponent): \(found)")
+            }
+        }
+        XCTAssertEqual(failures, [])
+    }
+
     /// R2: no new Swift/npm dependency or project-target change. Pins the
     /// dependency declarations themselves; a later PR that adds one updates
     /// this list together with its Decision Log row (`agent.md` §17.7).
