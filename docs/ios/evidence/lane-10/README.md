@@ -1,49 +1,79 @@
 # Lane 10 — iPhone／iPad 自適應 App shell：交付摘要
 
-日期：2026-10-08。契約版本：IOS-C0-v1（specification，尚未實作）。
-
-## 狀態宣告
-
-**C0 尚未交付。** `docs/ios/integration-ledger.md` 目前記錄 `IOS_BASE_REF`／`IOS_BASE_SHA`
-為 *Not published*，lane 13 尚無 `phase3-ios-integration` 分支或 C0 commit；repo 內不存在
-`AppIOS/`、`AppIOSTests/`、EditorKitIOS／WorkspaceKitIOS 或任何已凍結的 Swift contract
-declaration。依 handoff 規則，本交付只做**來源調查與測試設計**，沒有、也不得發明平行 API
-或自行從 `main` 建立另一份 contracts。
+日期：2026-10-08。契約版本：**IOS-C0-v1**（`refs/tags/ios-c0-v1`，`642cb21`）。
 
 ## 交付格式
 
 | 項目 | 值 |
 |---|---|
 | Branch | `phase3-ios-adaptive-shell` |
-| Base SHA | `2144c46`（`phase3-ios-parallel-handoffs` head：source snapshot `b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2` + handoff packet commit）。**這是調查基準，不是 IOS_BASE_SHA**；IOS_BASE_SHA 公布後，實作 worktree 以該 SHA 重建，本證據檔於 owned path 平移 |
-| Head SHA | branch tip（本檔所在的最新 commit；以 `git rev-parse phase3-ios-adaptive-shell` 為準，已 push 至 origin） |
-| PR | **未開。** C0 未公布、packet 未 merge 進 `main`，現在以任何 base 開 PR 都會把 13 的 packet 檔案混進 lane-10 diff。待 IOS_BASE_REF 公布後依共同基準開可審查 PR |
-| 實際修改路徑 | `docs/ios/evidence/lane-10/**`（本目錄，lane-10 exclusive） |
-| 已實作介面 | 無 — 凍結介面尚無可編譯宣告 |
-| 仍使用 doubles 的接點 | 全部 provider 接點（04／05／06／07／08／09／13） |
-| Named tests | 未執行：測試設計完成（見 `test-plan.md`），等 C0 scaffold 後以 hosted test target 落實 |
-| 未跑的檢查 | Swift build／tests／lint／simulator（無 AppIOS target 可建）；未跑即未跑 |
+| Worktree | `/private/tmp/plainsong-ios-adaptive-shell` |
+| Base SHA | `642cb212703220409874a2741c5adbfb8c80fe8a`（公布之 `IOS_BASE_SHA`，worktree 以此重建） |
+| Head SHA | 本檔所在 commit；以 `git rev-parse phase3-ios-adaptive-shell` 為準 |
+| PR | **未開** — 待 13 公布的 integration 目標分支後開立（不自行 merge） |
+| 實際修改路徑 | `AppIOS/UI/**`（8 files）、`AppIOS/Navigation/**`（3 files）、`AppIOSTests/Shell/**`（5 files）、`docs/ios/evidence/lane-10/**` |
+| Contract 版本 | IOS-C0-v1；只讀消費，未改任何 contract／manifest |
+| Named tests | 29 tests 全數通過（iPhone 17 Pro simulator, iOS 27.0）；見下節 |
 
-## 文件索引
+## 已實作（owned paths 內）
 
-- [`source-investigation.md`](source-investigation.md) — macOS shell 現況盤點，逐條映射到 iOS 設計輸入。
-- [`shell-design.md`](shell-design.md) — lane-10 視圖結構、scene-scoped action routing、layout policy、不變條件與失敗反例。
-- [`test-plan.md`](test-plan.md) — 五個 named acceptance tests 的 fake 設計、斷言與 negative probes。
-- [`wiring-requests.md`](wiring-requests.md) — 需要 13 在 C0 凍結／提供的最小 wiring；不交給 13 就得自行發明的項目清單。
+`AppIOS/UI/`：`IOSContentLayout`（純 900 pt policy，不靠 device model）、
+`IOSSceneHostedViews`（capability-identity 鍵控的 retained host cache）、
+`IOSEditorPreviewContainer`（UIKit 雙掛載 container，mode 只改 geometry/visibility）、
+`IOSShellSceneState`（per-scene ObservableObject；facade observation→dedup chrome）、
+`IOSChromeProjection`（`IOSShellChromeSnapshot`／`IOSShellError`／`IOSShellRoute`）、
+`IOSShellActionRouter`（scene-scoped，非 singleton；`IOSShellActionOutcome` 可測）、
+`IOSShellFeatureSurfaces`（08/09/13 未凍結接點的 closure seam＋`IOSShellSheetContext`）、
+`IOSDocumentScreen`＋`IOSDocumentStatusChrome`＋`IOSAuthoringToolbar`（含 ⌘S/⌘F/⌘Z/⇧⌘Z、
+`.keyboard` group、Format overflow menu）。
+
+`AppIOS/Navigation/`：`IOSShellRootView`（compact `NavigationStack` ↔ regular
+`NavigationSplitView`；scenePhase `.background`→`flushForBackground`）、
+`IOSWorkspaceBrowser`（OutlineGroup list、availability dimming、New File／Open／Refresh）、
+`IOSWorkspaceQueries`（`parentDirectoryLocation`、depth-first lookup）。
+
+`AppIOSTests/Shell/`：`IOSShellTestDoubles`（`FakeSceneFacade`／`FakeEditorBinding`／
+`FakePreviewController`／`FakeAuthoringProvider`／`FakeImageInserter`／`ShellFixtures`）
+＋四個測試檔共 29 tests。
+
+## Named acceptance tests — 結果
+
+| 測試 | 結果 |
+|---|---|
+| `testShellUsesSingleEditorAndPreviewAcrossLayoutChanges` | ✅ 60 次切換零 detach/attach；factory 各恰 1 次；container 保留同一 UIView |
+| `testLayoutTransitionRetainsSelectionScrollAndUndo` | ✅ selection/visibleRange/selectionGeneration/markedText 逐位相等；version 不變；undo 仍路由到同一實體 |
+| `testToolbarUsesCurrentSceneEditorAndRefusesReadOnlyDocument` | ✅ provider 收到同實體 editor；`updateAccess(canWrite:false)` 後 `.disabled`、chrome 顯示唯讀、零寫入 |
+| `testDismissedSheetDoesNotCommitPendingEdit` | ✅ dismiss→`onDismiss` 恰一次；provider/editor/inserter 零呼叫；version 不變 |
+| Simulator smoke（直橫向／900pt／resizing／實體鍵盤／composing／VoiceOver） | ⏳ owner gate——doubles 不能宣稱 |
+
+加跑負面探針（全綠）：conflict 禁寫、stale `setCommandFocus` 拒絕、detach 後 drop、
+sheet 替換／文件切換恰一次 cancel、scene 狀態非 app-global、899/900 邊界、
+capability 換 identity 才換 host。
+
+## 驗證證據
+
+- `Scripts/ios/c0.sh test`，`IOS_DESTINATION=platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66`（iPhone 17 Pro, iOS 27.0, SDK 27.0）
+- Run 目錄：`/private/tmp/plainsong-ios-c0/<head>-test.RGxemz`（`source.json`／`build.log`／`test.log`／`Results.xcresult`）；PlainsongIOSTests 35/35、MarkdownCore/SyntaxKit/WorkspaceCore/EditorKitIOS/WorkspaceKitIOS consumer suites 全過
+- 過程中發現並修正一個真 bug：`setPanes` 未重跑 visibility→初始掛載於非預設 mode 會亮錯 pane（`testContainerVisibilityTracksModeWithoutUnmounting` 捕獲）
+- `swiftformat AppIOS/UI AppIOS/Navigation AppIOSTests/Shell --lint`：0 違規；`swiftlint` 我負責路徑：0 violation
+
+## Wiring 解析（對照 `wiring-requests.md`）
+
+| # | 狀態 |
+|---|---|
+| W1–W3 | ✅ C0 交付：`PlainsongIOS` target、`AppIOSTests` scheme、`IOSAppSceneControlling` facade |
+| W6, W8 | ✅ C0 交付：`IOSAuthoringAction/Providing`、`IOSSceneCapabilities.editor`＋`setCommandFocus(expected:bindingID:)` |
+| W4, W5, W7 | ⚠️ 未凍結具體名稱 → shell 以 `IOSShellFeatureSurfaces` 的 hosted-view factory closures 接（04/07/08/09 由 13 在 composition 注入） |
+| W9–W12 | ✅ 採用預設：hidden preview 繼續 render、無 scroll sync、doc switch 關 sheet、compact 預設 source |
+| W13–W16（新） | ⏳ 記在 surfaces：`currentGrant`（image context）、`resolveConflictCopy`（`.saveCopy(destination:lease:)` 需要 lease）、`refreshWorkspace`、`openWorkspace`（picker grant 必須來自使用者選擇） |
 
 ## 關卡分列
 
-- **已關閉：** 無（調查階段不關產品關卡）。
-- **待整合：** C0 契約凍結（`IOSSourceEditorControlling`、`IOSDocumentStore`、workspace
-  access provider、`IOSAuthoringAction` consumer seam、scene state facade、hosted view
-  names）、`AppIOS` skeleton 與 `AppIOSTests` hosted test target 註冊、04–09 真實 providers、
-  13 production composition。
-- **Owner-only 真機：** 橫直向切換中的中文 composing、外接鍵盤 command discovery、
-  VoiceOver、Dynamic Type、iPad Split View／Stage Manager resizing、真機 Undo retention。
+- **已關閉：** lane-10 全部可 double 驗證的關卡（instance retention、layout policy、scene-scoped routing、cancel≠commit、facade delegation、chrome dedup、error surfacing）。
+- **待整合（13／provider lanes）：** `makeEditorView`（04）與 `makePreviewView`（07）的具體型別接線；`makeAuthoringPanel`/`makeImagePicker` 內容注入（08/09）；`currentGrant`／`resolveConflictCopy`／`refreshWorkspace`／`openWorkspace` 的 composition 來源；`IOSShellRootView` 掛進 `PlainsongIOSApp` scene（`AppIOS/App` 屬 13）；多 scene 化（`UIApplicationSupportsMultipleScenes` 目前 false——shell 設計已是 scene-scoped）。
+- **Owner-only 真機：** rotation 中鍵盤/marked-text 保留、外接鍵盤 shortcut discovery、中文 composing 切版、VoiceOver 走查、44pt 觸控、Dynamic Type、iPad Split View/Stage Manager 實際 resize、Undo 在真 editor 的保留。
 
-## 不做的事（依 handoff 邊界）
+## 不做的事（已核對）
 
-- 不改 `AppIOS/App/**`、`State/**`、`Composition/**`，不自建第二個 AppState。
-- 不改任何 package／contract／manifest、Mac `App/**`、`project.yml`、Makefile、CI、
-  `agent.md`、Decision Log、其他 lane 的路徑。
-- 不 merge 自己的 PR，不 force-push，不改 owner checkout 或其他 worktree。
+- `git status` 確認零改動於 `AppIOS/App`／`State`／`Composition`、任何 Package、`App/**`（mac）、`project.yml`、Makefile、CI、`agent.md`、decision log、他線目錄。
+- shell 無任何直接 `DocumentSession`/UITextView 寫入；唯一寫入路徑是 provider→`editor.apply(_:)`；無 shadow source、無 fake save success。

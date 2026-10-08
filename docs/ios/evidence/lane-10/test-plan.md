@@ -88,3 +88,22 @@
   屬整合：13 composition 後 11 驗收，lane-10 提供 wiring map（`shell-design.md`）。
 - 真機 IME／Undo／VoiceOver／外接鍵盤／Split View：owner／11 清單，不列入本 lane
   fake 結果。
+
+## 5. As-built 結果（2026-10-08）
+
+落實於 `AppIOSTests/Shell/`（doubles 在 `IOSShellTestDoubles.swift`）：
+
+| 規劃 | 檔案 | 狀態 |
+|---|---|---|
+| 2.1 identity retention | `IOSShellLayoutTests.testShellUsesSingleEditorAndPreviewAcrossLayoutChanges` | ✅ |
+| 2.2 selection/scroll/undo | `IOSShellLayoutTests.testLayoutTransitionRetainsSelectionScrollAndUndo` | ✅ |
+| 2.3 scene-scoped routing＋read-only | `IOSShellActionRoutingTests.testToolbarUsesCurrentSceneEditorAndRefusesReadOnlyDocument` | ✅ |
+| 2.4 cancel ≠ commit | `IOSShellSheetTests.testDismissedSheetDoesNotCommitPendingEdit` | ✅ |
+| 2.5 900pt／mounted 切換 | `testLayoutPolicyFlipsExactlyAtNineHundredPoints`＋`testContainerVisibilityTracksModeWithoutUnmounting` | ✅ |
+
+額外 negative probes（全過）：conflict 禁寫、stale focus claim、detach 後 drop、
+sheet 替換/文件切換恰好一次 cancel、capability identity 變更才換 host、
+scene 狀態非 app-global、entry gating、`newFileTarget` 推導、chrome dedup。
+
+測試中修正一個實作 bug：`IOSDualPaneContainerView.setPanes` 未對新掛載 pane
+重跑 visibility——在 `.single(.preview)` 初始態會亮錯 pane。

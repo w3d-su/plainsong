@@ -46,3 +46,24 @@ contracts.md 凍結了 provider protocol 的 *語意*，但下列 **shell 這一
 - W1–W8 是 lane-10 *實作* 的前置；W9–W12 是 review 前確認即可。
 - 04–09 真實 providers 不是 lane-10 module PR 的前置（doubles 驗收）；是 13
   composition PR 的前置。
+
+## 6. C0 落地後解析（2026-10-08，`642cb21`）
+
+- W1–W3、W6、W8：C0 直接交付。facade 為 `IOSAppSceneControlling`＋
+  `IOSSceneCapabilities`；authored seam 為 `IOSAuthoringActionProviding`；command
+  route 為 `setCommandFocus(_:expected:bindingID:)`。
+- W4/W5/W7：C0 刻意不給具體 view 型別（contract 無 view）。shell 以
+  `IOSShellFeatureSurfaces` 的 `makeEditorView`/`makePreviewView`/
+  `makeAuthoringPanel`/`makeImagePicker` 收斂——每 capability identity 至多建一次，
+  由 13 composition 填入 04/07/08/09 實體。這是 **13 待辦**，不是 lane-10 發明的
+  平行 API（只是注入點）。
+- W9–W12：預設全部採用（hidden preview 續 render；無 scroll sync；doc 切換關
+  sheet；compact 預設 source pane）。
+- 新增待 13 確認（記在 `IOSShellFeatureSurfaces` 註解）：
+  - W13 `currentGrant: () -> IOSWorkspaceGrant?` — 09 `captureContext` 需要 live
+    grant；scene snapshot 只有 `IOSWorkspaceSnapshot`，grant 在 access provider 手上。
+  - W14 `resolveConflictCopy` — facade `resolveExternal(.saveCopy(destination:lease:))`
+    需要 destination picker＋lease，shell 無從推導；nil 時隱藏按鈕。
+  - W15 `refreshWorkspace` — `refresh(_:)` 需要 grant；composition 代理。
+  - W16 `openWorkspace` — `open(selectedURL:)` 的 URL 必須來自 picker grant；
+    UIDocumentPicker 由 composition 持有，shell 只掛按鈕。
