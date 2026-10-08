@@ -569,13 +569,7 @@ final class MarkdownTextViewCoordinator: @preconcurrency STTextViewDelegate {
             return
         }
 
-        let previousSelection = textView.selectedRange()
-        isUpdating = true
-        textView.text = candidate.sourceText
-        textView.textSelection = previousSelection.clamped(
-            toLength: (candidate.sourceText as NSString).length
-        )
-        isUpdating = false
+        assignWholeSource(candidate.sourceText, to: textView)
         notePreparedNativeSource(candidate)
 
         guard finishDocumentTransition(candidate, in: textView) != nil else {

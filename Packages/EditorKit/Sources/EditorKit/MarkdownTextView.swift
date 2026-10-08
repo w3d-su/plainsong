@@ -120,6 +120,8 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isSelectable = isEnabled
         textView.setAccessibilityIdentifier(EditorAccessibility.textViewIdentifier)
 
+        // First install only: no presentation exists yet, so there is nothing to
+        // discard. Every later whole-source assignment goes through `assignWholeSource`.
         textView.text = text
         context.coordinator.isUpdating = false
         let candidate = prepareCoordinatorInputs(context.coordinator, for: textView)
@@ -199,13 +201,7 @@ struct MarkdownTextView: NSViewRepresentable {
             return
         }
 
-        coordinator.isUpdating = true
-        let currentSelection = textView.selectedRange()
-        textView.text = candidate.sourceText
-        textView.textSelection = currentSelection.clamped(
-            toLength: (candidate.sourceText as NSString).length
-        )
-        coordinator.isUpdating = false
+        coordinator.assignWholeSource(candidate.sourceText, to: textView)
         coordinator.notePreparedNativeSource(candidate)
     }
 
