@@ -58,7 +58,7 @@ struct PlainsongApp: App {
         }
         .defaultSize(width: 1280, height: 800)
         .commands {
-            SidebarCommands()
+            if #available(macOS 27.0, *) { SidebarCommands() }
             InspectorToggleCommands(menuState: inspectorMenuState)
             PlainsongCommands(appState: appState, menuBarState: menuBarState)
         }

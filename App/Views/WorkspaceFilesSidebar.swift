@@ -167,7 +167,11 @@ struct WorkspaceFilesSidebar: View {
             set: { newValue in
                 // Clicking empty space or a non-file row must not drop the open file's highlight.
                 guard let newValue, newValue != appState.workspaceTree?.selectedNodeID else { return }
-                appState.selectWorkspaceNode(id: newValue)
+                // List retains its native selection/drag gestures. Keyboard and AX selection
+                // keep the navigator focused; a mouse selection may focus the editor.
+                let mouseSelection = NSApp.currentEvent
+                    .map { [.leftMouseDown, .leftMouseUp].contains($0.type) } ?? false
+                appState.selectWorkspaceNode(id: newValue, requestingEditorFocus: mouseSelection)
             }
         )
     }
@@ -235,38 +239,6 @@ struct WorkspaceFilesSidebar: View {
     }
 }
 
-enum WorkspaceSidebarCreationKind {
-    case file
-    case folder
-
-    var title: String {
-        switch self {
-        case .file:
-            "New File"
-        case .folder:
-            "New Folder"
-        }
-    }
-
-    var prompt: String {
-        switch self {
-        case .file:
-            "Enter a name for the new file."
-        case .folder:
-            "Enter a name for the new folder."
-        }
-    }
-
-    var defaultName: String {
-        switch self {
-        case .file:
-            "Untitled.md"
-        case .folder:
-            "New Folder"
-        }
-    }
-}
-
 struct WorkspaceTreeNodeRow: View {
     @EnvironmentObject private var appState: AppState
 
@@ -308,7 +280,9 @@ struct WorkspaceTreeNodeRow: View {
         .foregroundStyle(isDimmed ? .secondary : .primary)
         .tag(node.id)
         .selectionDisabled(!node.isEditableMarkdown)
-        .draggable(node.id)
+        .onDrag {
+            WorkspaceSidebarDragProvider.make(nodeID: node.id, imageURL: imageURL)
+        }
         .help(node.relativePath)
         .contextMenu {
             if node.isDirectory {
@@ -341,6 +315,11 @@ struct WorkspaceTreeNodeRow: View {
 
     private var isDimmed: Bool {
         !node.isDirectory && !node.isEditableMarkdown
+    }
+
+    private var imageURL: URL? {
+        guard case .image = node.kind else { return nil }
+        return itemURL
     }
 
     private var itemURL: URL? {

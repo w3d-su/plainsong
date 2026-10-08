@@ -16,6 +16,7 @@ struct DocumentJumpBar: View {
     let fileURL: URL?
     let fileKind: FileKind
     let isSaving: Bool
+    let isDirty: Bool
     /// Read when a segment menu opens, never while laying out the bar.
     let workspaceTree: () -> WorkspaceFileTree?
     let openNode: (WorkspaceFileNode.ID) -> Void
@@ -37,6 +38,7 @@ struct DocumentJumpBar: View {
                 .overlay {
                     JumpBarMenuTarget(
                         accessibilityLabel: segment.name,
+                        hasPrimaryMenu: segment.treePath != nil,
                         primaryMenu: { folderMenu(path: segment.treePath) },
                         contextMenu: { JumpBarMenus.copyMenu(for: segment.url, rootURL: rootURL) }
                     )
@@ -55,7 +57,7 @@ struct DocumentJumpBar: View {
                     .truncationMode(.middle)
                     .accessibilityIdentifier("plainsong.editor.fileName")
                     .accessibilityLabel("Current editor file")
-                    .accessibilityValue(fileName)
+                    .accessibilityValue(isDirty ? "\(fileName), Edited" : fileName)
             } icon: {
                 Image(systemName: "doc.text")
                     .foregroundStyle(.secondary)
@@ -65,6 +67,7 @@ struct DocumentJumpBar: View {
                 if let fileURL {
                     JumpBarMenuTarget(
                         accessibilityLabel: "Files in \(fileURL.deletingLastPathComponent().lastPathComponent)",
+                        hasPrimaryMenu: folderSegments.last?.treePath != nil,
                         primaryMenu: { folderMenu(path: folderSegments.last?.treePath) },
                         contextMenu: { JumpBarMenus.copyMenu(for: fileURL, rootURL: rootURL) }
                     )

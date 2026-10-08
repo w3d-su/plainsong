@@ -8,19 +8,11 @@ struct WorkspaceInspector: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        if appState.hasOpenDocument {
-            DocumentInspectorForm(
-                session: appState.currentDocument,
-                rootURL: appState.workspaceRootURL
-            ) { newText, session in
-                appState.replaceDocumentText(newText, in: session)
-            }
-        } else {
-            ContentUnavailableView(
-                "No Document",
-                systemImage: "sidebar.trailing",
-                description: Text("Open a document to see its frontmatter and file details.")
-            )
+        DocumentInspectorForm(
+            session: appState.currentDocument,
+            rootURL: appState.workspaceRootURL
+        ) { newText, session in
+            appState.replaceDocumentText(newText, in: session)
         }
     }
 }

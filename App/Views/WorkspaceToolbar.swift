@@ -21,7 +21,7 @@ struct WorkspaceToolbar: ToolbarContent {
             .pickerStyle(.segmented)
             .labelStyle(.iconOnly)
             .disabled(!appState.hasOpenDocument)
-            .help(appState.layoutModeToolbarHelp)
+            .help("Choose editor layout (⌘⇧P cycles layouts)")
         }
 
         #if compiler(>=6.2)

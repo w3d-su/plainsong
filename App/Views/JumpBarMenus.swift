@@ -10,6 +10,7 @@ import WorkspaceKit
 /// so the segment's text underneath keeps its identity (`plainsong.editor.fileName`).
 struct JumpBarMenuTarget: NSViewRepresentable {
     let accessibilityLabel: String
+    var hasPrimaryMenu = true
     let primaryMenu: () -> NSMenu?
     let contextMenu: () -> NSMenu
 
@@ -24,12 +25,14 @@ struct JumpBarMenuTarget: NSViewRepresentable {
     }
 
     private func update(_ view: TargetView) {
+        view.hasPrimaryMenu = hasPrimaryMenu
         view.primaryMenu = primaryMenu
         view.contextMenuProvider = contextMenu
         view.setAccessibilityLabel(accessibilityLabel)
     }
 
     final class TargetView: NSView {
+        var hasPrimaryMenu = true
         var primaryMenu: (() -> NSMenu?)?
         var contextMenuProvider: (() -> NSMenu)?
         private var isHovered = false {
@@ -82,7 +85,7 @@ struct JumpBarMenuTarget: NSViewRepresentable {
         }
 
         override func accessibilityRole() -> NSAccessibility.Role? {
-            .popUpButton
+            hasPrimaryMenu ? .popUpButton : .staticText
         }
 
         override func accessibilityPerformPress() -> Bool {

@@ -7,26 +7,71 @@ import SwiftUI
 /// Sidebar and inspector visibility are scene state, so each window keeps its own
 /// (`docs/window-state-gates.md` §10.1).
 struct WorkspaceWindow: View {
-    @EnvironmentObject private var appState: AppState
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @SceneStorage("plainsong.inspectorPresented") private var storedInspectorPresented = true
-    @StateObject private var inspectorVisibility = InspectorVisibility()
+    var shellOverride: WorkspaceShell = .automatic
+    var inspectorIntentOverride: Binding<Bool>?
+    var inspectorVisibilityOverride: InspectorVisibility?
+    var sidebarIdealWidth: CGFloat = 256
+    var sidebarMinimumWidth: CGFloat = 220
+
+    var body: some View {
+        WorkspaceWindowContent(
+            inspectorIntent: inspectorIntentOverride ?? $storedInspectorPresented,
+            shellOverride: shellOverride,
+            sidebarIdealWidth: sidebarIdealWidth,
+            sidebarMinimumWidth: sidebarMinimumWidth,
+            visibility: inspectorVisibilityOverride
+        )
+    }
+}
+
+enum WorkspaceShell { case automatic, fixed, split }
+
+private struct WorkspaceWindowContent: View {
+    @EnvironmentObject private var appState: AppState
+    @Binding var inspectorIntent: Bool
+    let shellOverride: WorkspaceShell
+    let sidebarIdealWidth: CGFloat
+    let sidebarMinimumWidth: CGFloat
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @StateObject private var inspectorVisibility: InspectorVisibility
     @SceneStorage("plainsong.inspectorWidth") private var inspectorWidth = InspectorLayout.defaultWidth
+
+    init(
+        inspectorIntent: Binding<Bool>,
+        shellOverride: WorkspaceShell,
+        sidebarIdealWidth: CGFloat,
+        sidebarMinimumWidth: CGFloat,
+        visibility: InspectorVisibility?
+    ) {
+        _inspectorIntent = inspectorIntent
+        self.shellOverride = shellOverride
+        self.sidebarIdealWidth = sidebarIdealWidth
+        self.sidebarMinimumWidth = sidebarMinimumWidth
+        _inspectorVisibility =
+            StateObject(wrappedValue: visibility ?? InspectorVisibility(userIntent: inspectorIntent.wrappedValue))
+    }
 
     var body: some View {
         shell
             .navigationTitle(documentTitle)
             .navigationSubtitle(documentSubtitle)
             .toolbar {
-                WorkspaceToolbar(appState: appState, isInspectorPresented: $inspectorVisibility.isPresented)
+                WorkspaceToolbar(
+                    appState: appState,
+                    isInspectorPresented: Binding(
+                        get: { inspectorVisibility.isPresented },
+                        set: { _ in inspectorVisibility.toggle() }
+                    )
+                )
             }
-            .onAppear {
-                inspectorVisibility.isPresented = storedInspectorPresented
+            .onChange(of: inspectorVisibility.userIntent) { _, intent in
+                inspectorIntent = intent
             }
-            .onChange(of: inspectorVisibility.isPresented) { _, isPresented in
-                storedInspectorPresented = isPresented
+            .onChange(of: inspectorIntent) { _, intent in
+                inspectorVisibility.setUserIntent(intent)
             }
-            .frame(minWidth: 760, minHeight: 420)
+            .frame(minWidth: WorkspaceLayout.windowMinimum, minHeight: 420)
             .alert(
                 appState.presentedError?.title ?? "Error",
                 isPresented: errorIsPresented
@@ -62,10 +107,11 @@ struct WorkspaceWindow: View {
     /// keeps the fixed-width `HStack` shell that predates it.
     @ViewBuilder
     private var shell: some View {
-        if #available(macOS 27.0, *) {
+        if #available(macOS 27.0, *), shellOverride != .fixed {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 WorkspaceSidebar()
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 256, max: 320)
+                    .navigationSplitViewColumnWidth(min: sidebarMinimumWidth, ideal: sidebarIdealWidth, max: 320)
+                    .workspaceFrameProbe("sidebar")
             } detail: {
                 documentColumn
             }
@@ -73,6 +119,7 @@ struct WorkspaceWindow: View {
             HStack(spacing: 0) {
                 WorkspaceSidebar()
                     .frame(width: 256)
+                    .workspaceFrameProbe("sidebar")
                     .background(SidebarMaterialBackground().ignoresSafeArea())
                 Divider()
                 documentColumn
@@ -81,14 +128,37 @@ struct WorkspaceWindow: View {
     }
 
     private var documentColumn: some View {
-        HStack(spacing: 0) {
-            detail
-            if showsInspector {
-                InspectorColumn(width: $inspectorWidth) {
-                    WorkspaceInspector()
+        // R17: all column widths derive from this proxy and constants, never child minima.
+        GeometryReader { proxy in
+            let minimum = WorkspaceLayout.contentMinimum(preview: appState.isPreviewVisible)
+            let visible = inspectorIntent && appState.hasOpenDocument
+                && proxy.size.width >= minimum + InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+            HStack(spacing: 0) {
+                detail
+                    .frame(width: max(
+                        0,
+                        proxy.size
+                            .width -
+                            (visible ? InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth : 0)
+                    ))
+                if visible {
+                    InspectorColumn(width: $inspectorWidth) { WorkspaceInspector() }
                 }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .onAppear { updateInspector(width: proxy.size.width) }
+            .onChange(of: proxy.size.width) { _, width in updateInspector(width: width) }
+            .onChange(of: inspectorWidth) { _, _ in updateInspector(width: proxy.size.width) }
+            .onChange(of: appState.isPreviewVisible) { _, _ in updateInspector(width: proxy.size.width) }
+            .onChange(of: appState.hasOpenDocument) { _, _ in updateInspector(width: proxy.size.width) }
         }
+    }
+
+    private func updateInspector(width: CGFloat) {
+        inspectorVisibility.updateLayout(availableWidth: width, inspectorWidth: inspectorWidth,
+                                         contentMinimum: WorkspaceLayout
+                                             .contentMinimum(preview: appState.isPreviewVisible),
+                                         hasDocument: appState.hasOpenDocument)
     }
 
     private var detail: some View {
@@ -97,25 +167,13 @@ struct WorkspaceWindow: View {
             if appState.workspaceMutationRecoveryBannerPlacement == .global {
                 WorkspaceMutationRecoveryBanner()
             }
-
-            // R17: a split column whose minimum size follows its content (editor, web view)
-            // re-enters AppKit's Update Constraints pass until the window throws. The
-            // GeometryReader gives the column a fixed, content-independent minimum.
             GeometryReader { proxy in
                 Group {
-                    if appState.hasOpenDocument {
-                        EditorWorkspace()
-                    } else {
-                        EmptyEditorState()
-                    }
+                    if appState.hasOpenDocument { EditorWorkspace() } else { EmptyEditorState() }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
         }
-    }
-
-    private var showsInspector: Bool {
-        inspectorVisibility.isPresented && appState.hasOpenDocument
     }
 
     private var documentTitle: String {

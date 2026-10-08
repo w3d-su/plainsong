@@ -28,6 +28,10 @@ struct WindowMetadataAccessor: NSViewRepresentable {
             window.identifier = AppState.exportHTMLWorkspaceWindowIdentifier
             NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
         }
+        // Keep the content-independent floor on AppKit windows too (including hosted roots).
+        if window.contentMinSize.width != WorkspaceLayout.windowMinimum {
+            window.contentMinSize = NSSize(width: WorkspaceLayout.windowMinimum, height: 420)
+        }
         window.representedURL = representedURL
         window.isDocumentEdited = isDocumentEdited
         onWindow(window)

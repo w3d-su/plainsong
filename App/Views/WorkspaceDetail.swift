@@ -17,6 +17,7 @@ struct EditorWorkspace: View {
                 fileURL: appState.currentDocument.fileURL,
                 fileKind: appState.currentDocument.fileKind,
                 isSaving: appState.isSaving,
+                isDirty: appState.currentDocument.isDirty,
                 workspaceTree: { appState.workspaceTree },
                 openNode: { appState.selectWorkspaceNode(id: $0) }
             )
@@ -49,6 +50,8 @@ struct EditorWorkspace: View {
                     scrollCoordinator: scrollCoordinator
                 )
                 .environmentObject(appState)
+                .frame(minWidth: WorkspaceLayout.editorMinimum)
+                .workspaceFrameProbe("editor")
                 .clipped()
                 .zIndex(0)
 
@@ -59,7 +62,8 @@ struct EditorWorkspace: View {
                         session: appState.currentDocument,
                         controller: previewController
                     )
-                    .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: WorkspaceLayout.previewMinimum, maxWidth: .infinity, maxHeight: .infinity)
+                    .workspaceFrameProbe("preview")
                     .zIndex(1)
                 }
             }

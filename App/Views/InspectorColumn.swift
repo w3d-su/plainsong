@@ -24,6 +24,7 @@ struct InspectorColumn<Content: View>: View {
             content
                 .frame(width: InspectorLayout.clamped(width))
                 .frame(maxHeight: .infinity)
+                .workspaceFrameProbe("inspector")
         }
     }
 }
@@ -31,6 +32,7 @@ struct InspectorColumn<Content: View>: View {
 enum InspectorLayout {
     static let widthRange = 240.0 ... 360.0
     static let defaultWidth = 280.0
+    static let handleWidth = 5.0
 
     static func clamped(_ width: Double) -> Double {
         min(max(width, widthRange.lowerBound), widthRange.upperBound)
@@ -75,7 +77,17 @@ private struct InspectorResizeHandle: View {
                     NSCursor.pop()
                 }
             }
-            .accessibilityHidden(true)
+            .workspaceFrameProbe("handle")
+            .accessibilityElement()
+            .accessibilityLabel("Inspector width")
+            .accessibilityValue("\(Int(InspectorLayout.clamped(width))) points")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: width = InspectorLayout.clamped(width + 10)
+                case .decrement: width = InspectorLayout.clamped(width - 10)
+                @unknown default: break
+                }
+            }
     }
 }
 
@@ -87,11 +99,49 @@ private struct InspectorResizeHandle: View {
 /// window chrome PR L).
 @MainActor
 final class InspectorVisibility: ObservableObject {
-    @Published var isPresented = true
+    @Published private(set) var userIntent: Bool
+    @Published private(set) var isPresented = false
+    @Published private(set) var hasDocument = false
     private weak var window: NSWindow?
     private var keyObservation: KeyWindowObservation?
+    private var availableWidth: CGFloat = 0
+    private var requiredWidth: CGFloat = 0
 
-    /// Follows `window`'s key status so the menu acts on the key window's inspector only.
+    init(userIntent: Bool) {
+        self.userIntent = userIntent
+    }
+
+    func updateLayout(availableWidth: CGFloat, inspectorWidth: Double, contentMinimum: CGFloat, hasDocument: Bool) {
+        self.availableWidth = availableWidth
+        requiredWidth = contentMinimum + InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+        if self.hasDocument != hasDocument { self.hasDocument = hasDocument }
+        refreshVisibility()
+    }
+
+    func setUserIntent(_ intent: Bool) {
+        if userIntent != intent { userIntent = intent }
+        refreshVisibility()
+    }
+
+    func toggle() {
+        guard hasDocument else { return }
+        let show = !isPresented
+        setUserIntent(show)
+        guard show, requiredWidth > availableWidth, let window, let screen = window.screen else { return }
+        let deficit = requiredWidth - availableWidth
+        let visible = screen.visibleFrame
+        var frame = window.frame
+        frame.size.width = min(frame.width + deficit, visible.width)
+        frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
+        window.setFrame(frame, display: true)
+        // The geometry callback decides visibility after the screen-clamped resize.
+    }
+
+    private func refreshVisibility() {
+        let visible = userIntent && hasDocument && availableWidth >= requiredWidth
+        if isPresented != visible { isPresented = visible }
+    }
+
     func attach(to window: NSWindow) {
         guard self.window !== window else { return }
         self.window = window
@@ -103,9 +153,7 @@ final class InspectorVisibility: ObservableObject {
                 InspectorMenuState.shared.windowResignedKey(self)
             }
         }
-        if window.isKeyWindow {
-            InspectorMenuState.shared.windowBecameKey(self)
-        }
+        if window.isKeyWindow { InspectorMenuState.shared.windowBecameKey(self) }
     }
 }
 
@@ -122,9 +170,10 @@ final class InspectorMenuState: ObservableObject {
 
     func windowBecameKey(_ visibility: InspectorVisibility) {
         keyWindowVisibility = visibility
-        visibilitySubscription = visibility.$isPresented.sink { [weak self] isPresented in
-            self?.isKeyWindowInspectorPresented = isPresented
-        }
+        visibilitySubscription = visibility.$isPresented.combineLatest(visibility.$hasDocument)
+            .sink { [weak self] isPresented, hasDocument in
+                self?.isKeyWindowInspectorPresented = hasDocument ? isPresented : nil
+            }
     }
 
     func windowResignedKey(_ visibility: InspectorVisibility) {
@@ -135,7 +184,7 @@ final class InspectorMenuState: ObservableObject {
     }
 
     func toggleKeyWindowInspector() {
-        keyWindowVisibility?.isPresented.toggle()
+        keyWindowVisibility?.toggle()
     }
 }
 
@@ -148,10 +197,13 @@ private final class KeyWindowObservation {
         let center = NotificationCenter.default
         tokens = [
             center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
-                Task { @MainActor in onChange(true) }
+                MainActor.assumeIsolated { onChange(true) }
+            },
+            center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { _ in
+                MainActor.assumeIsolated { onChange(false) }
             },
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { _ in
-                Task { @MainActor in onChange(false) }
+                MainActor.assumeIsolated { onChange(false) }
             },
         ]
     }
