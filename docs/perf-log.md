@@ -2470,7 +2470,35 @@ acceptance suite ran at comparable host load.
 | `large-1mb.md` (opt-in, `TEST_RUNNER_PLAINSONG_PDF_ACCEPTANCE_1MB=1`) | 56 | 14,400.0 | 1.000 | 18.37 s |
 
 The 1 MB capture is dominated by 56 per-page `WKPDFConfiguration` snapshots plus the
-full-size measure/resize iterations; `testCaptureEachPlannedPageWithWKPDFConfiguration`
+full-size measure/resize iterations;
+`ExportPDFMechanismSpikeTests.testTallCaptureEnumeratesBoundOutcomeAndPaginatesWithoutDuplicateOrDroppedSentinels`
 bounds the page count so per-page capture stays linear. Result bundles:
 `/private/tmp/plainsong-export-g-20a-run4.xcresult` (full matrix),
 `/private/tmp/plainsong-export-g-20a-1mb.xcresult` (opt-in run).
+
+## Export PR G per-page width — acceptance timings (recorded load) — 2026-10-08
+
+Same hosted acceptance suite as the 2026-10-07 section, now reporting per-page width
+metrics: `ExportPDFAcceptanceAppTests` logs pages, widest page (pt), smallest page
+scale, and capture seconds per fixture (`A1 ACCEPTANCE` lines in
+`/private/tmp/plainsong-export-g-20b-run1.log`).
+
+| Fixture | Pages | Widest page (pt) | Smallest scale | Capture time |
+|---|---:|---:|---:|---:|
+| 700-item list (generated) | 2 | 800.0 | 1.000 | 0.15 s |
+| 800-line code (generated) | 2 | 800.0 | 1.000 | 0.19 s |
+| 2,000-row table (generated) | 6 | 800.0 | 1.000 | 0.60 s |
+| `perf-100kb.md` | 2 | 800.0 | 1.000 | 0.36 s |
+| `perf-500kb.md` | 11 | 800.0 | 1.000 | 1.75 s |
+| `math-dense-100kb.md` | 8 | 800.0 | 1.000 | 2.88 s |
+| `kitchen-sink.md` | 1 | 800.0 | 1.000 | 0.10 s |
+| `kitchen-sink.mdx` | 1 | 808.0 | 1.000 | 0.07 s |
+| `math.md` | 1 | 800.0 | 1.000 | 0.08 s |
+
+None of the named/generated fixtures overflow the baseline, so every page sits at
+width 800 (808 for the MDX fixture's wider root padding path) and scale 1; the
+wide-extent path is exercised by `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`
+and `ExportPDFShrunkPagesAppTests`. The opt-in `large-1mb.md` capture was not re-run
+for this section (its 2026-10-07 numbers stand as the loaded-scale observation).
+Result bundles: `/private/tmp/plainsong-export-g-20b-run1.xcresult` (full matrix),
+`/private/tmp/plainsong-export-g-20b-run2.xcresult` (ExportPDF* rerun).

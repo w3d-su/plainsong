@@ -31,7 +31,12 @@
 > PR G continuation (2026-10-07) implements the amended D4: A1 variable-height
 > pagination, PDF-space scaling, and B1 printing of the captured PDF through the
 > standard panel — which required `com.apple.security.print` — with File › Print…
-> on ⌘P. Real panel/Powerbox, keyboard/VoiceOver, and idle PDF timing stay open.** Precedent:
+> on ⌘P. PR G continuation (2026-10-08) implements the per-page owner decision:
+> each page gets its own width and, for PDF, its own scale — one wide element no
+> longer shrinks every page, and a shrunk page warns instead of failing; Print's
+> paper aspect becomes a soft page budget, so a tall image or diagram extends one
+> page (scaled to fit at print) instead of erroring. Real panel/Powerbox,
+> keyboard/VoiceOver, and idle PDF timing stay open.** Precedent:
 > PR #45 and PR #95. Every E0–E9 checkbox may be checked only with named test evidence
 > or an owner-recorded result in the same commit.
 
@@ -309,10 +314,12 @@ uniform zoom to the whole capture before pagination; the zoom is not per element
 Pagination then uses the post-scale block bounds and the E0 fixed-height plan. Print
 uses the same expansion, then `NSPrintInfo.horizontalPagination = .fit` for the paper
 width. The standard print panel stays visible, including its scaling control, and
-Plainsong does not write a file for a system or panel PDF destination. A layout wider
-than about 14,000 pt terminates the current WebKit process when it is measured at full
-size, so the zoom is applied from the contained scroll width before expansion. The
-factor itself is `ExportPDFPagePlanner.uniformScale`. PDF remains panel-first, matching
+Plainsong does not write a file for a system or panel PDF destination. (Historical,
+not reproduced (2026-10-07/08): this paragraph recorded that a layout wider than
+about 14,000 pt terminates the WebKit process at full-size measurement, which is why
+the zoom was chosen from the contained scroll width before expansion; neither the A1
+nor the per-page-width path reproduces the termination — see the 2026-10-07 amendment
+and the 2026-10-08 owner decision below.) PDF remains panel-first, matching
 Export as HTML…. Print renders first because the panel paginates that completed render.
 
 **Amended 2026-10-07 (A1 page plan; B1 print path).** Two implementation choices made
@@ -329,8 +336,10 @@ destinations, panel-first PDF.
   position not strictly inside a merged unsplittable interval; gaps between blocks,
   items, rows, and lines fall out of the complement with no container classification.
   `ExportPDFPagePlanner.plan` ends each page at the last safe break within a CSS-point
-  budget of `14,400 / scale` for PDF — and, for Print, additionally the paper imageable
-  `width × aspect`. Spans that merely touch keep their shared edge; only an overlap
+  budget of `14,400 / scale` for PDF (the scale is each page's own since
+  2026-10-08 — see the owner decision below) — and, for Print, additionally the paper
+  imageable `width × aspect`. Spans that merely touch keep their shared edge; only an
+  overlap
   greater than 0.5 pt merges. One unbreakable run taller than the budget fails typed as
   `oversizeAtomicBox` with its post-scale height. Fixed/sticky/transformed/floated
   elements are reported as offenders; a planned break that would cross one fails typed
@@ -338,7 +347,8 @@ destinations, panel-first PDF.
   stop referenced from `ExportPDFMeasurement`. Capture then runs at full size, one
   `pdf(configuration:)` call per planned rect, and `ExportPDFPageJoiner` concatenates
   the pieces through `CGContext` PDF pages. When the contained width exceeds 14,400 pt
-  the joiner scales every media box and its drawing by `uniformScale` in PDF space, so
+  the joiner scales media boxes and drawing in PDF space — uniformly at this step
+  (`uniformScale`; per page by `pageScale` since 2026-10-08), so
   text stays vector and extractable and every page stays inside the default user space.
   This replaces the recorded "uniform zoom before pagination": no WebKit zoom is
   applied, and the 14,000 pt termination claim that motivated it is revised — under A1
@@ -361,6 +371,38 @@ destinations, panel-first PDF.
   the panel opens. If the user changes paper size or orientation in the panel, the
   pre-planned pages scale to fit and may show extra margins; re-planning on panel
   changes is out of scope.
+
+**Owner decision 2026-10-08 (per-page width and scale; soft Print aspect).** One wide
+element must not shrink every page, and Print must not refuse an image or diagram
+taller than one paper page. Under the same sign-off:
+
+- **Every page gets its own width — for PDF and Print.** The measurement JS also
+  returns the baseline width (the `#preview-root` border edge after the settle,
+  padding included) and the right edge of every element or line box that overflows
+  the root's content box. `ExportPDFPagePlanner.plan` gives each page the maximum
+  right edge of the content intersecting its vertical span, never below the baseline
+  and never above the settled content width. The greedy plan recomputes width as the
+  page's span grows: width only increases through the finite set {baseline} ∪
+  {each overflow edge} ∪ {content width}, so the fixed point terminates, and the
+  emitted page's height is bounded by the budget of its final width.
+- **Per-page PDF scaling; a shrunk page warns, it does not fail (C2).**
+  `uniformScale` is replaced by `pageScale(width)`: a page is scaled in PDF space
+  only when its own width exceeds 14,400 pt, and `ExportPDFPageJoiner` applies each
+  piece's own factor to its media box and drawing. There is no minimum scale and no
+  refusal: a PDF with any scaled page still commits, then posts the
+  `exportedWithShrunkPages` warning (accessible, spoken, symbol-plus-text, never
+  color-only) naming up to three pages and the smallest percentage with the
+  "very wide line or table" advice. Print shows no warning — the panel's preview
+  already shows the per-page scaling.
+- **The paper aspect is a soft budget for Print.** Each page's height budget is
+  `width × aspect` (the orientation-aware `imageablePageBounds` ratio — landscape
+  paper plans landscape-shaped pages). When the budgeted break would land inside an
+  unbreakable run that already reaches the page top, the page extends to the run's
+  end and `.pageScaleToFit` shrinks that one page onto the sheet; only a run taller
+  than the hard `14,400 / scale` cap still fails as `oversizeAtomicBox`, for both
+  products. The aspect comes from the panel-persisted `NSPrintInfo`: a completed
+  print run's paper size and orientation carry to the next Print…; a cancelled run
+  changes nothing.
 
 ### D5 — One-shot sandbox write path
 
@@ -976,9 +1018,10 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
 - [x] Print… prints the captured PDF through `PDFDocument.printOperation(for:
   scalingMode:autoRotate:)` (B1) and presents the standard macOS print panel; it does
   not show `NSSavePanel` first. The hosted tests assert `showsPrintPanel`,
-  `showsProgressPanel`, and that the save-panel seam is not called; a suppressed-panel
-  real `runModal` job produces a readable PDF, and real-sheet cancel/supersede unwind
-  the operation.
+  `showsProgressPanel`, and that the save-panel seam is not called; opt-in
+  (`TEST_RUNNER_PLAINSONG_REAL_PRINT=1`, skipped by default) real `runModal` runs
+  confirm a suppressed-panel job produces a readable PDF and that real-sheet
+  cancel/supersede unwind the operation.
 - [ ] Both use the same completed offscreen snapshot and include finalized images,
   KaTeX, highlighting, Mermaid, MDX placeholders, and resolved theme.
 - [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
@@ -992,13 +1035,23 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   `testPrintAspectBoundsPageHeightForThePaper`,
   `testWideTableCodeMathAndMermaidStayInsideTheCapture`,
   `testCaptureErrorAndMidCaptureCancelPropagateTyped`,
-  `ExportPrintSheetAppTests.testRealPrintJobProducesLightThemePDFWithEverySentinelOnce`,
-  `testCancelDuringRealPrintSheetIsSilent`,
+  `ExportPrintPaginationAppTests.testTallImageExtendsItsPrintPageWithoutFailing`,
+  `testPhoneScreenshotPrintsOnceWithoutFailing`,
+  `testTallMermaidFlowchartPrintsEveryNodeOnce`,
+  `testWideTableWidensOnlyItsPrintPages`,
+  `testLandscapePrintInfoProducesLandscapeShapedPages`,
+  `testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`,
+  `ExportPrintSheetAppTests.testPrintCompletionResolvesExactlyOnceAndIsRetainedUntilDidRun`,
+  plus the opt-in real-panel extras (`TEST_RUNNER_PLAINSONG_REAL_PRINT=1`, skipped by
+  default): `testRealPrintJobProducesLightThemePDFWithEverySentinelOnce`,
+  `testCancelDuringRealPrintSheetIsSilent`, and
   `testSupersedeDuringRealPrintSheetFinishesAndReleasesObjects`,
-  `testPrintCompletionResolvesExactlyOnceAndIsRetainedUntilDidRun`,
-  `ExportPDFMatrixAppTests.testPDFAndPrintMatrixAcrossThemesAndFixtures`, and
+  `ExportPDFMatrixAppTests.testPDFAndPrintMatrixAcrossThemesAndFixtures` (the
+  `printDocumentObserver` seam asserts each fixture's real content on the captured
+  `PDFDocument` handed to PDFKit), and
   `ExportHTMLCommandAppTests.testPDFAndPrintLeaveEditorPreviewAndDocumentStateUnchanged`.
-  The interactive Print panel remains owner smoke in `docs/export-pdf-print-checklist.md`.
+  With content asserted on the captured print PDF, only the final PDFKit-to-device
+  print hop remains owner smoke, in `docs/export-pdf-print-checklist.md`.
   KaTeX, code, Mermaid, MDX placeholders, a wide table, and the light print theme are in
   the hosted capture/print job; finalized raster images and highlighted-code styling in
   the PDF are still not asserted, so that bullet stays open.
@@ -1375,13 +1428,18 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `testProductionTallCaptureKeepsEverySentinelOnceInOrder` (A1 variable-height pages,
   every sentinel once). `ExportPDFAcceptanceAppTests` captures every named fixture plus
   generated 700-item list, 800-line code, and 2000-row table sources with every marker
-  once and every page inside the default user space. `ExportPDFPagePlannerTests` pins
-  the invariants on synthetic geometry: safe breaks between line boxes, items, and
-  table rows, the scale and Print-aspect budgets, and the typed `oversizeAtomicBox`.
+  once and every page inside the default user space. `ExportPDFPagePlannerTests` and
+  `ExportPDFPagePlannerWidthTests` pin the invariants on synthetic geometry: safe
+  breaks between line boxes, items, and table rows, per-page width and scale (only a
+  page whose own content overflows widens/shrinks), the soft Print aspect budget with
+  atomic-run extension, the hard cap's typed `oversizeAtomicBox`, and landscape
+  aspecting. Per-page width is exercised hosted by
+  `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages` and the C2
+  warning by `ExportPDFShrunkPagesAppTests`.
   The 2026-10-06 note that a hosted capture wider than about 14,000 pt terminates the
   web process is revised per the D4 amendment: the A1 full-size path does not
   reproduce it, so the over-maximum factor is exercised hosted rather than only
-  unit-pinned (`testUniformScaleShrinksOnlyPastTheMaximum` still pins the formula).
+  unit-pinned (`testPageScaleShrinksOnlyPastTheMaximum` still pins the formula).
 
 ### E9 — Accessibility, performance, security, and regression
 
@@ -1659,7 +1717,8 @@ PDF/Print E9 timing is **pending idle-machine run**.
   `oversizeAtomicBox`, and a break crossing an offender throws
   `break-crosses-positioned-content`. `ExportPDFPageJoiner` concatenates the per-page
   `pdf(configuration:)` captures, scaling media boxes and drawing by `uniformScale`
-  in PDF space when the contained width exceeds 14,400 pt.
+  in PDF space when the contained width exceeds 14,400 pt (superseded by the
+  per-page `pageScale` of the 2026-10-08 owner decision below).
 - Print (B1): the same snapshot renders light, the planner bounds pages by the
   imageable aspect, and `PDFDocument.printOperation(.pageScaleToFit)` runs the real
   standard panel. `com.apple.security.print` is required — without it the sandboxed
@@ -1695,10 +1754,44 @@ PDF/Print E9 timing is **pending idle-machine run**.
   recorded load): see `docs/perf-log.md`. `large-1mb.md` stays opt-in.
 - Environment note: the hosted real-print path needs a configured CUPS destination
   inside the sandbox; the sheet tests skip with a reason when
-  `NSPrinter.printerNames` is empty. The offline tests need the external loopback
+  `NSPrinter.printerNames` is empty. Since 2026-10-08 they are additionally opt-in —
+  `TEST_RUNNER_PLAINSONG_REAL_PRINT=1` is required, so they do not run in the default
+  matrix. The offline tests need the external loopback
   recorder (`TEST_RUNNER_PLAINSONG_EXPORT_TEST_PROXY_PORT`); reusing a recorder
   across `xcodebuild` invocations breaks `ExportHTMLOfflineTests`'s strict
   empty-recorder assert, so each run gets a fresh proxy.
 - Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud, keyboard-only
   and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine run**), and the
   E5 finalized-images/highlighted-code assertions.
+### PR G per-page width/scale implementation — 2026-10-08
+
+- Mechanism: the measurement script also returns the settled `#preview-root`
+  baseline width and a `wide` list of overflow right edges (minY, maxY, maxX —
+  the edge plus root right padding). `ExportPDFPagePlanner.plan` computes each
+  page's own width as the widest edge intersecting its span, clamped to
+  [baseline, contentWidth]; `hard(W) = 14,400 / pageScale(W)` and, for Print,
+  `soft(W) = min(hard, W × aspect)`. The greedy fixed point grows W only through
+  the finite set {baseline} ∪ {ceil maxX} ∪ {contentWidth}, so it terminates;
+  each emitted page is contiguous, covers [0, contentHeight] with no empty page,
+  contains every right edge in its span, and respects the hard cap — plus the
+  soft aspect budget unless it extends to the end of an atomic run. A break
+  crossing positioned content throws `breakCrossesPositionedContent`.
+- Joiner/document: `ExportPDFPageJoiner.join(pieces:scales:)` scales each
+  piece's media box and drawing CTM by its own factor (mismatched counts throw);
+  `ExportPDFDocument` exposes `pageScales`, `pageWidths`, `minimumScale`, and
+  `shrunkPages`. A PDF with shrunk pages still commits, then posts the
+  `exportedWithShrunkPages` warning naming up to three pages and the smallest
+  percentage. Print shows no warning.
+- Print: `exportPrintPageAspect` reads the orientation-aware imageable bounds
+  with no manual inversion, so landscape `NSPrintInfo` yields a landscape
+  aspect; the soft budget extends a page to the end of a tall atomic run (a tall
+  image or Mermaid diagram) instead of throwing. The run's `operation.printInfo`
+  copy persists to the next Print on success only. `printDocumentObserver`
+  exposes the captured `PDFDocument` for hosted content assertions.
+- Verification: see the locked hosted runs recorded with this change
+  (PreviewKit `swift test`, the ExportPDF*/ExportPrint*/ExportHTML*/
+  ExportDestination* matrix — ExportPDF* twice — `make build`, pinned lint).
+  Result bundle paths are recorded in `docs/perf-log.md` and the PR notes.
+- Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud,
+  keyboard-only and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine
+  run**), and the E5 finalized-images/highlighted-code assertions.

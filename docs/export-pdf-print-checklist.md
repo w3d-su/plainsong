@@ -2,8 +2,11 @@
 
 **Ready for the owner.** Automated PDF/Print tests now cover the offscreen capture on
 every named fixture plus generated long fixtures (A1 acceptance), the save-panel seam,
-the real `runModal` print path (suppressed-panel job, real-sheet cancel and supersede,
-light-theme print output), the ⌘P File-menu item, and typed capture-error notices. The
+the standard print-panel path (the `printOperationRunner` and `printDocumentObserver`
+seams exercise the real operation with the panel suppressed or the run faked), the ⌘P
+File-menu item, and typed capture-error notices. The real `runModal` sheet tests
+(suppressed-panel job, real-sheet cancel and supersede, light-theme print output) are
+opt-in via `TEST_RUNNER_PLAINSONG_REAL_PRINT=1` — see the last item below. The
 sandbox now carries `com.apple.security.print`; without it the app sees no CUPS
 destinations. Every box below still needs a real `NSSavePanel`, interactive Print
 panel, or VoiceOver pass. Record date, macOS version, exact build commit,
@@ -29,6 +32,14 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   an atomic element taller than the page budget (a very tall diagram, image, or
   formula) shows the dedicated "taller than a PDF page can hold (200 inches)"
   notice, not the generic render error.
+- [ ] Per-page width: export a post with one very wide table in the middle.
+  Pages containing the table are wider than the text-only pages, and the
+  text-only pages stay at the normal width (hosted:
+  `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`).
+- [ ] C2 warning: export a post containing a single minified line wider than
+  14,400 pt. The PDF is still written, its wide page is visibly shrunk to fit
+  200 inches, and the warning banner names the page and the smallest percentage
+  (hosted: `ExportPDFShrunkPagesAppTests`).
 - [ ] Cancel destination/progress and inspect failure feedback: no destination
   publication and no source, selection, scroll, baseline, identity, recents, tree,
   recovery or visible-preview change; panel focus causes no source autosave.
@@ -37,24 +48,47 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
 
 - [ ] Print opens the standard panel from the completed offscreen render, with
   no preliminary save panel and no mounted export preview. (Hosted:
-  `showsPrintPanel` on the real operation, `runModal` path exercised.)
+  `showsPrintPanel` on the real operation; the `runModal` path is exercised by
+  the opt-in `TEST_RUNNER_PLAINSONG_REAL_PRINT=1` run.)
 - [ ] Paper size/orientation/pagination and system PDF actions work through
   AppKit; Plainsong performs no artifact write for these system destinations.
+  The panel's preview shows the per-page scaling (each page's own width, shrunk
+  only where content overflows 14,400 pt). Landscape paper produces
+  landscape-shaped pages (hosted:
+  `ExportPrintPaginationAppTests.testLandscapePrintInfoProducesLandscapeShapedPages`).
   Known limitation: pages are planned to the imageable aspect at panel-open, so
   changing paper size or orientation in the panel makes the pre-planned pages
   scale to fit and may show extra margins (re-planning is out of scope).
+- [ ] Panel persistence: change paper size or orientation in the panel and
+  complete a Print; the next Print… opens with those choices. Cancel a run and
+  confirm the previous choices remain (hosted:
+  `ExportPrintPaginationAppTests.testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`).
 - [ ] Cancel and error release the operation and controller, with correct
-  feedback and unchanged document/session/visible-preview state. (Hosted:
+  feedback and unchanged document/session/visible-preview state. (Opt-in hosted:
   `testCancelDuringRealPrintSheetIsSilent`,
   `testSupersedeDuringRealPrintSheetFinishesAndReleasesObjects`.)
 - [ ] Markdown, MDX, math/code/Mermaid, images and wide tables remain complete
   across paper/page boundaries; compare PDF content/theme, not identical breaks.
-  (Hosted: `testRealPrintJobProducesLightThemePDFWithEverySentinelOnce` —
+  (Hosted by default: `ExportPDFMatrixAppTests` asserts real md/mdx/math content
+  on the captured print PDF via `printDocumentObserver`; opt-in real sheet:
+  `testRealPrintJobProducesLightThemePDFWithEverySentinelOnce` —
   table/code/KaTeX/Mermaid sentinels once, dark ink on light paper.)
 - [ ] Print… is on ⌘P and there is exactly one Print item and no Page Setup…
   item in the File menu. (Hosted: `testFileMenuHasExactlyOnePrintWithCommandP`.)
 - [ ] Print a long post: multiple paper pages, and the output is dark ink on
   white paper even when the app is in dark theme (B1 always prints light).
+- [ ] Tall atomic content prints instead of erroring: a tall phone screenshot
+  (~1,584 pt) and a tall Mermaid `flowchart TD` (~30 nodes) each extend one
+  page (scaled to fit the sheet) rather than failing — only a run taller than
+  ~200 inches shows the "too tall to print (over 200 inches)" notice
+  (hosted: `ExportPrintPaginationAppTests.testPhoneScreenshotPrintsOnceWithoutFailing`,
+  `testTallMermaidFlowchartPrintsEveryNodeOnce`,
+  `testTallImageExtendsItsPrintPageWithoutFailing`).
+- [ ] Opt-in real-printer check (requires a CUPS destination; skips otherwise):
+  `TEST_RUNNER_PLAINSONG_REAL_PRINT=1 xcodebuild test -project Plainsong.xcodeproj -scheme Plainsong -only-testing:PlainsongTests/ExportPrintSheetAppTests`
+  — covers all three real-panel tests: one job-saving print (light theme, every
+  sentinel once), a real-sheet cancel, and a real-sheet supersede. Do not add,
+  remove, or change printers.
 
 ## Keyboard and VoiceOver
 
@@ -66,7 +100,7 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   light, dark and resolved-system themes. Untitled/non-workspace windows refuse.
 
 Performance remains **pending idle-machine run** for formal PDF/Print E9. The A1
-acceptance suite now records per-fixture pages/max height/scale/capture time under
-recorded load in `docs/perf-log.md`, including the opt-in `large-1mb.md` capture
-(56 pages, ~18 s under load 8); these are recorded-load observations, not budgets,
+acceptance suite now records per-fixture pages/widest page/smallest scale/capture
+time under recorded load in `docs/perf-log.md`, including the opt-in `large-1mb.md`
+capture; these are recorded-load observations, not budgets,
 and no owner-acceptance result is inferred from them.
