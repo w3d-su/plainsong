@@ -1,0 +1,7 @@
+# Required resources inside PlainsongIOS.app (bundle-relative, one per line).
+# The committed preview bundle is additionally verified byte-for-byte via the
+# runner's --parity check; keep these three as the minimum declared contract.
+preview/index.html
+preview/bundle.js
+preview/bundle.css
+preview/font-manifest.json
