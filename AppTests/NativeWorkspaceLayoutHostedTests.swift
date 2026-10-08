@@ -27,6 +27,7 @@ extension EditorFindHostedGateTests {
                 let setting = NativeInspectorIntent(intent)
                 let host = makeNativeLayoutHost(appState: state, shell: shell, setting: setting)
                 registerTeardown(host: host, fixture: fixture)
+                var inspectorColumnWidth: CGFloat?
                 for requested in [900.0, 720, 735, 760, 900, 1280] {
                     // setContentSize bypasses AppKit's interactive resize constraint; model the
                     // user's resize with the production window's actual contentMinSize.
@@ -58,6 +59,11 @@ extension EditorFindHostedGateTests {
                         try await waitUntil("inspector restored iff requested") {
                             (self.layoutFrame("inspector", in: host.window) != nil) == intent
                         }
+                        if intent {
+                            let handle = try XCTUnwrap(layoutFrame("handle", in: host.window))
+                            let inspector = try XCTUnwrap(layoutFrame("inspector", in: host.window))
+                            inspectorColumnWidth = inspector.maxX - handle.minX
+                        }
                     } else if state.isPreviewVisible {
                         try await waitUntil("narrow Split auto-collapses") {
                             self.layoutFrame("inspector", in: host.window) == nil
@@ -86,16 +92,53 @@ extension EditorFindHostedGateTests {
                         try await waitUntil("menu stays hidden after shrink") {
                             InspectorMenuState.shared.isKeyWindowInspectorPresented == false
                         }
-                        InspectorMenuState.shared.toggleKeyWindowInspector()
-                        try await waitUntil("explicit Show persists and widens to fit") {
-                            setting.value && self.layoutFrame("inspector", in: host.window) != nil
-                        }
-                        try await assertNativeLayout(in: host.window, preview: true)
+                        try await checkExplicitShow(
+                            host: host,
+                            setting: setting,
+                            inspectorColumnWidth: XCTUnwrap(inspectorColumnWidth)
+                        )
                     }
                 }
                 print("NATIVE_LAYOUT shell=\(shell) layout=\(layout) intent=\(intent) samples=6")
             }
         }
+    }
+
+    /// Explicit Show widens the window by the inspector's deficit, but only within the screen's
+    /// visible frame. On a screen too narrow for that (CI's VM display), the intent persists and
+    /// the inspector stays collapsed without squeezing the editor or preview.
+    private func checkExplicitShow(
+        host: HostedWorkspace,
+        setting: NativeInspectorIntent,
+        inspectorColumnWidth: CGFloat
+    ) async throws {
+        let window = host.window
+        let visible = try XCTUnwrap(window.screen, "Explicit Show widens within the window's screen").visibleFrame
+        let editor = try XCTUnwrap(layoutFrame("editor", in: window))
+        let available = host.hostingView.bounds.width - editor.minX
+        let required = WorkspaceLayout.contentMinimum(preview: true) + inspectorColumnWidth
+        let neededWindowWidth = window.frame.width + required - available
+        let fits = neededWindowWidth <= visible.width + 0.5
+        let diagnostics = "branch=\(fits ? "widen" : "screen-limited") visibleFrame=\(visible) required=\(required) "
+            + "available=\(available) neededWindowWidth=\(neededWindowWidth)"
+        print("INSPECTOR_SHOW \(diagnostics)")
+        InspectorMenuState.shared.toggleKeyWindowInspector()
+        if fits {
+            try await waitUntil("explicit Show persists and widens to fit (\(diagnostics))") {
+                setting.value && self.layoutFrame("inspector", in: window) != nil
+            }
+            XCTAssertGreaterThanOrEqual(window.frame.width, neededWindowWidth - 0.5, diagnostics)
+        } else {
+            try await waitUntil("explicit Show persists and grows to the screen (\(diagnostics))") {
+                host.hostingView.layoutSubtreeIfNeeded()
+                return setting.value && abs(window.frame.width - visible.width) <= 0.5
+            }
+            XCTAssertNil(layoutFrame("inspector", in: window), diagnostics)
+            XCTAssertEqual(InspectorMenuState.shared.isKeyWindowInspectorPresented, false, diagnostics)
+        }
+        XCTAssertTrue(setting.value, diagnostics)
+        XCTAssertLessThanOrEqual(window.frame.width, visible.width + 0.5, diagnostics)
+        try await assertNativeLayout(in: window, preview: true)
     }
 
     private func assertNativeLayout(in window: NSWindow, preview: Bool) async throws {
