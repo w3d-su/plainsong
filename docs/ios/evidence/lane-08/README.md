@@ -14,7 +14,7 @@
 |---|---|
 | Branch | `phase3-ios-authoring-tools` |
 | 實作基準 | `ios-c0-v1` = `642cb212703220409874a2741c5adbfb8c80fe8a` |
-| PR | https://github.com/w3d-su/plainsong/pull/155。寫入本檔時 GitHub base 仍是 `phase3-ios-parallel-handoffs`。推送實作 commit 之後把 base 改成 `phase3-ios-integration`，不 merge |
+| PR | https://github.com/w3d-su/plainsong/pull/155。`79b0f71` 推送後，base 從 `phase3-ios-parallel-handoffs` 改為 `phase3-ios-integration`。不 merge |
 | 修改路徑 | `AppIOS/Features/Authoring/**`、`AppIOSTests/Authoring/**`、`docs/ios/evidence/lane-08/**` |
 | Doubles | `AuthoringEditorFake` 與 `RecordingFindScheduler` 只在 `AppIOSTests/Authoring/`。沒有第二份 public editor protocol |
 | 快捷鍵 | `IOSAuthoringCatalog` 只提供 descriptor。`installsKeyCommands == false`。View 沒有 `UIKeyCommand` 或 SwiftUI `.keyboardShortcut` |
