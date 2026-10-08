@@ -100,18 +100,27 @@ extension PreviewController {
     /// over non-whitespace text nodes, atomic subtrees rejected). Emitted as a flat
     /// [minY, maxY, …] number array in document coordinates to keep the JSON small.
     ///
+    /// `baselineWidth` is the root border-box's right edge — the normal content width
+    /// including padding — measured after the geometry settle, when the overflow style
+    /// may already have grown the root past the export viewport. `wide` is a flat
+    /// [minY, maxY, maxX, …] triple list of every measured element or line box whose
+    /// right edge overflows the root's content box; the planner uses it to give each
+    /// page the width of the widest content on that page (`maxX` re-adds the right
+    /// padding so a page covers the padded overflow edge).
+    ///
     /// Elements with computed position fixed/sticky, a non-none transform, or a float are
     /// returned as offenders: a break cannot be proven safe across one (the A1 design
     /// stop in `docs/export-gates.md`), so the caller fails typed when a planned break
     /// would land strictly inside one.
-    func measureUnsplittableSpans() async throws -> (
-        spans: [ExportPDFPagePlanner.Span],
-        offenders: [ExportPositionedOffender]
-    ) {
+    func measureUnsplittableSpans() async throws -> ExportSpanMeasurementResult {
         let script = """
         JSON.stringify((() => {
           const root = document.getElementById("preview-root");
-          if (!root) return { spans: [], offenders: [] };
+          if (!root) return { spans: [], offenders: [], wide: [], baselineWidth: 0 };
+          const rootRect = root.getBoundingClientRect();
+          const padR = parseFloat(getComputedStyle(root).paddingRight) || 0;
+          const baselineWidth = Math.ceil(rootRect.right + window.scrollX);
+          const contentRight = rootRect.right + window.scrollX - padR;
           const atomicSelector = [
             "img", "svg", "video", "canvas", "iframe", "input", "hr", "tr",
             ".katex", ".katex-display", ".plainsong-math-block", ".mermaid-rendered"
@@ -125,9 +134,18 @@ extension PreviewController {
             return false;
           };
           const spans = [];
+          const wide = [];
+          const pushWide = (rect) => {
+            if (rect.height <= 0) return;
+            const right = rect.right + window.scrollX;
+            if (right > contentRight + 0.5) {
+              wide.push(rect.top + window.scrollY, rect.bottom + window.scrollY, right + padR);
+            }
+          };
           const pushRect = (rect) => {
             if (rect.height <= 0) return;
             spans.push(rect.top + window.scrollY, rect.bottom + window.scrollY);
+            pushWide(rect);
           };
           for (const el of atomics) pushRect(el.getBoundingClientRect());
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -145,6 +163,7 @@ extension PreviewController {
           }
           const offenders = [];
           for (const el of root.querySelectorAll("*")) {
+            pushWide(el.getBoundingClientRect());
             const style = getComputedStyle(el);
             const positioned = style.position === "fixed" || style.position === "sticky";
             const transformed = style.transform && style.transform !== "none";
@@ -158,25 +177,66 @@ extension PreviewController {
               maxY: rect.bottom + window.scrollY
             });
           }
-          return { spans: spans, offenders: offenders };
+          return {
+            spans: spans,
+            offenders: offenders,
+            wide: wide,
+            baselineWidth: baselineWidth
+          };
         })())
         """
         guard let json = try await evaluateExportJavaScript(script, label: "unsplittable spans") as? String,
-              let data = json.data(using: .utf8),
-              let measurement = try? JSONDecoder().decode(ExportSpanMeasurement.self, from: data)
+              let data = json.data(using: .utf8)
         else { throw ExportPDFCaptureError.geometryUnstable }
-        guard measurement.spans.count % 2 == 0 else {
-            throw ExportPDFCaptureError.geometryUnstable
+        return try await decodeSpanMeasurement(data)
+    }
+
+    /// Decoding and flattening the span payload is pure `Data` work, so it runs off the
+    /// main actor; WebKit evaluation stays on main. Cancellation is forwarded into the
+    /// worker, mirroring `joinAndReparse`.
+    private func decodeSpanMeasurement(
+        _ data: Data
+    ) async throws -> ExportSpanMeasurementResult {
+        let task = Task.detached(priority: .userInitiated) { () throws -> ExportSpanMeasurementResult in
+            try Task.checkCancellation()
+            guard let measurement = try? JSONDecoder().decode(ExportSpanMeasurement.self, from: data) else {
+                throw ExportPDFCaptureError.geometryUnstable
+            }
+            guard measurement.spans.count % 2 == 0, measurement.wide.count % 3 == 0 else {
+                throw ExportPDFCaptureError.geometryUnstable
+            }
+            var spans: [ExportPDFPagePlanner.Span] = []
+            spans.reserveCapacity(measurement.spans.count / 2)
+            for index in stride(from: 0, to: measurement.spans.count, by: 2) {
+                let minY = measurement.spans[index]
+                let maxY = measurement.spans[index + 1]
+                guard minY.isFinite, maxY.isFinite, maxY > minY else { continue }
+                spans.append(ExportPDFPagePlanner.Span(minY: minY, maxY: maxY))
+            }
+            var wide: [ExportPDFPagePlanner.WidthExtent] = []
+            wide.reserveCapacity(measurement.wide.count / 3)
+            for index in stride(from: 0, to: measurement.wide.count, by: 3) {
+                let minY = measurement.wide[index]
+                let maxY = measurement.wide[index + 1]
+                let maxX = measurement.wide[index + 2]
+                guard minY.isFinite, maxY.isFinite, maxX.isFinite, maxY > minY, maxX > 0 else { continue }
+                wide.append(ExportPDFPagePlanner.WidthExtent(minY: minY, maxY: maxY, maxX: maxX))
+            }
+            guard measurement.baselineWidth.isFinite else {
+                throw ExportPDFCaptureError.geometryUnstable
+            }
+            return ExportSpanMeasurementResult(
+                spans: spans,
+                offenders: measurement.offenders,
+                wide: wide,
+                baselineWidth: measurement.baselineWidth
+            )
         }
-        var spans: [ExportPDFPagePlanner.Span] = []
-        spans.reserveCapacity(measurement.spans.count / 2)
-        for index in stride(from: 0, to: measurement.spans.count, by: 2) {
-            let minY = measurement.spans[index]
-            let maxY = measurement.spans[index + 1]
-            guard minY.isFinite, maxY.isFinite, maxY > minY else { continue }
-            spans.append(ExportPDFPagePlanner.Span(minY: minY, maxY: maxY))
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
-        return (spans, measurement.offenders)
     }
 
     func evaluateExportJavaScript(_ script: String, label: String) async throws -> Any? {
@@ -203,6 +263,17 @@ private struct ExportContentMeasurement: Codable {
 private struct ExportSpanMeasurement: Codable {
     let spans: [CGFloat]
     let offenders: [ExportPositionedOffender]
+    let wide: [CGFloat]
+    let baselineWidth: CGFloat
+}
+
+/// The decoded span measurement: unsplittable spans, positioned offenders, overflow
+/// width extents, and the post-settle baseline content width.
+struct ExportSpanMeasurementResult: Sendable {
+    let spans: [ExportPDFPagePlanner.Span]
+    let offenders: [ExportPositionedOffender]
+    let wide: [ExportPDFPagePlanner.WidthExtent]
+    let baselineWidth: CGFloat
 }
 
 /// A fixed/sticky/transformed/floated element inside the export DOM, with its document

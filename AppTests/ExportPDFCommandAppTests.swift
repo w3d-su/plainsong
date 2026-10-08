@@ -18,7 +18,7 @@ final class ExportPDFCommandAppTests: XCTestCase {
         let recorder = fixture.record(returning: [destination])
         let before = ExportHTMLCommandAppTests.DocumentState(fixture.session)
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value
-        guard case let .exported(commit, _) = try XCTUnwrap(recorder.results.first?.result) else {
+        guard case let .exported(commit, _, _) = try XCTUnwrap(recorder.results.first?.result) else {
             return XCTFail("Expected a committed PDF, got \(recorder.results)")
         }
         XCTAssertEqual(commit.selectedURL, destination)

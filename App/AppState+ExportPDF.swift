@@ -84,10 +84,13 @@ extension AppState {
         if let stop = exportHTMLStopReason(for: snapshot) {
             return .stopped(stop)
         }
+        // PDFDocument is not Sendable, so parsing stays on main; the parse is lazy and
+        // runs once per Print, not per keystroke.
         guard let pdfDocument = PDFDocument(data: document.data) else {
             return .stopped(.renderFailed(reason: "print-document"))
         }
         guard let window = snapshot.window else { return .stopped(.documentChanged) }
+        exportHTMLOperations.printDocumentObserver?(pdfDocument)
         guard let operation = pdfDocument.printOperation(
             for: printInfo,
             scalingMode: .pageScaleToFit,
@@ -106,6 +109,9 @@ extension AppState {
         }
         let succeeded = await runExportPrintPanel(operation, window: window)
         if succeeded {
+            // A completed panel run persists the user's paper size and orientation for
+            // the next Print…; a cancelled one does not.
+            exportHTMLOperations.lastPrintInfo = operation.printInfo.copy() as? NSPrintInfo
             // The job is done; an edit made while the panel was up must not read as a
             // mid-operation document change.
             return .printed
@@ -116,22 +122,24 @@ extension AppState {
         return .stopped(.cancelled)
     }
 
-    /// A copy of the shared print info — or the test seam's — with the imageable area
-    /// the planner's page aspect comes from.
+    /// A copy of the panel's last chosen print info — or the test seam's — with the
+    /// imageable area the planner's page aspect comes from.
     private func exportPrintInfo() -> NSPrintInfo? {
         if let provider = exportHTMLOperations.printInfoProvider {
             return provider()
         }
+        if let last = exportHTMLOperations.lastPrintInfo {
+            return last.copy() as? NSPrintInfo
+        }
         return NSPrintInfo.shared.copy() as? NSPrintInfo
     }
 
-    /// Imageable height / width, orientation-aware: `imageablePageBounds` is expressed
-    /// in unrotated paper space, so landscape swaps the ratio.
+    /// Imageable height / width. `imageablePageBounds` is already orientation-aware
+    /// (landscape A4 reports 783 × 559), so the ratio is used as-is.
     private func exportPrintPageAspect(_ printInfo: NSPrintInfo) -> CGFloat {
         let bounds = printInfo.imageablePageBounds
         guard bounds.width > 0, bounds.height > 0 else { return 1 }
-        let aspect = bounds.height / bounds.width
-        return printInfo.orientation == .landscape ? 1 / aspect : aspect
+        return bounds.height / bounds.width
     }
 
     /// Typed mapping for PDF capture errors: supersede/cancel first (silent), then each
@@ -183,7 +191,11 @@ extension AppState {
             writeExportArtifact(request, exportSource: snapshot.session)
         }
         if case let .committed(commit) = outcome {
-            return .exported(commit, omittedImageCount: export.omittedImageCount)
+            return .exported(
+                commit,
+                omittedImageCount: export.omittedImageCount,
+                shrunkPages: document.shrunkPages
+            )
         }
         return .written(outcome)
     }

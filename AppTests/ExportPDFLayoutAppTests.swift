@@ -4,8 +4,8 @@ import PDFKit
 @testable import PreviewKit
 import XCTest
 
-/// Production Export as PDF… layout: export-only overflow, uniform scale, and the A1
-/// variable-height page plan (`docs/export-gates.md` D4).
+/// Production Export as PDF… layout: export-only overflow, per-page width and scale,
+/// and the A1 variable-height page plan (`docs/export-gates.md` D4).
 @MainActor
 final class ExportPDFLayoutAppTests: XCTestCase {
     func testWideTableCodeMathAndMermaidStayInsideTheCapture() async throws {
@@ -22,7 +22,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         let source = [table, code, math, mermaid, "AFTERALLSENTINEL"].joined(separator: "\n")
         let (controller, pdf) = try await capture(source)
         defer { controller.invalidate() }
-        XCTAssertEqual(pdf.scale, 1, "This fixture must stay under 14,400 pt so scale stays 1")
+        XCTAssertEqual(pdf.minimumScale, 1, "This fixture must stay under 14,400 pt so no page shrinks")
         XCTAssertLessThanOrEqual(pdf.contentSize.width, ExportPDFPagePlanner.maximumSide + 0.5)
         let text = Self.text(of: pdf.data)
         // The KaTeX and Mermaid sentinels must survive as extractable PDF text, proving
@@ -79,7 +79,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         let source = Self.tableSource(columns, cell: "x")
         let (controller, pdf) = try await capture(source)
         defer { controller.invalidate() }
-        XCTAssertEqual(pdf.scale, 1)
+        XCTAssertEqual(pdf.minimumScale, 1)
         XCTAssertGreaterThan(pdf.contentSize.width, 10000)
         XCTAssertLessThanOrEqual(pdf.contentSize.width, ExportPDFPagePlanner.maximumSide)
         XCTAssertEqual(Self.text(of: pdf.data).components(separatedBy: "SCALERIGHTSENTINEL").count - 1, 1)
@@ -95,7 +95,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         let (controller, pdf) = try await capture(source)
         defer { controller.invalidate() }
         XCTAssertGreaterThan(pdf.contentSize.width, 20000)
-        XCTAssertLessThan(pdf.scale, 1)
+        XCTAssertLessThan(pdf.minimumScale, 1)
         let text = Self.text(of: pdf.data)
         for marker in columns {
             XCTAssertEqual(text.components(separatedBy: marker).count - 1, 1, marker)

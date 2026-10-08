@@ -11,17 +11,33 @@ extension ExportHTMLNoticeMapper {
         }
     }
 
-    /// Every `ExportPDFCaptureError` case gets an actionable line; the oversize-atomic
-    /// cause is named directly rather than hidden behind the generic render failure.
-    static func captureDetail(_ error: ExportPDFCaptureError) -> String {
+    /// Every `ExportPDFCaptureError` case gets an actionable, product-aware line; the
+    /// oversize-atomic and positioned-content causes are named directly rather than
+    /// hidden behind the generic render failure.
+    static func captureDetail(_ error: ExportPDFCaptureError, product: ExportCommandProduct) -> String {
         switch error {
         case .oversizeAtomicBox:
-            "A diagram, image, or formula is taller than a PDF page can hold (200 inches). " +
+            product == .print
+                ? "A diagram, image, or formula is too tall to print (over 200 inches). " +
                 "Shrink or split it, then try again."
+                : "A diagram, image, or formula is taller than a PDF page can hold (200 inches). " +
+                "Shrink or split it, then try again."
+        case .breakCrossesPositionedContent:
+            product == .print
+                ? "An element with floating, sticky, or transformed styling sits where a page " +
+                "break is needed, so the document can’t be split into printed pages safely. " +
+                "Remove that styling, then try again."
+                : "An element with floating, sticky, or transformed styling sits where a page " +
+                "break is needed, so the PDF can’t be split into pages safely. " +
+                "Remove that styling, then try again."
         case .webContentProcessTerminated, .invalidated:
-            "The renderer stopped while preparing the PDF. Try again."
+            product == .print
+                ? "The renderer stopped while preparing the document for printing. Try again."
+                : "The renderer stopped while preparing the PDF. Try again."
         case .geometryUnstable:
-            "The layout kept changing while preparing the PDF. Try again."
+            product == .print
+                ? "The layout kept changing while preparing the document for printing. Try again."
+                : "The layout kept changing while preparing the PDF. Try again."
         case .captureFailed, .emptyDocument:
             "The document couldn’t be rendered for export. Try again."
         }

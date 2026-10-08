@@ -177,15 +177,21 @@ final class E0OffscreenPDFProbe {
         )
     }
 
-    /// The production A1 plan over the probe's settled geometry: variable-height page
-    /// rects whose breaks cut no line box or atomic box.
-    func planPagination(contentBounds: CGRect, scale: CGFloat = 1) async throws -> [CGRect] {
+    /// The production A1 plan over the probe's settled geometry: variable-height,
+    /// per-page-width page rects whose breaks cut no line box or atomic box.
+    func planPagination(
+        contentBounds: CGRect,
+        pageAspect: CGFloat? = nil
+    ) async throws -> [CGRect] {
         let measurement = try await controller.measureUnsplittableSpans()
-        return try ExportPDFPagePlanner.plan(
+        let plan = try ExportPDFPagePlanner.plan(
             contentSize: contentBounds.size,
+            baselineWidth: min(contentBounds.width, max(measurement.baselineWidth, 1)),
             unsplittable: measurement.spans,
-            scale: scale
-        ).pageRects
+            widthExtents: measurement.wide,
+            targetAspect: pageAspect
+        )
+        return plan.pages.map(\.rect)
     }
 
     func scroll(toY offset: CGFloat) async throws {

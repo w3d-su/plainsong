@@ -110,6 +110,8 @@ final class ExportPDFMatrixAppTests: XCTestCase {
             XCTFail("Print must not open a save panel")
             return nil
         }
+        var observed: PDFDocument?
+        fixture.appState.exportHTMLOperations.printDocumentObserver = { observed = $0 }
         fixture.appState.exportHTMLOperations.printOperationRunner = { _, _ in
             printed = true
             return true
@@ -120,6 +122,14 @@ final class ExportPDFMatrixAppTests: XCTestCase {
         // B1: paper is white — the print render is light under every preference.
         XCTAssertEqual(renderedTheme, "light", "Print \(name) \(theme)")
         XCTAssertNil(fixture.appState.exportHTMLNotice)
+        // E8: the captured PDF handed to PDFKit carries the fixture's real content.
+        let document = try XCTUnwrap(observed, "Print \(name) \(theme): no print PDF observed")
+        let text = (0 ..< document.pageCount)
+            .compactMap { document.page(at: $0)?.string }
+            .joined(separator: "\n")
+        for marker in sentinels[name] ?? [] {
+            XCTAssertTrue(text.contains(marker), "Print \(name) \(theme): missing \(marker)")
+        }
     }
 
     private static func text(of data: Data) -> String {

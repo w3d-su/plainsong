@@ -1,7 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Variable-height page plan for Export as PDF… (`docs/export-gates.md` D4, A1).
+/// Variable-height, per-page-width page plan for Export as PDF… and Print…
+/// (`docs/export-gates.md` D4, A1 + the 2026-10-08 owner decision).
 ///
 /// The caller measures **unsplittable spans** — every line box (Range.getClientRects over
 /// non-whitespace text nodes) and every atomic box (images, SVG, media, controls, rules,
@@ -11,12 +12,33 @@ import Foundation
 /// paragraphs and pre blocks all fall out of that complement automatically; no container
 /// classification is needed.
 ///
-/// Each page ends at the last safe break at or below its CSS-height budget
-/// (`maximumSide / scale`, optionally `width × targetAspect` for Print) from its top.
+/// Each page gets **its own width**: the maximum right edge of any content intersecting
+/// its vertical span, never narrower than the document's baseline content width (the
+/// measured `#preview-root` border edge) and never wider than the full content width.
+/// A page is scaled in PDF space only when its own width exceeds 14,400 pt, so one wide
+/// table or long line shrinks only the pages that contain it.
+///
+/// Each page ends at the last safe break at or below its CSS-height budget from its
+/// top. The **hard** budget is `maximumSide / pageScale(width)` (equal to
+/// `max(14,400, width)`). `targetAspect` — `imageableHeight / imageableWidth` — adds a
+/// **soft** budget of `width × aspect` for Print: when a planned break would land inside
+/// an unbreakable run that already reaches the page top, the page extends to the run's
+/// end instead of failing, and `.pageScaleToFit` shrinks that one page onto paper. A run
+/// taller than the hard budget still fails as `oversizeAtomicBox`, for both products.
 /// Spans that merely touch — adjacent table rows, stacked line boxes — keep their shared
 /// edge as a valid break; only a genuine overlap (> 0.5 pt) merges spans into one
-/// unbreakable interval. A break can therefore only fail when one unbreakable run is
-/// taller than the budget, reported as `oversizeAtomicBox`.
+/// unbreakable run.
+///
+/// Termination and invariants: the inner fixed-point loop only ever increases `width`,
+/// through the finite set {baseline} ∪ {ceil(maxX) over extents} ∪ {contentWidth}, so it
+/// terminates after at most one growth step per width value; on exit
+/// `width == pageWidth(top, bottom)`, so the emitted page height is ≤ soft(width), or —
+/// after a soft extension — ≤ hard(width) or the plan throws. Every branch emits
+/// `bottom > top` (soft(width) > 0; the safe-break branch requires `I.minY > top + ε`;
+/// the extension branch yields `I.maxY > target > top`), so the outer loop terminates.
+/// Pages are contiguous, cover [0, contentHeight], and are never empty; every page's
+/// width lies within [baseline, contentWidth] and covers the right edge of every span it
+/// contains, so no content is clipped.
 public enum ExportPDFPagePlanner {
     public static let maximumSide: CGFloat = 14400
 
@@ -35,51 +57,77 @@ public enum ExportPDFPagePlanner {
         }
     }
 
-    /// The capture plan: contiguous full-size rects in document coordinates plus the
-    /// uniform PDF-space scale the joiner applies (≤ 1).
-    public struct Plan: Equatable, Sendable {
-        public let pageRects: [CGRect]
+    /// The rightmost edge (`maxX`, right padding included) of content occupying one
+    /// vertical interval. The measurement layer emits one only for content wider than
+    /// the baseline, so this list stays small.
+    public struct WidthExtent: Equatable, Sendable {
+        public let minY: CGFloat
+        public let maxY: CGFloat
+        public let maxX: CGFloat
+
+        public init(minY: CGFloat, maxY: CGFloat, maxX: CGFloat) {
+            self.minY = minY
+            self.maxY = maxY
+            self.maxX = maxX
+        }
+    }
+
+    /// One output page: its full-size capture rect in document coordinates (always
+    /// `x: 0`) and the PDF-space scale the joiner applies to it (≤ 1).
+    public struct Page: Equatable, Sendable {
+        public let rect: CGRect
         public let scale: CGFloat
 
-        public init(pageRects: [CGRect], scale: CGFloat) {
-            self.pageRects = pageRects
+        public init(rect: CGRect, scale: CGFloat) {
+            self.rect = rect
             self.scale = scale
         }
     }
 
-    /// 1 until the contained overflow width exceeds 14,400 pt, then the single factor that
-    /// brings that width down to the maximum. Applied to the whole capture, not per element.
-    public static func uniformScale(containedWidth: CGFloat) -> CGFloat {
-        guard containedWidth > maximumSide, containedWidth.isFinite else { return 1 }
-        return maximumSide / containedWidth
+    /// The capture plan: contiguous full-size page rects, each with its own width and
+    /// PDF-space scale.
+    public struct Plan: Equatable, Sendable {
+        public let pages: [Page]
+
+        public init(pages: [Page]) {
+            self.pages = pages
+        }
     }
 
-    /// Splits [0, `contentSize.height`] into page rects at safe breaks.
+    /// 1 while a page's own width fits the 14,400 pt default user space; otherwise the
+    /// factor that brings that page's width down to the maximum.
+    public static func pageScale(width: CGFloat) -> CGFloat {
+        guard width > maximumSide, width.isFinite else { return 1 }
+        return maximumSide / width
+    }
+
+    /// Splits [0, `contentSize.height`] into pages at safe breaks, giving each page the
+    /// width its own content requires.
     ///
-    /// `scale` is the uniform PDF-space factor from `uniformScale` (pages are captured at
-    /// full size and scaled when joined, so the CSS height budget is `maximumSide /
-    /// scale`). `targetAspect` — `imageableHeight / imageableWidth` — further bounds a
-    /// page to the paper's imageable aspect for Print; nil plans PDF pages bounded only
-    /// by the 14,400 pt default user space.
-    ///
-    /// Invariants: pages are contiguous, cover [0, contentHeight], are never taller than
-    /// the budget, are never empty, and all share `contentSize.width`.
+    /// `baselineWidth` is the document's normal content width including padding (the
+    /// `#preview-root` border edge measured after the geometry settle); it is clamped
+    /// into [1, contentSize.width]. `widthExtents` carries the overflow right edges.
+    /// `targetAspect` — the paper imageable `height / width` — bounds a page to
+    /// `width × aspect` for Print as a *soft* budget; nil plans PDF pages bounded only
+    /// by the hard 14,400 pt user-space cap. A non-finite aspect or one ≤ 0.01 (below
+    /// any real paper) is treated as nil.
     public static func plan(
         contentSize: CGSize,
+        baselineWidth: CGFloat,
         unsplittable: [Span],
-        scale: CGFloat,
+        widthExtents: [WidthExtent],
         targetAspect: CGFloat? = nil
     ) throws(ExportPDFCaptureError) -> Plan {
         let epsilon: CGFloat = 0.5
         let contentWidth = contentSize.width
         let contentHeight = contentSize.height
-        guard contentWidth > 0, contentHeight > 0, scale > 0, scale.isFinite else {
+        guard contentWidth > 0, contentHeight > 0,
+              contentWidth.isFinite, contentHeight.isFinite
+        else {
             throw .emptyDocument
         }
-        var budget = maximumSide / scale
-        if let targetAspect {
-            budget = min(budget, contentWidth * targetAspect)
-        }
+        let baseline = min(contentWidth, max(baselineWidth.isFinite ? baselineWidth : 1, 1))
+        let aspect = targetAspect.flatMap { $0.isFinite && $0 > 0.01 ? $0 : nil }
 
         // Union of the unsplittable intervals. Merge only on a real overlap so spans that
         // merely touch keep their shared edge as a valid break.
@@ -99,27 +147,91 @@ public enum ExportPDFPagePlanner {
             }
         }
 
-        var pageRects: [CGRect] = []
+        let extents = widthExtents
+            .filter { $0.maxY > $0.minY && $0.maxX > baseline }
+            .sorted { $0.minY < $1.minY }
+
+        func hard(_ width: CGFloat) -> CGFloat {
+            maximumSide / pageScale(width: width)
+        }
+        func soft(_ width: CGFloat) -> CGFloat {
+            guard let aspect else { return hard(width) }
+            return min(hard(width), width * aspect)
+        }
+
+        var pages: [Page] = []
         var top: CGFloat = 0
         while top < contentHeight - epsilon {
-            let target = top + budget
-            var breakY = target
-            if target >= contentHeight - epsilon {
-                breakY = contentHeight
-            } else if let interval = intervalStrictlyContaining(
-                target, in: intervals, epsilon: epsilon
-            ) {
-                breakY = interval.minY
-                guard breakY > top + epsilon else {
-                    throw .oversizeAtomicBox(heightPoints: interval.height * scale)
+            var width = baseline
+            while true {
+                let target = top + soft(width)
+                let bottom: CGFloat
+                var extended: Span?
+                if target >= contentHeight - epsilon {
+                    bottom = contentHeight
+                } else if let interval = intervalStrictlyContaining(
+                    target, in: intervals, epsilon: epsilon
+                ) {
+                    if interval.minY > top + epsilon {
+                        bottom = interval.minY
+                    } else {
+                        // Soft extension: no safe break exists before this unbreakable
+                        // run, so the page grows to its end and stays capped by `hard`.
+                        bottom = min(interval.maxY, contentHeight)
+                        extended = interval
+                    }
+                } else {
+                    bottom = target
                 }
+                let measured = pageWidth(
+                    top: top, bottom: bottom, baseline: baseline,
+                    contentWidth: contentWidth, extents: extents, epsilon: epsilon
+                )
+                if measured > width {
+                    width = measured
+                    continue
+                }
+                if let extended, bottom - top > hard(width) + epsilon {
+                    throw .oversizeAtomicBox(heightPoints: extended.height * pageScale(width: width))
+                }
+                pages.append(Page(
+                    rect: CGRect(x: 0, y: top, width: width, height: bottom - top),
+                    scale: pageScale(width: width)
+                ))
+                top = bottom
+                break
             }
-            pageRects.append(CGRect(
-                x: 0, y: top, width: contentWidth, height: breakY - top
-            ))
-            top = breakY
         }
-        return Plan(pageRects: pageRects, scale: scale)
+        return Plan(pages: pages)
+    }
+
+    /// The width the page [top, bottom) needs: the baseline, raised to the widest right
+    /// edge of any extent intersecting that span and clamped to the content width.
+    /// `extents` is sorted by `minY`; the binary search bounds the scan to extents that
+    /// can reach into the page.
+    private static func pageWidth(
+        top: CGFloat,
+        bottom: CGFloat,
+        baseline: CGFloat,
+        contentWidth: CGFloat,
+        extents: [WidthExtent],
+        epsilon: CGFloat
+    ) -> CGFloat {
+        var low = 0
+        var high = extents.count
+        while low < high {
+            let mid = (low + high) / 2
+            if extents[mid].minY < bottom - epsilon {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+        var width = baseline
+        for extent in extents[..<low] where extent.maxY > top + epsilon {
+            width = max(width, ceil(extent.maxX))
+        }
+        return min(contentWidth, width)
     }
 
     /// The merged interval whose interior (`minY + ε`, `maxY − ε`) holds `y`, if any.

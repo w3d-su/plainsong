@@ -35,24 +35,29 @@ final class ExportPDFAcceptanceAppTests: XCTestCase {
             fileKind: .markdown,
             markers: listMarkers
         )
-        let codeLines = (0 ..< 800).map {
-            String(format: "let codeline%04d = \"CODESENTINEL%04d\"", $0, $0)
+        // Every one of the 800 line sentinels must appear exactly once and in order —
+        // no line box may be dropped or duplicated across page breaks.
+        let codeMarkers = (0 ..< 800).map { String(format: "CODESENTINEL%04d", $0) }
+        let codeLines = codeMarkers.enumerated().map {
+            String(format: "let codeline%04d = \"%@\"", $0, $1)
         }.joined(separator: "\n")
         try await acceptFixture(
             label: "800-line code",
             source: "# Code\n\n```swift\n\(codeLines)\n```\n",
             fileKind: .markdown,
-            markers: ["CODESENTINEL0000", "CODESENTINEL0799"]
+            markers: codeMarkers
         )
-        let rows = (0 ..< 2000).map {
-            String(format: "| ROW%04d | TABLECELLSENTINEL%04d |", $0, $0)
+        // Same contract for every row of the 2,000-row table.
+        let tableMarkers = (0 ..< 2000).map { String(format: "TABLECELLSENTINEL%04d", $0) }
+        let rows = tableMarkers.enumerated().map {
+            String(format: "| ROW%04d | %@ |", $0, $1)
         }.joined(separator: "\n")
         let table = "| A | B |\n| --- | --- |\n\(rows)\n"
         try await acceptFixture(
             label: "2000-row table",
             source: table,
             fileKind: .markdown,
-            markers: ["TABLECELLSENTINEL0000", "TABLECELLSENTINEL1999"]
+            markers: tableMarkers
         )
     }
 
@@ -105,26 +110,35 @@ final class ExportPDFAcceptanceAppTests: XCTestCase {
         }
         let text = Self.text(of: pdf.data)
         try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(sentinels, in: text)
+        let widestPage = pdf.pageWidths.max() ?? 0
         XCTContext.runActivity(named: String(
-            format: "A1 acceptance %@ pages=%d maxPageHeight=%.1f scale=%.3f capture=%.2fs content=%.0fx%.0f",
-            label, pdf.pageCount, pdf.maximumPageHeight, pdf.scale, seconds,
+            format: "A1 acceptance %@ pages=%d widestPage=%.1fpt minScale=%.3f capture=%.2fs content=%.0fx%.0f",
+            label, pdf.pageCount, widestPage, pdf.minimumScale, seconds,
             pdf.contentSize.width, pdf.contentSize.height
         )) { _ in }
         print(String(
-            format: "A1 ACCEPTANCE %@ pages=%d maxPageHeight=%.1f scale=%.3f time=%.2fs",
-            label, pdf.pageCount, pdf.maximumPageHeight, pdf.scale, seconds
+            format: "A1 ACCEPTANCE %@ pages=%d widestPage=%.1fpt minScale=%.3f time=%.2fs",
+            label, pdf.pageCount, widestPage, pdf.minimumScale, seconds
         ))
     }
 
     /// Three heading markers at the third boundaries so once-and-in-order can be
-    /// asserted on fixtures that carry no sentinels of their own.
+    /// asserted on fixtures that carry no sentinels of their own. Fixtures that open
+    /// with a YAML frontmatter block get the markers after it — inserting inside the
+    /// `---` fences would corrupt the parse and change what the fixture measures.
     private static func injectAcceptanceSentinels(into markdown: String) -> (String, [String]) {
         let markers = ["ACCEPTSENTINELBEGIN", "ACCEPTSENTINELMID", "ACCEPTSENTINELEND"]
         var lines = markdown.components(separatedBy: "\n")
-        let third = max(lines.count / 3, 1)
-        lines.insert("## \(markers[2])\n", at: min(third * 2 + 1, lines.count))
-        lines.insert("## \(markers[1])\n", at: min(third, lines.count))
-        lines.insert("## \(markers[0])\n", at: 0)
+        var bodyStart = 0
+        if lines.first == "---",
+           let close = lines.dropFirst().firstIndex(of: "---")
+        {
+            bodyStart = close + 1
+        }
+        let third = max((lines.count - bodyStart) / 3, 1)
+        lines.insert("## \(markers[2])\n", at: min(bodyStart + third * 2 + 1, lines.count))
+        lines.insert("## \(markers[1])\n", at: min(bodyStart + third, lines.count))
+        lines.insert("## \(markers[0])\n", at: min(bodyStart + 1, lines.count))
         return (lines.joined(separator: "\n"), markers)
     }
 

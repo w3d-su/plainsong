@@ -29,7 +29,7 @@ extension ExportHTMLCommandAppTests {
                         .appendingPathComponent("\(theme.rawValue)-\(mode.rawValue).html")
                     let recorder = fixture.record(returning: [destination])
                     try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
-                    guard case let .exported(_, omissions) = recorder.results.first?.result else {
+                    guard case let .exported(_, omissions, _) = recorder.results.first?.result else {
                         return XCTFail("Expected matrix export: \(recorder.results)")
                     }
                     XCTAssertEqual(recorder.requests.first?.defaultFileName, "Export F Matrix.html")

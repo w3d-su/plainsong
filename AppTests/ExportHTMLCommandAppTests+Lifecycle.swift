@@ -138,7 +138,7 @@ extension ExportHTMLCommandAppTests {
         try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsHTML()).value
         XCTAssertEqual(recorder.requests.count, 2)
         XCTAssertEqual(recorder.results.first?.result, .stopped(.cancelled))
-        guard case let .exported(commit, _) = recorder.results.last?.result
+        guard case let .exported(commit, _, _) = recorder.results.last?.result
         else { return XCTFail("Expected fresh export") }
         XCTAssertEqual(commit.selectedURL, destination)
         XCTAssertEqual(recorder.results.map(\.operationID), [1, 2])

@@ -42,9 +42,6 @@ final class ExportPrintSheetAppTests: XCTestCase {
         XCTAssertEqual(results, [.printed])
         XCTAssertNil(fixture.appState.exportHTMLNotice)
         let data = try Data(contentsOf: jobURL)
-        let dump = FileManager.default.temporaryDirectory.appendingPathComponent("print-job.pdf")
-        try? data.write(to: dump)
-        print("PRINTJOB-DUMP \(dump.path)")
         XCTAssertTrue(data.starts(with: Data("%PDF".utf8)))
         let text = Self.text(of: data)
         for marker in columns + ["PRINTCODESENTINEL", "PRINTMERMAIDSENTINEL"] {
@@ -174,11 +171,18 @@ final class ExportPrintSheetAppTests: XCTestCase {
                              "Print output must carry dark text on the light paper", file: file, line: line)
     }
 
-    /// The real `runModal` path needs a configured CUPS destination: on a host with
-    /// none, PrintingUI raises an app-modal alert inside `runModal` before any sheet
-    /// exists, and that nested modal loop starves main-actor work so the awaiting test
-    /// can never unwind. Skip honestly rather than hang the suite.
+    /// The real `runModal` path is opt-in: the panel is only suppressed, never mocked,
+    /// so these tests put real print jobs and real sheets through the host's CUPS
+    /// configuration. They run only with `TEST_RUNNER_PLAINSONG_REAL_PRINT=1`.
+    /// A configured CUPS destination is still required: on a host with none, PrintingUI
+    /// raises an app-modal alert inside `runModal` before any sheet exists, and that
+    /// nested modal loop starves main-actor work so the awaiting test can never unwind.
+    /// Skip honestly rather than hang the suite.
     private static func requirePrintDestination() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["PLAINSONG_REAL_PRINT"] == "1",
+            "Opt-in: set TEST_RUNNER_PLAINSONG_REAL_PRINT=1 to run the real print-panel tests"
+        )
         try XCTSkipUnless(
             !NSPrinter.printerNames.isEmpty,
             "No CUPS destination configured; the real print panel cannot run"
@@ -240,9 +244,15 @@ final class ExportPrintSheetAppTests: XCTestCase {
         XCTFail("Timed out waiting for \(description)")
     }
 
+    /// Built from typed pieces: a single long `+` chain with a closure exceeds the
+    /// hosted CI compiler's type-check time limit.
     private static func tableSource(_ columns: [String], cell: String) -> String {
         let delimiter = [String](repeating: "---", count: columns.count)
         let body = [String](repeating: cell, count: columns.count)
-        return [columns, delimiter, body].map { "| " + $0.joined(separator: " | ") + " |\n" }.joined()
+        return [columns, delimiter, body].map(tableRow).joined()
+    }
+
+    private static func tableRow(_ cells: [String]) -> String {
+        "| " + cells.joined(separator: " | ") + " |\n"
     }
 }

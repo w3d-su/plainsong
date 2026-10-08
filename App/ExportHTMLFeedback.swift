@@ -39,6 +39,7 @@ enum ExportHTMLNoticeSeverity: String, Equatable {
 enum ExportHTMLNoticeGroup: String, CaseIterable, Equatable {
     case exported
     case exportedWithPlaceholders
+    case exportedWithShrunkPages
     case destinationAlias
     case destinationUnreadable
     case destinationChanged
@@ -99,45 +100,65 @@ enum ExportHTMLNoticeMapper {
             notCommitted(failure, operationID: operationID, product: product)
         case let .written(.indeterminate(write)):
             indeterminate(write, operationID: operationID, product: product)
-        case let .exported(commit, omittedImageCount):
-            exported(commit, omittedImageCount: omittedImageCount, operationID: operationID, product: product)
+        case let .exported(commit, omittedImageCount, shrunkPages):
+            exported(
+                commit, omittedImageCount: omittedImageCount, shrunkPages: shrunkPages,
+                operationID: operationID, product: product
+            )
         case let .written(.committed(commit)):
-            exported(commit, omittedImageCount: 0, operationID: operationID, product: product)
+            exported(
+                commit, omittedImageCount: 0, shrunkPages: [],
+                operationID: operationID, product: product
+            )
         }
     }
 
     static func exported(
         _ commit: ExportArtifactCommit,
         omittedImageCount: Int,
+        shrunkPages: [ExportPDFShrunkPage] = [],
         operationID: UInt64,
         product: ExportCommandProduct = .html
     ) -> ExportHTMLNotice {
         let name = commit.selectedURL.lastPathComponent
         let folder = commit.selectedURL.deletingLastPathComponent().path(percentEncoded: false)
         var message = "“\(name)” was exported to \(folder)."
-        guard omittedImageCount > 0 else {
+        if omittedImageCount > 0 {
+            message += omittedImageCount == 1
+                ? " 1 image couldn’t be embedded and was replaced by a placeholder with its description."
+                : " \(omittedImageCount) images couldn’t be embedded and were replaced by placeholders " +
+                "with their descriptions."
+            message += " Only local PNG, JPEG, GIF, or WebP images up to 10 MB are embedded; " +
+                "remote images are never downloaded."
+        }
+        message += shrunkPagesDetail(shrunkPages)
+        if omittedImageCount > 0 {
             return ExportHTMLNotice(
                 operationID: operationID,
-                group: .exported,
-                severity: .success,
-                title: product == .pdf ? "Exported as PDF" : "Exported as HTML",
+                group: .exportedWithPlaceholders,
+                severity: .warning,
+                title: product == .pdf
+                    ? "Exported as PDF with Image Placeholders"
+                    : "Exported as HTML with Image Placeholders",
                 message: message,
                 revealURL: commit.selectedURL
             )
         }
-        message += omittedImageCount == 1
-            ? " 1 image couldn’t be embedded and was replaced by a placeholder with its description."
-            : " \(omittedImageCount) images couldn’t be embedded and were replaced by placeholders " +
-            "with their descriptions."
-        message += " Only local PNG, JPEG, GIF, or WebP images up to 10 MB are embedded; " +
-            "remote images are never downloaded."
+        guard shrunkPages.isEmpty else {
+            return ExportHTMLNotice(
+                operationID: operationID,
+                group: .exportedWithShrunkPages,
+                severity: .warning,
+                title: "Exported as PDF with Shrunk Pages",
+                message: message,
+                revealURL: commit.selectedURL
+            )
+        }
         return ExportHTMLNotice(
             operationID: operationID,
-            group: .exportedWithPlaceholders,
-            severity: .warning,
-            title: product == .pdf
-                ? "Exported as PDF with Image Placeholders"
-                : "Exported as HTML with Image Placeholders",
+            group: .exported,
+            severity: .success,
+            title: product == .pdf ? "Exported as PDF" : "Exported as HTML",
             message: message,
             revealURL: commit.selectedURL
         )
@@ -188,7 +209,7 @@ enum ExportHTMLNoticeMapper {
             (group, title, detail) = (
                 .renderFailed,
                 failureTitle(for: product),
-                Self.captureDetail(error)
+                Self.captureDetail(error, product: product)
             )
         case .pendingEditorSource:
             (group, title, detail) = (

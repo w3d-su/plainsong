@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import MarkdownCore
+import PDFKit
 import PreviewKit
 import WebKit
 import WorkspaceKit
@@ -191,7 +192,13 @@ enum ExportHTMLOperationResult: Equatable {
     case stopped(ExportHTMLStopReason)
     /// The writer ran; its typed committed / not-committed / indeterminate outcome.
     case written(ExportArtifactWriteOutcome)
-    case exported(ExportArtifactCommit, omittedImageCount: Int)
+    /// `shrunkPages` lists the PDF pages scaled down past the 200-inch user-space limit;
+    /// a committed export with any still succeeds but warns instead of reporting success.
+    case exported(
+        ExportArtifactCommit,
+        omittedImageCount: Int,
+        shrunkPages: [ExportPDFShrunkPage] = []
+    )
     /// Print finished through AppKit. Plainsong wrote no file.
     case printed
 }
@@ -228,6 +235,13 @@ struct ExportHTMLOperationRegistry {
     var printOperationRunner: (@MainActor (NSPrintOperation, NSWindow) async -> Bool)?
     /// Test seam: the print info the real path copies (for job disposition / save URL).
     var printInfoProvider: (@MainActor () -> NSPrintInfo)?
+    /// The print info the last completed print panel run used, so the next Print… keeps
+    /// the paper size and orientation the user chose. Cancelled runs never write it, and
+    /// `NSPrintInfo.shared` is never mutated.
+    var lastPrintInfo: NSPrintInfo?
+    /// Test seam: observes the captured `PDFDocument` just before its print operation is
+    /// created, so hosted tests can assert the real content Print sends to PDFKit.
+    var printDocumentObserver: (@MainActor (PDFDocument) -> Void)?
     /// Test seam: keeps the real runModal path but suppresses both panels so a hosted
     /// print job completes without user interaction.
     var printPanelSuppressedForTesting = false
