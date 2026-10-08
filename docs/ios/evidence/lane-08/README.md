@@ -16,8 +16,8 @@ M0 真機 gate 未通過。本文件不宣布 module-ready，也不宣布 produc
 |---|---|
 | Branch | `phase3-ios-authoring-tools` |
 | 調查基準 | `2144c46c888360c84a42fef79e676e60b518048b`（handoff packet）。**不是 IOS_BASE_SHA**。實作 worktree 等 13 公布可抓取的 IOS_BASE_REF 與完整 SHA 後重建 |
-| Head | 本分支 tip。以 `git rev-parse phase3-ios-authoring-tools` 為準 |
-| PR | Draft，base 為 `phase3-ios-parallel-handoffs`，只含本目錄。不對 `main` 開 PR：packet 仍在 draft PR #153，對 `main` 的 diff 會混入 13 的規格檔。實作 PR 等 IOS_BASE_SHA |
+| Head | 調查內容是 `e068b453536561dbd46f7832b93e321f48e29b3a`。PR URL 記在其後的 tip，以 `git rev-parse phase3-ios-authoring-tools` 為準 |
+| PR | Draft https://github.com/w3d-su/plainsong/pull/155 ，base 為 `phase3-ios-parallel-handoffs`，只含本目錄。不對 `main` 開 PR：packet 仍在 draft PR #153，對 `main` 的 diff 會混入 13 的規格檔。實作 PR 等 IOS_BASE_SHA |
 | 實際修改路徑 | `docs/ios/evidence/lane-08/**` |
 | 已實作介面 | 無 |
 | Doubles | 04 editor、05 document binding、10 shell 安裝點都未接。Private fake 留在測試設計，未寫成原始碼 |
