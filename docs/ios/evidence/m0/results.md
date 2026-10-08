@@ -9,6 +9,21 @@ Contract semantics: IOS-C0-v1. No frozen declarations or production providers
 are imported, replaced or modified. Code/verified artifact provenance is in
 `runs.json` and per-attempt manifests; the final evidence commit changes docs only.
 
+Draft PR: [#156](https://github.com/w3d-su/plainsong/pull/156), stacked on
+specification PR #153 while its base remains open. Verified implementation SHA
+`a12de4502941aed964dee42533bf39d775c2b6a9`; clean-source final checks ran
+2026-10-08 10:01:18–10:01:42 UTC (18:01:18–18:01:42 Asia/Taipei), under one
+shared lock. Xcode 27.0 build 27A5194q, iPhoneOS/iPhoneSimulator SDK 27.0.
+The subsequent commit adds evidence only, so compiled input hashes match its
+source tree. No owner device model/OS exists for this run; those fields are OPEN.
+
+Final unsigned IPA (ignored local artifact):
+`Prototypes/iOSM0/Artifacts/20261008T100133Z-ipa-1B1C5DD3/PlainsongIOSM0-unsigned.ipa`.
+SHA-256 `d09502242053f56dfac1bdaefb4ba886b982c1c630bed72280ba4bbac6c9bab4`.
+Fixture SHA-256 and complete compiled input hashes are in `runs.json`.
+`ipa-receipt.json` records structural validation only, never installation PASS.
+No device screenshots/recordings or signing materials were created.
+
 All authored changes are in `Prototypes/iOSM0/**` and
 `docs/ios/evidence/m0/**`. No root project/Makefile/CI, packages, App/AppIOS,
 handoffs, shared contracts or owner checkout changes. Generated projects,
@@ -79,6 +94,10 @@ Pinned SwiftFormat 0.62.1 scoped lint, shell syntax, Python syntax, JSON parsing
 allowlist and `git diff --check` are checked. Root `make test`, Mac suites,
 formal AppIOS CI, performance and real-device signing are not run for this
 isolated lane. Review/hosted CI never substitutes for M0 owner proof.
+Only the optional AppIntents metadata extraction warning remains in the final
+build logs; there are no Swift compiler concurrency/deprecation diagnostics.
+The lock-busy exits are scheduling waits, not failed product tests, and are
+recorded separately from the earlier compile failures.
 
 Integration handoff: retain all five M0 gates OPEN and block production
 composition. Independent module/double work may continue per the shared README.
