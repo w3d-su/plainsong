@@ -383,7 +383,10 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 ### 7.4 Build
 
 `make preview-bundle`: `npm ci && esbuild src/index.ts --bundle --minify` →
-`App/Resources/preview/`. KaTeX fonts/CSS, highlight.js theme CSS, mermaid bundled
+`App/Resources/preview/`. KaTeX fonts/CSS and Mermaid are bundled; syntax highlighting uses the preview
+stylesheet’s Apple system palette and Xcode-inspired light/dark token colors, with dark
+function/link/comment colors raised to meet 4.5:1 on code background `#2a2a2c`.
+The highlight.js `github.css` theme is no longer bundled. All assets are bundled
 locally. No CDN, app must work fully offline. Commit the dist output.
 
 ---

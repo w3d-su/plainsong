@@ -86,6 +86,8 @@ supported. Live fixture coverage: `Fixtures/math.md`.
 - **WYSIWYG is Experimental and inline-only** (headings, emphasis/strike, inline code,
   list/quote styling). Links, images, tables, and code fences stay as raw Markdown in the
   editor; the preview pane renders everything.
+- **Sidebar:** The sidebar is fixed-width on macOS 14–26. On macOS 27+ it is resizable
+  (220–320 pt) and collapsible with ⌃⌘S.
 - **No auto-update:** alpha builds are manual downloads.
 
 ## License

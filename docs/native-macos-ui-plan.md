@@ -75,3 +75,39 @@ match count inside it, a previous/next segmented control, and a trailing **Done*
 Show export progress and outcome with `NoticeBar` (or the window's toolbar progress)
 instead of a bespoke banner. Menu titles follow the HIG ellipsis rule ("Export as PDF…",
 "Print…").
+
+## Review fixes: width and intent policy (2026-10-08)
+
+The editor minimum is 260 pt: a useful narrow text column matching Preview’s existing
+260 pt floor. Split therefore requires 521 pt (including its 1 pt divider). The window
+minimum is a **constant 900 pt**, covering the widest 320 pt sidebar, the Split minimum,
+and system split-view/chrome allowance. Half-screen requests of 720–760 pt (including
+735) clamp to that floor; they cannot squeeze or overlap either document pane.
+
+The entire document/inspector column takes its size from a `GeometryReader`. Inspector
+width is clamped to 240–360 pt, plus a 5 pt handle. It auto-collapses whenever the
+available document-column width cannot fit the content minimum and inspector, and
+restores only when the user’s stored intent is Show. `SceneStorage` persists **intent**,
+never automatic visibility. A child StateObject initializes from the restored binding
+before mounting the inspector. Show/Hide Inspector and the toolbar reflect visibility.
+Explicit Show while collapsed tries to widen the window by the deficit, clamped to the
+screen’s `visibleFrame`; if the available area is still insufficient, intent stays Show
+and the inspector stays collapsed until there is room. Explicit Hide remains hidden
+when widened. No sizing depends on editor or WebKit content minima (R17).
+
+The handle exposes an accessibility adjustable action in 10 pt increments. Single-file
+jump-bar segments without a primary menu expose static text, retaining the context-menu
+accessibility action. Dirty documents announce Edited. The View sidebar command is
+gated to 27+; the fixed HStack retains its established sidebar on 14–26. ⌘⇧S remains
+dropped (Save As convention).
+
+Keyboard/AX selection in the native Files List opens the file without requesting editor
+focus; mouse selections can focus the editor. The synchronous activation carries that
+choice through its anchored/cached/retired paths without changing authority contracts.
+Rows retain native `.tag` and selection, with an `onDrag` provider carrying the existing
+plain-text node ID for workspace moves and, for images, a file URL consumed by the
+editor’s existing image insertion path. The reviewed String-only payload could not reach
+that image path; the additional URL representation repairs it. No tap gesture is added
+that could compete with native selection or dragging.
+
+Review verification and owner commands are recorded in `native-macos-ui-review-evidence.md`.
