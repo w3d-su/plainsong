@@ -1,10 +1,14 @@
 # Lane 08 → lane 13 dependency request
 
-日期：2026-10-08。請求者：lane 08。沒有附帶 Swift diff，因為這些項目屬於 C0 的檔案所有權。
+日期：2026-10-08。請求者：lane 08。
 
 ## 現況
 
-`IOS_BASE_SHA` 未公布。`AppIOS` hosted test target 不存在。若現在把 handler 寫進 `AppIOS/Features/Authoring`，就要麼參考不存在的型別，要麼在本 lane 複製 `IOSSourceEditorControlling`。兩者都違反 `docs/ios/contracts.md` §8。
+請求已由 tag `ios-c0-v1`（`642cb212703220409874a2741c5adbfb8c80fe8a`）滿足。`AppIOS` hosted test target、`IOSSourceEditorControlling` 與 `IOSAuthoringAction` 都使用那份凍結宣告。本 lane 沒有第二份 protocol，也沒有要求把 `TextSearchInputValidation` 改成 public、替 Link 加 URL 參數，或替 editor 加欄位。
+
+以下是公布前的請求原文，留下是為了對照凍結面，不是仍未完成的工作。
+
+`IOS_BASE_SHA` 當時未公布。`AppIOS` hosted test target 不存在。若在那之前把 handler 寫進 `AppIOS/Features/Authoring`，就要麼參考不存在的型別，要麼在本 lane 複製 `IOSSourceEditorControlling`。兩者都違反 `docs/ios/contracts.md` §8。
 
 ## 請 13 在 C0 提供
 

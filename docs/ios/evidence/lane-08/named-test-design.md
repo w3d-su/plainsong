@@ -2,7 +2,7 @@
 
 C0 提供 hosted target 與凍結型別之後，測試放在 `AppIOSTests/Authoring/`。Fake 是該目錄的 private type，同步實作 13 凍結的 `IOSSourceEditorControlling`。它記錄 `capture`／`apply`／`reveal`／`undo`／`redo`、拒絕原因，以及拒絕後的 text、selection、selectionGeneration、accessGeneration、undo 次數。Fake 不存在第二個 public protocol。
 
-下列方法是要實作的完整名單。斷言寫成可直接轉成 `XCTAssert` 的條件。在 IOS_BASE 落地前，這些測試 **沒有檔案、沒有執行結果**。
+下列方法是實作名單。斷言寫成可直接轉成 `XCTAssert` 的條件。2026-10-08 起，這些方法在 `AppIOSTests/Authoring/`，並於 iOS 27 simulator 的 private fake 上通過。通過次數見 `README.md`。那次結果不是 hosted editor，也不是真機。
 
 `IOSEditRefusal` 的 case 名稱以 C0 凍結宣告為準。設計用這些語意：source／document changed、selection changed、access changed、marked text、read only、invalid range、busy。Case 拼法不同時，只改斷言名稱，不在本 lane 自訂 enum。
 

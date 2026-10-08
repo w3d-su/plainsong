@@ -59,6 +59,10 @@ Mac menu（`App/PlainsongCommands.swift`）與 `agent.md` §6.4 的對應，就�
 
 Toolbar 的 Heading 與 Code 是群組，不是第三個 `MarkdownEditCommand`。Handoff 的快捷鍵句子沒有重寫 ⌃⌘X；它存在於 `agent.md` §6.4。Descriptor 先帶上。若 13 認定 handoff 列表是排他清單，只移除此一快捷鍵，命令仍留在 Format menu。
 
+## 實作落點（2026-10-08）
+
+`IOSAuthoringActionPlacement` 每個 descriptor 只有一個位置。Catalog 因此沒有做成上表的「toolbar 與 Format menu 同時出現」，也沒有把 Inline Code、Code Fence 放進 Format menu（handoff 第 41 行要它們在 Format menu）。Named test `testToolbarContainsPrimaryActionsAndGroups` 要求 Code 群組同時含 `.code`、`.inlineCode`、`.codeFence`，所以這三個只在 `toolbarGroup("Code")`。`.code` 與 `.inlineCode` 都呼叫 `.format(.inlineCode)`，快捷鍵都是空的，都不使用 ⌘E。Bold、Italic、Link 只在 `.toolbar`。Heading 1–6 只在 `toolbarGroup("Heading")`。Strikethrough、Paragraph、Quote、兩種 Math、Checkbox、Format Table 只在 `.formatMenu`。Format menu view 只列出 `.formatMenu`。
+
 Find 預設 `TextSearchCaseSensitivity.smart`，另外提供 `.sensitive`、`.insensitive` 與 `wholeWord`。Mac find bar 只有 smart／sensitive 兩態；iOS 這項以 handoff 的三態為準，因為 enum 已存在，不新增搜尋演算法。
 
 ## Adapter 規則（IOS_BASE 之後才寫成程式）
