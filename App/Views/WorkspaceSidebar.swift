@@ -16,6 +16,9 @@ struct WorkspaceSidebar: View {
                 select: { appState.selectWorkspaceSidebarMode($0) }
             )
             .padding(.horizontal, 10)
+            // Same row as the document's jump bar, so the capsule's bottom meets its divider
+            // and its top stays clear of the toolbar above.
+            .frame(height: DocumentJumpBar.height, alignment: .bottom)
             .padding(.bottom, 6)
 
             Group {
@@ -45,7 +48,7 @@ private struct NavigatorSelector: View {
             item(.files, title: "Files", systemImage: "folder", isEnabled: true)
             item(.search, title: "Search", systemImage: "magnifyingglass", isEnabled: isSearchEnabled)
         }
-        .padding(3)
+        .padding(2)
         .plainsongGlass(in: Capsule())
         .animation(.snappy(duration: 0.25), value: selection)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,9 +68,9 @@ private struct NavigatorSelector: View {
             select(mode)
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .frame(width: 32, height: 24)
+                .frame(width: 28, height: 20)
                 .background {
                     if isSelected {
                         Capsule()

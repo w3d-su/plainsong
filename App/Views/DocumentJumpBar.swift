@@ -9,6 +9,9 @@ import WorkspaceKit
 /// segment keeps the `plainsong.editor.fileName` static text the UI tests use to find the
 /// workspace window.
 struct DocumentJumpBar: View {
+    /// The sidebar's navigator bar shares this row height so the two bottoms line up.
+    static let height: CGFloat = 30
+
     let rootURL: URL?
     let fileURL: URL?
     let fileKind: FileKind
@@ -87,7 +90,7 @@ struct DocumentJumpBar: View {
         .font(.callout)
         .labelStyle(JumpBarLabelStyle())
         .padding(.horizontal, 8)
-        .frame(height: 30)
+        .frame(height: Self.height)
         .help(fileURL?.path(percentEncoded: false) ?? "Untitled")
     }
 
