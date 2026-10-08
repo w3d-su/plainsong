@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MarkdownCore",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v14), .iOS("26.0")],
     products: [
         .library(name: "MarkdownCore", targets: ["MarkdownCore"]),
     ],

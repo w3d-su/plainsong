@@ -6,37 +6,6 @@ import TreeSitterMarkdownInline
 import TreeSitterTSXFixed
 import TreeSitterYAMLFixed
 
-struct MarkdownSyntaxToken {
-    enum Kind: Equatable {
-        case frontmatter
-        case frontmatterKey
-        case headingMarker
-        case headingText(level: Int)
-        case listMarker
-        case codeBlock
-        case codeFenceMarker
-        case codeFenceInfo
-        case inlineCode
-        case strong
-        case emphasis
-        case linkText
-        case linkDestination
-        case quoteMarker
-        case tableHeader
-        case tableDelimiter
-        case tablePipe
-        case mdxSource
-        case tsxKeyword
-        case tsxString
-        case tsxTag
-        case tsxAttribute
-        case tsxPunctuation
-    }
-
-    var kind: Kind
-    var range: NSRange
-}
-
 final class MarkdownSyntaxParser {
     /// Full block parsing stays enabled for large documents. Inline sub-parsing is
     /// deferred until visible-range plumbing lands so 1 MB edits do not saturate CPU.
