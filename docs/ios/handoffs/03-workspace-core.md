@@ -64,7 +64,99 @@
 
 ## Evidence（由執行者填寫）
 
-尚未執行；本文件僅為並行開發 handoff，沒有產品實作或測試結果。
+執行日期：2026-10-08。契約：**IOS-C0-v1**。Worktree：`/private/tmp/plainsong-ios-workspace-core`。Branch：`phase3-ios-workspace-core`。Owner checkout `/Users/davis._.su/Documents/blogeditor` 仍在 `phase3-native-macos-polish`，工作樹只有既有的 `CLAUDE.md` 修改與未追蹤 `.omc/`。
+
+### 基準
+
+| 項目 | 值 |
+|---|---|
+| IOS_BASE_REF | `refs/tags/ios-c0-v1` |
+| Base / IOS_BASE_SHA | `642cb212703220409874a2741c5adbfb8c80fe8a` |
+| 遠端 tag | `git ls-remote origin refs/tags/ios-c0-v1` 回傳同一 SHA |
+| 未用作程式基準的 integration tip | `3274bfc8ad7f70105fe10c03cb111cf987ca1800`（`phase3-ios-integration`）。台帳把它標成文件 receipt。本分支的 parent 是 tag，沒有 fast-forward。 |
+| Head | 實作與這份 evidence 在同一個 commit，parent 就是上列 base。完整 head SHA 以 PR head 為準；commit 內不寫自己的 hash。 |
+
+### 變更路徑
+
+WorkspaceCore 的 `Contracts.swift` 與 `Package.swift` 保持 C0 凍結內容。新增：
+
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceDisplayNodeID.swift`
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceFileKind.swift`
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePathByteKey.swift`
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePureTree.swift`
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceRelativePath.swift`
+- `Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceSnapshotReconcile.swift`
+- `Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspacePathIdentityTests.swift`
+- `Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspacePureTreeTests.swift`
+- `Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotFixtures.swift`
+- `Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotReconcileTests.swift`
+- `Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotRejectionTests.swift`
+
+WorkspaceKit：
+
+- `Packages/WorkspaceKit/Package.swift`：只加入 `../WorkspaceCore` 與 library product。platforms 仍是 macOS 14。test target dependencies 未動。
+- `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift`：純 builder 移出。`reconcile(previous:snapshot:options:)`、snapshot、node、`mutationExpectation` 的 public 簽名保持原樣。`Entry.normalized` 仍保留開頭 `/`。
+- `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspacePathByteKey.swift`：改成 internal `typealias WorkspacePathByteKey = WorkspaceCore.WorkspacePathByteKey`。搜尋、completion、ignore、overlay 繼續用這個名字；`.bytes` 仍是 public。
+- 新增 `WorkspaceCoreAdapter.swift` 與 `WorkspaceCoreAdapterTests.swift`。
+- `WorkspaceFileTreeTests.swift` 沒有修改。
+
+同一次提交只另改本 evidence section。`agent.md`、Decision Log、`project.yml`、Makefile、CI、`Package.resolved`、App 與其他 lane 都沒有改。Makefile 的 `test-portable-core` 已經包含 WorkspaceCore。
+
+### 模型
+
+- 路徑相等與 `Hashable` 使用 UTF-8 bytes。Swift `String` 相等會把 NFC 與 NFD 視為同一個字串。
+- `WorkspaceRelativePath` 拒絕空 leaf、絕對路徑、NUL、`..`、空元件與 `.`，並保留呼叫端 spelling。`/etc/a.md` 不會被改寫成 `etc/a.md`。Root 是 `WorkspaceTreeLocation.root`；`file(spelling: "")` 回傳 nil。
+- Mac 絕對路徑仍由 `Entry.normalized` 保留 `/`。純 builder 沿用原本的 parent split：開頭斜線產生的空元件被丟掉，節點掛在 parent key `etc` 下，不會變成 root child `etc/a.md`。詞法拒絕用在新的 path API 與 IOS snapshot reconcile。
+- 排序是 `caseInsensitive` + `numeric`，再用 UTF-8 bytes 做 tie-break。預設過濾保留 markdown／mdx、image 與目錄；`showAllFiles` 略過種類優先。Tree image 含 svg、heic、tiff，寬於 preview 的 PNG／JPEG／GIF／WebP allowlist。對應測試沒有 import `MarkdownImageAssetPolicy`。
+- Mac device／inode proof 留在 `WorkspaceItemMutationExpectation`。Adapter 用 snapshot entry 的 index 當 sidecar；root index 是 `-1`，expectation 為 nil。
+- IOS stability key 不含 workspace UUID。沒有 resource 時是 `0` 加 path UTF-8，rename 不追蹤。唯一 resource 是 `1` 加 resource bytes，rename 追蹤，entry UUID 不參與。同一 material 出現多次時再附加 `31` 與 path bytes，兩個節點都留下。
+- 同一 workspace 且 `snapshot.accessGeneration` 較舊時回傳 `.rejectedStaleGeneration`，沿用先前的 expansion state。另一個 root 回傳 `.applied`，expansion 與 selection 是空的。entry 的 workspace、generation 不符，或路徑被拒時，省略該 entry 與它的子孫。混合 generation 的子 entry 是逐項省略；frozen snapshot 沒有 snapshot 級錯誤型別。
+- Portable node 記錄 `entryID` 與 relative spelling，不複製 `fileURL`。
+- `Packages/WorkspaceCore/Sources` 裡唯一的 Darwin 字樣是未修改的 `Contracts.swift` 註解。沒有 inode、`FileManager`、`mutationExpectation` 或 symlink resolution。
+
+### 測試
+
+還原 probe 之後：
+
+- 2026-10-08 20:29:32，`swift test --package-path Packages/WorkspaceCore`。Build 2.25 秒。**25 tests，0 failures**（0.010 秒）。`WorkspaceContractTests` 1、`WorkspacePathIdentityTests` 5、`WorkspacePureTreeTests` 9、`WorkspaceSnapshotReconcileTests` 5、`WorkspaceSnapshotRejectionTests` 5。Swift Testing 套件是 0 tests。
+- 2026-10-08 20:29:33，`Packages/WorkspaceKit` 的 `swift test --filter 'WorkspaceFileTreeTests|WorkspaceCoreAdapterTests|CompletionWorkspaceProviderTests'`。**19 tests，0 failures**。既有 `WorkspaceFileTreeTests` 10/10，含 `testReconcileTwoThousandFilesStaysUnderBudget` 0.027 秒（門檻 50 毫秒）。`WorkspaceCoreAdapterTests` 3/3。`CompletionWorkspaceProviderTests` 6/6。
+- 2026-10-08 20:30:34，`swift test --filter WorkspaceSearchContractTests`。**18 tests，0 failures**。涵蓋 byte-key 排序、NFC／NFD overlay，以及空路徑、絕對路徑與 `..` 的拒絕。`WorkspacePathByteKey("")` 仍可建構。
+
+SwiftFormat **0.62.1**（`/private/tmp/plainsong-swiftformat-0.62.1/swiftformat`）對 lane Swift 檔 lint 通過。本機 SwiftLint **0.65.0** 用 `--use-script-input-files` 只掃 16 個 lane Swift 檔，exit 0，沒有 finding。
+
+### Negative probes
+
+每次只改一個守衛，跑完即從備份還原。還原後三個來源檔與備份 `cmp` 一致，才跑上一節的綠燈。
+
+1. 移除 stale-generation early return。`testStaleGenerationDoesNotReconcile` 失敗，訊息是 `expected stale generation to be rejected`。同輪 `testSameRootNewerGenerationKeepsSurvivingExpansionAndSelection` 通過。20:28:38，2 tests，1 failure。
+2. Carry 分支改成 `guard let previous else`，拿掉 workspaceID 比對。`testSamePathAcrossRootsDoesNotInheritExpansionOrSelection` 失敗：`expandedKeys` 不是空的，`selectedKey` 仍在。同輪 stale-generation 測試通過。20:28:40，2 tests，2 failures。
+3. Adapter 的 `mutationExpectation` 固定回 nil。失敗的是 `testAdapterRoundTripsMutationExpectationForEveryNode`、`testDuplicateIdentityKeepsEachPathExpectation`、`testCanonicalSpellingsKeepSeparateExpectations`、`testTreePreservesSnapshotMutationExpectation`。斷言看到 nil，而 fixture 仍是 device／inode expectation。20:28:45，4 tests，9 failures。
+4. `WorkspacePathByteKey` 的 `==` 與 `hash(into:)` 改成 UTF-8 `String` 相等。失敗的是 `testByteKeyDoesNotTreatCanonicalEquivalentsAsEqual`（Set count 變成 1）、`testRelativePathPreservesDistinctUnicodeSpellings`、`testNFCAndNFDPathsStayDistinctNodes`（子節點被合併）。`testCanonicalSpellingsAndDuplicateResourcesStayDistinct` 仍通過：snapshot stability key 存的是 raw UTF-8，不讀這個 `==`。Hashable 改成 canonical 時，純檔案樹會合併；IOS snapshot 的節點清單仍靠 raw bytes 分開。20:28:48，4 tests，5 failures。
+
+### 未過關與 integrator 筆記
+
+- M0 真機、iCloud／Files、重簽 IPA 維持開放。本 lane 沒有宣告 Files 可用。
+- C0 的 iOS simulator test execution 在台帳仍是 OPEN。這裡沒有跑 simulator。
+- 完整 WorkspaceKit、Mac app 與 `make test` 由 integrator 跑。C0 台帳裡的 WorkspaceKit 計數是 357。
+- 混合 generation 的子 entry 是省略，並連帶省略該 entry 的子孫。需要 snapshot 級 typed refusal 時由 13 升契約。
+- Portable node 用 `entryID` 回查，不帶 `fileURL`。
+- 沒有新的 Swift 或 npm dependency，`Package.resolved` 沒有變更。
+
+### 建議 Decision Log
+
+請 integrator 寫入 `docs/decision-log.md`。本 lane 沒有改那個檔。
+
+2026-10-08。將 WorkspaceKit 的純檔案樹、顯示用 byte path 與詞法相對路徑抽到 WorkspaceCore，依賴只有 Foundation 與 MarkdownCore。Mac `WorkspaceFileTree.reconcile(previous:snapshot:options:)` 與 `WorkspaceItemMutationExpectation` 留在 WorkspaceKit，以後者的 entry index 附回每個 node。Root 與 generation 守衛只放在 `WorkspaceSnapshotReconciler`。`WorkspaceRelativePath` 拒絕而不改寫；路徑相等使用 UTF-8 bytes，因為 Swift `String` 相等是 canonical。未採用的做法：把 Darwin device／inode 放進 core、用 canonical string 當路徑 key、讓 Mac `Entry.normalized` 去掉開頭 `/`、把 workspace UUID 放進 display key。最後一項會讓拿掉 root 守衛之後，跨 root 測試仍然通過。
+
+### Claude review
+
+```sh
+git diff --stat 642cb212703220409874a2741c5adbfb8c80fe8a...HEAD
+rg -n "Darwin|inode|mutationExpectation|FileManager|resolvingSymlinks" Packages/WorkspaceCore/Sources
+swift test --package-path Packages/WorkspaceCore
+```
+
+預期：sources 只有 `Contracts.swift` 的既有註解提到 Darwin；WorkspaceCore 是 25 tests、0 failures；Mac `reconcile` 沒有新增 root 或 generation 參數。
 
 ## 可直接貼給其他 LLM 的任務
 
