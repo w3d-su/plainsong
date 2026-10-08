@@ -1,63 +1,7 @@
 import Foundation
-import MarkdownCore
+import WorkspaceCore
 
-public enum WorkspaceFileKind: Sendable, Equatable {
-    case directory
-    case markdown
-    case mdx
-    case image
-    case other
-
-    public init(url: URL, isDirectory: Bool) {
-        if isDirectory {
-            self = .directory
-        } else if let fileKind = FileKind(url: url) {
-            switch fileKind {
-            case .markdown:
-                self = .markdown
-            case .mdx:
-                self = .mdx
-            }
-        } else if Self.imageExtensions.contains(url.pathExtension.lowercased()) {
-            self = .image
-        } else {
-            self = .other
-        }
-    }
-
-    public var isEditableMarkdown: Bool {
-        switch self {
-        case .markdown, .mdx:
-            true
-        case .directory, .image, .other:
-            false
-        }
-    }
-
-    public var isVisibleByDefault: Bool {
-        switch self {
-        case .directory, .markdown, .mdx, .image:
-            true
-        case .other:
-            false
-        }
-    }
-
-    private static let imageExtensions: Set<String> = [
-        "apng",
-        "avif",
-        "gif",
-        "heic",
-        "heif",
-        "jpeg",
-        "jpg",
-        "png",
-        "svg",
-        "tif",
-        "tiff",
-        "webp",
-    ]
-}
+public typealias WorkspaceFileKind = WorkspaceCore.WorkspaceFileKind
 
 public struct WorkspaceFileSnapshot: Sendable, Equatable {
     public struct Entry: Sendable, Equatable {
@@ -82,11 +26,7 @@ public struct WorkspaceFileSnapshot: Sendable, Equatable {
         }
 
         public var nodeID: WorkspaceFileNode.ID {
-            guard let identity else {
-                return workspaceFileTreeFallbackPathIDPrefix
-                    + WorkspacePathByteKey(relativePath).asciiHex
-            }
-            return identity
+            WorkspaceDisplayNodeID.make(identity: identity, relativePath: relativePath)
         }
 
         private static func normalized(_ path: String) -> String {
@@ -179,15 +119,10 @@ public struct WorkspaceFileTree: Sendable, Equatable {
         snapshot: WorkspaceFileSnapshot,
         options: Options
     ) -> WorkspaceFileTree {
-        let root = WorkspaceFileTreeBuilder(snapshot: snapshot, options: options).build()
-        let currentIDs = root.nodeIDs()
-        let expanded = previous?.expandedNodeIDs.intersection(currentIDs) ?? []
-        let selected = previous?.selectedNodeID.flatMap { currentIDs.contains($0) ? $0 : nil }
-
-        return WorkspaceFileTree(
-            root: root,
-            expandedNodeIDs: expanded,
-            selectedNodeID: selected
+        WorkspaceCoreAdapter.reconcile(
+            previous: previous,
+            snapshot: snapshot,
+            options: options
         )
     }
 
@@ -212,181 +147,7 @@ public struct WorkspaceFileTree: Sendable, Equatable {
     }
 }
 
-private struct WorkspaceFileTreeBuilder {
-    let snapshot: WorkspaceFileSnapshot
-    let options: WorkspaceFileTree.Options
-
-    func build() -> WorkspaceFileNode {
-        let entries = visibleEntries()
-        let duplicateNodeIDs = Set(
-            Dictionary(grouping: entries, by: \.nodeID)
-                .compactMap { nodeID, matches in matches.count > 1 ? nodeID : nil }
-        )
-        let entriesByParent = Dictionary(
-            grouping: entries,
-            by: { WorkspacePathByteKey(parentPath(of: $0)) }
-        )
-        let children = buildChildren(
-            parentPath: WorkspacePathByteKey(""),
-            entriesByParent: entriesByParent,
-            duplicateNodeIDs: duplicateNodeIDs
-        )
-        return WorkspaceFileNode(
-            id: workspaceFileTreeRootID,
-            name: "",
-            relativePath: "",
-            kind: .directory,
-            contentModificationDate: nil,
-            mutationExpectation: nil,
-            children: children
-        )
-    }
-
-    private func visibleEntries() -> [WorkspaceFileSnapshot.Entry] {
-        guard !options.showAllFiles else {
-            return snapshot.entries
-        }
-
-        var directoryPaths: Set<WorkspacePathByteKey> = []
-        let directlyVisible = snapshot.entries.filter { entry in
-            guard entry.kind != .directory, entry.kind.isVisibleByDefault else { return false }
-            insertAncestorPaths(of: entry.relativePath, into: &directoryPaths)
-            return true
-        }
-        let directlyVisiblePaths = Set(directlyVisible.map { WorkspacePathByteKey($0.relativePath) })
-
-        return snapshot.entries.filter { entry in
-            let pathKey = WorkspacePathByteKey(entry.relativePath)
-            return switch entry.kind {
-            case .directory:
-                directoryPaths.contains(pathKey)
-            case .markdown, .mdx, .image:
-                directlyVisiblePaths.contains(pathKey)
-            case .other:
-                false
-            }
-        }
-    }
-
-    private func buildChildren(
-        parentPath: WorkspacePathByteKey,
-        entriesByParent: [WorkspacePathByteKey: [WorkspaceFileSnapshot.Entry]],
-        duplicateNodeIDs: Set<WorkspaceFileNode.ID>
-    ) -> [WorkspaceFileNode] {
-        (entriesByParent[parentPath] ?? [])
-            .sorted { first, second in
-                compare(first, second)
-            }
-            .map { entry in
-                WorkspaceFileNode(
-                    id: uniqueNodeID(for: entry, duplicateNodeIDs: duplicateNodeIDs),
-                    name: lastPathComponent(of: entry.relativePath),
-                    relativePath: entry.relativePath,
-                    kind: entry.kind,
-                    contentModificationDate: entry.contentModificationDate,
-                    mutationExpectation: entry.mutationExpectation,
-                    children: entry.kind == .directory
-                        ? buildChildren(
-                            parentPath: WorkspacePathByteKey(entry.relativePath),
-                            entriesByParent: entriesByParent,
-                            duplicateNodeIDs: duplicateNodeIDs
-                        )
-                        : []
-                )
-            }
-    }
-
-    private func uniqueNodeID(
-        for entry: WorkspaceFileSnapshot.Entry,
-        duplicateNodeIDs: Set<WorkspaceFileNode.ID>
-    ) -> WorkspaceFileNode.ID {
-        let nodeID = entry.nodeID
-        guard duplicateNodeIDs.contains(nodeID) else { return nodeID }
-        return workspaceFileTreeDuplicateIdentityIDPrefix
-            + WorkspacePathByteKey(nodeID).asciiHex
-            + ":"
-            + WorkspacePathByteKey(entry.relativePath).asciiHex
-    }
-
-    private func compare(_ first: WorkspaceFileSnapshot.Entry, _ second: WorkspaceFileSnapshot.Entry) -> Bool {
-        if !options.showAllFiles {
-            let firstPriority = defaultFilterSortPriority(first.kind)
-            let secondPriority = defaultFilterSortPriority(second.kind)
-            if firstPriority != secondPriority {
-                return firstPriority < secondPriority
-            }
-        }
-
-        let pathComparison = first.relativePath.compare(
-            second.relativePath,
-            options: [.caseInsensitive, .numeric]
-        )
-        if pathComparison != .orderedSame {
-            return pathComparison == .orderedAscending
-        }
-        return WorkspacePathByteKey(first.relativePath) < WorkspacePathByteKey(second.relativePath)
-    }
-
-    private func defaultFilterSortPriority(_ kind: WorkspaceFileKind) -> Int {
-        switch kind {
-        case .markdown, .mdx:
-            0
-        case .image:
-            1
-        case .directory:
-            2
-        case .other:
-            3
-        }
-    }
-
-    private func parentPath(of entry: WorkspaceFileSnapshot.Entry) -> String {
-        let components = entry.relativePath.split(separator: "/", omittingEmptySubsequences: true)
-        guard components.count > 1 else { return "" }
-        return components.dropLast().joined(separator: "/")
-    }
-
-    private func insertAncestorPaths(
-        of relativePath: String,
-        into paths: inout Set<WorkspacePathByteKey>
-    ) {
-        let components = relativePath.split(separator: "/", omittingEmptySubsequences: true)
-        guard components.count > 1 else { return }
-
-        var current = ""
-        for component in components.dropLast() {
-            if current.isEmpty {
-                current = String(component)
-            } else {
-                current += "/\(component)"
-            }
-            paths.insert(WorkspacePathByteKey(current))
-        }
-    }
-
-    private func lastPathComponent(of relativePath: String) -> String {
-        relativePath.split(separator: "/", omittingEmptySubsequences: true).last.map(String.init) ?? relativePath
-    }
-}
-
-private let workspaceFileTreeRootID = "__workspace_root__"
-private let workspaceFileTreeFallbackPathIDPrefix = "__workspace_path_bytes__:"
-private let workspaceFileTreeDuplicateIdentityIDPrefix = "__workspace_duplicate_identity__:"
-
 private extension WorkspaceFileNode {
-    func nodeIDs() -> Set<WorkspaceFileNode.ID> {
-        var ids: Set<WorkspaceFileNode.ID> = []
-        collectNodeIDs(into: &ids)
-        return ids
-    }
-
-    func collectNodeIDs(into ids: inout Set<WorkspaceFileNode.ID>) {
-        ids.insert(id)
-        for child in children {
-            child.collectNodeIDs(into: &ids)
-        }
-    }
-
     func firstNode(id nodeID: WorkspaceFileNode.ID) -> WorkspaceFileNode? {
         if id == nodeID {
             return self

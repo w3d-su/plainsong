@@ -9,11 +9,15 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../MarkdownCore"),
+        .package(path: "../WorkspaceCore"),
     ],
     targets: [
         .target(
             name: "WorkspaceKit",
-            dependencies: [.product(name: "MarkdownCore", package: "MarkdownCore")],
+            dependencies: [
+                .product(name: "MarkdownCore", package: "MarkdownCore"),
+                .product(name: "WorkspaceCore", package: "WorkspaceCore"),
+            ],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(name: "WorkspaceKitTests", dependencies: ["WorkspaceKit"]),
