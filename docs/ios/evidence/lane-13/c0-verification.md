@@ -53,3 +53,8 @@ Every mutated file is restored in a finally block under the shared lock; restore
 ## Open evidence
 
 Exact-head hosted results belong to the created PR. iOS execution/runtime, M0 actual device IME/Undo/Files/background/install, provider integration, final IPA/accessibility/performance and Claude review remain OPEN. No fake successful provider is wired to production.
+
+
+## Clean freeze-head publication build
+
+`642cb212703220409874a2741c5adbfb8c80fe8a`, dirty=false, `make ios-c0-build` PASS at `/private/tmp/plainsong-ios-c0/642cb212703220409874a2741c5adbfb8c80fe8a-build.ZPVo8p`. All 64 preview resource hashes equal committed source. App and all test products compile for arm64/x86_64. No iOS test is executed; the 12-case runtime smoke remains OPEN.

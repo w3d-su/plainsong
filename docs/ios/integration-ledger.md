@@ -10,13 +10,13 @@ C0 provides declarations and an unavailable app scaffold. **C0 overall acceptanc
 |---|---|
 | Integration branch | `phase3-ios-integration` |
 | PR base | `main`; includes the authorized #153 packet as an ancestor |
-| C0 PR / exact head | Publishing receipt follows this freeze commit |
-| IOS_BASE_REF | `refs/tags/ios-c0-v1` (not published until verified remote receipt) |
-| IOS_BASE_SHA | Pending immutable freeze publication receipt |
+| C0 PR / freeze head | [#157](https://github.com/w3d-su/plainsong/pull/157) (draft); code freeze `642cb212703220409874a2741c5adbfb8c80fe8a`; latest PR head tracked by GitHub |
+| IOS_BASE_REF | `refs/tags/ios-c0-v1` (remote ls-remote verified) |
+| IOS_BASE_SHA | `642cb212703220409874a2741c5adbfb8c80fe8a` |
 | Declarations | 13 frozen files / 71 unique declarations; frozen-contracts.json |
 | App / tests / scheme | `PlainsongIOS` / `PlainsongIOSTests` / `PlainsongIOS` |
 | Contract smoke | 12 selected cases compiled; execution OPEN, no runtime/devices installed |
-| Global manifest transfer | Remains 13 until draft PR exists and additive transfer receipt is published |
+| Global manifest transfer | Transferred exclusively to 12 by this additive documentation receipt after #157 creation; freeze tree `642cb212703220409874a2741c5adbfb8c80fe8a` |
 | Production composition | All capabilities nil; no provider factory, fake data or saved-success state |
 
 The immutable tag points to the code freeze; a later documentation-only receipt records its full SHA without attempting a self-referential commit hash. Other lanes read that receipt before starting implementation and must fetch/verify the exact tag. A later integration branch head is not an interchangeable base.
@@ -37,7 +37,7 @@ This full Mac run used `CI=1` for timing classification. It is regression eviden
 
 ## Exact-head hosted evidence
 
-No hosted result is claimed before publishing. The draft PR's `CI / build-and-test` must be read for its current full head; prior heads/reruns do not substitute. iOS hosted execution remains OPEN until 12 supplies a usable manual workflow/runtime. CodeQL is informational.
+The publication receipt precedes the final PR-head hosted result; no unverified success is recorded here. The draft PR's `CI / build-and-test` must be read for its current full head; prior heads/reruns do not substitute. iOS hosted execution remains OPEN until 12 supplies a usable manual workflow/runtime. CodeQL is informational.
 
 ## Lane receipts and exclusive transfer map
 
@@ -54,7 +54,7 @@ No hosted result is claimed before publishing. The draft PR's `CI / build-and-te
 | 09 Images | Adopt verified IOS_BASE_SHA | Insertion context/seam only | Features/Images + AppIOSTests/Images | Saved leaf before source; retained ownership; real writer/editor |
 | 10 Shell | Adopt verified IOS_BASE_SHA | State/action capabilities only | UI/Navigation + AppIOSTests/Shell | View lifetime, command focus, real providers |
 | 11 Validation | Adopt verified IOS_BASE_SHA | No final acceptance | IOSAcceptanceTests + evidence/validation | Exact integrated head, devices/accessibility/performance |
-| 12 Build | Await explicit receipt after draft PR creation, then adopt IOS_BASE_SHA | C0 bootstrap build/test only | project.yml, Makefile, Scripts/ios, ios.yml, build/IPA docs | Stable iOS entries, manual CI, device IPA, owner install |
+| 12 Build | Transfer now effective after #157 creation; adopt IOS_BASE_SHA | C0 bootstrap build/test only | project.yml, Makefile, Scripts/ios, ios.yml, build/IPA docs | Stable iOS entries, manual CI, device IPA, owner install |
 | 13 Integration | C0 freeze + publication receipt | Production factory unavailable | Frozen declarations, MarkdownCore platform/contracts, WorkspaceKitIOS manifest, App/State/Composition/Integration tests and central docs | Runtime smoke, Claude review, M0/provider composition |
 
 C0 architecture inventory `EditorReplaceLayeringTests.swift`, WorkspaceKitIOS Contracts tests, `.gitignore` and `.swiftlint.yml` remain 13-owned; other lanes submit proposed central changes. Syntax/WorkspaceCore/EditorKitIOS package smoke tests transfer with their module. Existing lane handoff allowlists still narrow the paths above. No shared file has two writers.
@@ -68,6 +68,19 @@ C0 architecture inventory `EditorReplaceLayeringTests.swift`, WorkspaceKitIOS Co
 - [ ] Owner-re-signed unsigned IPA launches and opens/saves selected Files resources.
 
 Prototype archive/build, simulator compilation, doubles, Mac tests and CI do not check these boxes. #156 explicitly reports them OPEN.
+
+## Explicit ownership transfer — 2026-10-08
+
+This documentation-only receipt is the transfer event after draft PR #157 exists. Frozen code/manifests are commit `642cb212703220409874a2741c5adbfb8c80fe8a` / remote `refs/tags/ios-c0-v1`. Find this receipt commit with `git log --format=%H -1 -- docs/ios/c0-baseline.md`; the PR body records its exact SHA after publication.
+
+- 13 → 02: SyntaxKit and Mac EditorKit manifests; narrow parser/fold/token-compatibility paths remain 02, frozen token/contracts remain 13.
+- 13 → 03: WorkspaceCore and Mac WorkspaceKit manifests; frozen model file remains 13.
+- 13 → 04: EditorKitIOS manifest and Editor/Presentation/module tests.
+- 13 → 07: PreviewKit manifest, platform implementation/tests; frozen contract/export files and wire protocol remain excluded.
+- 13 → 12: root project.yml, Makefile, Scripts/ios/** and future ios.yml/build docs. 13 will review proposed global changes rather than concurrently edit those files.
+- 13 retains MarkdownCore platform/contracts, WorkspaceKitIOS manifest, frozen API files, central architecture inventory, AppIOS App/State/Composition and Integration tests/docs.
+
+The tag itself contains the freeze-stage ledger; use this publication receipt to obtain the full SHA and effective transfer. The code and frozen-file hashes are identical. No worktree is reset or modified for another lane; existing pre-C0 plans must adopt this tag with additive commits or a new isolated implementation worktree.
 
 ## Release receipt
 
