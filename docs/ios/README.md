@@ -2,7 +2,7 @@
 
 日期：2026-10-08。規格版本：IOS-C0-v1。
 
-本包將核准的 iPhone／iPad、iOS／iPadOS 26 首版拆為 **12 條開發線 + 1 個整合角色**。每份 handoff 都可交給不同 LLM；[啟動提示詞](launch-prompts.md) 可直接複製。本 PR 只有規格與 handoff，沒有宣稱任何 iOS 功能、真機關卡或 IPA 已完成。
+本包將核准的 iPhone／iPad、iOS／iPadOS 26 首版拆為 **12 條開發線 + 1 個整合角色**。每份 handoff 都可交給不同 LLM；[啟動提示詞](launch-prompts.md) 可直接複製。C0 另以整合 PR 提供唯一契約與 unavailable scaffold；[台帳](integration-ledger.md) 分列編譯／測試執行／CI／真機狀態，沒有宣稱完整 iOS 功能、真機關卡或 IPA 已完成。
 
 ## 先讀與執行順序
 
@@ -51,7 +51,7 @@
 
 ## 獨立 worktree 與共同基準
 
-本包基於已 live fetch 的 `origin/main`：`b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`。這是 source snapshot，不是 PR／CI 狀態承諾。C0 交付時，13 記錄新的 **IOS_BASE_REF（可抓取分支／tag／SHA）和精確 IOS_BASE_SHA**；所有線從同一基準建立 worktree。
+本包基於已 live fetch 的 `origin/main`：`b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`。這是 source snapshot，不是 PR／CI 狀態承諾。C0 交付時，13 在台帳記錄新的 **IOS_BASE_REF（可抓取分支／tag／SHA）和精確 IOS_BASE_SHA**；所有線從同一基準建立 worktree。
 
 owner checkout `/Users/davis._.su/Documents/blogeditor` 有 `CLAUDE.md` 與 `.omc/` 的既有工作，不得修改、切分支、stash、format 或在那裡 generate。不得清理其他 worktree。
 
@@ -81,8 +81,9 @@ git -C /Users/davis._.su/Documents/blogeditor worktree add \
 | `IOSAcceptanceTests/**`、`docs/ios/evidence/validation/**` | 11 |
 | `project.yml`、`Makefile`、`Scripts/ios/**`、`.github/workflows/ios.yml`、build/IPA 文件 | C0 bootstrap 時 13，交接後只由 12 修改 |
 | `AppIOS/App/**`、`AppIOS/Composition/**`、`AppIOS/State/**`、`AppIOSTests/Integration/**` | 13 |
-| `MarkdownCore` 平台／新增契約、`WorkspaceKitIOS/Package.swift`、所有 frozen contract files | 13 |
+| `MarkdownCore` 平台／新增契約、`WorkspaceKitIOS/Package.swift`、所有 frozen contract files（完整索引見 contracts.md §9） | 13 |
 | `agent.md`、`docs/decision-log.md`、本包總表／contracts／integration ledger | 13 |
+| `Packages/EditorKit/Tests/EditorKitTests/EditorReplaceLayeringTests.swift` | 13；C0 中央 architecture/dependency pin，不改 Replace executor |
 
 若 allowlist 與總表不同，以更窄範圍為準，停下該項修改並交由 13 修正契約；不擴大自己所有權。Package-specific tests 屬 module owner，11 只寫跨模組驗收。依賴 `preview-src` 及 generated bundle 的變更由 07 提案給 13，核准所有權後才做，不能兩條線各自重建 bundle。
 

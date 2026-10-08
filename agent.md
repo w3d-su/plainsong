@@ -30,8 +30,9 @@ projects such as Astro/Next.js content directories).
   source-editor and preview work follows [`docs/ios/README.md`](docs/ios/README.md):
   12 parallel implementation lanes and one integration owner, frozen C0 interfaces,
   isolated worktrees, and M0 real-device gates before production composition.
-  The current handoff packet is a specification; it does not close any iOS build,
-  device, persistence, performance, or IPA-installation gate.
+  C0 supplies compile-time contracts and an unavailable app scaffold. Production
+  providers, device validation, persistence, performance and IPA installation remain
+  separate gates in `docs/ios/integration-ledger.md`.
 - Cloud sync, accounts, collaboration.
 - Full MDX component *execution* with user project bundling (placeholder rendering instead; see §9).
 - Plugin system for third parties.
@@ -596,7 +597,11 @@ Phase 1 milestones were delivered in order and are all accepted; each lists the 
 
 **Phase 2 = WYSIWYG (§13). Phase 3 candidates:** export (HTML/PDF via preview print),
 window tabs, search across workspace (ripgrep-style), publish integrations, real MDX
-component rendering.
+component rendering. The independent iOS lane follows `docs/ios/contracts.md`: iOS 26+,
+source plus preview, Files/iCloud in-place access, native UIKit editor and UIDocument
+persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform shared
+core extraction, 13 retains contracts/composition, and 12 receives global build
+manifests after the recorded C0 transfer. iOS-only packages stay out of Mac `make test`.
 
 ---
 
