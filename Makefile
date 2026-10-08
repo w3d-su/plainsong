@@ -6,7 +6,8 @@ XCODE_DERIVED_DATA ?=
 XCODE_ARTIFACT_DIR ?=
 
 PACKAGES := MarkdownCore EditorKit PreviewKit WorkspaceKit
-SWIFT_FORMAT_PATHS := App AppTests Packages PerformanceTests PlainsongUITests Scripts
+PORTABLE_PACKAGES := SyntaxKit WorkspaceCore
+SWIFT_FORMAT_PATHS := App AppTests AppIOS AppIOSTests Packages PerformanceTests PlainsongUITests Scripts
 # SwiftFormat 0.62 enabled these wrapping rules by default. Keep the repository's
 # existing 0.61 layout until a deliberate repo-wide migration, without breaking
 # older SwiftFormat versions that do not recognize the rule names.
@@ -40,6 +41,7 @@ test: generate
 		echo "==> swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+	$(MAKE) test-portable-core
 	Scripts/check-export-sandbox-root.sh
 # TEST_RUNNER_ vars are forwarded by xcodebuild into the xctest process env,
 # which does not inherit the shell env; without this, PerformanceTests'
@@ -74,3 +76,18 @@ lint: swiftformat-version-check
 clean:
 	rm -rf Plainsong.xcodeproj
 	@for pkg in $(PACKAGES); do rm -rf Packages/$$pkg/.build; done
+
+# C0-only bootstrap; 12 owns future ios-build/test/archive/ipa entry points.
+.PHONY: ios-c0-build ios-c0-test
+ios-c0-build:
+	Scripts/ios/c0.sh build
+
+ios-c0-test:
+	Scripts/ios/c0.sh test
+
+.PHONY: test-portable-core
+test-portable-core:
+	@set -e; for pkg in $(PORTABLE_PACKAGES); do \
+		echo "==> portable swift test: $$pkg"; \
+		(cd Packages/$$pkg && swift test); \
+	done

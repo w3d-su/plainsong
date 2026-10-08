@@ -18,6 +18,7 @@ final class EditorReplaceLayeringTests: XCTestCase {
     func testAppAndMarkdownCoreDoNotImportSTTextView() throws {
         let roots = [
             repoRoot.appendingPathComponent("App"),
+            repoRoot.appendingPathComponent("AppIOS"),
             repoRoot.appendingPathComponent("Packages/MarkdownCore/Sources"),
         ]
         let typeName = try NSRegularExpression(pattern: #"\bSTText\w*"#)
@@ -90,6 +91,7 @@ final class EditorReplaceLayeringTests: XCTestCase {
         XCTAssertEqual(try swiftPackageDeclarations(), [
             "EditorKit": [
                 #".package(path: "../MarkdownCore")"#,
+                #".package(path: "../SyntaxKit")"#,
                 #".package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.3.10")"#,
                 #".package(url: "https://github.com/tree-sitter/swift-tree-sitter.git", exact: "0.10.0")"#,
                 #".package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git", exact: "0.5.3")"#,
@@ -99,14 +101,24 @@ final class EditorReplaceLayeringTests: XCTestCase {
             ],
             "PreviewKit": [#".package(path: "../MarkdownCore")"#],
             "WorkspaceKit": [#".package(path: "../MarkdownCore")"#],
+            "SyntaxKit": [#".package(path: "../MarkdownCore")"#],
+            "WorkspaceCore": [#".package(path: "../MarkdownCore")"#],
+            "EditorKitIOS": [#".package(path: "../MarkdownCore")"#, #".package(path: "../SyntaxKit")"#],
+            "WorkspaceKitIOS": [
+                #".package(path: "../MarkdownCore")"#,
+                #".package(path: "../WorkspaceCore")"#,
+                #".package(path: "../PreviewKit")"#,
+            ],
         ])
 
         let project = try projectManifest()
         XCTAssertEqual(project.packages, [
             "EditorKit", "MarkdownCore", "PreviewKit", "WorkspaceKit", "Yams",
+            "SyntaxKit", "WorkspaceCore", "EditorKitIOS", "WorkspaceKitIOS",
         ])
         XCTAssertEqual(project.targets, [
             "PerformanceTests", "Plainsong", "PlainsongTests", "PlainsongUITests",
+            "PlainsongIOS", "PlainsongIOSTests",
         ])
         XCTAssertEqual(project.dependencies, [
             "package: EditorKit",
@@ -115,6 +127,16 @@ final class EditorReplaceLayeringTests: XCTestCase {
             "package: WorkspaceKit",
             "sdk: PDFKit.framework",
             "target: Plainsong",
+            "target: PlainsongIOS",
+            "package: SyntaxKit",
+            "package: WorkspaceCore",
+            "package: EditorKitIOS",
+            "package: WorkspaceKitIOS",
+            "package: MarkdownCore/MarkdownCoreTests",
+            "package: SyntaxKit/SyntaxKitTests",
+            "package: WorkspaceCore/WorkspaceCoreTests",
+            "package: EditorKitIOS/EditorKitIOSTests",
+            "package: WorkspaceKitIOS/WorkspaceKitIOSTests",
         ])
 
         let npm = try npmDependencyNames()
@@ -126,11 +148,36 @@ final class EditorReplaceLayeringTests: XCTestCase {
         XCTAssertEqual(npm.development, ["esbuild", "jsdom", "typescript", "vitest"])
     }
 
+    /// C0 must compile declarations without linking the Mac editor/workspace or
+    /// unfinished PreviewKit UIKit implementation. 13 owns this architecture pin.
+    func testIOSScaffoldDoesNotLinkMacOnlyProviders() throws {
+        let project = try source("project.yml")
+        let app = try XCTUnwrap(project.components(separatedBy: "\n  PlainsongIOS:").dropFirst().first)
+            .components(separatedBy: "\n  PlainsongIOSTests:")[0]
+        XCTAssertTrue(app.contains("product: PreviewKitContracts"))
+        XCTAssertFalse(app.contains("- package: EditorKit\n"))
+        XCTAssertFalse(app.contains("- package: WorkspaceKit\n"))
+        for package in ["MarkdownCore", "SyntaxKit", "WorkspaceCore"] {
+            for file in try swiftFiles(under: repoRoot.appendingPathComponent("Packages/\(package)/Sources")) {
+                let text = try String(contentsOf: file, encoding: .utf8)
+                for line in text.split(separator: "\n") {
+                    let code = Self.strippingLineComment(String(line)).trimmingCharacters(in: .whitespaces)
+                    for module in ["AppKit", "UIKit", "WebKit"] {
+                        XCTAssertNotEqual(code, "import \(module)", file.path)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Manifest readers
 
     private func swiftPackageDeclarations() throws -> [String: [String]] {
         var result: [String: [String]] = [:]
-        for name in ["EditorKit", "MarkdownCore", "PreviewKit", "WorkspaceKit"] {
+        for name in [
+            "EditorKit", "MarkdownCore", "PreviewKit", "WorkspaceKit",
+            "SyntaxKit", "WorkspaceCore", "EditorKitIOS", "WorkspaceKitIOS",
+        ] {
             let manifest = try source("Packages/\(name)/Package.swift")
             result[name] = manifest
                 .split(separator: "\n")
