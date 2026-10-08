@@ -1,4 +1,6 @@
-import AppKit
+#if os(macOS)
+    import AppKit
+#endif
 import MarkdownCore
 @testable import PreviewKit
 import XCTest
@@ -129,7 +131,12 @@ final class PreviewKitTests: XCTestCase {
     func testPreviewControllerUsesTransparentWebViewBackground() {
         let controller = PreviewController()
 
-        XCTAssertEqual(controller.webView.layer?.backgroundColor, NSColor.clear.cgColor)
+        #if os(macOS)
+            XCTAssertEqual(controller.webView.layer?.backgroundColor, NSColor.clear.cgColor)
+        #else
+            XCTAssertFalse(controller.webView.isOpaque)
+            XCTAssertEqual(controller.webView.backgroundColor, .clear)
+        #endif
     }
 
     @MainActor
@@ -173,6 +180,7 @@ final class PreviewKitTests: XCTestCase {
         try Self.onePixelPNGData.write(to: imageDirectory.appendingPathComponent("spaced pixel.png"))
 
         let controller = try PreviewController(previewIndexURL: previewIndexFixtureURL())
+        controller.installAssetReader(DirectPreviewAssetReader())
         controller.setWorkspaceAssetRoot(workspaceRoot)
 
         try await waitUntil("preview bridge ready") {

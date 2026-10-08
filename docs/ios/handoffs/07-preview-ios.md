@@ -58,7 +58,13 @@
 
 ## Evidence（由執行者填寫）
 
-尚未執行；此 handoff 沒有跨平台 PreviewKit、iCloud 圖片或效能驗收結果。
+2026-10-09。Branch `phase3-ios-preview-ios`，base `642cb212703220409874a2741c5adbfb8c80fe8a`（`ios-c0-v1`），契約 IOS-C0-v1。詳細命令、negative probe 與未閉關卡見 [lane-07 verification](../evidence/lane-07/verification.md)。
+
+Mac `swift test --package-path Packages/PreviewKit`：91 tests，0 failures，含既有 export／resource／lifecycle 與新的 fence、identity、hosted 測試。iOS 27.0 / iPhone 17：`PreviewAssetFenceTests` 12 通過；`PreviewIdentityTests` 6 通過；temp-page hosted ready／render／checkbox 通過。`testBundledKitchenSinkAndMDXStayVisible` 在 iOS skip，因為 simulator `loadFileURL` 讀 Mac repo preview bundle 不會 ready；該 fixture 由 Mac suite 執行。
+
+Negative probe：拿掉 `LANE07_COMPLETION_FENCE` 後，root A 的 late read 會送進 root B（`finished == 1`），還原後該測試通過。Protocol 8、frozen contracts、`preview-src` 與 committed bundle 沒有 diff。
+
+未閉：06 真實 reader、01 M0 真機／iCloud、11 效能、手動旋轉與 iPad layout。iOS 預設不安裝 direct reader；`installAssetReader` 留給 13 注入。沒有 merge、沒有 force-push、沒有改 owner checkout。
 
 ## 可直接貼給其他 LLM 的任務
 

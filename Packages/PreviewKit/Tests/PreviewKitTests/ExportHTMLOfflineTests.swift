@@ -1,4 +1,6 @@
-import AppKit
+#if os(macOS)
+    import AppKit
+#endif
 import MarkdownCore
 @testable import PreviewKit
 import WebKit
