@@ -62,7 +62,14 @@
 
 ## Evidence（由執行者填寫）
 
-尚未執行；本文件沒有 UIDocument 實作、背景可靠性或真機驗收證據。
+模組已在 `phase3-ios-document-io` 實作，尚未產品接線，也尚未關閉真機關卡。
+
+- 基準：`refs/tags/ios-c0-v1` / `642cb212703220409874a2741c5adbfb8c80fe8a`。沒有改 `Package.swift`、`Contracts.swift`、`DocumentContracts.swift`。
+- `IOSUIDocumentStore` 以 UIDocument 寫入既有文件。成功只對已落盤 snapshot 呼叫 `rebaseSavedText(to:)`。失敗、取消與逾時保留 draft，不把 original 標成 clean。
+- 2026-10-09 02:22:06 +0800，iPhone 17 Pro simulator `59CB04BD-26CC-4841-8D06-E75A2EDEBC66`：`xcodebuild test -scheme WorkspaceKitIOS` **TEST SUCCEEDED**，31 tests、0 failures。紀錄在 `/tmp/plainsong-doc-io-test3.log`。
+- 負向探針：`markSaved`、拿掉 writer queue、拿掉 generation fence、recovery 失敗前發布 conflict，四個具名測試都失敗。來源已還原。細節見 [lane-05 races](../evidence/lane-05/races.md)。
+- 真機 Files、未下載 iCloud、雙機修改、背景重啟、注音組字中的外部更新仍是 owner open gates。見 [device-acceptance](../evidence/lane-05/device-acceptance.md)。
+- Mac `make test` 未跑。此線沒有改 Mac target。06 真實 provider 與 13 production composition 仍未接。
 
 ## 可直接貼給其他 LLM 的任務
 
