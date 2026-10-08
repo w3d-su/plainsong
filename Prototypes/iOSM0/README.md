@@ -47,6 +47,8 @@ The prototype has these controls:
   **Inspect** shows exact UTF-16 units, selection and source digest. The status
   and exported event log include actual marked range, revision, dirty/saving/
   conflict and Undo availability. Exported logs omit source, URLs and bookmarks.
+  Native `setMarkedText`, `unmarkText`, insertion and deletion are also sampled
+  immediately after their UIKit calls, alongside delegate changes/selections.
 - **View switch** presents a read-only source pane. It is a presentation
   lifecycle probe, not the product Markdown preview. Dismiss by swiping down.
   **External probe** invokes the same guarded revert route without changing

@@ -1,5 +1,30 @@
 import UIKit
 
+@MainActor
+final class NativeProbeTextView: UITextView {
+    var nativeEvent: ((String) -> Void)?
+
+    override func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
+        super.setMarkedText(markedText, selectedRange: selectedRange)
+        nativeEvent?("native-set-marked")
+    }
+
+    override func unmarkText() {
+        super.unmarkText()
+        nativeEvent?("native-unmark")
+    }
+
+    override func insertText(_ text: String) {
+        super.insertText(text)
+        nativeEvent?("native-insert")
+    }
+
+    override func deleteBackward() {
+        super.deleteBackward()
+        nativeEvent?("native-delete-backward")
+    }
+}
+
 struct PresentationTicket: Sendable {
     let documentID: UUID
     let revision: Int
@@ -9,7 +34,7 @@ struct PresentationTicket: Sendable {
 
 @MainActor
 final class SourceEditor: NSObject, UITextViewDelegate {
-    let textView = UITextView(usingTextLayoutManager: true)
+    let textView = NativeProbeTextView(usingTextLayoutManager: true)
     private(set) var documentID = UUID()
     private(set) var revision = 0
     private(set) var generation: UInt64 = 0
@@ -20,6 +45,7 @@ final class SourceEditor: NSObject, UITextViewDelegate {
 
     override init() {
         super.init()
+        textView.nativeEvent = { [weak self] event in self?.event?(event) }
         textView.delegate = self
         textView.font = .monospacedSystemFont(ofSize: 17, weight: .regular)
         textView.autocorrectionType = .no
