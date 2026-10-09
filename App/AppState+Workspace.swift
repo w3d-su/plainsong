@@ -11,11 +11,6 @@ extension AppState {
     }
 
     func refreshWorkspaceAfterFileSystemChange() {
-        editorFindHost.traceReplaceBarAction(
-            "fsRefreshRequest watcherStreaming=\(workspaceWatcher?.isStreamingForTesting ?? false) "
-                + "namespaceDepth=\(workspaceMutationNamespaceDepth) "
-                + "caller=\(editorFindTraceCallerFrames())"
-        )
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending = true
@@ -50,11 +45,6 @@ extension AppState {
         using retainedRootAuthority: WorkspaceFileSystemRootAuthority,
         inspectManagedSessions: Bool
     ) {
-        editorFindHost.traceReplaceBarAction(
-            "namespaceRefresh inspect=\(inspectManagedSessions) "
-                + "namespaceDepth=\(workspaceMutationNamespaceDepth) "
-                + "caller=\(editorFindTraceCallerFrames())"
-        )
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending =
@@ -325,6 +315,12 @@ extension AppState {
     }
 }
 
+/// Lets a `WorkspaceEventWatcher` handler refer to the watcher it was installed on,
+/// which cannot be captured while the watcher is being initialized.
+private final class WorkspaceEventWatcherBox {
+    weak var watcher: WorkspaceEventWatcher?
+}
+
 private struct ManagedSessionWriteContext {
     let sessionIdentity: ObjectIdentifier
     let stateURL: URL
@@ -357,11 +353,16 @@ extension AppState {
             rememberRecentItem(root)
         }
 
-        let traceHost = editorFindHost
-        workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
-            traceHost.traceReplaceBarActionOffMain("watcherDebouncedFired root=\(root.lastPathComponent)")
+        let watcherBox = WorkspaceEventWatcherBox()
+        let watcher = WorkspaceEventWatcher(rootURL: root) { [weak self, watcherBox, root] in
             Task { @MainActor [weak self] in
+                // The watcher's stop() boundary only guarantees no handler *begins*
+                // afterwards; a handler that began just before it still hops here.
+                // Drop a delivery whose watcher was replaced or stopped meanwhile.
                 guard let self,
+                      let watcher = watcherBox.watcher,
+                      watcher === workspaceWatcher,
+                      !watcher.isStopped,
                       let currentRoot = workspaceRootURL,
                       exactFileURLSpellingMatches(currentRoot, root)
                 else {
@@ -370,14 +371,8 @@ extension AppState {
                 refreshWorkspaceAfterFileSystemChange()
             }
         }
-        #if DEBUG
-            workspaceWatcher?.onEventForTesting = { paths in
-                let names = paths.map { URL(fileURLWithPath: $0).lastPathComponent }
-                traceHost.traceReplaceBarActionOffMain(
-                    "watcherEvent count=\(paths.count) files=\(names.suffix(4).joined(separator: ","))"
-                )
-            }
-        #endif
+        watcherBox.watcher = watcher
+        workspaceWatcher = watcher
         workspaceWatcher?.start()
 
         scheduleWorkspaceReload(

@@ -121,8 +121,10 @@ extension EditorFindHostedGateTests {
                 && editor?.text == app.currentDocument.text
                 && app.editorFindHost.controller.documentBinding.revision == UInt64(app.currentDocument.version)
         }
-        // Fixture observation is already drained by the common Replace setup. Stop
-        // subsequent filesystem notifications so only the tested event can supersede.
+        // Fixture observation is already drained by the common Replace setup. `stop()`
+        // is a hard boundary: no watcher handler begins after it returns, and App drops
+        // a delivery whose main-actor hop lands behind a stop or watcher replacement, so
+        // only the tested event can supersede.
         hosted.appState.workspaceWatcher?.stop()
         return hosted
     }

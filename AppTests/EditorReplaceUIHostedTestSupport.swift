@@ -196,14 +196,11 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the bar's Replace All reaches its held preparation checkpoint") { hold.isEntered }
         XCTAssertFalse(hold.didRunOnMainThread)
         #if DEBUG
-            // Handoff 27b: on a PASSING run, keep the trace only when external-observation
-            // activity appears in it, so the failure-vs-pass comparison can answer whether
-            // the same producer always runs and only its timing differs.
+            // Handoff 27b: on a PASSING run, keep the trace only when a disk inspection
+            // appears in it, so the failure-vs-pass comparison can answer whether the
+            // same producer always runs and only its timing differs.
             let trace = appState.editorFindHost.replaceBarTrace
-            if trace.contains(where: {
-                $0.contains("handleExternalChange") || $0.contains("fsRefreshRequest")
-                    || $0.contains("namespaceRefresh") || $0.contains("watcherEvent")
-            }) {
+            if trace.contains(where: { $0.contains("handleExternalChange") }) {
                 print("replaceBarTrace@checkpoint (passed, external activity observed):")
                 print(trace.joined(separator: "\n"))
             }

@@ -267,7 +267,7 @@
       "stale assertion in testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen corrected"
     ],
     "flakes": [
-      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField timed out once waiting for Cancel to mount in a mixed run under machine load; passed in isolation (1 test, 0 failures) and in the rerun six-test selection (6/6)"
+      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField timed out once waiting for Cancel to mount in a mixed run; recorded here as machine load, but root-caused 2026-10-09 (handoff 27b): the fixture's own post.md write was observed by the workspace watcher after makeHostedBatchWorkspace's stop() — a debounce task racing stop() still fired — and the resulting disk inspection refused the held Replace All with externalObservationPending before preparation began, cascading into the Cancel-mount timeout. Fixed by making stop() a hard boundary; see watcherStopBoundaryFix."
     ],
     "evidence": "/private/tmp/plainsong-prh-hardening/focushandoff.xcresult"
   },

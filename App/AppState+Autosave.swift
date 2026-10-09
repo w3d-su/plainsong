@@ -4,9 +4,6 @@ import MarkdownCore
 @MainActor
 extension AppState {
     func flushAutosaveIfNeeded() {
-        editorFindHost.traceReplaceBarAction(
-            "flushAutosaveIfNeeded caller=\(editorFindTraceCallerFrames())"
-        )
         var sessions = [currentDocument]
         sessions.append(contentsOf: sessionCache.values)
         sessions.append(contentsOf: retiredEditorDocumentSessions.values.map(\.session))
