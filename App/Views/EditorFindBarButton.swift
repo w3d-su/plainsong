@@ -113,12 +113,36 @@ struct EditorFindBarLabel: NSViewRepresentable {
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         label.setAccessibilityIdentifier(identifier)
         configure(label)
+        Self.debugTraceMount("make", identifier: identifier, text: text)
         return label
     }
 
     func updateNSView(_ label: NSTextField, context _: Context) {
+        if label.stringValue != text {
+            Self.debugTraceMount("update", identifier: identifier, text: text)
+        }
         configure(label)
     }
+
+    #if DEBUG
+        /// Handoff 27b Applying-frame/Escape-label diagnosis: mount/update/dismantle of the
+        /// owned bar labels on the trace clock (stdout; the ring buffer cannot see AppKit
+        /// view events). Never consulted for behavior.
+        static func dismantleNSView(_ label: NSTextField, coordinator _: Void) {
+            debugTraceMount(
+                "dismantle",
+                identifier: label.accessibilityIdentifier() ?? "?",
+                text: label.stringValue
+            )
+        }
+
+        private static func debugTraceMount(_ event: String, identifier: String, text: String) {
+            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
+            print("REPLTRACE +\(milliseconds)ms barLabel.\(event) id=\(identifier) text=\(text)")
+        }
+    #else
+        private static func debugTraceMount(_: String, identifier _: String, text _: String) {}
+    #endif
 
     private func configure(_ label: NSTextField) {
         if label.stringValue != text {

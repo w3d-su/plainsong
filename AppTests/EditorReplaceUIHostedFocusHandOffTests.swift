@@ -135,8 +135,15 @@ extension EditorFindHostedGateTests {
         defer { state.willCommitForTesting = nil }
         try await click(EditorFindAccessibility.replaceAllButton, in: window)
         await awaitBarReplaceAll(app)
-        XCTAssertEqual(rendered, "Applying…", "the row rendered Applying… before the final recheck")
-        XCTAssertFalse(cancelShown, "Cancel is withdrawn once preparation is done")
+        XCTAssertEqual(
+            rendered,
+            "Applying…",
+            "the row rendered Applying… before the final recheck" + replaceBarTraceDiagnostic(app)
+        )
+        XCTAssertFalse(
+            cancelShown,
+            "Cancel is withdrawn once preparation is done" + replaceBarTraceDiagnostic(app)
+        )
         XCTAssertEqual(app.editorReplaceActivity, .idle)
         guard case .delivered(.replaced)? = state.lastResult else { return XCTFail("expected the batch") }
 

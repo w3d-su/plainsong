@@ -230,4 +230,36 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(EditorReplaceEffectSnapshot(appState, textView: editor), before, file: file, line: line)
         XCTAssertEqual(appState.editorReplaceAuthorityGeneration, generation, file: file, line: line)
     }
+
+    /// Handoff 27b diagnostics: the bar trace on assertion failure (DEBUG only — the ring
+    /// does not exist in Release, where this returns an empty string).
+    func replaceBarTraceDiagnostic(_ app: AppState) -> String {
+        #if DEBUG
+            return "\nreplaceBarTrace:\n" + app.editorFindHost.replaceBarTrace.joined(separator: "\n")
+        #else
+            return ""
+        #endif
+    }
+
+    /// Describes a stray mounted bar label: its view ancestry, visibility, host window, and
+    /// the current replace state. Used when a label survives past its expected lifetime.
+    @MainActor
+    func mountedBarLabelDiagnostic(_ label: NSTextField, window: NSWindow, app: AppState) -> String {
+        var chain = [String]()
+        var cursor: NSView? = label
+        while let view = cursor {
+            chain.append("\(type(of: view))\(view.isHidden ? ":hidden" : "")")
+            cursor = view.superview
+        }
+        let host = app.editorFindHost
+        return "'\(label.stringValue)' in window \(label.window?.windowNumber ?? -1)"
+            + " super=[\(chain.joined(separator: " <- "))]"
+            + " isBarVisible=\(host.ui.isBarVisible)"
+            + " activity=\(host.replaceBatch.activity)"
+            + " status=\(String(describing: host.replaceStatus))"
+            + " lastResult=\(String(describing: host.replaceBatch.lastResult))"
+            + " firstResponder=\(String(describing: window.firstResponder))"
+            + " actualKeyWindow=\(String(describing: NSApp.keyWindow?.windowNumber))"
+            + replaceBarTraceDiagnostic(app)
+    }
 }

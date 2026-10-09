@@ -39,7 +39,10 @@ extension EditorFindHostedGateTests {
         let field = try await waitForReplacementField(in: window)
         XCTAssertEqual(field.stringValue, "NEW")
         XCTAssertEqual(app.editorFindHost.ui.queryText, "hit")
-        XCTAssertNil(label(EditorFindAccessibility.replaceProgress, in: window))
+        if let stray = label(EditorFindAccessibility.replaceProgress, in: window) {
+            XCTFail("the progress label survives close and reopen: "
+                + mountedBarLabelDiagnostic(stray, window: window, app: app))
+        }
     }
 
     func testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue() async throws {

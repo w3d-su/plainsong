@@ -97,8 +97,11 @@ final class EditorFindHost {
 
     /// `traceReplaceBarAction` for the detached preparation worker: the entry lands on the
     /// next main turn, ordered behind anything already queued there.
-    nonisolated func traceReplaceBarActionOffMain(_ message: String) {
-        Task { @MainActor in traceReplaceBarAction(message) }
+    nonisolated func traceReplaceBarActionOffMain(_ message: @autoclosure () -> String) {
+        #if DEBUG
+            let message = message()
+            Task { @MainActor in traceReplaceBarAction(message) }
+        #endif
     }
 
     init() {

@@ -27,6 +27,13 @@ struct EditorReplaceRowModel: Equatable {
         isTruncated = ui.isTruncated
         activity = appState.editorReplaceActivity
         status = appState.editorFindHost.replaceStatus
+        // Handoff 27b: Applying-frame diagnosis — `preparing` models churn per progress
+        // update, so only the Applying transition and visible statuses are stamped.
+        if activity == .applying || status != nil {
+            appState.editorFindHost.traceReplaceBarAction(
+                "rowModel activity=\(activity) status=\(status?.text ?? "nil")"
+            )
+        }
     }
 }
 

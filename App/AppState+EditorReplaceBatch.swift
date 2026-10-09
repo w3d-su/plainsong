@@ -176,7 +176,9 @@ extension AppState {
     private func presentEditorReplaceApplying(_ state: EditorReplaceBatchRuntime) async {
         state.beginApplying()
         objectWillChange.send()
+        editorFindHost.traceReplaceBarAction("applyingPublished")
         try? await Task.sleep(nanoseconds: Self.editorReplaceApplyingFrameNanoseconds)
+        editorFindHost.traceReplaceBarAction("applyingFrameElapsed")
     }
 
     /// One display frame at 60 Hz.
@@ -230,6 +232,7 @@ extension AppState {
     ) -> EditorReplaceBatchCommandResult {
         let state = editorFindHost.replaceBatch
         // From here to the native insert there is no suspension.
+        editorFindHost.traceReplaceBarAction("willCommit")
         state.willCommitForTesting?()
         guard isCurrentEditorReplaceBatch(capture) else { return .superseded }
         let record = EditorReplaceAuthorizationRecord()
