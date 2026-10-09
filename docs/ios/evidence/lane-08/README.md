@@ -1,5 +1,7 @@
 # Lane 08 — 格式、Frontmatter、Find／單次 Replace：交付摘要
 
+> 2026-10-09 acceptance review 修正與實際 simulator 證據見 [`acceptance-review-fixes.md`](acceptance-review-fixes.md)。Find 已接受結果的來源保護、Frontmatter 即時投影與 production scheduler 反例已補；以下 2026-10-08 原始交付紀錄保留為歷史，不代表最新關卡。
+
 日期：2026-10-08。契約版本：IOS-C0-v1。推理等級：L3。
 
 ## 狀態宣告

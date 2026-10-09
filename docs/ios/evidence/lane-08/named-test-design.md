@@ -121,3 +121,11 @@ IOS_BASE 上的實作 PR 要另附：
 - Private fake 的拒絕呼叫紀錄，不是只有 label 斷言。
 - 04／10 尚未合併時，hosted editor before／after 列為未跑。
 - 真機中文候選字、VoiceOver、硬體鍵盤列為未跑。
+
+## Acceptance review regressions — 2026-10-09
+
+Three new classes run on the iOS 27 simulator, 14 tests in total. See `acceptance-review-fixes.md` for the selected 93-test receipt.
+
+- `IOSAcceptedFindProtectionTests` (5): changed same-length source, different document, same document rebound binding, Next and Previous refresh before reveal. These retain accepted results first, then change live context before the action.
+- `IOSFrontmatterProjectionTests` (6): native edit/Undo projection, draft capture retained across newer source, cross-document draft refusal/discard, Add with a stale absent projection, malformed existing block, and actual frozen binding observer delivery/cancellation.
+- `IOSProductionFindSchedulerTests` (3): a parked real worker drains before only the latest pending query starts; cancellation drops queued work and running delivery before reuse; cancellation before the runner starts prevents invocation. The production scheduler is instantiated directly, with synchronous worker barriers and a measured maximum of one running operation.

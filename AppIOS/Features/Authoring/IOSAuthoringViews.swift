@@ -119,8 +119,16 @@ struct IOSAuthoringFrontmatterPanel<Editor: IOSSourceEditorControlling>: View {
                     fieldRow(field)
                 }
             }
+            if !controller.frontmatter.drafts.isEmpty {
+                Button("Discard Draft") { controller.discardFrontmatterDrafts(using: editor) }
+                    .accessibilityLabel("Discard frontmatter draft")
+            }
+            if !controller.statusMessage.isEmpty {
+                Text(controller.statusMessage).accessibilityLabel(controller.statusMessage)
+            }
         }
-        .onAppear { controller.noteFrontmatterSource(using: editor) }
+        .onAppear { controller.startObservingFrontmatter(using: editor) }
+        .onDisappear { controller.stopObservingFrontmatter() }
     }
 
     private var displayedDate: String {
@@ -141,18 +149,17 @@ struct IOSAuthoringFrontmatterPanel<Editor: IOSSourceEditorControlling>: View {
                     set: { _ in controller.toggleFrontmatterBool(key: field.key, using: editor) }
                 ))
             case let .string(value):
-                CommitField(key: field.key, initial: value) {
-                    controller.commitFrontmatter(key: field.key, value: .string($0), using: editor)
-                }
+                CommitField(key: field.key, initial: value, begin: beginDraft, change: {
+                    controller.setFrontmatterDraft(key: field.key, value: .string($0), using: editor)
+                }) { controller.commitFrontmatter(key: field.key, value: .string($0), using: editor) }
             case let .date(value):
-                CommitField(key: field.key, initial: value) {
-                    controller.commitFrontmatter(key: field.key, value: .date($0), using: editor)
-                }
+                CommitField(key: field.key, initial: value, begin: beginDraft, change: {
+                    controller.setFrontmatterDraft(key: field.key, value: .date($0), using: editor)
+                }) { controller.commitFrontmatter(key: field.key, value: .date($0), using: editor) }
             case let .stringList(values):
-                CommitField(key: field.key, initial: values.joined(separator: ", ")) { text in
-                    let tags = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    controller.commitFrontmatter(key: field.key, value: .stringList(tags), using: editor)
-                }
+                CommitField(key: field.key, initial: values.joined(separator: ", "), begin: beginDraft, change: {
+                    controller.setFrontmatterDraft(key: field.key, value: .stringList(tags($0)), using: editor)
+                }) { controller.commitFrontmatter(key: field.key, value: .stringList(tags($0)), using: editor) }
             case .raw:
                 EmptyView()
             }
@@ -163,24 +170,45 @@ struct IOSAuthoringFrontmatterPanel<Editor: IOSSourceEditorControlling>: View {
     }
 
     private func displayed(_ field: FrontmatterField) -> FrontmatterValue {
-        controller.frontmatter.drafts[field.key] ?? field.value
+        controller.displayedFrontmatterValue(field)
+    }
+
+    private func beginDraft() {
+        controller.beginFrontmatterDraft(using: editor)
+    }
+
+    private func tags(_ text: String) -> [String] {
+        text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
     }
 }
 
 private struct CommitField: View {
     let key: String
+    let initial: String
+    let begin: () -> Void
+    let change: (String) -> Void
     let commit: (String) -> Void
     @State private var text: String
+    @FocusState private var isFocused: Bool
 
-    init(key: String, initial: String, commit: @escaping (String) -> Void) {
+    init(key: String, initial: String, begin: @escaping () -> Void,
+         change: @escaping (String) -> Void, commit: @escaping (String) -> Void)
+    {
         self.key = key
+        self.initial = initial
+        self.begin = begin
+        self.change = change
         self.commit = commit
         _text = State(initialValue: initial)
     }
 
     var body: some View {
         TextField(key, text: $text)
+            .focused($isFocused)
             .accessibilityLabel(key)
+            .onChange(of: isFocused) { _, focused in if focused { begin() } }
+            .onChange(of: text) { _, value in if isFocused, value != initial { change(value) } }
+            .onChange(of: initial) { _, value in text = value }
             .onSubmit { commit(text) }
     }
 }

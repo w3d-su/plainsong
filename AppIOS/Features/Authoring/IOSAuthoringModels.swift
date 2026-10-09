@@ -13,6 +13,7 @@ struct IOSLinkDraft: Identifiable {
 
 struct IOSFrontmatterModel {
     var acceptedText = ""
+    var projectedSnapshot: IOSSourceEditorSnapshot?
     var capture: IOSSourceEditorSnapshot?
     var needsRecapture = false
     var drafts: [String: FrontmatterValue] = [:]
@@ -34,6 +35,23 @@ enum IOSFindStatus: Equatable {
     case matches
 }
 
+struct IOSAuthoringFindContext {
+    let bindingID: UUID
+    let revision: IOSDocumentRevision
+    let source: String
+
+    init(snapshot: IOSSourceEditorSnapshot) {
+        bindingID = snapshot.bindingID
+        revision = snapshot.revision
+        source = snapshot.document.text
+    }
+
+    func matches(_ snapshot: IOSSourceEditorSnapshot) -> Bool {
+        bindingID == snapshot.bindingID && revision == snapshot.revision &&
+            ExactSourceText.matches(source, snapshot.document.text)
+    }
+}
+
 struct IOSFindModel {
     var isPresented = false
     var queryText = ""
@@ -44,6 +62,7 @@ struct IOSFindModel {
     var counterText = ""
     var message = ""
     var session: EditorFindSession?
+    var context: IOSAuthoringFindContext?
     var queryGeneration: UInt64 = 0
     var pendingSteps = 0
     var editorSelection = NSRange(location: 0, length: 0)
