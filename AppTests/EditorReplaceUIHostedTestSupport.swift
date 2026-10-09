@@ -5,6 +5,15 @@ import MarkdownCore
 @testable import Plainsong
 import XCTest
 
+/// Opt-in CI mimicry window (handoff 27b): plain `.borderless` windows refuse key status,
+/// so a key-capable subclass is needed for `NSApp.keyWindow` to actually point at a window
+/// that is not the designated test window.
+private final class HostedForeignKeyWindow: NSWindow {
+    override var canBecomeKey: Bool {
+        true
+    }
+}
+
 /// Replace PR H hosted support: production `WorkspaceWindow`s, the real replacement row, and
 /// its real controls. Bar controls are owned AppKit views, clicked through `performClick`, and
 /// the fields are driven through their real field editors — never by calling the App intent
@@ -29,8 +38,10 @@ extension EditorFindHostedGateTests {
         // Opt-in CI mimicry (handoff 27b): on CI the real NSApp.keyWindow differed from the
         // designated test window. A foreign borderless window made key after designation
         // reproduces that split for any product path still reading NSApp.keyWindow itself.
+        // Plain borderless windows refuse key status, so a key-capable subclass is required
+        // for the split to be real.
         if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW"] == "1" {
-            let foreign = NSWindow(
+            let foreign = HostedForeignKeyWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
                 styleMask: [.borderless],
                 backing: .buffered,
@@ -184,6 +195,19 @@ extension EditorFindHostedGateTests {
         try await start()
         try await waitUntil("the bar's Replace All reaches its held preparation checkpoint") { hold.isEntered }
         XCTAssertFalse(hold.didRunOnMainThread)
+        #if DEBUG
+            // Handoff 27b: on a PASSING run, keep the trace only when external-observation
+            // activity appears in it, so the failure-vs-pass comparison can answer whether
+            // the same producer always runs and only its timing differs.
+            let trace = appState.editorFindHost.replaceBarTrace
+            if trace.contains(where: {
+                $0.contains("handleExternalChange") || $0.contains("fsRefreshRequest")
+                    || $0.contains("namespaceRefresh") || $0.contains("watcherEvent")
+            }) {
+                print("replaceBarTrace@checkpoint (passed, external activity observed):")
+                print(trace.joined(separator: "\n"))
+            }
+        #endif
         return hold
     }
 

@@ -10,6 +10,15 @@ public final class WorkspaceEventWatcher {
     private var stream: FSEventStreamRef?
     private var debounceTask: Task<Void, Never>?
 
+    #if DEBUG
+        /// Handoff 27b diagnostics: raw FSEvents paths as delivered (pre-debounce).
+        public var onEventForTesting: (@Sendable ([String]) -> Void)?
+        /// Whether the FSEventStream is currently started.
+        public var isStreamingForTesting: Bool {
+            stream != nil
+        }
+    #endif
+
     public init(
         rootURL: URL,
         debounceNanoseconds: UInt64 = 300_000_000,
@@ -83,9 +92,15 @@ public final class WorkspaceEventWatcher {
         }
     }
 
-    private static let eventCallback: FSEventStreamCallback = { _, info, _, _, _, _ in
+    private static let eventCallback: FSEventStreamCallback = { _, info, _, eventPaths, _, _ in
         guard let info else { return }
         let watcher = Unmanaged<WorkspaceEventWatcher>.fromOpaque(info).takeUnretainedValue()
+        #if DEBUG
+            if let onEvent = watcher.onEventForTesting {
+                let cfArray = Unmanaged<CFArray>.fromOpaque(eventPaths).takeUnretainedValue()
+                onEvent((cfArray as? [String]) ?? [])
+            }
+        #endif
         watcher.scheduleDebouncedHandler()
     }
 }

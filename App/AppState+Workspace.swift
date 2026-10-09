@@ -11,6 +11,11 @@ extension AppState {
     }
 
     func refreshWorkspaceAfterFileSystemChange() {
+        editorFindHost.traceReplaceBarAction(
+            "fsRefreshRequest watcherStreaming=\(workspaceWatcher?.isStreamingForTesting ?? false) "
+                + "namespaceDepth=\(workspaceMutationNamespaceDepth) "
+                + "caller=\(editorFindTraceCallerFrames())"
+        )
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending = true
@@ -45,6 +50,11 @@ extension AppState {
         using retainedRootAuthority: WorkspaceFileSystemRootAuthority,
         inspectManagedSessions: Bool
     ) {
+        editorFindHost.traceReplaceBarAction(
+            "namespaceRefresh inspect=\(inspectManagedSessions) "
+                + "namespaceDepth=\(workspaceMutationNamespaceDepth) "
+                + "caller=\(editorFindTraceCallerFrames())"
+        )
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending =
@@ -347,7 +357,9 @@ extension AppState {
             rememberRecentItem(root)
         }
 
+        let traceHost = editorFindHost
         workspaceWatcher = WorkspaceEventWatcher(rootURL: root) { [weak self, root] in
+            traceHost.traceReplaceBarActionOffMain("watcherDebouncedFired root=\(root.lastPathComponent)")
             Task { @MainActor [weak self] in
                 guard let self,
                       let currentRoot = workspaceRootURL,
@@ -358,6 +370,14 @@ extension AppState {
                 refreshWorkspaceAfterFileSystemChange()
             }
         }
+        #if DEBUG
+            workspaceWatcher?.onEventForTesting = { paths in
+                let names = paths.map { URL(fileURLWithPath: $0).lastPathComponent }
+                traceHost.traceReplaceBarActionOffMain(
+                    "watcherEvent count=\(paths.count) files=\(names.suffix(4).joined(separator: ","))"
+                )
+            }
+        #endif
         workspaceWatcher?.start()
 
         scheduleWorkspaceReload(

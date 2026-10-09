@@ -112,3 +112,27 @@ final class EditorFindHost {
         }
     }
 }
+
+#if DEBUG
+    /// Compact caller chain for `replaceBarTrace` (handoff 27b): the calling thread's
+    /// frames inside the App module, innermost first, joined by " <- ". Pure symbol
+    /// formatting — safe on any thread, and it captures the producing call site rather
+    /// than a queued trampoline.
+    func editorFindTraceCallerFrames(limit: Int = 8) -> String {
+        Thread.callStackSymbols
+            .lazy
+            .filter { $0.contains("Plainsong") }
+            .dropFirst()
+            .prefix(limit)
+            .map { frame -> String in
+                // "<idx> <image> 0x<addr> <symbol tokens…>": keep everything after the
+                // address so a frame reads as "symbol + offset".
+                let parts = frame.split(whereSeparator: { $0 == " " || $0 == "\t" })
+                guard parts.count > 3 else {
+                    return frame.trimmingCharacters(in: .whitespaces)
+                }
+                return parts.dropFirst(3).joined(separator: " ")
+            }
+            .joined(separator: " <- ")
+    }
+#endif

@@ -180,6 +180,10 @@ extension AppState {
         for session: DocumentSession,
         advancingDiskEvent: Bool = true
     ) {
+        editorFindHost.traceReplaceBarAction(
+            "handleExternalChange file=\(session.fileURL?.lastPathComponent ?? "untitled") "
+                + "advancing=\(advancingDiskEvent) caller=\(editorFindTraceCallerFrames())"
+        )
         let sessionIdentity = ObjectIdentifier(session)
         guard !workspaceMutationWriteFences.contains(sessionIdentity),
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)

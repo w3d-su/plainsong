@@ -150,7 +150,9 @@ extension EditorFindHostedGateTests {
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if try await predicate() { return }
+            if try await predicate() {
+                return
+            }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         let report = (["Timed out waiting for \(description)"] + hostedTimeoutDiagnostics.map { $0() })
@@ -176,6 +178,9 @@ extension EditorFindHostedGateTests {
             )
             try text.write(to: url, atomically: true, encoding: .utf8)
         }
+        // Handoff 27b: stamp the fixture's own disk writes on the trace clock so a later
+        // external-observation refusal can be measured against them.
+        let fixtureWriteUptime = Int(ProcessInfo.processInfo.systemUptime * 1000)
 
         let suiteName = "EditorFindHostedGateTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -186,6 +191,11 @@ extension EditorFindHostedGateTests {
             shouldRestoreLastOpenedFile: false,
             userDefaults: defaults
         )
+        #if DEBUG
+            appState.editorFindHost.traceReplaceBarAction(
+                "fixtureWrote +\(fixtureWriteUptime)ms files=\(files.keys.sorted().joined(separator: ","))"
+            )
+        #endif
         hostedTimeoutDiagnostics.append { [weak self, weak appState] in
             guard let self, let appState else { return "Hosted AppState released" }
             return hostedFindTimeoutState(appState)
