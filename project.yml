@@ -210,6 +210,38 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Same document types as the Mac app: .md/.markdown (imported UTI) and
+        # .mdx (exported UTI). Opening in place keeps Files/iCloud semantics —
+        # no copy-to-container masquerade (contracts.md §4).
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Default
+            LSItemContentTypes:
+              - net.daringfireball.markdown
+          - CFBundleTypeName: MDX Document
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - app.plainsong.mdx
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - md
+                - markdown
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: app.plainsong.mdx
+            UTTypeDescription: MDX Document
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - mdx
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

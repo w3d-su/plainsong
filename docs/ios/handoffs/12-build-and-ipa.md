@@ -79,7 +79,30 @@ L3 reviewer／Claude 核對 Mac manifest／命令未變、套件平台分離、�
 
 ## Evidence（由執行者填寫）
 
-尚未執行；基線沒有這些 iOS 命令／target，本文件沒有 simulator build、device archive、IPA 或安裝通過證據。
+2026-10-08（`phase3-ios-build-and-ipa`，base `2144c46` packet head）：**C0 未交付、
+13→12 全域 manifest 未交接**，故僅完成 pre-C0 項目——本機 toolchain preflight
+（Xcode 27.0β／iphoneos27.0 SDK、**零 iOS simulator runtime**、工具與鎖 inventory）、
+四個固定入口的完整設計、可語法驗證的 draft 腳本與 ios.yml（`bash -n` 6/6 PASS）、
+負向測試計畫與給 13 的 wiring requests。全部證據在 `docs/ios/evidence/lane-12/`。
+全域檔案（project.yml／Makefile／Scripts/ios／ios.yml）未修改。正式 build／IPA
+證據待交接與 providers 到位後補；**BUILD PASS / INSTALL OPEN 仍全 OPEN**。
+
+2026-10-08（交接後，base `ios-c0-v1` = `642cb21`，head `39e522e` dirty）：
+**C0 已交付、13→12 receipt 確認本 lane 獨占全域 build 檔**。正式入口實作完成並
+實跑——`ios-build` BUILD SUCCEEDED、`ios-test` TEST EXECUTE SUCCEEDED
+（12/12 named，iPhone 17 Pro iOS 27 runtime）、`ios-archive` ARCHIVE SUCCEEDED
+（Release device arm64、platform IOS、minos 26.0、sdk 27.0、unsigned）、
+`ios-ipa` 產出 unsigned IPA（`PlainsongIOS-39e522e27d1e.ipa`，SHA-256
+`dbb86a98…d473a`，2,460,581 B；解包驗證 Payload 僅 app、Mach-O platform
+IOS/arm64、codesign "not signed at all"、零 mobileprovision/_CodeSignature、
+preview bundle 與 doc types 齊、單 scene）。負向 probe N2/N3/N5 皆如預期
+非零退出。Mac regression：`make build` PASS、`make -n test` recipe 展開不變
+（iOS-only packages 不進 Mac loop）、`git diff --check` clean；`make lint`
+FAIL 為 **pre-existing 產品碼**（swiftformat `redundantSendable` 等，7/609 檔，
+非本 lane 可修）。證據索引 `docs/ios/evidence/lane-12/build-run-index.md`
+（`evidence/build/` 被 `.gitignore` 裸 `build/` pattern 攔截，待 13/owner 決定
+是否加 negation）。**BUILD PASS（local）／INSTALL OPEN（owner re-sign）分列；
+hosted ios.yml 未觸發，無 run ID。**
 
 ## 可直接貼給 agent
 
