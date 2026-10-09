@@ -11,10 +11,12 @@ final class ExportPDFPagePlannerTests: XCTestCase {
     typealias Span = ExportPDFPagePlanner.Span
 
     /// The planner invariants: contiguous coverage of [0, contentHeight], no page taller
-    /// than its hard budget, no empty page, every width inside [baseline, contentWidth],
-    /// and every page's scale equal to `pageScale` of its own width. Under an aspect, a
-    /// page taller than its soft budget is allowed only when it starts inside an
-    /// unbreakable run that reaches past the soft budget (the soft extension).
+    /// than its width's hard budget — the flat 14,400 CSS pt, lowered once the page's
+    /// width would push the capture raster past `captureAreaBudget` — no empty page,
+    /// every width inside [baseline, contentWidth], and every page's scale equal to
+    /// `pageScale` of its own width. Under an aspect, a page taller than its soft budget
+    /// is allowed only when it starts inside an unbreakable run that reaches past the
+    /// soft budget (the soft extension).
     static func assertPlanInvariants(
         _ plan: ExportPDFPagePlanner.Plan,
         contentSize: CGSize,
@@ -37,7 +39,10 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             XCTAssertGreaterThan(rect.height, 0.001, file: file, line: line)
             let scale = ExportPDFPagePlanner.pageScale(width: rect.width)
             XCTAssertEqual(page.scale, scale, accuracy: 0.0001, file: file, line: line)
-            let hard = ExportPDFPagePlanner.maximumSide / scale
+            let hard = min(
+                ExportPDFPagePlanner.maximumSide,
+                ExportPDFPagePlanner.captureAreaBudget / max(rect.width, 1)
+            )
             XCTAssertLessThanOrEqual(rect.height, hard + 0.001, file: file, line: line)
             if let aspect {
                 let soft = min(hard, rect.width * aspect)
@@ -57,7 +62,20 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             }
             expectedTop = rect.maxY
         }
-        XCTAssertEqual(expectedTop, contentSize.height, accuracy: 0.001, file: file, line: line)
+        // Pages cover [0, contentHeight] contiguously — except that a fully span-free
+        // tail may be dropped as the B2 safety net; nothing but whitespace can follow
+        // the last kept page.
+        if expectedTop < contentSize.height - epsilon {
+            for span in unsplittable {
+                XCTAssertLessThanOrEqual(
+                    span.maxY, expectedTop + epsilon,
+                    "Content at \(span.minY)…\(span.maxY) lies past the dropped tail",
+                    file: file, line: line
+                )
+            }
+        } else {
+            XCTAssertEqual(expectedTop, contentSize.height, accuracy: 0.001, file: file, line: line)
+        }
     }
 
     /// Every page boundary must land on a safe break: never strictly inside a merged
@@ -117,9 +135,9 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         }
     }
 
-    func testOversizeAtomicBoxReportsScaledHeight() {
-        // The page's own width (28,800 pt) sets its scale to 0.5, so the reported height
-        // is in post-scale PDF points.
+    func testOversizeAtomicBoxReportsTheRunHeightInCSSPoints() {
+        // The cap is a flat 14,400 CSS pt: a 30,000 pt unbreakable interval throws and
+        // reports its CSS height, no matter the page width (28,800 pt → scale 0.5).
         XCTAssertThrowsError(
             try ExportPDFPagePlanner.plan(
                 contentSize: CGSize(width: 28800, height: 40000),
@@ -133,7 +151,7 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             else {
                 return XCTFail("Expected oversizeAtomicBox, got \(error)")
             }
-            XCTAssertEqual(heightPoints, 15000, accuracy: 0.5)
+            XCTAssertEqual(heightPoints, 30000, accuracy: 0.5)
         }
     }
 
@@ -276,9 +294,10 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         XCTAssertGreaterThan(plan.pages.count, 1)
     }
 
-    func testPageWiderThanTheMaximumGetsABudgetProportionalToIt() throws {
-        // Page width 28,800 → scale 0.5 → CSS height budget 28,800 for a 40,000 pt
-        // document → 2 pages.
+    func testPageWiderThanTheMaximumIsStillCappedAtTheMaximumSide() throws {
+        // Page width 28,800 → scale 0.5 — but the height budget stays a flat 14,400
+        // CSS pt: a 40,000 pt document needs 3 pages, and WebKit never sees a
+        // taller-than-maximum capture.
         let spans = (0 ..< 400).map { Span(minY: CGFloat($0) * 100, maxY: CGFloat($0) * 100 + 90) }
         let plan = try planDocument(width: 28800, height: 40000, unsplittable: spans)
         Self.assertPlanInvariants(
@@ -286,8 +305,9 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             baselineWidth: 28800, unsplittable: spans
         )
         Self.assertBreaksAreSafe(plan, unsplittable: spans)
-        XCTAssertEqual(plan.pages.count, 2)
+        XCTAssertEqual(plan.pages.count, 3)
         for page in plan.pages {
+            XCTAssertLessThanOrEqual(page.rect.height, 14400 + 0.5)
             XCTAssertEqual(page.scale, 0.5, accuracy: 0.0001)
         }
     }

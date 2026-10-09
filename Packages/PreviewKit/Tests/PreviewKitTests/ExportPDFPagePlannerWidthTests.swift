@@ -4,7 +4,8 @@ import XCTest
 
 /// Per-page width coverage for the planner: a wide element widens only the pages whose
 /// vertical span intersects it, each page scales by its own width, and under an aspect
-/// a wide page's height budget grows with its own width.
+/// a wide page's height budget grows with its own width. Extents past the product's
+/// wide threshold form isolated runs; those live in `ExportPDFPagePlannerRunTests`.
 final class ExportPDFPagePlannerWidthTests: XCTestCase {
     private typealias Span = ExportPDFPagePlanner.Span
     private typealias Extent = ExportPDFPagePlanner.WidthExtent
@@ -26,10 +27,9 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
         )
     }
 
-    /// A wide extent on one page widens only that page; neighboring pages keep the
-    /// baseline width. Under an aspect the wide page's own budget grows with its width:
-    /// it ends past `baseline × aspect` but never past `width × aspect` (greedy Print
-    /// budgeting).
+    /// A wide extent forms a Print run (2,400 > 800/0.9), so its pages are isolated:
+    /// the neighbouring prose pages keep the baseline width and the run's own page is
+    /// bounded by the run's edges, not by its soft `width × aspect` budget.
     func testPerPageWidthGrowsOnlyThePageContainingWideContent() throws {
         let extent = Extent(minY: 1200, maxY: 1600, maxX: 2400)
         let plan = try planDocument(
@@ -39,16 +39,22 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
             plan, contentSize: CGSize(width: 3200, height: 3200),
             baselineWidth: 800, unsplittable: [], aspect: 0.5
         )
-        XCTAssertEqual(plan.pages.map(\.rect.width), [800, 800, 800, 2400, 800, 800])
-        XCTAssertEqual(plan.pages.map(\.scale), [1, 1, 1, 1, 1, 1])
-        // The wide page grew to its own soft budget: 2,400 × 0.5 = 1,200.
-        XCTAssertEqual(plan.pages[3].rect.minY, 1200, accuracy: 0.5)
-        XCTAssertEqual(plan.pages[3].rect.height, 1200, accuracy: 0.5)
-        XCTAssertGreaterThan(plan.pages[3].rect.height, 800 * 0.5)
+        XCTAssertEqual(
+            plan.pages.map(\.rect.width),
+            [800, 800, 800, 2400, 800, 800, 800, 800]
+        )
+        XCTAssertEqual(plan.pages.map(\.scale), [1, 1, 1, 1, 1, 1, 1, 1])
+        // The run's mandatory breaks pin its page to exactly [1200, 1600]: the soft
+        // budget (2,400 × 0.5 = 1,200) could not extend it past the run's bottom.
+        let runPage = plan.pages[3].rect
+        XCTAssertEqual(runPage.minY, 1200, accuracy: 0.5)
+        XCTAssertEqual(runPage.maxY, 1600, accuracy: 0.5)
+        XCTAssertLessThan(runPage.height, 2400 * 0.5)
     }
 
     /// A page whose own width exceeds 14,400 pt scales down in PDF space while the
-    /// other pages stay at 100%.
+    /// other pages stay at 100%. The extent is a PDF wide run, so its page is isolated
+    /// to the run's span and capped at 14,400 CSS pt like every other page.
     func testPerPageScaleShrinksOnlyTheWidePage() throws {
         let extent = Extent(minY: 15000, maxY: 16000, maxX: 28800)
         let plan = try planDocument(
@@ -58,16 +64,20 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
             plan, contentSize: CGSize(width: 28800, height: 40000),
             baselineWidth: 800, unsplittable: []
         )
-        XCTAssertEqual(plan.pages.map(\.rect.width), [800, 28800])
-        XCTAssertEqual(plan.pages[0].scale, 1)
-        XCTAssertEqual(plan.pages[1].scale, 0.5, accuracy: 0.0001)
-        // The wide page's CSS height budget is 14,400 / 0.5 = 28,800.
-        XCTAssertLessThanOrEqual(plan.pages[1].rect.height, 28800 + 0.5)
-        XCTAssertEqual(plan.pages[1].rect.maxY, 40000, accuracy: 0.5)
+        XCTAssertEqual(plan.pages.map(\.rect.width), [800, 800, 28800, 800, 800])
+        let runPage = plan.pages[2]
+        XCTAssertEqual(runPage.rect.minY, 15000, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.maxY, 16000, accuracy: 0.5)
+        XCTAssertEqual(runPage.scale, 0.5, accuracy: 0.0001)
+        for (index, page) in plan.pages.enumerated() where index != 2 {
+            XCTAssertEqual(page.scale, 1)
+            XCTAssertLessThanOrEqual(page.rect.height, 14400 + 0.5)
+        }
     }
 
     /// A narrower extent must not shrink a page below the baseline, and an extent wider
-    /// than the measured content width clamps to it.
+    /// than the measured content width clamps to it. (The wide extent is a Print run,
+    /// so its page is isolated to [0, 400].)
     func testPageWidthIsNeverBelowBaselineAndNeverAboveContentWidth() throws {
         let extents = [
             Extent(minY: 0, maxY: 400, maxX: 5000),
@@ -80,8 +90,13 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
             plan, contentSize: CGSize(width: 3000, height: 4000),
             baselineWidth: 800, unsplittable: [], aspect: 0.6
         )
-        XCTAssertEqual(plan.pages[0].rect.width, 3000)
-        XCTAssertEqual(plan.pages.dropFirst().map(\.rect.width), [800, 800, 800, 800, 800])
+        let first = try XCTUnwrap(plan.pages.first)
+        XCTAssertEqual(first.rect.width, 3000)
+        XCTAssertEqual(first.rect.maxY, 400, accuracy: 0.5)
+        XCTAssertEqual(
+            plan.pages.dropFirst().map(\.rect.width),
+            [800, 800, 800, 800, 800, 800, 800, 800]
+        )
     }
 
     /// Soft aspect budget: an atomic run taller than `width × aspect` but under the hard
