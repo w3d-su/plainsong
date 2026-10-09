@@ -242,6 +242,58 @@ final class ExportPrintPaginationAppTests: XCTestCase {
         }
     }
 
+    /// M2: a completed run persists only the page setup — paper name and size,
+    /// orientation, printer. The panel's page range, copies, scaling and save
+    /// disposition must come back from a fresh shared copy on the next Print….
+    func testPrintJobSettingsDoNotPersistBeyondPageSetup() async throws {
+        let support = ExportHTMLCommandAppTests()
+        let prose = (0 ..< 10).map { "JOBSETTINGSENTINEL paragraph \($0)." }
+            .joined(separator: "\n\n")
+        let fixture = try support.makeFixture(text: prose)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        var chosenSize = NSSize.zero
+        var chosenPaperName: NSPrinter.PaperName?
+        fixture.appState.exportHTMLOperations.printOperationRunner = { operation, _ in
+            // Simulate the panel's choices: a page range, copies, scaling and a save
+            // disposition, plus a landscape orientation on a custom paper size.
+            let info = operation.printInfo
+            info.dictionary()[NSPrintInfo.AttributeKey.jobDisposition] =
+                NSPrintInfo.JobDisposition.save.rawValue
+            info.dictionary()[NSPrintInfo.AttributeKey.jobSavingURL] =
+                URL(fileURLWithPath: "/tmp/panel-choice.pdf")
+            info.dictionary()[NSPrintInfo.AttributeKey.copies] = 3
+            info.dictionary()[NSPrintInfo.AttributeKey.firstPage] = 2
+            info.dictionary()[NSPrintInfo.AttributeKey.lastPage] = 3
+            info.dictionary()[NSPrintInfo.AttributeKey.scalingFactor] = 0.5
+            info.orientation = .landscape
+            info.paperSize = NSSize(width: 612, height: 1008)
+            chosenSize = info.paperSize
+            chosenPaperName = info.paperName
+            return true
+        }
+        var results: [ExportHTMLOperationResult] = []
+        fixture.appState.exportHTMLOperations.didFinishOperation = { _, result in
+            results.append(result)
+        }
+        try await XCTUnwrap(fixture.appState.printCurrentDocument()).value
+        XCTAssertEqual(results.last, .printed)
+        let persisted = try XCTUnwrap(fixture.appState.exportHTMLOperations.lastPrintInfo)
+        XCTAssertEqual(persisted.orientation, .landscape)
+        XCTAssertEqual(persisted.paperName, chosenPaperName)
+        // paperSize is reported as the completed operation reported it (landscape
+        // swaps the axes); what matters is the persisted copy matches that value.
+        XCTAssertEqual(persisted.paperSize, chosenSize)
+        // Everything else matches a fresh shared copy — the job fields must not leak.
+        let fresh = NSPrintInfo.shared.copy() as? NSPrintInfo ?? NSPrintInfo()
+        for key: NSPrintInfo.AttributeKey in
+            [.jobDisposition, .jobSavingURL, .copies, .firstPage, .lastPage, .scalingFactor]
+        {
+            let persistedValue = persisted.dictionary()[key] as? NSObject
+            let freshValue = fresh.dictionary()[key] as? NSObject
+            XCTAssertEqual(persistedValue, freshValue, "\(key) leaked from the panel")
+        }
+    }
+
     private static func portraitPrintInfo() -> NSPrintInfo {
         let info = NSPrintInfo.shared.copy() as? NSPrintInfo ?? NSPrintInfo()
         info.orientation = .portrait
