@@ -51,6 +51,8 @@
 
 ## 獨立 worktree 與共同基準
 
+C0 已提供 [固定 tag 與完整 SHA／manifest 交接 receipt](c0-baseline.md)。可依同一基準做獨立模組開發；simulator smoke execution 與 M0 真機仍 OPEN，不能宣稱 C0 全驗收或 production release ready。
+
 本包基於已 live fetch 的 `origin/main`：`b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`。這是 source snapshot，不是 PR／CI 狀態承諾。C0 交付時，13 在台帳記錄新的 **IOS_BASE_REF（可抓取分支／tag／SHA）和精確 IOS_BASE_SHA**；所有線從同一基準建立 worktree。
 
 owner checkout `/Users/davis._.su/Documents/blogeditor` 有 `CLAUDE.md` 與 `.omc/` 的既有工作，不得修改、切分支、stash、format 或在那裡 generate。不得清理其他 worktree。
