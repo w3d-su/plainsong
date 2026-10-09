@@ -173,6 +173,59 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         )
     }
 
+    /// The M1 boundary shape: the ~4,700 pt table that Print isolates (it is wider
+    /// than `baseline / printWideFraction`) is narrower than PDF's `maximumSide`
+    /// threshold, so PDF forms no run — every page is scale 1, the table's pages
+    /// widen to their own extents, and prose may share a page with the table.
+    func testPrintWideTableDoesNotIsolateForPDF() async throws {
+        let (before, beforeMarkers) = Self.prose(prefix: "PRWIDEBEFORE", count: 150)
+        let (after, afterMarkers) = Self.prose(prefix: "PRWIDEAFTER", count: 150)
+        let columnMarkers = (0 ..< 10).map { String(format: "PRWIDECOL%02dSENTINEL", $0) }
+        let header = columnMarkers.map { $0 + String(repeating: "x", count: 90) }
+        let rowMarkers = (0 ..< 60).map { String(format: "PRWIDEROW%04dSENTINEL", $0) }
+        let rows = rowMarkers.map { "| \($0) |" }
+        let table = Self.tableSource(headerRow: header, bodyRows: rows)
+        let source = [before, table, after].joined(separator: "\n\n")
+        let (controller, pdf) = try await capture(source)
+        defer { controller.invalidate() }
+        // Wide for Print (> 800 / 0.9) but under the PDF threshold: no run, no
+        // mandatory breaks, no scaling.
+        XCTAssertGreaterThan(pdf.contentSize.width, 900)
+        XCTAssertLessThan(pdf.contentSize.width, 14400)
+        XCTAssertEqual(pdf.pageCount, pdf.plannedPageCount)
+        XCTAssertEqual(pdf.minimumScale, 1)
+        let document = try XCTUnwrap(PDFDocument(data: pdf.data))
+        XCTAssertEqual(document.pageCount, pdf.plannedPageCount)
+        Self.assertNoBlankPage(document)
+        var tablePages = 0
+        var mixedPages = 0
+        for index in 0 ..< document.pageCount {
+            let box = try XCTUnwrap(document.page(at: index)).bounds(for: .mediaBox)
+            let text = document.page(at: index)?.string ?? ""
+            let holdsTable = text.contains("PRWIDECOL") || text.contains("PRWIDEROW")
+            let holdsProse = text.contains("PRWIDEBEFORE") || text.contains("PRWIDEAFTER")
+            if holdsTable {
+                tablePages += 1
+                // The page grows to the table's own width — under 14,400 — and is
+                // still emitted at scale 1, not isolated onto mandatory boundaries.
+                XCTAssertGreaterThan(box.width, 900)
+                XCTAssertEqual(pdf.pageScales[index], 1)
+            }
+            if holdsTable, holdsProse {
+                mixedPages += 1
+            }
+        }
+        XCTAssertGreaterThan(tablePages, 0, "No page held the table")
+        XCTAssertGreaterThan(
+            mixedPages, 0,
+            "With no run, prose should share at least one page with the table"
+        )
+        try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
+            beforeMarkers + columnMarkers + rowMarkers + afterMarkers,
+            in: Self.text(of: pdf.data)
+        )
+    }
+
     /// The MDX kitchen sink still exports as one page.
     func testKitchenSinkMdxStillOnePage() async throws {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "kitchen-sink", withExtension: "mdx"))
