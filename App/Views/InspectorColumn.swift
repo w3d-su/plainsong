@@ -49,10 +49,25 @@ enum InspectorLayout {
     }
 
     /// Drag and VoiceOver stay inside 240...360 and inside the width that still fits the content floor.
-    static func clamped(_ width: Double, availableWidth: CGFloat, contentMinimum: CGFloat) -> Double {
+    static func upperBound(availableWidth: CGFloat, contentMinimum: CGFloat) -> Double {
         let fitted = availableWidth - contentMinimum - handleWidth
-        let upper = min(widthRange.upperBound, max(fitted, widthRange.lowerBound))
-        return min(max(width, widthRange.lowerBound), upper)
+        return min(widthRange.upperBound, max(fitted, widthRange.lowerBound))
+    }
+
+    static func clamped(_ width: Double, availableWidth: CGFloat, contentMinimum: CGFloat) -> Double {
+        min(
+            max(width, widthRange.lowerBound),
+            upperBound(availableWidth: availableWidth, contentMinimum: contentMinimum)
+        )
+    }
+
+    /// Explicit Show widens the window by the inspector's deficit within the screen's
+    /// visible frame; a window already wider than the screen never shrinks.
+    static func grownWindowFrame(_ frame: NSRect, deficit: CGFloat, visible: NSRect) -> NSRect {
+        var grown = frame
+        grown.size.width = max(frame.width, min(frame.width + deficit, visible.width))
+        grown.origin.x = min(max(grown.origin.x, visible.minX), visible.maxX - grown.width)
+        return grown
     }
 }
 
@@ -105,7 +120,10 @@ private struct InspectorResizeHandle: View {
             }
             .workspaceFrameProbe("handle")
             .background(InspectorWidthAnnouncement(
-                text: "\(announced) points",
+                value: announced,
+                maximum: Int(InspectorLayout.upperBound(
+                    availableWidth: availableWidth, contentMinimum: contentMinimum
+                )),
                 onIncrement: {
                     width = InspectorLayout.clamped(
                         width + 10, availableWidth: availableWidth, contentMinimum: contentMinimum
@@ -120,9 +138,12 @@ private struct InspectorResizeHandle: View {
     }
 }
 
-/// VoiceOver reads this view. SwiftUI's adjustable element exposes the actions but not the value.
+/// VoiceOver reads this view as a slider: a numeric value with min/max and increment
+/// actions announces as adjustable. SwiftUI's adjustable element exposes the actions but
+/// not the value or role.
 private struct InspectorWidthAnnouncement: NSViewRepresentable {
-    var text: String
+    var value: Int
+    var maximum: Int
     var onIncrement: () -> Void
     var onDecrement: () -> Void
 
@@ -131,13 +152,16 @@ private struct InspectorWidthAnnouncement: NSViewRepresentable {
     }
 
     func updateNSView(_ view: AnnouncementView, context _: Context) {
-        view.text = text
+        view.value = value
+        view.maximum = maximum
         view.onIncrement = onIncrement
         view.onDecrement = onDecrement
     }
 
     final class AnnouncementView: NSView {
-        var text = ""
+        var value = 0
+        var minimum = Int(InspectorLayout.widthRange.lowerBound)
+        var maximum = Int(InspectorLayout.widthRange.upperBound)
         var onIncrement: (() -> Void)?
         var onDecrement: (() -> Void)?
         override func hitTest(_: NSPoint) -> NSView? {
@@ -148,12 +172,28 @@ private struct InspectorWidthAnnouncement: NSViewRepresentable {
             true
         }
 
+        override func accessibilityRole() -> NSAccessibility.Role? {
+            .slider
+        }
+
         override func accessibilityLabel() -> String? {
             "Inspector width"
         }
 
         override func accessibilityValue() -> Any? {
-            text
+            NSNumber(value: value)
+        }
+
+        override func accessibilityValueDescription() -> String? {
+            "\(value) points"
+        }
+
+        override func accessibilityMinValue() -> Any? {
+            NSNumber(value: minimum)
+        }
+
+        override func accessibilityMaxValue() -> Any? {
+            NSNumber(value: maximum)
         }
 
         override func accessibilityPerformIncrement() -> Bool {
@@ -226,11 +266,10 @@ final class InspectorVisibility: ObservableObject {
         if window.styleMask.contains(.fullScreen) { return }
         guard let screen = window.screen else { return }
         let deficit = requiredWidth - availableWidth
-        let visible = screen.visibleFrame
-        var frame = window.frame
-        frame.size.width = min(frame.width + deficit, visible.width)
-        frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
-        window.setFrame(frame, display: true)
+        window.setFrame(
+            InspectorLayout.grownWindowFrame(window.frame, deficit: deficit, visible: screen.visibleFrame),
+            display: true
+        )
         // The geometry callback decides visibility after the screen-clamped resize.
     }
 

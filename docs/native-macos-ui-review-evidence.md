@@ -182,10 +182,9 @@ line is inside `testNativeFilesArrowSelectionOpensTwoFilesWithoutRequestingEdito
 (the test then passed in 0.415 s), immediately after the hosted SceneStorage
 "outside of being installed on a View" warnings. The width-matrix tests later in
 the same log did not log it, and `/private/tmp/plainsong-native-ui-29a-matrix2.log`
-has none. The inspector column records geometry in the reader without publishing
-and applies visibility on the next turn. The burst belongs to that hosted Files
-selection, which publishes while the root is outside a SwiftUI scene. It is not an
-inspector-layout failure.
+has none. Follow-up 29b attributed the burst to the Files `List` selection setter
+calling `selectWorkspaceNode` synchronously inside NavigationAuthority's own view
+update and fixed it; see below.
 
 R17 was rerun because the split-shell constant changed from 900 to 841. The loop
 does not cover the `HStack` shell. The final Debug build was copied to
@@ -219,6 +218,158 @@ Left as-is: `KeyWindowObservation` was not folded into `WindowKeyStateTracker`.
 The Files mouse-versus-keyboard check still reads `NSApp.currentEvent`; the
 selection setter runs synchronously inside the event, and a comment says so.
 Owner FKA/IME, macOS 15 CI, and `PlainsongUITests` remain outside this run.
+
+## Follow-up 29b (2026-10-09)
+
+Worktree `plainsong-native-ui-merge` on `phase3-native-ui-29a-merge`, head `a55cb69`.
+Uncommitted review-fix pass; the orchestrator commits after review. All xcodebuild
+work serialized under `/private/tmp/plainsong-xcodebuild-test.lock`.
+
+### MEDIUM 1 — transient pane overlap, fixed and measured
+
+The inspector's visibility publish is deferred one main-actor turn; before this fix
+the document column reserved the stale `isPresented` for that pass. The body now
+gates the reservation on geometry (`proxy.size.width >= contentMinimum + reserved`),
+so hiding is immediate while only the publish stays deferred. `publishInspectorLayout`,
+`InspectorVisibility`, explicit Show, auto-restore, and intent persistence are
+unchanged, and the `GeometryReader` structure did not change.
+
+`AppTests/NativeWorkspaceTransientLayoutHostedTests.swift` samples the probe frames
+right after `layoutSubtreeIfNeeded()` + `displayIfNeeded()`, before any yield:
+
+- `testTransientSourceToSplitDoesNotOverlapOnFixedShell` (864 pt)
+- `testTransientSourceToSplitDoesNotOverlapOnSplitShell` (900 pt, macOS 27)
+- `testTransientShrinkDoesNotOverlapOnFixedShell` (1280 → 864)
+- `testTransientShrinkDoesNotOverlapOnSplitShell` (1280 → 900, macOS 27)
+
+Failing on `a55cb69` (`/private/tmp/plainsong-29b-baseline.log`), editor/preview vs
+sidebar/inspector overlap in the transient pass:
+
+| Case | Editor×sidebar | Preview×inspector |
+|---|---|---|
+| Fixed, Source-only→Split at 864 | 98.5 pt (editor minX 157.5 < 256) | 94.5 pt |
+| Split, Source-only→Split at 900 | 113 pt (editor minX 207 < 320) | 108 pt |
+| Fixed, shrink 1280→864 | 98.5 pt | 94.5 pt |
+| Split, shrink 1280→900 | 113 pt | 108 pt |
+
+Passing after the fix (`/private/tmp/plainsong-29b-focused.log`): in the transient
+pass the inspector and handle are already unmounted; fixed 864 draws editor 257→560
+and preview 561→864 with no intersection; split 900 draws editor 320→609.5 and
+preview 610.5→900. Editor ≥ 260 and preview ≥ 260 in every transient sample.
+
+### MEDIUM 2 — selection-publish warnings, fixed and attributed
+
+Baseline run of `testNativeFilesArrowSelectionOpensTwoFilesWithoutRequestingEditorFocus`
+on `a55cb69`: **160** "Publishing changes from within view updates" lines and **1**
+"Update NavigationAuthority bound selection tried to update multiple times per frame",
+all inside that test (the SceneStorage "outside of being installed on a View" lines
+are emitted by every hosted `WorkspaceWindow` mount and are unrelated to selection).
+The setter now reads `NSApp.currentEvent` synchronously, records the pick in
+`FilesSelectionDeferral`, and opens it on the next main-actor turn; `issued`/`applied`
+drop an older deferred open that would land after a newer one, and the binding getter
+reports the pending pick so the next arrow advances from the just-chosen row.
+
+After the fix (`/private/tmp/plainsong-29b-focused.log`): **0** "Publishing changes"
+lines and **0** "multiple times per frame" lines across the arrow test, the new
+`testNativeFilesRapidArrowSelectionAppliesInOrderWithoutReverting` (three arrows sent
+back-to-back; final document `d.md`, observed order never reverts, no editor focus
+request), and `testNativeFilesSingleMouseClickStillSelectsDraggableRow`. The earlier
+"harmless because hosted" reading is withdrawn — the warnings were a real
+publish-during-update defect with a real fix.
+
+The deferred open needs a bounded retry: measured with diagnostics in
+`/private/tmp/plainsong-29b-single-{1..5}.log`, a **single** deferred
+`selectWorkspaceNode` was refused in **4 of 5** arrow-test runs by the
+installed-capture-generation guard (`cap=2, gen=3`; every other guard input
+satisfied) and the test timed out with the pick dropped. The a55cb69 synchronous
+shape was refused in **0 of 5** runs (`/private/tmp/plainsong-29b-sync-{1..5}.log`),
+so the one-turn delay is what lands inside the reload window. The task therefore
+retries at 25 ms — but only while the node is still an editable-Markdown tree member
+and the installed capture still lags the workspace generation; any other refusal,
+a succeeded pick, or a newer applied sequence exits immediately.
+
+### Lows
+
+- The inspector handle is now an `AXSlider` with a numeric value, "N points" value
+  description, min 240, and max `InspectorLayout.upperBound(availableWidth:contentMinimum:)`
+  (the fitted clamp the drag already used). Verified by the extended
+  `testTooWideInspectorIncrementStaysVisibleAtTheClampedWidth`.
+- `assertNativeLayout` includes the sidebar in the overlap check, and
+  `testSplitShellChromeMatchesTheRecordedConstant` asserts `document.minX >= sidebar.maxX − 0.5`.
+- `InspectorLayout.grownWindowFrame(_:deficit:visible:)` keeps an over-wide window's
+  width; `InspectorVisibilityTests/testExplicitShowGrowthNeverShrinksAnOverWideWindow`
+  covers over-wide, normal growth, and the visible-frame cap.
+
+### Known limitation (not a regression)
+
+Half of a 1512 pt display (756 pt) or a 1470 pt display (735 pt) fits neither floor
+(780 fixed / 841 split). `main`'s 760 pt minimum did not fit 756 or 735 either; only
+the 1728 pt display's half (864 pt) was in scope.
+
+### R17
+
+Not rerun. MEDIUM 1 changed one expression in the `GeometryReader` body — the reader
+structure, window-minimum constants, and sidebar/inspector mounting are unchanged, so
+the launch-loop constraint regime does not change (same reasoning as a no-constant
+edit; the loop was rerun for 29a only because the split-shell constant moved).
+
+### Verification
+
+- `NativeWorkspaceLayoutHostedTests` + `NativeWorkspaceTransientLayoutHostedTests`,
+  three runs: **9 tests, 0 failures each** (9.5 s, 9.3 s, 9.9 s;
+  `/private/tmp/plainsong-29b-layout-r{1,2,3}.log`). Load averages were ~15–21.
+- Focused 29b batch: **18 tests, 1 skipped, 0 failures**
+  (`/private/tmp/plainsong-29b-focused.log`). The skip is the single mouse-click
+  test, which requires a real key window the hosted runner cannot provide.
+- Broad gates rerun (all `EditorFind*`, `EditorFindFocusReceiptTests`,
+  `EditorReplace*AppTests`, `WorkspaceSearch*`, `ExportHTML*`,
+  `InspectorVisibilityTests`, `NativeSidebarDragTests`, `EditorFindHostedGateTests`):
+  **363 tests, 5 skipped, 0 failures, TEST SUCCEEDED**
+  (`/private/tmp/plainsong-29b-gates2.log`). The first batch run
+  (`plainsong-29b-gates.log`) recorded one flake: the arrow-selection test timed out
+  twice waiting for `b.md`/`c.md` (10.45 s under load); the same test passed in
+  0.475 s on the rerun and in all five focused runs
+  (`/private/tmp/plainsong-29b-arrow-v2-{1..5}.log`).
+- R22 exact command, 16 repetitions × 2 tests: all passed, `FAILED_FLAG=0`
+  (`/private/tmp/plainsong-29b-r22-{1..16}.log`). Iterations 11–16 were rerun
+  without result bundles after `/private/tmp` ran out of space on `.xcresult`
+  bundles; several large bundles were then removed.
+- `make build`: **BUILD SUCCEEDED** (`/private/tmp/plainsong-29b-build.log`).
+- Pinned SwiftFormat 0.62.1 + SwiftLint: 329 violations, 0 serious — the existing
+  repository baseline, including the pre-existing `MarkdownSyntaxParser.swift`
+  complexity/length warnings (`/private/tmp/plainsong-29b-lint.log`).
+- `git diff --check` clean; changed Swift files stay under ~400 lines.
+
+### Visuals
+
+The agent's process tree (Devin) lacks assistive access — `osascript` returned
+`is not allowed assistive access. (-1719)` — so the re-signed copy could not be
+driven through System Events, and no keystroke/window-resize AX path exists.
+Visual evidence was gathered two other ways:
+
+- A temporary hosted snapshot harness rendered the production `WorkspaceWindow`
+  to PNG (generator file removed afterward; PNGs kept under `/private/tmp`, not
+  committed). For each shell, three frames were captured: Source-only at 864 fixed
+  / 900 split with the inspector presented, the transient frame sampled
+  immediately after `setLayoutMode(.sourcePreview)` + `layoutSubtreeIfNeeded()` +
+  `displayIfNeeded()`, and the settled frame. **The transient and settled PNGs are
+  md5-identical per shell** — the inspector is already unmounted in the first
+  transient frame, matching the probe numbers above.
+  `/private/tmp/plainsong-29b-{fixed,split}-{sourceonly,transient,settled}-*.png`.
+  `/private/tmp/plainsong-29b-files-after-arrows.png` shows the Files list after
+  two back-to-back down arrows (`c.md` opened, the table keeps first responder);
+  the same behavior is asserted by
+  `testNativeFilesRapidArrowSelectionAppliesInOrderWithoutReverting`.
+- The re-signed copy `app.plainsong.native-review-h29b`
+  (`/private/tmp/PlainsongNativeReview29b.app`) was launched detached and its
+  1280×800 window captured with `screencapture -l`:
+  `/private/tmp/plainsong-29b-review-window.png` (full desktop also at
+  `/private/tmp/plainsong-29b-liveapp.png`). The copy is left running for a
+  possible rework round; `app.plainsong.editor` was not launched or terminated.
+
+Driving the signed copy through Source→Split at 864 and arrowing its Files list
+live remains owner acceptance — it needs a TCC-permitted terminal. The hosted
+snapshots cover the same production views at the exact sizes.
 
 ## Owner macOS 27 UI command (prepare only)
 

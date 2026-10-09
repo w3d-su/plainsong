@@ -98,9 +98,12 @@ screen’s `visibleFrame`; if the available area is still insufficient, intent s
 and the inspector stays collapsed until there is room. Explicit Hide remains hidden
 when widened. No sizing depends on editor or WebKit content minima (R17).
 
-The handle exposes an accessibility adjustable action in 10 pt increments. Single-file
-jump-bar segments without a primary menu expose static text, retaining the context-menu
-accessibility action. Dirty documents announce Edited. The View sidebar command is
+The handle is an accessibility slider adjustable in 10 pt increments, clamped to
+240–360 pt and to the fitted width that still leaves the content floor in the document
+column. Single-file jump-bar segments without a primary menu expose static text,
+retaining the context-menu accessibility action. A dirty document marks the window’s
+document-edited state, which VoiceOver and the close button already announce, so the
+file-name value stays the file name. The View sidebar command is
 gated to 27+; the fixed HStack retains its established sidebar on 14–26. ⌘⇧S remains
 dropped (Save As convention).
 

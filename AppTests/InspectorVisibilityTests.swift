@@ -71,6 +71,22 @@ final class InspectorVisibilityTests: XCTestCase {
         XCTAssertLessThanOrEqual(contentMinimum + dragged + InspectorLayout.handleWidth, available + 0.001)
     }
 
+    func testExplicitShowGrowthNeverShrinksAnOverWideWindow() {
+        let visible = NSRect(x: 0, y: 0, width: 1512, height: 900)
+        let overWide = InspectorLayout.grownWindowFrame(
+            NSRect(x: 0, y: 0, width: 2000, height: 800), deficit: 281, visible: visible
+        )
+        XCTAssertEqual(overWide.width, 2000, accuracy: 0.001)
+        let grown = InspectorLayout.grownWindowFrame(
+            NSRect(x: 100, y: 0, width: 1000, height: 800), deficit: 281, visible: visible
+        )
+        XCTAssertEqual(grown.width, 1281, accuracy: 0.001)
+        let capped = InspectorLayout.grownWindowFrame(
+            NSRect(x: 100, y: 0, width: 1000, height: 800), deficit: 900, visible: visible
+        )
+        XCTAssertEqual(capped.width, 1512, accuracy: 0.001)
+    }
+
     func testShowWhileFullScreenDoesNotResizeTheWindow() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
                               styleMask: [.titled, .resizable, .fullScreen], backing: .buffered, defer: true)

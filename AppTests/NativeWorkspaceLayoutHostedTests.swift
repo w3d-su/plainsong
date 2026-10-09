@@ -40,6 +40,7 @@ extension EditorFindHostedGateTests {
                 "document=\(document.width) maxX=\(document.maxX) chrome=\(chrome)"
         )
         XCTAssertEqual(sidebar.width, 320, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(document.minX, sidebar.maxX - 0.5)
         XCTAssertEqual(chrome, WorkspaceLayout.splitShellChrome, accuracy: 0.5,
                        "Record this measured chrome in WorkspaceLayout.splitShellChrome")
     }
@@ -85,9 +86,20 @@ extension EditorFindHostedGateTests {
             AccessibilityQuery.find(identifier: nil, label: "Inspector width", in: host.window),
             AccessibilityQuery.summary(in: host.window)
         )
+        // VoiceOver must announce an adjustable slider with the fitted range, not AXUnknown.
+        XCTAssertEqual(AccessibilityQuery.role(of: announcedHandle), "AXSlider")
+        let announced = Int(InspectorLayout.clamped(fitted))
+        XCTAssertEqual(AccessibilityQuery.numericValue(of: announcedHandle), Double(announced))
+        XCTAssertEqual(AccessibilityQuery.valueDescription(of: announcedHandle), "\(announced) points")
         XCTAssertEqual(
-            AccessibilityQuery.value(of: announcedHandle),
-            "\(Int(InspectorLayout.clamped(fitted))) points"
+            AccessibilityQuery.minValue(of: announcedHandle),
+            InspectorLayout.widthRange.lowerBound
+        )
+        XCTAssertEqual(
+            AccessibilityQuery.maxValue(of: announcedHandle),
+            InspectorLayout.upperBound(
+                availableWidth: document.width, contentMinimum: WorkspaceLayout.editorMinimum
+            )
         )
         XCTAssertLessThanOrEqual(
             WorkspaceLayout.editorMinimum + inspector.width + InspectorLayout.handleWidth,
@@ -266,10 +278,13 @@ extension EditorFindHostedGateTests {
         try await assertNativeLayout(in: window, preview: true)
     }
 
-    private func assertNativeLayout(in window: NSWindow, preview: Bool) async throws {
+    func assertNativeLayout(in window: NSWindow, preview: Bool) async throws {
         let editor = try XCTUnwrap(layoutFrame("editor", in: window))
         XCTAssertGreaterThanOrEqual(editor.width, WorkspaceLayout.editorMinimum - 0.5)
         var frames = [editor]
+        if let sidebar = layoutFrame("sidebar", in: window) {
+            frames.append(sidebar)
+        }
         if preview {
             let rendered = try XCTUnwrap(layoutFrame("preview", in: window))
             XCTAssertGreaterThanOrEqual(rendered.width, WorkspaceLayout.previewMinimum - 0.5)
@@ -288,15 +303,15 @@ extension EditorFindHostedGateTests {
         }
     }
 
-    private func layoutFrame(_ name: String, in window: NSWindow) -> NSRect? {
+    func layoutFrame(_ name: String, in window: NSWindow) -> NSRect? {
         guard let view = firstDescendant(of: NSView.self, in: window.contentView, where: {
             $0.identifier?.rawValue == "plainsong.layout.\(name)"
         }), view.window != nil else { return nil }
         return view.convert(view.bounds, to: window.contentView)
     }
 
-    private func makeNativeLayoutHost(appState: AppState, shell: WorkspaceShell,
-                                      setting: NativeInspectorIntent) -> HostedWorkspace
+    func makeNativeLayoutHost(appState: AppState, shell: WorkspaceShell,
+                              setting: NativeInspectorIntent) -> HostedWorkspace
     {
         EditorPreviewScrollCoordinator.latestDebugInstance = nil
         let disposal = HostedRootDisappearance()
@@ -320,7 +335,7 @@ extension EditorFindHostedGateTests {
 }
 
 @MainActor
-private final class NativeInspectorIntent: ObservableObject {
+final class NativeInspectorIntent: ObservableObject {
     @Published var value: Bool
     @Published var width = InspectorLayout.defaultWidth
     let visibility: InspectorVisibility
@@ -330,7 +345,7 @@ private final class NativeInspectorIntent: ObservableObject {
     }
 }
 
-private struct NativeLayoutRoot: View {
+struct NativeLayoutRoot: View {
     @ObservedObject var setting: NativeInspectorIntent
     let shell: WorkspaceShell
     var body: some View {

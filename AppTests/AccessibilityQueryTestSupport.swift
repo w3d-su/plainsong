@@ -28,6 +28,26 @@ enum AccessibilityQuery {
         attribute(element, kAXValueAttribute) as? String
     }
 
+    static func role(of element: AXUIElement) -> String? {
+        attribute(element, kAXRoleAttribute) as? String
+    }
+
+    static func numericValue(of element: AXUIElement) -> Double? {
+        (attribute(element, kAXValueAttribute) as? NSNumber)?.doubleValue
+    }
+
+    static func valueDescription(of element: AXUIElement) -> String? {
+        attribute(element, kAXValueDescriptionAttribute) as? String
+    }
+
+    static func minValue(of element: AXUIElement) -> Double? {
+        (attribute(element, kAXMinValueAttribute) as? NSNumber)?.doubleValue
+    }
+
+    static func maxValue(of element: AXUIElement) -> Double? {
+        (attribute(element, kAXMaxValueAttribute) as? NSNumber)?.doubleValue
+    }
+
     static func performIncrement(on element: AXUIElement) -> Bool {
         AXUIElementPerformAction(element, kAXIncrementAction as CFString) == .success
     }

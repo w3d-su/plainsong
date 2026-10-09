@@ -139,8 +139,11 @@ private struct WorkspaceWindowContent: View {
 
     private var documentColumn: some View {
         // R17: all column widths derive from this proxy and constants, never child minima.
-        // Visibility is `inspectorVisibility.isPresented` only. The geometry publish is
-        // deferred so it does not run inside this reader.
+        // Visibility is `inspectorVisibility.isPresented` only, and its geometry publish is
+        // deferred so it does not run inside this reader. The width gate below hides the
+        // inspector in the same pass once the column no longer fits it — a stale `true`
+        // must never keep the reservation for a frame (29b); showing still waits for the
+        // publish, so auto-restore and intent persistence are unchanged.
         GeometryReader { proxy in
             let contentMinimum = WorkspaceLayout.contentMinimum(preview: appState.isPreviewVisible)
             // Store the measured column without publishing. Show reads this during the same
@@ -153,8 +156,9 @@ private struct WorkspaceWindowContent: View {
                 contentMinimum: contentMinimum,
                 hasDocument: appState.hasOpenDocument
             )
-            let presented = inspectorVisibility.isPresented
             let reserved = InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+            let presented = inspectorVisibility.isPresented
+                && proxy.size.width >= contentMinimum + reserved
             HStack(spacing: 0) {
                 detail
                     .frame(width: max(0, proxy.size.width - (presented ? reserved : 0)))

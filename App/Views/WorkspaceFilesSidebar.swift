@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 import WorkspaceKit
 
 /// Files navigator: workspace tree with glass Add/Filter controls (WS3C Files mode).
@@ -10,6 +9,7 @@ import WorkspaceKit
 /// selecting one goes through `selectWorkspaceNode(id:)` exactly like the former row button.
 struct WorkspaceFilesSidebar: View {
     @EnvironmentObject private var appState: AppState
+    @State private var selectionDeferral = FilesSelectionDeferral()
     @State private var creationRequest: CreationRequest?
     @State private var itemName = ""
     @State private var renameTarget: WorkspaceFileNode?
@@ -163,18 +163,47 @@ struct WorkspaceFilesSidebar: View {
 
     private var selectionBinding: Binding<WorkspaceFileNode.ID?> {
         Binding(
-            get: { appState.workspaceTree?.selectedNodeID },
+            get: { selectionDeferral.pendingID ?? appState.workspaceTree?.selectedNodeID },
             set: { newValue in
+                let current = selectionDeferral.pendingID ?? appState.workspaceTree?.selectedNodeID
                 // Clicking empty space or a non-file row must not drop the open file's highlight.
-                guard let newValue, newValue != appState.workspaceTree?.selectedNodeID else { return }
-                // List retains its native selection/drag gestures. This setter runs
-                // synchronously inside the event that changed the selection, so
-                // `currentEvent` is still that event; SwiftUI does not defer the binding
-                // to a later turn. A left-mouse event may focus the editor. Key,
-                // accessibility, and a nil current event keep the navigator focused.
+                guard let newValue, newValue != current else { return }
+                // This setter runs inside the List/NavigationAuthority view update that
+                // changed the selection, so `currentEvent` is read now while it is still
+                // that event. The open itself is deferred one main-actor turn: mutating
+                // AppState here publishes during the view update (R22). A left-mouse event
+                // may focus the editor; key, accessibility, and a nil current event keep
+                // the navigator focused. `sequence` drops an older deferred open that
+                // would land after a newer one.
                 let mouseSelection = NSApp.currentEvent
                     .map { [.leftMouseDown, .leftMouseUp].contains($0.type) } ?? false
-                appState.selectWorkspaceNode(id: newValue, requestingEditorFocus: mouseSelection)
+                let deferral = selectionDeferral
+                deferral.issued += 1
+                let sequence = deferral.issued
+                deferral.pendingID = newValue
+                Task { @MainActor in
+                    guard sequence > deferral.applied else { return }
+                    deferral.applied = sequence
+                    // The one-turn delay lands inside a workspace-reload window often
+                    // enough to matter (measured 4/5 runs, 29b): selectWorkspaceNode
+                    // refuses while the installed capture generation lags the workspace
+                    // generation, and the pick would be dropped. Retry only while the
+                    // refusal is that lag — a missing or non-Markdown node, or any
+                    // refusal outside the lag, ends the loop immediately, as does a
+                    // newer applied pick.
+                    for _ in 0 ..< 200 {
+                        appState.selectWorkspaceNode(id: newValue, requestingEditorFocus: mouseSelection)
+                        if appState.workspaceTree?.selectedNodeID == newValue { break }
+                        let nodeStillPickable =
+                            appState.workspaceTree?.node(id: newValue)?.isEditableMarkdown == true
+                        let captureLagging = appState.workspaceInstalledCaptureGeneration
+                            != appState.workspaceGeneration
+                        guard nodeStillPickable, captureLagging else { break }
+                        try? await Task.sleep(nanoseconds: 25_000_000)
+                        guard deferral.applied == sequence else { break }
+                    }
+                    if sequence == deferral.issued { deferral.pendingID = nil }
+                }
             }
         )
     }
@@ -239,139 +268,5 @@ struct WorkspaceFilesSidebar: View {
     private struct CreationRequest {
         let kind: WorkspaceSidebarCreationKind
         let directoryID: WorkspaceFileNode.ID?
-    }
-}
-
-struct WorkspaceTreeNodeRow: View {
-    @EnvironmentObject private var appState: AppState
-
-    let node: WorkspaceFileNode
-    let rootURL: URL?
-    let onRename: (WorkspaceFileNode) -> Void
-    let onCreate: (WorkspaceSidebarCreationKind, WorkspaceFileNode.ID?) -> Void
-
-    var body: some View {
-        if node.isDirectory {
-            DisclosureGroup(isExpanded: expandedBinding) {
-                ForEach(node.children) { child in
-                    WorkspaceTreeNodeRow(
-                        node: child,
-                        rootURL: rootURL,
-                        onRename: onRename,
-                        onCreate: onCreate
-                    )
-                }
-            } label: {
-                rowLabel
-            }
-            .onDrop(of: [UTType.plainText.identifier], isTargeted: nil) { providers in
-                handleDrop(providers)
-            }
-        } else {
-            rowLabel
-        }
-    }
-
-    private var rowLabel: some View {
-        Label {
-            Text(node.name)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        } icon: {
-            Image(systemName: iconName)
-        }
-        .foregroundStyle(isDimmed ? .secondary : .primary)
-        .tag(node.id)
-        .selectionDisabled(!node.isEditableMarkdown)
-        .onDrag {
-            WorkspaceSidebarDragProvider.make(nodeID: node.id, imageURL: imageURL)
-        }
-        .help(node.relativePath)
-        .contextMenu {
-            if node.isDirectory {
-                Button("New File") {
-                    onCreate(.file, node.id)
-                }
-                Button("New Folder") {
-                    onCreate(.folder, node.id)
-                }
-                Divider()
-            }
-
-            Button("Rename…") {
-                onRename(node)
-            }
-
-            if let itemURL {
-                Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([itemURL])
-                }
-            }
-
-            Divider()
-
-            Button("Move to Trash", role: .destructive) {
-                appState.trashWorkspaceItem(id: node.id)
-            }
-        }
-    }
-
-    private var isDimmed: Bool {
-        !node.isDirectory && !node.isEditableMarkdown
-    }
-
-    private var imageURL: URL? {
-        guard case .image = node.kind else { return nil }
-        return itemURL
-    }
-
-    private var itemURL: URL? {
-        rootURL?.appending(path: node.relativePath, directoryHint: node.isDirectory ? .isDirectory : .notDirectory)
-    }
-
-    private var expandedBinding: Binding<Bool> {
-        Binding(
-            get: { appState.workspaceTree?.isExpanded(node.id) == true },
-            set: { isExpanded in
-                appState.setWorkspaceNodeExpanded(isExpanded, id: node.id)
-            }
-        )
-    }
-
-    private var iconName: String {
-        switch node.kind {
-        case .directory:
-            "folder"
-        case .markdown, .mdx:
-            "doc.text"
-        case .image:
-            "photo"
-        case .other:
-            "doc"
-        }
-    }
-
-    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
-        guard node.isDirectory,
-              let provider = providers
-              .first(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) })
-        else {
-            return false
-        }
-
-        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
-            let droppedID: String? = if let data = item as? Data {
-                String(data: data, encoding: .utf8)
-            } else {
-                item as? String
-            }
-
-            guard let droppedID, droppedID != node.id else { return }
-            Task { @MainActor in
-                appState.moveWorkspaceItem(id: droppedID, toDirectoryID: node.id)
-            }
-        }
-
-        return true
     }
 }

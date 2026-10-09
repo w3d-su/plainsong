@@ -42,6 +42,62 @@ extension EditorFindHostedGateTests {
         XCTAssertNotEqual(state.editorFocusRequestID, focusBefore)
     }
 
+    /// A burst of arrows with no yield between events: each deferred open must land in
+    /// order, the last file wins, and focus stays in the navigator (handoff 29b MEDIUM 2).
+    func testNativeFilesRapidArrowSelectionAppliesInOrderWithoutReverting() async throws {
+        let fixture = try makeWorkspaceFixture(
+            files: ["a.md": "a", "b.md": "b", "c.md": "c", "d.md": "d"]
+        )
+        let state = fixture.appState
+        state.setLayoutMode(.sourceOnly)
+        state.openExternalFile(fixture.root)
+        try await waitUntil("sidebar fixture opens") {
+            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+        }
+        let host = makeWorkspaceHost(appState: state)
+        registerTeardown(host: host, fixture: fixture)
+        var table: NSTableView?
+        try await waitUntil("native Files list mounts") {
+            table = self.firstDescendant(of: NSTableView.self, in: host.window.contentView)
+            return (table?.numberOfRows ?? 0) >= 5
+        }
+        let list = try XCTUnwrap(table)
+        host.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(host.window.makeFirstResponder(list))
+        let focusBefore = state.editorFocusRequestID
+        for _ in 0 ..< 3 {
+            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                                       timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: host.window.windowNumber,
+                                                       context: nil, characters: "\u{f701}",
+                                                       charactersIgnoringModifiers: "\u{f701}",
+                                                       isARepeat: false, keyCode: 125))
+            host.window.sendEvent(event)
+        }
+        var observed: [String] = []
+        for _ in 0 ..< 6 {
+            await Task.yield()
+            if let name = state.currentDocument.fileURL?.lastPathComponent, name != observed.last {
+                observed.append(name)
+            }
+        }
+        try await waitUntil("the last arrow's file is open") {
+            state.currentDocument.fileURL?.lastPathComponent == "d.md"
+        }
+        print("RAPID_ARROWS observed=\(observed)")
+        // An older deferred open must never land after a newer one.
+        let order = ["a.md", "b.md", "c.md", "d.md"]
+        var lastIndex = 0
+        for name in observed {
+            let index = try XCTUnwrap(order.firstIndex(of: name))
+            XCTAssertGreaterThanOrEqual(index, lastIndex)
+            lastIndex = index
+        }
+        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "d.md")
+        XCTAssertEqual(state.editorFocusRequestID, focusBefore)
+        XCTAssertTrue(host.window.firstResponder === list)
+    }
+
     func testNativeFilesSingleMouseClickStillSelectsDraggableRow() async throws {
         let fixture = try makeWorkspaceFixture(files: ["a.md": "a", "b.md": "b"])
         let state = fixture.appState
