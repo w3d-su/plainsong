@@ -48,6 +48,10 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   14,400 pt. The PDF is still written, its wide page is visibly shrunk to fit
   200 inches, and the warning banner names the page and the smallest percentage
   (hosted: `ExportPDFShrunkPagesAppTests`).
+- [ ] Long post with a minified line in the middle: in the exported PDF the file
+  is written and the shrunk-pages warning appears; in the Print preview only the
+  sheet holding the line is small — the prose sheets stay normal size (hosted:
+  `ExportPDFWideRunsAppTests.testMinifiedLineRunInALongPostWritesWithAShrunkWarning`).
 - [ ] Cancel destination/progress and inspect failure feedback: no destination
   publication and no source, selection, scroll, baseline, identity, recents, tree,
   recovery or visible-preview change; panel focus causes no source autosave.
@@ -100,6 +104,14 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   `ExportPrintWideRunsAppTests.testWideTableRunIsolatesOnA4Portrait`,
   `testWideTableRunIsolatesOnA4Landscape`,
   `testQuoteListTableShapePrintsNoBlankSheets`).
+- [ ] A wide table inside a quote and a list: the print preview shows no blank
+  trailing sheets after the run (hosted:
+  `ExportPrintWideRunsAppTests.testQuoteListTableShapePrintsNoBlankSheets`).
+- [ ] Job settings do not persist: set a page range or copy count (or use the
+  panel's Save as PDF action) and complete a Print; the next Print… shows fresh
+  job settings — only the paper name/size, orientation, and printer carry over
+  (hosted:
+  `ExportPrintPaginationAppTests.testPrintJobSettingsDoNotPersistBeyondPageSetup`).
 - [ ] Opt-in real-printer check (requires a CUPS destination; skips otherwise):
   `TEST_RUNNER_PLAINSONG_REAL_PRINT=1 xcodebuild test -project Plainsong.xcodeproj -scheme Plainsong -only-testing:PlainsongTests/ExportPrintSheetAppTests`
   — covers all three real-panel tests: one job-saving print (light theme, every

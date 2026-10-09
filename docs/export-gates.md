@@ -317,9 +317,13 @@ width. The standard print panel stays visible, including its scaling control, an
 Plainsong does not write a file for a system or panel PDF destination. (Historical,
 not reproduced (2026-10-07/08): this paragraph recorded that a layout wider than
 about 14,000 pt terminates the WebKit process at full-size measurement, which is why
-the zoom was chosen from the contained scroll width before expansion; neither the A1
-nor the per-page-width path reproduces the termination — see the 2026-10-07 amendment
-and the 2026-10-08 owner decision below.) PDF remains panel-first, matching
+the zoom was chosen from the contained scroll width before expansion; the
+termination did not reproduce at measurement under A1 or the per-page-width path,
+but it did reproduce on 2026-10-09 from over-tall wide captures — `WKWebView.pdf`
+dies when one rect's raster area nears 2³⁰ px — and is fixed by the flat 14,400 CSS
+pt height cap, the 2²⁹ px capture-area budget, and run isolation — see the
+2026-10-07 amendment, the 2026-10-08 decision, and the 2026-10-09 E1 decision
+below.) PDF remains panel-first, matching
 Export as HTML…. Print renders first because the panel paginates that completed render.
 
 **Amended 2026-10-07 (A1 page plan; B1 print path).** Two implementation choices made
@@ -403,6 +407,41 @@ taller than one paper page. Under the same sign-off:
   products. The aspect comes from the panel-persisted `NSPrintInfo`: a completed
   print run's paper size and orientation carry to the next Print…; a cancelled run
   changes nothing.
+
+**Owner decision 2026-10-09 (E1 — wide runs; bounded page height; B2 measured
+height).** A single wide element must not shrink the prose that shares its pages,
+a page's height budget must not grow with its width (a proportional budget let a
+wide page absorb an unbounded area and terminate WebContent), and WebKit must never
+get a chance to split an over-tall capture off a planned break. Under the same
+sign-off:
+
+- **Wide runs are mandatory page boundaries.** An extent whose right edge is
+  strictly past the product's wide threshold — `maximumSide` (14,400 pt) for PDF,
+  `baseline / printWideFraction` (Print `printWideFraction = 0.9`, so wider than
+  ≈1.11 × baseline) — joins a *wide run*: the union of the wide extents' vertical
+  spans, merged on overlap or touch, snapped outward to merged-unsplittable-interval
+  edges (always safe breaks), clamped to the document, and merged again. Run tops
+  and bottoms are mandatory breaks the page loop may end at but never crosses, so
+  prose never shares a page with wide content. Inside a run, per-page width growth
+  and the soft Print aspect extension work exactly as on 2026-10-08.
+- **Every page is at most 14,400 CSS pt tall, capped further by raster area.** The
+  hard height budget is a flat `maximumSide`, lowered only when the page's own
+  width would push the capture raster past `captureAreaBudget` (2²⁹ px): probing
+  brackets `WKWebView.pdf` at a 2³⁰ px per-rect bound, so the budget keeps roughly
+  a 2× margin and only affects pages wider than ~37,300 pt. An unbreakable
+  interval taller than its page's width-adjusted budget still fails typed as
+  `oversizeAtomicBox` with its CSS height. This supersedes the 2026-10-08
+  proportional hard budget (`14,400 / pageScale`), which grew without bound.
+- **One planned page produces exactly one PDF page.** Each
+  `pdf(configuration:)` piece is parsed through `CGPDFDocument`; any count other
+  than 1 — or a joined total different from the plan — throws typed
+  `pageCountMismatch` rather than emitting a document WebKit split off the plan.
+- **Height is measured from content (B2).** The settled height is the maximum
+  bottom of any `#preview-root` descendant plus the root's bottom padding and
+  border, in document coordinates — never `clientHeight`; the export-only style
+  forces `#preview-root { min-height: 0 !important }` so the `100vh` floor cannot
+  pin the measure. A trailing planned page intersecting no measured span is
+  dropped as a safety net.
 
 ### D5 — One-shot sandbox write path
 
@@ -1023,9 +1062,12 @@ Checkboxes start unchecked. Evidence lines are filled only when the gate closes.
   confirm a suppressed-panel job produces a readable PDF and that real-sheet
   cancel/supersede unwind the operation.
 - [ ] Both use the same completed offscreen snapshot and include finalized images,
-  KaTeX, highlighting, Mermaid, MDX placeholders, and resolved theme.
+  KaTeX, highlighting, Mermaid, MDX placeholders, and the right theme for the
+  product (PDF: resolved invocation theme; Print: light by B1).
 - [x] Print uses panel-controlled paper pagination; PDF/Print prove equivalent
-  content/assets/theme without asserting identical page breaks.
+  content/assets without asserting identical page breaks or theme — Print is
+  deliberately light-only (B1: paper is white) while PDF keeps the resolved
+  invocation theme.
 - [x] Cancel/error paths close their panel/operation cleanly, write nothing, and do not
   touch the visible preview or source session.
 - Evidence: `ExportPDFCommandAppTests.testExportPDFWritesAValidFileAndPrintWritesNothing`,
@@ -1437,8 +1479,10 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   atomic-run extension, the hard cap's typed `oversizeAtomicBox`, and landscape
   aspecting. Per-page width is exercised hosted by
   `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`, wide-run
-  isolation by `ExportPDFWideRunsAppTests` and `ExportPrintWideRunsAppTests`, and
-  the C2 warning by `ExportPDFShrunkPagesAppTests`.
+  isolation by `ExportPDFWideRunsAppTests` and `ExportPrintWideRunsAppTests`,
+  the C2 warning by `ExportPDFShrunkPagesAppTests`, and the M2 persistence
+  subset by `ExportPrintPaginationAppTests.testPrintJobSettingsDoNotPersistBeyondPageSetup`
+  with `testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`.
   The 2026-10-06 note that a hosted capture wider than about 14,000 pt terminates the
   web process is revised per the D4 amendment: the A1 full-size path does not
   reproduce it, so the over-maximum factor is exercised hosted rather than only
@@ -1772,7 +1816,10 @@ PDF/Print E9 timing is **pending idle-machine run**.
   baseline width and a `wide` list of overflow right edges (minY, maxY, maxX —
   the edge plus root right padding). `ExportPDFPagePlanner.plan` computes each
   page's own width as the widest edge intersecting its span, clamped to
-  [baseline, contentWidth]; `hard(W) = 14,400 / pageScale(W)` and, for Print,
+  [baseline, contentWidth]; at this step `hard(W) = 14,400 / pageScale(W)` —
+  superseded 2026-10-09 by the flat `maximumSide` plus the 2²⁹ px
+  `captureAreaBudget`, because a budget that grows with W let a very wide page's
+  capture terminate WebContent — and, for Print,
   `soft(W) = min(hard, W × aspect)`. The greedy fixed point grows W only through
   the finite set {baseline} ∪ {ceil maxX} ∪ {contentWidth}, so it terminates;
   each emitted page is contiguous, covers [0, contentHeight] with no empty page,
