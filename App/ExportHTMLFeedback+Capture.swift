@@ -38,7 +38,7 @@ extension ExportHTMLNoticeMapper {
             product == .print
                 ? "The layout kept changing while preparing the document for printing. Try again."
                 : "The layout kept changing while preparing the PDF. Try again."
-        case .captureFailed, .emptyDocument:
+        case .captureFailed, .emptyDocument, .pageCountMismatch:
             "The document couldn’t be rendered for export. Try again."
         }
     }

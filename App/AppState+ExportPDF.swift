@@ -109,9 +109,17 @@ extension AppState {
         }
         let succeeded = await runExportPrintPanel(operation, window: window)
         if succeeded {
-            // A completed panel run persists the user's paper size and orientation for
-            // the next Print…; a cancelled one does not.
-            exportHTMLOperations.lastPrintInfo = operation.printInfo.copy() as? NSPrintInfo
+            // A completed panel run persists only the page setup the user chose — paper
+            // name and size, orientation, printer — for the next Print…; the job
+            // disposition, saving URL, page range and copies must not leak into a later
+            // print of another document, so the rest comes from a fresh shared copy.
+            let persisted = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo()
+            let chosen = operation.printInfo
+            persisted.paperName = chosen.paperName
+            persisted.paperSize = chosen.paperSize
+            persisted.orientation = chosen.orientation
+            persisted.printer = chosen.printer
+            exportHTMLOperations.lastPrintInfo = persisted
             // The job is done; an edit made while the panel was up must not read as a
             // mid-operation document change.
             return .printed
