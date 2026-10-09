@@ -1,6 +1,33 @@
 {
-  "originHash" : "7baf8871fed0980682bc4dcc220d4e6d95a65c845833c2c013f229d715b3c273",
+  "originHash" : "21f6b1c7689891ca2e087e6adf9ed1fee683f045391947647c726451e4a8e3d2",
   "pins" : [
+    {
+      "identity" : "swift-tree-sitter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter/swift-tree-sitter.git",
+      "state" : {
+        "revision" : "f97df585296977d8fcaf644cbde567151d1367b8",
+        "version" : "0.10.0"
+      }
+    },
+    {
+      "identity" : "tree-sitter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter/tree-sitter",
+      "state" : {
+        "revision" : "da6fe9beb4f7f67beb75914ca8e0d48ae48d6406",
+        "version" : "0.25.10"
+      }
+    },
+    {
+      "identity" : "tree-sitter-markdown",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git",
+      "state" : {
+        "revision" : "f969cd3ae3f9fbd4e43205431d0ae286014c05b5",
+        "version" : "0.5.3"
+      }
+    },
     {
       "identity" : "yams",
       "kind" : "remoteSourceControl",
