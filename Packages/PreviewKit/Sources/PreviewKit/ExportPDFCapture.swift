@@ -7,12 +7,17 @@ public enum ExportPDFCaptureError: Error, Equatable, Sendable {
     case invalidated
     case webContentProcessTerminated
     case geometryUnstable
-    /// One unbreakable run (line/atomic box chain) exceeds the page's hard budget; the
-    /// value is its height in PDF points after that page's scale.
+    /// One unbreakable run (line/atomic box chain) exceeds the hard height budget —
+    /// a flat 14,400 CSS pt, lowered when the page's width would push the capture
+    /// raster past `captureAreaBudget`; the value is its height in CSS points.
     case oversizeAtomicBox(heightPoints: CGFloat)
     /// A planned break would land strictly inside a fixed/sticky/transformed/floated
     /// element; the value identifies it as "tag.className".
     case breakCrossesPositionedContent(String)
+    /// WebKit returned a different number of PDF pages than the plan asked for — an
+    /// off-break split the plan cannot represent, so the export fails typed rather than
+    /// emitting a mis-split document.
+    case pageCountMismatch(planned: Int, captured: Int)
     case captureFailed(String)
     case emptyDocument
 }
@@ -35,6 +40,9 @@ public struct ExportPDFShrunkPage: Equatable, Sendable {
 public struct ExportPDFDocument: Equatable, Sendable {
     public let data: Data
     public let pageCount: Int
+    /// The number of pages the planner emitted; equal to `pageCount` on success — a
+    /// WebKit split would have thrown `pageCountMismatch` instead.
+    public let plannedPageCount: Int
     /// The PDF-space scale applied to each output page; 1 unless the content on that
     /// page was wider than 14,400 pt.
     public let pageScales: [CGFloat]
@@ -99,6 +107,7 @@ extension PreviewController {
         return ExportPDFDocument(
             data: joined.data,
             pageCount: joined.pageSizes.count,
+            plannedPageCount: plan.pages.count,
             pageScales: joined.pageScales,
             pageWidths: joined.pageSizes.map(\.width),
             maximumPageHeight: joined.pageSizes.map(\.height).max() ?? 0,
@@ -130,12 +139,22 @@ extension PreviewController {
             }
             let configuration = WKPDFConfiguration()
             configuration.rect = rect
+            let piece: Data
             do {
-                try await pages.append(webView.pdf(configuration: configuration))
+                piece = try await webView.pdf(configuration: configuration)
             } catch {
                 try checkExportAlive()
                 throw ExportPDFCaptureError.captureFailed(error.localizedDescription)
             }
+            // One planned page must come back as exactly one PDF page: a piece WebKit
+            // split or merged on its own means the file no longer matches the plan.
+            let captured = CGDataProvider(data: piece as CFData)
+                .flatMap(CGPDFDocument.init)?
+                .numberOfPages ?? 0
+            guard captured == 1 else {
+                throw ExportPDFCaptureError.pageCountMismatch(planned: 1, captured: captured)
+            }
+            pages.append(piece)
         }
         guard !pages.isEmpty else { throw ExportPDFCaptureError.emptyDocument }
         return pages
@@ -151,6 +170,14 @@ extension PreviewController {
             try Task.checkCancellation()
             let joined = try ExportPDFPageJoiner.join(pieces, scales: scales)
             try Task.checkCancellation()
+            // One planned page must come back as exactly one PDF page: a piece WebKit
+            // split on its own means the file no longer matches the plan.
+            guard joined.pageScales.count == scales.count else {
+                throw ExportPDFCaptureError.pageCountMismatch(
+                    planned: scales.count,
+                    captured: joined.pageScales.count
+                )
+            }
             guard let provider = CGDataProvider(data: joined.data as CFData),
                   let document = CGPDFDocument(provider),
                   document.numberOfPages > 0
