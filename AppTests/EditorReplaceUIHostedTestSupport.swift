@@ -26,6 +26,23 @@ extension EditorFindHostedGateTests {
             appState.editorFindHost.keyWindowOverride = nil
             appState.editorFindHost.keyWindowNumberOverride = nil
         }
+        // Opt-in CI mimicry (handoff 27b): on CI the real NSApp.keyWindow differed from the
+        // designated test window. A foreign borderless window made key after designation
+        // reproduces that split for any product path still reading NSApp.keyWindow itself.
+        if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW"] == "1" {
+            let foreign = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+            foreign.isReleasedWhenClosed = false
+            foreign.makeKeyAndOrderFront(nil)
+            addTeardownBlock { @MainActor in
+                foreign.orderOut(nil)
+                foreign.close()
+            }
+        }
     }
 
     /// The menu dispatchers read `PlainsongAppServices.appState`; point it at the fixture.
@@ -135,11 +152,34 @@ extension EditorFindHostedGateTests {
         start: @MainActor () async throws -> Void
     ) async throws -> HostedReplaceBatchHold {
         let hold = HostedReplaceBatchHold()
-        let state = hosted.appState.editorFindHost.replaceBatch
+        let appState = hosted.appState
+        let state = appState.editorFindHost.replaceBatch
         state.onChunkForTesting = { _ in hold.checkpoint() }
         addTeardownBlock { @MainActor in
             hold.release()
             state.onChunkForTesting = nil
+        }
+        // Handoff 27b: when the held-checkpoint wait below times out, this also reports the
+        // Replace All button's live state and the authority/status counters captured just
+        // before the press. `hostedFindTimeoutState` covers the rest of App's state.
+        weak var weakAppState = appState
+        weak var weakWindow = hosted.window
+        let serialAtPress = appState.editorFindHost.replaceStatusSerial
+        let generationAtPress = appState.editorReplaceAuthorityGeneration
+        hostedTimeoutDiagnostics.append { [weak self] in
+            guard let self, let appState = weakAppState, let window = weakWindow else {
+                return "Hosted Replace fixture released before the timeout report"
+            }
+            let button = barButton(EditorFindAccessibility.replaceAllButton, in: window)
+            return "replaceAllButton mounted=\(button != nil) "
+                + "enabled=\(String(describing: button?.isEnabled)) "
+                + "hidden=\(String(describing: button?.isHidden)) "
+                + "buttonWindow=\(String(describing: button?.window?.windowNumber)) "
+                + "designatedWindow=\(window.windowNumber)\n"
+                + "countersAtPress serial=\(serialAtPress) generation=\(generationAtPress); "
+                + "atTimeout serial=\(appState.editorFindHost.replaceStatusSerial) "
+                + "generation=\(appState.editorReplaceAuthorityGeneration) "
+                + "replaceAllTask=\(appState.editorFindHost.replaceAllTask != nil)"
         }
         try await start()
         try await waitUntil("the bar's Replace All reaches its held preparation checkpoint") { hold.isEntered }

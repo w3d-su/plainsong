@@ -88,7 +88,12 @@ extension AppState {
 
     /// Lifecycle resets and value edits drop the row's last message. The serial also makes a
     /// Replace All that finishes afterwards unable to write its stale result.
-    func clearEditorReplaceStatus() {
+    func clearEditorReplaceStatus(fileID: StaticString = #fileID, line: UInt = #line) {
+        editorFindHost.traceReplaceBarAction(
+            "clearReplaceStatus serial \(editorFindHost.replaceStatusSerial)->\(editorFindHost.replaceStatusSerial &+ 1)",
+            fileID: fileID,
+            line: line
+        )
         editorFindHost.replaceStatusSerial &+= 1
         guard editorFindHost.replaceStatus != nil else { return }
         editorFindHost.replaceStatus = nil
@@ -137,12 +142,18 @@ extension AppState {
     /// without making it key) must never reach the key window's editor.
     @discardableResult
     func replaceFromEditorReplaceBar(in window: NSWindow?) -> EditorReplaceCommandResult? {
+        editorFindHost.traceReplaceBarAction(
+            "barReplaceInvoked window=\(window?.windowNumber ?? -1)"
+        )
         guard isEditorReplaceBarActionAllowed(from: window) else { return nil }
         return runEditorReplace(invocation: .barControl)
     }
 
     @discardableResult
     func replaceAllFromEditorReplaceBar(in window: NSWindow?) -> Bool {
+        editorFindHost.traceReplaceBarAction(
+            "barReplaceAllInvoked window=\(window?.windowNumber ?? -1)"
+        )
         guard isEditorReplaceBarActionAllowed(from: window) else { return false }
         return startEditorReplaceAll(invocation: .barControl)
     }
@@ -151,8 +162,36 @@ extension AppState {
         guard hasOpenDocument, editorFindHost.ui.isReplaceRowActive,
               editorFindHost.ui.replacementValidity == .valid,
               let window, let keyWindow = editorFindKeyWindow()
-        else { return false }
-        return window === keyWindow
+        else {
+            editorFindHost.traceReplaceBarAction(
+                "barActionDenied clause=\(editorReplaceBarActionDenial(from: window))"
+            )
+            return false
+        }
+        guard window === keyWindow else {
+            editorFindHost.traceReplaceBarAction(
+                "barActionDenied clause=windowNotKey window=\(window.windowNumber) "
+                    + "key=\(keyWindow.windowNumber) appKey=\(NSApp.keyWindow?.windowNumber ?? -1)"
+            )
+            return false
+        }
+        editorFindHost.traceReplaceBarAction("barActionAllowed window=\(window.windowNumber)")
+        return true
+    }
+
+    /// Names the first failing clause of `isEditorReplaceBarActionAllowed`'s guard, for the
+    /// DEBUG press trace. `windowNotKey` is reported by the caller's identity check instead.
+    private func editorReplaceBarActionDenial(from window: NSWindow?) -> String {
+        guard hasOpenDocument else { return "hasOpenDocument" }
+        guard editorFindHost.ui.isReplaceRowActive else { return "isReplaceRowActive" }
+        guard editorFindHost.ui.replacementValidity == .valid else {
+            return "replacementValidity=\(editorFindHost.ui.replacementValidity)"
+        }
+        guard window != nil else { return "windowNil" }
+        guard editorFindKeyWindow() != nil else {
+            return "keyWindowNil window=\(window?.windowNumber ?? -1)"
+        }
+        return "windowNotKey"
     }
 
     /// Explicit Cancel while preparing; a distinct `.cancelled` result (PR G review fix 6).
@@ -181,19 +220,35 @@ extension AppState {
         installEditorReplacePresentationIfNeeded()
         let serial = advanceEditorReplaceStatusSerial()
         let replacement = editorFindHost.ui.replacementText
+        editorFindHost.traceReplaceBarAction(
+            "startReplaceAll invocation=\(invocation) serial=\(serial)"
+        )
         editorFindHost.replaceAllTask = Task { @MainActor [weak self] in
-            guard let self,
-                  editorFindHost.replaceStatusSerial == serial,
-                  editorFindHost.ui.isReplaceRowActive
-            else { return }
+            guard let self else { return }
+            let guardHolds = editorFindHost.replaceStatusSerial == serial
+                && editorFindHost.ui.isReplaceRowActive
+            editorFindHost.traceReplaceBarAction(
+                "replaceAllTaskFirstRun holds=\(guardHolds) expectedSerial=\(serial) "
+                    + "actualSerial=\(editorFindHost.replaceStatusSerial) "
+                    + "rowActive=\(editorFindHost.ui.isReplaceRowActive)"
+            )
+            guard guardHolds else { return }
             let result = await performEditorReplaceAll(replacement: replacement, invocation: invocation)
             publishEditorReplaceStatus(EditorReplaceStatusText.status(for: result), serial: serial)
         }
         return true
     }
 
-    private func advanceEditorReplaceStatusSerial() -> UInt64 {
+    private func advanceEditorReplaceStatusSerial(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) -> UInt64 {
         editorFindHost.replaceStatusSerial &+= 1
+        editorFindHost.traceReplaceBarAction(
+            "statusSerial=\(editorFindHost.replaceStatusSerial)",
+            fileID: fileID,
+            line: line
+        )
         if editorFindHost.replaceStatus != nil {
             editorFindHost.replaceStatus = nil
             objectWillChange.send()
@@ -203,6 +258,11 @@ extension AppState {
 
     private func publishEditorReplaceStatus(_ status: EditorReplaceStatus?, serial: UInt64) {
         guard serial == editorFindHost.replaceStatusSerial, editorFindHost.ui.isReplaceRowActive else {
+            editorFindHost.traceReplaceBarAction(
+                "publishStatusDrop serial=\(serial) actual=\(editorFindHost.replaceStatusSerial) "
+                    + "rowActive=\(editorFindHost.ui.isReplaceRowActive) "
+                    + "status=\(String(describing: status))"
+            )
             return
         }
         editorFindHost.replaceStatus = status

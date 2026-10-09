@@ -73,10 +73,41 @@ final class EditorFindHost {
     var isBlockedStatusCheckPending = false
     var isReplacePresentationPublishPending = false
 
+    // Handoff 27b flake trace: every silent hop between a bar Replace All press and
+    // `EditorReplaceBatchPreparation.prepare`. Read only by hosted timeout diagnostics.
+    #if DEBUG
+        private(set) var replaceBarTrace: [String] = []
+    #endif
+
+    /// Records one `replaceBarTrace` entry with a monotonic uptime stamp and the call site.
+    /// A no-op outside DEBUG; never consulted for behavior.
+    func traceReplaceBarAction(
+        _ message: @autoclosure () -> String,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        #if DEBUG
+            if replaceBarTrace.count >= 64 {
+                replaceBarTrace.removeFirst(replaceBarTrace.count - 63)
+            }
+            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
+            replaceBarTrace.append("+\(milliseconds)ms \(message()) (\(fileID):\(line))")
+        #endif
+    }
+
+    /// `traceReplaceBarAction` for the detached preparation worker: the entry lands on the
+    /// next main turn, ordered behind anything already queued there.
+    nonisolated func traceReplaceBarActionOffMain(_ message: String) {
+        Task { @MainActor in traceReplaceBarAction(message) }
+    }
+
     init() {
         // An authority advance supersedes every plan; a preparing one stops at once instead
         // of draining to a refusal behind a still-visible progress label.
-        replaceAuthority.onAdvance = { [weak replaceBatch] in
+        replaceAuthority.onAdvance = { [weak self, weak replaceBatch] in
+            self?.traceReplaceBarAction(
+                "authorityAdvance supersededPreparing=\(replaceBatch?.isPreparing ?? false)"
+            )
             replaceBatch?.supersedeIfPreparing()
         }
     }

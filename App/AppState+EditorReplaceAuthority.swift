@@ -88,13 +88,19 @@ extension AppState {
     /// `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`) and
     /// `externalResolutionIntentCaptures`. They are covered by the rekey notification, the
     /// write-fence `didSet`, and the live evaluation at commit.
-    func noteEditorReplaceAuthorityInputDidChange() {
-        advanceEditorReplaceAuthorityGeneration()
+    func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
         scheduleStaleEditorReplaceBlockedStatusCheck()
     }
 
     /// Rebind, reload, rekey, focus, and bar transitions call this directly.
-    func advanceEditorReplaceAuthorityGeneration() {
+    func advanceEditorReplaceAuthorityGeneration(fileID: StaticString = #fileID, line: UInt = #line) {
+        editorFindHost.traceReplaceBarAction(
+            "advanceAuthority \(editorReplaceAuthorityGeneration)->\(editorReplaceAuthorityGeneration + 1) "
+                + "preparing=\(editorFindHost.replaceBatch.isPreparing)",
+            fileID: fileID,
+            line: line
+        )
         editorFindHost.replaceAuthority.advance()
     }
 
@@ -115,7 +121,9 @@ extension AppState {
     /// still stops a *preparing* Replace All at once instead of letting it drain to a refusal.
     func noteEditorReplaceFindChromeTransition(
         from old: EditorFindUIState,
-        to new: EditorFindUIState
+        to new: EditorFindUIState,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         if old.queryText != new.queryText || old.matchCase != new.matchCase || old.wholeWord != new.wholeWord {
             editorFindHost.replaceBatch.supersedeIfPreparing()
@@ -123,7 +131,7 @@ extension AppState {
         if old.isReplaceRowActive, !new.isReplaceRowActive {
             // Close, collapse, and no-document all end the row's visible state; results and
             // refusals from before do not describe the next time it is shown.
-            clearEditorReplaceStatus()
+            clearEditorReplaceStatus(fileID: fileID, line: line)
         }
         guard old.isBarVisible != new.isBarVisible
             || old.isReplaceExpanded != new.isReplaceExpanded
@@ -133,7 +141,7 @@ extension AppState {
         else {
             return
         }
-        advanceEditorReplaceAuthorityGeneration()
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
     }
 
     /// Reload or Keep Mine finished converging every live installation (§5.6 last rows).
@@ -142,11 +150,15 @@ extension AppState {
     /// revalidated against the accepted source and recomputes **counter-only** when its
     /// binding does not already describe that exact source and revision. Nothing is
     /// queued; the user makes a fresh explicit Replace against the recomputed session.
-    func editorReplaceExternalResolutionDidComplete(for session: DocumentSession) {
-        advanceEditorReplaceAuthorityGeneration()
+    func editorReplaceExternalResolutionDidComplete(
+        for session: DocumentSession,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
         guard session === currentDocument else { return }
         // A "choose Reload or Keep Mine" refusal no longer describes the document.
-        clearEditorReplaceStatus()
+        clearEditorReplaceStatus(fileID: fileID, line: line)
         refreshEditorFindCounterFromAppSource()
     }
 

@@ -14,6 +14,11 @@ enum EditorReplaceBatchCommandResult: Equatable {
     case delivered(EditorReplaceBatchOutcome)
 }
 
+private enum EditorReplaceAllPlanCheck {
+    case ready(EditorReplacePlan)
+    case refused(EditorReplaceBatchCommandResult)
+}
+
 private struct EditorReplaceBatchCapture {
     let plan: EditorReplacePlan
     let invocation: EditorReplaceInvocation
@@ -42,37 +47,24 @@ extension AppState {
         replacement: String,
         invocation: EditorReplaceInvocation = .menu
     ) async -> EditorReplaceBatchCommandResult {
+        let host = editorFindHost
+        host.traceReplaceBarAction("performReplaceAllEntered invocation=\(invocation)")
         setEditorReplaceReplacement(replacement)
         let plan: EditorReplacePlan
-        switch makeEditorReplacePlan(replacement: replacement) {
-        case let .failure(.ineligible(reason)): return .ineligible(reason)
-        case let .failure(.noKeyWindowEditor(reason)): return .notDelivered(reason)
-        case let .success(value): plan = value
-        }
-        if editorReplaceHasMarkedText(for: plan) {
-            return .markedText
-        }
-        if case let .refused(reason) = editorReplaceAuthorizationDecision(for: plan.stamp, session: plan.session) {
-            return .refused(reason)
-        }
-        // Cheap refusals happen before a task or progress starts.
-        if plan.request.session.isTruncated {
-            return .invalidPlan(.truncatedSession)
-        }
-        if plan.request.session.total == 0 {
-            return .invalidPlan(.emptySession)
-        }
-        guard plan.request.sourceRevision == editorFindHost.controller.documentBinding.revision,
-              plan.request.sourceRevision == UInt64(max(0, currentDocument.version)),
-              plan.request.documentIdentity == activeEditorDocumentIdentity
-        else {
-            refreshEditorFindCounterFromAppSource()
-            return .superseded
+        switch planEditorReplaceAll(replacement: replacement) {
+        case let .refused(result):
+            host.traceReplaceBarAction("replaceAllReturn \(result)")
+            return result
+        case let .ready(value): plan = value
         }
 
         let state = editorFindHost.replaceBatch
         let previousTask = state.preparationTask
         let token = state.begin(total: plan.request.session.total)
+        host.traceReplaceBarAction(
+            "batchBegin total=\(plan.request.session.total) actionID=\(state.actionID) "
+                + "previousTask=\(previousTask != nil)"
+        )
         let capture = EditorReplaceBatchCapture(
             plan: plan, invocation: invocation, actionID: state.actionID,
             replacementGeneration: state.replacementGeneration,
@@ -92,8 +84,11 @@ extension AppState {
             // Serial drain: a newer explicit action cancels the old one, then waits for
             // its bounded checkpoint before allocating another source/slice.
             if let previousTask {
+                host.traceReplaceBarActionOffMain("workerWaitingOnPrevious actionID=\(capture.actionID)")
                 _ = await previousTask.value
+                host.traceReplaceBarActionOffMain("workerPreviousDrained actionID=\(capture.actionID)")
             }
+            host.traceReplaceBarActionOffMain("workerEnteringPrepare actionID=\(capture.actionID)")
             let ranOffMain = pthread_main_np() == 0
             let result = EditorReplaceBatchPreparation.prepare(
                 session: request.session, source: source,
@@ -124,6 +119,9 @@ extension AppState {
         } onCancel: {
             token.cancel()
         }
+        host.traceReplaceBarAction(
+            "workerPrepared actionID=\(capture.actionID) cancelled=\(token.isCancelled) prepared=\(prepared)"
+        )
         if state.preparationActionID == capture.actionID {
             state.preparationMilliseconds = elapsedMilliseconds(since: began)
         }
@@ -133,9 +131,43 @@ extension AppState {
         // The selection observer covers the frame above; the final recheck takes over from here.
         observation?.stop()
         let result = finishEditorReplaceBatchPreparation(prepared, capture: capture, token: token)
+        host.traceReplaceBarAction("replaceAllFinished result=\(result)")
         state.isApplying = false
         state.finish(action: capture.actionID, result: result)
         return result
+    }
+
+    /// Every pre-worker refusal of `performEditorReplaceAll`, before a task or progress
+    /// starts. The stale-capture check still refreshes the Find counter, as before.
+    private func planEditorReplaceAll(
+        replacement: String
+    ) -> EditorReplaceAllPlanCheck {
+        let plan: EditorReplacePlan
+        switch makeEditorReplacePlan(replacement: replacement) {
+        case let .failure(.ineligible(reason)): return .refused(.ineligible(reason))
+        case let .failure(.noKeyWindowEditor(reason)): return .refused(.notDelivered(reason))
+        case let .success(value): plan = value
+        }
+        if editorReplaceHasMarkedText(for: plan) {
+            return .refused(.markedText)
+        }
+        if case let .refused(reason) = editorReplaceAuthorizationDecision(for: plan.stamp, session: plan.session) {
+            return .refused(.refused(reason))
+        }
+        if plan.request.session.isTruncated {
+            return .refused(.invalidPlan(.truncatedSession))
+        }
+        if plan.request.session.total == 0 {
+            return .refused(.invalidPlan(.emptySession))
+        }
+        guard plan.request.sourceRevision == editorFindHost.controller.documentBinding.revision,
+              plan.request.sourceRevision == UInt64(max(0, currentDocument.version)),
+              plan.request.documentIdentity == activeEditorDocumentIdentity
+        else {
+            refreshEditorFindCounterFromAppSource()
+            return .refused(.superseded)
+        }
+        return .ready(plan)
     }
 
     /// Shows `Applying…` (Cancel withdrawn) and yields one frame so it can render. This is
