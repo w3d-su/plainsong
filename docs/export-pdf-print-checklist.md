@@ -36,6 +36,14 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   Pages containing the table are wider than the text-only pages, and the
   text-only pages stay at the normal width (hosted:
   `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`).
+- [ ] Wide-run isolation: the same post's wide table lands on its own pages —
+  prose never shares a page with the table, no page is blank, and the written
+  page count equals the plan (hosted:
+  `ExportPDFWideRunsAppTests.testVeryWideTableRunIsolatesAndCapsEveryPage`,
+  `testMidWidthTableRunScalesNeighboursStayWhole`,
+  `testQuoteListTableShapeLeavesNoBlankTail`). A ~184,770 pt wide table
+  exports 5/5 planned pages with the run capped under the raster area budget
+  (see `docs/perf-log.md`).
 - [ ] C2 warning: export a post containing a single minified line wider than
   14,400 pt. The PDF is still written, its wide page is visibly shrunk to fit
   200 inches, and the warning banner names the page and the smallest percentage
@@ -60,9 +68,11 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   changing paper size or orientation in the panel makes the pre-planned pages
   scale to fit and may show extra margins (re-planning is out of scope).
 - [ ] Panel persistence: change paper size or orientation in the panel and
-  complete a Print; the next Print… opens with those choices. Cancel a run and
-  confirm the previous choices remain (hosted:
-  `ExportPrintPaginationAppTests.testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`).
+  complete a Print; the next Print… opens with those choices — only paper
+  name, paper size, orientation, and printer carry over from a completed run.
+  Cancel a run and confirm the previous choices remain (hosted:
+  `ExportPrintPaginationAppTests.testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`,
+  `testPrintJobSettingsDoNotPersistBeyondPageSetup`).
 - [ ] Cancel and error release the operation and controller, with correct
   feedback and unchanged document/session/visible-preview state. (Opt-in hosted:
   `testCancelDuringRealPrintSheetIsSilent`,
@@ -84,6 +94,12 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   (hosted: `ExportPrintPaginationAppTests.testPhoneScreenshotPrintsOnceWithoutFailing`,
   `testTallMermaidFlowchartPrintsEveryNodeOnce`,
   `testTallImageExtendsItsPrintPageWithoutFailing`).
+- [ ] Wide-run Print isolation: a post with a very wide table prints the table
+  on its own sheets in both A4 portrait and landscape — no sheet mixes prose
+  with the table and no sheet is blank (hosted:
+  `ExportPrintWideRunsAppTests.testWideTableRunIsolatesOnA4Portrait`,
+  `testWideTableRunIsolatesOnA4Landscape`,
+  `testQuoteListTableShapePrintsNoBlankSheets`).
 - [ ] Opt-in real-printer check (requires a CUPS destination; skips otherwise):
   `TEST_RUNNER_PLAINSONG_REAL_PRINT=1 xcodebuild test -project Plainsong.xcodeproj -scheme Plainsong -only-testing:PlainsongTests/ExportPrintSheetAppTests`
   — covers all three real-panel tests: one job-saving print (light theme, every

@@ -1428,14 +1428,17 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `testProductionTallCaptureKeepsEverySentinelOnceInOrder` (A1 variable-height pages,
   every sentinel once). `ExportPDFAcceptanceAppTests` captures every named fixture plus
   generated 700-item list, 800-line code, and 2000-row table sources with every marker
-  once and every page inside the default user space. `ExportPDFPagePlannerTests` and
-  `ExportPDFPagePlannerWidthTests` pin the invariants on synthetic geometry: safe
+  once and every page inside the default user space. `ExportPDFPagePlannerTests`,
+  `ExportPDFPagePlannerWidthTests`, `ExportPDFPagePlannerRunTests`, and
+  `ExportPDFPagePlannerPrintRunTests` pin the invariants on synthetic geometry: safe
   breaks between line boxes, items, and table rows, per-page width and scale (only a
-  page whose own content overflows widens/shrinks), the soft Print aspect budget with
+  page whose own content overflows widens/shrinks), wide-run mandatory breaks and
+  snapping, the capture-area-capped hard budget, the soft Print aspect budget with
   atomic-run extension, the hard cap's typed `oversizeAtomicBox`, and landscape
   aspecting. Per-page width is exercised hosted by
-  `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages` and the C2
-  warning by `ExportPDFShrunkPagesAppTests`.
+  `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`, wide-run
+  isolation by `ExportPDFWideRunsAppTests` and `ExportPrintWideRunsAppTests`, and
+  the C2 warning by `ExportPDFShrunkPagesAppTests`.
   The 2026-10-06 note that a hosted capture wider than about 14,000 pt terminates the
   web process is revised per the D4 amendment: the A1 full-size path does not
   reproduce it, so the over-maximum factor is exercised hosted rather than only
@@ -1792,6 +1795,58 @@ PDF/Print E9 timing is **pending idle-machine run**.
   (PreviewKit `swift test`, the ExportPDF*/ExportPrint*/ExportHTML*/
   ExportDestination* matrix — ExportPDF* twice — `make build`, pinned lint).
   Result bundle paths are recorded in `docs/perf-log.md` and the PR notes.
+- Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud,
+  keyboard-only and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine
+  run**), and the E5 finalized-images/highlighted-code assertions.
+
+### PR G wide-run isolation + capture-area cap — 2026-10-09
+
+- **E1 wide runs.** An extent whose right edge crosses the product's wide
+  threshold — `maximumSide` (14,400 pt) for PDF, `baseline / printWideFraction`
+  (`printWideFraction = 0.9`, ≈1.11 × baseline) for Print — joins a *wide run*:
+  the union of the wide extents' vertical spans, merged on overlap or touch,
+  snapped outward to merged-unsplittable-interval edges so every boundary is a
+  safe break, clamped to the document, and merged again. Run tops and bottoms
+  are mandatory breaks: a page may end there but never crosses, so prose never
+  shares a page with wide content. Inside a run the per-page width growth and
+  soft Print aspect extension are unchanged; outside, nothing is scaled.
+- **Capture-area cap.** `WKWebView.pdf` dies painting a single rect near 2³⁰
+  raster px (measured 2026-10-09, `docs/perf-log.md`), independent of document
+  totals. `captureAreaBudget` targets 2²⁹ px (~2× margin); `hardBudget(width)`
+  keeps the flat 14,400 CSS pt cap until a page's own width would exceed the
+  raster budget, then trades height for width. An unbreakable interval taller
+  than the width-adjusted budget throws `oversizeAtomicBox` (CSS height).
+- **One planned page = one PDF page.** Each `pdf(configuration:)` piece is
+  parsed via `CGPDFDocument`; ≠ 1 page throws typed
+  `ExportPDFCaptureError.pageCountMismatch(planned:captured:)`, as does a
+  joined total ≠ the plan. An unplanned WebKit split now fails instead of
+  silently mis-splitting.
+- **B2 content height.** The settled height is measured from actual content
+  (root in-flow descendants' max bottom + root bottom padding/border), never
+  `clientHeight`; `#preview-root { min-height: 0 !important }` is added to the
+  export-only `plainsong-export-layout` style so `100vh` no longer inflates
+  measured height. A trailing planned page intersecting no measured span is
+  dropped as a safety net (a span-free document keeps its budget-split tail —
+  blankness is unprovable there).
+- **M2 Print persistence.** The next `lastPrintInfo` is a fresh
+  `NSPrintInfo.shared.copy()` carrying only paper name, paper size,
+  orientation, and printer from a *completed* run's `printInfo`; a cancelled
+  or failed run changes nothing. Plainsong still performs no printer or system
+  mutation — the standard panel owns all printing UI.
+- **Tests.** Planner: `ExportPDFPagePlannerRunTests`,
+  `ExportPDFPagePlannerPrintRunTests` (run isolation, boundary snapping,
+  strict thresholds, area-cap oversize, randomized invariants). Hosted PDF:
+  `ExportPDFWideRunsAppTests` (minified `text` fence, very-wide and mid-width
+  tables, wide code, quote/list/table — every page count equals plan, no blank
+  tail, baseline measured from the root border edge). Hosted Print:
+  `ExportPrintWideRunsAppTests` (A4 portrait/landscape isolation, no blank
+  sheets, kitchen-sink sheet count), plus persistence/job-settings cases in
+  `ExportPrintPaginationAppTests`.
+- **Verification (macOS 27.0, Xcode 27.0 beta, Debug, shared lock):**
+  PreviewKit `swift test` 116/116, MarkdownCore 320/320; hosted export matrix
+  45 tests (5 expected opt-in skips) + ExportDestination/ExportHTML
+  52 tests, zero failures; `make build` passes; pinned SwiftFormat 0.62.1
+  lint clean (0 serious). Fixture-level metrics are in `docs/perf-log.md`.
 - Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud,
   keyboard-only and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine
   run**), and the E5 finalized-images/highlighted-code assertions.

@@ -2502,3 +2502,51 @@ and `ExportPDFShrunkPagesAppTests`. The opt-in `large-1mb.md` capture was not re
 for this section (its 2026-10-07 numbers stand as the loaded-scale observation).
 Result bundles: `/private/tmp/plainsong-export-g-20b-run1.xcresult` (full matrix),
 `/private/tmp/plainsong-export-g-20b-run2.xcresult` (ExportPDF* rerun).
+
+## Export PR G wide runs — capture-area bound + hosted metrics (recorded load) — 2026-10-09
+
+A temporary test-only probe (deleted before commit) isolated why a ~114,000 pt wide
+table terminated WebContent: geometry settling and unsplittable-span measurement
+succeed at every probed width; `WKWebView.pdf(configuration:)` dies only when a single
+planned rect's raster area crosses a fixed bound. Total document area does not matter —
+per-page area does. The probe held page height at 7,290 pt and grew the wide-table
+width; results bracket the limit at exactly 2³⁰ px:
+
+| Wide-table shape (chars per cell) | Settled width (pt) | Wide-page area (px) | Result |
+|---:|---:|---:|---|
+| 240 | 85,009 | 619,481,835 | passed |
+| 320 | 112,126 | 817,090,194 | passed |
+| 400 | 139,243 | 1,014,698,552 | passed |
+| 420 | 146,022 | 1,064,098,820 | passed |
+| 430 | 149,412 | 1,088,802,597 | WebContent crash |
+| 440 | 152,802 | 1,113,506,375 | WebContent crash |
+| 480 | 166,360 | 1,212,306,910 | WebContent crash |
+| 520 | 179,919 | 1,311,114,733 | WebContent crash |
+
+`ExportPDFPagePlanner.captureAreaBudget` therefore targets 2²⁹ px (536,870,912),
+roughly a 2× margin under the observed 2³⁰ bound, and `hardBudget(width)` lowers a
+page's height cap only when `width × 14,400` would exceed the budget — pages narrower
+than ~37,300 pt keep the flat 14,400 pt cap. An unbreakable interval taller than the
+width-adjusted budget still fails typed as `oversizeAtomicBox`.
+
+Hosted wide-run captures (Debug, `PLAINSONG_XCODEBUILD_LOCK`, recorded load
+`14.88 17.73 20.29` at measurement; `planned` = emitted plan pages):
+
+| Fixture | Pages (out/planned) | Widest output page | Smallest scale | Capture time | Content (pt) |
+|---|---:|---:|---:|---:|---|
+| Very wide table mid-post (`testVeryWideTableRunIsolatesAndCapsEveryPage`) | 5/5 | 14,400.0 pt | 0.078 | 0.36–0.41 s | 184,770 × 18,839 |
+| Minified `text` fence mid-post (`testMinifiedLineRunInALongPostWritesWithAShrunkWarning`) | 3/3 | 14,400.0 pt (wide page shrunk) | < 1 | — | sentinel once, in order |
+| Mid-width table (`testMidWidthTableRunScalesNeighboursStayWhole`) | 3/3 | 14,400.0 pt | 0.572 | 0.10 s | 25,178 × 13,764 |
+| Wide code near end (`testWideCodeLineNearTheEndLeavesNoBlankTail`) | 3/3 | 14,400.0 pt | 0.294 | 0.05–0.06 s | 48,990 × 7,841 |
+| Quote/list/table shape (`testQuoteListTableShapeLeavesNoBlankTail`) | 2/2 | 4,954.0 pt | 1.000 | 0.07 s | 4,954 × 23,138 |
+| Kitchen-sink MDX (`testKitchenSinkMdxStillOnePage`) | 1/1 | 808.0 pt | 1.000 | 0.08 s | 808 × 1,686 |
+
+The minified-line fixture renders through a `text`-tagged fence: the same 240,000-char
+block as a bare fence took ~113 s to render (highlight.js auto-detection); tagged
+`text` renders in ~0.68 s while keeping the same overflow layout. Print wide-run
+sheets (`ExportPrintWideRunsAppTests`) isolate on A4 portrait and landscape with no
+blank sheets. Result bundles: DerivedData
+`Test-Plainsong-2026.10.09_15-19-00-+0800.xcresult` (wide-run suite),
+`…_15-20-16-+0800.xcresult` (ExportDestination/ExportHTML suites),
+`…_15-22-01-+0800.xcresult` (ExportPDF*/ExportPrint* matrix). The probe
+run was transient by design and kept no artifact.
