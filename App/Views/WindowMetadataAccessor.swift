@@ -8,6 +8,8 @@ import SwiftUI
 struct WindowMetadataAccessor: NSViewRepresentable {
     let representedURL: URL?
     let isDocumentEdited: Bool
+    /// Shell-specific content floor. The `HStack` and split shells use different constants.
+    let contentMinWidth: CGFloat
     /// Hands the hosting window to window-scoped chrome (the inspector's menu routing).
     var onWindow: (NSWindow) -> Void = { _ in }
 
@@ -29,8 +31,8 @@ struct WindowMetadataAccessor: NSViewRepresentable {
             NotificationCenter.default.post(name: AppState.exportHTMLWindowRegistered, object: window)
         }
         // Keep the content-independent floor on AppKit windows too (including hosted roots).
-        if window.contentMinSize.width != WorkspaceLayout.windowMinimum {
-            window.contentMinSize = NSSize(width: WorkspaceLayout.windowMinimum, height: 420)
+        if window.contentMinSize.width != contentMinWidth {
+            window.contentMinSize = NSSize(width: contentMinWidth, height: 420)
         }
         window.representedURL = representedURL
         window.isDocumentEdited = isDocumentEdited

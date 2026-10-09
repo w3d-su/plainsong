@@ -17,7 +17,6 @@ struct EditorWorkspace: View {
                 fileURL: appState.currentDocument.fileURL,
                 fileKind: appState.currentDocument.fileKind,
                 isSaving: appState.isSaving,
-                isDirty: appState.currentDocument.isDirty,
                 workspaceTree: { appState.workspaceTree },
                 openNode: { appState.selectWorkspaceNode(id: $0) }
             )

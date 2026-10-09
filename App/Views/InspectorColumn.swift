@@ -11,16 +11,26 @@ import SwiftUI
 /// never reached the editor (`docs/decision-log.md`, window chrome PR L).
 struct InspectorColumn<Content: View>: View {
     @Binding var width: Double
+    /// Document-column width. The drag stops before the editor and preview fall through their floors.
+    var availableWidth: CGFloat
+    var contentMinimum: CGFloat
     @ViewBuilder let content: Content
 
-    init(width: Binding<Double>, @ViewBuilder content: () -> Content) {
+    init(
+        width: Binding<Double>,
+        availableWidth: CGFloat,
+        contentMinimum: CGFloat,
+        @ViewBuilder content: () -> Content
+    ) {
         _width = width
+        self.availableWidth = availableWidth
+        self.contentMinimum = contentMinimum
         self.content = content()
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            InspectorResizeHandle(width: $width)
+            InspectorResizeHandle(width: $width, availableWidth: availableWidth, contentMinimum: contentMinimum)
             content
                 .frame(width: InspectorLayout.clamped(width))
                 .frame(maxHeight: .infinity)
@@ -37,16 +47,28 @@ enum InspectorLayout {
     static func clamped(_ width: Double) -> Double {
         min(max(width, widthRange.lowerBound), widthRange.upperBound)
     }
+
+    /// Drag and VoiceOver stay inside 240...360 and inside the width that still fits the content floor.
+    static func clamped(_ width: Double, availableWidth: CGFloat, contentMinimum: CGFloat) -> Double {
+        let fitted = availableWidth - contentMinimum - handleWidth
+        let upper = min(widthRange.upperBound, max(fitted, widthRange.lowerBound))
+        return min(max(width, widthRange.lowerBound), upper)
+    }
 }
 
 /// The column's leading edge: a hairline separator with a wider, invisible drag target.
 private struct InspectorResizeHandle: View {
     @Binding var width: Double
+    var availableWidth: CGFloat
+    var contentMinimum: CGFloat
     @State private var widthAtDragStart: Double?
     @State private var isShowingResizeCursor = false
 
     var body: some View {
-        Rectangle()
+        let announced = Int(InspectorLayout.clamped(
+            width, availableWidth: availableWidth, contentMinimum: contentMinimum
+        ))
+        return Rectangle()
             .fill(Color(nsColor: .separatorColor))
             .frame(width: 1)
             .padding(.horizontal, 2)
@@ -65,7 +87,11 @@ private struct InspectorResizeHandle: View {
                     .onChanged { value in
                         let start = widthAtDragStart ?? InspectorLayout.clamped(width)
                         widthAtDragStart = start
-                        width = InspectorLayout.clamped(start - value.translation.width)
+                        width = InspectorLayout.clamped(
+                            start - value.translation.width,
+                            availableWidth: availableWidth,
+                            contentMinimum: contentMinimum
+                        )
                     }
                     .onEnded { _ in
                         widthAtDragStart = nil
@@ -78,16 +104,67 @@ private struct InspectorResizeHandle: View {
                 }
             }
             .workspaceFrameProbe("handle")
-            .accessibilityElement()
-            .accessibilityLabel("Inspector width")
-            .accessibilityValue("\(Int(InspectorLayout.clamped(width))) points")
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: width = InspectorLayout.clamped(width + 10)
-                case .decrement: width = InspectorLayout.clamped(width - 10)
-                @unknown default: break
+            .background(InspectorWidthAnnouncement(
+                text: "\(announced) points",
+                onIncrement: {
+                    width = InspectorLayout.clamped(
+                        width + 10, availableWidth: availableWidth, contentMinimum: contentMinimum
+                    )
+                },
+                onDecrement: {
+                    width = InspectorLayout.clamped(
+                        width - 10, availableWidth: availableWidth, contentMinimum: contentMinimum
+                    )
                 }
-            }
+            ))
+    }
+}
+
+/// VoiceOver reads this view. SwiftUI's adjustable element exposes the actions but not the value.
+private struct InspectorWidthAnnouncement: NSViewRepresentable {
+    var text: String
+    var onIncrement: () -> Void
+    var onDecrement: () -> Void
+
+    func makeNSView(context _: Context) -> AnnouncementView {
+        AnnouncementView()
+    }
+
+    func updateNSView(_ view: AnnouncementView, context _: Context) {
+        view.text = text
+        view.onIncrement = onIncrement
+        view.onDecrement = onDecrement
+    }
+
+    final class AnnouncementView: NSView {
+        var text = ""
+        var onIncrement: (() -> Void)?
+        var onDecrement: (() -> Void)?
+        override func hitTest(_: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func isAccessibilityElement() -> Bool {
+            true
+        }
+
+        override func accessibilityLabel() -> String? {
+            "Inspector width"
+        }
+
+        override func accessibilityValue() -> Any? {
+            text
+        }
+
+        override func accessibilityPerformIncrement() -> Bool {
+            onIncrement?()
+            return true
+        }
+
+        override func accessibilityPerformDecrement() -> Bool {
+            onDecrement?()
+            return true
+        }
     }
 }
 
@@ -106,16 +183,33 @@ final class InspectorVisibility: ObservableObject {
     private var keyObservation: KeyWindowObservation?
     private var availableWidth: CGFloat = 0
     private var requiredWidth: CGFloat = 0
+    /// Latest geometry. Updated without publishing so Show sees the current column during a view update.
+    private var recordedHasDocument = false
 
     init(userIntent: Bool) {
         self.userIntent = userIntent
     }
 
-    func updateLayout(availableWidth: CGFloat, inspectorWidth: Double, contentMinimum: CGFloat, hasDocument: Bool) {
+    /// Stores the column measurement. Does not publish; call `applyRecordedLayout` to update visibility.
+    func recordLayout(availableWidth: CGFloat, inspectorWidth: Double, contentMinimum: CGFloat, hasDocument: Bool) {
         self.availableWidth = availableWidth
         requiredWidth = contentMinimum + InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
-        if self.hasDocument != hasDocument { self.hasDocument = hasDocument }
+        recordedHasDocument = hasDocument
+    }
+
+    func applyRecordedLayout() {
+        if hasDocument != recordedHasDocument { hasDocument = recordedHasDocument }
         refreshVisibility()
+    }
+
+    func updateLayout(availableWidth: CGFloat, inspectorWidth: Double, contentMinimum: CGFloat, hasDocument: Bool) {
+        recordLayout(
+            availableWidth: availableWidth,
+            inspectorWidth: inspectorWidth,
+            contentMinimum: contentMinimum,
+            hasDocument: hasDocument
+        )
+        applyRecordedLayout()
     }
 
     func setUserIntent(_ intent: Bool) {
@@ -124,10 +218,13 @@ final class InspectorVisibility: ObservableObject {
     }
 
     func toggle() {
-        guard hasDocument else { return }
+        guard recordedHasDocument else { return }
         let show = !isPresented
         setUserIntent(show)
-        guard show, requiredWidth > availableWidth, let window, let screen = window.screen else { return }
+        guard show, requiredWidth > availableWidth, let window else { return }
+        // A full-screen window cannot grow. Keep the Show intent and stay collapsed.
+        if window.styleMask.contains(.fullScreen) { return }
+        guard let screen = window.screen else { return }
         let deficit = requiredWidth - availableWidth
         let visible = screen.visibleFrame
         var frame = window.frame
@@ -138,7 +235,7 @@ final class InspectorVisibility: ObservableObject {
     }
 
     private func refreshVisibility() {
-        let visible = userIntent && hasDocument && availableWidth >= requiredWidth
+        let visible = userIntent && recordedHasDocument && availableWidth >= requiredWidth
         if isPresented != visible { isPresented = visible }
     }
 

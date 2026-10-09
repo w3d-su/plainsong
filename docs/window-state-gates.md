@@ -593,7 +593,7 @@ final layout instead of a layout that is about to move. It changes chrome and it
   Open and Save leave the toolbar; File › Open… ⌘O, Save ⌘S, and the empty-state Open… and
   recent items remain (§5.2).
 - **Stable identifiers.** `plainsong.editor.fileName` (now the jump bar's document segment,
-  same label; dirty documents additionally announce Edited; its menu is a separate pop-up button laid over it), `plainsong.workspaceSearch.mode` (the navigator selector container,
+  same label; its value stays the file name, and the window's document-edited state announces Edited; its menu is a separate pop-up button laid over it), `plainsong.workspaceSearch.mode` (the navigator selector container,
   with Files and Search buttons), `plainsong.workspaceSearch.queryField` (still an owned
   `NSTextField`), `plainsong.editor.textView`, `plainsong.editorFind.*`, and the window
   identifier with its `exportHTMLWindowRegistered` post. The Search sidebar still unmounts in
@@ -660,7 +660,7 @@ recorded in the closing commit.
 
 Before accepting C, keep the inspector mounted and run
 `EditorFindHostedGateTests/testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair`
-and `EditorKeepMineHostedPresentationTests/testHostedKeepMineInWYSIWYGRetainsFoldsImageMarkersAndFindDecorationWithoutAnEdit`
+and `EditorFindHostedGateTests/testHostedKeepMineInWYSIWYGRetainsFoldsImageMarkersAndFindDecorationWithoutAnEdit`
 16 times each. Retain all attempts; the `.inspector` / focused-values / grouped-Form
 scheduling root cause remains unknown. This is an additional gate, not closure by a green rerun.
 

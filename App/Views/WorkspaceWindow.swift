@@ -4,12 +4,16 @@ import SwiftUI
 /// Main window: native split view on macOS 27+ (fixed `HStack` shell before, R17), the
 /// document column, and an Xcode-style inspector column.
 ///
-/// Sidebar and inspector visibility are scene state, so each window keeps its own
-/// (`docs/window-state-gates.md` §10.1).
+/// Inspector intent and width are scene state. Visibility is derived from the document
+/// column (`docs/window-state-gates.md` §10.1). The `HStack` shell's minimum is 780 pt;
+/// the split shell's is the widest sidebar, the measured chrome, and the Split floor.
+/// The inspector auto-collapses when that column cannot fit it.
 struct WorkspaceWindow: View {
     @SceneStorage("plainsong.inspectorPresented") private var storedInspectorPresented = true
+    @SceneStorage("plainsong.inspectorWidth") private var storedInspectorWidth = InspectorLayout.defaultWidth
     var shellOverride: WorkspaceShell = .automatic
     var inspectorIntentOverride: Binding<Bool>?
+    var inspectorWidthOverride: Binding<Double>?
     var inspectorVisibilityOverride: InspectorVisibility?
     var sidebarIdealWidth: CGFloat = 256
     var sidebarMinimumWidth: CGFloat = 220
@@ -17,6 +21,7 @@ struct WorkspaceWindow: View {
     var body: some View {
         WorkspaceWindowContent(
             inspectorIntent: inspectorIntentOverride ?? $storedInspectorPresented,
+            inspectorWidth: inspectorWidthOverride ?? $storedInspectorWidth,
             shellOverride: shellOverride,
             sidebarIdealWidth: sidebarIdealWidth,
             sidebarMinimumWidth: sidebarMinimumWidth,
@@ -30,21 +35,25 @@ enum WorkspaceShell { case automatic, fixed, split }
 private struct WorkspaceWindowContent: View {
     @EnvironmentObject private var appState: AppState
     @Binding var inspectorIntent: Bool
+    @Binding var inspectorWidth: Double
     let shellOverride: WorkspaceShell
     let sidebarIdealWidth: CGFloat
     let sidebarMinimumWidth: CGFloat
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @StateObject private var inspectorVisibility: InspectorVisibility
-    @SceneStorage("plainsong.inspectorWidth") private var inspectorWidth = InspectorLayout.defaultWidth
+    /// Drops superseded geometry updates so a late publish cannot collapse a newer width.
+    @State private var inspectorLayoutGeneration = 0
 
     init(
         inspectorIntent: Binding<Bool>,
+        inspectorWidth: Binding<Double>,
         shellOverride: WorkspaceShell,
         sidebarIdealWidth: CGFloat,
         sidebarMinimumWidth: CGFloat,
         visibility: InspectorVisibility?
     ) {
         _inspectorIntent = inspectorIntent
+        _inspectorWidth = inspectorWidth
         self.shellOverride = shellOverride
         self.sidebarIdealWidth = sidebarIdealWidth
         self.sidebarMinimumWidth = sidebarMinimumWidth
@@ -71,7 +80,7 @@ private struct WorkspaceWindowContent: View {
             .onChange(of: inspectorIntent) { _, intent in
                 inspectorVisibility.setUserIntent(intent)
             }
-            .frame(minWidth: WorkspaceLayout.windowMinimum, minHeight: 420)
+            .frame(minWidth: windowMinimum, minHeight: 420)
             .alert(
                 appState.presentedError?.title ?? "Error",
                 isPresented: errorIsPresented
@@ -86,6 +95,7 @@ private struct WorkspaceWindowContent: View {
                 WindowMetadataAccessor(
                     representedURL: appState.currentDocument.fileURL,
                     isDocumentEdited: appState.currentDocument.isDirty,
+                    contentMinWidth: windowMinimum,
                     onWindow: { inspectorVisibility.attach(to: $0) }
                 )
             )
@@ -129,36 +139,70 @@ private struct WorkspaceWindowContent: View {
 
     private var documentColumn: some View {
         // R17: all column widths derive from this proxy and constants, never child minima.
+        // Visibility is `inspectorVisibility.isPresented` only. The geometry publish is
+        // deferred so it does not run inside this reader.
         GeometryReader { proxy in
-            let minimum = WorkspaceLayout.contentMinimum(preview: appState.isPreviewVisible)
-            let visible = inspectorIntent && appState.hasOpenDocument
-                && proxy.size.width >= minimum + InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+            let contentMinimum = WorkspaceLayout.contentMinimum(preview: appState.isPreviewVisible)
+            // Store the measured column without publishing. Show reads this during the same
+            // layout; `applyRecordedLayout` still waits until the next turn.
+            // `let _` is required: a bare discard is not a ViewBuilder statement.
+            // swiftlint:disable:next redundant_discardable_let
+            let _ = inspectorVisibility.recordLayout(
+                availableWidth: proxy.size.width,
+                inspectorWidth: inspectorWidth,
+                contentMinimum: contentMinimum,
+                hasDocument: appState.hasOpenDocument
+            )
+            let presented = inspectorVisibility.isPresented
+            let reserved = InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
             HStack(spacing: 0) {
                 detail
-                    .frame(width: max(
-                        0,
-                        proxy.size
-                            .width -
-                            (visible ? InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth : 0)
-                    ))
-                if visible {
-                    InspectorColumn(width: $inspectorWidth) { WorkspaceInspector() }
+                    .frame(width: max(0, proxy.size.width - (presented ? reserved : 0)))
+                if presented {
+                    InspectorColumn(
+                        width: $inspectorWidth,
+                        availableWidth: proxy.size.width,
+                        contentMinimum: contentMinimum
+                    ) { WorkspaceInspector() }
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .onAppear { updateInspector(width: proxy.size.width) }
-            .onChange(of: proxy.size.width) { _, width in updateInspector(width: width) }
-            .onChange(of: inspectorWidth) { _, _ in updateInspector(width: proxy.size.width) }
-            .onChange(of: appState.isPreviewVisible) { _, _ in updateInspector(width: proxy.size.width) }
-            .onChange(of: appState.hasOpenDocument) { _, _ in updateInspector(width: proxy.size.width) }
+            .workspaceFrameProbe("document")
+            .onAppear { publishInspectorLayout(width: proxy.size.width) }
+            .onChange(of: proxy.size.width) { _, width in publishInspectorLayout(width: width) }
+            .onChange(of: inspectorWidth) { _, _ in publishInspectorLayout(width: proxy.size.width) }
+            .onChange(of: appState.isPreviewVisible) { _, _ in publishInspectorLayout(width: proxy.size.width) }
+            .onChange(of: appState.hasOpenDocument) { _, _ in publishInspectorLayout(width: proxy.size.width) }
         }
     }
 
-    private func updateInspector(width: CGFloat) {
-        inspectorVisibility.updateLayout(availableWidth: width, inspectorWidth: inspectorWidth,
-                                         contentMinimum: WorkspaceLayout
-                                             .contentMinimum(preview: appState.isPreviewVisible),
-                                         hasDocument: appState.hasOpenDocument)
+    /// Records the column immediately and publishes visibility on the next turn, so a view
+    /// update does not publish and Show still sees the latest width.
+    private func publishInspectorLayout(width: CGFloat) {
+        inspectorVisibility.recordLayout(
+            availableWidth: width,
+            inspectorWidth: inspectorWidth,
+            contentMinimum: WorkspaceLayout.contentMinimum(preview: appState.isPreviewVisible),
+            hasDocument: appState.hasOpenDocument
+        )
+        inspectorLayoutGeneration += 1
+        let generation = inspectorLayoutGeneration
+        Task { @MainActor in
+            await Task.yield()
+            guard generation == inspectorLayoutGeneration else { return }
+            inspectorVisibility.applyRecordedLayout()
+        }
+    }
+
+    /// Matches `shell`: split view only on macOS 27 when the shell is not forced fixed.
+    private var usesSplitShell: Bool {
+        guard shellOverride != .fixed else { return false }
+        if #available(macOS 27.0, *) { return true }
+        return false
+    }
+
+    private var windowMinimum: CGFloat {
+        WorkspaceLayout.windowMinimum(splitShell: usesSplitShell)
     }
 
     private var detail: some View {

@@ -170,8 +170,11 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   is reserved for Apple).
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
-  (R17), then the document column and a right inspector for frontmatter and file details. Sidebar and inspector visibility are per-window scene state
-  (`docs/window-state-gates.md` §10.1).
+  (R17), then the document column and a right inspector for frontmatter and file details.
+  Inspector intent and width are per-window scene state; visibility is derived
+  (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
+  and the macOS 27 split shell's is 841 pt (320 pt sidebar, 0 pt measured chrome, and
+  the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
   be drag-inserted.

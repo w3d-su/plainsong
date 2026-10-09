@@ -80,9 +80,12 @@ instead of a bespoke banner. Menu titles follow the HIG ellipsis rule ("Export a
 
 The editor minimum is 260 pt: a useful narrow text column matching Preview’s existing
 260 pt floor. Split therefore requires 521 pt (including its 1 pt divider). The window
-minimum is a **constant 900 pt**, covering the widest 320 pt sidebar, the Split minimum,
-and system split-view/chrome allowance. Half-screen requests of 720–760 pt (including
-735) clamp to that floor; they cannot squeeze or overlap either document pane.
+minimum is a **constant per shell**, both content-independent (R17). The `HStack` shell
+(macOS 14–26) is **780 pt** (256 pt sidebar + 1 pt divider + 521 pt Split content,
+raised from 778). The macOS 27 split shell is **841 pt**: widest sidebar 320 pt, measured
+NavigationSplitView chrome 0 pt, and the 521 pt Split floor. A request below the active
+shell’s floor clamps to it; panes do not squeeze or overlap. Half of a 1728 pt display
+(864 pt) fits either floor.
 
 The entire document/inspector column takes its size from a `GeometryReader`. Inspector
 width is clamped to 240–360 pt, plus a 5 pt handle. It auto-collapses whenever the

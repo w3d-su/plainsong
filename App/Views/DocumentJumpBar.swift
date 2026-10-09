@@ -16,7 +16,6 @@ struct DocumentJumpBar: View {
     let fileURL: URL?
     let fileKind: FileKind
     let isSaving: Bool
-    let isDirty: Bool
     /// Read when a segment menu opens, never while laying out the bar.
     let workspaceTree: () -> WorkspaceFileTree?
     let openNode: (WorkspaceFileNode.ID) -> Void
@@ -57,7 +56,7 @@ struct DocumentJumpBar: View {
                     .truncationMode(.middle)
                     .accessibilityIdentifier("plainsong.editor.fileName")
                     .accessibilityLabel("Current editor file")
-                    .accessibilityValue(isDirty ? "\(fileName), Edited" : fileName)
+                    .accessibilityValue(fileName)
             } icon: {
                 Image(systemName: "doc.text")
                     .foregroundStyle(.secondary)
