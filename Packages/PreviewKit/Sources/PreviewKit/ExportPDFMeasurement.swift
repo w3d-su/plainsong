@@ -7,8 +7,10 @@ import Foundation
 /// overflow style, the full-size geometry settle, and the unsplittable-span walk.
 extension PreviewController {
     /// Injected once on the dedicated export controller so tables, code, display math,
-    /// and Mermaid draw their overflow instead of scrolling inside the viewport. The
-    /// live preview is a different controller and never receives this style.
+    /// and Mermaid draw their overflow instead of scrolling inside the viewport, and so
+    /// `#preview-root`'s `min-height: 100vh` cannot pin the root to a previous (taller)
+    /// frame height while the settle loop shrinks the document. The live preview is a
+    /// different controller and never receives this style.
     func applyExportOverflowStyle() async throws {
         let script = """
         (() => {
@@ -42,6 +44,9 @@ extension PreviewController {
             }
             #preview-root .plainsong-math-block > .katex-display {
               min-width: 0 !important;
+            }
+            #preview-root {
+              min-height: 0 !important;
             }
           `;
           return true;
@@ -77,14 +82,38 @@ extension PreviewController {
         throw ExportPDFCaptureError.geometryUnstable
     }
 
+    /// Width comes from the document's scroll/client boxes as before, but the height is
+    /// measured **from content**: the maximum bottom of any `#preview-root` descendant —
+    /// in-flow, floated, or positioned; anything that can reach below its ancestors —
+    /// plus the root's padding-bottom and border, in document coordinates, falling back
+    /// to the root's own border box when the root is empty. `clientHeight` is
+    /// frame's own height and would pin the measure to the previous iteration, which is
+    /// how wide content once produced trailing blank pages (B2, 2026-10-09).
     private func measureExportContentSize() async throws -> CGSize {
         let script = """
-        JSON.stringify({
-          width: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth,
-            document.documentElement.clientWidth, document.body.clientWidth),
-          height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight,
-            document.documentElement.clientHeight, document.body.clientHeight)
-        })
+        JSON.stringify((() => {
+          const root = document.getElementById("preview-root");
+          let height = 0;
+          if (root) {
+            const rootStyle = getComputedStyle(root);
+            const padB = parseFloat(rootStyle.paddingBottom) || 0;
+            const borderB = parseFloat(rootStyle.borderBottomWidth) || 0;
+            let bottom = 0;
+            for (const el of root.querySelectorAll("*")) {
+              bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+            }
+            if (bottom > 0) {
+              height = bottom + window.scrollY + padB + borderB;
+            } else {
+              height = root.getBoundingClientRect().bottom + window.scrollY;
+            }
+          }
+          return {
+            width: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth,
+              document.documentElement.clientWidth, document.body.clientWidth),
+            height: Math.ceil(height)
+          };
+        })())
         """
         guard let json = try await evaluateExportJavaScript(script, label: "export content size") as? String,
               let data = json.data(using: .utf8),
