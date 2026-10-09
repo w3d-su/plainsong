@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 @testable import Plainsong
 import SwiftUI
 import WebKit
@@ -129,6 +128,7 @@ extension EditorFindHostedGateTests {
                 let setting = NativeInspectorIntent(intent)
                 let host = makeNativeLayoutHost(appState: state, shell: shell, setting: setting)
                 registerTeardown(host: host, fixture: fixture)
+                var inspectorColumnWidth: CGFloat?
                 for requested in requests {
                     // setContentSize bypasses AppKit's interactive resize constraint; model the
                     // user's resize with the production window's actual contentMinSize.
@@ -167,6 +167,11 @@ extension EditorFindHostedGateTests {
                         try await waitUntil("inspector restored iff requested") {
                             (self.layoutFrame("inspector", in: host.window) != nil) == intent
                         }
+                        if intent {
+                            let handle = try XCTUnwrap(layoutFrame("handle", in: host.window))
+                            let inspector = try XCTUnwrap(layoutFrame("inspector", in: host.window))
+                            inspectorColumnWidth = inspector.maxX - handle.minX
+                        }
                     } else if state.isPreviewVisible {
                         try await waitUntil("narrow Split auto-collapses") {
                             self.layoutFrame("inspector", in: host.window) == nil
@@ -202,11 +207,11 @@ extension EditorFindHostedGateTests {
                         // Let the document column record the narrow width before Show.
                         await Task.yield()
                         host.hostingView.layoutSubtreeIfNeeded()
-                        InspectorMenuState.shared.toggleKeyWindowInspector()
-                        try await waitUntil("explicit Show persists and widens to fit") {
-                            setting.value && self.layoutFrame("inspector", in: host.window) != nil
-                        }
-                        try await assertNativeLayout(in: host.window, preview: true)
+                        try await checkExplicitShow(
+                            host: host,
+                            setting: setting,
+                            inspectorColumnWidth: XCTUnwrap(inspectorColumnWidth)
+                        )
                     }
                 }
                 print("NATIVE_LAYOUT shell=\(shell) layout=\(layout) intent=\(intent) samples=\(requests.count)")
@@ -222,6 +227,43 @@ extension EditorFindHostedGateTests {
         }
         requests.append(1280)
         return requests
+    }
+
+    /// Explicit Show widens the window by the inspector's deficit, but only within the screen's
+    /// visible frame. On a screen too narrow for that (CI's VM display), the intent persists and
+    /// the inspector stays collapsed without squeezing the editor or preview.
+    private func checkExplicitShow(
+        host: HostedWorkspace,
+        setting: NativeInspectorIntent,
+        inspectorColumnWidth: CGFloat
+    ) async throws {
+        let window = host.window
+        let visible = try XCTUnwrap(window.screen, "Explicit Show widens within the window's screen").visibleFrame
+        let editor = try XCTUnwrap(layoutFrame("editor", in: window))
+        let available = host.hostingView.bounds.width - editor.minX
+        let required = WorkspaceLayout.contentMinimum(preview: true) + inspectorColumnWidth
+        let neededWindowWidth = window.frame.width + required - available
+        let fits = neededWindowWidth <= visible.width + 0.5
+        let diagnostics = "branch=\(fits ? "widen" : "screen-limited") visibleFrame=\(visible) required=\(required) "
+            + "available=\(available) neededWindowWidth=\(neededWindowWidth)"
+        print("INSPECTOR_SHOW \(diagnostics)")
+        InspectorMenuState.shared.toggleKeyWindowInspector()
+        if fits {
+            try await waitUntil("explicit Show persists and widens to fit (\(diagnostics))") {
+                setting.value && self.layoutFrame("inspector", in: window) != nil
+            }
+            XCTAssertGreaterThanOrEqual(window.frame.width, neededWindowWidth - 0.5, diagnostics)
+        } else {
+            try await waitUntil("explicit Show persists and grows to the screen (\(diagnostics))") {
+                host.hostingView.layoutSubtreeIfNeeded()
+                return setting.value && abs(window.frame.width - visible.width) <= 0.5
+            }
+            XCTAssertNil(layoutFrame("inspector", in: window), diagnostics)
+            XCTAssertEqual(InspectorMenuState.shared.isKeyWindowInspectorPresented, false, diagnostics)
+        }
+        XCTAssertTrue(setting.value, diagnostics)
+        XCTAssertLessThanOrEqual(window.frame.width, visible.width + 0.5, diagnostics)
+        try await assertNativeLayout(in: window, preview: true)
     }
 
     private func assertNativeLayout(in window: NSWindow, preview: Bool) async throws {
@@ -274,102 +316,6 @@ extension EditorFindHostedGateTests {
         hosting.layoutSubtreeIfNeeded()
         lifecycle.capture(EditorPreviewScrollCoordinator.latestDebugInstance?.previewControllerForTesting)
         return HostedWorkspace(window: window, hostingView: hosting, disposal: disposal, previewLifecycle: lifecycle)
-    }
-}
-
-@MainActor
-private enum AccessibilityQuery {
-    static func find(identifier: String?, label: String?, in window: NSWindow) -> AXUIElement? {
-        var seen = Set<CFHashCode>()
-        for root in roots(for: window) {
-            if let found = search(root, identifier: identifier, label: label, seen: &seen, depth: 0) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    static func summary(in window: NSWindow) -> String {
-        var seen = Set<CFHashCode>()
-        var lines: [String] = []
-        for root in roots(for: window) {
-            collect(root, seen: &seen, lines: &lines, depth: 0)
-        }
-        return "AX elements (\(lines.count)):\n" + lines.joined(separator: "\n")
-    }
-
-    static func value(of element: AXUIElement) -> String? {
-        attribute(element, kAXValueAttribute) as? String
-    }
-
-    static func performIncrement(on element: AXUIElement) -> Bool {
-        AXUIElementPerformAction(element, kAXIncrementAction as CFString) == .success
-    }
-
-    private static func roots(for window: NSWindow) -> [AXUIElement] {
-        let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
-        let windows = children(of: app, attribute: kAXWindowsAttribute)
-        let title = window.title
-        let titled = windows.filter { attribute($0, kAXTitleAttribute) as? String == title }
-        var ordered = titled.isEmpty ? windows : titled
-        if let focused = element(attribute(app, kAXFocusedWindowAttribute)) {
-            ordered.insert(focused, at: 0)
-        }
-        return ordered
-    }
-
-    private static func search(
-        _ element: AXUIElement, identifier: String?, label: String?, seen: inout Set<CFHashCode>, depth: Int
-    ) -> AXUIElement? {
-        guard depth < 30, seen.insert(CFHash(element)).inserted else { return nil }
-        let identifierMatches = identifier == nil || attribute(element, kAXIdentifierAttribute) as? String == identifier
-        let labelMatches = label == nil || attribute(element, kAXDescriptionAttribute) as? String == label
-        if identifierMatches, labelMatches, identifier != nil || label != nil { return element }
-        for child in children(of: element, attribute: kAXChildrenAttribute) {
-            if let found = search(child, identifier: identifier, label: label, seen: &seen, depth: depth + 1) {
-                return found
-            }
-        }
-        return nil
-    }
-
-    private static func collect(_ element: AXUIElement, seen: inout Set<CFHashCode>, lines: inout [String],
-                                depth: Int)
-    {
-        guard depth < 30, lines.count < 40, seen.insert(CFHash(element)).inserted else { return }
-        let role = attribute(element, kAXRoleAttribute) as? String
-        let identifier = attribute(element, kAXIdentifierAttribute) as? String
-        let label = attribute(element, kAXDescriptionAttribute) as? String
-        if role != nil || identifier != nil || label != nil {
-            lines.append("role=\(role ?? "-") id=\(identifier ?? "-") label=\(label ?? "-")")
-        }
-        for child in children(of: element, attribute: kAXChildrenAttribute) {
-            collect(child, seen: &seen, lines: &lines, depth: depth + 1)
-        }
-    }
-
-    private static func children(of element: AXUIElement, attribute name: String) -> [AXUIElement] {
-        guard let raw = attribute(element, name) else { return [] }
-        guard CFGetTypeID(raw) == CFArrayGetTypeID() else { return self.element(raw).map { [$0] } ?? [] }
-        let array = unsafeBitCast(raw, to: CFArray.self)
-        return (0 ..< CFArrayGetCount(array)).compactMap { index in
-            let pointer = CFArrayGetValueAtIndex(array, index)
-            guard let pointer else { return nil }
-            let value = Unmanaged<CFTypeRef>.fromOpaque(pointer).takeUnretainedValue()
-            return self.element(value)
-        }
-    }
-
-    /// `as? AXUIElement` always succeeds for any CF value, so the type id selects real elements.
-    private static func element(_ raw: CFTypeRef?) -> AXUIElement? {
-        guard let raw, CFGetTypeID(raw) == AXUIElementGetTypeID() else { return nil }
-        return unsafeBitCast(raw, to: AXUIElement.self)
-    }
-
-    private static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
-        var raw: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &raw) == .success else { return nil }
-        return raw
     }
 }
 
