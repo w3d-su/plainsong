@@ -281,5 +281,18 @@
     "R8 owner Full Keyboard Access smoke",
     "R9",
     "R10"
-  ]
+  ],
+  "watcherStopBoundaryFix": {
+    "date": "2026-10-09",
+    "commit": "b5571d7",
+    "change": "WorkspaceEventWatcher confines debounceTask, a stopped flag and a monotonic generation to its serial queue: the delivered-event path returns early when stopped, each debounce re-validates stopped/generation under the queue and invokes the handler inside that check, and stop() tears the stream down then applies flag/generation/cancel under the same queue (dispatch-specific marker keeps deinit and on-queue callers off queue.sync). start() re-arms under the queue, isStopped is public, and the App openWorkspace closure drops a main-actor hop whose watcher is no longer workspaceWatcher or is stopped.",
+    "rootCause": "A hosted fixture's own post.md write surfaced as an FSEvent ~310 ms after the write and its +300 ms debounce fired behind makeHostedBatchWorkspace's workspaceWatcher?.stop(), landing a handleExternalChange disk inspection between the Replace All press and its task's evaluation: refused(.externalObservationPending) before preparation began (CI #151; reproduced locally 5x in handoff 27b phases 1/1b, caller chain: openWorkspace watcher closure -> refreshWorkspaceAfterFileSystemChange -> handleManagedWorkspaceSessionsExternalChange -> handleExternalChange).",
+    "verification": {
+      "workspaceKitTests": "WorkspaceEventWatcherTests 4/4 (stop-before-debounce, event-after-stop, stop->start->event, isStopped tracking) via the @testable simulateDeliveredEventForTesting seam; full WorkspaceKit package 361/0",
+      "replaceRowRepetition": "all 28 hosted Replace-row tests x30 baseline (26 pass / 4 fail) and x30 PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW=1 (27 pass / 3 fail): held-preparation-checkpoint timeouts 0/60, externalObservationPending refusals 0; failures were the pre-existing unrelated Applying-frame assertion flake (3x baseline, 1x foreign) and WKWebView teardown/preview-render timeouts under load (1x baseline, 2x foreign)",
+      "hostedSuite": "EditorFind*/EditorReplace*/WorkspaceSearch*/EditorFindFocusReceiptTests/MenuBarStateTests/PlainsongMenuKeyBindingTests/AppStateWorkspaceDataIntegrityTests once under lock: 470 pass / 64 fail, every failure a WebKit-under-load environmental signature (67 'PreviewController and WKWebView deallocate' teardown timeouts, 7 preview-render wait/JS errors); 0 held-checkpoint timeouts, 0 externalObservationPending",
+      "load": "1-min load averages 9-58 across repetition runs (typical 11-30; shared machine)",
+      "build": "make build and build-for-testing under the xcodebuild lock: SUCCEEDED; pinned make lint: 331 violations, 0 serious; git diff --check clean"
+    }
+  }
 }
