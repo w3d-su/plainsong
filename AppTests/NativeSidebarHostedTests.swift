@@ -2,6 +2,7 @@ import AppKit
 @testable import EditorKit
 @testable import Plainsong
 import UniformTypeIdentifiers
+import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -12,6 +13,11 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         state.openExternalFile(fixture.root)
         try await waitUntil("sidebar fixture opens") { state.currentDocument.fileURL?.lastPathComponent == "a.md" }
+        // A deferred pick is refused while the open reload's capture still lags; wait
+        // for it to install so the first arrow cannot hit that window (29c).
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
         let host = makeWorkspaceHost(appState: state)
         registerTeardown(host: host, fixture: fixture)
         var table: NSTableView?
@@ -24,13 +30,7 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(host.window.makeFirstResponder(list))
         let focusBefore = state.editorFocusRequestID
         for file in ["b.md", "c.md"] {
-            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                                                       timestamp: ProcessInfo.processInfo.systemUptime,
-                                                       windowNumber: host.window.windowNumber,
-                                                       context: nil, characters: "\u{f701}",
-                                                       charactersIgnoringModifiers: "\u{f701}",
-                                                       isARepeat: false, keyCode: 125))
-            host.window.sendEvent(event)
+            try sendFilesArrowDown(to: host.window)
             try await waitUntil("arrow selection opens \(file)") {
                 state.currentDocument.fileURL?.lastPathComponent == file
             }
@@ -54,6 +54,11 @@ extension EditorFindHostedGateTests {
         try await waitUntil("sidebar fixture opens") {
             state.currentDocument.fileURL?.lastPathComponent == "a.md"
         }
+        // Same as the two-file test: settle the open reload before the arrows so no
+        // deferred pick is refused by a lagging capture it was not meant to meet (29c).
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
         let host = makeWorkspaceHost(appState: state)
         registerTeardown(host: host, fixture: fixture)
         var table: NSTableView?
@@ -66,13 +71,7 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(host.window.makeFirstResponder(list))
         let focusBefore = state.editorFocusRequestID
         for _ in 0 ..< 3 {
-            let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                                                       timestamp: ProcessInfo.processInfo.systemUptime,
-                                                       windowNumber: host.window.windowNumber,
-                                                       context: nil, characters: "\u{f701}",
-                                                       charactersIgnoringModifiers: "\u{f701}",
-                                                       isARepeat: false, keyCode: 125))
-            host.window.sendEvent(event)
+            try sendFilesArrowDown(to: host.window)
         }
         var observed: [String] = []
         for _ in 0 ..< 6 {
@@ -137,6 +136,134 @@ extension EditorFindHostedGateTests {
             state.currentDocument.fileURL?.lastPathComponent == "b.md"
         }
         XCTAssertEqual(state.workspaceTree?.selectedNode?.name, "b.md")
+    }
+
+    /// Handoff 29c MEDIUM: a pick refused while a reload's installed capture lags the
+    /// workspace generation must retry until it installs, and a newer pick supersedes
+    /// an older pick's retry without the older one ever landing. The scanner parks the
+    /// capture in flight so the lag is deterministic instead of a race the 25 ms poll
+    /// happens to meet; the deferral's attempt log proves each pick's outcome.
+    func testNativeFilesDeferredOpenRetriesHeldReloadAndNewestPickWins() async throws {
+        let scanner = HeldWorkspaceDirectoryScanner()
+        let fixture = try makeWorkspaceFixture(
+            files: ["a.md": "a", "b.md": "b", "c.md": "c"],
+            directoryScanner: scanner
+        )
+        let state = fixture.appState
+        state.setLayoutMode(.sourceOnly)
+        state.openExternalFile(fixture.root)
+        try await waitUntil("sidebar fixture opens") {
+            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+        }
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        let host = makeWorkspaceHost(appState: state)
+        registerTeardown(host: host, fixture: fixture)
+        var table: NSTableView?
+        try await waitUntil("native Files list mounts") {
+            table = self.firstDescendant(of: NSTableView.self, in: host.window.contentView)
+            return (table?.numberOfRows ?? 0) >= 4
+        }
+        let list = try XCTUnwrap(table)
+        host.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(host.window.makeFirstResponder(list))
+        let focusBefore = state.editorFocusRequestID
+        let deferral = try XCTUnwrap(
+            FilesSelectionDeferral.latestDebugInstance,
+            "the mounted Files list owns a selection deferral"
+        )
+        let nodes = try XCTUnwrap(state.workspaceTree?.root.children)
+        let bID = try XCTUnwrap(nodes.first { $0.name == "b.md" }?.id)
+        let cID = try XCTUnwrap(nodes.first { $0.name == "c.md" }?.id)
+
+        // Hold a reload in flight: the generation advances now but no capture can
+        // install until released, so every deferred pick is refused deterministically.
+        await scanner.holdNextCapture()
+        state.scheduleWorkspaceReload(
+            root: fixture.root, selectFirstIfNeeded: false, errorTitle: "Reload"
+        )
+        try await waitUntil("the reload is parked in the scanner") { await scanner.isHeld }
+        XCTAssertNotEqual(
+            state.workspaceInstalledCaptureGeneration, state.workspaceGeneration,
+            "the held reload must leave the installed capture lagging"
+        )
+
+        try sendFilesArrowDown(to: host.window) // picks b.md
+        try await waitUntil("the first pick was refused under the lag") {
+            deferral.openAttempts.contains { $0.id == bID && !$0.landed }
+        }
+        try sendFilesArrowDown(to: host.window) // picks c.md while b.md's retry sleeps
+        try await waitUntil("the second pick was refused under the lag") {
+            deferral.openAttempts.contains { $0.id == cID && !$0.landed }
+        }
+        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md",
+                       "a held reload must keep both picks refused")
+
+        await scanner.releaseCapture()
+        try await waitUntil("the newest pick opens after the capture installs") {
+            state.currentDocument.fileURL?.lastPathComponent == "c.md"
+        }
+        // Give the superseded retry its next turn: it must have exited instead of landing.
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await Task.yield()
+        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "c.md")
+
+        let attempts = deferral.openAttempts
+        XCTAssertFalse(
+            attempts.contains { $0.id == bID && $0.landed },
+            "the older pick must never land after the newer one: \(attempts)"
+        )
+        XCTAssertEqual(
+            attempts.filter { $0.id == cID && $0.landed }.count, 1,
+            "the newest pick must land exactly once: \(attempts)"
+        )
+        XCTAssertEqual(state.editorFocusRequestID, focusBefore,
+                       "arrow selection must not request editor focus")
+        XCTAssertTrue(host.window.firstResponder === list)
+    }
+}
+
+/// Sends one real down-arrow key event to `window`, the same path the arrow tests use.
+@MainActor
+private func sendFilesArrowDown(to window: NSWindow) throws {
+    let event = try XCTUnwrap(NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: [],
+        timestamp: ProcessInfo.processInfo.systemUptime,
+        windowNumber: window.windowNumber,
+        context: nil, characters: "\u{f701}", charactersIgnoringModifiers: "\u{f701}",
+        isARepeat: false, keyCode: 125
+    ))
+    window.sendEvent(event)
+}
+
+/// Wraps the production scanner and parks the next `snapshotCapture` after its scan
+/// completes until `releaseCapture()` resumes it. A hosted test can then hold a reload
+/// in flight with the installed capture generation lagging, deterministically (29c).
+private actor HeldWorkspaceDirectoryScanner: WorkspaceDirectoryScanning {
+    private let backing = WorkspaceDirectoryScanner()
+    private var holdsRemaining = 0
+    private var gate: CheckedContinuation<Void, Never>?
+    private(set) var isHeld = false
+
+    func holdNextCapture() {
+        holdsRemaining += 1
+    }
+
+    func releaseCapture() {
+        gate?.resume()
+    }
+
+    func snapshotCapture(root: URL) async throws -> WorkspaceDirectorySnapshotCapture {
+        let capture = try await backing.snapshotCapture(root: root)
+        if holdsRemaining > 0 {
+            holdsRemaining -= 1
+            isHeld = true
+            await withCheckedContinuation { gate = $0 }
+            isHeld = false
+            gate = nil
+        }
+        return capture
     }
 }
 

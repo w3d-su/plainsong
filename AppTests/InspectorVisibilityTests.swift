@@ -77,6 +77,8 @@ final class InspectorVisibilityTests: XCTestCase {
             NSRect(x: 0, y: 0, width: 2000, height: 800), deficit: 281, visible: visible
         )
         XCTAssertEqual(overWide.width, 2000, accuracy: 0.001)
+        // No width gain means no room was made: the origin must not move either.
+        XCTAssertEqual(overWide.origin.x, 0, accuracy: 0.001)
         let grown = InspectorLayout.grownWindowFrame(
             NSRect(x: 100, y: 0, width: 1000, height: 800), deficit: 281, visible: visible
         )

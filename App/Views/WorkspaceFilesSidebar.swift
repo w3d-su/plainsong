@@ -10,6 +10,9 @@ import WorkspaceKit
 struct WorkspaceFilesSidebar: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectionDeferral = FilesSelectionDeferral()
+    /// Bumped after a dropped pick so the List re-reads the binding and reverts its
+    /// highlight to the tree's selection (the still-current document).
+    @State private var selectionRevertTick = 0
     @State private var creationRequest: CreationRequest?
     @State private var itemName = ""
     @State private var renameTarget: WorkspaceFileNode?
@@ -53,6 +56,9 @@ struct WorkspaceFilesSidebar: View {
                 renameTarget = nil
             }
         }
+        // The pick tracker is per-view @State: it outlives Files → Search → Files,
+        // so a deferred open still retrying when the navigator unmounts is cancelled.
+        .onDisappear { selectionDeferral.cancelPendingOpen() }
     }
 
     private func list(_ tree: WorkspaceFileTree) -> some View {
@@ -173,36 +179,18 @@ struct WorkspaceFilesSidebar: View {
                 // that event. The open itself is deferred one main-actor turn: mutating
                 // AppState here publishes during the view update (R22). A left-mouse event
                 // may focus the editor; key, accessibility, and a nil current event keep
-                // the navigator focused. `sequence` drops an older deferred open that
-                // would land after a newer one.
+                // the navigator focused. `FilesSelectionDeferral.open` retries a pick
+                // refused while a workspace reload's capture lags, drops an older pick
+                // that would land after a newer one, and reverts the row highlight when
+                // the pick is dropped.
                 let mouseSelection = NSApp.currentEvent
                     .map { [.leftMouseDown, .leftMouseUp].contains($0.type) } ?? false
-                let deferral = selectionDeferral
-                deferral.issued += 1
-                let sequence = deferral.issued
-                deferral.pendingID = newValue
-                Task { @MainActor in
-                    guard sequence > deferral.applied else { return }
-                    deferral.applied = sequence
-                    // The one-turn delay lands inside a workspace-reload window often
-                    // enough to matter (measured 4/5 runs, 29b): selectWorkspaceNode
-                    // refuses while the installed capture generation lags the workspace
-                    // generation, and the pick would be dropped. Retry only while the
-                    // refusal is that lag — a missing or non-Markdown node, or any
-                    // refusal outside the lag, ends the loop immediately, as does a
-                    // newer applied pick.
-                    for _ in 0 ..< 200 {
-                        appState.selectWorkspaceNode(id: newValue, requestingEditorFocus: mouseSelection)
-                        if appState.workspaceTree?.selectedNodeID == newValue { break }
-                        let nodeStillPickable =
-                            appState.workspaceTree?.node(id: newValue)?.isEditableMarkdown == true
-                        let captureLagging = appState.workspaceInstalledCaptureGeneration
-                            != appState.workspaceGeneration
-                        guard nodeStillPickable, captureLagging else { break }
-                        try? await Task.sleep(nanoseconds: 25_000_000)
-                        guard deferral.applied == sequence else { break }
-                    }
-                    if sequence == deferral.issued { deferral.pendingID = nil }
+                selectionDeferral.open(
+                    id: newValue,
+                    requestingEditorFocus: mouseSelection,
+                    appState: appState
+                ) {
+                    selectionRevertTick += 1
                 }
             }
         )

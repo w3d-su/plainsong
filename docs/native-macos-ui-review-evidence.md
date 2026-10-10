@@ -222,7 +222,7 @@ Owner FKA/IME, macOS 15 CI, and `PlainsongUITests` remain outside this run.
 ## Follow-up 29b (2026-10-09)
 
 Worktree `plainsong-native-ui-merge` on `phase3-native-ui-29a-merge`, head `a55cb69`.
-Uncommitted review-fix pass; the orchestrator commits after review. All xcodebuild
+Committed as `f6543b5`. All xcodebuild
 work serialized under `/private/tmp/plainsong-xcodebuild-test.lock`.
 
 ### MEDIUM 1 — transient pane overlap, fixed and measured

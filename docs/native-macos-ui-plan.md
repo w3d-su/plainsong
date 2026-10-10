@@ -108,8 +108,13 @@ gated to 27+; the fixed HStack retains its established sidebar on 14–26. ⌘�
 dropped (Save As convention).
 
 Keyboard/AX selection in the native Files List opens the file without requesting editor
-focus; mouse selections can focus the editor. The synchronous activation carries that
-choice through its anchored/cached/retired paths without changing authority contracts.
+focus; mouse selections can focus the editor. The event kind is read synchronously inside
+the List's selection update; the activation itself is deferred one main-actor turn so it
+does not publish inside that update (R22). A pick refused while a workspace reload's
+installed capture still lags the workspace generation retries at 25 ms for a bounded
+window, the newest pick wins, and a dropped pick reverts the row highlight to the current
+document. The activation carries that choice through its anchored/cached/retired paths
+without changing authority contracts.
 Rows retain native `.tag` and selection, with an `onDrag` provider carrying the existing
 plain-text node ID for workspace moves and, for images, a file URL consumed by the
 editor’s existing image insertion path. The reviewed String-only payload could not reach

@@ -62,10 +62,13 @@ enum InspectorLayout {
     }
 
     /// Explicit Show widens the window by the inspector's deficit within the screen's
-    /// visible frame; a window already wider than the screen never shrinks.
+    /// visible frame; a window already wider than the screen never shrinks. When the
+    /// clamp leaves no width gain the frame is returned unchanged: moving an over-wide
+    /// window's origin would only slide it sideways without making room.
     static func grownWindowFrame(_ frame: NSRect, deficit: CGFloat, visible: NSRect) -> NSRect {
         var grown = frame
         grown.size.width = max(frame.width, min(frame.width + deficit, visible.width))
+        guard grown.width > frame.width else { return frame }
         grown.origin.x = min(max(grown.origin.x, visible.minX), visible.maxX - grown.width)
         return grown
     }
@@ -266,10 +269,12 @@ final class InspectorVisibility: ObservableObject {
         if window.styleMask.contains(.fullScreen) { return }
         guard let screen = window.screen else { return }
         let deficit = requiredWidth - availableWidth
-        window.setFrame(
-            InspectorLayout.grownWindowFrame(window.frame, deficit: deficit, visible: screen.visibleFrame),
-            display: true
+        let grown = InspectorLayout.grownWindowFrame(
+            window.frame, deficit: deficit, visible: screen.visibleFrame
         )
+        // No width gain means no room was made; do not move the window at all.
+        guard grown.width > window.frame.width else { return }
+        window.setFrame(grown, display: true)
         // The geometry callback decides visibility after the screen-clamped resize.
     }
 

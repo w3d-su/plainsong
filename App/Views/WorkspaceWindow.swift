@@ -156,8 +156,13 @@ private struct WorkspaceWindowContent: View {
                 contentMinimum: contentMinimum,
                 hasDocument: appState.hasOpenDocument
             )
-            let reserved = InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+            let reserved = CGFloat(
+                InspectorLayout.clamped(inspectorWidth) + InspectorLayout.handleWidth
+            )
+            // Geometry and the open document gate hiding in this same pass; a closed
+            // document must not leave the inspector drawn while the publish catches up.
             let presented = inspectorVisibility.isPresented
+                && appState.hasOpenDocument
                 && proxy.size.width >= contentMinimum + reserved
             HStack(spacing: 0) {
                 detail

@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownCore
 @testable import Plainsong
 import XCTest
 
@@ -74,6 +75,25 @@ extension EditorFindHostedGateTests {
             return self.layoutFrame("inspector", in: host.window) != nil
         }
         return (host, state)
+    }
+
+    /// 29c: closing the document must hide the inspector in the same pass — the
+    /// `hasDocument` publish is deferred one turn, but the frame gate is not.
+    func testTransientDocumentCloseHidesInspectorWithoutWaiting() async throws {
+        for shell in [WorkspaceShell.fixed, .split] {
+            if shell == .split {
+                guard #available(macOS 27.0, *) else { continue }
+            }
+            let settled = try await makeSettledInspectorHost(
+                shell: shell, width: 1000, mode: .sourceOnly
+            )
+            let state = settled.state
+            state.setCurrentDocument(DocumentSession())
+            let frames = transientFrames(in: settled.host)
+            XCTAssertFalse(state.hasOpenDocument)
+            XCTAssertNil(frames["inspector"], "shell=\(shell): inspector must hide in the same pass")
+            XCTAssertNil(frames["handle"], "shell=\(shell): handle must hide in the same pass")
+        }
     }
 
     /// Forces the pending render and reads the probe frames without suspending.
