@@ -4,6 +4,13 @@ import XCTest
 /// `WorkspaceEventWatcher.stop()` is a hard boundary: no handler invocation may begin
 /// after it returns, whether the debounce was scheduled before or after the call. These
 /// tests drive the watcher's delivered-event seam so no FSEvents timing is involved.
+///
+/// The watched path is deliberately never created: a live FSEventStream can still
+/// deliver real events for its root — fseventsd batches deliveries and a delayed or
+/// resync event can reach the handler inside the debounce/assert window, making an
+/// exact handler count nondeterministic (observed as calls==2 in
+/// testStopThenStartDeliversASimulatedEventOnce). A path nothing writes leaves the
+/// simulated seam as the only event source.
 final class WorkspaceEventWatcherTests: XCTestCase {
     private final class HandlerCallCount: @unchecked Sendable {
         private let lock = NSLock()
@@ -28,10 +35,6 @@ final class WorkspaceEventWatcherTests: XCTestCase {
     ) throws -> WorkspaceEventWatcher {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("WorkspaceEventWatcherTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        addTeardownBlock {
-            try? FileManager.default.removeItem(at: root)
-        }
         return WorkspaceEventWatcher(
             rootURL: root,
             debounceNanoseconds: debounceNanoseconds,

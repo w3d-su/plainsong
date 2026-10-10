@@ -1,39 +1,15 @@
 import AppKit
 import SwiftUI
 
-// An owned AppKit button for the find bar's replacement controls (Replace PR H).
-//
-// AppKit rather than SwiftUI `Button`, for three reasons:
-// - Full Keyboard Access focuses and presses an `NSButton` natively, and its focus is a real
-//   AppKit first responder that `EditorFindResponderSupport` can recognize as bar provenance;
-// - focusing it reports nothing to SwiftUI `FocusState`, so Tab onto **Cancel** cannot advance
-//   the Replace authority generation and supersede the plan it is about to cancel;
-// - hosted tests can click the real control (`performClick`), which runs the same
-//   target/action path a mouse click or a Full Keyboard Access Space press runs.
-#if DEBUG
-    /// Handoff 27b/27c row-flake evidence: owned bar view mount/update/dismantle records on
-    /// the trace clock, kept in memory and dumped only by hosted timeout diagnostics, so
-    /// Debug consoles stay quiet on passing runs. `PLAINSONG_HOSTED_TRACE_STDOUT=1` mirrors
-    /// each record to stdout for live reproduction work. Never consulted for behavior.
-    enum EditorFindBarViewTrace {
-        /// Written and read only from main-actor contexts (SwiftUI view lifecycle and hosted
-        /// timeout diagnostics); nonisolated-unsafe so the DEBUG-only buffer needs no lock.
-        private(set) nonisolated(unsafe) static var entries: [String] = []
-
-        static func record(_ entry: String) {
-            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
-            let line = "+\(milliseconds)ms \(entry)"
-            if entries.count >= 128 {
-                entries.removeFirst(entries.count - 127)
-            }
-            entries.append(line)
-            if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
-                print("REPLTRACE \(line)")
-            }
-        }
-    }
-#endif
-
+/// An owned AppKit button for the find bar's replacement controls (Replace PR H).
+///
+/// AppKit rather than SwiftUI `Button`, for three reasons:
+/// - Full Keyboard Access focuses and presses an `NSButton` natively, and its focus is a real
+///   AppKit first responder that `EditorFindResponderSupport` can recognize as bar provenance;
+/// - focusing it reports nothing to SwiftUI `FocusState`, so Tab onto **Cancel** cannot advance
+///   the Replace authority generation and supersede the plan it is about to cancel;
+/// - hosted tests can click the real control (`performClick`), which runs the same
+///   target/action path a mouse click or a Full Keyboard Access Space press runs.
 struct EditorFindBarButton: NSViewRepresentable {
     enum Style: Equatable {
         case push
@@ -199,3 +175,27 @@ struct EditorFindBarLabel: NSViewRepresentable {
         label.textColor = isSecondary ? .secondaryLabelColor : .labelColor
     }
 }
+
+#if DEBUG
+    /// Handoff 27b/27c row-flake evidence: owned bar view mount/update/dismantle records on
+    /// the trace clock, kept in memory and dumped only by hosted timeout diagnostics, so
+    /// Debug consoles stay quiet on passing runs. `PLAINSONG_HOSTED_TRACE_STDOUT=1` mirrors
+    /// each record to stdout for live reproduction work. Never consulted for behavior.
+    enum EditorFindBarViewTrace {
+        /// Written and read only from main-actor contexts (SwiftUI view lifecycle and hosted
+        /// timeout diagnostics); nonisolated-unsafe so the DEBUG-only buffer needs no lock.
+        private(set) nonisolated(unsafe) static var entries: [String] = []
+
+        static func record(_ entry: String) {
+            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
+            let line = "+\(milliseconds)ms \(entry)"
+            if entries.count >= 128 {
+                entries.removeFirst(entries.count - 127)
+            }
+            entries.append(line)
+            if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
+                print("REPLTRACE \(line)")
+            }
+        }
+    }
+#endif

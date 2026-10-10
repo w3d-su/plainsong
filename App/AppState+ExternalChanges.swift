@@ -187,7 +187,9 @@ extension AppState {
     ) {
         editorFindHost.traceReplaceBarAction(
             "handleExternalChange file=\(session.fileURL?.lastPathComponent ?? "untitled") "
-                + "advancing=\(advancingDiskEvent)",
+                + "advancing=\(advancingDiskEvent) "
+                + "authorityGen=\(editorReplaceAuthorityGeneration) "
+                + "authorization=\(editorReplaceAuthorizationDecision(for: session))",
             fileID: fileID,
             line: line
         )

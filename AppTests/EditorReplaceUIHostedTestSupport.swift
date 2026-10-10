@@ -191,21 +191,32 @@ extension EditorFindHostedGateTests {
                 + "generation=\(appState.editorReplaceAuthorityGeneration) "
                 + "replaceAllTask=\(appState.editorFindHost.replaceAllTask != nil)"
         }
+        // Handoff 27c: readiness immediately before the press — no external observation may
+        // still be in flight and authorization must be .allowed, so a slow runner cannot
+        // evaluate the press against a stale disk-inspection window.
+        try await waitForHostedReplaceObservationQuiescence(hosted)
+        try await waitUntil("authorization is .allowed immediately before the press") {
+            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument) == .allowed
+        }
         try await start()
+        XCTAssertTrue(
+            appState.editorFindHost.replaceAllTask != nil
+                || appState.editorFindHost.replaceBatch.isPreparing,
+            "the press must start a Replace All batch" + replaceBarTraceDiagnostic(appState)
+        )
         try await waitUntil("the bar's Replace All reaches its held preparation checkpoint") { hold.isEntered }
         XCTAssertFalse(hold.didRunOnMainThread)
         #if DEBUG
-            // Handoff 27b/27c: on a PASSING run, keep the trace only when a disk inspection
-            // appears in it, so the failure-vs-pass comparison can answer whether the
-            // same producer always runs and only its timing differs. Failures already dump
-            // the buffer through the timeout report, so this prints only on demand —
-            // PLAINSONG_HOSTED_TRACE_STDOUT=1 keeps passing-run consoles quiet otherwise.
+            // Handoff 27b/27c: on a PASSING run, dump the trace with whether a disk
+            // inspection appears in it, so the failure-vs-pass comparison can answer
+            // whether the same producer always runs and only its timing differs. Failures
+            // already dump the buffer through the timeout report, so this prints only on
+            // demand — PLAINSONG_HOSTED_TRACE_STDOUT=1 keeps passing-run consoles quiet.
             if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
                 let trace = appState.editorFindHost.replaceBarTrace
-                if trace.contains(where: { $0.contains("handleExternalChange") }) {
-                    print("replaceBarTrace@checkpoint (passed, external activity observed):")
-                    print(trace.joined(separator: "\n"))
-                }
+                let observed = trace.contains(where: { $0.contains("handleExternalChange") })
+                print("replaceBarTrace@checkpoint (passed, external activity observed=\(observed)):")
+                print(trace.joined(separator: "\n"))
             }
         #endif
         return hold

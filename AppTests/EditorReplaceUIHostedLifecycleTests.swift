@@ -42,6 +42,9 @@ extension EditorFindHostedGateTests {
         // SwiftUI can defer the unmount one run-loop turn (transient, cosmetic); a label
         // still mounted afterwards fails with its ancestry and live replace state.
         if label(EditorFindAccessibility.replaceProgress, in: window) != nil {
+            #if DEBUG
+                print("REPLSTRAY progressLabel still mounted after close+reopen; entering unmount recheck")
+            #endif
             hostedTimeoutDiagnostics.append { [weak self, weak app] in
                 guard let self, let app else { return "fixture released" }
                 guard let stray = label(EditorFindAccessibility.replaceProgress, in: window)

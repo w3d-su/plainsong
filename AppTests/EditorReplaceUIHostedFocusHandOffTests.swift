@@ -144,6 +144,9 @@ extension EditorFindHostedGateTests {
         // isPreparing), and SwiftUI may defer its removal one run-loop turn; only a mount
         // that persists fails, with its ancestry and live replace state in the report.
         if barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil {
+            #if DEBUG
+                print("REPLSTRAY cancelButton still mounted at commit; entering unmount recheck")
+            #endif
             hostedTimeoutDiagnostics.append { [weak self, weak app] in
                 guard let self, let app else { return "fixture released" }
                 guard let stray = barButton(EditorFindAccessibility.replaceCancelButton, in: window)

@@ -107,6 +107,9 @@ extension EditorFindHostedGateTests {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
         let appState = hosted.appState
         let watcher = try XCTUnwrap(appState.workspaceWatcher)
+        // The original watcher stays live through the swap below; stop it at test end so a
+        // late real FSEvent cannot deliver into a later test's workspace state.
+        defer { watcher.stop() }
         try await waitForHostedReplaceObservationQuiescence(hosted)
         let session = appState.currentDocument
         let identity = ObjectIdentifier(session)
@@ -149,8 +152,12 @@ extension EditorFindHostedGateTests {
     #if DEBUG
         /// Handoff 27c M3: an accepted hop attributes the resulting `handleExternalChange`
         /// to the hop's own `refreshWorkspaceAfterFileSystemChange()` site in
-        /// `App/AppState+Workspace.swift` — the openWorkspace watcher closure, the producer
-        /// behind the `advancing=true` entry seen ~40 ms before the press on CI.
+        /// `App/AppState+Workspace.swift`. Passing row-test runs show the only
+        /// `advancing=true` producers near the press are test-injected refreshes and this
+        /// watcher hop: a real FSEvent delivered during fixture setup can hop onto the main
+        /// actor before `makeHostedBatchWorkspace`'s `stop()` and refresh; the readiness
+        /// wait in `startHeldBarReplaceAll` absorbs any still-pending observation before
+        /// the press, and hops arriving after `stop()` are dropped by the guard.
         func testHostedWatcherHopAcceptedAttributesExternalChangeToTheHop() async throws {
             let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
             let appState = hosted.appState
@@ -163,14 +170,22 @@ extension EditorFindHostedGateTests {
                 return trace.contains { $0.contains("watcherHop accepted") }
                     && trace.contains { $0.contains("handleExternalChange file=post.md advancing=true") }
             }
+            let trace = appState.editorFindHost.replaceBarTrace
+            let hopIndex = try XCTUnwrap(
+                trace.lastIndex { $0.contains("watcherHop accepted") },
+                "the hop was accepted"
+            )
             let entry = try XCTUnwrap(
-                appState.editorFindHost.replaceBarTrace.last {
-                    $0.contains("handleExternalChange file=post.md advancing=true")
-                }
+                trace.last { $0.contains("handleExternalChange file=post.md advancing=true") }
             )
             XCTAssertTrue(
-                entry.contains("(Plainsong/AppState+Workspace.swift:395)"),
+                entry.contains("(Plainsong/AppState+Workspace.swift:"),
                 "the producer is the openWorkspace watcher hop; got: \(entry)"
+            )
+            XCTAssertGreaterThan(
+                try XCTUnwrap(trace.lastIndex { $0 == entry }),
+                hopIndex,
+                "the external change is recorded after the accepted hop: \(trace.joined(separator: "\n"))"
             )
         }
     #endif
