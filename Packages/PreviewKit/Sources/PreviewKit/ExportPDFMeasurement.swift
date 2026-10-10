@@ -135,90 +135,126 @@ extension PreviewController {
     /// [minY, maxY, maxX, …] triple list of every measured element or line box whose
     /// right edge overflows the root's content box; the planner uses it to give each
     /// page the width of the widest content on that page (`maxX` re-adds the right
-    /// padding so a page covers the padded overflow edge).
+    /// padding so a page covers the padded overflow edge). Measured rects are first
+    /// intersected with the padding box of every ancestor whose computed overflow-x
+    /// clips (hidden, clip, auto, scroll) — text an `overflow: hidden` pill hides or
+    /// ellipsizes must not mark the document wide — while elements the export style
+    /// forces to `overflow: visible` (wide code, tables, math, Mermaid) still measure
+    /// at their painted edge.
     ///
     /// Elements with computed position fixed/sticky, a non-none transform, or a float are
     /// returned as offenders: a break cannot be proven safe across one (the A1 design
     /// stop in `docs/export-gates.md`), so the caller fails typed when a planned break
     /// would land strictly inside one.
     func measureUnsplittableSpans() async throws -> ExportSpanMeasurementResult {
-        let script = """
-        JSON.stringify((() => {
-          const root = document.getElementById("preview-root");
-          if (!root) return { spans: [], offenders: [], wide: [], baselineWidth: 0 };
-          const rootRect = root.getBoundingClientRect();
-          const padR = parseFloat(getComputedStyle(root).paddingRight) || 0;
-          const baselineWidth = Math.ceil(rootRect.right + window.scrollX);
-          const contentRight = rootRect.right + window.scrollX - padR;
-          const atomicSelector = [
-            "img", "svg", "video", "canvas", "iframe", "input", "hr", "tr",
-            ".katex", ".katex-display", ".plainsong-math-block", ".mermaid-rendered"
-          ].join(", ");
-          const atomics = new Set(root.querySelectorAll(atomicSelector));
-          const insideAtomic = (node) => {
-            let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-            for (; el && el !== root; el = el.parentElement) {
-              if (atomics.has(el)) return true;
-            }
-            return false;
-          };
-          const spans = [];
-          const wide = [];
-          const pushWide = (rect) => {
-            if (rect.height <= 0) return;
-            const right = rect.right + window.scrollX;
-            if (right > contentRight + 0.5) {
-              wide.push(rect.top + window.scrollY, rect.bottom + window.scrollY, right + padR);
-            }
-          };
-          const pushRect = (rect) => {
-            if (rect.height <= 0) return;
-            spans.push(rect.top + window.scrollY, rect.bottom + window.scrollY);
-            pushWide(rect);
-          };
-          for (const el of atomics) pushRect(el.getBoundingClientRect());
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-            acceptNode: (node) => {
-              if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
-              if (insideAtomic(node)) return NodeFilter.FILTER_REJECT;
-              return NodeFilter.FILTER_ACCEPT;
-            }
-          });
-          const range = document.createRange();
-          let node;
-          while ((node = walker.nextNode())) {
-            range.selectNodeContents(node);
-            for (const rect of range.getClientRects()) pushRect(rect);
-          }
-          const offenders = [];
-          for (const el of root.querySelectorAll("*")) {
-            pushWide(el.getBoundingClientRect());
-            const style = getComputedStyle(el);
-            const positioned = style.position === "fixed" || style.position === "sticky";
-            const transformed = style.transform && style.transform !== "none";
-            const floated = style.float === "left" || style.float === "right";
-            if (!positioned && !transformed && !floated) continue;
-            const rect = el.getBoundingClientRect();
-            offenders.push({
-              tag: el.tagName.toLowerCase(),
-              className: typeof el.className === "string" ? el.className : "",
-              minY: rect.top + window.scrollY,
-              maxY: rect.bottom + window.scrollY
-            });
-          }
-          return {
-            spans: spans,
-            offenders: offenders,
-            wide: wide,
-            baselineWidth: baselineWidth
-          };
-        })())
-        """
+        let script = PreviewController.measureUnsplittableSpansScript
         guard let json = try await evaluateExportJavaScript(script, label: "unsplittable spans") as? String,
               let data = json.data(using: .utf8)
         else { throw ExportPDFCaptureError.geometryUnstable }
         return try await decodeSpanMeasurement(data)
     }
+
+    /// The unsplittable-span walker, kept as a constant so `measureUnsplittableSpans`
+    /// stays under the function-length budget. Everything below — the atomic selector,
+    /// the per-ancestor `clipRightFor` cache, and the positioned-offender walk — is
+    /// documented on `measureUnsplittableSpans` itself.
+    private static let measureUnsplittableSpansScript = """
+    JSON.stringify((() => {
+      const root = document.getElementById("preview-root");
+      if (!root) return { spans: [], offenders: [], wide: [], baselineWidth: 0 };
+      const rootRect = root.getBoundingClientRect();
+      const padR = parseFloat(getComputedStyle(root).paddingRight) || 0;
+      const baselineWidth = Math.ceil(rootRect.right + window.scrollX);
+      const contentRight = rootRect.right + window.scrollX - padR;
+      const atomicSelector = [
+        "img", "svg", "video", "canvas", "iframe", "input", "hr", "tr",
+        ".katex", ".katex-display", ".plainsong-math-block", ".mermaid-rendered"
+      ].join(", ");
+      const atomics = new Set(root.querySelectorAll(atomicSelector));
+      const insideAtomic = (node) => {
+        let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+        for (; el && el !== root; el = el.parentElement) {
+          if (atomics.has(el)) return true;
+        }
+        return false;
+      };
+      const spans = [];
+      const wide = [];
+      // The painted right edge a piece of content is clipped to, in document
+      // coordinates: the minimum padding-box right edge (border-left +
+      // clientWidth, i.e. rect.left + clientLeft + clientWidth + scrollX) over
+      // every ancestor up to the export root whose computed overflow-x is not
+      // visible — hidden, clip, auto and scroll all clip horizontally while
+      // overflow-y alone cannot reach the right edge. clipRightFor(el) is the
+      // limit on content painted *inside* el; a rect belonging to el itself is
+      // clipped only by el's strict ancestors. Each element's limit is computed
+      // once and cached, so the ancestor walk stays linear.
+      const clipCache = new Map();
+      const clipRightFor = (el) => {
+        if (clipCache.has(el)) return clipCache.get(el);
+        let limit = el === root ? Infinity : clipRightFor(el.parentElement || root);
+        if (getComputedStyle(el).overflowX !== "visible") {
+          const box = el.getBoundingClientRect();
+          limit = Math.min(limit, box.left + el.clientLeft + el.clientWidth + window.scrollX);
+        }
+        clipCache.set(el, limit);
+        return limit;
+      };
+      const pushWide = (rect, clipRight) => {
+        if (rect.height <= 0) return;
+        const right = Math.min(rect.right + window.scrollX, clipRight);
+        if (right > contentRight + 0.5) {
+          wide.push(rect.top + window.scrollY, rect.bottom + window.scrollY, right + padR);
+        }
+      };
+      const pushRect = (rect, clipRight) => {
+        if (rect.height <= 0) return;
+        spans.push(rect.top + window.scrollY, rect.bottom + window.scrollY);
+        pushWide(rect, clipRight);
+      };
+      for (const el of atomics) {
+        pushRect(el.getBoundingClientRect(), clipRightFor(el.parentElement || root));
+      }
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+          if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
+          if (insideAtomic(node)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      const range = document.createRange();
+      let node;
+      while ((node = walker.nextNode())) {
+        range.selectNodeContents(node);
+        // A text node's rects are content of its parent element, so the parent's
+        // own overflow-x clip applies to them too.
+        const clipRight = clipRightFor(node.parentElement || root);
+        for (const rect of range.getClientRects()) pushRect(rect, clipRight);
+      }
+      const offenders = [];
+      for (const el of root.querySelectorAll("*")) {
+        pushWide(el.getBoundingClientRect(), clipRightFor(el.parentElement || root));
+        const style = getComputedStyle(el);
+        const positioned = style.position === "fixed" || style.position === "sticky";
+        const transformed = style.transform && style.transform !== "none";
+        const floated = style.float === "left" || style.float === "right";
+        if (!positioned && !transformed && !floated) continue;
+        const rect = el.getBoundingClientRect();
+        offenders.push({
+          tag: el.tagName.toLowerCase(),
+          className: typeof el.className === "string" ? el.className : "",
+          minY: rect.top + window.scrollY,
+          maxY: rect.bottom + window.scrollY
+        });
+      }
+      return {
+        spans: spans,
+        offenders: offenders,
+        wide: wide,
+        baselineWidth: baselineWidth
+      };
+    })())
+    """
 
     /// Decoding and flattening the span payload is pure `Data` work, so it runs off the
     /// main actor; WebKit evaluation stays on main. Cancellation is forwarded into the

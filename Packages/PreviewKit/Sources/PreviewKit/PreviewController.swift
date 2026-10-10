@@ -35,6 +35,11 @@ public final class PreviewController: NSObject, ObservableObject {
     /// Test seam for `captureExportPDF`: invoked with the page index before each page
     /// capture so hosted tests can inject errors, cancellation, or record weak refs.
     var exportPDFCaptureWillCaptureHook: (@MainActor (Int) async throws -> Void)?
+    /// Test seam for `captureExportPDF`: replaces the piece joiner so hosted tests
+    /// can drive the joined-count check (`pageCountMismatch`).
+    var exportPDFPageJoiner: (
+        @Sendable ([Data], [CGFloat]) throws -> (data: Data, pageScales: [CGFloat])
+    )?
     var pendingHTMLExport: PendingHTMLExport?
     var pendingExportRender: PendingExportRender?
     private var theme = "system"
