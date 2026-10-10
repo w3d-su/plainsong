@@ -340,12 +340,15 @@ destinations, panel-first PDF.
   position not strictly inside a merged unsplittable interval; gaps between blocks,
   items, rows, and lines fall out of the complement with no container classification.
   `ExportPDFPagePlanner.plan` ends each page at the last safe break within a CSS-point
-  budget of `14,400 / scale` for PDF (the scale is each page's own since
-  2026-10-08 — see the owner decision below) — and, for Print, additionally the paper
-  imageable `width × aspect`. Spans that merely touch keep their shared edge; only an
+  budget of a flat 14,400 for PDF — lowered further when the page's own width would
+  push its capture raster past `captureAreaBudget` (2²⁹ px; see the 2026-10-09/10
+  owner decisions below) — and, for Print, additionally the paper imageable
+  `width × aspect`. Spans that merely touch keep their shared edge; only an
   overlap
-  greater than 0.5 pt merges. One unbreakable run taller than the budget fails typed as
-  `oversizeAtomicBox` with its post-scale height. Fixed/sticky/transformed/floated
+  greater than 0.5 pt merges. One unbreakable run taller than the budget fails typed:
+  `oversizeAtomicBox` with its CSS height past the 14,400 pt user-space cap,
+  `oversizeCaptureArea` with its CSS width and height when only the raster area
+  overflows. Fixed/sticky/transformed/floated
   elements are reported as offenders; a planned break that would cross one fails typed
   (`break-crosses-positioned-content`) rather than slicing it — this is the A1 design
   stop referenced from `ExportPDFMeasurement`. Capture then runs at full size, one
@@ -357,9 +360,9 @@ destinations, panel-first PDF.
   This replaces the recorded "uniform zoom before pagination": no WebKit zoom is
   applied, and the 14,000 pt termination claim that motivated it is revised — under A1
   the hosted suite measures and captures a contained width greater than 20,000 pt at
-  full size (`testOverMaximumWidthScalesInPDFSpaceWithEveryColumnOnce`). The earlier
-  observation belonged to the pre-A1 measurement path and is retained as a historical
-  caution, not a current bound.
+  full size (`testOverMaximumWidthScalesInPDFSpaceWithEveryColumnOnce`). Width alone
+  does not terminate; the 2026-10-09 probing brackets `WKWebView.pdf` at a ~2³⁰ px²
+  per-rect raster bound instead, which `captureAreaBudget` halves for safety.
 - **B1 — Print prints the captured PDF, not `printOperation(with:)`.** Print renders
   the same snapshot in the light theme (paper is white and dark backgrounds are not
   printed; PDF keeps the invocation theme), plans pages bounded by the paper's
@@ -402,8 +405,10 @@ taller than one paper page. Under the same sign-off:
   `width × aspect` (the orientation-aware `imageablePageBounds` ratio — landscape
   paper plans landscape-shaped pages). When the budgeted break would land inside an
   unbreakable run that already reaches the page top, the page extends to the run's
-  end and `.pageScaleToFit` shrinks that one page onto the sheet; only a run taller
-  than the hard `14,400 / scale` cap still fails as `oversizeAtomicBox`, for both
+  end and `.pageScaleToFit` shrinks that one page onto the sheet; only a single
+  unbreakable interval past the hard cap still fails typed — `oversizeAtomicBox`
+  past 14,400 CSS pt, `oversizeCaptureArea` when only the width-adjusted raster
+  budget overflows — for both
   products. The aspect comes from the panel-persisted `NSPrintInfo`: a completed
   print run's paper size and orientation carry to the next Print…; a cancelled run
   changes nothing.
@@ -442,6 +447,40 @@ sign-off:
   forces `#preview-root { min-height: 0 !important }` so the `100vh` floor cannot
   pin the measure. A trailing planned page intersecting no measured span is
   dropped as a safety net.
+
+**Owner decision 2026-10-10 (G3 — truthful area refusal; X1 gap absorption; X2
+clipped text).** Under the same sign-off:
+
+- **No empty pages (X1).** Every emitted page must intersect at least one
+  measured span (strict overlap > ε; padding and border boxes count because the
+  measured spans include them). A snapped run edge grows across the neighbouring
+  span-free gap — up to the previous interval's bottom or the document start,
+  down to the next interval's top or the document end — before runs merge, so a
+  mandatory break never strands a whitespace-only page; runs separated only by a
+  shared safe break still stay separate. The invariant assumes whitespace gaps
+  between consecutive spans stay below a page's soft budget; prose whitespace
+  taller than a page is out of scope. The safety net keeps dropping trailing
+  span-free pages — a content-measured height makes them provably blank — and
+  `Plan.droppedTrailingBlankPages` records the count.
+- **Clipped text is not content width (X2).** A measured right edge is first
+  intersected with the padding box of every ancestor whose computed `overflow-x`
+  is not `visible` — `hidden`, `clip`, `auto` and `scroll` all clip what is
+  painted — up to the export root, and only the clipped edge feeds the wide
+  threshold and per-page width. Text an `overflow: hidden` pill hides or
+  ellipsizes (`.mdx-esm-placeholder`) can no longer form a wide run; elements
+  the export style forces to `overflow: visible` (wide code, tables, math,
+  Mermaid) still measure at their painted edge.
+- **Only a single unbreakable box over the raster budget is refused (G3).**
+  WebContent terminates painting near ~2³⁰ px², independent of aspect ratio and
+  device pixel ratio, so the capture-area budget stays at half — 2²⁹ px² — for
+  safety across machines and OS versions. A wide *run* over the budget is split
+  into more, shorter pages as before; only a single unbreakable interval whose
+  own width × height exceeds the budget while fitting the 14,400 pt side cap
+  fails, typed `oversizeCaptureArea(widthPoints:heightPoints:)` in CSS points,
+  with a product-aware message naming the box's size in inches and the
+  split-it-smaller advice. Rejected alternatives: G1 (single boxes up to ~90% of
+  the measured limit — leaves no machine margin) and G2 (never refuse, cut the
+  box across pages — ships clipped content).
 
 ### D5 — One-shot sandbox write path
 
@@ -1447,6 +1486,18 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
 - [x] HTML: Source-only, source+preview and Experimental WYSIWYG have content-equivalent
   static HTML for each deterministic snapshot/resource/theme combination.
 - [x] PDF/Print content/theme matrix and the distinct D4 pagination contracts (PR G).
+  Re-checked 2026-10-10 after the X1/X2/Y1/X3 named tests passed hosted and in
+  `swift test` (`testDocumentStartingWithAWideRunEmitsNoLeadingBlankPage`,
+  `testTwoAdjacentWideRunsWithASpanFreeGapMergeInPrint`,
+  `testTwoRunsSeparatedByASingleSafeBreakStayIsolated`,
+  `testDocumentStartingWithAWideTableHasNoBlankFirstPage`,
+  `testMdxPostWithTwoLongImportLinesPrintsOnOneSheet`,
+  `testKitchenSinkMdxPrintKeepsItsSheetCount`,
+  `testClippedMdxPlaceholderProducesNoWideExtent`,
+  `testOversizeCaptureAreaBoxFailsTypedAndWritesNothing`,
+  `testJoinerPageCountMismatchFailsTypedAndWritesNothing`,
+  `testWrappingParagraphsMeasureTheContentHeight`,
+  `testMinifiedLineRunInALongPostWritesWithAShrunkWarning`).
 - [x] HTML: light, dark and resolved-system themes are frozen at invocation without
   mutating the visible preview.
 - [x] PDF/Print theme matrix (PR G).
@@ -1471,12 +1522,15 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   every sentinel once). `ExportPDFAcceptanceAppTests` captures every named fixture plus
   generated 700-item list, 800-line code, and 2000-row table sources with every marker
   once and every page inside the default user space. `ExportPDFPagePlannerTests`,
-  `ExportPDFPagePlannerWidthTests`, `ExportPDFPagePlannerRunTests`, and
+  `ExportPDFPagePlannerWidthTests`, `ExportPDFPagePlannerRunTests`,
+  `ExportPDFPagePlannerGapTests`, and
   `ExportPDFPagePlannerPrintRunTests` pin the invariants on synthetic geometry: safe
   breaks between line boxes, items, and table rows, per-page width and scale (only a
   page whose own content overflows widens/shrinks), wide-run mandatory breaks and
-  snapping, the capture-area-capped hard budget, the soft Print aspect budget with
-  atomic-run extension, the hard cap's typed `oversizeAtomicBox`, and landscape
+  snapping, gap absorption at run edges (no whitespace-only page), the
+  capture-area-capped hard budget, the soft Print aspect budget with
+  atomic-run extension, the hard cap's typed `oversizeAtomicBox` and
+  `oversizeCaptureArea`, and landscape
   aspecting. Per-page width is exercised hosted by
   `ExportPrintPaginationAppTests.testWideTableWidensOnlyItsPrintPages`, wide-run
   isolation by `ExportPDFWideRunsAppTests` and `ExportPrintWideRunsAppTests`,
@@ -1485,7 +1539,9 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   with `testPrintPanelChoicesPersistOnlyWhenTheRunCompletes`.
   The 2026-10-06 note that a hosted capture wider than about 14,000 pt terminates the
   web process is revised per the D4 amendment: the A1 full-size path does not
-  reproduce it, so the over-maximum factor is exercised hosted rather than only
+  reproduce it for width alone — the 2026-10-09 probing brackets termination at a
+  ~2³⁰ px² raster bound, which the halved `captureAreaBudget` stays under — so the
+  over-maximum factor is exercised hosted rather than only
   unit-pinned (`testPageScaleShrinksOnlyPastTheMaximum` still pins the formula).
 
 ### E9 — Accessibility, performance, security, and regression

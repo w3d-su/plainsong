@@ -32,6 +32,12 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   an atomic element taller than the page budget (a very tall diagram, image, or
   formula) shows the dedicated "taller than a PDF page can hold (200 inches)"
   notice, not the generic render error.
+- [ ] Oversize element (G3): export a post whose single unbreakable box is too
+  large to capture within the raster-area budget (e.g. a very tall image in a
+  very wide table row). The export refuses with "An element is too large to
+  export as one PDF page (about W × H inches)…" naming the box, no file is
+  written, and the app does not crash (hosted:
+  `ExportPDFWideRunsEdgeAppTests.testOversizeCaptureAreaBoxFailsTypedAndWritesNothing`).
 - [ ] Per-page width: export a post with one very wide table in the middle.
   Pages containing the table are wider than the text-only pages, and the
   text-only pages stay at the normal width (hosted:
@@ -44,6 +50,10 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
   `testQuoteListTableShapeLeavesNoBlankTail`). A ~184,770 pt wide table
   exports 5/5 planned pages with the run capped under the raster area budget
   (see `docs/perf-log.md`).
+- [ ] A document that *begins* with a very wide table: the first page holds the
+  table — no blank leading page, no prose on the run pages, no table on the
+  prose pages (hosted:
+  `ExportPDFWideRunsEdgeAppTests.testDocumentStartingWithAWideTableHasNoBlankFirstPage`).
 - [ ] C2 warning: export a post containing a single minified line wider than
   14,400 pt. The PDF is still written, its wide page is visibly shrunk to fit
   200 inches, and the warning banner names the page and the smallest percentage
@@ -107,6 +117,10 @@ Debug/Release, destination, typed writer outcome, and any remaining paths in
 - [ ] A wide table inside a quote and a list: the print preview shows no blank
   trailing sheets after the run (hosted:
   `ExportPrintWideRunsAppTests.testQuoteListTableShapePrintsNoBlankSheets`).
+- [ ] An Astro MDX post whose front matter is followed by long `import` lines
+  prints on one sheet — the placeholder pills clip their text, so no wide run
+  forms (hosted:
+  `ExportPrintWideRunsAppTests.testMdxPostWithTwoLongImportLinesPrintsOnOneSheet`).
 - [ ] Job settings do not persist: set a page range or copy count (or use the
   panel's Save as PDF action) and complete a Print; the next Print… shows fresh
   job settings — only the paper name/size, orientation, and printer carry over

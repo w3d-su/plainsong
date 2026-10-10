@@ -2527,7 +2527,8 @@ width; results bracket the limit at exactly 2³⁰ px:
 roughly a 2× margin under the observed 2³⁰ bound, and `hardBudget(width)` lowers a
 page's height cap only when `width × 14,400` would exceed the budget — pages narrower
 than ~37,300 pt keep the flat 14,400 pt cap. An unbreakable interval taller than the
-width-adjusted budget still fails typed as `oversizeAtomicBox`.
+width-adjusted budget fails typed: `oversizeAtomicBox` past 14,400 CSS pt,
+`oversizeCaptureArea` when only the raster area overflows (G3, 2026-10-10).
 
 Hosted wide-run captures (Debug, `PLAINSONG_XCODEBUILD_LOCK`, recorded load
 `14.88 17.73 20.29` at measurement; `planned` = emitted plan pages):
@@ -2550,3 +2551,35 @@ blank sheets. Result bundles: DerivedData
 `…_15-20-16-+0800.xcresult` (ExportDestination/ExportHTML suites),
 `…_15-22-01-+0800.xcresult` (ExportPDF*/ExportPrint* matrix). The probe
 run was transient by design and kept no artifact.
+
+## Export PR G wide-page capture slack calibration (Y2) — 2026-10-10
+
+`WKWebView.pdf(configuration:)` paints a line's tail a few points past the right
+edge the geometry measurement reports; a capture rect cut exactly at the measured
+edge drops the last glyphs of a very long line. A paginated-capture probe (a
+`MINIFIEDSENTINEL` + `W`-run + `ENDLINESENTINEL` line inside a `text` fence,
+240k–410k chars, PDFKit-extracted text checked for the end sentinel) swept the
+total capture overscan on five line widths. `min overscan` is the smallest
+capture width past the measured edge that restores the full `ENDLINESENTINEL`:
+
+| Content width (pt) | Tail lost at 0 overscan | Min overscan to restore (pt) |
+|---:|---|---:|
+| ~101,000 | none | 0 |
+| ~130,000 | ~5 pt (last glyph) | ~10 |
+| ~812,000 | ~9 chars (~44 pt) | ~68 |
+| ~1,950,000 | ~12 chars (~59 pt) | ~98 |
+| ~3,350,000 | ~1 glyph (~5 pt) | ~5–66 |
+
+The deficit is bounded and non-monotonic — it tracks glyph boundaries, not width
+— so the slack is a constant, not a fraction: `widePageSlack = 200`, twice the
+worst observed need (~100 pt). It applies only to pages wider than
+`maximumSide` (14,400 pt): clipping was never observed below ~1M pt and those
+pages already shrink, while adding slack to a page that fits would lower its
+print scale for no benefit (E1). Applied after run classification — it never
+promotes a page into a run — and included in the capture-area budget check.
+
+Reference run at slack 200, ~1.95M pt line (the
+`testMinifiedLineRunInALongPostWritesWithAShrunkWarning` shape): 9 planned /
+9 output pages, one run `[50291–50376]` at 1,950,628 × 85 pt, smallest scale
+0.0074, every marker extracted once in order including the end sentinel, no
+blank pages; capture 0.34 s, total 1.6 s (DPR 2).
