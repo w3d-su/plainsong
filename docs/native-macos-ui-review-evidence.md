@@ -257,6 +257,8 @@ pass the inspector and handle are already unmounted; fixed 864 draws editor 257�
 and preview 561→864 with no intersection; split 900 draws editor 320→609.5 and
 preview 610.5→900. Editor ≥ 260 and preview ≥ 260 in every transient sample.
 
+**CI follow-up (macOS 15).** CI run 38028182485 sampled the unchanged Source + inspector layout right after the mode switch, because macOS 15's SwiftUI applies the published change on a later run-loop turn. Before macOS 27, the mode-switch case therefore accepts an unrendered sample only if it equals the pre-switch frames within 0.5 pt, then checks the first sample that renders Split, advancing one main-queue hop per sample (branch `deferred-render`). macOS 27 stays strict (branch `same-pass`), and the negative control (`WorkspaceWindow.swift` at `a55cb69`) still fails all four cases there. With the fallback simulated on macOS 27, the mode-switch cases pass after one hop and the negative control no longer fails them, because the deferred inspector apply has already run by then; on macOS 15 that same-pass guarantee is enforced only by the shrink cases.
+
 ### MEDIUM 2 — selection-publish warnings, fixed and attributed
 
 Baseline run of `testNativeFilesArrowSelectionOpensTwoFilesWithoutRequestingEditorFocus`

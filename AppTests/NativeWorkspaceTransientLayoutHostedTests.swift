@@ -27,13 +27,36 @@ extension EditorFindHostedGateTests {
     }
 
     /// Source-only at `width`, inspector settled and visible, then a same-pass switch to Split.
+    ///
+    /// macOS 27 applies the published mode switch inside the synchronous layout, so there the
+    /// first sample must already be Split; that is what makes the same-pass negative control
+    /// fail. Earlier SwiftUI applies an `ObservableObject` change only on a later run-loop turn
+    /// (the macOS 15 CI runner sampled the untouched Source layout), so before macOS 27 an
+    /// unrendered sample must equal the pre-switch frames, and the first sample that renders
+    /// Split is checked instead, one main-queue hop at a time.
     private func checkTransientModeSwitch(shell: WorkspaceShell, width: CGFloat) async throws {
         let settled = try await makeSettledInspectorHost(shell: shell, width: width, mode: .sourceOnly)
+        let label = "mode-switch shell=\(shell) width=\(width)"
+        let before = transientFrames(in: settled.host)
         settled.state.setLayoutMode(.sourcePreview)
-        try assertNoTransientOverlap(
-            transientFrames(in: settled.host),
-            label: "mode-switch shell=\(shell) width=\(width)"
-        )
+        var frames = transientFrames(in: settled.host)
+        var branch = "same-pass"
+        // macOS 27+ gets no fallback: the synchronous sample has to contain the preview.
+        if #unavailable(macOS 27.0), frames["preview"] == nil {
+            var turns = 0
+            while frames["preview"] == nil, turns < 50 {
+                XCTAssertTrue(
+                    framesMatch(frames, before),
+                    "\(label): unrendered sample after \(turns) turns differs from the pre-switch frames"
+                        + " \(frames) vs \(before)"
+                )
+                await nextMainQueueTurn()
+                turns += 1
+                frames = transientFrames(in: settled.host)
+            }
+            branch = "deferred-render turns=\(turns)"
+        }
+        try assertNoTransientOverlap(frames, label: "\(label) branch=\(branch)")
         try await waitUntil("layout settles after mode switch") {
             settled.host.hostingView.layoutSubtreeIfNeeded()
             return self.layoutFrame("inspector", in: settled.host.window) == nil
@@ -78,6 +101,7 @@ extension EditorFindHostedGateTests {
 
     /// Forces the pending render and reads the probe frames without suspending.
     private func transientFrames(in host: HostedWorkspace) -> [String: NSRect] {
+        host.hostingView.needsLayout = true
         host.hostingView.layoutSubtreeIfNeeded()
         host.window.displayIfNeeded()
         var frames: [String: NSRect] = [:]
@@ -87,6 +111,22 @@ extension EditorFindHostedGateTests {
             }
         }
         return frames
+    }
+
+    private func framesMatch(_ lhs: [String: NSRect], _ rhs: [String: NSRect]) -> Bool {
+        lhs.keys.sorted() == rhs.keys.sorted() && lhs.allSatisfy { name, frame in
+            guard let other = rhs[name] else { return false }
+            return abs(frame.minX - other.minX) <= 0.5 && abs(frame.minY - other.minY) <= 0.5
+                && abs(frame.width - other.width) <= 0.5 && abs(frame.height - other.height) <= 0.5
+        }
+    }
+
+    /// One hop through the main queue, so the run loop gets a turn (and SwiftUI its pending
+    /// update) between two samples without skipping several turns at once.
+    private func nextMainQueueTurn() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
     }
 
     private func assertNoTransientOverlap(_ frames: [String: NSRect], label: String) throws {
