@@ -1,7 +1,9 @@
 import AppKit
 
-/// The query field is registered at mount, and checked live only at command boundaries.
-/// PR H can register its replacement field through the same seam without changing order.
+/// The owned query and replacement fields register at mount and unregister at dismantle;
+/// composition is read live only at command boundaries (Replace, Replace All's entry and
+/// final recheck, and the bar's responder-chain Escape). The editor is the third owner and
+/// is read through EditorKit instead (`docs/editor-replace-gates.md` §5.5).
 @MainActor
 final class EditorReplaceMarkedTextOwners {
     private struct Owner {

@@ -26,11 +26,15 @@ final class EditorReplaceAuthorityState {
     /// Test seam: runs inside EditorKit's commit-time authorization call, before App
     /// evaluates it, so a test can make a fence appear between validation and commit.
     var willCheckCommitForTesting: (() -> Void)?
+    /// Runs after every advance. `EditorFindHost` uses it to stop a preparing Replace All at
+    /// once, so its progress and Cancel never outlive the authority that started it.
+    var onAdvance: (() -> Void)?
     private var keyWindowObservation: EditorReplaceKeyWindowObservation?
 
     func advance() {
         precondition(generation < .max, "Replace authority generation exhausted")
         generation += 1
+        onAdvance?()
     }
 
     /// Key-window changes supersede every outstanding plan. Installed with the first plan:
@@ -84,12 +88,19 @@ extension AppState {
     /// `unanchoredManagedSessionOwnershipProofs`, `indeterminateSessionWriteContexts`) and
     /// `externalResolutionIntentCaptures`. They are covered by the rekey notification, the
     /// write-fence `didSet`, and the live evaluation at commit.
-    func noteEditorReplaceAuthorityInputDidChange() {
-        advanceEditorReplaceAuthorityGeneration()
+    func noteEditorReplaceAuthorityInputDidChange(fileID: StaticString = #fileID, line: UInt = #line) {
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
+        scheduleStaleEditorReplaceBlockedStatusCheck()
     }
 
     /// Rebind, reload, rekey, focus, and bar transitions call this directly.
-    func advanceEditorReplaceAuthorityGeneration() {
+    func advanceEditorReplaceAuthorityGeneration(fileID: StaticString = #fileID, line: UInt = #line) {
+        editorFindHost.traceReplaceBarAction(
+            "advanceAuthority \(editorReplaceAuthorityGeneration)->\(editorReplaceAuthorityGeneration + 1) "
+                + "preparing=\(editorFindHost.replaceBatch.isPreparing)",
+            fileID: fileID,
+            line: line
+        )
         editorFindHost.replaceAuthority.advance()
     }
 
@@ -103,21 +114,34 @@ extension AppState {
         )
     }
 
-    /// Bar open/close and every find-focus token transition (⌘F request, key-window
-    /// receipt, ⇧⌘F supersession) supersede outstanding plans. Counter and query updates do
-    /// not: the query generation and source revision already fence those.
+    /// Bar open/close, replacement-row expand/collapse (PR H's collapse seam), and every
+    /// find-focus token transition (⌘F request, key-window receipt, ⇧⌘F supersession)
+    /// supersede outstanding plans. Counter and query updates do not advance the generation:
+    /// the query generation and source revision already fence those. A query or option change
+    /// still stops a *preparing* Replace All at once instead of letting it drain to a refusal.
     func noteEditorReplaceFindChromeTransition(
         from old: EditorFindUIState,
-        to new: EditorFindUIState
+        to new: EditorFindUIState,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
+        if old.queryText != new.queryText || old.matchCase != new.matchCase || old.wholeWord != new.wholeWord {
+            editorFindHost.replaceBatch.supersedeIfPreparing()
+        }
+        if old.isReplaceRowActive, !new.isReplaceRowActive {
+            // Close, collapse, and no-document all end the row's visible state; results and
+            // refusals from before do not describe the next time it is shown.
+            clearEditorReplaceStatus(fileID: fileID, line: line)
+        }
         guard old.isBarVisible != new.isBarVisible
+            || old.isReplaceExpanded != new.isReplaceExpanded
             || old.focusRequestID != new.focusRequestID
             || old.focusAppliedID != new.focusAppliedID
             || old.focusSupersededID != new.focusSupersededID
         else {
             return
         }
-        advanceEditorReplaceAuthorityGeneration()
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
     }
 
     /// Reload or Keep Mine finished converging every live installation (§5.6 last rows).
@@ -126,9 +150,15 @@ extension AppState {
     /// revalidated against the accepted source and recomputes **counter-only** when its
     /// binding does not already describe that exact source and revision. Nothing is
     /// queued; the user makes a fresh explicit Replace against the recomputed session.
-    func editorReplaceExternalResolutionDidComplete(for session: DocumentSession) {
-        advanceEditorReplaceAuthorityGeneration()
+    func editorReplaceExternalResolutionDidComplete(
+        for session: DocumentSession,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        advanceEditorReplaceAuthorityGeneration(fileID: fileID, line: line)
         guard session === currentDocument else { return }
+        // A "choose Reload or Keep Mine" refusal no longer describes the document.
+        clearEditorReplaceStatus(fileID: fileID, line: line)
         refreshEditorFindCounterFromAppSource()
     }
 

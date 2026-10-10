@@ -95,6 +95,24 @@
 > Build, pinned lint and diff checks pass. See
 > [initial PR G verification](evidence/editor-replace-g-20261005.json) and
 > [review-fix verification](evidence/editor-replace-g-review-fixes-20261005.json).
+> **PR H (`phase3-editor-replace-ui`) is the product UI:** the Find row is the
+> first row of a compact stack; a native disclosure reveals an owned AppKit
+> replacement `NSTextField`, owned AppKit Replace / Replace All / Cancel buttons,
+> and owned AppKit labels for progress, results, blocked reasons, overflow and
+> field errors. Edit gains Find and Replace…, Replace and Replace All with no
+> shortcut. The replacement field is the third marked-text owner: single Replace,
+> Replace All entry and the final pre-commit recheck refuse while any owner
+> composes, with one `.markedText` result. Collapse is the real authority seam,
+> and any authority advance or query/option edit stops a preparing plan at once.
+> Bar Replace/Replace All presses run the same key-window gating as the menus;
+> Replace All renders one frame of `Applying…` before the no-suspension final
+> recheck; a focused owned control that unmounts hands focus to a surviving bar
+> control through direct `makeFirstResponder` routing; a transient blocked
+> message withdraws once its inspection settles; and a single Replace speaks
+> "Replaced 1 match". R8's in-process bullets and R6 deterministic bullets 1–4
+> close; R8 itself stays open on its owner Full Keyboard Access smoke, and R6's
+> owner Zhuyin/Pinyin bullets, R9 and R10 stay open. See
+> [PR H verification](evidence/editor-replace-h-20261006.json).
 >
 > Check a gate only with named-test or owner-recorded evidence in the same
 > implementation commit.
@@ -1188,13 +1206,13 @@ hosted spike PR #112.
 
 ### R6 — Marked text + real Zhuyin/Pinyin boundaries
 
-- [ ] Deterministic tests refuse Replace/Replace All while marked text exists
+- [x] Deterministic tests refuse Replace/Replace All while marked text exists
   in the editor, query field, or replacement field.
-- [ ] Refusal performs no navigation/reveal, authorization/preflight, undo,
+- [x] Refusal performs no navigation/reveal, authorization/preflight, undo,
   progress, ordinal change, or queued post-composition action.
-- [ ] Replacement-field Return and Escape defer to the input context while
+- [x] Replacement-field Return and Escape defer to the input context while
   marked text exists; after composition a fresh explicit action is required.
-- [ ] Marked text beginning in any of the three owners during Replace All
+- [x] Marked text beginning in any of the three owners during Replace All
   planning invalidates the action at final pre-commit recheck, with no queued
   post-composition mutation.
 - [ ] Owner-run real macOS Zhuyin **and composition-capable Pinyin** harness
@@ -1203,7 +1221,64 @@ hosted spike PR #112.
 - [ ] Owner evidence records TIS input-source IDs, real event route, no skipped
   composition, exact committed source/caret, and exactly one mutation after a
   fresh post-composition Replace.
-- Evidence: _open — synthetic coverage does not close owner-run item_
+- Evidence (PR H, deterministic bullets 1–4; synthetic AppKit `setMarkedText` on
+  the production owners in a hosted `WorkspaceWindow`, not a real input method):
+  - Bullets 1–2:
+    `EditorFindHostedGateTests.testHostedMarkedTextInEachOwnerRefusesReplaceAndReplaceAllWithZeroEffect`
+    composes in the editor, the query field and the replacement field in turn,
+    with the caret deliberately off the current match so a non-refused Replace
+    would navigate. `performEditorReplace`, the bar's Replace/Return intent, the
+    Edit ▸ Replace menu intent and `performEditorReplaceAll` each return the one
+    `.markedText` shape; `lastAuthorizationRecord` stays `nil`; the full
+    `EditorReplaceEffectSnapshot` (source, revision, selection, Find session and
+    ordinal, undo/redo, shared and pending navigation, recovery maps) is
+    unchanged; no preparation or progress starts; the authority generation does
+    not move. After composition ends nothing fires. Single Replace now checks all
+    three owners in App before validation-time authorization
+    (`AppState.editorReplaceHasMarkedText(for:)`), as PR G's Replace All entry
+    already did; EditorKit's editor check
+    (`EditorReplaceExecutorTests.testMarkedTextRefusesBeforeAuthorization`) stays
+    as defense in depth and maps to the same App result. Consequence for R7's
+    hosted matrix: editor composition is also what leaves editor source pending,
+    so `testHostedReplaceRefusesWhileEditorSourceIsPending` and
+    `testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource`
+    now assert App's §5.6 decision (`pendingEditorSource`, then
+    `externalResolutionSuspended`) directly and that the command refuses
+    `.markedText` first with zero effect and no authorization record; the first
+    also refuses an isolated pending-source fence (no composition) through the
+    production path with its §5.6 reason.
+  - Bullet 3:
+    `testHostedReplacementFieldReturnAndEscapeDeferToCompositionThenAFreshReturnReplacesOnce`
+    calls the production field delegate with Return, Escape and Option-Return
+    during composition (all declined to the input context), proves the bar's
+    responder-chain Escape (`closeEditorFindBarFromExitCommand`) also refuses
+    while the replacement field composes, commits the composition (the value is
+    published once, nothing replaces), then a fresh Return through the real field
+    editor replaces exactly once (one Undo restores the source; nothing else to
+    undo), and Escape without composition closes the bar keeping the value.
+  - Bullet 4:
+    `testHostedMarkedTextBeginningDuringReplaceAllPlanningInvalidatesTheActionInEachOwner`
+    starts Replace All from the real button, parks the off-main worker, begins
+    composition in each owner, then releases it. Query and replacement field
+    composition change no source, query or replacement generation, so only the
+    live owner recheck at commit sees them: the result is `.markedText` with no
+    writer activation. Native editor marked text also moves the editor selection,
+    which PR G's preparation-only selection observer reports first (`.superseded`);
+    either way no writer activation, mutation or undo occurs, and nothing fires
+    after composition ends. EditorKit's own final editor check is
+    `EditorReplaceBatchExecutorTests.testMarkedTextAppearingAfterPreparationRefusesBeforeAuthorizationOrUndo`.
+    `testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame`
+    proves the recheck still runs on the main actor one frame after `Applying…`
+    is published, so a state arriving in that frame — marked text or a
+    selection move — is caught before the writer activates.
+  - Owner harness prepared for PR I (not run here): the editor owner keeps the
+    §5.5 command,
+    `cd Packages/EditorKit && PLAINSONG_RUN_ACTUAL_IME=1 swift test --filter EditorReplaceActualIMEGateTests`;
+    the two App-owned fields need an app-hosted opt-in run,
+    `TEST_RUNNER_PLAINSONG_RUN_ACTUAL_IME=1 xcodebuild -project Plainsong.xcodeproj -scheme Plainsong test -only-testing:PlainsongTests/EditorFindHostedGateTests/testHostedActualIMEReplaceFieldOwners`,
+    following the `PLAINSONG_RUN_ACTUAL_IME` TIS/CGEvent precedent. Neither
+    test exists yet; PR I adds them, and bullets 5–6 stay open until the owner
+    records a run.
 
 ### R7 — External reconciliation and indeterminate-write fencing
 
@@ -1347,30 +1422,151 @@ hosted spike PR #112.
 
 ### R8 — UI, menu, focus, and accessibility
 
-- [ ] Existing find row behavior and IDs remain compatible; disclosed second
+- [x] Existing find row behavior and IDs remain compatible; disclosed second
   row owns replacement field, Replace, Replace All, progress, Cancel, blocked,
   and overflow identifiers.
-- [ ] A replacement over 256 UTF-16 code units shows an explicit field error
+- [x] A replacement over 256 UTF-16 code units shows an explicit field error
   and disables both replacement actions; empty replacement remains valid.
-- [ ] Edit menu adds Find and Replace…, Replace, Replace All; v1 adds no global
+- [x] Edit menu adds Find and Replace…, Replace, Replace All; v1 adds no global
   shortcut and preserves Format Table `⌥⌘F`.
-- [ ] `⌘F` focuses/selects query without collapsing Replace; `⌘E` changes only
+- [x] `⌘F` focuses/selects query without collapsing Replace; `⌘E` changes only
   query; query-focus intents and `⇧⌘F` cancel pre-commit Replace All, while
   `⇧⌘F` supersedes but never consumes editor-find receipts.
-- [ ] Find and Replace… uses the existing key-window query focus receipt;
+- [x] Find and Replace… uses the existing key-window query focus receipt;
   Tab/click enters replacement without a competing async focus token.
-- [ ] Replace/Replace All menus are eligible from either owned field editor
+- [x] Replace/Replace All menus are eligible from either owned field editor
   only while the bar is visible and replacement row expanded; close/collapse
   cancels planning and hidden retained text cannot execute.
-- [ ] Menu commands target only the installed editor in the key window;
-  background/remounted bars cannot replay focus or mutation.
-- [ ] Full Keyboard Access can invoke every bar control; progress, blocked, and
-  overflow states are spoken and not color-only.
-- [ ] Escape closes/cancels only after marked-text refusal; query and
+- [x] Menu commands and bar presses target only the installed editor in the key
+  window; background/remounted bars cannot replay focus or mutation.
+- [x] Every owned bar control is an AppKit responder that takes keyboard focus
+  and responds to an accessibility press; progress, blocked, and overflow states
+  are spoken and not color-only. (In-process half. Full Keyboard Access Tab/Space
+  traversal is the owner bullet below.)
+- [x] Escape closes/cancels only after marked-text refusal; query and
   replacement values follow the documented file/workspace lifecycle; pending
   focus/reports are superseded without resetting monotonic receipt high-water
   marks.
-- Evidence: _open_
+- [ ] Owner Full Keyboard Access smoke (added by PR H): with the system setting
+  on, Tab reaches and Space invokes the disclosure, both fields, Replace,
+  Replace All and Cancel in a Debug build, recorded beside the F6/F7 owner
+  smoke. In-process tests cannot turn the system setting on: AppKit ignores
+  Space on a focused button without it, and SwiftUI builds no accessibility tree
+  without an assistive client.
+- Evidence (PR H; hosted methods run as `EditorFindHostedGateTests` on production
+  `WorkspaceWindow`s whose key status is designated; production key-window
+  eligibility runs with no `commandContextOverride`, only *which* window is key is
+  designated through `EditorSelectionProbe.keyWindowOverrideForTesting` and the
+  new `EditorFindHost.keyWindowOverride`; row controls are clicked with AppKit
+  `performClick` and fields driven through their real field editors):
+  - IDs and row: `testHostedReplaceRowKeepsFindRowIdentifiersAndOwnsEveryReplaceIdentifier`
+    pins the nine Find-row identifiers, proves the collapsed bar mounts no
+    replacement control, expanding never remounts the query field, and the row
+    owns the field, Replace and Replace All (Cancel only while preparing). Progress
+    and Cancel are read from the mounted views in
+    `testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen`;
+    blocked and overflow in
+    `testHostedOverflowAndBlockedStatesAreSpokenTextAndRefuseWithZeroEffect`; the
+    result label in `testHostedReplaceAllButtonSpeaksChangedOfTotalAndNoChanges`.
+    Every existing `EditorFind*` hosted suite passes unchanged.
+  - Field validation: `testHostedReplacementOverLimitShowsFieldErrorAndDisablesBothActionsWhileEmptyStaysValid`
+    (258 units from 129 surrogate pairs, a pasted line break, exactly 256 units,
+    and empty deleting the match), `EditorReplaceUIStateTests.testReplacementValueEditsBumpOnlyTheReplacementSeamAndValidateOnce`
+    and `EditorReplaceStatusTextTests.testFieldErrorsCoverLengthAndLineBreaksAndEmptyIsValid`.
+    `testHostedReplaceButtonAndReturnReplaceThroughRealControlsAndKeepFieldFocus`
+    proves `$1\n` stays literal, Return replaces without taking focus from the
+    field, and each Replace is one undo step.
+  - Menu: `testEditMenuAddsFindAndReplaceReplaceAndReplaceAllWithoutShortcuts`
+    reads the hosted app's real `NSApp.mainMenu`: each item once, empty key
+    equivalents, Find and Replace… after Find…, Replace items after Use Selection
+    for Find, and Format ▸ Format Table still `⌥⌘F`.
+  - Existing commands: `testHostedCommandFRefocusesAndSelectsTheQueryWithoutCollapsingAndCancelsThePlan`,
+    `testHostedUseSelectionForFindAndFindNextPreviousLeaveTheReplacementAndSourceAlone`
+    (⌘E changes only the query and focuses nothing; ⌘G / ⇧⌘G never mutate) and
+    `testHostedShiftCommandFCancelsThePlanAndSupersedesFindFocusWithoutConsumingReceipts`
+    (through `PlainsongWorkspaceSearchKeyAction`, the ⇧⌘F production action).
+  - Find and Replace…: `testHostedFindAndReplaceUsesTheQueryReceiptAndTabReachesReplacementWithoutAToken`
+    spends the existing query receipt with select-all; Tab (AppKit's key-view
+    loop) and Shift-Tab move between the fields and a click focuses the
+    replacement field, with `focusRequestID` unchanged and no retry stealing focus.
+  - Eligibility matrix: `testHostedReplaceMenuEligibilityMatrixReachesOnlyTheExpandedKeyWindowRow`
+    (bar hidden, row collapsed through the real disclosure, query field, replacement
+    field, focus elsewhere; each ineligible case has a zero-effect snapshot),
+    `testHostedReplaceMenuFromABackgroundWindowCannotReachAnotherWindowsRow`,
+    `testHostedRemountedBarCannotReplayAFocusTokenOrAPreparingPlan` (a remounted
+    bar's owner registration supersedes the preparing plan, and its query field
+    never replays the spent receipt), `testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue`
+    (the real collapse seam PR G left, now driven from the disclosure) and
+    `EditorReplaceUIStateTests.testCollapseAndExpandAreTheAuthoritySeamAndCollapseKeepsTheValue`.
+  - Key-window gating of bar presses:
+    `testHostedBackgroundWindowBarPressesCannotReachTheKeyWindowsEditor` clicks
+    Replace, Replace All and Return in a background window's bar: no task
+    starts, nothing is validated, and the key window's editor is untouched;
+    the key window's own bar still works.
+  - One-frame `Applying…` before the final recheck:
+    `testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame`
+    observes `Applying…` rendered (with Cancel withdrawn) inside
+    `willCommitForTesting`, then proves a selection that leaves and returns
+    during that frame still fails the recheck with `.superseded` and no write.
+  - Focus hand-off on unmount:
+    `testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField` covers
+    focused Cancel leaving while the row stays — after a press, after commit,
+    and after supersession with Replace All disabled — with focus landing on
+    Replace All, or on the replacement field when Replace All is ineligible;
+    `testHostedCollapseWhileARowControlHasFocusHandsFocusToTheQueryField` covers
+    a focused replacement field and a focused row button collapsing to the
+    query field, after which every Find command stays eligible. Routing is a
+    direct `makeFirstResponder` hand-off: no focus token is minted and nothing
+    replays. A focused owned button hands off before being disabled, and the
+    owned field tracks its field-editor editing state so a teardown order that
+    resigns the editor before `viewWillMove(toWindow:)` still hands focus off.
+  - Escape on a focused row button:
+    `testHostedEscapeOnAFocusedRowButtonClosesTheBarAndCancelsThePlan` — AppKit
+    buttons consume Escape themselves, so the owned button routes it to the
+    bar's exit command, which closes the bar and cancels the held plan with no
+    write.
+  - Transient blocked withdrawal:
+    `testHostedTransientBlockedMessageIsWithdrawnWhenTheInspectionSettles` —
+    the autosave disk-inspection fence shows the clock-style blocked text while
+    pending, and the message withdraws once the inspection settles. Withdrawal
+    re-evaluates the §5.6 decision on a later main turn and clears the status
+    only when that same reason no longer refuses, so a still-fenced document
+    keeps its blocked message.
+  - Keyboard/assistive access and speech:
+    `testHostedRowControlsAreFocusableRespondersAndPressingFocusedCancelCancelsThePlan`
+    (each owned control is a real responder that keeps the menus eligible without
+    advancing the authority generation, its accessibility press runs it, and
+    focusing Cancel keeps the plan alive until pressing it returns `.cancelled`).
+    All row states are text in owned AppKit labels that VoiceOver speaks as the
+    label's value (no separate accessibility label, so nothing is said twice),
+    with decorative symbols hidden from accessibility; results,
+    refusals, blocked, overflow and the start of preparation are also posted as
+    accessibility announcements (`lastReplaceAnnouncement` asserts the spoken
+    text). `EditorReplaceStatusTextTests` maps every plain PR D–G result to one
+    sentence, including the transient `externalObservationPending` ("try again in
+    a moment", shown as blocked, not as a failure) and a distinct Cancel. A
+    single Replace speaks "Replaced 1 match":
+    `testHostedOverflowAndBlockedStatesAreSpokenTextAndRefuseWithZeroEffect`
+    asserts the row label and the announcement use the singular text.
+  - Escape and lifecycle: `testHostedReplacementFieldReturnAndEscapeDeferToCompositionThenAFreshReturnReplacesOnce`,
+    `testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen`,
+    `testHostedFileSwitchKeepsTheExpandedRowAndValuesAndDropsThePlanAndMessage`,
+    `testHostedExternalReloadKeepsValuesAndExpansionCancelsProgressAndRecountsFirst`
+    (a clean reload, then rekey, then a fresh Replace All only after recount), and
+    `EditorReplaceUIStateTests` for Escape/Done, no document (closed and collapsed,
+    values kept, pending focus superseded, chrome reports cleared), workspace close
+    (both values cleared, receipt high-water marks kept) and Reload / Keep Mine
+    completion clearing a stale blocked message.
+  - Typing path: `testHostedEditorTypingWithTheRowOpenTouchesNoReplaceGenerationOrRowState`
+    types into the editor with the row open and the replacement field mounted; the
+    authority generation, replacement generation, status serial and row state do
+    not move. Replacement-field edits reach App only through that field's own
+    delegate, never through the editor's text path. The row is an `Equatable`
+    view over a small value model and does not observe `AppState`, so an
+    unrelated publish costs one value comparison and never re-evaluates the row
+    or updates its AppKit views; validation runs once per value edit, not in a
+    view body. This is structural evidence; the idle-machine typing measurement
+    with the row open belongs to R9.
 
 ### R9 — `large-1mb.md` Replace All + §12 typing latency
 

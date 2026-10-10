@@ -17,6 +17,9 @@ struct EditorReplacePlan {
 /// Why no plan could be made. Nothing was validated against the editor or changed.
 enum EditorReplaceIneligibility: Equatable, Sendable {
     case findBarHidden
+    /// The bar is visible but its replacement row is collapsed: hidden retained replacement
+    /// text never executes (`docs/editor-replace-gates.md` §5.1).
+    case replaceRowCollapsed
     /// No retained Find session (no query, or the match is recomputing).
     case noFindSession
 }
@@ -26,9 +29,22 @@ enum EditorReplacePlanFailure: Error, Equatable {
     case noKeyWindowEditor(EditorReplaceDeliveryRefusal)
 }
 
+/// Where a Replace command came from (`docs/editor-replace-gates.md` §5.1).
+///
+/// Menus keep Find's key-window responder eligibility for the find-chrome fallback. The bar's
+/// own controls (buttons, Return in the replacement field) are unambiguous, like Next /
+/// Previous, so they always reach the key window's installed editor — never another window.
+enum EditorReplaceInvocation: Equatable {
+    case menu
+    case barControl
+}
+
 /// Plain result of one App Replace command. No STTextView type crosses it.
 enum EditorReplaceCommandResult: Equatable {
     case ineligible(EditorReplaceIneligibility)
+    /// The editor, the query field, or the replacement field owns IME marked text. Refused
+    /// before authorization, navigation, or any editor work (§5.5); nothing is queued.
+    case markedText
     /// App refused, at command validation or at EditorKit's commit-time check.
     case refused(EditorReplaceAuthorizationRefusal)
     /// No installed key-window editor ran the command.
@@ -41,17 +57,31 @@ enum EditorReplaceCommandResult: Equatable {
 extension AppState {
     /// One explicit Replace of the current match: plan, then deliver in the same turn.
     ///
-    /// This is the seam product chrome (PR H) calls. There is no menu item or button yet.
+    /// The bar's Replace button, Return in the replacement field, and Edit ▸ Replace all
+    /// call this. Composition in any of the three marked-text owners refuses first.
     @discardableResult
-    func performEditorReplace(replacement: String) -> EditorReplaceCommandResult {
+    func performEditorReplace(
+        replacement: String,
+        invocation: EditorReplaceInvocation = .menu
+    ) -> EditorReplaceCommandResult {
         switch makeEditorReplacePlan(replacement: replacement) {
         case let .failure(.ineligible(reason)):
-            .ineligible(reason)
+            return .ineligible(reason)
         case let .failure(.noKeyWindowEditor(reason)):
-            .notDelivered(reason)
+            return .notDelivered(reason)
         case let .success(plan):
-            deliverEditorReplacePlan(plan)
+            if editorReplaceHasMarkedText(for: plan) {
+                return .markedText
+            }
+            return deliverEditorReplacePlan(plan, invocation: invocation)
         }
+    }
+
+    /// §5.5: the installed editor, the owned query field, or the owned replacement field.
+    /// Read live at the command boundary only; nothing observes composition per keystroke.
+    func editorReplaceHasMarkedText(for plan: EditorReplacePlan) -> Bool {
+        EditorReplaceCommandDispatcher.batchEditorHasMarkedText(matching: plan.editorStamp)
+            || editorFindHost.replaceMarkedTextOwners.hasMarkedText(in: plan.editorStamp.window)
     }
 
     /// Captures the App authority stamp, the key-window editor stamp, and the exact Find
@@ -61,6 +91,9 @@ extension AppState {
     ) -> Result<EditorReplacePlan, EditorReplacePlanFailure> {
         guard editorFindHost.ui.isBarVisible else {
             return .failure(.ineligible(.findBarHidden))
+        }
+        guard editorFindHost.ui.isReplaceExpanded else {
+            return .failure(.ineligible(.replaceRowCollapsed))
         }
         let controller = editorFindHost.controller
         guard let findSession = controller.session else {
@@ -91,7 +124,10 @@ extension AppState {
 
     /// Validates the plan's authority, then routes it to the key window's installed editor:
     /// the responder chain first, and App's find-chrome fallback exactly where Find uses it.
-    func deliverEditorReplacePlan(_ plan: EditorReplacePlan) -> EditorReplaceCommandResult {
+    func deliverEditorReplacePlan(
+        _ plan: EditorReplacePlan,
+        invocation: EditorReplaceInvocation = .menu
+    ) -> EditorReplaceCommandResult {
         let record = EditorReplaceAuthorizationRecord()
         editorFindHost.replaceAuthority.lastAuthorizationRecord = record
         let validation = editorReplaceAuthorizationDecision(for: plan.stamp, session: plan.session)
@@ -113,7 +149,7 @@ extension AppState {
         )
         var delivery = EditorReplaceCommandDispatcher.send(command)
         if delivery == .notDelivered(.noEditorOnResponderChain),
-           isEditorFindCommandContextActive()
+           invocation == .barControl || isEditorFindCommandContextActive()
         {
             delivery = EditorReplaceCommandDispatcher.sendToKeyWindowEditor(command)
         }
@@ -123,6 +159,9 @@ extension AppState {
             return .notDelivered(reason)
         case .delivered(.refused(.unauthorized)):
             return .refused(record.refusal ?? .authoritySuperseded)
+        case .delivered(.refused(.markedText)):
+            // One App shape per reason, whichever layer saw the composition.
+            return .markedText
         case let .delivered(outcome):
             reconcileEditorFindAfterReplace(outcome)
             return .delivered(outcome)

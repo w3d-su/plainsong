@@ -252,6 +252,10 @@ extension EditorReplaceAuthorizationAppTests {
     func setBarVisible(_ isVisible: Bool, in appState: AppState) {
         var ui = appState.editorFindHost.ui
         ui.isBarVisible = isVisible
+        if isVisible {
+            // Replace PR H: Replace executes only from a visible bar with an expanded row.
+            ui.isReplaceExpanded = true
+        }
         appState.setEditorFindUI(ui)
     }
 

@@ -31,6 +31,8 @@ extension AppState {
     /// `applyDocumentText` (External Reload, Keep Mine, clean auto-adoption).
     func notifyEditorFindExternalContentDidReplace() {
         advanceEditorReplaceAuthorityGeneration()
+        // §5.1: values and expansion stay; progress and the last result do not.
+        clearEditorReplaceStatus()
         notifyEditorFindDocumentDidChange()
     }
 
@@ -38,6 +40,7 @@ extension AppState {
     /// document switch — rebind so Find identity tracks the new URL.
     func notifyEditorFindDocumentIdentityDidRekey() {
         advanceEditorReplaceAuthorityGeneration()
+        clearEditorReplaceStatus()
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else {
             // Still drop any published nav under the old identity.
             cancelPublishedFindNavigationOnSharedChannel()
@@ -64,6 +67,7 @@ extension AppState {
     /// hit. Must run before the search navigation is issued so its cancel carries the older ID.
     func notifyEditorFindWorkspaceSearchWillNavigate(to selection: NSRange) {
         advanceEditorReplaceAuthorityGeneration()
+        clearEditorReplaceStatus()
         editorFindHost.latestKnownEditorSelection = nil
         guard editorFindHost.ui.isBarVisible || editorFindHost.controller.query != nil else {
             return
@@ -94,6 +98,8 @@ extension AppState {
 
     func notifyEditorFindDocumentDidSwitch() {
         advanceEditorReplaceAuthorityGeneration()
+        // §5.1: the bar, its expansion, and both values survive a switch; no intent does.
+        clearEditorReplaceStatus()
         // Drop selection cache — ranges are document-scoped.
         editorFindHost.latestKnownEditorSelection = nil
         cancelPublishedFindNavigationOnSharedChannel()
@@ -102,6 +108,8 @@ extension AppState {
             editorFindHost.controller.clearForNoDocument()
             var ui = editorFindHost.ui
             ui.closeBar()
+            // No document: close and collapse, but keep query/replacement as workspace memory.
+            ui.isReplaceExpanded = false
             ui.applySessionPresentation(nil)
             setEditorFindUI(ui)
             clearEditorFindChromeFocus()
@@ -134,8 +142,14 @@ extension AppState {
         var ui = editorFindHost.ui
         ui.closeBar()
         ui.queryText = ""
+        // Workspace close / switch: collapse and clear the replacement value too (§5.1).
+        ui.isReplaceExpanded = false
+        ui.replacementText = ""
+        ui.replacementValidity = .valid
         ui.applySessionPresentation(nil)
         setEditorFindUI(ui)
+        setEditorReplaceReplacement("")
+        clearEditorReplaceStatus()
         clearEditorFindChromeFocus()
     }
 }

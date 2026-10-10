@@ -31,12 +31,10 @@ extension EditorFindHostedGateTests {
         )
         let appState = hosted.appState
         try await recordExternalConflict(hosted, disk: "hit disk")
-        let editor = try hostedEditor(hosted)
-        editor.setMarkedText(
-            "ㄅ",
-            selectedRange: NSRange(location: 1, length: 0),
-            replacementRange: .notFound
-        )
+        // Pending editor source with no composition, so each refusal below goes through the
+        // production command path to App's §5.6 decision.
+        let installation = try XCTUnwrap(editorCoordinator(in: hosted.window)?.currentDocumentBindingInstallation)
+        appState.pendingEditorSourceInstallations[installation] = appState.currentDocument
         XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
         try assertAppRefusal(hosted, .pendingEditorSource)
 
@@ -46,6 +44,39 @@ extension EditorFindHostedGateTests {
         XCTAssertTrue(appState.externalReloadTasks.isEmpty, "the Reload read is suspended")
 
         try assertAppRefusal(hosted, .externalResolutionSuspended)
+        appState.pendingEditorSourceInstallations[installation] = nil
+    }
+
+    /// The realistic cause of pending editor source is IME composition in the editor. App's
+    /// §5.6 decision still reports each fence, but the command refuses the composition first
+    /// (§5.5, Replace PR H), before any authorization is evaluated.
+    func testHostedComposingEditorRefusesMarkedTextFirstWhileReloadIsSuspended() async throws {
+        let hosted = try await makeHostedEditorWorkspace(
+            source: "hit one",
+            query: "hit",
+            localEdit: "hit local hit local"
+        )
+        let appState = hosted.appState
+        try await recordExternalConflict(hosted, disk: "hit disk")
+        let editor = try hostedEditor(hosted)
+        editor.setMarkedText(
+            "ㄅ",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: .notFound
+        )
+        XCTAssertTrue(appState.hasPendingEditorSource(for: appState.currentDocument))
+        XCTAssertEqual(
+            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            .refused(.pendingEditorSource)
+        )
+        try assertMarkedTextRefusal(hosted)
+
+        appState.reloadExternallyChangedFile()
+        XCTAssertEqual(
+            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            .refused(.externalResolutionSuspended)
+        )
+        try assertMarkedTextRefusal(hosted)
         editor.unmarkText()
     }
 
@@ -121,14 +152,28 @@ extension EditorFindHostedGateTests {
 
     func testHostedReplaceRefusesWhileEditorSourceIsPending() async throws {
         let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two", query: "hit")
+        let appState = hosted.appState
         let editor = try hostedEditor(hosted)
+
+        // Pending editor source on its own refuses for its §5.6 reason through the
+        // production path.
+        let installation = try XCTUnwrap(editorCoordinator(in: hosted.window)?.currentDocumentBindingInstallation)
+        appState.pendingEditorSourceInstallations[installation] = appState.currentDocument
+        try assertAppRefusal(hosted, .pendingEditorSource)
+        appState.pendingEditorSourceInstallations[installation] = nil
+
+        // Composition also leaves source pending; the command then refuses the composition
+        // first (§5.5, Replace PR H), before any authorization is evaluated.
         editor.setMarkedText(
             "ㄅ",
             selectedRange: NSRange(location: 1, length: 0),
             replacementRange: .notFound
         )
-
-        try assertAppRefusal(hosted, .pendingEditorSource)
+        XCTAssertEqual(
+            appState.editorReplaceAuthorizationDecision(for: appState.currentDocument),
+            .refused(.pendingEditorSource)
+        )
+        try assertMarkedTextRefusal(hosted)
         editor.unmarkText()
     }
 

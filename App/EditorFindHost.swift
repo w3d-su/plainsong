@@ -51,4 +51,67 @@ final class EditorFindHost {
     /// Only *which window is key* is stubbed — the report-versus-key comparison that decides
     /// eligibility still runs, so a cross-window regression is observable.
     var keyWindowNumberOverride: Int?
+    /// Test seam: when non-`nil`, stands in for `NSApp.keyWindow` in the AppKit responder
+    /// branch of `isEditorFindCommandContextActive()`. The window's real first responder is
+    /// still inspected; only which window is key is designated (hosted tests cannot make a
+    /// window really key). An installed override is authoritative even when it returns `nil`.
+    var keyWindowOverride: (() -> NSWindow?)?
+
+    // MARK: Replacement row (Replace PR H)
+
+    /// Last result or refusal shown in the replacement row; `nil` when nothing applies.
+    var replaceStatus: EditorReplaceStatus?
+    /// Advanced by every row action and by every lifecycle reset, so a Replace All that
+    /// finishes after either never writes a stale message into the row.
+    var replaceStatusSerial: UInt64 = 0
+    /// The bar's own Replace All task. Cancellation goes through the batch runtime, not this.
+    var replaceAllTask: Task<Void, Never>?
+    /// Spoken copy of the last announced status, for tests; announcements are fire-and-forget.
+    var lastReplaceAnnouncement: String?
+    var didInstallReplacePresentation = false
+    var didAnnounceReplacePreparation = false
+    var isBlockedStatusCheckPending = false
+    var isReplacePresentationPublishPending = false
+
+    // Handoff 27b flake trace: every silent hop between a bar Replace All press and
+    // `EditorReplaceBatchPreparation.prepare`. Read only by hosted timeout diagnostics.
+    #if DEBUG
+        private(set) var replaceBarTrace: [String] = []
+    #endif
+
+    /// Records one `replaceBarTrace` entry with a monotonic uptime stamp and the call site.
+    /// A no-op outside DEBUG; never consulted for behavior.
+    func traceReplaceBarAction(
+        _ message: @autoclosure () -> String,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        #if DEBUG
+            if replaceBarTrace.count >= 64 {
+                replaceBarTrace.removeFirst(replaceBarTrace.count - 63)
+            }
+            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
+            replaceBarTrace.append("+\(milliseconds)ms \(message()) (\(fileID):\(line))")
+        #endif
+    }
+
+    /// `traceReplaceBarAction` for the detached preparation worker: the entry lands on the
+    /// next main turn, ordered behind anything already queued there.
+    nonisolated func traceReplaceBarActionOffMain(_ message: @autoclosure () -> String) {
+        #if DEBUG
+            let message = message()
+            Task { @MainActor in traceReplaceBarAction(message) }
+        #endif
+    }
+
+    init() {
+        // An authority advance supersedes every plan; a preparing one stops at once instead
+        // of draining to a refusal behind a still-visible progress label.
+        replaceAuthority.onAdvance = { [weak self, weak replaceBatch] in
+            self?.traceReplaceBarAction(
+                "authorityAdvance supersededPreparing=\(replaceBatch?.isPreparing ?? false)"
+            )
+            replaceBatch?.supersedeIfPreparing()
+        }
+    }
 }

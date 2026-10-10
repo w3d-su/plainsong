@@ -1,0 +1,298 @@
+{
+  "date": "2026-10-06",
+  "branch": "phase3-editor-replace-ui",
+  "base": "ccaf1f7",
+  "codeCommits": [
+    "2f123d4 Phase 3 Replace PR H: add the replacement row, Edit-menu commands and owner-checked Replace",
+    "5f5763a Phase 3 Replace PR H: prove row controls are focusable responders and Cancel survives focus",
+    "2001326 Phase 3 Replace PR H: keep the row off unrelated publishes and order composition before fences"
+  ],
+  "delivery": "local commits only; no push, PR or merge",
+  "lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "machine": "shared M1 Pro; load averages 13-22 during the hosted run (other agents building)",
+  "markdownCore": {
+    "tests": 320,
+    "skipped": 0,
+    "failures": 0,
+    "command": "cd Packages/MarkdownCore && swift test"
+  },
+  "editorKit": {
+    "tests": 445,
+    "skipped": 7,
+    "failures": 0,
+    "command": "cd Packages/EditorKit && swift test",
+    "note": "seven skips are the PLAINSONG_RUN_ACTUAL_IME opt-in harness"
+  },
+  "hosted": {
+    "tests": 352,
+    "skipped": 3,
+    "failures": 0,
+    "selection": "every EditorFind*/EditorReplace* App test class (EditorFindHostedGateTests includes all hosted F, R0-R8 and WYSIWYG methods), F6/F7 focus receipts, MenuBarStateTests, PlainsongMenuKeyBindingTests and every WorkspaceSearch* class; serial Debug macOS through xcodebuild test under the shared lock",
+    "skippedTests": [
+      "testHostedHighlightScheduleStressAppliesAfterEveryEdit",
+      "testHostedLargeFixtureSourceOnlyTypingStaysUnderBudget",
+      "testHostedLargeFixtureWYSIWYGTypingStaysUnderBudget"
+    ],
+    "skipReason": "opt-in wall-clock gates (PLAINSONG_RUN_HIGHLIGHT_SCHEDULE_STRESS, PLAINSONG_RUN_HOSTED_TYPING_GATE)",
+    "perClass": {
+      "EditorFindHostedGateTests": 114,
+      "EditorFindFocusReceiptTests": 19,
+      "EditorFindLifecycleCombinationTests": 5,
+      "EditorFindMatchHighlightAppTests": 4,
+      "EditorFindNavigationOwnershipTests": 4,
+      "EditorFindReviewFixTests": 8,
+      "EditorFindUITests": 18,
+      "EditorReplaceAuthorizationAppTests": 7,
+      "EditorReplaceBatchSpikeAppTests": 1,
+      "EditorReplaceSingleReplaceAppTests": 2,
+      "EditorReplaceStatusTextTests": 6,
+      "EditorReplaceUIStateTests": 6,
+      "MenuBarStateTests": 3,
+      "PlainsongMenuKeyBindingTests": 7,
+      "WorkspaceSearchActiveRefreshTests": 15,
+      "WorkspaceSearchAppStateTests": 115,
+      "WorkspaceSearchHostedActivationTests": 1,
+      "WorkspaceSearchResultsPresentationTests": 9,
+      "WorkspaceSearchSelectionTests": 8
+    },
+    "newHostedTests": [
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRowKeepsFindRowIdentifiersAndOwnsEveryReplaceIdentifier",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplacementOverLimitShowsFieldErrorAndDisablesBothActionsWhileEmptyStaysValid",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceButtonAndReturnReplaceThroughRealControlsAndKeepFieldFocus",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceAllButtonSpeaksChangedOfTotalAndNoChanges",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedOverflowAndBlockedStatesAreSpokenTextAndRefuseWithZeroEffect",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testEditMenuAddsFindAndReplaceReplaceAndReplaceAllWithoutShortcuts",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceMenuEligibilityMatrixReachesOnlyTheExpandedKeyWindowRow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceMenuFromABackgroundWindowCannotReachAnotherWindowsRow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedRemountedBarCannotReplayAFocusTokenOrAPreparingPlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedFindAndReplaceUsesTheQueryReceiptAndTabReachesReplacementWithoutAToken",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCommandFRefocusesAndSelectsTheQueryWithoutCollapsingAndCancelsThePlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedUseSelectionForFindAndFindNextPreviousLeaveTheReplacementAndSourceAlone",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedShiftCommandFCancelsThePlanAndSupersedesFindFocusWithoutConsumingReceipts",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedRowControlsAreFocusableRespondersAndPressingFocusedCancelCancelsThePlan",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedFileSwitchKeepsTheExpandedRowAndValuesAndDropsThePlanAndMessage",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedExternalReloadKeepsValuesAndExpansionCancelsProgressAndRecountsFirst",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEditorTypingWithTheRowOpenTouchesNoReplaceGenerationOrRowState",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedMarkedTextInEachOwnerRefusesReplaceAndReplaceAllWithZeroEffect",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplacementFieldReturnAndEscapeDeferToCompositionThenAFreshReturnReplacesOnce",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedMarkedTextBeginningDuringReplaceAllPlanningInvalidatesTheActionInEachOwner",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedComposingEditorRefusesMarkedTextFirstWhileReloadIsSuspended",
+        "result": "passed",
+        "hardening": "marked-text refusal is checked before the reload-suspension fence"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCollapseWhileARowControlHasFocusHandsFocusToTheQueryField",
+        "result": "passed",
+        "hardening": "a focused field or focused row button collapsing hands focus to the query field"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField",
+        "result": "passed",
+        "hardening": "focused Cancel unmounting hands focus to Replace All, or the replacement field when Replace All is ineligible"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedApplyingRendersBeforeTheFinalRecheckWhichStillCatchesChangesInThatFrame",
+        "result": "passed",
+        "hardening": "one Applying frame is published before the no-suspension final recheck"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedBackgroundWindowBarPressesCannotReachTheKeyWindowsEditor",
+        "result": "passed",
+        "hardening": "bar Replace/Replace All/Return presses are key-window gated like the menus"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedEscapeOnAFocusedRowButtonClosesTheBarAndCancelsThePlan",
+        "result": "passed",
+        "hardening": "Escape on a focused AppKit row button routes to the bar exit command"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedTransientBlockedMessageIsWithdrawnWhenTheInspectionSettles",
+        "result": "passed",
+        "hardening": "the transient disk-inspection blocked text withdraws when the inspection settles clear"
+      }
+    ],
+    "newUnitTests": [
+      {
+        "test": "EditorReplaceStatusTextTests/testReplaceAllResultsPresentNoChangesChangedOfTotalCancelAndOverflow",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testProgressAndApplyingTextIsSpokenText",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testEveryAuthorizationRefusalIsABlockedSentenceAndTheInspectionWindowIsTransient",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testMarkedTextHasOneShapeAndOneSentenceForBothCommands",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testSingleReplaceNavigationIsSilentCommitSaysReplacedAndIdenticalSaysNoChanges",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceStatusTextTests/testFieldErrorsCoverLengthAndLineBreaksAndEmptyIsValid",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testCollapseAndExpandAreTheAuthoritySeamAndCollapseKeepsTheValue",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testReplacementValueEditsBumpOnlyTheReplacementSeamAndValidateOnce",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testEscapeDoneKeepsQueryReplacementAndExpansionButClearsTheRowMessage",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testNoDocumentClosesAndCollapsesKeepsValuesAndNeverResetsReceiptHighWaterMarks",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testWorkspaceCloseClearsBothValuesCollapsesAndKeepsReceiptHighWaterMarks",
+        "result": "passed"
+      },
+      {
+        "test": "EditorReplaceUIStateTests/testReloadOrKeepMineCompletionClearsABlockedMessageButKeepsTheRow",
+        "result": "passed"
+      }
+    ],
+    "adjustedR7Tests": [
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRefusesWhileEditorSourceIsPending",
+        "result": "passed"
+      },
+      {
+        "test": "EditorFindHostedGateTests/testHostedReplaceRefusesWhileReloadIsSuspendedBehindPendingEditorSource",
+        "result": "passed"
+      }
+    ]
+  },
+  "build": {
+    "command": "make build",
+    "result": "BUILD SUCCEEDED"
+  },
+  "lint": {
+    "command": "PATH=<pinned SwiftFormat 0.62.1>:$PATH make lint",
+    "result": "0/595 files require formatting; SwiftLint exit 0 (331 pre-existing warnings, 0 serious)"
+  },
+  "hardeningPass": {
+    "state": "uncommitted at record time; lead commits",
+    "behaviors": [
+      "bar Replace/Replace All presses gated on the bar's window being key",
+      "focused owned controls hand off via makeFirstResponder before unmount or disable",
+      "Escape on a focused row button routes to the bar exit command",
+      "one Applying frame renders before the no-suspension final recheck",
+      "replaceRowCollapsed makes bar actions ineligible",
+      "transient blocked status withdraws when the inspection settles",
+      "replacement field error is setAccessibilityHelp; .replaced speaks 'Replaced 1 match'"
+    ],
+    "fixesDuringVerification": [
+      "EditorReplaceRowModel derives hasActiveQuery from controller.query presence, not the transient session, so a focused Replace All is not disabled during the post-commit recount",
+      "EditorFindOwnedTextField tracks field-editor editing from controlTextDidBeginEditing so a teardown order that resigns the editor before viewWillMove(toWindow:) still hands focus off",
+      "EditorFindBarButton hands focus off before isEnabled=false strands a focused button",
+      "stale assertion in testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen corrected"
+    ],
+    "flakes": [
+      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField timed out once waiting for Cancel to mount in a mixed run; recorded here as machine load, but root-caused 2026-10-09 (handoff 27b): the fixture's own post.md write was observed by the workspace watcher after makeHostedBatchWorkspace's stop() — a debounce task racing stop() still fired — and the resulting disk inspection refused the held Replace All with externalObservationPending before preparation began, cascading into the Cancel-mount timeout. Fixed by making stop() a hard boundary; see watcherStopBoundaryFix."
+    ],
+    "evidence": "/private/tmp/plainsong-prh-hardening/focushandoff.xcresult"
+  },
+  "diffCheck": "git diff --check clean",
+  "notRun": {
+    "PlainsongUITests": "XCUITest needs a foreground interactive session; menus are proven against the hosted app's real NSApp.mainMenu and the production dispatchers instead",
+    "PerformanceTests": "R9 scope (PR I)"
+  },
+  "openGates": [
+    "R6 owner Zhuyin/Pinyin bullets 5-6",
+    "R8 owner Full Keyboard Access smoke",
+    "R9",
+    "R10"
+  ],
+  "watcherStopBoundaryFix": {
+    "date": "2026-10-09",
+    "commit": "b5571d7",
+    "change": "WorkspaceEventWatcher confines debounceTask, a stopped flag and a monotonic generation to its serial queue: the delivered-event path returns early when stopped, each debounce re-validates stopped/generation under the queue and invokes the handler inside that check, and stop() tears the stream down then applies flag/generation/cancel under the same queue (dispatch-specific marker keeps deinit and on-queue callers off queue.sync). start() re-arms under the queue, isStopped is public, and the App openWorkspace closure drops a main-actor hop whose watcher is no longer workspaceWatcher or is stopped.",
+    "rootCause": "A hosted fixture's own post.md write surfaced as an FSEvent ~310 ms after the write and its +300 ms debounce fired behind makeHostedBatchWorkspace's workspaceWatcher?.stop(), landing a handleExternalChange disk inspection between the Replace All press and its task's evaluation: refused(.externalObservationPending) before preparation began (CI #151; reproduced locally 5x in handoff 27b phases 1/1b, caller chain: openWorkspace watcher closure -> refreshWorkspaceAfterFileSystemChange -> handleManagedWorkspaceSessionsExternalChange -> handleExternalChange).",
+    "verification": {
+      "workspaceKitTests": "WorkspaceEventWatcherTests 4/4 (stop-before-debounce, event-after-stop, stop->start->event, isStopped tracking) via the @testable simulateDeliveredEventForTesting seam; full WorkspaceKit package 361/0",
+      "replaceRowRepetition": "all 28 hosted Replace-row tests x30 baseline (26 pass / 4 fail) and x30 PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW=1 (27 pass / 3 fail): held-preparation-checkpoint timeouts 0/60, externalObservationPending refusals 0; failures were the pre-existing unrelated Applying-frame assertion flake (3x baseline, 1x foreign) and WKWebView teardown/preview-render timeouts under load (1x baseline, 2x foreign)",
+      "hostedSuite": "EditorFind*/EditorReplace*/WorkspaceSearch*/EditorFindFocusReceiptTests/MenuBarStateTests/PlainsongMenuKeyBindingTests/AppStateWorkspaceDataIntegrityTests once under lock: 470 pass / 64 fail, every failure a WebKit-under-load environmental signature (67 'PreviewController and WKWebView deallocate' teardown timeouts, 7 preview-render wait/JS errors); 0 held-checkpoint timeouts, 0 externalObservationPending",
+      "load": "1-min load averages 9-58 across repetition runs (typical 11-30; shared machine)",
+      "build": "make build and build-for-testing under the xcodebuild lock: SUCCEEDED; pinned make lint: 331 violations, 0 serious; git diff --check clean"
+    }
+  }
+}
