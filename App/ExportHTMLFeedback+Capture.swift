@@ -1,3 +1,4 @@
+import Foundation
 import PreviewKit
 
 /// PDF/Print wording for `ExportHTMLNoticeMapper`, kept in an extension to keep the main
@@ -30,6 +31,10 @@ extension ExportHTMLNoticeMapper {
                 : "An element with floating, sticky, or transformed styling sits where a page " +
                 "break is needed, so the PDF can’t be split into pages safely. " +
                 "Remove that styling, then try again."
+        case let .oversizeCaptureArea(widthPoints, heightPoints):
+            Self.oversizeCaptureAreaDetail(
+                product: product, widthPoints: widthPoints, heightPoints: heightPoints
+            )
         case .webContentProcessTerminated, .invalidated:
             product == .print
                 ? "The renderer stopped while preparing the document for printing. Try again."
@@ -38,9 +43,32 @@ extension ExportHTMLNoticeMapper {
             product == .print
                 ? "The layout kept changing while preparing the document for printing. Try again."
                 : "The layout kept changing while preparing the PDF. Try again."
-        case .captureFailed, .emptyDocument, .pageCountMismatch:
+        case .pageCountMismatch:
+            product == .print
+                ? "Print failed because of an internal pagination error. Please report this issue."
+                : "Export failed because of an internal pagination error. Please report this issue."
+        case .captureFailed, .emptyDocument:
             "The document couldn’t be rendered for export. Try again."
         }
+    }
+
+    /// The capture-area refusal message with the box's size named in inches.
+    private static func oversizeCaptureAreaDetail(
+        product: ExportCommandProduct, widthPoints: CGFloat, heightPoints: CGFloat
+    ) -> String {
+        let size = "\(inchesDetail(widthPoints)) × \(inchesDetail(heightPoints))"
+        return product == .print
+            ? "An element is too large to print (about \(size) inches). " +
+            "Split the table or make the image smaller, then export again."
+            : "An element is too large to export as one PDF page (about \(size) inches). " +
+            "Split the table or make the image smaller, then export again."
+    }
+
+    /// Points rendered as inches for the capture-area message: locale-aware, whole
+    /// numbers once the value reaches ten inches, one decimal below.
+    private static func inchesDetail(_ points: CGFloat) -> String {
+        let value = Double(points) / 72
+        return value.formatted(.number.precision(.fractionLength(value >= 10 ? 0 : 1)))
     }
 
     /// The 64 MiB serialization limit named for the actual product.

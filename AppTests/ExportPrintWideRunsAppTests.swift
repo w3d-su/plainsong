@@ -57,10 +57,10 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         // table itself PDFKit's reading order is not DOM order, so its markers are
         // asserted once-only rather than in a fixed sequence.
         try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
-            beforeMarkers + ["PB2LISTSENTINEL"] + afterMarkers,
+            Self.markers(beforeMarkers, ["PB2LISTSENTINEL"], afterMarkers),
             in: text
         )
-        for marker in columnMarkers + ["PB2CELLSENTINEL"] {
+        for marker in Self.markers(columnMarkers, ["PB2CELLSENTINEL"]) {
             XCTAssertEqual(
                 text.components(separatedBy: marker).count - 1, 1, marker
             )
@@ -68,7 +68,10 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
     }
 
     /// kitchen-sink.mdx prints the same number of sheets it did before the run
-    /// work — a regression pin, not a recomputed expectation.
+    /// work — a regression pin. On explicit A4 portrait the pre-20c planner
+    /// measured 2 sheets; 20c's clipped-placeholder run pushed it to 4 (a blank
+    /// sheet, a 14 pt strip, then the body). With clipped text ignored the count
+    /// returns to 2.
     func testKitchenSinkMdxPrintKeepsItsSheetCount() async throws {
         let support = ExportHTMLCommandAppTests()
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "kitchen-sink", withExtension: "mdx"))
@@ -77,6 +80,34 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let document = try await printFixture(fixture, orientation: .portrait)
         XCTAssertEqual(document.pageCount, Self.kitchenSinkPrintSheetCount)
+    }
+
+    /// X2: an ordinary Astro post whose two long `import` lines render as clipped
+    /// `.mdx-esm-placeholder` pills must print on one sheet — text the pill hides
+    /// behind `overflow: hidden` is not painted, so it cannot form a wide run.
+    /// Before the clip fix the measured text edge produced a run and three sheets.
+    func testMdxPostWithTwoLongImportLinesPrintsOnOneSheet() async throws {
+        let support = ExportHTMLCommandAppTests()
+        let source = """
+        ---
+        title: Two imports
+        ---
+        import { Tabs, TabItem, Aside, Card, CardGrid, LinkButton, FileTree, Steps } from '@astrojs/starlight/components';
+        import MyLongComponentName from '../../../components/demo/MyLongComponentNameForPlaceholderClipping.astro';
+
+        # Two imports
+
+        IMPORTBODYSENTINEL A short post body.
+        """
+        let fixture = try support.makeFixture(name: "imports-post.mdx", text: source)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let document = try await printFixture(fixture, orientation: .portrait)
+        XCTAssertEqual(document.pageCount, 1)
+        // No run: the one page keeps the baseline width — a clipped-placeholder
+        // run would have widened its page to the hidden text's right edge.
+        let box = try XCTUnwrap(document.page(at: 0)?.bounds(for: .mediaBox))
+        XCTAssertLessThan(box.width, 900)
+        XCTAssertTrue(document.page(at: 0)?.string?.contains("IMPORTBODYSENTINEL") == true)
     }
 
     /// The shared wide-table Print body: run pages hold the table markers and are
@@ -108,7 +139,17 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
             XCTAssertLessThanOrEqual(box.width, 14400.5, file: file, line: line)
             XCTAssertLessThanOrEqual(box.height, 14400.5, file: file, line: line)
             let text = page.string ?? ""
-            if text.contains("PRTBLCOL") || text.contains("PRTBLROW") {
+            // Isolation is about the markers too, not only the width: a run sheet
+            // holds table markers and no prose, a prose sheet the reverse — a
+            // sheet with both mixes the run, a sheet with neither is blank.
+            let holdsTable = text.contains("PRTBLCOL") || text.contains("PRTBLROW")
+            let holdsProse = text.contains("PRTBEFORE") || text.contains("PRTAFTER")
+            XCTAssertNotEqual(
+                holdsTable, holdsProse,
+                "\(orientation) sheet \(index + 1) mixes run and prose markers (or is blank)",
+                file: file, line: line
+            )
+            if holdsTable {
                 runSheets += 1
                 XCTAssertGreaterThan(
                     box.width, 1100,
@@ -126,7 +167,7 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         XCTAssertGreaterThan(runSheets, 0, "\(orientation): no sheet held the table", file: file, line: line)
         let text = Self.text(of: document)
         try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
-            beforeMarkers + columnMarkers + rowMarkers + afterMarkers,
+            Self.markers(beforeMarkers, columnMarkers, rowMarkers, afterMarkers),
             in: text
         )
     }
@@ -139,9 +180,9 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) async throws -> PDFDocument {
-        let info = NSPrintInfo.shared.copy() as? NSPrintInfo ?? NSPrintInfo()
-        info.orientation = orientation
-        fixture.appState.exportHTMLOperations.printInfoProvider = { info }
+        fixture.appState.exportHTMLOperations.printInfoProvider = {
+            Self.a4PrintInfo(orientation: orientation)
+        }
         var observed: PDFDocument?
         fixture.appState.exportHTMLOperations.printDocumentObserver = { observed = $0 }
         fixture.appState.exportHTMLOperations.printOperationRunner = { _, _ in true }
@@ -154,15 +195,34 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         return try XCTUnwrap(observed, "printDocumentObserver saw nothing", file: file, line: line)
     }
 
-    /// kitchen-sink.mdx measured on A4 portrait, 2026-10-09: four sheets. The count
-    /// is a regression pin — if a style or planner change shifts it, update the pin
-    /// deliberately rather than silently.
-    private static let kitchenSinkPrintSheetCount = 4
+    /// kitchen-sink.mdx measured on explicit A4 portrait: two sheets — the pre-20c
+    /// count the clipped-text fix restores. If a style or planner change shifts it,
+    /// update the pin deliberately rather than silently.
+    private static let kitchenSinkPrintSheetCount = 2
+
+    /// Explicit A4 through the print-info seam (low 4): paper size and margins are
+    /// fixed so the sheet counts never depend on the system default paper.
+    /// `imageablePageBounds` comes back (18, 41, 559, 783) portrait.
+    private static func a4PrintInfo(orientation: NSPrintInfo.PaperOrientation) -> NSPrintInfo {
+        let info = NSPrintInfo()
+        info.paperSize = NSSize(width: 595.28, height: 841.89)
+        info.leftMargin = 18
+        info.rightMargin = 18
+        info.topMargin = 41
+        info.bottomMargin = 18
+        info.orientation = orientation
+        return info
+    }
 
     private static func prose(prefix: String, count: Int) -> (markdown: String, markers: [String]) {
         let markers = (0 ..< count).map { String(format: "%@%04d", prefix, $0) }
         let markdown = markers.map { "\($0) prose paragraph." }.joined(separator: "\n\n")
         return (markdown, markers)
+    }
+
+    /// Marker groups flattened in order — a typed helper instead of `+` chains.
+    private static func markers(_ groups: [String]...) -> [String] {
+        groups.flatMap { $0 }
     }
 
     private static func text(of document: PDFDocument) -> String {

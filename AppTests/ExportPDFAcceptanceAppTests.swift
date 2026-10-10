@@ -101,6 +101,7 @@ final class ExportPDFAcceptanceAppTests: XCTestCase {
         let seconds = Date().timeIntervalSince(start)
         let document = try XCTUnwrap(PDFDocument(data: pdf.data), "\(label): empty PDF")
         XCTAssertEqual(document.pageCount, pdf.pageCount, label)
+        XCTAssertEqual(pdf.pageCount, pdf.plannedPageCount, label)
         XCTAssertLessThanOrEqual(pdf.maximumPageHeight, 14400, label)
         for index in 0 ..< document.pageCount {
             let box = document.page(at: index)?.bounds(for: .mediaBox) ?? .zero
@@ -117,8 +118,8 @@ final class ExportPDFAcceptanceAppTests: XCTestCase {
             pdf.contentSize.width, pdf.contentSize.height
         )) { _ in }
         print(String(
-            format: "A1 ACCEPTANCE %@ pages=%d widestPage=%.1fpt minScale=%.3f time=%.2fs",
-            label, pdf.pageCount, widestPage, pdf.minimumScale, seconds
+            format: "A1 ACCEPTANCE %@ pages=%d planned=%d widestPage=%.1fpt minScale=%.3f time=%.2fs",
+            label, pdf.pageCount, pdf.plannedPageCount, widestPage, pdf.minimumScale, seconds
         ))
     }
 

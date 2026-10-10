@@ -115,10 +115,13 @@ extension AppState {
             // print of another document, so the rest comes from a fresh shared copy.
             let persisted = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo()
             let chosen = operation.printInfo
+            // Order matters: setting the printer first and the orientation last keeps
+            // each write inside what the previous fields permit (paper sizes are
+            // per-printer, and orientation rotates paperSize).
+            persisted.printer = chosen.printer
             persisted.paperName = chosen.paperName
             persisted.paperSize = chosen.paperSize
             persisted.orientation = chosen.orientation
-            persisted.printer = chosen.printer
             exportHTMLOperations.lastPrintInfo = persisted
             // The job is done; an edit made while the panel was up must not read as a
             // mid-operation document change.

@@ -205,7 +205,9 @@ final class ExportPDFCommandAppTests: XCTestCase {
                 } else {
                     fixture.appState.exportHTMLOperations.offscreenController?
                         .exportPDFCaptureWillCaptureHook = { index in
-                            if index == 0 { throw CancellationError() }
+                            if index == 0 {
+                                throw CancellationError()
+                            }
                         }
                 }
                 return destination
@@ -243,6 +245,67 @@ final class ExportPDFCommandAppTests: XCTestCase {
             product: .print
         )
         XCTAssertEqual(printNotice?.title, "Could Not Print")
+    }
+
+    /// G3: the capture-area refusal names the box's real size in inches and keeps
+    /// the split-it advice, product-aware — PDF says "export as one PDF page",
+    /// Print says "print".
+    func testOversizeCaptureAreaNoticeNamesTheCauseInBothProducts() {
+        let error = ExportPDFCaptureError.oversizeCaptureArea(
+            widthPoints: 285_748, heightPoints: 3019
+        )
+        let pdfNotice = ExportHTMLNoticeMapper.notice(
+            for: .stopped(.captureFailed(error)),
+            operationID: 7,
+            product: .pdf
+        )
+        XCTAssertEqual(pdfNotice?.title, "Could Not Export as PDF")
+        XCTAssertEqual(
+            pdfNotice?.message,
+            "Nothing was written. An element is too large to export as one PDF page "
+                + "(about 3,969 × 42 inches). "
+                + "Split the table or make the image smaller, then export again."
+        )
+        let printNotice = ExportHTMLNoticeMapper.notice(
+            for: .stopped(.captureFailed(error)),
+            operationID: 7,
+            product: .print
+        )
+        XCTAssertEqual(printNotice?.title, "Could Not Print")
+        XCTAssertEqual(
+            printNotice?.message,
+            "Nothing was written. An element is too large to print "
+                + "(about 3,969 × 42 inches). "
+                + "Split the table or make the image smaller, then export again."
+        )
+        // Under ten inches the value keeps one fraction digit.
+        let smallNotice = ExportHTMLNoticeMapper.notice(
+            for: .stopped(.captureFailed(.oversizeCaptureArea(
+                widthPoints: 40000, heightPoints: 540
+            ))),
+            operationID: 7,
+            product: .pdf
+        )
+        XCTAssertTrue(smallNotice?.message.contains("(about 556 × 7.5 inches)") == true)
+    }
+
+    /// A WebKit split off the plan is an internal defect: the notice says so and
+    /// asks for a report — no "try again", which cannot help (low 1).
+    func testPageCountMismatchNoticeIsAnInternalPaginationError() {
+        for product in [ExportCommandProduct.pdf, .print] {
+            let notice = ExportHTMLNoticeMapper.notice(
+                for: .stopped(.captureFailed(.pageCountMismatch(planned: 4, captured: 5))),
+                operationID: 7,
+                product: product
+            )
+            let verb = product == .print ? "Print" : "Export"
+            XCTAssertEqual(
+                notice?.message,
+                "Nothing was written. \(verb) failed because of an internal "
+                    + "pagination error. Please report this issue."
+            )
+            XCTAssertFalse(notice?.message.contains("Try again") == true)
+        }
     }
 
     func testPrintFocusDoesNotFlushTheDirtyBaseline() async throws {
