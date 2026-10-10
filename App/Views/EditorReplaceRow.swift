@@ -27,13 +27,18 @@ struct EditorReplaceRowModel: Equatable {
         isTruncated = ui.isTruncated
         activity = appState.editorReplaceActivity
         status = appState.editorFindHost.replaceStatus
-        // Handoff 27b: Applying-frame diagnosis — `preparing` models churn per progress
-        // update, so only the Applying transition and visible statuses are stamped.
-        if activity == .applying || status != nil {
-            appState.editorFindHost.traceReplaceBarAction(
-                "rowModel activity=\(activity) status=\(status?.text ?? "nil")"
-            )
-        }
+        #if DEBUG
+            // Handoff 27b: Applying-frame diagnosis — `preparing` models churn per progress
+            // update, so only the Applying transition and visible statuses are stamped,
+            // and only on a change: a stable row model must not flood the 64-entry buffer.
+            if activity == .applying || status != nil {
+                let signature = "activity=\(activity) status=\(status?.text ?? "nil")"
+                if appState.editorFindHost.lastTracedRowModelSignature != signature {
+                    appState.editorFindHost.lastTracedRowModelSignature = signature
+                    appState.editorFindHost.traceReplaceBarAction("rowModel \(signature)")
+                }
+            }
+        #endif
     }
 }
 

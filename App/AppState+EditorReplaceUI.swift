@@ -90,7 +90,8 @@ extension AppState {
     /// Replace All that finishes afterwards unable to write its stale result.
     func clearEditorReplaceStatus(fileID: StaticString = #fileID, line: UInt = #line) {
         editorFindHost.traceReplaceBarAction(
-            "clearReplaceStatus serial \(editorFindHost.replaceStatusSerial)->\(editorFindHost.replaceStatusSerial &+ 1)",
+            "clearReplaceStatus serial \(editorFindHost.replaceStatusSerial)"
+                + "->\(editorFindHost.replaceStatusSerial &+ 1)",
             fileID: fileID,
             line: line
         )

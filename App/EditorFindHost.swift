@@ -77,6 +77,9 @@ final class EditorFindHost {
     // `EditorReplaceBatchPreparation.prepare`. Read only by hosted timeout diagnostics.
     #if DEBUG
         private(set) var replaceBarTrace: [String] = []
+        /// Last row-model signature traced, so a stable visible state does not flood the
+        /// 64-entry buffer with identical `rowModel` entries on every publish.
+        var lastTracedRowModelSignature: String?
     #endif
 
     /// Records one `replaceBarTrace` entry with a monotonic uptime stamp and the call site.
@@ -106,10 +109,14 @@ final class EditorFindHost {
 
     init() {
         // An authority advance supersedes every plan; a preparing one stops at once instead
-        // of draining to a refusal behind a still-visible progress label.
-        replaceAuthority.onAdvance = { [weak self, weak replaceBatch] in
+        // of draining to a refusal behind a still-visible progress label. One trace entry
+        // per advance, with the advancing call site attributed.
+        replaceAuthority.onAdvance = { [weak self, weak replaceBatch] fileID, line in
             self?.traceReplaceBarAction(
-                "authorityAdvance supersededPreparing=\(replaceBatch?.isPreparing ?? false)"
+                "authorityAdvance gen=\(self?.replaceAuthority.generation ?? 0) "
+                    + "supersededPreparing=\(replaceBatch?.isPreparing ?? false)",
+                fileID: fileID,
+                line: line
             )
             replaceBatch?.supersedeIfPreparing()
         }

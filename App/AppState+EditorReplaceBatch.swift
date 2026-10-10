@@ -53,7 +53,7 @@ extension AppState {
         let plan: EditorReplacePlan
         switch planEditorReplaceAll(replacement: replacement) {
         case let .refused(result):
-            host.traceReplaceBarAction("replaceAllReturn \(result)")
+            host.traceReplaceBarAction("replaceAllReturn \(result.replaceBatchTraceSummary)")
             return result
         case let .ready(value): plan = value
         }
@@ -120,7 +120,8 @@ extension AppState {
             token.cancel()
         }
         host.traceReplaceBarAction(
-            "workerPrepared actionID=\(capture.actionID) cancelled=\(token.isCancelled) prepared=\(prepared)"
+            "workerPrepared actionID=\(capture.actionID) cancelled=\(token.isCancelled) "
+                + "prepared=\(prepared.replaceBatchTraceSummary)"
         )
         if state.preparationActionID == capture.actionID {
             state.preparationMilliseconds = elapsedMilliseconds(since: began)
@@ -131,7 +132,7 @@ extension AppState {
         // The selection observer covers the frame above; the final recheck takes over from here.
         observation?.stop()
         let result = finishEditorReplaceBatchPreparation(prepared, capture: capture, token: token)
-        host.traceReplaceBarAction("replaceAllFinished result=\(result)")
+        host.traceReplaceBarAction("replaceAllFinished result=\(result.replaceBatchTraceSummary)")
         state.isApplying = false
         state.finish(action: capture.actionID, result: result)
         return result
@@ -290,5 +291,50 @@ extension AppState {
     private func elapsedMilliseconds(since start: ContinuousClock.Instant) -> Double {
         let duration = start.duration(to: .now).components
         return Double(duration.seconds) * 1000 + Double(duration.attoseconds) / 1e15
+    }
+}
+
+/// Trace-safe summaries (handoff 27c): case names and counts only — never source strings,
+/// snapshots, or range arrays, which on the large fixtures made one trace entry megabytes.
+extension EditorReplaceBatchPlan {
+    var replaceBatchTraceSummary: String {
+        "changed=\(changedCount) total=\(totalCount) projectedUTF16=\(projectedUTF16Length)"
+    }
+}
+
+extension Result where Success == EditorReplacePreparedBatch, Failure == EditorReplaceBatchPreparationFailure {
+    var replaceBatchTraceSummary: String {
+        switch self {
+        case let .success(batch):
+            "success(\(batch.plan.replaceBatchTraceSummary) postSelection=\(batch.postSelection))"
+        case let .failure(failure):
+            "failure(\(failure))"
+        }
+    }
+}
+
+extension EditorReplaceBatchOutcome {
+    var replaceBatchTraceSummary: String {
+        switch self {
+        case let .noChanges(plan): "noChanges(\(plan.replaceBatchTraceSummary))"
+        case let .replaced(plan): "replaced(\(plan.replaceBatchTraceSummary))"
+        case .unverifiedWrite: "unverifiedWrite"
+        case let .refused(reason): "refused(\(reason))"
+        }
+    }
+}
+
+extension EditorReplaceBatchCommandResult {
+    var replaceBatchTraceSummary: String {
+        switch self {
+        case let .ineligible(reason): "ineligible(\(reason))"
+        case let .refused(reason): "refused(\(reason))"
+        case let .notDelivered(reason): "notDelivered(\(reason))"
+        case let .invalidPlan(reason): "invalidPlan(\(reason))"
+        case .cancelled: "cancelled"
+        case .superseded: "superseded"
+        case .markedText: "markedText"
+        case let .delivered(outcome): "delivered(\(outcome.replaceBatchTraceSummary))"
+        }
     }
 }

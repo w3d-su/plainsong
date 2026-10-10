@@ -1,15 +1,39 @@
 import AppKit
 import SwiftUI
 
-/// An owned AppKit button for the find bar's replacement controls (Replace PR H).
-///
-/// AppKit rather than SwiftUI `Button`, for three reasons:
-/// - Full Keyboard Access focuses and presses an `NSButton` natively, and its focus is a real
-///   AppKit first responder that `EditorFindResponderSupport` can recognize as bar provenance;
-/// - focusing it reports nothing to SwiftUI `FocusState`, so Tab onto **Cancel** cannot advance
-///   the Replace authority generation and supersede the plan it is about to cancel;
-/// - hosted tests can click the real control (`performClick`), which runs the same
-///   target/action path a mouse click or a Full Keyboard Access Space press runs.
+// An owned AppKit button for the find bar's replacement controls (Replace PR H).
+//
+// AppKit rather than SwiftUI `Button`, for three reasons:
+// - Full Keyboard Access focuses and presses an `NSButton` natively, and its focus is a real
+//   AppKit first responder that `EditorFindResponderSupport` can recognize as bar provenance;
+// - focusing it reports nothing to SwiftUI `FocusState`, so Tab onto **Cancel** cannot advance
+//   the Replace authority generation and supersede the plan it is about to cancel;
+// - hosted tests can click the real control (`performClick`), which runs the same
+//   target/action path a mouse click or a Full Keyboard Access Space press runs.
+#if DEBUG
+    /// Handoff 27b/27c row-flake evidence: owned bar view mount/update/dismantle records on
+    /// the trace clock, kept in memory and dumped only by hosted timeout diagnostics, so
+    /// Debug consoles stay quiet on passing runs. `PLAINSONG_HOSTED_TRACE_STDOUT=1` mirrors
+    /// each record to stdout for live reproduction work. Never consulted for behavior.
+    enum EditorFindBarViewTrace {
+        /// Written and read only from main-actor contexts (SwiftUI view lifecycle and hosted
+        /// timeout diagnostics); nonisolated-unsafe so the DEBUG-only buffer needs no lock.
+        private(set) nonisolated(unsafe) static var entries: [String] = []
+
+        static func record(_ entry: String) {
+            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
+            let line = "+\(milliseconds)ms \(entry)"
+            if entries.count >= 128 {
+                entries.removeFirst(entries.count - 127)
+            }
+            entries.append(line)
+            if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
+                print("REPLTRACE \(line)")
+            }
+        }
+    }
+#endif
+
 struct EditorFindBarButton: NSViewRepresentable {
     enum Style: Equatable {
         case push
@@ -53,10 +77,16 @@ struct EditorFindBarButton: NSViewRepresentable {
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         configure(button)
+        Self.debugTraceMount("make", identifier: identifier, text: title)
         return button
     }
 
     func updateNSView(_ button: NSButton, context: Context) {
+        #if DEBUG
+            if button.isEnabled != isEnabled {
+                Self.debugTraceMount("update", identifier: identifier, text: "enabled=\(isEnabled)")
+            }
+        #endif
         context.coordinator.action = action
         configure(button)
     }
@@ -82,6 +112,24 @@ struct EditorFindBarButton: NSViewRepresentable {
             owned.onEscape = onEscape
         }
     }
+
+    #if DEBUG
+        /// Handoff 27c Applying-frame/Cancel diagnosis, same style as the bar label trace:
+        /// mount/update/dismantle of owned bar buttons on the trace clock.
+        static func dismantleNSView(_ button: NSButton, coordinator _: Coordinator) {
+            debugTraceMount(
+                "dismantle",
+                identifier: button.accessibilityIdentifier(),
+                text: button.title
+            )
+        }
+
+        private static func debugTraceMount(_ event: String, identifier: String, text: String) {
+            EditorFindBarViewTrace.record("barButton.\(event) id=\(identifier) title=\(text)")
+        }
+    #else
+        private static func debugTraceMount(_: String, identifier _: String, text _: String) {}
+    #endif
 
     @MainActor
     final class Coordinator: NSObject {
@@ -118,27 +166,27 @@ struct EditorFindBarLabel: NSViewRepresentable {
     }
 
     func updateNSView(_ label: NSTextField, context _: Context) {
-        if label.stringValue != text {
-            Self.debugTraceMount("update", identifier: identifier, text: text)
-        }
+        #if DEBUG
+            if label.stringValue != text {
+                Self.debugTraceMount("update", identifier: identifier, text: text)
+            }
+        #endif
         configure(label)
     }
 
     #if DEBUG
         /// Handoff 27b Applying-frame/Escape-label diagnosis: mount/update/dismantle of the
-        /// owned bar labels on the trace clock (stdout; the ring buffer cannot see AppKit
-        /// view events). Never consulted for behavior.
+        /// owned bar labels on the trace clock. Never consulted for behavior.
         static func dismantleNSView(_ label: NSTextField, coordinator _: Void) {
             debugTraceMount(
                 "dismantle",
-                identifier: label.accessibilityIdentifier() ?? "?",
+                identifier: label.accessibilityIdentifier(),
                 text: label.stringValue
             )
         }
 
         private static func debugTraceMount(_ event: String, identifier: String, text: String) {
-            let milliseconds = Int(ProcessInfo.processInfo.systemUptime * 1000)
-            print("REPLTRACE +\(milliseconds)ms barLabel.\(event) id=\(identifier) text=\(text)")
+            EditorFindBarViewTrace.record("barLabel.\(event) id=\(identifier) text=\(text)")
         }
     #else
         private static func debugTraceMount(_: String, identifier _: String, text _: String) {}

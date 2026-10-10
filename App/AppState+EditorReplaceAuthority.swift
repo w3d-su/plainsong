@@ -26,15 +26,16 @@ final class EditorReplaceAuthorityState {
     /// Test seam: runs inside EditorKit's commit-time authorization call, before App
     /// evaluates it, so a test can make a fence appear between validation and commit.
     var willCheckCommitForTesting: (() -> Void)?
-    /// Runs after every advance. `EditorFindHost` uses it to stop a preparing Replace All at
-    /// once, so its progress and Cancel never outlive the authority that started it.
-    var onAdvance: (() -> Void)?
+    /// Runs after every advance, with the advancing call site attributed. `EditorFindHost`
+    /// uses it to stop a preparing Replace All at once, so its progress and Cancel never
+    /// outlive the authority that started it.
+    var onAdvance: ((_ fileID: StaticString, _ line: UInt) -> Void)?
     private var keyWindowObservation: EditorReplaceKeyWindowObservation?
 
-    func advance() {
+    func advance(fileID: StaticString = #fileID, line: UInt = #line) {
         precondition(generation < .max, "Replace authority generation exhausted")
         generation += 1
-        onAdvance?()
+        onAdvance?(fileID, line)
     }
 
     /// Key-window changes supersede every outstanding plan. Installed with the first plan:
@@ -95,13 +96,7 @@ extension AppState {
 
     /// Rebind, reload, rekey, focus, and bar transitions call this directly.
     func advanceEditorReplaceAuthorityGeneration(fileID: StaticString = #fileID, line: UInt = #line) {
-        editorFindHost.traceReplaceBarAction(
-            "advanceAuthority \(editorReplaceAuthorityGeneration)->\(editorReplaceAuthorityGeneration + 1) "
-                + "preparing=\(editorFindHost.replaceBatch.isPreparing)",
-            fileID: fileID,
-            line: line
-        )
-        editorFindHost.replaceAuthority.advance()
+        editorFindHost.replaceAuthority.advance(fileID: fileID, line: line)
     }
 
     func currentEditorReplaceAuthorityStamp(
