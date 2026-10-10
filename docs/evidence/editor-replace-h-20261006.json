@@ -292,7 +292,53 @@
       "replaceRowRepetition": "all 28 hosted Replace-row tests x30 baseline (26 pass / 4 fail) and x30 PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW=1 (27 pass / 3 fail): held-preparation-checkpoint timeouts 0/60, externalObservationPending refusals 0; failures were the pre-existing unrelated Applying-frame assertion flake (3x baseline, 1x foreign) and WKWebView teardown/preview-render timeouts under load (1x baseline, 2x foreign). Foreign-key-window limitation (handoff 27c): the variant did not truly reproduce CI's NSApp.keyWindow split — the hosted runner is never the active application, so the borderless window cannot take real key status and NSApp.keyWindow stayed nil; the seam therefore exercised only the designated-key-window path. Kept as an available seam for runners whose host is active, not as reproduction evidence.",
       "hostedSuite": "EditorFind*/EditorReplace*/WorkspaceSearch*/EditorFindFocusReceiptTests/MenuBarStateTests/PlainsongMenuKeyBindingTests/AppStateWorkspaceDataIntegrityTests once under lock at lower load: 353 pass / 0 fail. An earlier heavier run of the same suites under disk/load pressure reported 470 pass / 64 fail, every failure a WebKit-under-load environmental signature (67 'PreviewController and WKWebView deallocate' teardown timeouts, 7 preview-render wait/JS errors); 0 held-checkpoint timeouts, 0 externalObservationPending in either run",
       "load": "1-min load averages 9-58 across repetition runs (typical 11-30; shared machine)",
-      "build": "make build and build-for-testing under the xcodebuild lock: SUCCEEDED; pinned make lint: 331 violations, 0 serious; git diff --check clean"
+      "build": "make build and build-for-testing under the xcodebuild lock: SUCCEEDED; pinned make lint: 331 violations, 0 serious; git diff --check clean",
+      "ci": "549b220 build-and-test run 38028443739 PASSED in 22m (log /private/tmp/ci-549b220.log): hosted suite 842 tests, 5 skipped, 0 failures; 0 occurrences of 'held preparation checkpoint' timeouts and 0 'externalObservationPending' refusals — the watcher-hop refusal signature did not appear on CI after the fix"
+    }
+  },
+  "diagnosticsCleanup27c": {
+    "date": "2026-10-10",
+    "commits": [
+      "b5956cc Phase 3: attribute external-change producers and trace watcher-hop decisions (#151)",
+      "a722fa2 Phase 3: bound replace trace entries and deduplicate authority advances (#151)",
+      "7df31c4 Phase 3: prove the watcher-hop guard and quiet passing hosted runs (#151)",
+      "83ca6a1 Phase 3: correct the watcher-hop mechanism wording in the record (#151)",
+      "cca022a Phase 3: clear the remaining above-baseline hosted warnings (#151)"
+    ],
+    "m1": "All Replace/Find-bar DEBUG traces emit bounded summaries (result kinds, match counts, identifiers) — no serialized prepared batches, full source snapshots, replacement strings or range arrays; the trace buffer itself is bounded and row-model entries emit only on signature change",
+    "m2": {
+      "guard": "App openWorkspace hop guard requires watcher === workspaceWatcher, !watcher.isStopped and matching workspaceRootURL before entering handleExternalChange",
+      "tests": [
+        "EditorFindHostedNavigationRaceTests/testHostedWatcherHopQueuedBehindStopIsDropped",
+        "EditorFindHostedNavigationRaceTests/testHostedWatcherHopFromAReplacedWatcherIsDropped"
+      ],
+      "result": "both pass together (2 tests, 0 failures); 30 iterations clean",
+      "negativeControls": "identity clause removed -> replaced-watcher test failed while stopped-watcher test passed; isStopped clause removed -> stopped-watcher test failed while replaced-watcher test passed; full guard restored, negative edits not committed"
+    },
+    "m3": {
+      "attribution": "handleExternalChange takes fileID: StaticString = #fileID, line: UInt = #line and forwards them to traceReplaceBarAction; watcher hops trace 'watcherHop accepted|dropped reason=<replaced|stopped|rootChanged>'",
+      "finding": "the ~40 ms advancing=true caller is the workspace refresh chain: openWorkspace watcher closure -> refreshWorkspaceAfterFileSystemChange -> handleManagedWorkspaceSessionsExternalChange -> handleExternalChange; a delivery that lands before authorization/preparation completes can advance disk observation and refuse (.externalObservationPending) or supersede a held Replace All, which is exactly what the watcher-hop guard and queue confinement now keep stale deliveries out of",
+      "log": "/private/tmp/plainsong-27c-m3.log"
+    },
+    "lows": [
+      "five above-baseline warnings vs b157e38 cleared (watcher queue-confined state + box marked safe, redundant ??, hosted-test concurrency warnings via @unchecked Sendable weak-storage box, Task.sleep for Thread.sleep, weak capture-list bindings); Release build shows 0 warnings in files changed since b157e38",
+      "no unconditional REPLTRACE/checkpoint output on passing runs; output stays failure-only or environment-gated",
+      "all trace construction gated behind #if DEBUG; Release binary strings scan found 0 trace markers (watcherHop|workerPrepared|rowModel|authorityAdvance|REPLTRACE|advancing=|replaceBarTrace)",
+      "Cancel/row AppKit controls get mount/update/dismantle trace + ancestry/state dump and one-run-loop-turn rechecks in the flake paths",
+      "foreign-key-window variant kept as a seam with its limitation recorded (never-active host cannot take real key status); hasKeyWindowFindChromeFocus honors keyWindowOverride before keyWindowNumberOverride/NSApp.keyWindow",
+      "overlong line in AppState+EditorReplaceUI.swift wrapped; swiftformat reports 0/599 files requiring formatting"
+    ],
+    "verification": {
+      "replaceRowSuite": "all 28 hosted Replace-row tests x10 under lock: 280 executions, 10/10 iterations clean, 0 failures",
+      "watcherHopTests": "the two M2 tests repeated 30 iterations: clean",
+      "broaderHostedSuite": "497 tests, 3 skipped, 0 failures under lock",
+      "workspaceKit": "swift test 361/0; WorkspaceEventWatcherTests 30x: 44/45 iterations clean (one transient unattributed failure under 1-min load ~38-47)",
+      "builds": "locked make build (Debug) SUCCEEDED; locked build-for-testing SUCCEEDED; locked Release build SUCCEEDED",
+      "warnings": "0 swift warnings in files changed since b157e38 in the full Release build; earlier full-build census plus post-fix incremental checks confirm no above-baseline warnings remain from this work",
+      "lint": "pinned swiftformat 0.62.1: 0/599 files require formatting; swiftlint 330 violations, 0 serious (baseline 331) — every violation in a changed file is pre-existing at b157e38",
+      "diffCheck": "git diff --check clean",
+      "fileLengths": "largest touched files grew modestly over already-long files (AppState+ExternalChanges 966->977, AppState+Workspace 895->934); file_length violations pre-date this pass",
+      "load": "1-min load averages ~13-89 across the hosted runs (shared machine; typical 15-40)"
     }
   }
 }
