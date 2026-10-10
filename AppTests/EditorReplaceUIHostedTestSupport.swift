@@ -174,12 +174,10 @@ extension EditorFindHostedGateTests {
         // Handoff 27b: when the held-checkpoint wait below times out, this also reports the
         // Replace All button's live state and the authority/status counters captured just
         // before the press. `hostedFindTimeoutState` covers the rest of App's state.
-        weak var weakAppState = appState
-        weak var weakWindow = hosted.window
         let serialAtPress = appState.editorFindHost.replaceStatusSerial
         let generationAtPress = appState.editorReplaceAuthorityGeneration
-        hostedTimeoutDiagnostics.append { [weak self] in
-            guard let self, let appState = weakAppState, let window = weakWindow else {
+        hostedTimeoutDiagnostics.append { [weak self, weak appState, weak window = hosted.window] in
+            guard let self, let appState, let window else {
                 return "Hosted Replace fixture released before the timeout report"
             }
             let button = barButton(EditorFindAccessibility.replaceAllButton, in: window)
