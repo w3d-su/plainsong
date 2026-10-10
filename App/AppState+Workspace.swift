@@ -389,7 +389,10 @@ extension AppState {
                     nil
                 }
                 editorFindHost.traceReplaceBarAction(
-                    "watcherHop \(dropReason.map { "dropped reason=\($0)" } ?? "accepted")"
+                    "watcherHop \(dropReason.map { "dropped reason=\($0)" } ?? "accepted") "
+                        + "hop=\(watcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil") "
+                        + "installed=\(workspaceWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil") "
+                        + "isStopped=\(watcher.map { String($0.isStopped) } ?? "nil")"
                 )
                 guard dropReason == nil else { return }
                 refreshWorkspaceAfterFileSystemChange()

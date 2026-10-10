@@ -139,7 +139,15 @@ extension EditorFindHostedGateTests {
         // is a hard boundary: no watcher handler begins after it returns, and App drops
         // a delivery whose main-actor hop lands behind a stop or watcher replacement, so
         // only the tested event can supersede.
+        let fixtureWatcher = hosted.appState.workspaceWatcher
         hosted.appState.workspaceWatcher?.stop()
+        let fixtureID = fixtureWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil"
+        let installedID = hosted.appState.workspaceWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil"
+        hosted.appState.editorFindHost.traceReplaceBarAction(
+            "fixtureStopped watcher=\(fixtureID) "
+                + "isStopped=\(fixtureWatcher.map { String($0.isStopped) } ?? "nil") "
+                + "installed=\(installedID)"
+        )
         return hosted
     }
 

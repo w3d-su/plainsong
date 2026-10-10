@@ -193,10 +193,12 @@ extension EditorFindHostedGateTests {
         }
         // Handoff 27c: readiness immediately before the press — no external observation may
         // still be in flight and authorization must be .allowed, so a slow runner cannot
-        // evaluate the press against a stale disk-inspection window.
+        // evaluate the press against a stale disk-inspection window. The fixture's watcher
+        // must already be stopped so no real FSEvent can still hop in behind the press.
         try await waitForHostedReplaceObservationQuiescence(hosted)
-        try await waitUntil("authorization is .allowed immediately before the press") {
+        try await waitUntil("authorization is .allowed and the fixture watcher is stopped") {
             appState.editorReplaceAuthorizationDecision(for: appState.currentDocument) == .allowed
+                && (appState.workspaceWatcher?.isStopped ?? true)
         }
         try await start()
         XCTAssertTrue(

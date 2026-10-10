@@ -154,10 +154,14 @@ extension EditorFindHostedGateTests {
         /// to the hop's own `refreshWorkspaceAfterFileSystemChange()` site in
         /// `App/AppState+Workspace.swift`. Passing row-test runs show the only
         /// `advancing=true` producers near the press are test-injected refreshes and this
-        /// watcher hop: a real FSEvent delivered during fixture setup can hop onto the main
-        /// actor before `makeHostedBatchWorkspace`'s `stop()` and refresh; the readiness
-        /// wait in `startHeldBarReplaceAll` absorbs any still-pending observation before
-        /// the press, and hops arriving after `stop()` are dropped by the guard.
+        /// watcher hop: a real FSEvent for fixture-setup activity under the root (e.g. the
+        /// fixture's own `post.md` write delivered across the `sinceNow` boundary)
+        /// debounces ~300 ms and hops onto the main actor while the watcher is still live
+        /// — proven by matching `ObjectIdentifier`s and `isStopped=false` ~40 ms before
+        /// `fixtureStopped` — so the hop legitimately runs before
+        /// `makeHostedBatchWorkspace`'s `stop()`. The readiness wait in
+        /// `startHeldBarReplaceAll` absorbs any still-pending observation before the
+        /// press, and hops arriving after `stop()` are dropped by the guard.
         func testHostedWatcherHopAcceptedAttributesExternalChangeToTheHop() async throws {
             let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
             let appState = hosted.appState
