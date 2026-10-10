@@ -20,7 +20,7 @@ extension EditorFindHostedGateTests {
             "externalPrompt=\(String(describing: appState.externalChangePrompt?.fileURL)) pendingExternalText=\(session.fileURL.flatMap { appState.pendingExternalTexts[$0] } != nil)",
             "replaceAuthorization=\(appState.editorReplaceAuthorizationDecision(for: session)) liveInstallations=\(appState.liveEditorDocumentBindingInstallations(for: session))",
             "actualKeyWindow=\(String(describing: NSApp.keyWindow?.windowNumber)) replaceKeyWindow=\(String(describing: EditorReplaceCommandDispatcher.keyWindow?.windowNumber)) findKeyWindow=\(String(describing: appState.editorFindKeyWindow()?.windowNumber))",
-            "replaceBatch isPreparing=\(appState.editorFindHost.replaceBatch.isPreparing) isApplying=\(appState.editorFindHost.replaceBatch.isApplying) preparationTask=\(appState.editorFindHost.replaceBatch.preparationTask != nil) lastResult=\(String(describing: appState.editorFindHost.replaceBatch.lastResult))",
+            "replaceBatch isPreparing=\(appState.editorFindHost.replaceBatch.isPreparing) isApplying=\(appState.editorFindHost.replaceBatch.isApplying) preparationTask=\(appState.editorFindHost.replaceBatch.preparationTask != nil) lastResult=\(appState.editorFindHost.replaceBatch.lastResult?.replaceBatchTraceSummary ?? "nil")",
             "replaceStatus=\(String(describing: appState.editorFindHost.replaceStatus)) replaceStatusSerial=\(appState.editorFindHost.replaceStatusSerial) authorityGeneration=\(appState.editorReplaceAuthorityGeneration)",
             "replaceRow validity=\(ui.replacementValidity) rowActive=\(ui.isReplaceRowActive) expanded=\(ui.isReplaceExpanded) truncated=\(ui.isTruncated) replacement=\(ui.replacementText)",
         ]
@@ -29,6 +29,8 @@ extension EditorFindHostedGateTests {
             lines.append(contentsOf: appState.editorNavigationChannel.writeHistory)
             lines.append("replaceBarTrace (oldest first):")
             lines.append(contentsOf: appState.editorFindHost.replaceBarTrace)
+            lines.append("barViewTrace (oldest first):")
+            lines.append(contentsOf: EditorFindBarViewTrace.entries)
         #endif
         for window in NSApp.windows {
             guard let editor = editorTextView(in: window) else { continue }

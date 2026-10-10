@@ -2,6 +2,7 @@ import AppKit
 @testable import EditorKit
 import Foundation
 @testable import Plainsong
+@testable import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -44,4 +45,133 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(appState.editorNavigationCommand, command)
         XCTAssertFalse(editor.undoManager?.canUndo == true)
     }
+
+    /// Holds the main actor synchronously for `seconds`, so a watcher debounce that fires
+    /// meanwhile can only queue — not run — its `Task { @MainActor }` hop behind this turn.
+    /// (`Thread.sleep` must live in a synchronous function to be callable here.)
+    private func holdMainActorForQueuedHop(_ seconds: TimeInterval) {
+        Thread.sleep(forTimeInterval: seconds)
+    }
+
+    /// Handoff 27c M2: the watcher's `stop()` is a hard boundary for handlers that begin
+    /// after it, but a handler that began before `stop()` still queues its
+    /// `Task { @MainActor }` hop behind it — the hop the CI flake took. Only the App guard
+    /// (`watcher === workspaceWatcher && !watcher.isStopped`) drops it. Blocking the main
+    /// actor past the 300 ms debounce queues such a hop deterministically.
+    func testHostedWatcherHopQueuedBehindStopIsDropped() async throws {
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
+        let appState = hosted.appState
+        let watcher = try XCTUnwrap(appState.workspaceWatcher)
+        try await waitForHostedReplaceObservationQuiescence(hosted)
+        let session = appState.currentDocument
+        let identity = ObjectIdentifier(session)
+        let authorityGeneration = appState.editorReplaceAuthorityGeneration
+        let diskGeneration = appState.currentExternalDiskEventGeneration(for: session)
+
+        watcher.simulateDeliveredEventForTesting()
+        // The debounce fires and queues its main-actor hop while this turn blocks; the hop
+        // then lands behind stop(), the interleaving the workspaceWatcher guard covers.
+        holdMainActorForQueuedHop(0.9)
+        appState.workspaceWatcher?.stop()
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertNil(appState.externalDiskInspectionTasks[identity], "no disk inspection")
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: session),
+            diskGeneration,
+            "handleExternalChange never ran"
+        )
+        XCTAssertEqual(
+            appState.editorReplaceAuthorityGeneration,
+            authorityGeneration,
+            "no authority-generation advance"
+        )
+        XCTAssertEqual(
+            appState.editorReplaceAuthorizationDecision(for: session),
+            .allowed,
+            "no externalObservationPending"
+        )
+        #if DEBUG
+            XCTAssertTrue(
+                appState.editorFindHost.replaceBarTrace.contains {
+                    $0.contains("watcherHop dropped reason=stopped")
+                },
+                "the queued hop ran and the guard dropped it"
+            )
+        #endif
+    }
+
+    /// The same hop from a watcher the workspace has since replaced: the identity clause
+    /// drops it even though the old watcher was never stopped.
+    func testHostedWatcherHopFromAReplacedWatcherIsDropped() async throws {
+        let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
+        let appState = hosted.appState
+        let watcher = try XCTUnwrap(appState.workspaceWatcher)
+        try await waitForHostedReplaceObservationQuiescence(hosted)
+        let session = appState.currentDocument
+        let identity = ObjectIdentifier(session)
+        let authorityGeneration = appState.editorReplaceAuthorityGeneration
+        let diskGeneration = appState.currentExternalDiskEventGeneration(for: session)
+
+        watcher.simulateDeliveredEventForTesting()
+        holdMainActorForQueuedHop(0.9)
+        // Replace the live watcher without stopping it: the queued hop's watcher is no
+        // longer workspaceWatcher, so only the identity clause can drop it.
+        appState.workspaceWatcher = WorkspaceEventWatcher(rootURL: hosted.fixture.root) {}
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertNil(appState.externalDiskInspectionTasks[identity], "no disk inspection")
+        XCTAssertEqual(
+            appState.currentExternalDiskEventGeneration(for: session),
+            diskGeneration,
+            "handleExternalChange never ran"
+        )
+        XCTAssertEqual(
+            appState.editorReplaceAuthorityGeneration,
+            authorityGeneration,
+            "no authority-generation advance"
+        )
+        XCTAssertEqual(
+            appState.editorReplaceAuthorizationDecision(for: session),
+            .allowed,
+            "no externalObservationPending"
+        )
+        #if DEBUG
+            XCTAssertTrue(
+                appState.editorFindHost.replaceBarTrace.contains {
+                    $0.contains("watcherHop dropped reason=replaced")
+                },
+                "the queued hop ran and the guard dropped it"
+            )
+        #endif
+    }
+
+    #if DEBUG
+        /// Handoff 27c M3: an accepted hop attributes the resulting `handleExternalChange`
+        /// to the hop's own `refreshWorkspaceAfterFileSystemChange()` site in
+        /// `App/AppState+Workspace.swift` — the openWorkspace watcher closure, the producer
+        /// behind the `advancing=true` entry seen ~40 ms before the press on CI.
+        func testHostedWatcherHopAcceptedAttributesExternalChangeToTheHop() async throws {
+            let hosted = try await makeHostedEditorWorkspace(source: "hit one hit two")
+            let appState = hosted.appState
+            let watcher = try XCTUnwrap(appState.workspaceWatcher)
+            try await waitForHostedReplaceObservationQuiescence(hosted)
+
+            watcher.simulateDeliveredEventForTesting()
+            try await waitUntil("the queued watcher hop is accepted and attributed") {
+                let trace = appState.editorFindHost.replaceBarTrace
+                return trace.contains { $0.contains("watcherHop accepted") }
+                    && trace.contains { $0.contains("handleExternalChange file=post.md advancing=true") }
+            }
+            let entry = try XCTUnwrap(
+                appState.editorFindHost.replaceBarTrace.last {
+                    $0.contains("handleExternalChange file=post.md advancing=true")
+                }
+            )
+            XCTAssertTrue(
+                entry.contains("(Plainsong/AppState+Workspace.swift:395)"),
+                "the producer is the openWorkspace watcher hop; got: \(entry)"
+            )
+        }
+    #endif
 }

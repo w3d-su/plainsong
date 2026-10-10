@@ -140,10 +140,24 @@ extension EditorFindHostedGateTests {
             "Applying…",
             "the row rendered Applying… before the final recheck" + replaceBarTraceDiagnostic(app)
         )
-        XCTAssertFalse(
-            cancelShown,
-            "Cancel is withdrawn once preparation is done" + replaceBarTraceDiagnostic(app)
-        )
+        // A Cancel still mounted at commit is inert (cancelEditorReplaceAllFromBar guards on
+        // isPreparing), and SwiftUI may defer its removal one run-loop turn; only a mount
+        // that persists fails, with its ancestry and live replace state in the report.
+        if barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil {
+            hostedTimeoutDiagnostics.append { [weak self, weak app] in
+                guard let self, let app else { return "fixture released" }
+                guard let stray = barButton(EditorFindAccessibility.replaceCancelButton, in: window)
+                else {
+                    return "replaceCancel button absent at report time"
+                }
+                return "stray replaceCancel mountedAtCommit=\(cancelShown) "
+                    + "stillAttached=\(stray.superview != nil) "
+                    + mountedBarButtonDiagnostic(stray, window: window, app: app)
+            }
+            try await waitUntil("Cancel unmounts after the Applying frame") {
+                self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) == nil
+            }
+        }
         XCTAssertEqual(app.editorReplaceActivity, .idle)
         guard case .delivered(.replaced)? = state.lastResult else { return XCTFail("expected the batch") }
 

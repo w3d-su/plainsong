@@ -232,6 +232,32 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(app.editorFindHost.lastReplaceAnnouncement, "Replaced 1 match")
     }
 
+    /// Handoff 27c M1: every `replaceBarTrace` entry stays bounded on a large plan — the
+    /// earlier `prepared=`/`result=` prints interpolated whole batches and produced one
+    /// ~8 MB entry on the 8,921-match fixture, itself a timing hazard between preparation
+    /// and the Applying frame.
+    func testHostedReplaceBarTraceEntriesStayBoundedOnALargePlan() async throws {
+        let hosted = try await makeHostedReplaceRow(source: String(repeating: "hit ", count: 4000))
+        let app = hosted.appState
+        try await click(EditorFindAccessibility.replaceAllButton, in: hosted.window)
+        await awaitBarReplaceAll(app)
+        XCTAssertEqual(app.currentDocument.text, String(repeating: "NEW ", count: 4000))
+        #if DEBUG
+            let trace = app.editorFindHost.replaceBarTrace
+            XCTAssertTrue(
+                trace.contains { $0.contains("workerPrepared") },
+                "the preparation trace site ran"
+            )
+            for entry in trace {
+                XCTAssertLessThan(
+                    entry.count,
+                    512,
+                    "trace entry stays bounded, got \(entry.count) chars: \(entry.prefix(120))…"
+                )
+            }
+        #endif
+    }
+
     /// An owned AppKit status label in `window`.
     func label(_ identifier: String, in window: NSWindow) -> NSTextField? {
         firstDescendant(of: NSTextField.self, in: window.contentView) {

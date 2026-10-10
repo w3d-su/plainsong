@@ -35,11 +35,12 @@ extension EditorFindHostedGateTests {
             appState.editorFindHost.keyWindowOverride = nil
             appState.editorFindHost.keyWindowNumberOverride = nil
         }
-        // Opt-in CI mimicry (handoff 27b): on CI the real NSApp.keyWindow differed from the
-        // designated test window. A foreign borderless window made key after designation
-        // reproduces that split for any product path still reading NSApp.keyWindow itself.
-        // Plain borderless windows refuse key status, so a key-capable subclass is required
-        // for the split to be real.
+        // Opt-in CI mimicry (handoff 27b/27c): on CI the real NSApp.keyWindow differed from
+        // the designated test window. This variant only makes a truly-key foreign window
+        // when the host application is active — the local hosted runner never is, so
+        // NSApp.keyWindow stays nil there and this exercises only the designated seam.
+        // Kept for runners whose host is active; it is not local reproduction evidence.
+        // Plain borderless windows refuse key status, so a key-capable subclass is required.
         if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_FOREIGN_KEY_WINDOW"] == "1" {
             let foreign = HostedForeignKeyWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 200, height: 120),
@@ -196,13 +197,17 @@ extension EditorFindHostedGateTests {
         try await waitUntil("the bar's Replace All reaches its held preparation checkpoint") { hold.isEntered }
         XCTAssertFalse(hold.didRunOnMainThread)
         #if DEBUG
-            // Handoff 27b: on a PASSING run, keep the trace only when a disk inspection
+            // Handoff 27b/27c: on a PASSING run, keep the trace only when a disk inspection
             // appears in it, so the failure-vs-pass comparison can answer whether the
-            // same producer always runs and only its timing differs.
-            let trace = appState.editorFindHost.replaceBarTrace
-            if trace.contains(where: { $0.contains("handleExternalChange") }) {
-                print("replaceBarTrace@checkpoint (passed, external activity observed):")
-                print(trace.joined(separator: "\n"))
+            // same producer always runs and only its timing differs. Failures already dump
+            // the buffer through the timeout report, so this prints only on demand —
+            // PLAINSONG_HOSTED_TRACE_STDOUT=1 keeps passing-run consoles quiet otherwise.
+            if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
+                let trace = appState.editorFindHost.replaceBarTrace
+                if trace.contains(where: { $0.contains("handleExternalChange") }) {
+                    print("replaceBarTrace@checkpoint (passed, external activity observed):")
+                    print(trace.joined(separator: "\n"))
+                }
             }
         #endif
         return hold
@@ -257,7 +262,29 @@ extension EditorFindHostedGateTests {
             + " isBarVisible=\(host.ui.isBarVisible)"
             + " activity=\(host.replaceBatch.activity)"
             + " status=\(String(describing: host.replaceStatus))"
-            + " lastResult=\(String(describing: host.replaceBatch.lastResult))"
+            + " lastResult=\(host.replaceBatch.lastResult?.replaceBatchTraceSummary ?? "nil")"
+            + " firstResponder=\(String(describing: window.firstResponder))"
+            + " actualKeyWindow=\(String(describing: NSApp.keyWindow?.windowNumber))"
+            + replaceBarTraceDiagnostic(app)
+    }
+
+    /// `mountedBarLabelDiagnostic` for an owned bar button (the Applying-frame Cancel).
+    @MainActor
+    func mountedBarButtonDiagnostic(_ button: NSButton, window: NSWindow, app: AppState) -> String {
+        var chain = [String]()
+        var cursor: NSView? = button
+        while let view = cursor {
+            chain.append("\(type(of: view))\(view.isHidden ? ":hidden" : "")")
+            cursor = view.superview
+        }
+        let host = app.editorFindHost
+        return "'\(button.title)' in window \(button.window?.windowNumber ?? -1)"
+            + " enabled=\(button.isEnabled)"
+            + " super=[\(chain.joined(separator: " <- "))]"
+            + " isBarVisible=\(host.ui.isBarVisible)"
+            + " activity=\(host.replaceBatch.activity)"
+            + " status=\(String(describing: host.replaceStatus))"
+            + " lastResult=\(host.replaceBatch.lastResult?.replaceBatchTraceSummary ?? "nil")"
             + " firstResponder=\(String(describing: window.firstResponder))"
             + " actualKeyWindow=\(String(describing: NSApp.keyWindow?.windowNumber))"
             + replaceBarTraceDiagnostic(app)

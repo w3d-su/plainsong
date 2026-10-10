@@ -39,9 +39,21 @@ extension EditorFindHostedGateTests {
         let field = try await waitForReplacementField(in: window)
         XCTAssertEqual(field.stringValue, "NEW")
         XCTAssertEqual(app.editorFindHost.ui.queryText, "hit")
-        if let stray = label(EditorFindAccessibility.replaceProgress, in: window) {
-            XCTFail("the progress label survives close and reopen: "
-                + mountedBarLabelDiagnostic(stray, window: window, app: app))
+        // SwiftUI can defer the unmount one run-loop turn (transient, cosmetic); a label
+        // still mounted afterwards fails with its ancestry and live replace state.
+        if label(EditorFindAccessibility.replaceProgress, in: window) != nil {
+            hostedTimeoutDiagnostics.append { [weak self, weak app] in
+                guard let self, let app else { return "fixture released" }
+                guard let stray = label(EditorFindAccessibility.replaceProgress, in: window)
+                else {
+                    return "replaceProgress label absent at report time"
+                }
+                return "stray replaceProgress stillAttached=\(stray.superview != nil) "
+                    + mountedBarLabelDiagnostic(stray, window: window, app: app)
+            }
+            try await waitUntil("the progress label unmounts after close and reopen") {
+                self.label(EditorFindAccessibility.replaceProgress, in: window) == nil
+            }
         }
     }
 
