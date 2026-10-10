@@ -130,7 +130,7 @@ extension AppState {
         return sessions
     }
 
-    func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID) {
+    func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID, requestingEditorFocus: Bool = true) {
         guard var tree = workspaceTree,
               let node = tree.node(id: nodeID),
               node.isEditableMarkdown,
@@ -143,7 +143,9 @@ extension AppState {
 
         tree.selectNode(id: nodeID)
         workspaceTree = tree
-        openWorkspaceFile(fileURL)
+        WorkspaceSelectionFocus.$requestsEditorFocus.withValue(requestingEditorFocus) {
+            openWorkspaceFile(fileURL)
+        }
     }
 
     func setWorkspaceNodeExpanded(_ isExpanded: Bool, id nodeID: WorkspaceFileNode.ID) {
@@ -456,12 +458,13 @@ extension AppState {
 
     func setCurrentDocument(
         _ session: DocumentSession,
-        synchronizingWorkspaceTree: Bool = true
+        synchronizingWorkspaceTree: Bool = true,
+        requestingEditorFocus: Bool = WorkspaceSelectionFocus.requestsEditorFocus
     ) {
         guard currentDocument !== session else { return }
         let previousSession = currentDocument
         moveCurrentDocumentWorkToBackgroundBeforeSwitch()
-        requestEditorFocus()
+        if requestingEditorFocus { requestEditorFocus() }
         if synchronizingWorkspaceTree {
             synchronizeWorkspaceTreeSelection(for: session)
         }

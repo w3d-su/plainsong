@@ -9,7 +9,6 @@ mkdirSync(outDir, { recursive: true });
 const css = [
   readFileSync("src/styles/base.css", "utf8"),
   readFileSync("node_modules/katex/dist/katex.min.css", "utf8"),
-  readFileSync("node_modules/highlight.js/styles/github.css", "utf8"),
 ].join("\n\n");
 
 await build({

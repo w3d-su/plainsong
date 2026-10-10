@@ -55,7 +55,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | `MenuBarState` observes one `AppState` and republishes a deduplicated five-fact snapshot. | `App/MenuBarState.swift:9-24`, `:26-34`, `:41-53` | §5.1 keeps this contract and retargets it. |
 | `CommandGroup(replacing: .newItem)` holds New File ⌘N, Open… ⌘O, and Open Recent. | `App/PlainsongCommands.swift:21-45` | There is no New Window command (§5.3). |
 | View menu: layout cycle ⇧⌘P and Toggle Workspace Search ⇧⌘F. | `App/PlainsongCommands.swift:91-105` | Both must target the key window. |
-| `git grep` finds no `handlesExternalEvents`, `openWindow`, `tabbingMode`, `allowsAutomaticWindowTabbing`, `newWindowForTab`, `SceneStorage`, `FocusedValue`, restoration API, or `applicationShouldTerminateAfterLastWindowClosed` outside `agent.md`. | repository search | AppKit and SwiftUI defaults apply. Whether the tab-bar "+" button or Window › Merge All Windows can create mirrored windows today is unverified (W0). |
+| `git grep` finds no `handlesExternalEvents`, `openWindow`, `tabbingMode`, `allowsAutomaticWindowTabbing`, `newWindowForTab`, `FocusedValue`, window/document restoration API, or `applicationShouldTerminateAfterLastWindowClosed` outside `agent.md`. | repository search; PR L adds `SceneStorage` for inspector user intent and width in `WorkspaceWindow` | AppKit and SwiftUI defaults apply to window creation. Whether the tab-bar "+" button or Window › Merge All Windows can create mirrored windows today is unverified (W0). |
 
 ### 2.2 Precedent: state already keyed by window
 
@@ -82,7 +82,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | Undo is per text view. | `Packages/EditorKit/Package.swift:12` pins STTextView 2.3.10. That version's initializer gives each view its own `CoalescingUndoManager`, and `STTextView+Undo.swift` returns it unless a delegate supplies one (dependency source, not in this repository). No `undoManager(for:)` exists in `Packages`. | Two editors on one session would hold two undo stacks. |
 | One LRU, limit 8. Protected URLs still count toward the limit. Every editor installation is protected. | `App/AppState.swift:287-289`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:28-31`, `:94-100`, `App/AppState+WorkspaceSessions.swift:391-410`, `:416-451` | With N windows, only 8 − N warm slots remain (§7.1). |
 | Autosave: a foreground task bound to `currentDocument`, background tasks per session, a flush over all sessions. | `App/AppState+Autosave.swift:6-25`, `:27-48`, `:68-97`, `:135-156` | The foreground/background split assumes one current document. |
-| Every `WorkspaceWindow` flushes when **any** window resigns key (no `object:` filter). | `App/Views/WorkspaceWindow.swift:83-85` | N windows mean N flushes per resign. |
+| Every `WorkspaceWindow` flushes when **any** window resigns key (no `object:` filter). | `App/Views/WorkspaceWindow.swift` (`WorkspaceWindowContent.onReceive`) | N windows mean N flushes per resign. |
 | The external-change and missing-file prompts are single values for the current document. Switching clears them. | `App/AppState.swift:178-184`, `App/AppState+ExternalChanges.swift:42-55`, `App/AppState+Workspace.swift:469-472` | They are per-window projections of per-file state. |
 | Indeterminate-write quarantine is per session and blocks `canSave`. | `App/AppState.swift:321-326`, `:809-825` | Per file. |
 | A namespace mutation sets depth 1, fences the supplied relocation-record sessions, and its end clears **all** fences. | `App/AppState+WorkspaceMutationTransaction.swift:24-48`, `:55-60` | Two concurrent root transactions would clear each other's fences (§3.4 I4). |
@@ -98,7 +98,7 @@ in two editors (§4.1 b), or bridge changes (`PROTOCOL_VERSION` stays unchanged)
 | A watcher event inspects only sessions of that root authority. An unanchored session records membership in at most one installed root. | `App/AppState+Workspace.swift:111-131`, `App/AppState+SessionOwnership.swift:491-538` (early return at `:496`) | Overlapping roots are unsafe (§4.3). |
 | `WorkspaceFileTree` bundles the scanned root with `expandedNodeIDs` and `selectedNodeID`. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:149-160` | Share the snapshot only. Each window owns its entire filtered tree and reload disposition (`App/AppState+WorkspaceReload.swift:232-250`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift:245-248`). |
 | One last-opened bookmark key and ten recents. Restore runs once per `AppState` and re-saves stale bookmarks. A restored workspace selects its first file, not the last document. | `Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift:4`, `:25-43`, `Packages/WorkspaceKit/Sources/WorkspaceKit/RecentItemStore.swift:4`, `:12-20`, `App/AppState.swift:545-573`, `App/AppState+Workspace.swift:363-367` | Per-window restoration needs a list (§6.4). |
-| Restoration starts from every window's `.task`, guarded only per `AppState`. | `App/Views/WorkspaceWindow.swift:79-82`, `App/AppState.swift:546-547` | Per-window state would restore into every new window. |
+| Restoration starts from every window's `.task`, guarded only per `AppState`. | `App/Views/WorkspaceWindow.swift` (`WorkspaceWindowContent.task`), `App/AppState.swift:546-547` | Per-window state would restore into every new window. |
 | Workspace Search requires a root. Its UI, task, and generation live on `AppState`. | `App/AppState+WorkspaceSearchUI.swift:8-10`, `:53-60`, `App/AppState.swift:163-171`, `:231-234` | Per window, bound to a per-root generation. |
 | One cached `PlainsongPreferences` per `AppState`, with one `onChange` callback. | `App/AppState.swift:427`, `:451-453`, `App/PlainsongPreferences.swift:63`, `:67` | Two instances would not see each other's changes. |
 | The layout mode persists under one key. | `App/AppState.swift:734-736`, `:770` | WD9. |
@@ -120,7 +120,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 | Package | Single-window assumption | Evidence |
 |---|---|---|
 | WorkspaceKit | None. The LRU policy is a value type. The clone-source registry is process-wide but lock-protected. | `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift:18`, `Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceItemCreationTypes.swift:24-28` |
-| PreviewKit | None. Each controller owns its WKWebView, `asset://` handler, render-ID counter, and `invalidate()`. But a controller (and its WKWebView) is created for every window that shows a document, even in source-only layout. | `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:27`, `:42-67`, `:153-170`, `App/Views/WorkspaceWindow.swift:102` |
+| PreviewKit | None. Each controller owns its WKWebView, `asset://` handler, render-ID counter, and `invalidate()`. But a controller (and its WKWebView) is created for every window that shows a document, even in source-only layout. | `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:27`, `:42-67`, `:153-170`, `App/Views/WorkspaceDetail.swift` (`EditorWorkspace.previewController`) |
 | EditorKit | The Find hooks are static and carry no window. The thumbnail refresh proxy fans out by workspace-relative path, so it belongs to one root. Command routes are keyed per text view, which is safe. | `Packages/EditorKit/Sources/EditorKit/EditorFindActionHooks.swift:6-14`, `Packages/EditorKit/Sources/EditorKit/EditorImageThumbnailLoading.swift:82-85`, `Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift:120` |
 
 ### 2.5 Tests and evidence infrastructure
@@ -129,7 +129,7 @@ Additional consumers of `currentDocument` / `sessionCache` that I2 must migrate:
 |---|---|
 | 286 direct `AppState(` initializers in `AppTests`; 339 substring matches include helper names. Performance tests also construct it. | Token-boundary count over `git grep "AppState(" origin/main -- AppTests`; `PerformanceTests/AppBackedEditorPerformanceTests.swift:223` |
 | UI tests pick "the" window as the first hittable one and query identifiers app-wide. | `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`, `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` |
-| Accessibility identifiers are not unique across windows. | `App/Views/WorkspaceWindow.swift:200` |
+| Accessibility identifiers are not unique across windows. | `App/Views/DocumentJumpBar.swift` (`plainsong.editor.fileName`) |
 | Real dual-window key activation has never been verified. | `docs/editor-find-gates.md:776-781`, `docs/decision-log.md:180` |
 | The memory gate is 8 warm sessions + 2 live webviews under 400 MB host RSS. Recorded runs: 141.6–149.8 MB host, with about 500 MB across two WebKit helpers (diagnostic, R16). | `PerformanceTests/PerformanceBudgetTests.swift:309`, `:431`, `docs/perf-log.md:51`, `:69`, `docs/risk-register.md:26` |
 | The typing-latency gate. | `PerformanceTests/PerformanceBudgetTests.swift:12` |
@@ -323,7 +323,7 @@ is left behind.
 | Entry point | Today | Target |
 |---|---|---|
 | Finder Open With, Dock drop, `open -a` (`onOpenURL`) | `App/PlainsongApp.swift:51-53`; SwiftUI may also create a scene (W0) | Same rule as Open. |
-| File › Open… ⌘O, toolbar Open, empty-state Open | `App/AppState.swift:575-604` | Same rule as Open. The panel is window-modal for the active window, or app-modal when there is none. |
+| File › Open… ⌘O, empty-state Open (PR L removed toolbar Open) | `App/AppState.swift:575-604` | Same rule as Open. The panel is window-modal for the active window, or app-modal when there is none. |
 | Open Recent | `App/PlainsongCommands.swift:34-44` | Same rule as Open. |
 | Sidebar click | `App/AppState+Workspace.swift:282-299` | Same window. WD1 focus if the file is current elsewhere. |
 | Preview relative link | `App/AppState+DocumentEditing.swift:105-110` | A workspace link opens in the same window; an external file follows the Open rule. |
@@ -350,10 +350,10 @@ which Plainsong removed by replacing `.newItem` (`App/PlainsongCommands.swift:21
 ### 6.1 Opening a window or tab
 
 - An empty WindowState has no document/root, inherits layout (WD9), closes Find, and starts
-  in Files mode. New windows never launch restoration (`App/Views/WorkspaceWindow.swift:79-82`).
+  in Files mode. New windows never launch restoration (`App/Views/WorkspaceWindow.swift`, `WorkspaceWindowContent.task`).
 - Register it with KeyWindowRouter. Create a WKWebView only when a document's preview is
   visible (§7.2); today editor mount creates it even in source-only layout
-  (`App/Views/WorkspaceWindow.swift:102`, `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:54`, `:66`).
+  (`App/Views/WorkspaceDetail.swift` (`EditorWorkspace.previewController`), `Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift:54`, `:66`).
 
 ### 6.2 Closing a window or tab
 
@@ -490,9 +490,12 @@ The registry publishes no text changes; menus observe deduplicated facts. W12 me
 
 ## 8. Accessibility and UI-test implications
 
-- **Titles:** today root name else file name (`App/AppState.swift:827-829`), with represented
-  URL/edited dot (`App/Views/WorkspaceWindow.swift:439-460`). Use document name, else root,
-  else Plainsong; root subtitle; append root name for duplicate filenames. Tab titles follow.
+- **Titles:** PR L (§10.1) moved the title to SwiftUI `navigationTitle` /
+  `navigationSubtitle`: document name, else root, else Plainsong, with the root (or a single
+  file's parent folder) as subtitle. `WindowMetadataAccessor` keeps the represented URL and
+  edited dot (`App/Views/WindowMetadataAccessor.swift`). `AppState.windowTitle` no longer
+  drives the window; C removes it with the singleton. Still open for C/F: append the root
+  name for duplicate filenames, and tab titles follow.
 - **Selectors:** identifiers stay stable but queries scope to a uniquely titled window.
   App-wide queries/first hittable window in `PlainsongUITests/EditorFindAcceptanceTests.swift:119-129`
   and `PlainsongUITests/WorkspaceSearchAcceptanceTests.swift:29-37` must change.
@@ -531,6 +534,7 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 |---|---|---|---|
 | **A — this spec** | Two docs only; no checked box. | None | No |
 | **B1 — types and forwarding** | Registry/root/window types and behavior-neutral forwarding façade; preserve all authority hooks, 286 direct AppTests initializers, and existing APIs. No inventory logic change or new publish; still shared one-window behavior. | W0 inventory; W1 partition/hooks/regressions | **Yes**: authority/recovery storage moves |
+| **L — window chrome** | Native `NavigationSplitView` sidebar, document column, Xcode-style inspector and toolbar (§10.1). Chrome plus `SidebarCommands` (27+) and `InspectorToggleCommands`; only the reviewed navigator focus parameter in `AppState+Workspace.swift`; no Find or export-banner file changes. Inspector user intent and width are scene state. | R17 launch stability; hosted suite unchanged | No |
 | **B2 — registry enumeration** | Migrate all session consumers under I2, with explicit list extras and operation filters. Preserve one-window behavior; prove no missed direct reads by grep. | W1 enumerator/grep; W3 registry fixtures | **Yes**: ownership, pruning, fences |
 | **C — independent state/routing, creation guarded** | Per-window state; deduplicated menus; remove singleton; route hot key and all Find hooks, including Escape. Disallow native tabs until F. Close W0 bullet 2; disable or route **every** W0-bullet-1 path to the existing window, including system menus and onOpenURL scene creation. Any unavoidable second WindowState fails closed on **any** file/root open until D2. Hosted test fixtures may bypass only creation guards. | W0 external-open + creation-guard/close probes; W2/W3/W5 hosted bullets | **Yes**: cross-window authority |
 | **D1 — root/session lifecycle** | Root reference counts; per-window filtered trees; scoped release/prune; per-root deferred refresh/image placement; WD2 overlap policy; separate installed/warm LRU capacity. No user window creation yet; retain C guards. | W6; W4 adoption; W11 LRU | **Yes**: mutation, retirement, quarantine |
@@ -539,9 +543,65 @@ Find, and Export F/G's File commands and Print (`docs/export-gates.md:665-666`).
 | **E — restoration** | After F: restoration/migration, missing-item handling, tab-group/order records and restoration. | W9 | **Yes (light)**: bookmarks |
 | **G — residency/acceptance** | Preview residency, dual-window XCUITest, memory/typing measurements, accessibility; no bridge changes. | W11; W12; W13 | No |
 
-Order: B1 → B2 → C → D1 → D2 → F → E → G. E follows F because it restores tab order.
+Order: {L, B1} → B2 → C → D1 → D2 → F → E → G. E follows F because it restores tab order.
+L lands before B1; its narrow navigator focus parameter must be preserved when B1 forwards activation. Both L and B1 must land before B2.
 Implementation completion requires relevant package/hosted tests, `make format`, `make lint`,
 `make test`, `make build`, and `git diff --check`; PR bodies name closed and open gates.
+
+### 10.1 Window chrome (PR L)
+
+PR L rebuilds the workspace window's chrome ahead of C so that C splits state under the
+final layout instead of a layout that is about to move. It changes chrome and its menu commands, with a narrow navigator focus parameter.
+
+```
+┌──────────────┬──────────────────────────────────────┬──────────────┐
+│ ● ● ●   [⊟]  │ post.md · blog       [▤|◫|✦]  [⊟]   │              │  toolbar: title + subtitle,
+│ [🗂] [🔍]     │ 📁 blog › posts › 📄 post.md    MDX  │ Frontmatter  │  layout picker, inspector toggle
+│ ▾ 📁 blog    │ ╭ ⚠ File changed on disk   [Reload] ╮│  title …     │  jump bar; glass notice cards
+│    📄 a.md   │  editor            │ preview         │ File         │
+│ (+) (⌯)      │ 188 lines · 432 words                │  name, type… │  status bar
+└──────────────┴──────────────────────────────────────┴──────────────┘
+   sidebar column           detail column               inspector
+```
+
+- **Shell.** On macOS 27+ `WorkspaceWindow` is a `NavigationSplitView` (sidebar ideal width
+  256, range 220–320); macOS 14–26 keep the fixed-width (256) `HStack` shell with the system
+  sidebar material, because macOS 15 still hits R17 in the split view (below). The detail column holds the document and, trailing it, `InspectorColumn`
+  (default 280, drag-resizable 240–360). SwiftUI's `.inspector` is not used: with it
+  mounted, even with static content, the editor's SwiftUI updates intermittently stalled in
+  the hosted Find/Replace gates (decision log, PR L). On macOS 27 the system draws the
+  sidebar and toolbar as Liquid Glass; custom surfaces use `plainsongGlass` (glass on
+  macOS 26+, a material fallback before).
+- **R17.** The detail content sits inside a `GeometryReader` so the split column's minimum
+  size never follows the editor or web view. Without it the window re-entered Update
+  Constraints until AppKit threw (20 of 20 restore launches); with it, 30 of 30 launches were
+  clean on macOS 27. On the macOS 15 CI runner the split view still threw, from STTextView's
+  layout requesting constraint updates, hence the version split (`docs/risk-register.md` R17).
+- **Per-window chrome state.** Sidebar column visibility is view `@State`; inspector
+  user intent and width are `@SceneStorage` (`plainsong.inspectorPresented`,
+  `plainsong.inspectorWidth`), shown by default and hidden
+  while no document is open. Neither lives in `AppState`, so C inherits per-window chrome
+  without moving it. Toggle Sidebar (⌃⌘S) comes from `SidebarCommands` on macOS 27+ only. Show/Hide
+  Inspector (⌃⌘I) is `InspectorToggleCommands`, which observes the app-global
+  `InspectorMenuState`: each window's `InspectorVisibility` registers there while its window
+  is key (become/resign-key notifications), so the command disables when no workspace window
+  with a document is key and never falls back (§5.1). It reflects visible state after key, intent, document, and geometry changes. SwiftUI
+  focused values are deliberately not used: any `focusedSceneValue` or `focusedSceneObject`
+  on the workspace window delayed the editor's own updates in the hosted gates. C should
+  fold `InspectorMenuState` into `KeyWindowRouter`.
+- **Entry points.** The toolbar holds only the layout picker and the inspector toggle.
+  Open and Save leave the toolbar; File › Open… ⌘O, Save ⌘S, and the empty-state Open… and
+  recent items remain (§5.2).
+- **Stable identifiers.** `plainsong.editor.fileName` (now the jump bar's document segment,
+  same label; its value stays the file name, and the window's document-edited state announces Edited; its menu is a separate pop-up button laid over it), `plainsong.workspaceSearch.mode` (the navigator selector container,
+  with Files and Search buttons), `plainsong.workspaceSearch.queryField` (still an owned
+  `NSTextField`), `plainsong.editor.textView`, `plainsong.editorFind.*`, and the window
+  identifier with its `exportHTMLWindowRegistered` post. The Search sidebar still unmounts in
+  Files mode, the Find bar stays in the document column of the same `NSWindow`, and the
+  sidebar stays left of x = 280 for the hosted Search activation test.
+- **C builds on L.** C replaces `@EnvironmentObject AppState` in these views with the
+  window's state; the view split (`WorkspaceDetail`, `DocumentJumpBar`, `WorkspaceToolbar`,
+  `WorkspaceInspector`, `WorkspaceStatusBar`, `EmptyEditorState`) keeps those edits local.
 
 ## 11. Gates
 
@@ -595,6 +655,14 @@ recorded in the closing commit.
 - [ ] Every session has ≤ 1 writer always and ≤ 1 live installation after SwiftUI teardown settles. Adoption revokes the old writer synchronously; late teardown cannot revoke the new writer. *Debug assertions + named hosted test with delayed teardown.*
 - [ ] A warm session adopted by window 2 after window 1 switched away transfers the writer; window 1's stale installation cannot publish. *Named hosted test.*
 - Evidence: _open_
+
+### PR C scheduling re-verification (R22)
+
+Before accepting C, keep the inspector mounted and run
+`EditorFindHostedGateTests/testHostedReplaceInvalidDelimiterStaysRawWithoutMarkdownRepair`
+and `EditorFindHostedGateTests/testHostedKeepMineInWYSIWYGRetainsFoldsImageMarkersAndFindDecorationWithoutAnEdit`
+16 times each. Retain all attempts; the `.inspector` / focused-values / grouped-Form
+scheduling root cause remains unknown. This is an additional gate, not closure by a green rerun.
 
 ### W5 — Menu commands act only on the key window
 

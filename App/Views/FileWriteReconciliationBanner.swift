@@ -4,22 +4,15 @@ struct FileWriteReconciliationBanner: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.shield")
-                .foregroundStyle(.orange)
-
-            Text(message)
-                .font(.callout.weight(.medium))
-
+        NoticeBar(
+            tone: .caution,
+            systemImage: "exclamationmark.shield.fill",
+            message: message
+        ) {
             Button("Check Again") {
                 appState.refreshIndeterminateFileWriteReconciliation()
             }
-
-            Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.orange.opacity(0.14))
     }
 
     private var message: String {
