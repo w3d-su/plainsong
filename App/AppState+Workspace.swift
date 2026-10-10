@@ -10,7 +10,10 @@ extension AppState {
         refreshWorkspaceAfterFileSystemChange()
     }
 
-    func refreshWorkspaceAfterFileSystemChange() {
+    func refreshWorkspaceAfterFileSystemChange(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
             workspaceMutationExternalRefreshPending = true
@@ -24,7 +27,7 @@ extension AppState {
             return
         }
         guard let workspaceRootURL else {
-            handleCurrentDocumentExternalChange()
+            handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             return
         }
 
@@ -32,7 +35,7 @@ extension AppState {
         // document reads. Advance the per-session disk generation immediately so a
         // slow directory snapshot cannot allow an older Reload / Keep Mine read to
         // commit before the newer event is observed.
-        handleManagedWorkspaceSessionsExternalChange()
+        handleManagedWorkspaceSessionsExternalChange(fileID: fileID, line: line)
 
         scheduleWorkspaceReload(
             root: workspaceRootURL,
@@ -43,7 +46,9 @@ extension AppState {
 
     func refreshWorkspaceAfterNamespaceMutation(
         using retainedRootAuthority: WorkspaceFileSystemRootAuthority,
-        inspectManagedSessions: Bool
+        inspectManagedSessions: Bool,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         guard workspaceMutationNamespaceDepth == 0 else {
             workspaceMutationRefreshPending = true
@@ -53,7 +58,7 @@ extension AppState {
         }
         guard let workspaceRootURL else {
             if inspectManagedSessions {
-                handleCurrentDocumentExternalChange()
+                handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             }
             return
         }
@@ -61,10 +66,12 @@ extension AppState {
         if inspectManagedSessions {
             if workspaceSearchRootAuthority == retainedRootAuthority {
                 handleManagedWorkspaceSessionsExternalChange(
-                    rootAuthority: retainedRootAuthority
+                    rootAuthority: retainedRootAuthority,
+                    fileID: fileID,
+                    line: line
                 )
             } else {
-                handleCurrentDocumentExternalChange()
+                handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             }
         }
         scheduleWorkspaceReload(
@@ -74,22 +81,31 @@ extension AppState {
         )
     }
 
-    private func handleManagedWorkspaceSessionsExternalChange() {
+    private func handleManagedWorkspaceSessionsExternalChange(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
         guard let rootAuthority = workspaceSearchRootAuthority,
               workspaceInstalledCaptureGeneration == workspaceGeneration
         else {
-            handleCurrentDocumentExternalChange()
+            handleCurrentDocumentExternalChange(fileID: fileID, line: line)
             return
         }
 
-        handleManagedWorkspaceSessionsExternalChange(rootAuthority: rootAuthority)
+        handleManagedWorkspaceSessionsExternalChange(
+            rootAuthority: rootAuthority,
+            fileID: fileID,
+            line: line
+        )
     }
 
     private func handleManagedWorkspaceSessionsExternalChange(
-        rootAuthority: WorkspaceFileSystemRootAuthority
+        rootAuthority: WorkspaceFileSystemRootAuthority,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         for session in managedWorkspaceSessions(rootAuthority: rootAuthority) {
-            handleExternalChange(for: session)
+            handleExternalChange(for: session, fileID: fileID, line: line)
         }
     }
 
@@ -316,8 +332,10 @@ extension AppState {
 }
 
 /// Lets a `WorkspaceEventWatcher` handler refer to the watcher it was installed on,
-/// which cannot be captured while the watcher is being initialized.
-private final class WorkspaceEventWatcherBox {
+/// which cannot be captured while the watcher is being initialized. `watcher` is written
+/// once on the main actor before `start()` and read on the watcher's serial queue and on
+/// the main actor; the only mutation is that single assignment, so the box is sent safely.
+private final class WorkspaceEventWatcherBox: @unchecked Sendable {
     weak var watcher: WorkspaceEventWatcher?
 }
 
@@ -359,15 +377,21 @@ extension AppState {
                 // The watcher's stop() boundary only guarantees no handler *begins*
                 // afterwards; a handler that began just before it still hops here.
                 // Drop a delivery whose watcher was replaced or stopped meanwhile.
-                guard let self,
-                      let watcher = watcherBox.watcher,
-                      watcher === workspaceWatcher,
-                      !watcher.isStopped,
-                      let currentRoot = workspaceRootURL,
-                      exactFileURLSpellingMatches(currentRoot, root)
-                else {
-                    return
+                guard let self else { return }
+                let watcher = watcherBox.watcher
+                let dropReason: String? = if watcher !== workspaceWatcher {
+                    "replaced"
+                } else if watcher == nil || watcher?.isStopped == true {
+                    "stopped"
+                } else if !(workspaceRootURL.map { self.exactFileURLSpellingMatches($0, root) } ?? false) {
+                    "rootChanged"
+                } else {
+                    nil
                 }
+                editorFindHost.traceReplaceBarAction(
+                    "watcherHop \(dropReason.map { "dropped reason=\($0)" } ?? "accepted")"
+                )
+                guard dropReason == nil else { return }
                 refreshWorkspaceAfterFileSystemChange()
             }
         }

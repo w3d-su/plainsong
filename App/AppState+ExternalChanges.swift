@@ -172,17 +172,24 @@ extension AppState {
         }
     }
 
-    func handleCurrentDocumentExternalChange() {
-        handleExternalChange(for: currentDocument)
+    func handleCurrentDocumentExternalChange(
+        fileID: StaticString = #fileID,
+        line: UInt = #line
+    ) {
+        handleExternalChange(for: currentDocument, fileID: fileID, line: line)
     }
 
     func handleExternalChange(
         for session: DocumentSession,
-        advancingDiskEvent: Bool = true
+        advancingDiskEvent: Bool = true,
+        fileID: StaticString = #fileID,
+        line: UInt = #line
     ) {
         editorFindHost.traceReplaceBarAction(
             "handleExternalChange file=\(session.fileURL?.lastPathComponent ?? "untitled") "
-                + "advancing=\(advancingDiskEvent)"
+                + "advancing=\(advancingDiskEvent)",
+            fileID: fileID,
+            line: line
         )
         let sessionIdentity = ObjectIdentifier(session)
         guard !workspaceMutationWriteFences.contains(sessionIdentity),

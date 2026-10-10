@@ -1,7 +1,10 @@
 import CoreServices
 import Foundation
 
-public final class WorkspaceEventWatcher {
+/// Mutable state (`stream`, `debounceTask`, `stopped`, `generation`) is confined to `queue`
+/// through `runOnQueue`; the FSEvents callback, debounce tasks, `stop()` and `deinit` all
+/// reach it only there, so the watcher is safe to send across concurrency domains.
+public final class WorkspaceEventWatcher: @unchecked Sendable {
     private let rootURL: URL
     private let debounceNanoseconds: UInt64
     private let eventHandler: @Sendable () -> Void
