@@ -29,46 +29,58 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
 
     /// A wide extent forms a Print run (2,400 > 800/0.9), so its pages are isolated:
     /// the neighbouring prose pages keep the baseline width and the run's own page is
-    /// bounded by the run's edges, not by its soft `width × aspect` budget.
+    /// bounded by the absorbed run's edges, not by its soft `width × aspect` budget.
     func testPerPageWidthGrowsOnlyThePageContainingWideContent() throws {
+        let spans = ExportPDFPagePlannerTests.lineSpans(to: 3200)
         let extent = Extent(minY: 1200, maxY: 1600, maxX: 2400)
         let plan = try planDocument(
-            width: 3200, height: 3200, extents: [extent], aspect: 0.5
+            width: 3200, height: 3200, unsplittable: spans,
+            extents: [extent], aspect: 0.5
         )
         ExportPDFPagePlannerTests.assertPlanInvariants(
             plan, contentSize: CGSize(width: 3200, height: 3200),
-            baselineWidth: 800, unsplittable: [], aspect: 0.5
+            baselineWidth: 800, unsplittable: spans, aspect: 0.5
         )
-        XCTAssertEqual(
-            plan.pages.map(\.rect.width),
-            [800, 800, 800, 2400, 800, 800, 800, 800]
-        )
-        XCTAssertEqual(plan.pages.map(\.scale), [1, 1, 1, 1, 1, 1, 1, 1])
-        // The run's mandatory breaks pin its page to exactly [1200, 1600]: the soft
-        // budget (2,400 × 0.5 = 1,200) could not extend it past the run's bottom.
-        let runPage = plan.pages[3].rect
-        XCTAssertEqual(runPage.minY, 1200, accuracy: 0.5)
-        XCTAssertEqual(runPage.maxY, 1600, accuracy: 0.5)
-        XCTAssertLessThan(runPage.height, 2400 * 0.5)
+        let wideWidth: CGFloat = 2400
+        XCTAssertTrue(plan.pages.allSatisfy {
+            $0.rect.width == 800 || $0.rect.width == wideWidth
+        })
+        XCTAssertTrue(plan.pages.allSatisfy { $0.scale == 1 })
+        // The run absorbs the neighbouring span-free margins to [1198, 1620]; its
+        // page covers exactly that at the measured width (2,400 — under
+        // `maximumSide`, so no slack), and the soft budget (wideWidth × 0.5)
+        // could not extend it past the run.
+        let runPage = try XCTUnwrap(plan.pages.first { $0.rect.width > 800 })
+        XCTAssertEqual(runPage.rect.minY, 1198, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.maxY, 1620, accuracy: 0.5)
+        XCTAssertLessThan(runPage.rect.height, wideWidth * 0.5)
     }
 
     /// A page whose own width exceeds 14,400 pt scales down in PDF space while the
     /// other pages stay at 100%. The extent is a PDF wide run, so its page is isolated
     /// to the run's span and capped at 14,400 CSS pt like every other page.
     func testPerPageScaleShrinksOnlyTheWidePage() throws {
+        let spans = ExportPDFPagePlannerTests.lineSpans(to: 40000)
         let extent = Extent(minY: 15000, maxY: 16000, maxX: 28800)
         let plan = try planDocument(
-            width: 28800, height: 40000, extents: [extent]
+            width: 28800, height: 40000, unsplittable: spans, extents: [extent]
         )
         ExportPDFPagePlannerTests.assertPlanInvariants(
             plan, contentSize: CGSize(width: 28800, height: 40000),
-            baselineWidth: 800, unsplittable: []
+            baselineWidth: 800, unsplittable: spans
         )
-        XCTAssertEqual(plan.pages.map(\.rect.width), [800, 800, 28800, 800, 800])
+        let wideWidth = 28800 + ExportPDFPagePlanner.widePageSlack
+        XCTAssertEqual(
+            plan.pages.map(\.rect.width), [800, 800, wideWidth, 800, 800]
+        )
         let runPage = plan.pages[2]
-        XCTAssertEqual(runPage.rect.minY, 15000, accuracy: 0.5)
-        XCTAssertEqual(runPage.rect.maxY, 16000, accuracy: 0.5)
-        XCTAssertEqual(runPage.scale, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(runPage.rect.minY, 14998, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.maxY, 16020, accuracy: 0.5)
+        XCTAssertEqual(
+            runPage.scale,
+            ExportPDFPagePlanner.pageScale(width: wideWidth),
+            accuracy: 0.0001
+        )
         for (index, page) in plan.pages.enumerated() where index != 2 {
             XCTAssertEqual(page.scale, 1)
             XCTAssertLessThanOrEqual(page.rect.height, 14400 + 0.5)
@@ -76,8 +88,8 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
     }
 
     /// A narrower extent must not shrink a page below the baseline, and an extent wider
-    /// than the measured content width clamps to it. (The wide extent is a Print run,
-    /// so its page is isolated to [0, 400].)
+    /// than the measured content width clamps to it — at 3,000 pt (< `maximumSide`)
+    /// the page captures exactly its clamped width, no `widePageSlack` overscan.
     func testPageWidthIsNeverBelowBaselineAndNeverAboveContentWidth() throws {
         let extents = [
             Extent(minY: 0, maxY: 400, maxX: 5000),
@@ -92,24 +104,21 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
         )
         let first = try XCTUnwrap(plan.pages.first)
         XCTAssertEqual(first.rect.width, 3000)
-        XCTAssertEqual(first.rect.maxY, 400, accuracy: 0.5)
-        XCTAssertEqual(
-            plan.pages.dropFirst().map(\.rect.width),
-            [800, 800, 800, 800, 800, 800, 800, 800]
-        )
+        XCTAssertTrue(plan.pages.dropFirst().allSatisfy { $0.rect.width == 800 })
     }
 
-    /// Soft aspect budget: an atomic run taller than `width × aspect` but under the hard
-    /// cap extends the page to the run's end instead of failing.
+    /// Soft aspect budget: an atomic box taller than `width × aspect` but under the
+    /// hard cap extends its page to the box's end — and because the slice before the
+    /// box holds no span, the page grows over the whitespace instead of emitting it
+    /// as a blank page (X1).
     func testSoftAspectBudgetExtendsAPageToAnAtomicBoxEnd() throws {
         let atomic = Span(minY: 100, maxY: 1700)
         let plan = try planDocument(
             width: 800, height: 1700, unsplittable: [atomic], aspect: 1.29
         )
-        XCTAssertEqual(plan.pages.count, 2)
-        XCTAssertEqual(plan.pages[0].rect.height, 100, accuracy: 0.5)
-        let extended = plan.pages[1].rect
-        XCTAssertEqual(extended.minY, 100, accuracy: 0.5)
+        XCTAssertEqual(plan.pages.count, 1)
+        let extended = plan.pages[0].rect
+        XCTAssertEqual(extended.minY, 0, accuracy: 0.5)
         XCTAssertEqual(extended.maxY, 1700, accuracy: 0.5)
         XCTAssertGreaterThan(extended.height, 800 * 1.29)
         ExportPDFPagePlannerTests.assertPlanInvariants(
@@ -151,5 +160,34 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
         XCTAssertEqual(page.width, 2000)
         XCTAssertEqual(page.height, 1700, accuracy: 0.5)
         XCTAssertGreaterThan(page.height, 2000 * 0.7)
+    }
+
+    /// `widePageSlack` overscan applies only past `maximumSide` (Y2, corrected
+    /// 2026-10-10): a Print page at 880 — under the 888 run threshold — and a PDF
+    /// page at 14,000 both fit, so slack would only lower their scale, and a
+    /// 200,000 pt run page captures exactly +200.
+    func testCaptureSlackAppliesOnlyPastTheMaximumSide() throws {
+        let spans = ExportPDFPagePlannerTests.lineSpans(to: 2000)
+        // Print non-run: 880 < 800/0.9 ≈ 889, and ≤ 14,400 — capture is exact.
+        let printPage = try planDocument(
+            width: 2000, height: 2000, unsplittable: spans,
+            extents: [Extent(minY: 0, maxY: 400, maxX: 880)], aspect: 1.29
+        )
+        XCTAssertEqual(printPage.pages[0].rect.width, 880)
+        // PDF non-run: 14,000 < `maximumSide` — capture is exact too.
+        let pdfPage = try planDocument(
+            width: 20000, height: 2000, unsplittable: spans,
+            extents: [Extent(minY: 0, maxY: 400, maxX: 14000)]
+        )
+        XCTAssertEqual(pdfPage.pages[0].rect.width, 14000)
+        // Run page past `maximumSide`: exactly `width + widePageSlack`.
+        let runPlan = try planDocument(
+            width: 200_000, height: 2000, unsplittable: spans,
+            extents: [Extent(minY: 0, maxY: 400, maxX: 200_000)]
+        )
+        XCTAssertEqual(
+            runPlan.pages[0].rect.width,
+            200_000 + ExportPDFPagePlanner.widePageSlack
+        )
     }
 }

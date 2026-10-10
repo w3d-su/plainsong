@@ -49,10 +49,12 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
     }
 
     /// Print inside a run keeps the greedy width growth: a page first grows to the
-    /// widest extent it spans, then uses that width's `width × aspect` soft budget.
+    /// widest extent it spans, then uses that capture width's `width × aspect` soft
+    /// budget.
     func testPrintGreedySoftBudgetInsideARun() throws {
-        // Touching 100 pt rows give a safe break every 100 pt.
-        var spans: [Span] = []
+        // Touching 100 pt rows give a safe break every 100 pt; the leading block
+        // keeps the absorbed run edges at [2000, 4000].
+        var spans = [Span(minY: 0, maxY: 2000)]
         for index in 0 ..< 40 {
             let top = CGFloat(2000 + index * 100)
             spans.append(Span(minY: top, maxY: top + 100))
@@ -65,15 +67,16 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
             width: 2400, height: 6000, unsplittable: spans, extents: extents, aspect: 0.5
         )
         assertRunIsolation(plan, runs: [(2000, 4000)])
-        // Width grows to 2,400 greedily; the run's first page then ends at its own
-        // soft budget of 2,400 × 0.5 = 1,200 at a row edge, never past the run.
+        // Width grows to the 2,400 capture (no slack under `maximumSide`); the
+        // run's pages then end at that width's own soft budget, never past the run.
+        let soft: CGFloat = 2400 * 0.5
         let runPages = plan.pages.filter {
             $0.rect.minY >= 2000 - 0.5 && $0.rect.maxY <= 4000 + 0.5
         }
         XCTAssertFalse(runPages.isEmpty)
         for page in runPages {
             XCTAssertEqual(page.rect.width, 2400)
-            XCTAssertLessThanOrEqual(page.rect.height, 2400 * 0.5 + 0.5)
+            XCTAssertLessThanOrEqual(page.rect.height, soft + 0.5)
             XCTAssertLessThanOrEqual(page.rect.maxY, 4000 + 0.5)
         }
         XCTAssertEqual(runPages.first?.rect.minY ?? 0, 2000, accuracy: 0.5)
@@ -81,25 +84,30 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
 
     /// The soft Print extension still applies inside a run: an atomic box taller
     /// than the page's `width × aspect` soft budget extends the page to its end —
-    /// but never past the run's bottom.
+    /// and swallows the remaining whitespace up to the run's bottom rather than
+    /// emitting a span-free page (X1).
     func testPrintSoftExtensionInsideARun() throws {
-        let atomic = Span(minY: 1200, maxY: 2600)
+        let spans = [
+            Span(minY: 0, maxY: 1000),
+            Span(minY: 1200, maxY: 2600),
+            Span(minY: 3000, maxY: 5000),
+        ]
         let extent = Extent(minY: 1000, maxY: 3000, maxX: 2400)
         let plan = try planDocument(
-            width: 2400, height: 5000, unsplittable: [atomic], extents: [extent], aspect: 0.5
+            width: 2400, height: 5000, unsplittable: spans, extents: [extent], aspect: 0.5
         )
         assertRunIsolation(plan, runs: [(1000, 3000)])
         let extended = plan.pages.first { page in
             page.rect.height > 2400 * 0.5 + 0.5
         }
         let rect = try XCTUnwrap(extended?.rect, "The atomic box's page must soft-extend")
-        XCTAssertEqual(rect.minY, 1200, accuracy: 0.5)
-        XCTAssertEqual(rect.maxY, 2600, accuracy: 0.5)
+        XCTAssertEqual(rect.minY, 1000, accuracy: 0.5)
+        XCTAssertEqual(rect.maxY, 3000, accuracy: 0.5)
         XCTAssertEqual(extended?.rect.width, 2400)
     }
 
-    /// Landscape paper inside a run: pages stay bounded by `width × aspect` (< 1)
-    /// and come out wider than tall.
+    /// Landscape paper inside a run: the wide pages stay bounded by `width × aspect`
+    /// (< 1) and come out wider than tall.
     func testPrintRunPagesInLandscape() throws {
         var spans: [Span] = []
         for index in 0 ..< 100 {
@@ -111,8 +119,9 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
         let plan = try planDocument(
             width: 2400, height: 5000, unsplittable: spans, extents: [extent], aspect: aspect
         )
-        assertRunIsolation(plan, runs: [(1000, 2500)])
-        let runPages = plan.pages.filter { $0.rect.minY >= 1000 - 0.5 && $0.rect.maxY <= 2500 + 0.5 }
+        // The run absorbs to the document top and the span edge at 2,500.
+        assertRunIsolation(plan, runs: [(0, 2500)])
+        let runPages = plan.pages.filter { $0.rect.width > 800 }
         XCTAssertGreaterThan(runPages.count, 1)
         for page in runPages {
             XCTAssertLessThanOrEqual(page.rect.height, page.rect.width * aspect + 0.5)
@@ -122,12 +131,14 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
 
     /// A tail with no spans after the last content produces no trailing blank page:
     /// every fully span-free page at the end is dropped (the content-measured B2
-    /// height makes this a safety net only).
+    /// height makes this a safety net only), and `droppedTrailingBlankPages`
+    /// reports how many.
     func testTrailingSpanFreeTailIsDropped() throws {
         let spans = [Span(minY: 0, maxY: 100), Span(minY: 120, maxY: 220)]
         let plan = try planDocument(width: 800, height: 50000, unsplittable: spans)
         XCTAssertEqual(plan.pages.count, 1)
         XCTAssertEqual(plan.pages[0].rect.maxY, 14400, accuracy: 0.5)
+        XCTAssertEqual(plan.droppedTrailingBlankPages, 3)
     }
 
     /// The drop never removes a page that still holds content: a span reaching into
@@ -141,8 +152,12 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
     }
 
     /// Randomized span/extent sets keep every invariant: contiguity from zero, no
-    /// empty pages, the flat height cap, run isolation, safe breaks, and a bounded
-    /// page count that proves the loops terminate.
+    /// empty pages (every page intersects a measured span), the flat height cap, run
+    /// isolation, safe breaks, and a bounded page count that proves the loops
+    /// terminate. Precondition for the no-empty-page invariant, per the planner doc:
+    /// whitespace gaps between consecutive spans stay below the smallest soft
+    /// budget — the generator's gaps are at most 19 pt — and every generated extent
+    /// carries its own measured span, as a real measurement always does.
     func testRandomizedRunsKeepInvariantsAndTerminate() throws {
         var state: UInt64 = 0x2F6E_6B6A
         func next(_ bound: Int) -> Int {
@@ -161,14 +176,16 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
                 cursor += height + CGFloat(next(20))
             }
             y = cursor + 5000
-            // Random extents, half of them past the PDF threshold.
-            for _ in 0 ..< next(6) {
-                let top = CGFloat(next(Int(max(y - 1000, 1000))))
-                let height = CGFloat(next(3000) + 100)
+            // Random extents inside the span region, half of them past the PDF wide
+            // threshold, each carrying the span its own content would measure.
+            for _ in 0 ..< next(6) where cursor > 200 {
+                let top = CGFloat(next(Int(cursor - 100)))
+                let height = min(CGFloat(next(3000) + 100), cursor - top)
                 let maxX: CGFloat = next(2) == 0
                     ? CGFloat(1000 + next(13000))
                     : CGFloat(15000 + next(80000))
-                extents.append(Extent(minY: top, maxY: min(top + height, y), maxX: maxX))
+                spans.append(Span(minY: top, maxY: top + height))
+                extents.append(Extent(minY: top, maxY: top + height, maxX: maxX))
             }
             let contentWidth = max(900, (extents.map(\.maxX).max() ?? 900) + 50)
             let aspect: CGFloat? = next(2) == 0 ? nil : [0.7, 1.0, 1.29][next(3)]
@@ -197,10 +214,13 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
                     plan.pages.count, bound, "iteration \(iteration) produced \(plan.pages.count) pages"
                 )
             } catch {
-                guard let captureError = error as? ExportPDFCaptureError,
-                      case .oversizeAtomicBox = captureError
-                else {
-                    return XCTFail("iteration \(iteration): unexpected error \(error)")
+                // `plan` throws typed `ExportPDFCaptureError`, so `error` already
+                // is one — no conditional cast needed.
+                switch error {
+                case .oversizeAtomicBox, .oversizeCaptureArea:
+                    break
+                default:
+                    XCTFail("iteration \(iteration): unexpected error \(error)")
                 }
             }
         }

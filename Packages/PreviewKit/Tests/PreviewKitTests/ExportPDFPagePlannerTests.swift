@@ -12,11 +12,13 @@ final class ExportPDFPagePlannerTests: XCTestCase {
 
     /// The planner invariants: contiguous coverage of [0, contentHeight], no page taller
     /// than its width's hard budget — the flat 14,400 CSS pt, lowered once the page's
-    /// width would push the capture raster past `captureAreaBudget` — no empty page,
-    /// every width inside [baseline, contentWidth], and every page's scale equal to
-    /// `pageScale` of its own width. Under an aspect, a page taller than its soft budget
-    /// is allowed only when it starts inside an unbreakable run that reaches past the
-    /// soft budget (the soft extension).
+    /// capture width would push the raster past `captureAreaBudget` — every page
+    /// intersecting at least one unsplittable span when spans were supplied (strict
+    /// overlap > ε: borders and padding count because the measured spans include
+    /// them), every width inside [baseline, contentWidth + widePageSlack], and every
+    /// page's scale equal to `pageScale` of its own capture width. Under an aspect, a
+    /// page taller than its soft budget is allowed only when an unbreakable run spans
+    /// it or the overage is whitespace swallowed up to a mandatory break.
     static func assertPlanInvariants(
         _ plan: ExportPDFPagePlanner.Plan,
         contentSize: CGSize,
@@ -34,9 +36,22 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             let rect = page.rect
             XCTAssertEqual(rect.minX, 0, file: file, line: line)
             XCTAssertGreaterThanOrEqual(rect.width, baseline - 0.001, file: file, line: line)
-            XCTAssertLessThanOrEqual(rect.width, contentSize.width + 0.001, file: file, line: line)
+            XCTAssertLessThanOrEqual(
+                rect.width,
+                contentSize.width + ExportPDFPagePlanner.widePageSlack + 0.001,
+                file: file, line: line
+            )
             XCTAssertEqual(rect.minY, expectedTop, accuracy: 0.001, file: file, line: line)
             XCTAssertGreaterThan(rect.height, 0.001, file: file, line: line)
+            if !unsplittable.isEmpty {
+                XCTAssertTrue(
+                    unsplittable.contains {
+                        $0.minY < rect.maxY - epsilon && $0.maxY > rect.minY + epsilon
+                    },
+                    "Page \(rect) intersects no unsplittable span — it would be blank",
+                    file: file, line: line
+                )
+            }
             let scale = ExportPDFPagePlanner.pageScale(width: rect.width)
             XCTAssertEqual(page.scale, scale, accuracy: 0.0001, file: file, line: line)
             let hard = min(
@@ -47,13 +62,23 @@ final class ExportPDFPagePlannerTests: XCTestCase {
             if let aspect {
                 let soft = min(hard, rect.width * aspect)
                 // The final page may end at the content's own end even past the soft
-                // budget; any other overage needs an unbreakable run spanning it.
+                // budget; any other overage needs an unbreakable run that spans the
+                // soft-budget position and reaches the page's own end — whether the
+                // page top sits inside it or the page grew over leading whitespace —
+                // or a purely whitespace overage swallowed up to a mandatory break.
                 let reachesContentEnd = rect.maxY >= contentSize.height - epsilon
                 if rect.height > soft + epsilon, !reachesContentEnd {
+                    let overageStart = rect.minY + soft
+                    let spansPage = unsplittable.contains { span in
+                        span.minY <= overageStart + epsilon
+                            && span.maxY > rect.maxY - epsilon
+                    }
+                    let overageIsWhitespace = !unsplittable.contains { span in
+                        span.minY < rect.maxY - epsilon
+                            && span.maxY > overageStart + epsilon
+                    }
                     XCTAssertTrue(
-                        unsplittable.contains { span in
-                            span.minY <= rect.minY + epsilon && span.maxY > rect.minY + soft
-                        },
+                        spansPage || overageIsWhitespace,
                         "Page at \(rect.minY) exceeds its soft budget without an "
                             + "unbreakable run spanning it",
                         file: file, line: line
@@ -76,6 +101,24 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         } else {
             XCTAssertEqual(expectedTop, contentSize.height, accuracy: 0.001, file: file, line: line)
         }
+    }
+
+    /// Fills [start, end) with line-box-like spans `height` tall every `step`, like the
+    /// spans a paragraph's line boxes produce — interior safe breaks between them keep
+    /// tests exercising the page loop instead of one giant interval.
+    static func lineSpans(
+        from start: CGFloat = 0,
+        to end: CGFloat,
+        step: CGFloat = 30,
+        height: CGFloat = 28
+    ) -> [Span] {
+        var spans: [Span] = []
+        var top = start
+        while top < end {
+            spans.append(Span(minY: top, maxY: min(top + height, end)))
+            top += step
+        }
+        return spans
     }
 
     /// Every page boundary must land on a safe break: never strictly inside a merged
@@ -295,9 +338,10 @@ final class ExportPDFPagePlannerTests: XCTestCase {
     }
 
     func testPageWiderThanTheMaximumIsStillCappedAtTheMaximumSide() throws {
-        // Page width 28,800 → scale 0.5 — but the height budget stays a flat 14,400
-        // CSS pt: a 40,000 pt document needs 3 pages, and WebKit never sees a
-        // taller-than-maximum capture.
+        // Page width 28,800 → scale ≈ 0.497 (14,400 / 29,000 — the past-cap page
+        // also captures `widePageSlack` of overscan) — but the height budget
+        // stays a flat 14,400 CSS pt: a 40,000 pt document needs 3 pages, and
+        // WebKit never sees a taller-than-maximum capture.
         let spans = (0 ..< 400).map { Span(minY: CGFloat($0) * 100, maxY: CGFloat($0) * 100 + 90) }
         let plan = try planDocument(width: 28800, height: 40000, unsplittable: spans)
         Self.assertPlanInvariants(
@@ -306,9 +350,15 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         )
         Self.assertBreaksAreSafe(plan, unsplittable: spans)
         XCTAssertEqual(plan.pages.count, 3)
+        let capture = 28800 + ExportPDFPagePlanner.widePageSlack
         for page in plan.pages {
+            XCTAssertEqual(page.rect.width, capture)
             XCTAssertLessThanOrEqual(page.rect.height, 14400 + 0.5)
-            XCTAssertEqual(page.scale, 0.5, accuracy: 0.0001)
+            XCTAssertEqual(
+                page.scale,
+                ExportPDFPagePlanner.pageScale(width: capture),
+                accuracy: 0.0001
+            )
         }
     }
 
@@ -346,67 +396,5 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         let shrunk = ExportPDFPagePlanner.pageScale(width: 28800)
         XCTAssertEqual(shrunk, 0.5, accuracy: 0.0001)
         XCTAssertEqual(28800 * shrunk, 14400, accuracy: 0.1)
-    }
-
-    func testJoinedPagesKeepEachMediaBox() throws {
-        let first = try Self.page(width: 200, height: 100)
-        let second = try Self.page(width: 180, height: 90)
-        let joined = try ExportPDFPageJoiner.join([first, second], scales: [1, 1])
-        XCTAssertEqual(joined.pageScales, [1, 1])
-        guard let document = CGPDFDocument(CGDataProvider(data: joined.data as CFData)!) else {
-            return XCTFail("Joined data is not a PDF")
-        }
-        XCTAssertEqual(document.numberOfPages, 2)
-        XCTAssertEqual(document.page(at: 1)?.getBoxRect(.mediaBox).height ?? 0, 100, accuracy: 0.5)
-        XCTAssertEqual(document.page(at: 2)?.getBoxRect(.mediaBox).height ?? 0, 90, accuracy: 0.5)
-    }
-
-    func testJoinerScaleShrinksTheMediaBox() throws {
-        let page = try Self.page(width: 200, height: 100)
-        let joined = try ExportPDFPageJoiner.join([page], scales: [0.5])
-        XCTAssertEqual(joined.pageScales, [0.5])
-        guard let document = CGPDFDocument(CGDataProvider(data: joined.data as CFData)!) else {
-            return XCTFail("Joined data is not a PDF")
-        }
-        let box = try XCTUnwrap(document.page(at: 1)?.getBoxRect(.mediaBox))
-        XCTAssertEqual(box.width, 100, accuracy: 0.5)
-        XCTAssertEqual(box.height, 50, accuracy: 0.5)
-    }
-
-    /// Per-piece scales are per page, so only the wide piece's media box shrinks.
-    func testJoinerAppliesEachPiecesScaleToItsPages() throws {
-        let first = try Self.page(width: 200, height: 100)
-        let second = try Self.page(width: 240, height: 120)
-        let joined = try ExportPDFPageJoiner.join([first, second], scales: [1, 0.5])
-        XCTAssertEqual(joined.pageScales, [1, 0.5])
-        guard let document = CGPDFDocument(CGDataProvider(data: joined.data as CFData)!) else {
-            return XCTFail("Joined data is not a PDF")
-        }
-        let firstBox = try XCTUnwrap(document.page(at: 1)?.getBoxRect(.mediaBox))
-        let secondBox = try XCTUnwrap(document.page(at: 2)?.getBoxRect(.mediaBox))
-        XCTAssertEqual(firstBox.width, 200, accuracy: 0.5)
-        XCTAssertEqual(secondBox.width, 120, accuracy: 0.5)
-    }
-
-    func testJoinerRequiresAScalePerPiece() throws {
-        let page = try Self.page(width: 100, height: 50)
-        XCTAssertThrowsError(try ExportPDFPageJoiner.join([page], scales: [1, 1])) { error in
-            guard let captureError = error as? ExportPDFCaptureError,
-                  case .captureFailed = captureError
-            else {
-                return XCTFail("Expected captureFailed, got \(error)")
-            }
-        }
-    }
-
-    static func page(width: CGFloat, height: CGFloat) throws -> Data {
-        let output = NSMutableData()
-        var box = CGRect(x: 0, y: 0, width: width, height: height)
-        let consumer = try XCTUnwrap(CGDataConsumer(data: output))
-        let context = try XCTUnwrap(CGContext(consumer: consumer, mediaBox: &box, nil))
-        context.beginPDFPage(nil)
-        context.endPDFPage()
-        context.closePDF()
-        return output as Data
     }
 }

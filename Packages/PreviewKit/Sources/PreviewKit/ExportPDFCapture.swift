@@ -8,9 +8,13 @@ public enum ExportPDFCaptureError: Error, Equatable, Sendable {
     case webContentProcessTerminated
     case geometryUnstable
     /// One unbreakable run (line/atomic box chain) exceeds the hard height budget —
-    /// a flat 14,400 CSS pt, lowered when the page's width would push the capture
-    /// raster past `captureAreaBudget`; the value is its height in CSS points.
+    /// the flat 14,400 CSS pt user-space cap; the value is its height in CSS points.
     case oversizeAtomicBox(heightPoints: CGFloat)
+    /// One unbreakable box fits under the 14,400 pt user-space cap but its page's
+    /// capture raster would exceed `captureAreaBudget` — a page that wide cannot be
+    /// painted, so the export refuses instead of terminating WebContent. The values
+    /// are the box's width and height in CSS points.
+    case oversizeCaptureArea(widthPoints: CGFloat, heightPoints: CGFloat)
     /// A planned break would land strictly inside a fixed/sticky/transformed/floated
     /// element; the value identifies it as "tag.className".
     case breakCrossesPositionedContent(String)
@@ -51,6 +55,9 @@ public struct ExportPDFDocument: Equatable, Sendable {
     /// The tallest output page in PDF points (≤ 14,400 by construction).
     public let maximumPageHeight: CGFloat
     public let contentSize: CGSize
+    /// Trailing pages the planner's span-intersection safety net dropped as provably
+    /// blank; 0 while the settled height is measured from content.
+    public let droppedTrailingBlankPages: Int
 
     /// The smallest scale any output page received; 1 when nothing had to shrink.
     public var minimumScale: CGFloat {
@@ -111,7 +118,8 @@ extension PreviewController {
             pageScales: joined.pageScales,
             pageWidths: joined.pageSizes.map(\.width),
             maximumPageHeight: joined.pageSizes.map(\.height).max() ?? 0,
-            contentSize: geometry
+            contentSize: geometry,
+            droppedTrailingBlankPages: plan.droppedTrailingBlankPages
         )
     }
 
@@ -134,7 +142,11 @@ extension PreviewController {
             if let hook = exportPDFCaptureWillCaptureHook {
                 try await hook(index)
             }
-            guard contentBounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) else {
+            // Pages wider than `maximumSide` capture `widePageSlack` of overscan
+            // past the measured content edge, so the bounds guard allows that
+            // much on every side.
+            let slack = ExportPDFPagePlanner.widePageSlack + 0.5
+            guard contentBounds.insetBy(dx: -slack, dy: -0.5).contains(rect) else {
                 throw ExportPDFCaptureError.captureFailed("rect-outside-view")
             }
             let configuration = WKPDFConfiguration()
@@ -166,9 +178,11 @@ extension PreviewController {
         _ pieces: [Data],
         scales: [CGFloat]
     ) async throws -> (data: Data, pageScales: [CGFloat], pageSizes: [CGSize]) {
+        let joiner = exportPDFPageJoiner
         let task = Task.detached(priority: .userInitiated) { () throws -> (Data, [CGFloat], [CGSize]) in
             try Task.checkCancellation()
-            let joined = try ExportPDFPageJoiner.join(pieces, scales: scales)
+            let joined = try joiner?(pieces, scales)
+                ?? ExportPDFPageJoiner.join(pieces, scales: scales)
             try Task.checkCancellation()
             // One planned page must come back as exactly one PDF page: a piece WebKit
             // split on its own means the file no longer matches the plan.
