@@ -401,9 +401,9 @@ Final hosted reruns (load averages are 1/5/15 minutes):
   **10.12–11.11 / 8.35–8.51 / 6.26–6.36**.
 - Dropped-pick test: **10/10 passed**. Newest-pick test: **10/10 passed**. Across these
   20 runs, load ranged **4.79–13.45 / 7.57–9.23 / 6.34–6.71**; all 23 focused-run logs
-  contained **0** "Publishing changes from within view updates" warnings. Logs are
-  `/Users/devin/29d-logs/native-group-rework-{1,2,3}.log`,
-  `positive-m1-rework-{1..10}.log`, and `positive-m2-rework-{1..10}.log`.
+  contained **0** "Publishing changes from within view updates" warnings. These runs
+  were on a Devin VM (macOS 26.6, Xcode 26.6), not the owner's Mac; their logs stay on
+  that VM and are not committed.
 - The earlier full-class failure in
   `testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits` did not
   reproduce: baseline `49b413f` passed **103 tests, 8 skipped, 0 failures** at
