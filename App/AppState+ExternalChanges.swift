@@ -185,14 +185,7 @@ extension AppState {
         fileID: StaticString = #fileID,
         line: UInt = #line
     ) {
-        editorFindHost.traceReplaceBarAction(
-            "handleExternalChange file=\(session.fileURL?.lastPathComponent ?? "untitled") "
-                + "advancing=\(advancingDiskEvent) "
-                + "authorityGen=\(editorReplaceAuthorityGeneration) "
-                + "authorization=\(editorReplaceAuthorizationDecision(for: session))",
-            fileID: fileID,
-            line: line
-        )
+        traceExternalChange(for: session, advancingDiskEvent: advancingDiskEvent, fileID: fileID, line: line)
         let sessionIdentity = ObjectIdentifier(session)
         guard !workspaceMutationWriteFences.contains(sessionIdentity),
               !indeterminateWorkspaceMutationSessions.contains(sessionIdentity)

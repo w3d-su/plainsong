@@ -388,14 +388,14 @@ extension AppState {
                 } else {
                     nil
                 }
-                editorFindHost.traceReplaceBarAction(
-                    "watcherHop \(dropReason.map { "dropped reason=\($0)" } ?? "accepted") "
-                        + "hop=\(watcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil") "
-                        + "installed=\(workspaceWatcher.map { String(describing: ObjectIdentifier($0)) } ?? "nil") "
-                        + "isStopped=\(watcher.map { String($0.isStopped) } ?? "nil")"
+                // One call site for the decision trace and the refresh, so the resulting
+                // handleExternalChange entry proves the fileID/line forwarding end to end.
+                let site: (fileID: StaticString, line: UInt) = (#fileID, #line)
+                traceWorkspaceWatcherDelivery(
+                    dropReason: dropReason, watcher: watcher, fileID: site.fileID, line: site.line
                 )
                 guard dropReason == nil else { return }
-                refreshWorkspaceAfterFileSystemChange()
+                refreshWorkspaceAfterFileSystemChange(fileID: site.fileID, line: site.line)
             }
         }
         watcherBox.watcher = watcher

@@ -150,9 +150,10 @@ extension EditorFindHostedGateTests {
     }
 
     #if DEBUG
-        /// Handoff 27c M3: an accepted hop attributes the resulting `handleExternalChange`
-        /// to the hop's own `refreshWorkspaceAfterFileSystemChange()` site in
-        /// `App/AppState+Workspace.swift`. Passing row-test runs show the only
+        /// Handoff 27c M3 / 27d: an accepted hop attributes the resulting
+        /// `handleExternalChange` to the hop's own call site in
+        /// `App/AppState+Workspace.swift` (the site its decision trace names), proving the
+        /// fileID/line forwarding end to end. Passing row-test runs show the only
         /// `advancing=true` producers near the press are test-injected refreshes and this
         /// watcher hop: a real FSEvent for fixture-setup activity under the root (e.g. the
         /// fixture's own `post.md` write delivered across the `sinceNow` boundary)
@@ -182,9 +183,16 @@ extension EditorFindHostedGateTests {
             let entry = try XCTUnwrap(
                 trace.last { $0.contains("handleExternalChange file=post.md advancing=true") }
             )
+            // The hop traces its decision and calls the refresh from one shared call site, so
+            // the external change must carry exactly that site: any dropped fileID/line
+            // forwarding step in the refresh chain would name its own line instead.
+            let hopEntry = trace[hopIndex]
+            let siteStart = try XCTUnwrap(hopEntry.range(of: " (", options: .backwards)).lowerBound
+            let hopSite = String(hopEntry[siteStart...])
+            XCTAssertTrue(hopSite.hasPrefix(" (Plainsong/AppState+Workspace.swift:"), "hop site: \(hopSite)")
             XCTAssertTrue(
-                entry.contains("(Plainsong/AppState+Workspace.swift:"),
-                "the producer is the openWorkspace watcher hop; got: \(entry)"
+                entry.hasSuffix(hopSite),
+                "the producer is the watcher hop's own call site\(hopSite); got: \(entry)"
             )
             XCTAssertGreaterThan(
                 try XCTUnwrap(trace.lastIndex { $0 == entry }),

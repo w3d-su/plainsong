@@ -1,9 +1,15 @@
 import CoreServices
 import Foundation
 
-/// Mutable state (`stream`, `debounceTask`, `stopped`, `generation`) is confined to `queue`
-/// through `runOnQueue`; the FSEvents callback, debounce tasks, `stop()` and `deinit` all
-/// reach it only there, so the watcher is safe to send across concurrency domains.
+/// Concurrency rule behind `@unchecked Sendable`:
+/// - `stream` is owned by the caller's thread (the main thread in the app): only `start()`,
+///   `stop()` and `deinit` touch it, and callers must not race them against each other.
+/// - `debounceTask`, `stopped` and `generation` are confined to `queue` through
+///   `runOnQueue`; the FSEvents callback, debounce tasks, `isStopped`, `stop()` and `deinit`
+///   reach them only there.
+/// - `eventHandler` runs inside `queue`'s critical section (a `runOnQueue` block), so it
+///   must never block on the main thread: `stop()`/`isStopped` on main wait on `queue`, and
+///   a handler that synchronously waited for main would deadlock. Hop asynchronously.
 public final class WorkspaceEventWatcher: @unchecked Sendable {
     private let rootURL: URL
     private let debounceNanoseconds: UInt64
@@ -11,6 +17,7 @@ public final class WorkspaceEventWatcher: @unchecked Sendable {
     private let queue = DispatchQueue(label: "Plainsong.workspace-events")
     private let queueMarker = DispatchSpecificKey<Void>()
 
+    /// Owned by the caller's thread; see the type comment.
     private var stream: FSEventStreamRef?
 
     // Confined to `queue`; reach it through `runOnQueue`.
