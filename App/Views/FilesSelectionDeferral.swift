@@ -21,20 +21,18 @@ final class FilesSelectionDeferral {
     /// The deferred open driving `pendingID`. The tracker outlives the view (per-view
     /// `@State`), so `cancelPendingOpen` must stop it when the navigator unmounts.
     private var openTask: Task<Void, Never>?
+    private static let retryAttemptLimit = 200
 
     #if DEBUG
-        /// Latest live deferral, so hosted tests can observe the retry seam.
+        /// Latest deferral used for a pick. Xcode 16.4 eagerly creates @State initial values
+        /// on every parent body run, so registering in init can point to a throwaway.
         weak static var latestDebugInstance: FilesSelectionDeferral?
+        /// Hosted-test override for the number of lagged-capture retries.
+        static var debugRetryAttemptLimit: Int?
         /// Every `selectWorkspaceNode` attempt: (picked node, whether it landed). The
         /// held-reload test reads it instead of timing the 25 ms poll.
         private(set) var openAttempts: [(id: WorkspaceFileNode.ID, landed: Bool)] = []
     #endif
-
-    init() {
-        #if DEBUG
-            Self.latestDebugInstance = self
-        #endif
-    }
 
     /// Open `nodeID` on the next main-actor turn.
     ///
@@ -54,6 +52,9 @@ final class FilesSelectionDeferral {
         appState: AppState,
         onDroppedPick: @escaping @MainActor () -> Void
     ) {
+        #if DEBUG
+            Self.latestDebugInstance = self
+        #endif
         issued += 1
         let sequence = issued
         pendingID = nodeID
@@ -63,7 +64,12 @@ final class FilesSelectionDeferral {
             guard let self, sequence > applied else { return }
             applied = sequence
             var landed = false
-            for _ in 0 ..< 200 {
+            #if DEBUG
+                let attemptLimit = Self.debugRetryAttemptLimit ?? Self.retryAttemptLimit
+            #else
+                let attemptLimit = Self.retryAttemptLimit
+            #endif
+            for _ in 0 ..< attemptLimit {
                 appState.selectWorkspaceNode(id: nodeID, requestingEditorFocus: requestingEditorFocus)
                 landed = appState.workspaceTree?.selectedNodeID == nodeID
                 #if DEBUG
