@@ -31,27 +31,50 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
     /// table, 300 paragraphs — the captured print PDF holds no blank sheet.
     func testQuoteListTableShapePrintsNoBlankSheets() async throws {
         let support = ExportHTMLCommandAppTests()
-        let (before, beforeMarkers) = Self.prose(prefix: "PB2BEFORE", count: 300)
-        let (after, afterMarkers) = Self.prose(prefix: "PB2AFTER", count: 300)
-        let columnMarkers = (0 ..< 10).map { String(format: "PB2COL%02dSENTINEL", $0) }
-        let quote = [
+        let (before, beforeMarkers) = ExportPDFWideRunsAppSupport.wrappingProse(
+            prefix: "PB2BEFORE", count: 300
+        )
+        let (after, afterMarkers) = ExportPDFWideRunsAppSupport.wrappingProse(
+            prefix: "PB2AFTER", count: 300
+        )
+        let columnMarkers = (0 ..< 30).map { String(format: "PB2COL%02dSENTINEL", $0) }
+        var bodyCells = ["PB2CELLSENTINEL"]
+        bodyCells.append(contentsOf: [String](repeating: "cell", count: columnMarkers.count - 1))
+        let bodyRow = "| " + bodyCells.joined(separator: " | ") + " |"
+        let table = ExportPDFWideRunsAppSupport.tableSource(
+            headerRow: columnMarkers, bodyRows: [bodyRow]
+        )
+        var quoteLines = [
             "> - PB2LISTSENTINEL quoted list item",
             ">",
-            "> | " + columnMarkers.joined(separator: " | ") + " |",
-            "> | " + [String](repeating: "---", count: columnMarkers.count).joined(separator: " | ") + " |",
-            "> | PB2CELLSENTINEL | " + [String](repeating: "cell", count: columnMarkers.count - 1)
-                .joined(separator: " | ") + " |",
-        ].joined(separator: "\n")
-        let fixture = try support.makeFixture(text: [before, quote, after].joined(separator: "\n\n"))
+        ]
+        quoteLines.append(contentsOf: table.split(separator: "\n").map { ">   \($0)" })
+        let quote = quoteLines.joined(separator: "\n")
+        let fixture = try support.makeFixture(text: [
+            before, quote, after,
+        ].joined(separator: "\n\n"))
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let document = try await printFixture(fixture, orientation: .portrait)
-        for index in 0 ..< document.pageCount {
-            let text = document.page(at: index)?.string ?? ""
-            XCTAssertFalse(
-                text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                "Sheet \(index + 1) is blank"
-            )
-        }
+        let controller = try await ExportPDFWideRunsAppSupport.preparedController(
+            [before, quote, after].joined(separator: "\n\n")
+        )
+        defer { controller.invalidate() }
+        let captured = try await controller.captureExportPDF(pageAspect: 1.29)
+        XCTAssertEqual(captured.droppedTrailingBlankPages, 0)
+        let lastChildBottom = try await controller.webView.evaluateJavaScript("""
+        (() => {
+          const root = document.getElementById("preview-root");
+          const style = getComputedStyle(root);
+          const padB = parseFloat(style.paddingBottom) || 0;
+          const borderB = parseFloat(style.borderBottomWidth) || 0;
+          return root.lastElementChild.getBoundingClientRect().bottom
+            + window.scrollY + padB + borderB;
+        })()
+        """) as? Double
+        XCTAssertEqual(
+            captured.contentSize.height, CGFloat(lastChildBottom ?? -1), accuracy: 60
+        )
+        ExportPDFWideRunsAppSupport.assertNoBlankPage(document)
         let text = Self.text(of: document)
         // Prose and the quote's list lead the table in extraction order; inside the
         // table itself PDFKit's reading order is not DOM order, so its markers are
@@ -65,6 +88,29 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
                 text.components(separatedBy: marker).count - 1, 1, marker
             )
         }
+    }
+
+    func testAdjacentWideCodeBlocksUseDistinctA4SheetWidths() async throws {
+        let support = ExportHTMLCommandAppTests()
+        let narrow = "SMALLCODESENTINEL" + String(repeating: "A", count: 126)
+        let wide = "LARGECODESENTINEL" + String(repeating: "B", count: 393)
+        let source = ["```text\n\(narrow)\n```", "```text\n\(wide)\n```"]
+            .joined(separator: "\n\n")
+        let fixture = try support.makeFixture(text: source)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let document = try await printFixture(fixture, orientation: .portrait)
+        XCTAssertEqual(document.pageCount, 2)
+        let narrowPage = try XCTUnwrap((0 ..< document.pageCount).first { index in
+            document.page(at: index)?.string?.contains("SMALLCODESENTINEL") == true
+        })
+        let widePage = try XCTUnwrap((0 ..< document.pageCount).first { index in
+            document.page(at: index)?.string?.contains("LARGECODESENTINEL") == true
+        })
+        let narrowWidth = try XCTUnwrap(document.page(at: narrowPage)).bounds(for: .mediaBox).width
+        let wideWidth = try XCTUnwrap(document.page(at: widePage)).bounds(for: .mediaBox).width
+        XCTAssertLessThan(narrowWidth, wideWidth)
+        XCTAssertEqual(narrowWidth, 1265, accuracy: 200)
+        XCTAssertEqual(wideWidth, 3401, accuracy: 450)
     }
 
     /// kitchen-sink.mdx prints the same number of sheets it did before the run
@@ -123,18 +169,17 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         let columnMarkers = (0 ..< 10).map { String(format: "PRTBLCOL%02dSENTINEL", $0) }
         let header = columnMarkers.map { $0 + String(repeating: "x", count: 90) }
         let rowMarkers = (0 ..< 60).map { String(format: "PRTBLROW%04dSENTINEL", $0) }
-        let table = [
-            "| " + header.joined(separator: " | ") + " |",
-            "| " + [String](repeating: "---", count: header.count).joined(separator: " | ") + " |",
-        ] + rowMarkers.map { "| \($0) |" }
+        let table = ExportPDFWideRunsAppSupport.tableSource(
+            headerRow: header, bodyRows: rowMarkers.map { "| \($0) |" }
+        )
         let fixture = try support.makeFixture(
-            text: [before, table.joined(separator: "\n"), after].joined(separator: "\n\n")
+            text: [before, table, after].joined(separator: "\n\n")
         )
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let document = try await printFixture(fixture, orientation: orientation)
         var runSheets = 0
         for index in 0 ..< document.pageCount {
-            let page = try XCTUnwrap(document.page(at: index), file: file, line: line)
+            let page: PDFPage = try XCTUnwrap(document.page(at: index), file: file, line: line)
             let box = page.bounds(for: .mediaBox)
             XCTAssertLessThanOrEqual(box.width, 14400.5, file: file, line: line)
             XCTAssertLessThanOrEqual(box.height, 14400.5, file: file, line: line)
@@ -192,7 +237,31 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         }
         try await XCTUnwrap(fixture.appState.printCurrentDocument(), file: file, line: line).value
         XCTAssertEqual(results, [.printed], file: file, line: line)
-        return try XCTUnwrap(observed, "printDocumentObserver saw nothing", file: file, line: line)
+        let document = try XCTUnwrap(
+            observed, "printDocumentObserver saw nothing", file: file, line: line
+        )
+        ExportPDFWideRunsAppSupport.assertNoBlankPage(document, file: file, line: line)
+        let controller = try await ExportPDFWideRunsAppSupport.preparedController(
+            fixture.session.text, fileKind: fixture.session.fileKind
+        )
+        defer { controller.invalidate() }
+        let bounds = Self.a4PrintInfo(orientation: orientation).imageablePageBounds
+        let startedAt = Date()
+        let capture = try await controller.captureExportPDF(
+            pageAspect: bounds.height / bounds.width
+        )
+        let elapsed = Date().timeIntervalSince(startedAt)
+        XCTAssertEqual(capture.droppedTrailingBlankPages, 0, file: file, line: line)
+        XCTAssertEqual(document.pageCount, capture.plannedPageCount, file: file, line: line)
+        print(String(
+            format: "E1 PRINT CAPTURE pages=%d planned=%d widest=%.1fpt minScale=%.3f time=%.2fs",
+            document.pageCount,
+            capture.plannedPageCount,
+            capture.pageWidths.max() ?? 0,
+            capture.minimumScale,
+            elapsed
+        ))
+        return document
     }
 
     /// kitchen-sink.mdx measured on explicit A4 portrait: two sheets — the pre-20c

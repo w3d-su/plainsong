@@ -59,14 +59,14 @@ extension ExportHTMLNoticeMapper {
         let size = "\(inchesDetail(widthPoints)) × \(inchesDetail(heightPoints))"
         return product == .print
             ? "An element is too large to print (about \(size) inches). " +
-            "Split the table or make the image smaller, then export again."
+            "Split the table or make the image smaller, then print again."
             : "An element is too large to export as one PDF page (about \(size) inches). " +
             "Split the table or make the image smaller, then export again."
     }
 
     /// Points rendered as inches for the capture-area message: locale-aware, whole
     /// numbers once the value reaches ten inches, one decimal below.
-    private static func inchesDetail(_ points: CGFloat) -> String {
+    static func inchesDetail(_ points: CGFloat) -> String {
         let value = Double(points) / 72
         return value.formatted(.number.precision(.fractionLength(value >= 10 ? 0 : 1)))
     }

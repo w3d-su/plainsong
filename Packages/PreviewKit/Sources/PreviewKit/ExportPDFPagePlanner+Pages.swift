@@ -1,124 +1,201 @@
 import CoreGraphics
 
 extension ExportPDFPagePlanner {
-    /// Emits the page starting at `top`, bounded by the mandatory break `limit`:
-    /// resolves its width by fixed-point (the page's own bottom can pull in a wider
-    /// extent, which changes its budgets), then ends it at the last safe break in
-    /// budget — or extends it across a span-free slice or to an unbreakable
-    /// interval's end, failing typed only when the interval itself is what
-    /// overflows the hard budget.
-    static func pageFromTop(
-        top: CGFloat,
-        limit: CGFloat,
-        baseline: CGFloat,
-        aspect: CGFloat?,
-        intervals: [Span],
-        extents: [WidthExtent],
-        contentWidth: CGFloat,
-        epsilon: CGFloat
-    ) throws(ExportPDFCaptureError) -> Page {
-        var width = baseline
+    struct PageContext {
+        let top: CGFloat
+        let limit: CGFloat
+        let baseline: CGFloat
+        let aspect: CGFloat?
+        let intervals: [Span]
+        let extents: [WidthExtent]
+        let contentWidth: CGFloat
+        let epsilon: CGFloat
+    }
+
+    private struct PageBounds {
+        let top: CGFloat
+        let bottom: CGFloat
+    }
+
+    /// Settles width before assigning whitespace, then recalculates the final capture
+    /// width and scale after any split or back-off.
+    static func pageFromTop(_ context: PageContext) throws(ExportPDFCaptureError) -> Page {
+        var width = context.baseline
         while true {
-            // A page wider than `maximumSide` captures `widePageSlack` of overscan
-            // past the measured right edge so glyphs painted beyond it are not
-            // clipped; the soft and hard budgets and the scale all see that
-            // wider capture rect.
-            let captureWidth = Self.captureWidth(for: width, contentWidth: contentWidth)
-            let target = top + softBudget(captureWidth, aspect: aspect)
-            var bottom: CGFloat
-            var extended: Span?
-            if target >= limit - epsilon {
-                // The run boundary (or the document end) is a safe break the page
-                // may never cross; `limit > top + ε` keeps the page non-empty.
-                bottom = limit
-            } else if let interval = intervalStrictlyContaining(
-                target, in: intervals, epsilon: epsilon
-            ) {
-                if interval.minY > top + epsilon,
-                   anyIntervalStrictlyIntersecting(
-                       minY: top, maxY: interval.minY,
-                       in: intervals, epsilon: epsilon
-                   )
-                {
-                    // The slice before this interval still holds content, so its
-                    // edge is the last safe break inside the budget.
-                    bottom = interval.minY
-                } else {
-                    // The interval already reaches the page top, or the slice
-                    // before it is span-free whitespace — emitting it would be a
-                    // blank page, so the page grows into the interval's end
-                    // (never past the mandatory break) as a soft extension.
-                    // The grown page must still fit the hard budget; when a
-                    // degenerate leading gap would push it past, the whitespace
-                    // page is the lesser evil — an over-budget capture cannot be
-                    // emitted (the interval itself stays splittable, so refusing
-                    // would be a false oversize).
-                    let grown = min(interval.maxY, limit)
-                    if interval.minY <= top + epsilon
-                        || grown - top <= hardBudget(captureWidth) + epsilon
-                    {
-                        bottom = grown
-                        extended = interval
-                    } else {
-                        bottom = interval.minY
-                    }
-                }
-            } else {
-                bottom = target
-            }
-            // A slice that holds no span up to the mandatory break would start
-            // the next page inside whitespace — emit it and it would be blank —
-            // so this page swallows it instead, bounded by the hard budget.
-            if bottom < limit - epsilon,
-               limit - top <= hardBudget(captureWidth) + epsilon,
-               !anyIntervalStrictlyIntersecting(
-                   minY: bottom, maxY: limit,
-                   in: intervals, epsilon: epsilon
-               )
-            {
-                bottom = limit
-            }
+            let captureWidth = Self.captureWidth(for: width, contentWidth: context.contentWidth)
+            var bounds = try initialBounds(context, captureWidth: captureWidth)
+            bounds = applyGapOwnership(
+                bounds, context: context, capture: captureWidth
+            )
             let measured = pageWidth(
-                top: top, bottom: bottom, baseline: baseline,
-                contentWidth: contentWidth, extents: extents, epsilon: epsilon
+                top: bounds.top, bottom: bounds.bottom, baseline: context.baseline,
+                contentWidth: context.contentWidth, extents: context.extents,
+                epsilon: context.epsilon
             )
             if measured > width {
                 width = measured
                 continue
             }
-            if let extended, bottom - top > hardBudget(captureWidth) + epsilon {
-                if extended.height > maximumSide + epsilon {
-                    throw .oversizeAtomicBox(heightPoints: extended.height)
-                }
-                throw .oversizeCaptureArea(
-                    widthPoints: width,
-                    heightPoints: extended.height
-                )
-            }
+            let finalWidth = pageWidth(
+                top: bounds.top, bottom: bounds.bottom, baseline: context.baseline,
+                contentWidth: context.contentWidth, extents: context.extents,
+                epsilon: context.epsilon
+            )
+            let finalCaptureWidth = Self.captureWidth(
+                for: finalWidth, contentWidth: context.contentWidth
+            )
             return Page(
-                rect: CGRect(x: 0, y: top, width: captureWidth, height: bottom - top),
-                scale: pageScale(width: captureWidth)
+                rect: CGRect(
+                    x: 0, y: bounds.top, width: finalCaptureWidth,
+                    height: bounds.bottom - bounds.top
+                ),
+                scale: pageScale(width: finalCaptureWidth)
             )
         }
     }
 
-    /// The capture width for a page whose content needs `width`: the same width,
-    /// plus `widePageSlack` of overscan only once the page is wider than
-    /// `maximumSide` — painted overflow past the measured right edge was only
-    /// ever observed far past that point (≈0 at ~101k pt, `docs/perf-log.md`),
-    /// and adding slack to a page that fits would shrink its print scale for no
-    /// reason (the E1 owner decision forbids it). The result is capped at
-    /// `contentWidth + widePageSlack`. Applied after run classification, so it
-    /// can never promote a page into a run.
+    private static func initialBounds(
+        _ context: PageContext,
+        captureWidth: CGFloat
+    ) throws(ExportPDFCaptureError) -> PageBounds {
+        let target = context.top + softBudget(captureWidth, aspect: context.aspect)
+        guard target < context.limit - context.epsilon else {
+            return PageBounds(top: context.top, bottom: context.limit)
+        }
+        if let interval = intervalStrictlyContaining(
+            target, in: context.intervals, epsilon: context.epsilon
+        ) {
+            let hasEarlierContent = anyIntervalStrictlyIntersecting(
+                minY: context.top, maxY: interval.minY,
+                in: context.intervals, epsilon: context.epsilon
+            )
+            if interval.minY > context.top + context.epsilon, hasEarlierContent {
+                return PageBounds(top: context.top, bottom: interval.minY)
+            }
+            return try extensionBounds(
+                interval, from: context.top, limit: context.limit,
+                context: context
+            )
+        }
+        let bounds = PageBounds(top: context.top, bottom: target)
+        guard !hasSpan(bounds, context: context) else { return bounds }
+        return try growSpanFreeSlice(bounds, context: context)
+    }
+
+    private static func growSpanFreeSlice(
+        _ bounds: PageBounds,
+        context: PageContext
+    ) throws(ExportPDFCaptureError) -> PageBounds {
+        guard let interval = context.intervals.first(where: {
+            $0.maxY > bounds.bottom + context.epsilon && $0.minY < context.limit - context.epsilon
+        }) else {
+            return bounds
+        }
+        return try extensionBounds(
+            interval, from: bounds.top, limit: context.limit,
+            context: context
+        )
+    }
+
+    private static func extensionBounds(
+        _ interval: Span,
+        from top: CGFloat,
+        limit: CGFloat,
+        context: PageContext
+    ) throws(ExportPDFCaptureError) -> PageBounds {
+        let boxWidth = pageWidth(
+            top: interval.minY, bottom: interval.maxY, baseline: context.baseline,
+            contentWidth: context.contentWidth, extents: context.extents,
+            epsilon: context.epsilon
+        )
+        let boxCaptureWidth = captureWidth(for: boxWidth, contentWidth: context.contentWidth)
+        let boxHard = hardBudget(boxCaptureWidth)
+        if interval.height > maximumSide {
+            throw .oversizeAtomicBox(heightPoints: interval.height)
+        }
+        if interval.height > boxHard {
+            throw .oversizeCaptureArea(
+                widthPoints: boxCaptureWidth, heightPoints: interval.height
+            )
+        }
+        let bottom = min(interval.maxY, limit)
+        let start = bottom - top > boxHard
+            ? max(top, bottom - boxHard)
+            : top
+        return PageBounds(top: start, bottom: bottom)
+    }
+
+    private static func applyGapOwnership(
+        _ initial: PageBounds,
+        context: PageContext,
+        capture: CGFloat
+    ) -> PageBounds {
+        var bounds = initial
+        guard bounds.bottom < context.limit - context.epsilon,
+              let nextIndex = context.intervals.firstIndex(where: {
+                  $0.minY > bounds.bottom + context.epsilon
+                      && $0.minY <= context.limit + context.epsilon
+              })
+        else { return bounds }
+        let next = context.intervals[nextIndex]
+        let nextWidth = pageWidth(
+            top: next.minY, bottom: next.maxY, baseline: context.baseline,
+            contentWidth: context.contentWidth, extents: context.extents,
+            epsilon: context.epsilon
+        )
+        let nextCaptureWidth = captureWidth(for: nextWidth, contentWidth: context.contentWidth)
+        let nextHard = hardBudget(nextCaptureWidth)
+        guard next.height <= nextHard else { return bounds }
+        let hard = hardBudget(capture)
+        let soft = softBudget(capture, aspect: context.aspect)
+        let need = next.maxY - nextHard
+        if next.minY - bounds.top <= soft {
+            bounds = PageBounds(top: bounds.top, bottom: next.minY)
+        } else if next.maxY - bounds.bottom <= nextHard {
+            return bounds
+        } else if need <= bounds.top + hard {
+            bounds = PageBounds(top: bounds.top, bottom: need)
+        } else if let start = backoffStart(
+            before: bounds.bottom, top: bounds.top, intervals: context.intervals,
+            epsilon: context.epsilon
+        ), need <= start + hard {
+            bounds = PageBounds(top: bounds.top, bottom: start)
+        } else {
+            bounds = PageBounds(top: bounds.top, bottom: min(next.minY, bounds.top + hard))
+        }
+        return bounds
+    }
+
+    private static func backoffStart(
+        before bottom: CGFloat,
+        top: CGFloat,
+        intervals: [Span],
+        epsilon: CGFloat
+    ) -> CGFloat? {
+        intervals.last(where: { interval in
+            interval.minY > top + epsilon
+                && interval.minY < bottom - epsilon
+                && intervals.contains {
+                    $0.minY < interval.minY - epsilon && $0.maxY > top + epsilon
+                }
+        })?.minY
+    }
+
+    private static func hasSpan(_ bounds: PageBounds, context: PageContext) -> Bool {
+        anyIntervalStrictlyIntersecting(
+            minY: bounds.top, maxY: bounds.bottom,
+            in: context.intervals, epsilon: context.epsilon
+        )
+    }
+
+    /// The capture width for a page whose content needs `width`, plus overscan only
+    /// after the page exceeds the PDF user-space maximum.
     static func captureWidth(for width: CGFloat, contentWidth: CGFloat) -> CGFloat {
         guard width > maximumSide else { return width }
         return min(width + widePageSlack, contentWidth + widePageSlack)
     }
 
-    /// Whether any merged interval strictly intersects `(minY, maxY)` — more than
-    /// `epsilon` on both sides. Intervals are sorted by `minY` and disjoint, so
-    /// their `maxY`s are sorted too: the first interval still open at `minY` is
-    /// the only candidate that can start before `maxY` — O(log n) per query.
+    /// Whether any merged interval strictly intersects `(minY, maxY)`.
     static func anyIntervalStrictlyIntersecting(
         minY: CGFloat,
         maxY: CGFloat,

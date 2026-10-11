@@ -47,7 +47,7 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
         )
     }
 
-    /// Prose, a 28,800 pt run, then prose: the run's pages cover exactly the absorbed
+    /// Prose, a 28,800 pt run, then prose: the run's pages cover its snapped edges
     /// run at the wide capture width (content plus `widePageSlack` overscan) and
     /// scale to fit; every prose page stays 800 wide at scale 1.
     func testProseRunProseIsolatesTheRunAtBaseline() throws {
@@ -60,14 +60,11 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
             plan, contentSize: CGSize(width: 28800, height: 40000),
             baselineWidth: 800, unsplittable: spans
         )
-        // Gap absorption: the run's top climbs to the last span edge before the
-        // extent (14,998); its bottom snaps out of the span holding 20,000 and
-        // climbs to the next span's top (20,010).
-        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(14998, 20010)]
+        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(15000, 20010)]
         assertRunIsolation(plan, runs: runs)
         assertProsePagesStayAtBaseline(plan, runs: runs, baseline: 800)
         let runPages = plan.pages.filter {
-            $0.rect.minY >= 14998 - 0.5 && $0.rect.maxY <= 20010 + 0.5
+            $0.rect.minY >= 15000 - 0.5 && $0.rect.maxY <= 20010 + 0.5
         }
         XCTAssertFalse(runPages.isEmpty)
         for page in runPages {
@@ -80,7 +77,7 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
                 accuracy: 0.0001
             )
         }
-        XCTAssertEqual(runPages.map(\.rect.minY).min() ?? 0, 14998, accuracy: 0.5)
+        XCTAssertEqual(runPages.map(\.rect.minY).min() ?? 0, 15000, accuracy: 0.5)
         XCTAssertEqual(runPages.map(\.rect.maxY).max() ?? 0, 20010, accuracy: 0.5)
     }
 
@@ -96,13 +93,11 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
             plan, contentSize: CGSize(width: 28800, height: 32000),
             baselineWidth: 800, unsplittable: spans
         )
-        // Absorbed edges: the last span ending before 14,400 and the first span
-        // starting after the 15,990–16,018 box that holds the extent's bottom.
-        assertRunIsolation(plan, runs: [(14398, 16020)])
-        XCTAssertEqual(plan.pages[0].rect.maxY, 14398, accuracy: 0.5)
+        assertRunIsolation(plan, runs: [(14400, 16020)])
+        XCTAssertEqual(plan.pages[0].rect.maxY, 14400, accuracy: 0.5)
         XCTAssertEqual(plan.pages[0].rect.width, 800)
         let runPage = plan.pages[1].rect
-        XCTAssertEqual(runPage.minY, 14398, accuracy: 0.5)
+        XCTAssertEqual(runPage.minY, 14400, accuracy: 0.5)
         XCTAssertEqual(runPage.maxY, 16020, accuracy: 0.5)
         XCTAssertEqual(plan.pages[1].rect.width, 28800 + ExportPDFPagePlanner.widePageSlack)
     }
@@ -118,14 +113,12 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
         let plan = try planDocument(
             width: 32000, height: 40000, unsplittable: spans, extents: extents
         )
-        // Merged [15000,17000] then absorbed outward to the neighbouring span
-        // edges: 14,998 and 17,010.
-        assertRunIsolation(plan, runs: [(14998, 17010)])
+        assertRunIsolation(plan, runs: [(15000, 17010)])
         let runPages = plan.pages.filter {
-            $0.rect.minY >= 14998 - 0.5 && $0.rect.maxY <= 17010 + 0.5
+            $0.rect.minY >= 15000 - 0.5 && $0.rect.maxY <= 17010 + 0.5
         }
         XCTAssertEqual(runPages.count, 1)
-        XCTAssertEqual(runPages[0].rect.minY, 14998, accuracy: 0.5)
+        XCTAssertEqual(runPages[0].rect.minY, 15000, accuracy: 0.5)
         XCTAssertEqual(runPages[0].rect.maxY, 17010, accuracy: 0.5)
         XCTAssertEqual(runPages[0].rect.width, 30000 + ExportPDFPagePlanner.widePageSlack)
     }
@@ -141,13 +134,13 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
         let plan = try planDocument(
             width: 28800, height: 40000, unsplittable: spans, extents: [extent]
         )
-        assertRunIsolation(plan, runs: [(14998, 17000)])
-        let runPage = plan.pages.first { $0.rect.minY >= 14998 - 0.5 }
+        assertRunIsolation(plan, runs: [(15000, 17000)])
+        let runPage = plan.pages.first { $0.rect.minY >= 15000 - 0.5 }
         let rect = try XCTUnwrap(runPage?.rect)
-        XCTAssertEqual(rect.minY, 14998, accuracy: 0.5)
+        XCTAssertEqual(rect.minY, 15000, accuracy: 0.5)
         XCTAssertEqual(rect.maxY, 17000, accuracy: 0.5)
         XCTAssertEqual(
-            plan.pages.first { $0.rect.minY >= 14998 - 0.5 }?.rect.width,
+            plan.pages.first { $0.rect.minY >= 15000 - 0.5 }?.rect.width,
             28800 + ExportPDFPagePlanner.widePageSlack
         )
     }
@@ -170,8 +163,8 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
         let plan = try planDocument(
             width: 14401, height: 20000, unsplittable: spans, extents: [extent]
         )
-        // The extent's bottom sits inside the [390,418] line box, so the run snaps
-        // out and absorbs to the next span's top: [0, 420].
+        // The extent's bottom snaps out of the [390,418] line box; its edge window
+        // ends at the next span's top: [0,420].
         assertRunIsolation(plan, runs: [(0, 420)])
         let first = try XCTUnwrap(plan.pages.first)
         XCTAssertEqual(first.rect.maxY, 420, accuracy: 0.5)
@@ -200,12 +193,12 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
         XCTAssertEqual(plan.pages[0].rect.width, 888)
         XCTAssertEqual(plan.pages[0].rect.maxY, 870, accuracy: 0.5)
         XCTAssertEqual(plan.pages[0].scale, 1)
-        // 890 > 800/0.9: a run — absorbed outward to the neighbouring span edges.
+        // 890 > 800/0.9: a run — snapped outward to the interval edges.
         // It is still under `maximumSide`, so it captures at exactly 890 too.
-        assertRunIsolation(plan, runs: [(1978, 2400)])
-        let runPage = plan.pages.first { $0.rect.minY >= 1978 - 0.5 }
+        assertRunIsolation(plan, runs: [(1980, 2400)])
+        let runPage = plan.pages.first { $0.rect.minY >= 1980 - 0.5 }
         let rect = try XCTUnwrap(runPage?.rect)
-        XCTAssertEqual(rect.minY, 1978, accuracy: 0.5)
+        XCTAssertEqual(rect.minY, 1980, accuracy: 0.5)
         XCTAssertEqual(rect.maxY, 2400, accuracy: 0.5)
         XCTAssertEqual(runPage?.rect.width, 890)
     }
@@ -241,17 +234,15 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
                     "width \(width): page \(page.rect) taller than the cap"
                 )
             }
-            // Absorbed edges: the last row ending before 20,000 and the row edge
-            // at 30,000 itself.
-            let runs: [(minY: CGFloat, maxY: CGFloat)] = [(19990, 30000)]
+            let runs: [(minY: CGFloat, maxY: CGFloat)] = [(20000, 30000)]
             assertRunIsolation(plan, runs: runs)
             assertProsePagesStayAtBaseline(plan, runs: runs, baseline: 800)
         }
     }
 
-    /// Past ~37,300 pt wide the capture raster — not the 14,400 pt side — binds:
-    /// WebContent dies painting a `pdf()` bitmap near 2³⁰ px (measured 2026-10-09,
-    /// `docs/perf-log.md`), so the run's pages trade height for width and stay under
+    /// Past ~37,300 pt wide the capture raster — not the 14,400 pt side — binds. The
+    /// cap is half the measured area before WebContent terminated during a `pdf()`
+    /// capture (`docs/perf-log.md`), so run pages trade height for width and stay under
     /// `captureAreaBudget / capture width` — the slack counts toward the area.
     func testVeryWideRunTradesHeightForWidthUnderTheCaptureAreaBudget() throws {
         let spans = (0 ..< 600).map { Span(minY: CGFloat($0) * 100, maxY: CGFloat($0) * 100 + 90) }
@@ -269,14 +260,14 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
             XCTAssertEqual(page.rect.width, captureWidth)
             XCTAssertLessThanOrEqual(page.rect.height, budget + 0.5)
         }
-        assertRunIsolation(plan, runs: [(19990, 30000)])
-        assertProsePagesStayAtBaseline(plan, runs: [(19990, 30000)], baseline: 800)
+        assertRunIsolation(plan, runs: [(20000, 30000)])
+        assertProsePagesStayAtBaseline(plan, runs: [(20000, 30000)], baseline: 800)
     }
 
     /// Under the capture-area budget a *single unbreakable* interval is oversize below
     /// 14,400 pt: at ~180,200 pt capture width the hard budget is ~2,978 pt, so a
     /// 10,000 pt atomic box inside the run throws `oversizeCaptureArea` reporting its
-    /// own CSS width and height — a wide run that could be split never throws (G3).
+    /// own capture width, including wide-page slack, and height.
     func testWideAtomicBoxOverTheAreaBudgetThrowsOversizeCaptureArea() {
         let atomic = Span(minY: 1000, maxY: 11000)
         let extent = Extent(minY: 1100, maxY: 1200, maxX: 180_000)
@@ -288,7 +279,9 @@ final class ExportPDFPagePlannerRunTests: XCTestCase {
             else {
                 return XCTFail("Expected oversizeCaptureArea, got \(error)")
             }
-            XCTAssertEqual(widthPoints, 180_000, accuracy: 0.5)
+            XCTAssertEqual(
+                widthPoints, 180_000 + ExportPDFPagePlanner.widePageSlack, accuracy: 0.5
+            )
             XCTAssertEqual(heightPoints, 10000, accuracy: 0.5)
         }
     }

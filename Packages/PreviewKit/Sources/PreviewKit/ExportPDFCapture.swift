@@ -10,10 +10,9 @@ public enum ExportPDFCaptureError: Error, Equatable, Sendable {
     /// One unbreakable run (line/atomic box chain) exceeds the hard height budget —
     /// the flat 14,400 CSS pt user-space cap; the value is its height in CSS points.
     case oversizeAtomicBox(heightPoints: CGFloat)
-    /// One unbreakable box fits under the 14,400 pt user-space cap but its page's
-    /// capture raster would exceed `captureAreaBudget` — a page that wide cannot be
-    /// painted, so the export refuses instead of terminating WebContent. The values
-    /// are the box's width and height in CSS points.
+    /// One unbreakable box fits under the 14,400 pt user-space cap but its own capture
+    /// raster, including `widePageSlack`, would exceed `captureAreaBudget`.
+    /// The values are that box's capture width and height in CSS points.
     case oversizeCaptureArea(widthPoints: CGFloat, heightPoints: CGFloat)
     /// A planned break would land strictly inside a fixed/sticky/transformed/floated
     /// element; the value identifies it as "tag.className".
@@ -55,9 +54,11 @@ public struct ExportPDFDocument: Equatable, Sendable {
     /// The tallest output page in PDF points (≤ 14,400 by construction).
     public let maximumPageHeight: CGFloat
     public let contentSize: CGSize
-    /// Trailing pages the planner's span-intersection safety net dropped as provably
-    /// blank; 0 while the settled height is measured from content.
+    /// Trailing pages dropped as blank without a painted end, or a stale-height page
+    /// estimate after subtracting `paintedBottom` and the root's bottom inset.
     public let droppedTrailingBlankPages: Int
+    /// The maximum bottom of a painted descendant in document coordinates.
+    public let paintedBottom: CGFloat
 
     /// The smallest scale any output page received; 1 when nothing had to shrink.
     public var minimumScale: CGFloat {
@@ -96,7 +97,9 @@ extension PreviewController {
             baselineWidth: baselineWidth,
             unsplittable: measured.spans,
             widthExtents: measured.wide,
-            targetAspect: pageAspect
+            targetAspect: pageAspect,
+            paintedBottom: measured.paintedBottom,
+            bottomInset: measured.bottomInset
         )
         // A fixed/sticky/transformed/floated box cannot be proven safe across a break
         // (the A1 design stop): fail typed only when a planned break would cross one.
@@ -119,7 +122,8 @@ extension PreviewController {
             pageWidths: joined.pageSizes.map(\.width),
             maximumPageHeight: joined.pageSizes.map(\.height).max() ?? 0,
             contentSize: geometry,
-            droppedTrailingBlankPages: plan.droppedTrailingBlankPages
+            droppedTrailingBlankPages: plan.droppedTrailingBlankPages,
+            paintedBottom: measured.paintedBottom
         )
     }
 

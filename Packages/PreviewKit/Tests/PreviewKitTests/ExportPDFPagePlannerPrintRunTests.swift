@@ -82,10 +82,7 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
         XCTAssertEqual(runPages.first?.rect.minY ?? 0, 2000, accuracy: 0.5)
     }
 
-    /// The soft Print extension still applies inside a run: an atomic box taller
-    /// than the page's `width × aspect` soft budget extends the page to its end —
-    /// and swallows the remaining whitespace up to the run's bottom rather than
-    /// emitting a span-free page (X1).
+    /// The box extends to its end; the next page owns the trailing gap.
     func testPrintSoftExtensionInsideARun() throws {
         let spans = [
             Span(minY: 0, maxY: 1000),
@@ -102,7 +99,7 @@ final class ExportPDFPagePlannerPrintRunTests: XCTestCase {
         }
         let rect = try XCTUnwrap(extended?.rect, "The atomic box's page must soft-extend")
         XCTAssertEqual(rect.minY, 1000, accuracy: 0.5)
-        XCTAssertEqual(rect.maxY, 3000, accuracy: 0.5)
+        XCTAssertEqual(rect.maxY, 2600, accuracy: 0.5)
         XCTAssertEqual(extended?.rect.width, 2400)
     }
 

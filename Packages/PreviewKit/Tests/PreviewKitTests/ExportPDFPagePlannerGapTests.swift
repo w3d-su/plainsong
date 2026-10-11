@@ -2,10 +2,7 @@ import CoreGraphics
 @testable import PreviewKit
 import XCTest
 
-/// X1 gap-absorption coverage for the planner (`docs/export-gates.md` D4, owner
-/// decision 2026-10-10): a wide run's snapped edges grow across the neighbouring
-/// span-free gaps so a mandatory break never strands whitespace on its own page,
-/// and runs separated only by a shared safe break stay separate.
+/// D4 gap-window and whitespace-ownership coverage for the planner.
 final class ExportPDFPagePlannerGapTests: XCTestCase {
     private typealias Span = ExportPDFPagePlanner.Span
     private typealias Extent = ExportPDFPagePlanner.WidthExtent
@@ -28,10 +25,7 @@ final class ExportPDFPagePlannerGapTests: XCTestCase {
         let plan = try ExportPDFPagePlannerTests.planRunDocument(
             width: 32000, height: 40000, unsplittable: spans, extents: extents
         )
-        // Each run snaps to its interval's edges; the first absorbs the 2 pt margin
-        // to the last line span, and the two share the 16,000 edge — pinned to one
-        // boundary, not merged and not separated by a hairline page.
-        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(14998, 16000), (16000, 17000)]
+        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(15000, 16000), (16000, 17000)]
         ExportPDFPagePlannerTests.assertPlanInvariants(
             plan, contentSize: CGSize(width: 32000, height: 40000),
             baselineWidth: 800, unsplittable: spans
@@ -39,7 +33,7 @@ final class ExportPDFPagePlannerGapTests: XCTestCase {
         ExportPDFPagePlannerTests.assertRunIsolation(plan, runs: runs)
         ExportPDFPagePlannerTests.assertProsePagesStayAtBaseline(plan, runs: runs, baseline: 800)
         let firstRun = plan.pages.filter {
-            $0.rect.minY >= 14998 - 0.5 && $0.rect.maxY <= 16000 + 0.5
+            $0.rect.minY >= 15000 - 0.5 && $0.rect.maxY <= 16000 + 0.5
         }
         let secondRun = plan.pages.filter {
             $0.rect.minY >= 16000 - 0.5 && $0.rect.maxY <= 17000 + 0.5
@@ -59,8 +53,8 @@ final class ExportPDFPagePlannerGapTests: XCTestCase {
     }
 
     /// X1, the [0–28] reproduction: a document that begins with a small leading gap
-    /// and then a very wide run emits no whitespace-only first page — the run
-    /// absorbs the gap and the first page grows into the run's first spans.
+    /// and then a very wide run emits no whitespace-only first page — the leading
+    /// span-free strip is skipped when it cannot be owned within either page's cap.
     func testDocumentStartingWithAWideRunEmitsNoLeadingBlankPage() throws {
         let spans = ExportPDFPagePlannerTests.lineSpans(from: 30, to: 40000)
         let extent = Extent(minY: 35, maxY: 5000, maxX: 180_097)
@@ -80,16 +74,15 @@ final class ExportPDFPagePlannerGapTests: XCTestCase {
         XCTAssertFalse(plan.pages.contains { $0.rect.maxY <= 30 + 0.5 })
     }
 
-    /// X1, the A4 Print reproduction: two wide runs separated only by a span-free
-    /// gap both claim the gap and merge — no page can be emitted inside it.
-    func testTwoAdjacentWideRunsWithASpanFreeGapMergeInPrint() throws {
+    /// Whitespace-separated wide runs on A4 Print retain separate pages and widths.
+    func testTwoAdjacentWideRunsWithASpanFreeGapStayDistinctInPrint() throws {
         var spans = ExportPDFPagePlannerTests.lineSpans(to: 2000)
         spans.append(Span(minY: 2100, maxY: 2600))
         spans.append(Span(minY: 2700, maxY: 3200))
         spans.append(contentsOf: ExportPDFPagePlannerTests.lineSpans(from: 3300, to: 10000))
         let extents = [
             Extent(minY: 2150, maxY: 2550, maxX: 1500),
-            Extent(minY: 2750, maxY: 3150, maxX: 1500),
+            Extent(minY: 2750, maxY: 3150, maxX: 2400),
         ]
         let plan = try ExportPDFPagePlannerTests.planRunDocument(
             width: 4000, height: 10000, unsplittable: spans,
@@ -99,24 +92,29 @@ final class ExportPDFPagePlannerGapTests: XCTestCase {
             plan, contentSize: CGSize(width: 4000, height: 10000),
             baselineWidth: 800, unsplittable: spans, aspect: 1.0
         )
-        // The (2600,2700) gap is claimed from both sides: the runs overlap after
-        // absorption and merge. The merged top climbs to the last line span's edge
-        // before the first atomic box (2,000), the bottom to the first line span
-        // after the second (3,300): [2000, 3300].
-        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(2000, 3300)]
+        let runs: [(minY: CGFloat, maxY: CGFloat)] = [(2100, 2700), (2700, 3300)]
         ExportPDFPagePlannerTests.assertRunIsolation(plan, runs: runs)
         ExportPDFPagePlannerTests.assertProsePagesStayAtBaseline(plan, runs: runs, baseline: 800)
         let runPages = plan.pages.filter {
-            $0.rect.minY >= 2000 - 0.5 && $0.rect.maxY <= 3300 + 0.5
+            $0.rect.minY >= 2100 - 0.5 && $0.rect.maxY <= 2700 + 0.5
         }
         let runPage = try XCTUnwrap(runPages.first)
         XCTAssertEqual(runPages.count, 1)
-        XCTAssertEqual(runPage.rect.minY, 2000, accuracy: 0.5)
-        XCTAssertEqual(runPage.rect.maxY, 3300, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.minY, 2100, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.maxY, 2700, accuracy: 0.5)
         XCTAssertEqual(runPage.rect.width, 1500)
+        let secondRunPage = try XCTUnwrap(plan.pages.first { intersects($0.rect, Span(
+            minY: 2700, maxY: 3200
+        )) })
+        XCTAssertEqual(secondRunPage.rect.minY, 2700, accuracy: 0.5)
+        XCTAssertGreaterThan(secondRunPage.rect.width, runPage.rect.width)
         // No page may sit wholly inside the span-free gap.
         XCTAssertFalse(plan.pages.contains {
             $0.rect.minY > 2600 - 0.5 && $0.rect.maxY < 2700 + 0.5
         })
+    }
+
+    private func intersects(_ rect: CGRect, _ span: Span) -> Bool {
+        span.minY < rect.maxY - 0.5 && span.maxY > rect.minY + 0.5
     }
 }

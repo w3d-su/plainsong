@@ -42,7 +42,7 @@ enum ExportPDFWideRunsAppSupport {
         }
     }
 
-    /// No output page is left blank: every page carries some text or drawing.
+    /// No output page has empty PDFKit text extraction; that is the blank-page proxy.
     static func assertNoBlankPage(
         _ document: PDFDocument,
         file: StaticString = #filePath,
@@ -145,6 +145,7 @@ enum ExportPDFWideRunsAppSupport {
         let start = Date()
         let pdf = try await controller.captureExportPDF()
         let seconds = Date().timeIntervalSince(start)
+        XCTAssertEqual(pdf.droppedTrailingBlankPages, 0)
         print(String(
             format: "E1 CAPTURE pages=%d planned=%d widest=%.1fpt minScale=%.3f time=%.2fs content=%.0fx%.0f",
             pdf.pageCount, pdf.plannedPageCount, pdf.pageWidths.max() ?? 0,

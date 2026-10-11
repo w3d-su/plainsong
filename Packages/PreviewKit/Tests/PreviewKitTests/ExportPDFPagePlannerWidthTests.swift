@@ -46,12 +46,11 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
             $0.rect.width == 800 || $0.rect.width == wideWidth
         })
         XCTAssertTrue(plan.pages.allSatisfy { $0.scale == 1 })
-        // The run absorbs the neighbouring span-free margins to [1198, 1620]; its
-        // page covers exactly that at the measured width (2,400 — under
-        // `maximumSide`, so no slack), and the soft budget (wideWidth × 0.5)
-        // could not extend it past the run.
+        // The run starts at the extent edge (1200, already a line-box boundary) and
+        // snaps its bottom outward to the interval edge at 1620. Its measured width
+        // (2,400) is under `maximumSide`, so no slack applies.
         let runPage = try XCTUnwrap(plan.pages.first { $0.rect.width > 800 })
-        XCTAssertEqual(runPage.rect.minY, 1198, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.minY, 1200, accuracy: 0.5)
         XCTAssertEqual(runPage.rect.maxY, 1620, accuracy: 0.5)
         XCTAssertLessThan(runPage.rect.height, wideWidth * 0.5)
     }
@@ -74,7 +73,7 @@ final class ExportPDFPagePlannerWidthTests: XCTestCase {
             plan.pages.map(\.rect.width), [800, 800, wideWidth, 800, 800]
         )
         let runPage = plan.pages[2]
-        XCTAssertEqual(runPage.rect.minY, 14998, accuracy: 0.5)
+        XCTAssertEqual(runPage.rect.minY, 15000, accuracy: 0.5)
         XCTAssertEqual(runPage.rect.maxY, 16020, accuracy: 0.5)
         XCTAssertEqual(
             runPage.scale,

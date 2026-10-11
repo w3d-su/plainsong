@@ -6,7 +6,9 @@ import Foundation
 ///
 /// The caller measures **unsplittable spans** — every line box (Range.getClientRects over
 /// non-whitespace text nodes) and every atomic box (images, SVG, media, controls, rules,
-/// table rows, KaTeX, Mermaid) — in document coordinates. A **safe break** is any
+/// table rows, KaTeX, Mermaid) — in document coordinates. Padding, borders and
+/// backgrounds are not spans; `paintedBottom` covers painted content after the last
+/// span. A **safe break** is any
 /// vertical position not strictly inside an unsplittable span. Gaps between top-level
 /// blocks, between li/tr/blockquote/MDX-card children, and between the line boxes of
 /// paragraphs and pre blocks all fall out of that complement automatically; no container
@@ -22,37 +24,38 @@ import Foundation
 /// scaled in PDF space only when its capture width exceeds 14,400 pt, so one wide
 /// table or long line shrinks only the pages that contain it.
 ///
-/// **Wide runs (E1, 2026-10-09; gap absorption 2026-10-10).** An extent whose right
+/// **Wide runs (E1, 2026-10-09; D4).** An extent whose right
 /// edge crosses the product's wide threshold — `maximumSide` for PDF,
 /// `baseline / printWideFraction` for Print — belongs to a *wide run*: the union of the
 /// wide extents' vertical spans, merged on overlap or touch, snapped outward to
 /// merged-unsplittable-interval edges (a boundary landing strictly inside an interval
-/// moves to that interval's edge, which is always a safe break), then grown across the
-/// neighbouring span-free gap so every boundary sits on a content edge — never inside
-/// whitespace, where a mandatory break would strand an empty page — clamped to the
-/// document, and merged again on real overlap; runs separated only by a shared safe
-/// break stay separate so each keeps its own width. Every run boundary is a
-/// **mandatory break**: a page may end there but never crosses it, so a page either
-/// stays outside every run or lies wholly inside one — prose never shares a page with
-/// wide content. Inside a run the same rules apply: per-page width from that page's own
+/// moves to that interval's edge, which is always a safe break). Runs merge only when
+/// the snapped ranges genuinely overlap; whitespace-separated runs stay separate and
+/// retain their own pages and widths. Their edges form span-free **gap windows**:
+/// Pages never cross a window's high edge, so prose and run content never share a page.
+/// Inside a run the same rules apply: per-page width from that page's own
 /// extents, greedy width growth, and the soft Print extension. Outside a run nothing
 /// changes; by construction those pages hold no wide extents, so they are never scaled.
 ///
-/// Each page ends at the last safe break at or below its CSS-height budget from its
-/// top. The **hard** budget is `maximumSide` — a flat 14,400 CSS pt whatever the page's
-/// width, because WebKit splits an over-tall capture off any planned break and can
-/// terminate on very tall full-size captures — lowered further when the page's own
-/// width would push its capture raster past `captureAreaBudget` (WebContent dies
-/// painting near 2³⁰ px; see the constant's note). `targetAspect` —
+/// Each page respects the hard budget and all gap-window limits. A span-free candidate
+/// grows through the next interval, while a leading gap too large for either adjacent
+/// page is skipped rather than emitted by itself. The **hard** budget is
+/// `maximumSide` — a flat 14,400 CSS pt whatever the page's width, because WebKit
+/// splits an over-tall capture off any planned break and can terminate on very tall
+/// full-size captures — lowered further when the page's own width would push its
+/// capture raster past `captureAreaBudget` (below the observed near-2³⁰ px² WebContent
+/// termination bound documented on the constant). `targetAspect` —
 /// `imageableHeight / imageableWidth` — adds a **soft** budget of `width × aspect` for
-/// Print: when a planned break would land inside an unbreakable run that already
-/// reaches the page top — or when the slice before it would hold no span — the page
-/// extends to the run's end (clamped by the mandatory break) instead of failing or
-/// emitting a blank page, and `.pageScaleToFit` shrinks that one page onto paper.
-/// An unbreakable interval taller than the hard budget for its page's width still
+/// Print. Gap ownership first assigns whitespace above when it fits the soft budget,
+/// otherwise below when the next interval fits its own hard budget, then tries a
+/// whitespace-only split, an earlier safe-break back-off, and finally the span-free skip
+/// fallback. `.pageScaleToFit` shrinks over-soft pages onto paper.
+/// An unbreakable interval taller than the hard budget for its own capture width,
+/// including `widePageSlack`, still
 /// fails truthfully, for both products: `oversizeAtomicBox` when it is taller than the
 /// 14,400 pt user space, `oversizeCaptureArea` when it only overflows the capture-area
-/// budget — wide runs merely over the area budget keep being split instead. Spans that
+/// budget at its own capture width — wide runs merely over the area budget keep being
+/// split instead. Spans that
 /// merely touch — adjacent table rows, stacked line boxes — keep their shared edge as
 /// a valid break; only a genuine overlap (> 0.5 pt) merges spans into one unbreakable
 /// run.
@@ -66,16 +69,14 @@ import Foundation
 /// `hard(width)` or the plan throws. Every branch emits `bottom > top` (soft(width) > 0;
 /// the limit branch requires `limit > top + ε`; the safe-break branch requires
 /// `I.minY > top + ε`; the extension branch yields `I.maxY > target > top`), so the
-/// outer loop terminates. Pages are contiguous, cover [0, contentHeight], and every
-/// page intersects at least one unsplittable span (strict overlap > ε; borders and
-/// padding count because the measured spans include them). That "no empty page"
-/// invariant relies on gap absorption and assumes whitespace gaps between consecutive
-/// spans stay below the smallest soft budget in play — prose whitespace taller than a
-/// page is out of scope. Every page's width lies within
+/// outer loop terminates. Pages are ordered and non-overlapping; every uncovered strip
+/// is span-free, and every page intersects a span except a painted end-tail page. Every
+/// page's width lies within
 /// [baseline, contentWidth + widePageSlack] and covers the right edge of every span it
-/// contains, so no content is clipped. A trailing page that intersects no span is
-/// dropped as a safety net — the settled height is measured from content, so such a
-/// page can only be blank — and `Plan.droppedTrailingBlankPages` records the count.
+/// contains, so no content is clipped. With `paintedBottom`, pages cover [0, E], where
+/// E is the measured painted end clamped to the content height; the root's remaining
+/// padding is excluded. Without it, trailing span-free pages retain the safety-net
+/// behavior and `Plan.droppedTrailingBlankPages` reports them.
 public enum ExportPDFPagePlanner {
     public static let maximumSide: CGFloat = 14400
 
@@ -106,8 +107,8 @@ public enum ExportPDFPagePlanner {
     /// slack is a constant twice the worst observed need (~100 pt). It applies only
     /// after run classification — it can never promote a page into a run — and only
     /// past `maximumSide`, where every page already has to shrink; adding it to a
-    /// narrower page would lower its print scale for no benefit (E1 forbids that),
-    /// while clipping was never observed below ~1M pt anyway.
+    /// narrower page would lower its print scale for no benefit (E1 forbids that).
+    /// A 1-glyph loss was measured at 130k pt with slack 0.
     public static let widePageSlack: CGFloat = 200
 
     /// One unsplittable vertical interval in full-size layout coordinates.
@@ -123,6 +124,11 @@ public enum ExportPDFPagePlanner {
         public var height: CGFloat {
             maxY - minY
         }
+    }
+
+    struct GapWindow: Equatable, Sendable {
+        let lo: CGFloat
+        let hi: CGFloat
     }
 
     /// The rightmost edge (`maxX`, right padding included) of content occupying one
@@ -152,14 +158,14 @@ public enum ExportPDFPagePlanner {
         }
     }
 
-    /// The capture plan: contiguous full-size page rects, each with its own width and
+    /// The capture plan: ordered full-size page rects, each with its own width and
     /// PDF-space scale.
     public struct Plan: Equatable, Sendable {
         public let pages: [Page]
 
-        /// How many trailing pages the span-intersection safety net dropped. Expected
-        /// to be 0 while the settled height is measured from content; a nonzero value
-        /// means a stale measurement produced provably blank trailing pages.
+        /// Without a painted end, trailing pages dropped by the span-intersection
+        /// safety net. With one, `ceil((contentHeight - E - bottomInset) / softBudget)`
+        /// when the excess is greater than 1 pt, where E is the painted end.
         public let droppedTrailingBlankPages: Int
 
         public init(pages: [Page], droppedTrailingBlankPages: Int = 0) {
@@ -175,8 +181,8 @@ public enum ExportPDFPagePlanner {
         return maximumSide / width
     }
 
-    /// Splits [0, `contentSize.height`] into pages at safe breaks, giving each page the
-    /// width its own content requires.
+    /// Splits the painted document end into safe pages, giving each page the width its
+    /// own content requires.
     ///
     /// `baselineWidth` is the document's normal content width including padding (the
     /// `#preview-root` border edge measured after the geometry settle); it is clamped
@@ -190,80 +196,16 @@ public enum ExportPDFPagePlanner {
         baselineWidth: CGFloat,
         unsplittable: [Span],
         widthExtents: [WidthExtent],
-        targetAspect: CGFloat? = nil
+        targetAspect: CGFloat? = nil,
+        paintedBottom: CGFloat? = nil,
+        bottomInset: CGFloat = 0
     ) throws(ExportPDFCaptureError) -> Plan {
-        let epsilon: CGFloat = 0.5
-        let contentWidth = contentSize.width
-        let contentHeight = contentSize.height
-        guard contentWidth > 0, contentHeight > 0,
-              contentWidth.isFinite, contentHeight.isFinite
-        else {
-            throw .emptyDocument
-        }
-        let baseline = min(contentWidth, max(baselineWidth.isFinite ? baselineWidth : 1, 1))
-        let aspect = targetAspect.flatMap { $0.isFinite && $0 > 0.01 ? $0 : nil }
-
-        // Union of the unsplittable intervals. Merge only on a real overlap so spans that
-        // merely touch keep their shared edge as a valid break.
-        let sorted = unsplittable
-            .filter { $0.maxY > $0.minY }
-            .sorted { $0.minY < $1.minY }
-        var intervals: [Span] = []
-        intervals.reserveCapacity(sorted.count)
-        for span in sorted {
-            if let last = intervals.last, span.minY < last.maxY - epsilon {
-                intervals[intervals.count - 1] = Span(
-                    minY: last.minY,
-                    maxY: max(last.maxY, span.maxY)
-                )
-            } else {
-                intervals.append(span)
-            }
-        }
-
-        let extents = widthExtents
-            .filter { $0.maxY > $0.minY && $0.maxX > baseline }
-            .sorted { $0.minY < $1.minY }
-
-        // A run boundary is a mandatory break: a page may end there but never crosses
-        // it, so no page mixes wide run content with anything else. The set is finite —
-        // `limit` is the smallest boundary strictly past the current page top. Print
-        // discriminates by `aspect` being non-nil.
-        let wideThreshold = aspect == nil ? maximumSide : baseline / printWideFraction
-        let breaks = mandatoryBreaks(
-            extents: extents, intervals: intervals,
-            wideThreshold: wideThreshold, contentHeight: contentHeight, epsilon: epsilon
-        )
-
-        var pages: [Page] = []
-        var top: CGFloat = 0
-        while top < contentHeight - epsilon {
-            let limit = pageLimit(
-                after: top, breaks: breaks, contentHeight: contentHeight, epsilon: epsilon
-            )
-            let page = try pageFromTop(
-                top: top, limit: limit, baseline: baseline, aspect: aspect,
-                intervals: intervals, extents: extents,
-                contentWidth: contentWidth, epsilon: epsilon
-            )
-            pages.append(page)
-            top = page.rect.maxY
-        }
-        // Safety net: the settled height is measured from content, but if a stale
-        // measurement still leaves trailing pages that intersect no span they can only
-        // be blank — drop them rather than emit empty pages. A document with no spans
-        // at all keeps its budget-split pages: without measured content the tail can't
-        // be proven blank. A non-empty plan always keeps its first page.
-        var droppedTrailingBlankPages = 0
-        while pages.count > 1, !intervals.isEmpty, let last = pages.last,
-              !intervals.contains(where: {
-                  $0.minY < last.rect.maxY - epsilon && $0.maxY > last.rect.minY + epsilon
-              })
-        {
-            pages.removeLast()
-            droppedTrailingBlankPages += 1
-        }
-        return Plan(pages: pages, droppedTrailingBlankPages: droppedTrailingBlankPages)
+        try buildPlan(PagePlanRequest(
+            contentSize: contentSize, baselineWidth: baselineWidth,
+            unsplittable: unsplittable, widthExtents: widthExtents,
+            targetAspect: targetAspect, paintedBottom: paintedBottom,
+            bottomInset: bottomInset
+        ))
     }
 
     /// The width the page [top, bottom) needs: the baseline, raised to the widest right

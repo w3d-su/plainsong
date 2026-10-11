@@ -161,9 +161,15 @@ extension PreviewController {
     private static let measureUnsplittableSpansScript = """
     JSON.stringify((() => {
       const root = document.getElementById("preview-root");
-      if (!root) return { spans: [], offenders: [], wide: [], baselineWidth: 0 };
+      if (!root) return {
+        spans: [], offenders: [], wide: [], baselineWidth: 0,
+        paintedBottom: 0, bottomInset: 0
+      };
       const rootRect = root.getBoundingClientRect();
-      const padR = parseFloat(getComputedStyle(root).paddingRight) || 0;
+      const rootStyle = getComputedStyle(root);
+      const padR = parseFloat(rootStyle.paddingRight) || 0;
+      const bottomInset = (parseFloat(rootStyle.paddingBottom) || 0)
+        + (parseFloat(rootStyle.borderBottomWidth) || 0);
       const baselineWidth = Math.ceil(rootRect.right + window.scrollX);
       const contentRight = rootRect.right + window.scrollX - padR;
       const atomicSelector = [
@@ -232,14 +238,16 @@ extension PreviewController {
         for (const rect of range.getClientRects()) pushRect(rect, clipRight);
       }
       const offenders = [];
+      let paintedBottom = 0;
       for (const el of root.querySelectorAll("*")) {
-        pushWide(el.getBoundingClientRect(), clipRightFor(el.parentElement || root));
+        const rect = el.getBoundingClientRect();
+        paintedBottom = Math.max(paintedBottom, rect.bottom + window.scrollY);
+        pushWide(rect, clipRightFor(el.parentElement || root));
         const style = getComputedStyle(el);
         const positioned = style.position === "fixed" || style.position === "sticky";
         const transformed = style.transform && style.transform !== "none";
         const floated = style.float === "left" || style.float === "right";
         if (!positioned && !transformed && !floated) continue;
-        const rect = el.getBoundingClientRect();
         offenders.push({
           tag: el.tagName.toLowerCase(),
           className: typeof el.className === "string" ? el.className : "",
@@ -251,7 +259,9 @@ extension PreviewController {
         spans: spans,
         offenders: offenders,
         wide: wide,
-        baselineWidth: baselineWidth
+        baselineWidth: baselineWidth,
+        paintedBottom: paintedBottom,
+        bottomInset: bottomInset
       };
     })())
     """
@@ -287,14 +297,18 @@ extension PreviewController {
                 guard minY.isFinite, maxY.isFinite, maxX.isFinite, maxY > minY, maxX > 0 else { continue }
                 wide.append(ExportPDFPagePlanner.WidthExtent(minY: minY, maxY: maxY, maxX: maxX))
             }
-            guard measurement.baselineWidth.isFinite else {
+            guard measurement.baselineWidth.isFinite,
+                  measurement.paintedBottom.isFinite, measurement.bottomInset.isFinite
+            else {
                 throw ExportPDFCaptureError.geometryUnstable
             }
             return ExportSpanMeasurementResult(
                 spans: spans,
                 offenders: measurement.offenders,
                 wide: wide,
-                baselineWidth: measurement.baselineWidth
+                baselineWidth: measurement.baselineWidth,
+                paintedBottom: measurement.paintedBottom,
+                bottomInset: measurement.bottomInset
             )
         }
         return try await withTaskCancellationHandler {
@@ -330,6 +344,8 @@ private struct ExportSpanMeasurement: Codable {
     let offenders: [ExportPositionedOffender]
     let wide: [CGFloat]
     let baselineWidth: CGFloat
+    let paintedBottom: CGFloat
+    let bottomInset: CGFloat
 }
 
 /// The decoded span measurement: unsplittable spans, positioned offenders, overflow
@@ -339,6 +355,8 @@ struct ExportSpanMeasurementResult: Sendable {
     let offenders: [ExportPositionedOffender]
     let wide: [ExportPDFPagePlanner.WidthExtent]
     let baselineWidth: CGFloat
+    let paintedBottom: CGFloat
+    let bottomInset: CGFloat
 }
 
 /// A fixed/sticky/transformed/floated element inside the export DOM, with its document

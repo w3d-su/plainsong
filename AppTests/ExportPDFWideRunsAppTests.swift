@@ -16,7 +16,7 @@ import XCTest
 final class ExportPDFWideRunsAppTests: XCTestCase {
     private typealias Support = ExportPDFWideRunsAppSupport
 
-    /// The B1 shape that terminated WebContent: a ~1.1M pt minified line in the
+    /// The B1 shape that terminated WebContent: a 1,950,298 pt minified line in the
     /// middle of a long post. With isolation plus the cap the file is written, the
     /// C2 warning names the run's pages and the percentage, and the prose on either
     /// side keeps baseline width at scale 1.
@@ -31,8 +31,12 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         let line = String(repeating: "W", count: 240_000) + "MINIFIEDSENTINEL"
         // A bare fence sends the 240k-char line through highlight.js auto-detect
         // (~113 s — past the 15 s render timeout); `text` renders the same
-        // 1.14M pt line in under a second.
+        // 1,950,298 pt line in under a second.
         let source = [before, "```text\n" + line + "\n```", after].joined(separator: "\n\n")
+        let (directController, directPDF) = try await Support.capture(source)
+        defer { directController.invalidate() }
+        let directDocument = try XCTUnwrap(PDFDocument(data: directPDF.data))
+        Support.assertNoBlankPage(directDocument)
         let fixture = try support.makeFixture(text: source)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let destination = fixture.exportsDirectory.appendingPathComponent("minified-run.pdf")
@@ -44,7 +48,7 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
         let data = try Data(contentsOf: destination)
         let document = try XCTUnwrap(PDFDocument(data: data))
-        XCTAssertFalse(shrunkPages.isEmpty, "A ~1.1M pt run must shrink at least one page")
+        XCTAssertFalse(shrunkPages.isEmpty, "A 1,950,298 pt run must shrink at least one page")
         let notice = try XCTUnwrap(fixture.appState.exportHTMLNotice)
         XCTAssertEqual(notice.group, .exportedWithShrunkPages)
         XCTAssertEqual(notice.severity, .warning)
@@ -139,20 +143,34 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
     /// The B2 shape: 300 paragraphs, a quote containing a list and a 30-column table,
     /// then 300 paragraphs. The last page holds content and no page is left blank.
     func testQuoteListTableShapeLeavesNoBlankTail() async throws {
-        let (before, beforeMarkers) = Support.prose(prefix: "B2BEFORE", count: 300)
-        let (after, afterMarkers) = Support.prose(prefix: "B2AFTER", count: 300)
+        let (before, beforeMarkers) = Support.wrappingProse(prefix: "B2BEFORE", count: 300)
+        let (after, afterMarkers) = Support.wrappingProse(prefix: "B2AFTER", count: 300)
         let columnMarkers = (0 ..< 30).map { String(format: "B2COL%02dSENTINEL", $0) }
-        let quote = [
+        var bodyCells = ["B2CELLSENTINEL"]
+        bodyCells.append(contentsOf: [String](repeating: "cell", count: columnMarkers.count - 1))
+        let bodyRow = "| " + bodyCells.joined(separator: " | ") + " |"
+        let table = Support.tableSource(headerRow: columnMarkers, bodyRows: [bodyRow])
+        var quoteLines = [
             "> - B2LISTSENTINEL quoted list item",
             ">",
-            "> | " + columnMarkers.joined(separator: " | ") + " |",
-            "> | " + [String](repeating: "---", count: columnMarkers.count).joined(separator: " | ") + " |",
-            "> | B2CELLSENTINEL | " + [String](repeating: "cell", count: columnMarkers.count - 1)
-                .joined(separator: " | ") + " |",
-        ].joined(separator: "\n")
+        ]
+        quoteLines.append(contentsOf: table.split(separator: "\n").map { ">   \($0)" })
+        let quote = quoteLines.joined(separator: "\n")
         let source = [before, quote, after].joined(separator: "\n\n")
         let (controller, pdf) = try await Support.capture(source)
         defer { controller.invalidate() }
+        let lastChildBottom = try await controller.webView.evaluateJavaScript("""
+        (() => {
+          const root = document.getElementById("preview-root");
+          const style = getComputedStyle(root);
+          const padB = parseFloat(style.paddingBottom) || 0;
+          const borderB = parseFloat(style.borderBottomWidth) || 0;
+          return root.lastElementChild.getBoundingClientRect().bottom
+            + window.scrollY + padB + borderB;
+        })()
+        """) as? Double
+        XCTAssertEqual(pdf.contentSize.height, CGFloat(lastChildBottom ?? -1), accuracy: 60)
+        XCTAssertEqual(pdf.droppedTrailingBlankPages, 0)
         XCTAssertEqual(pdf.pageCount, pdf.plannedPageCount)
         let document = try XCTUnwrap(PDFDocument(data: pdf.data))
         XCTAssertEqual(document.pageCount, pdf.plannedPageCount)

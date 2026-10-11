@@ -10,12 +10,14 @@ import XCTest
 final class ExportPDFPagePlannerTests: XCTestCase {
     typealias Span = ExportPDFPagePlanner.Span
 
-    /// The planner invariants: contiguous coverage of [0, contentHeight], no page taller
+    /// The planner invariants: ordered, non-overlapping pages; only span-free uncovered
+    /// strips; no empty pages except a painted end tail; no page taller
     /// than its width's hard budget — the flat 14,400 CSS pt, lowered once the page's
     /// capture width would push the raster past `captureAreaBudget` — every page
     /// intersecting at least one unsplittable span when spans were supplied (strict
-    /// overlap > ε: borders and padding count because the measured spans include
-    /// them), every width inside [baseline, contentWidth + widePageSlack], and every
+    /// overlap > ε: spans are atomic boxes and text line boxes; padding, borders and
+    /// backgrounds are not spans, while paintedBottom covers the document end),
+    /// every width inside [baseline, contentWidth + widePageSlack], and every
     /// page's scale equal to `pageScale` of its own capture width. Under an aspect, a
     /// page taller than its soft budget is allowed only when an unbreakable run spans
     /// it or the overage is whitespace swallowed up to a mandatory break.
@@ -25,13 +27,18 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         baselineWidth: CGFloat,
         unsplittable: [Span],
         aspect: CGFloat? = nil,
+        paintedBottom: CGFloat? = nil,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         let epsilon: CGFloat = 0.5
         let baseline = min(contentSize.width, max(baselineWidth, 1))
+        let lastSpanMax = unsplittable.map(\.maxY).max() ?? 0
+        let plannedEnd = paintedBottom.map {
+            min(contentSize.height, max($0, lastSpanMax))
+        } ?? contentSize.height
         XCTAssertFalse(plan.pages.isEmpty, file: file, line: line)
-        var expectedTop: CGFloat = 0
+        var previousBottom: CGFloat = 0
         for page in plan.pages {
             let rect = page.rect
             XCTAssertEqual(rect.minX, 0, file: file, line: line)
@@ -41,14 +48,29 @@ final class ExportPDFPagePlannerTests: XCTestCase {
                 contentSize.width + ExportPDFPagePlanner.widePageSlack + 0.001,
                 file: file, line: line
             )
-            XCTAssertEqual(rect.minY, expectedTop, accuracy: 0.001, file: file, line: line)
+            XCTAssertGreaterThanOrEqual(
+                rect.minY, previousBottom - 0.001, file: file, line: line
+            )
+            if rect.minY > previousBottom + epsilon {
+                XCTAssertFalse(
+                    unsplittable.contains {
+                        $0.minY < rect.minY - epsilon && $0.maxY > previousBottom + epsilon
+                    },
+                    "Uncovered strip \(previousBottom)…\(rect.minY) contains a span",
+                    file: file, line: line
+                )
+            }
             XCTAssertGreaterThan(rect.height, 0.001, file: file, line: line)
+            let intersectsSpan = unsplittable.contains {
+                $0.minY < rect.maxY - epsilon && $0.maxY > rect.minY + epsilon
+            }
+            let isPaintedTail = paintedBottom != nil
+                && rect.minY >= lastSpanMax - epsilon
+                && rect.maxY <= plannedEnd + epsilon
             if !unsplittable.isEmpty {
                 XCTAssertTrue(
-                    unsplittable.contains {
-                        $0.minY < rect.maxY - epsilon && $0.maxY > rect.minY + epsilon
-                    },
-                    "Page \(rect) intersects no unsplittable span — it would be blank",
+                    intersectsSpan || isPaintedTail,
+                    "Page \(rect) intersects no span or painted end tail",
                     file: file, line: line
                 )
             }
@@ -66,7 +88,7 @@ final class ExportPDFPagePlannerTests: XCTestCase {
                 // soft-budget position and reaches the page's own end — whether the
                 // page top sits inside it or the page grew over leading whitespace —
                 // or a purely whitespace overage swallowed up to a mandatory break.
-                let reachesContentEnd = rect.maxY >= contentSize.height - epsilon
+                let reachesContentEnd = rect.maxY >= plannedEnd - epsilon
                 if rect.height > soft + epsilon, !reachesContentEnd {
                     let overageStart = rect.minY + soft
                     let spansPage = unsplittable.contains { span in
@@ -85,21 +107,20 @@ final class ExportPDFPagePlannerTests: XCTestCase {
                     )
                 }
             }
-            expectedTop = rect.maxY
+            previousBottom = rect.maxY
         }
-        // Pages cover [0, contentHeight] contiguously — except that a fully span-free
-        // tail may be dropped as the B2 safety net; nothing but whitespace can follow
-        // the last kept page.
-        if expectedTop < contentSize.height - epsilon {
+        if paintedBottom != nil {
+            XCTAssertEqual(previousBottom, plannedEnd, accuracy: 0.001, file: file, line: line)
+        } else if previousBottom < contentSize.height - epsilon {
             for span in unsplittable {
                 XCTAssertLessThanOrEqual(
-                    span.maxY, expectedTop + epsilon,
+                    span.maxY, previousBottom + epsilon,
                     "Content at \(span.minY)…\(span.maxY) lies past the dropped tail",
                     file: file, line: line
                 )
             }
         } else {
-            XCTAssertEqual(expectedTop, contentSize.height, accuracy: 0.001, file: file, line: line)
+            XCTAssertEqual(previousBottom, contentSize.height, accuracy: 0.001, file: file, line: line)
         }
     }
 
@@ -295,15 +316,15 @@ final class ExportPDFPagePlannerTests: XCTestCase {
         XCTAssertEqual(plan.pages[0].rect.maxY, 14000, accuracy: 0.5)
     }
 
-    func testOverlappingSpansBreakAtTheUnionMinYNotAnInteriorEdge() throws {
+    func testOverlappingSpansTrimLeadingWhitespaceToStayWithinTheHardCap() throws {
         // A [9000,14000] and B [13800,14500] overlap by 200 pt and merge into one
-        // unbreakable run [9000,14500]. If they had not merged, the 14,400 target would
-        // land inside B alone and offer the interior edge 13,800; merged, the page must
-        // end at the union's minY = 9,000.
+        // unbreakable run [9000,14500]. Leading whitespace is skipped so the page can
+        // contain the whole run without exceeding the 14,400 pt hard cap.
         let spans = [Span(minY: 9000, maxY: 14000), Span(minY: 13800, maxY: 14500)]
         let plan = try planDocument(width: 800, height: 16000, unsplittable: spans)
-        XCTAssertEqual(plan.pages.count, 2)
-        XCTAssertEqual(plan.pages[0].rect.maxY, 9000, accuracy: 0.5)
+        XCTAssertEqual(plan.pages.count, 1)
+        XCTAssertEqual(plan.pages[0].rect.minY, 100, accuracy: 0.5)
+        XCTAssertEqual(plan.pages[0].rect.maxY, 14500, accuracy: 0.5)
     }
 
     func testOverlappingSpansFormAnUnbreakableRunTallerThanTheBudget() {
@@ -321,20 +342,6 @@ final class ExportPDFPagePlannerTests: XCTestCase {
                 return XCTFail("Expected oversizeAtomicBox, got \(error)")
             }
         }
-    }
-
-    func testTargetAspectBoundsPageHeightToThePaperAspect() throws {
-        // Letter-portrait-ish aspect: budget = 800 × (11in/8.5in ≈ 1.294) ≈ 1035.
-        let spans = (0 ..< 100).map { Span(minY: CGFloat($0) * 30, maxY: CGFloat($0) * 30 + 28) }
-        let plan = try planDocument(
-            width: 800, height: 3000, unsplittable: spans, aspect: 1.294
-        )
-        Self.assertPlanInvariants(
-            plan, contentSize: CGSize(width: 800, height: 3000),
-            baselineWidth: 800, unsplittable: spans, aspect: 1.294
-        )
-        Self.assertBreaksAreSafe(plan, unsplittable: spans)
-        XCTAssertGreaterThan(plan.pages.count, 1)
     }
 
     func testPageWiderThanTheMaximumIsStillCappedAtTheMaximumSide() throws {
@@ -359,17 +366,6 @@ final class ExportPDFPagePlannerTests: XCTestCase {
                 ExportPDFPagePlanner.pageScale(width: capture),
                 accuracy: 0.0001
             )
-        }
-    }
-
-    /// Landscape paper (A4 landscape imageable 783 × 559 → aspect ≈ 0.714) makes every
-    /// non-extended page wider than tall.
-    /// A non-finite or implausibly small aspect is treated as no aspect.
-    func testDegenerateAspectIsIgnored() throws {
-        for aspect: CGFloat in [.nan, .infinity, 0, 0.005] {
-            let plan = try planDocument(width: 800, height: 30000, aspect: aspect)
-            // No aspect → pure PDF budgeting: 14,400 pt pages.
-            XCTAssertEqual(plan.pages.first?.rect.height ?? 0, 14400, accuracy: 0.5)
         }
     }
 

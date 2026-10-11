@@ -7,7 +7,7 @@ import PDFKit
 import XCTest
 
 /// 20d edge coverage for the hosted wide-run pipeline (`docs/export-gates.md`
-/// D4): the leading-run gap absorbs into the run's first page, the settled
+/// D4): run-edge windows keep prose separate from wide runs, the settled
 /// content height leaves no trailing blank page, clipped hidden text cannot
 /// fabricate a run, an over-area atomic box fails typed, and a joiner
 /// page-count mismatch surfaces the internal-pagination notice.
@@ -16,8 +16,8 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
     private typealias Support = ExportPDFWideRunsAppSupport
 
     /// X1 hosted: a document that *begins* with a very wide table must not emit
-    /// a blank leading page — the run absorbs the small gap above its first
-    /// span, page 1 holds table markers, and no page mixes run and prose.
+    /// a blank leading page — the span-free leading window is assigned to the
+    /// table's page, and no page mixes run and prose.
     func testDocumentStartingWithAWideTableHasNoBlankFirstPage() async throws {
         let (after, afterMarkers) = Support.prose(prefix: "LEADAFTER", count: 150)
         let columnMarkers = (0 ..< 40).map { String(format: "LEADTBLCOL%02dSENTINEL", $0) }
@@ -138,6 +138,16 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
             + token + " |\n\nOAOUTROSENTINEL after.\n"
         let controller = try await Support.preparedController(source)
         defer { controller.invalidate() }
+        try await controller.applyExportOverflowStyle()
+        let contentSize = try await controller.settleExportGeometry()
+        let measurement = try await controller.measureUnsplittableSpans()
+        let box = try XCTUnwrap(measurement.spans.max(by: { $0.height < $1.height }))
+        let extent = try XCTUnwrap(measurement.wide
+            .filter { $0.minY < box.maxY && $0.maxY > box.minY }
+            .max(by: { $0.maxX < $1.maxX }))
+        let expectedWidth = min(
+            max(extent.maxX, measurement.baselineWidth), contentSize.width
+        ) + ExportPDFPagePlanner.widePageSlack
         do {
             _ = try await controller.captureExportPDF()
             XCTFail("An over-budget box must fail the capture")
@@ -149,6 +159,8 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
                 heightPoints, ExportPDFPagePlanner.maximumSide + 0.5,
                 "A box taller than 14,400 pt would be oversizeAtomicBox instead"
             )
+            XCTAssertEqual(widthPoints, expectedWidth, accuracy: 10)
+            XCTAssertEqual(heightPoints, box.height, accuracy: 1)
         }
         // The full command path: typed failure reaches the notice and no file.
         let support = ExportHTMLCommandAppTests()
@@ -169,6 +181,49 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
         XCTAssertTrue(notice.message.contains("inches"))
         XCTAssertTrue(notice.message.contains("Split the table or make the image smaller"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    }
+
+    func testTableAndLongCodeLineUseTheirOwnWidthsAndWritePDF() async throws {
+        let support = ExportHTMLCommandAppTests()
+        let image = try Support.pngData(size: NSSize(width: 600, height: 600))
+        let headers = (0 ..< 12).map { "TABLECOL\($0)" + String(repeating: "x", count: 206) }
+        let table = Support.tableSource(
+            headerRow: headers,
+            bodyRows: [
+                "| TABLEIMAGE ![wide](data:image/png;base64,\(image.base64EncodedString())) "
+                    + String(repeating: "| cell", count: 11) + " |",
+            ]
+        )
+        let line = "CODELINESENTINEL" + String(repeating: "W", count: 140_000)
+        let source = [table, "```text\n\(line)\n```"].joined(separator: "\n\n")
+        let fixture = try support.makeFixture(text: source)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let destination = fixture.exportsDirectory.appendingPathComponent("table-code.pdf")
+        let recorder = fixture.record(returning: [destination])
+        try await XCTUnwrap(fixture.appState.exportCurrentDocumentAsPDF()).value
+        guard case let .exported(_, _, shrunkPages) = recorder.results.first?.result else {
+            return XCTFail("Expected a committed PDF, got \(recorder.results)")
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+        let document = try XCTUnwrap(PDFDocument(url: destination))
+        let tableIndex = try XCTUnwrap((0 ..< document.pageCount).first { index in
+            document.page(at: index)?.string?.contains("TABLECOL") == true
+        })
+        let codeIndex = try XCTUnwrap((0 ..< document.pageCount).first { index in
+            document.page(at: index)?.string?.contains("CODELINESENTINEL") == true
+        })
+        let tableScale = try XCTUnwrap(shrunkPages.first {
+            $0.pageNumber == tableIndex + 1
+        }?.scale)
+        let codeScale = try XCTUnwrap(shrunkPages.first {
+            $0.pageNumber == codeIndex + 1
+        }?.scale)
+        let tableWidth = 14400 / tableScale
+        let codeWidth = 14400 / codeScale
+        XCTAssertEqual(tableScale, 0.65, accuracy: 0.12)
+        XCTAssertGreaterThan(tableScale, codeScale)
+        XCTAssertLessThan(tableWidth, codeWidth * 0.1)
+        XCTAssertLessThan(tableScale, 1)
     }
 
     /// Low 1: a joined document whose page count does not match the plan — here

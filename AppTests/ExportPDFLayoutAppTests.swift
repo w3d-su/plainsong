@@ -130,6 +130,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         defer { controller.invalidate() }
         let aspect: CGFloat = 1.294 // ~Letter portrait imageable ratio
         let pdf = try await controller.captureExportPDF(pageAspect: aspect)
+        XCTAssertEqual(pdf.droppedTrailingBlankPages, 0)
         XCTAssertGreaterThan(pdf.pageCount, 1)
         let aspectBudget = pdf.contentSize.width * aspect
         XCTAssertLessThanOrEqual(pdf.maximumPageHeight, max(aspectBudget, 0.5) + 0.5)
@@ -187,6 +188,7 @@ final class ExportPDFLayoutAppTests: XCTestCase {
     private func capture(_ markdown: String) async throws -> (PreviewController, ExportPDFDocument) {
         let controller = try await preparedController(markdown)
         let pdf = try await controller.captureExportPDF()
+        XCTAssertEqual(pdf.droppedTrailingBlankPages, 0)
         return (controller, pdf)
     }
 

@@ -254,6 +254,8 @@ final class ExportPDFCommandAppTests: XCTestCase {
         let error = ExportPDFCaptureError.oversizeCaptureArea(
             widthPoints: 285_748, heightPoints: 3019
         )
+        let size = "\(ExportHTMLNoticeMapper.inchesDetail(285_748)) × "
+            + "\(ExportHTMLNoticeMapper.inchesDetail(3019))"
         let pdfNotice = ExportHTMLNoticeMapper.notice(
             for: .stopped(.captureFailed(error)),
             operationID: 7,
@@ -263,7 +265,7 @@ final class ExportPDFCommandAppTests: XCTestCase {
         XCTAssertEqual(
             pdfNotice?.message,
             "Nothing was written. An element is too large to export as one PDF page "
-                + "(about 3,969 × 42 inches). "
+                + "(about \(size) inches). "
                 + "Split the table or make the image smaller, then export again."
         )
         let printNotice = ExportHTMLNoticeMapper.notice(
@@ -275,8 +277,8 @@ final class ExportPDFCommandAppTests: XCTestCase {
         XCTAssertEqual(
             printNotice?.message,
             "Nothing was written. An element is too large to print "
-                + "(about 3,969 × 42 inches). "
-                + "Split the table or make the image smaller, then export again."
+                + "(about \(size) inches). "
+                + "Split the table or make the image smaller, then print again."
         )
         // Under ten inches the value keeps one fraction digit.
         let smallNotice = ExportHTMLNoticeMapper.notice(
@@ -286,7 +288,9 @@ final class ExportPDFCommandAppTests: XCTestCase {
             operationID: 7,
             product: .pdf
         )
-        XCTAssertTrue(smallNotice?.message.contains("(about 556 × 7.5 inches)") == true)
+        let smallSize = "\(ExportHTMLNoticeMapper.inchesDetail(40000)) × "
+            + "\(ExportHTMLNoticeMapper.inchesDetail(540))"
+        XCTAssertTrue(smallNotice?.message.contains("(about \(smallSize) inches)") == true)
     }
 
     /// A WebKit split off the plan is an internal defect: the notice says so and

@@ -2,35 +2,29 @@ import CoreGraphics
 import Foundation
 
 extension ExportPDFPagePlanner {
-    /// The sorted mandatory break positions the page loop must respect: the tops and
-    /// bottoms of the wide runs — the union of the vertical spans of extents crossing
-    /// `wideThreshold`, merged on overlap or touch, snapped outward to
-    /// merged-unsplittable-interval edges so every boundary is a safe break, then grown
-    /// across the neighbouring whitespace gaps and merged again (see the `plan` doc
-    /// comment).
-    ///
-    /// The gap absorption keeps a mandatory break from ever landing inside span-free
-    /// whitespace: each snapped run's top climbs to the bottom of the last interval
-    /// ending at or before it (or the document start) and its bottom descends to the
-    /// top of the first interval starting at or after it (or the document end). A run
-    /// near the document start therefore covers the leading margin instead of leaving
-    /// it to a blank first page, and two runs separated by a gap both claim it and
-    /// merge. Two runs separated only by a shared safe break — touching intervals with
-    /// no gap between them — stay separate so each run's pages take their own width;
-    /// the shared edge collapses to one boundary position so no hairline page can form.
-    /// This assumes whitespace gaps between consecutive spans stay below a page's soft
-    /// budget; prose whitespace taller than a page is out of scope (such a gap has no
-    /// safe break for a page inside the run to end on).
-    static func mandatoryBreaks(
+    /// Builds the whitespace windows at snapped wide-run edges. Whitespace-separated
+    /// runs remain distinct; facing edges share and deduplicate one window.
+    static func gapWindows(
         extents: [WidthExtent],
         intervals: [Span],
         wideThreshold: CGFloat,
-        contentHeight: CGFloat,
+        end: CGFloat,
         epsilon: CGFloat
-    ) -> [CGFloat] {
+    ) -> [GapWindow] {
+        let runs = wideRuns(extents, threshold: wideThreshold)
+        let snappedRuns = snappedWideRuns(
+            runs, intervals: intervals, end: end, epsilon: epsilon
+        )
+        return windows(for: snappedRuns, intervals: intervals, end: end)
+    }
+
+    private static func wideRuns(
+        _ extents: [WidthExtent],
+        threshold: CGFloat
+    ) -> [Span] {
         var runs: [Span] = []
-        for extent in extents where extent.maxX > wideThreshold {
-            if let last = runs.last, extent.minY <= last.maxY + epsilon {
+        for extent in extents where extent.maxX > threshold {
+            if let last = runs.last, extent.minY <= last.maxY {
                 runs[runs.count - 1] = Span(
                     minY: last.minY,
                     maxY: max(last.maxY, extent.maxY)
@@ -39,6 +33,15 @@ extension ExportPDFPagePlanner {
                 runs.append(Span(minY: extent.minY, maxY: extent.maxY))
             }
         }
+        return runs
+    }
+
+    private static func snappedWideRuns(
+        _ runs: [Span],
+        intervals: [Span],
+        end: CGFloat,
+        epsilon: CGFloat
+    ) -> [Span] {
         var snapped: [Span] = []
         snapped.reserveCapacity(runs.count)
         for run in runs {
@@ -50,59 +53,60 @@ extension ExportPDFPagePlanner {
             if let interval = intervalStrictlyContaining(maxY, in: intervals, epsilon: epsilon) {
                 maxY = interval.maxY
             }
-            // Absorb the span-free gap on each side: the edges land on the nearest
-            // interval edge (or the document edge), so they stay safe breaks and no
-            // page is forced to hold only whitespace.
-            minY = intervals.last { $0.maxY <= minY }?.maxY ?? 0
-            maxY = intervals.first { $0.minY >= maxY }?.minY ?? contentHeight
             minY = max(0, minY)
-            maxY = min(contentHeight, maxY)
+            maxY = min(end, maxY)
             guard maxY > minY else { continue }
             if let last = snapped.last, minY < last.maxY - epsilon {
-                // The absorbed runs genuinely overlap: the gap between them was claimed
-                // from both sides, so they merge into one run.
                 snapped[snapped.count - 1] = Span(minY: last.minY, maxY: max(last.maxY, maxY))
-            } else if let last = snapped.last, minY <= last.maxY + epsilon {
-                // Only a shared safe break (or a sub-ε crack) separates the runs: keep
-                // them separate so each run's pages keep their own width, and pin the
-                // shared edge to a single position so no hairline page can be emitted
-                // between the two boundaries. A run entirely covered by the previous
-                // one contributes no new boundary.
-                if maxY > last.maxY {
-                    snapped.append(Span(minY: last.maxY, maxY: maxY))
-                }
+            } else if let last = snapped.last, minY == last.maxY {
+                snapped.append(Span(minY: last.maxY, maxY: maxY))
             } else {
                 snapped.append(Span(minY: minY, maxY: maxY))
             }
         }
-        var breaks: [CGFloat] = []
-        breaks.reserveCapacity(snapped.count * 2)
-        for run in snapped {
-            breaks.append(run.minY)
-            breaks.append(run.maxY)
-        }
-        return breaks.sorted()
+        return snapped
     }
 
-    /// The smallest mandatory break strictly past `top + ε`, or `contentHeight` when
-    /// no boundary remains — the position the current page may never cross.
-    static func pageLimit(
-        after top: CGFloat,
-        breaks: [CGFloat],
-        contentHeight: CGFloat,
-        epsilon: CGFloat
-    ) -> CGFloat {
-        var low = 0
-        var high = breaks.count
-        while low < high {
-            let mid = (low + high) / 2
-            if breaks[mid] <= top + epsilon {
-                low = mid + 1
-            } else {
-                high = mid
+    private static func windows(
+        for snapped: [Span],
+        intervals: [Span],
+        end: CGFloat
+    ) -> [GapWindow] {
+        var windows: [GapWindow] = []
+        for index in snapped.indices {
+            let run = snapped[index]
+            let previousBottom = index > snapped.startIndex ? snapped[index - 1].maxY : 0
+            let nextTop = index + 1 < snapped.endIndex ? snapped[index + 1].minY : end
+            let topLo = max(
+                previousBottom,
+                intervals.last(where: { $0.maxY <= run.minY })?.maxY ?? 0
+            )
+            let bottomHi = min(
+                nextTop,
+                intervals.first(where: { $0.minY >= run.maxY })?.minY ?? end
+            )
+            let candidates = [
+                GapWindow(lo: topLo, hi: run.minY),
+                GapWindow(lo: run.maxY, hi: bottomHi),
+            ]
+            for window in candidates where window.hi >= window.lo {
+                if !windows.contains(window) {
+                    windows.append(window)
+                }
             }
         }
-        return low < breaks.count ? breaks[low] : contentHeight
+        return windows.sorted { $0.lo < $1.lo }
+    }
+
+    /// The first window above the page start limits the page at its high edge. A page
+    /// beginning inside a window or at its low edge belongs to its lower side.
+    static func pageLimit(
+        after top: CGFloat,
+        windows: [GapWindow],
+        end: CGFloat,
+        epsilon: CGFloat
+    ) -> CGFloat {
+        windows.first(where: { $0.lo > top + epsilon })?.hi ?? end
     }
 
     /// The hard page-height cap: a flat 14,400 CSS pt until the page's own width
