@@ -218,9 +218,18 @@ final class ExportPDFWideRunsEdgeAppTests: XCTestCase {
         let codeScale = try XCTUnwrap(shrunkPages.first {
             $0.pageNumber == codeIndex + 1
         }?.scale)
+        let measurementController = try await Support.preparedController(source)
+        defer { measurementController.invalidate() }
+        try await measurementController.applyExportOverflowStyle()
+        let contentSize = try await measurementController.settleExportGeometry()
+        let measurement = try await measurementController.measureUnsplittableSpans()
+        let tableExtent = try XCTUnwrap(measurement.wide.min(by: { $0.minY < $1.minY }))
+        let measuredTableWidth = min(
+            max(tableExtent.maxX, measurement.baselineWidth), contentSize.width
+        ) + ExportPDFPagePlanner.widePageSlack
         let tableWidth = 14400 / tableScale
         let codeWidth = 14400 / codeScale
-        XCTAssertEqual(tableScale, 0.65, accuracy: 0.12)
+        XCTAssertEqual(tableScale, 14400 / measuredTableWidth, accuracy: 0.02)
         XCTAssertGreaterThan(tableScale, codeScale)
         XCTAssertLessThan(tableWidth, codeWidth * 0.1)
         XCTAssertLessThan(tableScale, 1)

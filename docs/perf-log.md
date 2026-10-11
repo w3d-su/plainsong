@@ -2535,7 +2535,7 @@ Hosted wide-run captures (Debug, `PLAINSONG_XCODEBUILD_LOCK`, recorded load
 
 | Fixture | Pages (out/planned) | Widest output page | Smallest scale | Capture time | Content (pt) |
 |---|---:|---:|---:|---:|---|
-| Very wide table mid-post (`testVeryWideTableRunIsolatesAndCapsEveryPage`) | 5/5 | 14,400.0 pt | 0.078 | 0.36–0.41 s | 184,770 × 18,839 |
+| Very wide table mid-post (`testVeryWideTableRunIsolatesAndCapsEveryPage`) | 5/5 | 14,400.0 pt | 0.078 | 0.24 s | 184,770 × 18,713 |
 | Minified `text` fence mid-post (`testMinifiedLineRunInALongPostWritesWithAShrunkWarning`) | 3/3 | 14,400.0 pt (wide page shrunk) | 0.007 | 0.11 s | 1,950,298 × 22,924; sentinel once, in order |
 | Mid-width table (`testMidWidthTableRunScalesNeighboursStayWhole`) | 3/3 | 14,400.0 pt | 0.572 | 0.10 s | 25,178 × 13,764 |
 | Wide code near end (`testWideCodeLineNearTheEndLeavesNoBlankTail`) | 3/3 | 14,400.0 pt | 0.294 | 0.05–0.06 s | 48,990 × 7,841 |

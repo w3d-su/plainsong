@@ -80,6 +80,36 @@ final class ExportPDFPagePlannerContractTests: XCTestCase {
         }
     }
 
+    func testLeadingWhitespaceExtentCannotExceedTheFinalCaptureAreaBudget() throws {
+        let baseline: CGFloat = 800
+        let contentWidth: CGFloat = 320_000
+        let span = Span(minY: 1000, maxY: 2700)
+        let extent = Extent(minY: 0, maxY: 1000, maxX: contentWidth)
+        let size = CGSize(width: contentWidth, height: 2700)
+        let plan = try ExportPDFPagePlanner.plan(
+            contentSize: size, baselineWidth: baseline,
+            unsplittable: [span], widthExtents: [extent], targetAspect: 1.29
+        )
+        ExportPDFPagePlannerTests.assertPlanInvariants(
+            plan, contentSize: size, baselineWidth: baseline,
+            unsplittable: [span], aspect: 1.29
+        )
+        let page = try XCTUnwrap(plan.pages.first)
+        XCTAssertEqual(plan.pages.count, 1)
+        XCTAssertEqual(page.rect.minY, span.minY, accuracy: 0.5)
+        let hard = min(
+            ExportPDFPagePlanner.maximumSide,
+            ExportPDFPagePlanner.captureAreaBudget / page.rect.width
+        )
+        XCTAssertLessThanOrEqual(page.rect.height, hard)
+        let originalTopWidth = contentWidth + ExportPDFPagePlanner.widePageSlack
+        let originalTopHard = min(
+            ExportPDFPagePlanner.maximumSide,
+            ExportPDFPagePlanner.captureAreaBudget / originalTopWidth
+        )
+        XCTAssertGreaterThan(span.maxY, originalTopHard)
+    }
+
     func testWhitespaceSeparatedWideRunsKeepTheirOwnPagesAndWidths() throws {
         let first = Span(minY: 100, maxY: 400)
         let second = Span(minY: 500, maxY: 900)
@@ -211,11 +241,15 @@ final class ExportPDFPagePlannerContractTests: XCTestCase {
         let lastSpanMax = spans.map(\.maxY).max() ?? 0
         let plannedEnd = min(height, max(end, lastSpanMax))
         var failures: [String] = []
-        if plan.pages.isEmpty { failures.append("has no pages") }
+        if plan.pages.isEmpty {
+            failures.append("has no pages")
+        }
         var previousBottom: CGFloat = 0
         for page in plan.pages {
             let rect = page.rect
-            if rect.minX != 0 { failures.append("page has nonzero x") }
+            if rect.minX != 0 {
+                failures.append("page has nonzero x")
+            }
             if rect.width < 800 - 0.001
                 || rect.width > size.width + ExportPDFPagePlanner.widePageSlack + 0.001
             {
@@ -234,7 +268,9 @@ final class ExportPDFPagePlannerContractTests: XCTestCase {
             }
             let isTail = rect.minY >= lastSpanMax - epsilon
                 && rect.maxY <= plannedEnd + epsilon
-            if !intersectsSpan, !isTail { failures.append("page \(rect) has no content") }
+            if !intersectsSpan, !isTail {
+                failures.append("page \(rect) has no content")
+            }
             let scale = ExportPDFPagePlanner.pageScale(width: rect.width)
             if abs(page.scale - scale) > 0.0001 {
                 failures.append("page scale \(page.scale) does not match \(scale)")

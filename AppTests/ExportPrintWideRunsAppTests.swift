@@ -100,6 +100,27 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let document = try await printFixture(fixture, orientation: .portrait)
         XCTAssertEqual(document.pageCount, 2)
+        let controller = try await ExportPDFWideRunsAppSupport.preparedController(source)
+        defer { controller.invalidate() }
+        try await controller.applyExportOverflowStyle()
+        let contentSize = try await controller.settleExportGeometry()
+        let measurement = try await controller.measureUnsplittableSpans()
+        let measuredWidths = try await controller.webView.evaluateJavaScript("""
+        (() => Array.from(document.querySelectorAll("pre")).map(pre => {
+          const rect = pre.getBoundingClientRect();
+          return rect.left + Math.max(rect.width, pre.scrollWidth);
+        }))()
+        """)
+        let measuredRightEdges = try XCTUnwrap(measuredWidths as? [Double])
+        let measuredBlockWidths = measuredRightEdges.map { rightEdge in
+            let width = min(max(CGFloat(rightEdge), measurement.baselineWidth), contentSize.width)
+            return width > ExportPDFPagePlanner.maximumSide
+                ? width + ExportPDFPagePlanner.widePageSlack
+                : width
+        }
+        XCTAssertEqual(measuredBlockWidths.count, 2)
+        XCTAssertEqual(measuredBlockWidths[0], 1265, accuracy: 60)
+        XCTAssertEqual(measuredBlockWidths[1], 3401, accuracy: 60)
         let narrowPage = try XCTUnwrap((0 ..< document.pageCount).first { index in
             document.page(at: index)?.string?.contains("SMALLCODESENTINEL") == true
         })
@@ -109,8 +130,8 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         let narrowWidth = try XCTUnwrap(document.page(at: narrowPage)).bounds(for: .mediaBox).width
         let wideWidth = try XCTUnwrap(document.page(at: widePage)).bounds(for: .mediaBox).width
         XCTAssertLessThan(narrowWidth, wideWidth)
-        XCTAssertEqual(narrowWidth, 1265, accuracy: 200)
-        XCTAssertEqual(wideWidth, 3401, accuracy: 450)
+        XCTAssertEqual(narrowWidth, measuredBlockWidths[0], accuracy: 60)
+        XCTAssertEqual(wideWidth, measuredBlockWidths[1], accuracy: 60)
     }
 
     /// kitchen-sink.mdx prints the same number of sheets it did before the run

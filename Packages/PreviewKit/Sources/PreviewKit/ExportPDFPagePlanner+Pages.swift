@@ -36,6 +36,9 @@ extension ExportPDFPagePlanner {
                 width = measured
                 continue
             }
+            bounds = try enforceFinalHardBudget(
+                bounds, context: context, captureWidth: captureWidth
+            )
             let finalWidth = pageWidth(
                 top: bounds.top, bottom: bounds.bottom, baseline: context.baseline,
                 contentWidth: context.contentWidth, extents: context.extents,
@@ -52,6 +55,71 @@ extension ExportPDFPagePlanner {
                 scale: pageScale(width: finalCaptureWidth)
             )
         }
+    }
+
+    private static func enforceFinalHardBudget(
+        _ bounds: PageBounds,
+        context: PageContext,
+        captureWidth: CGFloat
+    ) throws(ExportPDFCaptureError) -> PageBounds {
+        guard bounds.bottom - bounds.top > hardBudget(captureWidth) + context.epsilon else {
+            return bounds
+        }
+        var candidates: [PageBounds] = []
+        let intersecting = context.intervals.filter {
+            $0.minY < bounds.bottom - context.epsilon
+                && $0.maxY > bounds.top + context.epsilon
+        }
+        if let first = intersecting.first, first.minY > bounds.top + context.epsilon {
+            candidates.append(PageBounds(top: first.minY, bottom: bounds.bottom))
+        }
+        // Only the leading span-free whitespace may be skipped; content is never
+        // moved off a page, so later candidates only end the page earlier.
+        if let first = intersecting.first {
+            candidates.append(PageBounds(top: max(bounds.top, first.minY), bottom: first.maxY))
+        }
+        for interval in intersecting {
+            if interval.minY > bounds.top + context.epsilon {
+                candidates.append(PageBounds(top: bounds.top, bottom: interval.minY))
+            }
+            if interval.maxY < bounds.bottom - context.epsilon {
+                candidates.append(PageBounds(top: bounds.top, bottom: interval.maxY))
+            }
+        }
+        let fitting = candidates.filter { candidate in
+            guard candidate.bottom > candidate.top + context.epsilon,
+                  hasSpan(candidate, context: context)
+            else { return false }
+            let width = pageWidth(
+                top: candidate.top, bottom: candidate.bottom,
+                baseline: context.baseline, contentWidth: context.contentWidth,
+                extents: context.extents, epsilon: context.epsilon
+            )
+            let candidateCaptureWidth = Self.captureWidth(
+                for: width, contentWidth: context.contentWidth
+            )
+            return candidate.bottom - candidate.top
+                <= hardBudget(candidateCaptureWidth) + context.epsilon
+        }
+        if let candidate = fitting.max(by: {
+            $0.bottom - $0.top < $1.bottom - $1.top
+        }) {
+            return candidate
+        }
+        if let interval = intersecting.first {
+            let boxWidth = pageWidth(
+                top: interval.minY, bottom: interval.maxY,
+                baseline: context.baseline, contentWidth: context.contentWidth,
+                extents: context.extents, epsilon: context.epsilon
+            )
+            let boxCaptureWidth = Self.captureWidth(
+                for: boxWidth, contentWidth: context.contentWidth
+            )
+            throw .oversizeCaptureArea(
+                widthPoints: boxCaptureWidth, heightPoints: interval.height
+            )
+        }
+        throw .emptyDocument
     }
 
     private static func initialBounds(

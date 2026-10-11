@@ -58,6 +58,81 @@ enum ExportPDFWideRunsAppSupport {
         }
     }
 
+    static func assertEveryPageWithinHardBudget(
+        pdf: ExportPDFDocument,
+        document: PDFDocument,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(pdf.pageWidths.count, document.pageCount, file: file, line: line)
+        XCTAssertEqual(pdf.pageScales.count, document.pageCount, file: file, line: line)
+        for index in 0 ..< document.pageCount {
+            let page = document.page(at: index)
+            let scale = pdf.pageScales[index]
+            let captureWidth = pdf.pageWidths[index] / scale
+            let captureHeight = (page?.bounds(for: .mediaBox).height ?? 0) / scale
+            let hardBudget = min(
+                ExportPDFPagePlanner.maximumSide,
+                ExportPDFPagePlanner.captureAreaBudget / captureWidth
+            )
+            XCTAssertLessThanOrEqual(
+                captureHeight, hardBudget + 0.5,
+                "Page \(index + 1) height \(captureHeight) exceeds hard budget \(hardBudget)",
+                file: file, line: line
+            )
+        }
+    }
+
+    static func inkPixelCount(in page: PDFPage) -> Int {
+        let bounds = page.bounds(for: .mediaBox)
+        let maxPixels: CGFloat = 2_000_000
+        let pixelScale = min(1, sqrt(maxPixels / (bounds.width * bounds.height)))
+        let pixelWidth = max(1, Int(ceil(bounds.width * pixelScale)))
+        let pixelHeight = max(1, Int(ceil(bounds.height * pixelScale)))
+        var pixels = [UInt8](repeating: 255, count: pixelWidth * pixelHeight * 4)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let drewPage = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let context = CGContext(
+                data: bytes.baseAddress,
+                width: pixelWidth,
+                height: pixelHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: pixelWidth * 4,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+            context.scaleBy(x: pixelScale, y: pixelScale)
+            page.draw(with: .mediaBox, to: context)
+            return true
+        }
+        guard drewPage else { return 0 }
+        var count = 0
+        for offset in stride(from: 0, to: pixels.count, by: 4) {
+            if pixels[offset] < 245 || pixels[offset + 1] < 245 || pixels[offset + 2] < 245 {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    static func assertEveryPageHasInk(
+        in document: PDFDocument,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for index in 0 ..< document.pageCount {
+            let page = document.page(at: index)
+            let inkPixels = page.map { inkPixelCount(in: $0) } ?? 0
+            XCTAssertGreaterThan(
+                inkPixels, 0,
+                "Page \(index + 1) contains no rendered ink",
+                file: file, line: line
+            )
+        }
+    }
+
     static func prose(prefix: String, count: Int) -> (markdown: String, markers: [String]) {
         let markers = (0 ..< count).map { String(format: "%@%04d", prefix, $0) }
         let markdown = markers.map { "\($0) prose paragraph." }.joined(separator: "\n\n")
@@ -135,6 +210,13 @@ enum ExportPDFWideRunsAppSupport {
         let delimiter = "| " + [String](repeating: "---", count: headerRow.count)
             .joined(separator: " | ") + " |\n"
         return header + delimiter + bodyRows.joined(separator: "\n") + "\n"
+    }
+
+    static func g3TableSource(imageHeight: Int) throws -> String {
+        let image = try pngData(size: NSSize(width: 10, height: imageHeight))
+        let token = String(repeating: "W", count: 20000)
+        return "| image | blob |\n| --- | --- |\n"
+            + "| ![tall](data:image/png;base64,\(image.base64EncodedString())) | \(token) |\n"
     }
 
     static func capture(
