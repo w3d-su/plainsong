@@ -257,6 +257,38 @@ extension EditorFindHostedGateTests {
         #endif
     }
 
+    /// Handoff 27d: observes the row exactly one run-loop turn later — inside a single
+    /// `DispatchQueue.main.async` hop, before any further main-actor job resumes the caller —
+    /// so a stray bar control is judged as SwiftUI's one-turn deferred removal (transient)
+    /// or a persistent mount, never by a multi-second wait that would hide a real mount.
+    func observeAfterOneMainRunLoopTurn<T: Sendable>(
+        _ observe: @escaping @MainActor () -> T
+    ) async -> T {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume(returning: MainActor.assumeIsolated(observe))
+            }
+        }
+    }
+
+    /// Records a row-flake stray entry in the in-memory bar view trace (printed only by a
+    /// failure report or under `PLAINSONG_HOSTED_TRACE_STDOUT=1`). No-op in Release.
+    func recordReplaceStray(_ entry: String) {
+        #if DEBUG
+            EditorFindBarViewTrace.record("REPLSTRAY \(entry)")
+        #endif
+    }
+
+    /// The bar view trace (mount/update/dismantle and `REPLSTRAY` records) for a failure
+    /// report; empty in Release, where the buffer does not exist.
+    func barViewTraceDiagnostic() -> String {
+        #if DEBUG
+            return "\nbarViewTrace:\n" + EditorFindBarViewTrace.entries.joined(separator: "\n")
+        #else
+            return ""
+        #endif
+    }
+
     /// Describes a stray mounted bar label: its view ancestry, visibility, host window, and
     /// the current replace state. Used when a label survives past its expected lifetime.
     @MainActor

@@ -126,41 +126,24 @@ extension EditorFindHostedGateTests {
         let app = hosted.appState
         let window = hosted.window
         let state = app.editorFindHost.replaceBatch
-        var rendered: String?
-        var cancelShown = true
-        state.willCommitForTesting = {
-            rendered = self.label(EditorFindAccessibility.replaceProgress, in: window)?.stringValue
-            cancelShown = self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil
+        let observed = observeCommitTimeRow(hosted)
+        defer {
+            state.willCommitForTesting = nil
+            state.applyingFrameDidElapseForTesting = nil
         }
-        defer { state.willCommitForTesting = nil }
         try await click(EditorFindAccessibility.replaceAllButton, in: window)
         await awaitBarReplaceAll(app)
         XCTAssertEqual(
-            rendered,
+            observed.rendered,
             "Applying…",
             "the row rendered Applying… before the final recheck" + replaceBarTraceDiagnostic(app)
         )
-        // A Cancel still mounted at commit is inert (cancelEditorReplaceAllFromBar guards on
-        // isPreparing), and SwiftUI may defer its removal one run-loop turn; only a mount
-        // that persists fails, with its ancestry and live replace state in the report.
-        if barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil {
-            #if DEBUG
-                print("REPLSTRAY cancelButton still mounted at commit; entering unmount recheck")
-            #endif
-            hostedTimeoutDiagnostics.append { [weak self, weak app] in
-                guard let self, let app else { return "fixture released" }
-                guard let stray = barButton(EditorFindAccessibility.replaceCancelButton, in: window)
-                else {
-                    return "replaceCancel button absent at report time"
-                }
-                return "stray replaceCancel mountedAtCommit=\(cancelShown) "
-                    + "stillAttached=\(stray.superview != nil) "
-                    + mountedBarButtonDiagnostic(stray, window: window, app: app)
-            }
-            try await waitUntil("Cancel unmounts after the Applying frame") {
-                self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) == nil
-            }
-        }
+        XCTAssertFalse(
+            observed.cancelShown,
+            "Cancel is withdrawn once preparation is done (still attached one run-loop turn into the "
+                + "Applying frame): \(observed.strayReport ?? "not mounted at the frame end")"
+                + barViewTraceDiagnostic()
+        )
         XCTAssertEqual(app.editorReplaceActivity, .idle)
         guard case .delivered(.replaced)? = state.lastResult else { return XCTFail("expected the batch") }
 
@@ -184,6 +167,39 @@ extension EditorFindHostedGateTests {
         await awaitBarReplaceAll(app)
         XCTAssertEqual(state.lastResult, .superseded)
         try assertHostedBatchDidNotWrite(hosted, since: before)
+    }
+
+    /// Records the row at commit. A Cancel mounted at the end of the Applying frame — only
+    /// synchronous code separates it from `willCommit` — gets exactly one run-loop turn (one
+    /// main-queue hop) to unmount while `Applying…` is still shown: SwiftUI can defer the
+    /// removal one turn, but a Cancel still attached after it means the Applying frame never
+    /// withdrew it. The turn must pass before the commit: after it the row is idle, which
+    /// hides a Cancel kept mounted while applying.
+    private func observeCommitTimeRow(_ hosted: HostedReplaceWorkspace) -> HostedCommitTimeRow {
+        let app = hosted.appState
+        let window = hosted.window
+        let state = app.editorFindHost.replaceBatch
+        let observed = HostedCommitTimeRow()
+        state.applyingFrameDidElapseForTesting = {
+            guard self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil else { return }
+            self.recordReplaceStray("cancelButton mountedAtCommit=true activity=\(app.editorReplaceActivity)")
+            let report: String? = await self.observeAfterOneMainRunLoopTurn {
+                guard let stray = self.barButton(EditorFindAccessibility.replaceCancelButton, in: window),
+                      stray.superview != nil
+                else { return nil }
+                return self.mountedBarButtonDiagnostic(stray, window: window, app: app)
+            }
+            observed.strayReport = report ?? "transient: gone after one turn"
+            self.recordReplaceStray(
+                "cancelButton \(report == nil ? "transient" : "persistent") afterTurns=1 "
+                    + "stillAttached=\(report != nil) activity=\(app.editorReplaceActivity)"
+            )
+        }
+        state.willCommitForTesting = {
+            observed.rendered = self.label(EditorFindAccessibility.replaceProgress, in: window)?.stringValue
+            observed.cancelShown = self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil
+        }
+        return observed
     }
 
     func testHostedBackgroundWindowBarPressesCannotReachTheKeyWindowsEditor() async throws {
@@ -252,4 +268,13 @@ extension EditorFindHostedGateTests {
                 && self.label(EditorFindAccessibility.replaceBlockedReason, in: window) == nil
         }
     }
+}
+
+/// What the row showed at `willCommitForTesting`, plus the diagnostic for a Cancel still
+/// attached one run-loop turn into the Applying frame.
+@MainActor
+final class HostedCommitTimeRow {
+    var rendered: String?
+    var cancelShown = true
+    var strayReport: String?
 }

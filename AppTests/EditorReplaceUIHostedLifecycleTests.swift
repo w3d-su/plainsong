@@ -39,24 +39,25 @@ extension EditorFindHostedGateTests {
         let field = try await waitForReplacementField(in: window)
         XCTAssertEqual(field.stringValue, "NEW")
         XCTAssertEqual(app.editorFindHost.ui.queryText, "hit")
-        // SwiftUI can defer the unmount one run-loop turn (transient, cosmetic); a label
-        // still mounted afterwards fails with its ancestry and live replace state.
+        // SwiftUI can defer the unmount exactly one run-loop turn (transient, cosmetic); a
+        // label still attached after that one turn is a persistent mount and fails hard.
         if label(EditorFindAccessibility.replaceProgress, in: window) != nil {
-            #if DEBUG
-                print("REPLSTRAY progressLabel still mounted after close+reopen; entering unmount recheck")
-            #endif
-            hostedTimeoutDiagnostics.append { [weak self, weak app] in
-                guard let self, let app else { return "fixture released" }
-                guard let stray = label(EditorFindAccessibility.replaceProgress, in: window)
-                else {
-                    return "replaceProgress label absent at report time"
-                }
-                return "stray replaceProgress stillAttached=\(stray.superview != nil) "
-                    + mountedBarLabelDiagnostic(stray, window: window, app: app)
+            recordReplaceStray("progressLabel mountedAfterReopen=true")
+            let report: String? = await observeAfterOneMainRunLoopTurn {
+                guard let stray = self.label(EditorFindAccessibility.replaceProgress, in: window),
+                      stray.superview != nil
+                else { return nil }
+                return self.mountedBarLabelDiagnostic(stray, window: window, app: app)
             }
-            try await waitUntil("the progress label unmounts after close and reopen") {
-                self.label(EditorFindAccessibility.replaceProgress, in: window) == nil
-            }
+            recordReplaceStray(
+                "progressLabel " + (report == nil ? "transient" : "persistent")
+                    + " afterTurns=1 stillAttached=\(report != nil)"
+            )
+            XCTAssertNil(
+                report,
+                "the progress label is still attached one run-loop turn after close and reopen: "
+                    + (report ?? "") + barViewTraceDiagnostic()
+            )
         }
     }
 

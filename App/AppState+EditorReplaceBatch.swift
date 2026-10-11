@@ -180,6 +180,9 @@ extension AppState {
         editorFindHost.traceReplaceBarAction("applyingPublished")
         try? await Task.sleep(nanoseconds: Self.editorReplaceApplyingFrameNanoseconds)
         editorFindHost.traceReplaceBarAction("applyingFrameElapsed")
+        if let applyingFrameDidElapse = state.applyingFrameDidElapseForTesting {
+            await applyingFrameDidElapse()
+        }
     }
 
     /// One display frame at 60 Hz.

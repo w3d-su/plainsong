@@ -105,6 +105,12 @@ final class EditorReplaceBatchRuntime {
     /// Test seam: runs as `Applying…` is published, before the one-frame yield.
     var didBeginApplyingForTesting: (() -> Void)?
 
+    /// Test seam: awaited once the Applying frame has elapsed, before the final recheck.
+    /// Only synchronous code separates it from `willCommitForTesting`, so the row it sees is
+    /// the row at commit; it is the last point a run-loop turn can pass with `Applying…`
+    /// shown, and anything that changes while it is suspended still fails the final recheck.
+    var applyingFrameDidElapseForTesting: (@MainActor () async -> Void)?
+
     /// Stops a plan that has not reached its synchronous commit. Commit has already cleared
     /// `isPreparing`, so this can never interrupt an admitted native write.
     func supersedeIfPreparing() {
