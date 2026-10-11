@@ -102,6 +102,9 @@ extension EditorFindHostedGateTests {
 
     /// 29c: closing the document must hide the inspector in the same pass — the
     /// `hasDocument` publish is deferred one turn, but the frame gate is not.
+    ///
+    /// As in `checkTransientModeSwitch`, before macOS 27 an unrendered sample must equal the
+    /// pre-close frames, and the first sample that renders the close is checked instead.
     func testTransientDocumentCloseHidesInspectorWithoutWaiting() async throws {
         for shell in [WorkspaceShell.fixed, .split] {
             if shell == .split {
@@ -111,11 +114,26 @@ extension EditorFindHostedGateTests {
                 shell: shell, width: 1000, mode: .sourceOnly
             )
             let state = settled.state
+            let label = "document-close shell=\(shell)"
+            let before = transientFrames(in: settled.host)
             state.setCurrentDocument(DocumentSession())
-            let frames = transientFrames(in: settled.host)
+            var frames = transientFrames(in: settled.host)
+            var branch = "same-pass"
+            if #unavailable(macOS 27.0), framesMatch(frames, before) {
+                var turns = 0
+                while framesMatch(frames, before), turns < 50 {
+                    await nextMainQueueTurn()
+                    turns += 1
+                    frames = transientFrames(in: settled.host)
+                }
+                branch = "deferred-render turns=\(turns)"
+            }
+            let report = frames.keys.sorted().map { "\($0)=\(frames[$0]!)" }.joined(separator: " ")
+            print("TRANSIENT \(label) branch=\(branch) \(report)")
             XCTAssertFalse(state.hasOpenDocument)
-            XCTAssertNil(frames["inspector"], "shell=\(shell): inspector must hide in the same pass")
-            XCTAssertNil(frames["handle"], "shell=\(shell): handle must hide in the same pass")
+            XCTAssertFalse(framesMatch(frames, before), "\(label): the close never rendered")
+            XCTAssertNil(frames["inspector"], "\(label) branch=\(branch): inspector must hide in the same pass")
+            XCTAssertNil(frames["handle"], "\(label) branch=\(branch): handle must hide in the same pass")
         }
     }
 
