@@ -257,7 +257,7 @@ pass the inspector and handle are already unmounted; fixed 864 draws editor 257�
 and preview 561→864 with no intersection; split 900 draws editor 320→609.5 and
 preview 610.5→900. Editor ≥ 260 and preview ≥ 260 in every transient sample.
 
-**CI follow-up (macOS 15).** CI run 38028182485 sampled the unchanged Source + inspector layout right after the mode switch, because macOS 15's SwiftUI applies the published change on a later run-loop turn. Before macOS 27, the mode-switch case therefore accepts an unrendered sample only if it equals the pre-switch frames within 0.5 pt, then checks the first sample that renders Split, advancing one main-queue hop per sample (branch `deferred-render`). macOS 27 stays strict (branch `same-pass`), and the negative control (`WorkspaceWindow.swift` at `a55cb69`) still fails all four cases there. With the fallback simulated on macOS 27, the mode-switch cases pass after one hop and the negative control no longer fails them, because the deferred inspector apply has already run by then; on macOS 15 that same-pass guarantee is enforced only by the shrink cases.
+**CI follow-up (macOS 15).** CI run 38028182485 sampled the unchanged Source + inspector layout right after the mode switch, because macOS 15's SwiftUI applies the published change on a later run-loop turn. Before macOS 27, the mode-switch case therefore accepts an unrendered sample only if it equals the pre-switch frames within 0.5 pt, then checks the first sample that renders Split, advancing one main-queue hop per sample (branch `deferred-render`). macOS 27 stays strict (branch `same-pass`), and the negative control (`WorkspaceWindow.swift` at `a55cb69`) still fails all four cases there. With the fallback simulated on macOS 27, the mode-switch cases pass after one hop and the negative control no longer fails them, because the deferred inspector apply has already run by then; on macOS 15 that same-pass guarantee is enforced only by the shrink cases. Before macOS 27, `testTransientDocumentCloseHidesInspectorWithoutWaiting` (present at `49b413f`) is also checked on its first rendered sample.
 
 ### MEDIUM 2 — selection-publish warnings, fixed and attributed
 
@@ -272,10 +272,12 @@ drop an older deferred open that would land after a newer one, and the binding g
 reports the pending pick so the next arrow advances from the just-chosen row.
 
 After the fix (`/private/tmp/plainsong-29b-focused.log`): **0** "Publishing changes"
-lines and **0** "multiple times per frame" lines across the arrow test, the new
-`testNativeFilesRapidArrowSelectionAppliesInOrderWithoutReverting` (three arrows sent
-back-to-back; final document `d.md`, observed order never reverts, no editor focus
-request), and `testNativeFilesSingleMouseClickStillSelectsDraggableRow`. The earlier
+lines and **0** "multiple times per frame" lines across the arrow test,
+`testNativeFilesRapidArrowSelectionLandsOnLastFileWithoutReverting` (three arrows
+sent back-to-back; final document and selected row are `d.md`, no editor focus
+request), and `testNativeFilesSingleMouseClickStillSelectsDraggableRow`. The rapid-arrow
+test covers last-file selection without highlight reversion; ordering is covered by
+`testNativeFilesDeferredOpenRetriesHeldReloadAndNewestPickWins`. The earlier
 "harmless because hosted" reading is withdrawn — the warnings were a real
 publish-during-update defect with a real fix.
 
@@ -361,7 +363,7 @@ Visual evidence was gathered two other ways:
   `/private/tmp/plainsong-29b-files-after-arrows.png` shows the Files list after
   two back-to-back down arrows (`c.md` opened, the table keeps first responder);
   the same behavior is asserted by
-  `testNativeFilesRapidArrowSelectionAppliesInOrderWithoutReverting`.
+  `testNativeFilesRapidArrowSelectionLandsOnLastFileWithoutReverting`.
 - The re-signed copy `app.plainsong.native-review-h29b`
   (`/private/tmp/PlainsongNativeReview29b.app`) was launched detached and its
   1280×800 window captured with `screencapture -l`:
@@ -372,6 +374,46 @@ Visual evidence was gathered two other ways:
 Driving the signed copy through Source→Split at 864 and arrowing its Files list
 live remains owner acceptance — it needs a TCC-permitted terminal. The hosted
 snapshots cover the same production views at the exact sizes.
+
+## Follow-up 29c/29d
+
+Deferred Files opens retry every 25 ms for at most 200 attempts, and only while the
+installed capture generation lags. A newer applied pick, document or workspace-root
+change, `onDisappear` cancellation, successful application, or any refusal other than
+capture lag ends the retry. The DEBUG attempt-limit override keeps focused tests short.
+
+`WorkspaceFilesSidebar.body` reads `selectionRevertTick`, so a dropped pick re-reads
+the List binding without rebuilding the List. The held scanner parks every completed
+capture during `hold()` and resumes all parked captures on `release()`. The dropped-pick
+test sets `debugRetryAttemptLimit` to four and verifies the a.md row highlight has
+reverted before releasing the scanner. The newest-pick test waits for at least three
+refused c.md attempts before release, then asserts no b.md attempt follows c.md's first.
+This forces the sequence guard to be exercised; without that wait c.md often landed
+first and b.md exited on the changed-document check. The rapid-arrow test does not claim
+to establish ordering.
+
+Negative controls from the earlier runs remain **3/3 failures** with the revert body
+read removed and **10/10 failures** with both applied-sequence guards removed.
+
+Final hosted reruns (load averages are 1/5/15 minutes):
+
+- Native group: **23 tests, 5 skipped, 0 failures** in each of three runs; load ranged
+  **10.12–11.11 / 8.35–8.51 / 6.26–6.36**.
+- Dropped-pick test: **10/10 passed**. Newest-pick test: **10/10 passed**. Across these
+  20 runs, load ranged **4.79–13.45 / 7.57–9.23 / 6.34–6.71**; all 23 focused-run logs
+  contained **0** "Publishing changes from within view updates" warnings. Logs are
+  `/Users/devin/29d-logs/native-group-rework-{1,2,3}.log`,
+  `positive-m1-rework-{1..10}.log`, and `positive-m2-rework-{1..10}.log`.
+- The earlier full-class failure in
+  `testHostedReplaceInsideRevealedHeadingWithNestedFoldedStrongCommits` did not
+  reproduce: baseline `49b413f` passed **103 tests, 8 skipped, 0 failures** at
+  **3.70 / 4.13 / 4.34** load; the final tip passed **104 tests, 8 skipped,
+  0 failures** at **12.23 / 6.91 / 5.40**. The test also passed in isolation **3/3**
+  at the tip. Its prior cause remains unestablished.
+- Locked `build-for-testing` passed at commits A and B, and locked `make build`
+  succeeded. Pinned SwiftFormat formatted no files; SwiftLint completed with 330
+  violations and 0 serious, including the intentional discarded body-dependency read.
+  `git diff --check` was clean.
 
 ## Owner macOS 27 UI command (prepare only)
 
