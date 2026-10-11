@@ -448,20 +448,32 @@ sign-off:
   pin the measure. A trailing planned page intersecting no measured span is
   dropped as a safety net.
 
-**Owner decision 2026-10-10 (G3 — truthful area refusal; X1 gap absorption; X2
+**Owner decision 2026-10-10 (G3 — truthful area refusal; X1 gap windows; X2
 clipped text).** Under the same sign-off:
 
-- **No empty pages (X1).** Every emitted page must intersect at least one
-  measured span (strict overlap > ε; padding and border boxes count because the
-  measured spans include them). A snapped run edge grows across the neighbouring
-  span-free gap — up to the previous interval's bottom or the document start,
-  down to the next interval's top or the document end — before runs merge, so a
-  mandatory break never strands a whitespace-only page; runs separated only by a
-  shared safe break still stay separate. The invariant assumes whitespace gaps
-  between consecutive spans stay below a page's soft budget; prose whitespace
-  taller than a page is out of scope. The safety net keeps dropping trailing
-  span-free pages — a content-measured height makes them provably blank — and
-  `Plan.droppedTrailingBlankPages` records the count.
+- **Gap windows and ownership (D4).** Wide runs are the union of wide extents,
+  snapped outward to unsplittable-interval edges; only overlap greater than ε
+  merges snapped runs. Whitespace-separated runs keep distinct pages and widths.
+  Run tops and bottoms define span-free windows, deduplicated where adjacent runs
+  share one. A page is limited by the high edge of the first window whose low edge
+  is greater than `top + ε` and never crosses that high edge. Once width settles,
+  whitespace ownership is resolved in order: above takes a gap when it fits the
+  soft budget; otherwise below takes it when the next interval fits its own hard
+  budget; otherwise split at `interval.maxY - hardJ` when it fits the current
+  hard budget; otherwise back off to the last eligible interval start; otherwise
+  skip the span-free strip to `min(nextInterval.minY, top + hard)`. A span-free
+  page slice grows to the next interval's end within its limit and never becomes
+  a whitespace-only page.
+- **Painted document end.** Spans include atomic boxes and text line boxes only;
+  padding, borders and backgrounds are not spans. The measured `paintedBottom`
+  and root `bottomInset` (padding plus border) set
+  `E = min(contentHeight, max(paintedBottom, lastSpanMaxY))`: pages cover through
+  E, excluding root padding below E. A painted tail first fits within the last
+  page's soft budget, then backs off to the last interval start, then uses the
+  hard budget, and may finally occupy an end-tail sliver page. For stale height,
+  `excess = contentHeight - E - bottomInset`; when `excess > 1 pt`,
+  `droppedTrailingBlankPages = ceil(excess / softBudget(baseline))`, otherwise
+  it is zero.
 - **Clipped text is not content width (X2).** A measured right edge is first
   intersected with the padding box of every ancestor whose computed `overflow-x`
   is not `visible` — `hidden`, `clip`, `auto` and `scroll` all clip what is
@@ -471,14 +483,18 @@ clipped text).** Under the same sign-off:
   the export style forces to `overflow: visible` (wide code, tables, math,
   Mermaid) still measure at their painted edge.
 - **Only a single unbreakable box over the raster budget is refused (G3).**
-  WebContent terminates painting near ~2³⁰ px², independent of aspect ratio and
-  device pixel ratio, so the capture-area budget stays at half — 2²⁹ px² — for
-  safety across machines and OS versions. A wide *run* over the budget is split
+  The capture probe observed WebContent termination near a 2³⁰ px² raster; it did
+  not establish the underlying failure mechanism. The capture-area budget stays at
+  half — 2²⁹ px² — for safety across machines and OS versions. A wide *run* over the budget is split
   into more, shorter pages as before; only a single unbreakable interval whose
-  own width × height exceeds the budget while fitting the 14,400 pt side cap
+  own capture width (including `widePageSlack`) × height exceeds the budget while
+  fitting the 14,400 pt side cap
   fails, typed `oversizeCaptureArea(widthPoints:heightPoints:)` in CSS points,
   with a product-aware message naming the box's size in inches and the
-  split-it-smaller advice. Rejected alternatives: G1 (single boxes up to ~90% of
+  split-it-smaller advice. If the box fits its own area budget, a wider candidate
+  page containing leading whitespace does not trigger a refusal; the page is
+  emitted at its final content width, using the span-free skip fallback when
+  needed. Rejected alternatives: G1 (single boxes up to ~90% of
   the measured limit — leaves no machine margin) and G2 (never refuse, cut the
   box across pages — ships clipped content).
 
@@ -1485,19 +1501,10 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   remote images, and MDX placeholders.
 - [x] HTML: Source-only, source+preview and Experimental WYSIWYG have content-equivalent
   static HTML for each deterministic snapshot/resource/theme combination.
-- [x] PDF/Print content/theme matrix and the distinct D4 pagination contracts (PR G).
-  Re-checked 2026-10-10 after the X1/X2/Y1/X3 named tests passed hosted and in
-  `swift test` (`testDocumentStartingWithAWideRunEmitsNoLeadingBlankPage`,
-  `testTwoAdjacentWideRunsWithASpanFreeGapMergeInPrint`,
-  `testTwoRunsSeparatedByASingleSafeBreakStayIsolated`,
-  `testDocumentStartingWithAWideTableHasNoBlankFirstPage`,
-  `testMdxPostWithTwoLongImportLinesPrintsOnOneSheet`,
-  `testKitchenSinkMdxPrintKeepsItsSheetCount`,
-  `testClippedMdxPlaceholderProducesNoWideExtent`,
-  `testOversizeCaptureAreaBoxFailsTypedAndWritesNothing`,
-  `testJoinerPageCountMismatchFailsTypedAndWritesNothing`,
-  `testWrappingParagraphsMeasureTheContentHeight`,
-  `testMinifiedLineRunInALongPostWritesWithAShrunkWarning`).
+- [x] PDF/Print content/theme matrix.
+- [x] D4 pagination contracts (PR G).
+  The 2026-10-10 X1/X2/Y1/X3 re-check is superseded by the revised Phase 3
+  pagination contracts and is not evidence for this gate.
 - [x] HTML: light, dark and resolved-system themes are frozen at invocation without
   mutating the visible preview.
 - [x] PDF/Print theme matrix (PR G).
@@ -1510,6 +1517,23 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `testThemeChangesWhilePanelIsOpenDoNotChangeTheInvocationTheme` proves the frozen theme.
   `testMDXSyntaxErrorFailsWithoutWriting` and PreviewKit's
   `testMDXSyntaxErrorFailsInsteadOfExportingLastGoodDOM` prove failure, never prior content.
+  D4's BLOCKING 1/2 and MEDIUM 1/2 regressions passed before this re-check:
+  `ExportPDFPagePlannerContractTests.testGapOwnershipAroundTheHardBudgetForPDFAndPrint`,
+  `test286000PointRunKeepsTheHardBudgetMinus18RowAnd16PointGapsTogether`,
+  `test286200PointLeadingGapNeverBecomesAWhitespaceOnlyPage`,
+  `testWhitespaceSeparatedWideRunsKeepTheirOwnPagesAndWidths`,
+  `testG3ChecksTheWideBoxAtItsOwnCaptureWidth`,
+  `testOversizeBoxReportsItsOwnCaptureWidthAndHeight`,
+  `ExportPDFPagePlannerTailTests.testPaintedTailFitsAndBacksOffToTheLastInterval`,
+  `ExportPDFPagePlannerTailTests.testPaintedTailUsesASliverAfterBackoffCannotHoldIt`, and
+  `ExportPDFPagePlannerRegressionTests.testSeed551550976DoesNotEmitTheLeadingGapAsABlankPage`;
+  hosted `ExportPDFWideRunsEdgeAppTests.testOversizeCaptureAreaBoxFailsTypedAndWritesNothing`,
+  `ExportPDFWideRunsAppTests.testQuoteListTableShapeLeavesNoBlankTail`,
+  `ExportPrintWideRunsAppTests.testQuoteListTableShapePrintsNoBlankSheets`,
+  `ExportPDFWideRunsEdgeAppTests.testTableAndLongCodeLineUseTheirOwnWidthsAndWritePDF`,
+  `ExportPrintWideRunsAppTests.testAdjacentWideCodeBlocksUseDistinctA4SheetWidths`,
+  and `ExportPDFPaintedTailAppTests.test683And684LineCodeBlocksEndAtPaintedBottom`;
+  package `ExportPDFPaintedTailTests.testPaintedCodeEndsAt683And684LineMeasurementsAndReportsStaleHeight`.
   PDF: `testThemesAndLayoutsProduceTheSamePDFText` (three themes × three layouts, one text),
   `ExportPDFMatrixAppTests.testPDFAndPrintMatrixAcrossThemesAndFixtures` (three named
   fixtures × three themes × both products; PDF freezes the resolved invocation theme,
@@ -1527,7 +1551,8 @@ for `.pdf` remains `testExtensionMatchIsASCIICaseInsensitiveAndKindSpecific`.
   `ExportPDFPagePlannerPrintRunTests` pin the invariants on synthetic geometry: safe
   breaks between line boxes, items, and table rows, per-page width and scale (only a
   page whose own content overflows widens/shrinks), wide-run mandatory breaks and
-  snapping, gap absorption at run edges (no whitespace-only page), the
+  snapping, distinct whitespace-separated runs, ordered gap ownership with a
+  span-free skip fallback (no whitespace-only page), the
   capture-area-capped hard budget, the soft Print aspect budget with
   atomic-run extension, the hard cap's typed `oversizeAtomicBox` and
   `oversizeCaptureArea`, and landscape
@@ -1815,8 +1840,9 @@ PDF/Print E9 timing is **pending idle-machine run**.
 - Mechanism: `ExportPDFMeasurement` injects the export-only overflow style, settles
   full-size geometry (no width ceiling), and measures every unsplittable span —
   atomic boxes and text line boxes — plus fixed/sticky/transformed/floated offenders.
-  `ExportPDFPagePlanner.plan` splits at safe breaks within `14,400 / scale` (or the
-  paper imageable aspect for Print); an unbreakable run taller than the budget throws
+  `ExportPDFPagePlanner.plan` splits at safe breaks within the width-adjusted capture
+  area hard budget and the paper imageable aspect soft budget for Print; the old
+  `14,400 / scale` rule is superseded. An unbreakable run taller than the budget throws
   `oversizeAtomicBox`, and a break crossing an offender throws
   `break-crosses-positioned-content`. `ExportPDFPageJoiner` concatenates the per-page
   `pdf(configuration:)` captures, scaling media boxes and drawing by `uniformScale`
@@ -1913,9 +1939,10 @@ PDF/Print E9 timing is **pending idle-machine run**.
   are mandatory breaks: a page may end there but never crosses, so prose never
   shares a page with wide content. Inside a run the per-page width growth and
   soft Print aspect extension are unchanged; outside, nothing is scaled.
-- **Capture-area cap.** `WKWebView.pdf` dies painting a single rect near 2³⁰
-  raster px (measured 2026-10-09, `docs/perf-log.md`), independent of document
-  totals. `captureAreaBudget` targets 2²⁹ px (~2× margin); `hardBudget(width)`
+- **Capture-area cap.** The probe observed WebContent termination near a single
+  `WKWebView.pdf` raster of 2³⁰ px (measured 2026-10-09, `docs/perf-log.md`); it
+  did not establish the underlying failure mechanism. `captureAreaBudget` targets
+  2²⁹ px (~2× margin); `hardBudget(width)`
   keeps the flat 14,400 CSS pt cap until a page's own width would exceed the
   raster budget, then trades height for width. An unbreakable interval taller
   than the width-adjusted budget throws `oversizeAtomicBox` (CSS height).

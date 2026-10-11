@@ -2536,7 +2536,7 @@ Hosted wide-run captures (Debug, `PLAINSONG_XCODEBUILD_LOCK`, recorded load
 | Fixture | Pages (out/planned) | Widest output page | Smallest scale | Capture time | Content (pt) |
 |---|---:|---:|---:|---:|---|
 | Very wide table mid-post (`testVeryWideTableRunIsolatesAndCapsEveryPage`) | 5/5 | 14,400.0 pt | 0.078 | 0.36–0.41 s | 184,770 × 18,839 |
-| Minified `text` fence mid-post (`testMinifiedLineRunInALongPostWritesWithAShrunkWarning`) | 3/3 | 14,400.0 pt (wide page shrunk) | < 1 | — | sentinel once, in order |
+| Minified `text` fence mid-post (`testMinifiedLineRunInALongPostWritesWithAShrunkWarning`) | 3/3 | 14,400.0 pt (wide page shrunk) | 0.007 | 0.11 s | 1,950,298 × 22,924; sentinel once, in order |
 | Mid-width table (`testMidWidthTableRunScalesNeighboursStayWhole`) | 3/3 | 14,400.0 pt | 0.572 | 0.10 s | 25,178 × 13,764 |
 | Wide code near end (`testWideCodeLineNearTheEndLeavesNoBlankTail`) | 3/3 | 14,400.0 pt | 0.294 | 0.05–0.06 s | 48,990 × 7,841 |
 | Quote/list/table shape (`testQuoteListTableShapeLeavesNoBlankTail`) | 2/2 | 4,954.0 pt | 1.000 | 0.07 s | 4,954 × 23,138 |
@@ -2573,13 +2573,16 @@ capture width past the measured edge that restores the full `ENDLINESENTINEL`:
 The deficit is bounded and non-monotonic — it tracks glyph boundaries, not width
 — so the slack is a constant, not a fraction: `widePageSlack = 200`, twice the
 worst observed need (~100 pt). It applies only to pages wider than
-`maximumSide` (14,400 pt): clipping was never observed below ~1M pt and those
-pages already shrink, while adding slack to a page that fits would lower its
+`maximumSide` (14,400 pt): a 1-glyph loss was measured at 130k pt with slack 0;
+pages wider than this already shrink, while adding slack to a page that fits would lower its
 print scale for no benefit (E1). Applied after run classification — it never
 promotes a page into a run — and included in the capture-area budget check.
 
-Reference run at slack 200, ~1.95M pt line (the
-`testMinifiedLineRunInALongPostWritesWithAShrunkWarning` shape): 9 planned /
-9 output pages, one run `[50291–50376]` at 1,950,628 × 85 pt, smallest scale
-0.0074, every marker extracted once in order including the end sentinel, no
-blank pages; capture 0.34 s, total 1.6 s (DPR 2).
+An earlier slack-200 reference capture recorded 9 planned / 9 output pages, one
+run `[50291–50376]` at 1,950,628 × 85 pt, smallest scale 0.0074, and every
+marker once in order. The current hosted run of
+`testMinifiedLineRunInALongPostWritesWithAShrunkWarning` verifies its exact
+240,000-`W` plus sentinel line with 300 paragraphs on each side: 3 planned / 3
+output pages, content size 1,950,298 × 22,924 pt, smallest scale 0.007, and
+0.11 s capture time. Its PDFKit text assertions find every marker once in order
+and no blank pages by the trimmed-text proxy.
