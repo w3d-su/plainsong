@@ -42,6 +42,70 @@ extension EditorFindHostedGateTests {
         XCTAssertNotEqual(state.editorFocusRequestID, focusBefore)
     }
 
+    func testNativeFilesDroppedPickRevertsHighlightBeforeHeldReloadInstalls() async throws {
+        let scanner = HeldWorkspaceDirectoryScanner()
+        let fixture = try makeWorkspaceFixture(
+            files: ["a.md": "a", "b.md": "b", "c.md": "c"],
+            directoryScanner: scanner
+        )
+        let state = fixture.appState
+        state.setLayoutMode(.sourceOnly)
+        state.openExternalFile(fixture.root)
+        try await waitUntil("sidebar fixture opens") {
+            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+        }
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        let host = makeWorkspaceHost(appState: state)
+        registerTeardown(host: host, fixture: fixture)
+        var table: NSTableView?
+        try await waitUntil("native Files list mounts") {
+            table = self.firstDescendant(of: NSTableView.self, in: host.window.contentView)
+            return (table?.numberOfRows ?? 0) >= 4
+        }
+        let list = try XCTUnwrap(table)
+        host.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(host.window.makeFirstResponder(list))
+        let aRow = list.selectedRow
+        XCTAssertGreaterThanOrEqual(aRow, 0)
+        let bID = try XCTUnwrap(state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id)
+        FilesSelectionDeferral.debugRetryAttemptLimit = 4
+        addTeardownBlock { @MainActor in
+            FilesSelectionDeferral.debugRetryAttemptLimit = nil
+            await scanner.release()
+        }
+
+        await scanner.hold()
+        state.scheduleWorkspaceReload(
+            root: fixture.root, selectFirstIfNeeded: false, errorTitle: "Reload"
+        )
+        try await waitUntil("the reload is parked in the scanner") { await scanner.isHeld }
+
+        try sendFilesArrowDown(to: host.window)
+        try await waitUntil("the dropped pick exhausted its retry budget") {
+            guard let deferral = FilesSelectionDeferral.latestDebugInstance else { return false }
+            let refusedPicks = deferral.openAttempts.filter { $0.id == bID && !$0.landed }
+            return refusedPicks.count == 4 && deferral.pendingID == nil
+        }
+        try await waitUntil("the List highlight returns to a.md") {
+            list.selectedRow == aRow
+        }
+        let deferral = try XCTUnwrap(FilesSelectionDeferral.latestDebugInstance)
+        XCTAssertEqual(deferral.openAttempts.filter { $0.id == bID && !$0.landed }.count, 4)
+        XCTAssertNil(deferral.pendingID)
+        let scannerIsHeld = await scanner.isHeld
+        XCTAssertTrue(scannerIsHeld)
+        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md")
+        XCTAssertEqual(list.selectedRow, aRow)
+
+        await scanner.release()
+        try await waitUntil("the held reload installs") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        XCTAssertEqual(state.currentDocument.fileURL?.lastPathComponent, "a.md")
+    }
+
     /// A burst of arrows lands on the last file without reverting, and keeps focus in the
     /// navigator. Ordering is covered by the held-reload test's attempt-index assertion.
     func testNativeFilesRapidArrowSelectionLandsOnLastFileWithoutReverting() async throws {

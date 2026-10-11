@@ -10,8 +10,8 @@ import WorkspaceKit
 struct WorkspaceFilesSidebar: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectionDeferral = FilesSelectionDeferral()
-    /// Bumped after a dropped pick so the List re-reads the binding and reverts its
-    /// highlight to the tree's selection (the still-current document).
+    /// Read by body so a dropped pick re-evaluates the List binding and reverts
+    /// its highlight to the tree's selection (the still-current document).
     @State private var selectionRevertTick = 0
     @State private var creationRequest: CreationRequest?
     @State private var itemName = ""
@@ -21,6 +21,9 @@ struct WorkspaceFilesSidebar: View {
 
     var body: some View {
         Group {
+            // Body dependency: this read lets a dropped pick re-read the List binding.
+            // Unread @State writes do not re-evaluate body.
+            let _ = selectionRevertTick
             if let tree = appState.workspaceTree {
                 list(tree)
                     .safeAreaInset(edge: .bottom, spacing: 0) {
