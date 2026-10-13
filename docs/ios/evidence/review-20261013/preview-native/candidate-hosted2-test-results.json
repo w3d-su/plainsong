@@ -1,0 +1,68 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+      "deviceName" : "Plainsong iOS review 20261013",
+      "modelName" : "iPhone 17",
+      "osBuildNumber" : "24A5355p",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "name" : "failed: caught error: \"Timed out waiting for bundle ready\"",
+                      "nodeType" : "Failure Message"
+                    }
+                  ],
+                  "duration" : "9s",
+                  "durationInSeconds" : 9.594261050224304,
+                  "name" : "testBundledKitchenSinkAndMDXStayVisible()",
+                  "nodeIdentifier" : "PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/PreviewKit/PreviewKitTests/PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                },
+                {
+                  "duration" : "1s",
+                  "durationInSeconds" : 1.6153669357299805,
+                  "name" : "testHostedPageBecomesReadyAndRendersTheLatestDocument()",
+                  "nodeIdentifier" : "PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/PreviewKit/PreviewKitTests/PreviewIOSHostedTests/testHostedPageBecomesReadyAndRendersTheLatestDocument",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "PreviewIOSHostedTests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/PreviewKit/PreviewKitTests/PreviewIOSHostedTests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            }
+          ],
+          "name" : "PreviewKitTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/PreviewKit/PreviewKitTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Failed"
+        }
+      ],
+      "name" : "PreviewKit-Package",
+      "nodeType" : "Test Plan",
+      "result" : "Failed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

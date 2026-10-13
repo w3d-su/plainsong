@@ -102,6 +102,14 @@ Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`,
 `bundle.css`). The dist output **is committed** so Swift-only agents can build the app without
 Node installed; regenerate with `make preview-bundle` whenever `preview-src/` changes.
 
+Manual Swift linker harnesses must include the approved portable package dependencies:
+`WorkspaceKit` requires `WorkspaceCore`, while the parser extraction belongs to
+`SyntaxKit`. Keep missing-object refusals and existing sandbox assertions. For iOS
+package test admission, verify an enabled test plan, built test bundle and actual
+named results; a library-only `build-for-testing` does not verify test compilation.
+Current iOS runtime/provider/device gates are recorded in `docs/ios/integration-ledger.md`.
+
+
 ---
 
 ## 4. Architecture

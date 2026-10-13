@@ -1,0 +1,8 @@
+{
+  "binary": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/DerivedData/Build/Products/Debug-iphonesimulator/PreviewKitTests.xctest/PreviewKitTests",
+  "binary_sha256": "80ca7d50c760457d52904c70172d046553db543a2b20ba621a1ff6828d757ae5",
+  "confirmed_named_symbol_count": 94,
+  "missing_named_symbols": [],
+  "named_source_cases": 94,
+  "scope": "Native iOS XCTest bundle symbol presence, not runtime execution or acceptance"
+}

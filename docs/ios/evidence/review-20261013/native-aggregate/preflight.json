@@ -1,0 +1,12 @@
+{
+  "available_simulators": 12,
+  "canonical_lock": "/private/tmp/plainsong-xcodebuild-test.lock",
+  "contract_version": "IOS-C0-v1",
+  "iphoneos_sdk": "27.0",
+  "iphonesimulator_sdk": "27.0",
+  "source_dirty": false,
+  "source_sha": "c1c250a2b5c3e518108356b0c598064d4d1b0bb4",
+  "xcode_build": "27A5194q",
+  "xcode_version": "Xcode 27.0",
+  "xcodegen": "Version: 2.45.4"
+}

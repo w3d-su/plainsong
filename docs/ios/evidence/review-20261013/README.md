@@ -6,8 +6,8 @@
 
 - Frozen C0：`642cb212703220409874a2741c5adbfb8c80fe8a`，13 frozen files 保持原 SHA-256。
 - 原 11 個已交付 lanes 的精確 source heads 被組成審查基準 `9ddd0c3cc0b3cb3439ed296400abbb701eb48886`。
-- 獨立 worktree：`codex/ios-review-integration`；本批 iOS source head `4135301`；Mac CI 觀察/測試修正後的最後 code head `0f97875`。其後的 receipts/docs 不等於重新測試產品。
-- owner checkout、原 lane branches/PR bases、`main` 未修改；沒有自行 merge。
+- 獨立 worktree：`codex/ios-review-integration`；公開 runner 實測 head `c1c250a2b5c3e518108356b0c598064d4d1b0bb4`；後續 Mac sandbox link 修正 `f619cf6`、唯一 preview fixture helper 修正 `3570d31` 分別有 source-bound 證據。新 full94 未重跑；不把窄測或 docs 當成全產品重測。
+- 本批沒有寫入 owner checkout、原 lane branches/PR bases 或 `main`；其他並行工作的變動不屬於本批。沒有自行 merge。
 
 ## 本批修正
 
@@ -23,7 +23,7 @@
 | 09 Raster | 完整 ImageIO container/status 與第一張 raster 即時解碼 | 不再接受只有簽頭的偽 PNG/JPEG/GIF；不是所有 animation frames 解碼 |
 | 10 Shell | tree-only refresh 發布 projection；空資料夾新檔目標只用 matching explicit directory grant | 不隱式取得父目錄授權 |
 | 12 Tooling | source/archive/platform/contract receipts、原子 ZIP、實際 named tests、nested lock ancestry | 舊 archive、simulator binary、0-run/all-skip、forged lock 均拒收 |
-| 07 Preview tests | real committed bundle 複製並逐 byte 核對；每次 JS 回覆有 deadline；throwing wait 和立即 cleanup | 不改 CSP/JS bundle/security policy；iOS runtime 仍待執行 |
+| 07 Preview tests | real committed bundle 複製並逐 byte 核對；每次 JS 回覆有 deadline；throwing wait 和立即 cleanup | 不改 CSP/JS bundle/security policy；實際 native ready 結果見下方；首次真 bundle 載入仍 FAIL |
 | Central inventory | 架構測試符合已批准的 SyntaxKit/WorkspaceCore 抽取，保留原第三方 pins | 沒有停用 mutation/layering guards |
 
 Readonly Undo 的原始反例已通過，沒有為未證實問題修改 editor history。這次未增加依賴，未改 wire protocol、CSP 或 preview bundle。
@@ -38,13 +38,14 @@ Readonly Undo 的原始反例已通過，沒有為未證實問題修改 editor h
 | Tooling fixtures | 21 unittest PASS；exit 0 | receipts/ZIP/named-result/lock 的正反向工具測試；不是正式 provider |
 | Authoring/Images portable harness | 149 XCTest PASS、0 fail、0 skip；exit 0 | 89 Authoring＋60 Images 的 Mac 可攜邏輯；排除 UIKit views/native adapters，2 manifests 是測試 copy 專用 Mac metadata |
 | Portable guard mutations | 6 cases 實際執行：5 預期 FAIL＋1 accepted-commit control PASS；exit 1 | 移除 exact-source/cancellation/raster guards 能被測出；candidate 未保留 mutation |
-| Document lane | 最新 46 declared＝46 compiled；generic iOS BFT exit 0；0 executed | aggregate storage相關117/117 inputs一致；完整lane manifest138/148一致，10差異都是完整PreviewKit port/tests，不是148/148 |
-| Authoring/Images lane | 155 named App cases compiled；generic BFT exit 0；0 native executed | 149 邏輯＋6 contract cases；native Undo/IME/provider 不在此證據內 |
-| PreviewKit iOS package | generic BFT exit 0；0 executed | UIKit/真實 bundle 測試分支可編譯；不代替 iOS real WebKit runtime |
-| Aggregate iOS BFT | 新code head0f97875再驗 exit 0、source verify exit 0；原17 cases全部編入 | 6 test bundles：App192、Editor17、MarkdownCore322、Syntax8、WorkspaceCore29、WorkspaceKitIOS46個unique symbols；全為編譯／0 execution |
+| Document lane | aggregate46 PASS；六個 guard 各1 named FAIL、restore後46 PASS；0 skip/timeout | storage117 inputs一致；task copy148逐次restore一致；與aggregate全148僅138相同，10差異是full PreviewKit，非storage依賴 |
+| Aggregate App/Authoring/Images/Shell | 192 actual native PASS、0 fail/skip | 含 authoring/images 與 shell contracts/guards；不證明 physical IME、真 Files provider 或 production composition |
+| PreviewKit iOS library / package | 舊generic product BFT只有library，0 test bundles；新Package scheme真94 compiled/94 executed＝90 PASS/4 FAIL | 舊入口不證明tests編譯；錯46 inventory保留並更正94；完整native結果不是PASS |
+| PreviewIOSHosted fixture修正 | 原2 gate1 PASS/1 FAIL；修正alias後再2 actual＝1 PASS/1 FAIL；0 skip | fixture64files byte-equal/cleanup已驗證；realbundle現在到ready階段仍8s timeout，v1 preview gate FAIL |
+| Aggregate iOS actual runner | c1 head build/test/source verify exit0；294 PASS/0 fail/skip，原17與C0 smoke12全PASS | 實際App192、Editor17、MarkdownCore2 selected、Syntax8、WorkspaceCore29、WorkspaceKitIOS46；Core322 compiled不等於322 iOS執行 |
 | 2026-10-09 native歷史樣本 | storage41、authoring93 PASS | 舊候選快照；不涵蓋新 close/autosave3與async-source2，不當作最新 source 的驗收 |
-| Exact-head Mac CI | 初次 head46ef53e / run38359852530 FAIL：WorkspaceKit360中的1個既有hard-link test；修正後待新head CI | 初次Typecheck/lint、MarkdownCore322、Preview94通過；full Test在WorkspaceKit停止，Build skipped；保留失敗，不當作iOS結果 |
-| iOS runtime / 原17反例重播 | OPEN | 保留 Oct9 的10 PASS/7 FAIL原始結果；最新 source尚未完成完整重播 |
+| Exact-head Mac CI | 46ef53e/run38359852530 FAIL；c1/run38365268053 hardlink69/full362 PASS，但manualsandbox link缺WorkspaceCore而FAIL | 一行module list修正後local69＋actual signed sandbox PASS；新final head CI另追蹤。兩次原失敗均保留，Mac CI不是UIKit證據 |
+| 原17反例重播 | 17/17 actual PASS，required gate exit0 | 同c1 sealed xcresult294；Oct9的10 PASS/7 FAIL仍保留作歷史反例 |
 | 真機 / 安裝 / 效能 / 無障礙 | OPEN | iPhone/iPad 實際 IME、Files/iCloud、background、owner re-sign/install與量測均待 owner |
 
 新 source 經後續 comment/formatter-only delta 才提交的情況，lane receipts 同時保留 tested bytes、final bytes 與 token/literal 相同比對，不能說 final bytes 已再次執行。Swift Testing 另行顯示 0 cases 的 footer 未算入 XCTest PASS 數。
@@ -57,21 +58,25 @@ Final source `f426077` 的**69 focused/362 full PASS、0 skip**；移除guard時
 
 ## 模擬器與 hosted 入口
 
-Xcode 27.0 (27A5194q)/SDK27，最低 deployment26。已建立並成功 boot 的本任務 simulator `A24A1CB9-2861-4AA4-A79F-E53F768950D8` 後來仍被 xcodebuild/DVT 拒絕 destination，`simctl` discovery 也超時。既有 run 曾卡在 install；這些是 infrastructure/0-run，不是產品 PASS，也沒有建立可歸因的 root cause。
+Owner明確授權重啟共用CoreSimulator後，只對已驗明PID/UID/executable的服務送SIGTERM。未直接signal其他任務的xctest、未shutdown all。裝置探索/showdestinations隨後恢復，public `make ios-test` 在 task-owned iPhone17 `A24A1CB9-2861-4AA4-A79F-E53F768950D8`／iOS27實際完成294 cases。Xcode27.0(27A5194q)/SDK27、最低deployment26；不聲稱已在iOS26真機測試。
 
-未重啟 shared CoreSimulatorService，未 kill 其他任務的 suspended xctest、未 shutdown all。所有 heavy work使用 `/private/tmp/plainsong-xcodebuild-test.lock`；admission exit75與被中斷driver的外層exit75分開記錄。
+全程使用 `/private/tmp/plainsong-xcodebuild-test.lock`。Public runner維持on-failure diagnostics，外層1200s watchdog未觸發；其driver正常exit0。Stack sample顯示曾等simctl diagnose的600s後處理，這個觀察不歸因原服務卡住。Storage受控負向runner採never diagnostics，與public不同且明記；六個實際named assertion FAIL後全source restore，positive46 PASS。
 
-GitHub default `main` 未登錄 `ios.yml`，workflow API/default file 404。既有 Mac `CI` 跑 `make lint/test/build`，不會執行 iOS tests。本批不以更改 CI 或 rerun 隱藏 runtime缺口。
+Standalone full Preview必須用`PreviewKit-Package`且核對test bundle/cases。首次`PreviewKit` product scheme空TestConfigurations、0 xctest/0 executed、admission exit65，已保留。第二輪full94 source-bound90 PASS/4 FAIL；source檔頭`#if os(macOS)`只包import的情況不能誤當整檔Mac-only，原錯46inventory與更正94都保留。
+
+真bundle原失敗確認為test helper在`/tmp`/`/private/tmp` aliases上用字串長度計relative path。Foundation deterministic proof：64原始rawrelative均錯；新helper雙方normalized components＋validated prefix，64 byte-equal且failure cleanup PASS。唯一test file修正後native2仍1 PASS/1 FAIL：synthetic bridge/latest-document PASS，realbundle `bundle ready`8s throwing timeout。**Fixture缺陷修正不等於preview runtime PASS。**另三個Export失敗是ready timeout、offline navigation failure和60s XCTest timeout，原因未確認；未用綠色rerun、放寬deadline、skip或移除assertion關閉。
+
+GitHub default main未註冊ios.yml；Mac CI不執行iOS。C1的Mac suites通過後，check-export-sandbox-root.sh漏掉新WorkspaceCore物件，這個link原因已確認；一行修正後local69＋signed sandbox negativecontrols PASS。新PR head CI結果在交付包hosted-ci-latest.json，避免用舊head結論代替。
 
 ## Claude／下一個 agent 的操作順序
 
-1. Review 本批 PR 的 fixes diff；base 是獨立的已交付 lane aggregate。不要把 review-baseline 合入 `main`，不要改原13份PR的base。
-2. 核對 final source manifest、13 frozen hashes、tested bytes/nonsemantic deltas、實際 named cases與所有失敗嘗試。
-3. 在可用 runtime 上以 canonical runner重跑整合後 `make ios-test`，再用本批 `original-17-required.txt`核對原17個 cases真的PASS；其中opaque ID反例已另在Mac純邏輯測試通過。個案0-run/all-skip/missing均不接受。
-4. 單獨執行 full PreviewKit iOS package real-bundle測試；App scheme僅link PreviewKitContracts，不會因此驗證完整WebKit預覽。
-5. 重跑 lane05 六個 controlled guard probes，包含移除 autosave resumption；保留 restore hashes。Portable六-case mutation只證明08/09的Mac邏輯。
-6. 06 可先做 C0 doubles/prototype，11 可先做穩定 harness/fixtures；M0真機 gates通過之後，13才能接 production providers。
-7. owner補 iPhone/iPad IME/Undo、Files/iCloud/offline/外部move-delete、背景/recovery、VoiceOver/鍵盤/視窗與效能，以及重簽IPA launch/open/save。
+1. Review獨立PR fixes/base及全部失敗嘗試；核對13 frozen、source manifests、actual named cases、byte-equivalence與唯一fixture test delta。原feature PR bases不改、maintainer merge。
+2. 原17、C0 smoke12、aggregate294與storage六負向/restore46已實測；除非source相關變更或新問題，不必為收據重跑同樣邏輯。
+3. **07 native preview診斷（高／需Swift concurrency及WebKit經驗）：**先查realbundle首個ready timeout；以實際navigation/JS/bridge lifecycle與owned PID telemetry定位，分清headless harness、runtime和產品原因。保留old full94與新2失敗；不因synthetic page或warm rerun通過宣稱首次bundle成功。三個deferred Export失敗另列，不歸因cold/entitlement而無證據。
+4. **06 Workspace/Access（很高）：**真security-scoped leases/bookmarks、Files/iCloud協調讀寫與asset reader仍無實作。按原allowlist/ frozen contracts完成provider與negative cases。
+5. **11 product validation（高）：**補完整產品harness/fixtures/實際named gates；目前沒有target。模組fake、compile、Mac CI不代替end-to-end provider/device/performance。
+6. **13 production integration（很高）：**M0真機及realproviders滿足後才接composition；目前capabilities仍nil，App入口仍C0。
+7. owner補iPhone/iPad真機IME/Undo、Files/iCloud/offline/move/delete、background/recovery、VoiceOver/keyboard/window、具名效能量測與重簽IPA launch/open/save。這些不由模擬器關卡代替。
 
 重跑入口（新獨立 checkout，每個 public runner自行取得canonical lock）：
 
@@ -98,9 +103,11 @@ Lane12有已驗證的 unsigned **C0 tooling IPA**，source `3d4f671545eb41190b1b
 
 ## 直接證據索引
 
+- [actual294/原17/C0 smoke12](native-aggregate/receipt.json)、[storage六負向與restore46](../lane-05/native-guard-receipt.md)
+- [native Preview詳細失敗與fixture修正](preview-native/README.md)、[manual sandbox link修正](mac-sandbox-link/receipt.json)
 - [最新aggregate編譯](aggregate-generic-receipt-2.json)、[當時source inputs](aggregate-tested-source-2.json)、[compiled methods](aggregate-compiled-test-symbols-2.json)
 - [跨快照source核對](proof-scope-verification.json)、[frozen合約](frozen-contracts-verification.json)
-- [MacPreview94](preview-mac-receipt.json)、[MacWorkspace29](workspace-core-receipt.json)、[最新architecture](mac-architecture-receipt-2.json)、[最新lint](lint-receipt-2.json)、[原lane PR當前heads](original-lane-pr-heads.json)
+- [MacPreview94](preview-mac-receipt.json)、[MacWorkspace29](workspace-core-receipt.json)、[最新architecture](mac-architecture-receipt-2.json)、[最新lint](lint-receipt-3.json)、[原lane PR當前heads](original-lane-pr-heads.json)
 - [05 latest](../lane-05/autosave-review-receipt.json)、[08 latest](../lane-08/exact-source-delivery-review.md)、[09 latest](../lane-09/acceptance-review-fixes.md)、[03/10/12](../lane-12/review-fixes-20261013/README.md)
 
 Raw Xcode logs以可逆gzip保留，`gzip -dc <file.log.gz>`取得原始bytes；log-packaging.json列未壓縮/壓縮雜湊。沒有修改raw內容來通過diff check。

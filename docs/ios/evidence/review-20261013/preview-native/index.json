@@ -1,0 +1,537 @@
+{
+  "created_date": "2026-10-13",
+  "file_count": 67,
+  "files": {
+    "README.md": {
+      "bytes": 7947,
+      "codec": "identity",
+      "scope": "Generated review and next-agent handoff",
+      "sha256": "0fa13f4fa1347fd06c796c45a4b8e93c782fd8e9ace62a492111de1fcabdff32"
+    },
+    "alias-readonly-repro.json": {
+      "bytes": 1855,
+      "codec": "identity",
+      "original_bytes": 1855,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/alias-readonly-repro.json",
+      "original_sha256": "9f81464a4c78c399cdd565df4b53fb86031ce7edfe21051717784adeb05dcfc1",
+      "sha256": "9f81464a4c78c399cdd565df4b53fb86031ce7edfe21051717784adeb05dcfc1"
+    },
+    "alias-readonly-repro.swift": {
+      "bytes": 1143,
+      "codec": "identity",
+      "original_bytes": 1143,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/alias-readonly-repro.swift",
+      "original_sha256": "f757c99d97d401d0b9dac8122ddd5c4a0565fb5833689adf189e1f45cdcf0d5b",
+      "sha256": "f757c99d97d401d0b9dac8122ddd5c4a0565fb5833689adf189e1f45cdcf0d5b"
+    },
+    "candidate-207-input-delta.json": {
+      "bytes": 263,
+      "codec": "identity",
+      "original_bytes": 263,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/authorized-source-delta.json",
+      "original_sha256": "c164788dc8f8af297bd8947977aabc2924d00ce7a438d28eb04112a73da1fdc1",
+      "sha256": "c164788dc8f8af297bd8947977aabc2924d00ce7a438d28eb04112a73da1fdc1"
+    },
+    "candidate-fixture.patch": {
+      "bytes": 3272,
+      "codec": "identity",
+      "original_bytes": 3272,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/candidate-fixture.patch",
+      "original_sha256": "2debc5fcb3a16818449611fbffa2c091ad61be7a28939d01baa0425fd73eb1cc",
+      "sha256": "2debc5fcb3a16818449611fbffa2c091ad61be7a28939d01baa0425fd73eb1cc"
+    },
+    "candidate-hosted2-after-source-verify.json": {
+      "bytes": 179,
+      "codec": "identity",
+      "original_bytes": 179,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/after-source-verify.json",
+      "original_sha256": "e33568f128fd0f44123364e4bf850ba7c30d57c82a29eb101e39d82a7307cd68",
+      "sha256": "e33568f128fd0f44123364e4bf850ba7c30d57c82a29eb101e39d82a7307cd68"
+    },
+    "candidate-hosted2-before-source-verify.json": {
+      "bytes": 179,
+      "codec": "identity",
+      "original_bytes": 179,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/before-source-verify.json",
+      "original_sha256": "aeb03dd05be1d21f476284a3261a666bbda43d35a00e3a34389d92c1b9151a9b",
+      "sha256": "aeb03dd05be1d21f476284a3261a666bbda43d35a00e3a34389d92c1b9151a9b"
+    },
+    "candidate-hosted2-build-driver.json": {
+      "bytes": 793,
+      "codec": "identity",
+      "original_bytes": 793,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/build-driver.json",
+      "original_sha256": "81252f7c60352acd7419af4c9861ead7005d52141b9aab9851cbb194138b6676",
+      "sha256": "81252f7c60352acd7419af4c9861ead7005d52141b9aab9851cbb194138b6676"
+    },
+    "candidate-hosted2-build-phase.json": {
+      "bytes": 1219,
+      "codec": "identity",
+      "original_bytes": 1219,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/build-phase.json",
+      "original_sha256": "b19ada1c641329740c9abbf425b083159232ffc91b1bcc534066f8780c4c85cb",
+      "sha256": "b19ada1c641329740c9abbf425b083159232ffc91b1bcc534066f8780c4c85cb"
+    },
+    "candidate-hosted2-build-process-rss.jsonl.gz": {
+      "bytes": 739,
+      "codec": "gzip",
+      "original_bytes": 6748,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/build-process-rss.jsonl",
+      "original_sha256": "391c134f9d73e5b7d6b29e992f9ff3e673e4b0ff50ccc07128cad5b02f8c7923",
+      "sha256": "f8cb894330a22470e18a1fc3ef06c4aad313911548cfaef55c0d2ae71d36d3d1"
+    },
+    "candidate-hosted2-build.log.gz": {
+      "bytes": 20250,
+      "codec": "gzip",
+      "original_bytes": 345671,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/build.log",
+      "original_sha256": "8f4a1e2c16e736f6c022dfd8cb694cc16829ce2ed02b3137409c782a07ccad1b",
+      "sha256": "97dd3779923a78d265666b188543b931ed4bb7af2a95777b57870945badc4b2b"
+    },
+    "candidate-hosted2-extraction.json": {
+      "bytes": 284,
+      "codec": "identity",
+      "original_bytes": 284,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/extraction.json",
+      "original_sha256": "35737e91a0c887b4cb94af3c0d29131a017f3f0ed1a41b9025c5b2d2eb12eeeb",
+      "sha256": "35737e91a0c887b4cb94af3c0d29131a017f3f0ed1a41b9025c5b2d2eb12eeeb"
+    },
+    "candidate-hosted2-receipt.json": {
+      "bytes": 5075,
+      "codec": "identity",
+      "original_bytes": 5075,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/receipt.json",
+      "original_sha256": "33b1ccb0bf88571ef59b00f9e98039844add04e28902963d1bd55cfefd3aeaf7",
+      "sha256": "33b1ccb0bf88571ef59b00f9e98039844add04e28902963d1bd55cfefd3aeaf7"
+    },
+    "candidate-hosted2-test-driver.json": {
+      "bytes": 1353,
+      "codec": "identity",
+      "original_bytes": 1353,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-driver.json",
+      "original_sha256": "da01e38087071113c2c3be72098f61693d68923b27a39e551d160992a5bfb11a",
+      "sha256": "da01e38087071113c2c3be72098f61693d68923b27a39e551d160992a5bfb11a"
+    },
+    "candidate-hosted2-test-gate.json": {
+      "bytes": 379,
+      "codec": "identity",
+      "original_bytes": 379,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-gate.json",
+      "original_sha256": "edd6305656df4d72db46706335551847005f042388425c9cbe274a705dbd960b",
+      "sha256": "edd6305656df4d72db46706335551847005f042388425c9cbe274a705dbd960b"
+    },
+    "candidate-hosted2-test-images.json": {
+      "bytes": 116,
+      "codec": "identity",
+      "original_bytes": 116,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-images.json",
+      "original_sha256": "51e4d56844c061262bcbbe6d9015a282303d727fc1e6ee5b7bdc128f6cd8515b",
+      "sha256": "51e4d56844c061262bcbbe6d9015a282303d727fc1e6ee5b7bdc128f6cd8515b"
+    },
+    "candidate-hosted2-test-phase.json": {
+      "bytes": 2511,
+      "codec": "identity",
+      "original_bytes": 2511,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-phase.json",
+      "original_sha256": "c5945e05448518c3b0517f6d1266b530951100d72db9fb140f9ff12ae3f0487e",
+      "sha256": "c5945e05448518c3b0517f6d1266b530951100d72db9fb140f9ff12ae3f0487e"
+    },
+    "candidate-hosted2-test-plan.xctestrun": {
+      "bytes": 11031,
+      "codec": "identity",
+      "original_bytes": 11031,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/DerivedData/Build/Products/PreviewKit-Package_PreviewKit-Package_iphonesimulator27.0-arm64.xctestrun",
+      "original_sha256": "f7d4a494cae3549679a6c7c2b82d55da16ef51dc65e4584880011a5a4c1a2146",
+      "sha256": "f7d4a494cae3549679a6c7c2b82d55da16ef51dc65e4584880011a5a4c1a2146"
+    },
+    "candidate-hosted2-test-post-suite-owned-driver-sample.json": {
+      "bytes": 399,
+      "codec": "identity",
+      "original_bytes": 399,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-post-suite-owned-driver-sample.json",
+      "original_sha256": "657268125f835c381536fcfcdc1ec5fb2268cf35fd5c3ac8796967dc70cc8f16",
+      "sha256": "657268125f835c381536fcfcdc1ec5fb2268cf35fd5c3ac8796967dc70cc8f16"
+    },
+    "candidate-hosted2-test-process-rss.jsonl.gz": {
+      "bytes": 1414,
+      "codec": "gzip",
+      "original_bytes": 16273,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-process-rss.jsonl",
+      "original_sha256": "0939ef74f5a20c42955e75a995fa766eaf24ec0afee528ad4149f3d12259f2f2",
+      "sha256": "9b58e0d8a62d0dbf81242131bbac969d7e6b70e1ead60f967c9790795f71f65e"
+    },
+    "candidate-hosted2-test-results.json": {
+      "bytes": 2543,
+      "codec": "identity",
+      "original_bytes": 2543,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-results.json",
+      "original_sha256": "ac33dacd615f3abe139619a5b71483fbd0370aecdf9b599f3195edb6c6cffa19",
+      "sha256": "ac33dacd615f3abe139619a5b71483fbd0370aecdf9b599f3195edb6c6cffa19"
+    },
+    "candidate-hosted2-test-vmmap-17976.json": {
+      "bytes": 880,
+      "codec": "identity",
+      "original_bytes": 880,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test-vmmap-17976.json",
+      "original_sha256": "1941e726a89206c781ab636ca231aad972f205bda07753e5b0b95ceb1d4985eb",
+      "sha256": "1941e726a89206c781ab636ca231aad972f205bda07753e5b0b95ceb1d4985eb"
+    },
+    "candidate-hosted2-test.log.gz": {
+      "bytes": 2381,
+      "codec": "gzip",
+      "original_bytes": 14483,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/test.log",
+      "original_sha256": "41bb2c9fe4882744d28c1efa996f3441bdf356c6d102acbffb59cd7fbc317bfa",
+      "sha256": "b23b48fd1599e52c6c38428f289737f82020e7c6cf80903d020f13a8d68531cf"
+    },
+    "candidate-prepared-source.json": {
+      "bytes": 42429,
+      "codec": "identity",
+      "original_bytes": 42429,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/prepared-source.json",
+      "original_sha256": "82614a0d76a34cf662fa373127b1f60e23ecdcba9aceba2f40ae611ed53625af",
+      "sha256": "82614a0d76a34cf662fa373127b1f60e23ecdcba9aceba2f40ae611ed53625af"
+    },
+    "corrected-full94-inventory.json": {
+      "bytes": 25050,
+      "codec": "identity",
+      "original_bytes": 25050,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/corrected-full-case-inventory.json",
+      "original_sha256": "2978610be3394498d4f6c568f2b1f9d527056bf5a4100898754211c3ac1538a1",
+      "sha256": "2978610be3394498d4f6c568f2b1f9d527056bf5a4100898754211c3ac1538a1"
+    },
+    "empty-plan-after-source-verify.json": {
+      "bytes": 178,
+      "codec": "identity",
+      "original_bytes": 178,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/after-source-verify.json",
+      "original_sha256": "539f73213bcb4f403de2c37270539c6c729d3ad843dcbe800818fd18aae6ed55",
+      "sha256": "539f73213bcb4f403de2c37270539c6c729d3ad843dcbe800818fd18aae6ed55"
+    },
+    "empty-plan-attempt-failure.json": {
+      "bytes": 773,
+      "codec": "identity",
+      "original_bytes": 773,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/attempt-failure.json",
+      "original_sha256": "57e3e10d020046e9aa65e7a9d07f96e7dffd970718d5bc161caebfff07aa1c5d",
+      "sha256": "57e3e10d020046e9aa65e7a9d07f96e7dffd970718d5bc161caebfff07aa1c5d"
+    },
+    "empty-plan-before-source-verify.json": {
+      "bytes": 179,
+      "codec": "identity",
+      "original_bytes": 179,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/before-source-verify.json",
+      "original_sha256": "77af5a8fd2103eb2b907187c4184cf73452fd92cace38fa29708de380116a609",
+      "sha256": "77af5a8fd2103eb2b907187c4184cf73452fd92cace38fa29708de380116a609"
+    },
+    "empty-plan-build-driver.json": {
+      "bytes": 755,
+      "codec": "identity",
+      "original_bytes": 755,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/build-driver.json",
+      "original_sha256": "aaf792e8730b8cdbeef34c182e541c71be65ab3aad24a9c0112f40ab529f1fa7",
+      "sha256": "aaf792e8730b8cdbeef34c182e541c71be65ab3aad24a9c0112f40ab529f1fa7"
+    },
+    "empty-plan-build-phase.json": {
+      "bytes": 1160,
+      "codec": "identity",
+      "original_bytes": 1160,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/build-phase.json",
+      "original_sha256": "bd28f55cba0b4e11fef71808ace36a849d1d368e6b98a396f147082d04d2a94b",
+      "sha256": "bd28f55cba0b4e11fef71808ace36a849d1d368e6b98a396f147082d04d2a94b"
+    },
+    "empty-plan-build-process-rss.jsonl.gz": {
+      "bytes": 573,
+      "codec": "gzip",
+      "original_bytes": 5059,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/build-process-rss.jsonl",
+      "original_sha256": "3d453e9f10134fa68630b3a29aa2a44259c9fb55366127f95d5e75c0b6d1b8ba",
+      "sha256": "0eef0d99d9f757373ea44de26df659101b8275efef8a6e781ffeb28fd7288841"
+    },
+    "empty-plan-build.log.gz": {
+      "bytes": 17063,
+      "codec": "gzip",
+      "original_bytes": 269988,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/build.log",
+      "original_sha256": "fc1aa787d59c071151527f91c457c90a23504b5ca6e7977b6a1e554d83abf03f",
+      "sha256": "f14d269e1fab450aaf3ba3d3785e53701ff6700b0e59c7d0e325bd5a321aac69"
+    },
+    "empty-plan-test-plan.xctestrun": {
+      "bytes": 604,
+      "codec": "identity",
+      "original_bytes": 604,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-161446/DerivedData/Build/Products/PreviewKit_PreviewKit_iphonesimulator27.0.xctestrun",
+      "original_sha256": "a29be6c2cc87b6cc68f85ae7f9363c426ae6bc340651149199b83cc31e4619d1",
+      "sha256": "a29be6c2cc87b6cc68f85ae7f9363c426ae6bc340651149199b83cc31e4619d1"
+    },
+    "final-source-and-format-verification.json": {
+      "bytes": 1226,
+      "codec": "identity",
+      "scope": "Generated evidence metadata; not original runtime output",
+      "sha256": "61ce9a4de3ef8567c1d3f3f4c020eefaedff6ac6c8266ee8b413508e5ec235dd"
+    },
+    "fixture-alias64-copy-cleanup-proof.json": {
+      "bytes": 1867,
+      "codec": "identity",
+      "original_bytes": 1867,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/fixture-alias-copy-proof.json",
+      "original_sha256": "0ffcf1d684bf7ce110bcac60158704e671d632f9ed355a4ee623aee045b62c21",
+      "sha256": "0ffcf1d684bf7ce110bcac60158704e671d632f9ed355a4ee623aee045b62c21"
+    },
+    "fixture-alias64-copy-cleanup-proof.swift": {
+      "bytes": 3508,
+      "codec": "identity",
+      "original_bytes": 3508,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/fixture-alias-copy-proof.swift",
+      "original_sha256": "2136d9528aaba1ac963a46b86150c03be8569bf957021e27319b1f1812830d70",
+      "sha256": "2136d9528aaba1ac963a46b86150c03be8569bf957021e27319b1f1812830d70"
+    },
+    "frozen13-plus-c0-extra6-scope.json": {
+      "bytes": 3964,
+      "codec": "identity",
+      "original_bytes": 3964,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/frozen-inventory-scope.json",
+      "original_sha256": "64cc3d1145e2001dc35c75ed25dd0af145858cddf85bd3b8454e45501a77a8e4",
+      "sha256": "64cc3d1145e2001dc35c75ed25dd0af145858cddf85bd3b8454e45501a77a8e4"
+    },
+    "historical-full94-after-source-verify.json": {
+      "bytes": 178,
+      "codec": "identity",
+      "original_bytes": 178,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/after-source-verify.json",
+      "original_sha256": "5f69f2d6b9ed6ad949abb298459dceb6d7443f70be799d4db1a0212c2519c802",
+      "sha256": "5f69f2d6b9ed6ad949abb298459dceb6d7443f70be799d4db1a0212c2519c802"
+    },
+    "historical-full94-before-source-verify.json": {
+      "bytes": 178,
+      "codec": "identity",
+      "original_bytes": 178,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/before-source-verify.json",
+      "original_sha256": "530307738c0e95e6f479f7234d8d80c34165174ed05f768628d9a3ff2785cb3c",
+      "sha256": "530307738c0e95e6f479f7234d8d80c34165174ed05f768628d9a3ff2785cb3c"
+    },
+    "historical-full94-build-driver.json": {
+      "bytes": 763,
+      "codec": "identity",
+      "original_bytes": 763,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build-driver.json",
+      "original_sha256": "825806d262dc65df6a1b7f3b122a1775d2c4898d42aa0dee365cd3c50d0f282f",
+      "sha256": "825806d262dc65df6a1b7f3b122a1775d2c4898d42aa0dee365cd3c50d0f282f"
+    },
+    "historical-full94-build-phase.json": {
+      "bytes": 1174,
+      "codec": "identity",
+      "original_bytes": 1174,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build-phase.json",
+      "original_sha256": "834d671312c091a740aa2cb0d939796c69de286d2b64dbefa11f0d45d06c7ffd",
+      "sha256": "834d671312c091a740aa2cb0d939796c69de286d2b64dbefa11f0d45d06c7ffd"
+    },
+    "historical-full94-build-process-rss.jsonl.gz": {
+      "bytes": 567,
+      "codec": "gzip",
+      "original_bytes": 4496,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build-process-rss.jsonl",
+      "original_sha256": "a42ee78c4c8b86ba35d4363e92037d181d16313c3cce8bdd51762b0f650f9cf1",
+      "sha256": "fa52b9347ee618fb6e31a134b1962226f9e4a7224fa910a3bbf5719f7450010f"
+    },
+    "historical-full94-build.log.gz": {
+      "bytes": 19834,
+      "codec": "gzip",
+      "original_bytes": 324585,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/build.log",
+      "original_sha256": "65601cc599ff8a97b2333e4ba5b5b307803219a323f49caefa8dc7a6a853837d",
+      "sha256": "3d2d92d0083464ca7331ffb835bc55f3246cae1a9cfa9c1f1fa05da2644f2f09"
+    },
+    "historical-full94-compiled-test-symbol-gate.json": {
+      "bytes": 457,
+      "codec": "identity",
+      "original_bytes": 457,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/compiled-test-symbol-gate.json",
+      "original_sha256": "b2558736bf3e18122b86ae0baecff97fd938e7bb8125c8f7fba9ae4376629aac",
+      "sha256": "b2558736bf3e18122b86ae0baecff97fd938e7bb8125c8f7fba9ae4376629aac"
+    },
+    "historical-full94-compiled-test-symbols.txt.gz": {
+      "bytes": 65141,
+      "codec": "gzip",
+      "original_bytes": 573808,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/DerivedData/compiled-test-symbols.txt",
+      "original_sha256": "ed2ce6951486e624217317fda976ecf59ef488ab813006391f3d9fd7c0ee8298",
+      "sha256": "8f44fc41004cfa0404a7399fe3843da47209d8ba6bbf822e594c5503cc755461"
+    },
+    "historical-full94-corrected-test-reconciliation.json": {
+      "bytes": 7124,
+      "codec": "identity",
+      "original_bytes": 7124,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/corrected-test-reconciliation.json",
+      "original_sha256": "e583c2aa865230202bd4b342645e3be142ba026a0f77fc72f4b83f0aba3b66e4",
+      "sha256": "e583c2aa865230202bd4b342645e3be142ba026a0f77fc72f4b83f0aba3b66e4"
+    },
+    "historical-full94-extraction.json": {
+      "bytes": 269,
+      "codec": "identity",
+      "original_bytes": 269,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/extraction.json",
+      "original_sha256": "7a2022d8a11ee81297b3fc1b23f83517183915f470239688e3e0518447c673ae",
+      "sha256": "7a2022d8a11ee81297b3fc1b23f83517183915f470239688e3e0518447c673ae"
+    },
+    "historical-full94-receipt.json": {
+      "bytes": 18925,
+      "codec": "identity",
+      "original_bytes": 18925,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/receipt.json",
+      "original_sha256": "54b017f8c88a9c0a87493e61939ee883d61003cfa2af55fd0ff1d292f741dddf",
+      "sha256": "54b017f8c88a9c0a87493e61939ee883d61003cfa2af55fd0ff1d292f741dddf"
+    },
+    "historical-full94-test-driver.json": {
+      "bytes": 1133,
+      "codec": "identity",
+      "original_bytes": 1133,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-driver.json",
+      "original_sha256": "9446ac109a9106be0eab66ad342b371af11b0330b548216406bc518a259a0f3f",
+      "sha256": "9446ac109a9106be0eab66ad342b371af11b0330b548216406bc518a259a0f3f"
+    },
+    "historical-full94-test-gate.json": {
+      "bytes": 12425,
+      "codec": "identity",
+      "original_bytes": 12425,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-gate.json",
+      "original_sha256": "3b475a5ad23cac7c2fc2d1a57e8a0bd32a6d8dd10b2a005af5f60fd79460bc3a",
+      "sha256": "3b475a5ad23cac7c2fc2d1a57e8a0bd32a6d8dd10b2a005af5f60fd79460bc3a"
+    },
+    "historical-full94-test-images.json": {
+      "bytes": 116,
+      "codec": "identity",
+      "original_bytes": 116,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-images.json",
+      "original_sha256": "2d77c2046e5e7b99c6588bc132361b5fa012f799c94aab50b83f7c656d381de9",
+      "sha256": "2d77c2046e5e7b99c6588bc132361b5fa012f799c94aab50b83f7c656d381de9"
+    },
+    "historical-full94-test-owned-driver-sample.json": {
+      "bytes": 1878,
+      "codec": "identity",
+      "original_bytes": 1878,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-owned-driver-sample.json",
+      "original_sha256": "7405ccecc0101666870e45d8f8e63cc28b0cf32ec57134ee814a22aab2981abb",
+      "sha256": "7405ccecc0101666870e45d8f8e63cc28b0cf32ec57134ee814a22aab2981abb"
+    },
+    "historical-full94-test-owned-driver-sample.txt.gz": {
+      "bytes": 56669,
+      "codec": "gzip",
+      "original_bytes": 201869,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-owned-driver-sample.txt",
+      "original_sha256": "5b81fe520116499577935bde7ee66f9a814a66d8bdabe3b0d76dc87ff78954d6",
+      "sha256": "0e45e4fea5cafc1e167d18c45fd67bf4814d90813f35e1ba6f7e7d5673a83d97"
+    },
+    "historical-full94-test-owned-native-sample.json": {
+      "bytes": 1026,
+      "codec": "identity",
+      "original_bytes": 1026,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-owned-native-sample.json",
+      "original_sha256": "78f128f26adf09b46ec49e005518b9e7b5575d26b26c0f64894f8a0f364f1a1a",
+      "sha256": "78f128f26adf09b46ec49e005518b9e7b5575d26b26c0f64894f8a0f364f1a1a"
+    },
+    "historical-full94-test-phase.json": {
+      "bytes": 3952,
+      "codec": "identity",
+      "original_bytes": 3952,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-phase.json",
+      "original_sha256": "a2658d780e291da6ac9e3d87df1f82ea2c7968dc11b42ed50e50b19b9c35c56b",
+      "sha256": "a2658d780e291da6ac9e3d87df1f82ea2c7968dc11b42ed50e50b19b9c35c56b"
+    },
+    "historical-full94-test-plan.xctestrun": {
+      "bytes": 10986,
+      "codec": "identity",
+      "original_bytes": 10986,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/DerivedData/Build/Products/PreviewKit-Package_PreviewKit-Package_iphonesimulator27.0-arm64.xctestrun",
+      "original_sha256": "34141f3d5a1f6fc997d7b95965212007919ff58e4324153a713f4dc61c3cbc32",
+      "sha256": "34141f3d5a1f6fc997d7b95965212007919ff58e4324153a713f4dc61c3cbc32"
+    },
+    "historical-full94-test-process-rss.jsonl.gz": {
+      "bytes": 13248,
+      "codec": "gzip",
+      "original_bytes": 384533,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-process-rss.jsonl",
+      "original_sha256": "1cabc921918852243fc7f960b5585ddb7e0a0dce439339838e34c1f192860496",
+      "sha256": "97fab405b14e6525cdfb6e8ce8d20470929771f6bfd0edc93347929c70a3ff43"
+    },
+    "historical-full94-test-results.json": {
+      "bytes": 119523,
+      "codec": "identity",
+      "original_bytes": 119523,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-results.json",
+      "original_sha256": "2bcb1de268521e1d820221abfdf3672a279e079ac5c1712e33f1763794699ea4",
+      "sha256": "2bcb1de268521e1d820221abfdf3672a279e079ac5c1712e33f1763794699ea4"
+    },
+    "historical-full94-test-vmmap-14160.json": {
+      "bytes": 6298,
+      "codec": "identity",
+      "original_bytes": 6298,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-vmmap-14160.json",
+      "original_sha256": "54e445bdf433a3e878bcdcf2a9417911bb20a9e43c4e8511a8c5b0ea9332d7b5",
+      "sha256": "54e445bdf433a3e878bcdcf2a9417911bb20a9e43c4e8511a8c5b0ea9332d7b5"
+    },
+    "historical-full94-test-vmmap-14877.json": {
+      "bytes": 6297,
+      "codec": "identity",
+      "original_bytes": 6297,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-vmmap-14877.json",
+      "original_sha256": "099d5af6c0def9bc25b37af4dbec6414a541ab454dc51eda325c166b205fd925",
+      "sha256": "099d5af6c0def9bc25b37af4dbec6414a541ab454dc51eda325c166b205fd925"
+    },
+    "historical-full94-test.log.gz": {
+      "bytes": 18054,
+      "codec": "gzip",
+      "original_bytes": 334325,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test.log",
+      "original_sha256": "c2976cf9f764cfcb20b2ebcfe18b32c1d3c672a57a0c029eac626702bebeb4db",
+      "sha256": "03fed2f80e74610313de943d6680ad539c462a1390b5821c1be856d02f4fba32"
+    },
+    "historical-prepared-source-incorrect46.json": {
+      "bytes": 38126,
+      "codec": "identity",
+      "original_bytes": 38126,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/prepared-source.json",
+      "original_sha256": "cb46709d6f391107c781ffb65b5e2882557f95556ed8065ed5621ec648795f9f",
+      "sha256": "cb46709d6f391107c781ffb65b5e2882557f95556ed8065ed5621ec648795f9f"
+    },
+    "run-locations-and-scope.json": {
+      "bytes": 1581,
+      "codec": "identity",
+      "scope": "Generated evidence metadata; not original runtime output",
+      "sha256": "2535784aa90550f002a55799f9483015c8c1e56ed33cdff0519a02de594713ea"
+    },
+    "runner-preview_fixture_candidate_runner.py": {
+      "bytes": 15912,
+      "codec": "identity",
+      "original_bytes": 15912,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-tools-20261013/preview_fixture_candidate_runner.py",
+      "original_sha256": "2d65457c6fd9fcdf8ab590a344a7dfb9eb9e101b82dda6780e4bb5444eb6899a",
+      "sha256": "2d65457c6fd9fcdf8ab590a344a7dfb9eb9e101b82dda6780e4bb5444eb6899a"
+    },
+    "runner-preview_runner.py": {
+      "bytes": 15899,
+      "codec": "identity",
+      "original_bytes": 15899,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-tools-20261013/preview_runner.py",
+      "original_sha256": "ef7fc04ff8b4f0e9e976e583c0210ecbe3524a892d6a55ee2e3bbcb1c9cf96be",
+      "sha256": "ef7fc04ff8b4f0e9e976e583c0210ecbe3524a892d6a55ee2e3bbcb1c9cf96be"
+    },
+    "runner-preview_runner.py.first-library-only-attempt.py": {
+      "bytes": 15891,
+      "codec": "identity",
+      "original_bytes": 15891,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-tools-20261013/preview_runner.py.first-library-only-attempt.py",
+      "original_sha256": "7ea03026d0d68109db2b56266ad2182770773cf25c5057eb6964cfb0b9d93d70",
+      "sha256": "7ea03026d0d68109db2b56266ad2182770773cf25c5057eb6964cfb0b9d93d70"
+    },
+    "scheme-list.json": {
+      "bytes": 1027,
+      "codec": "identity",
+      "original_bytes": 1027,
+      "original_path": "/private/tmp/plainsong-preview-ios-native-c1-20261013/scheme-list-attempt.json",
+      "original_sha256": "16db830f641952bb163e1c7bb9e8aefb83f3f3a72dc2da9e0cdbfea26c4c7013",
+      "sha256": "16db830f641952bb163e1c7bb9e8aefb83f3f3a72dc2da9e0cdbfea26c4c7013"
+    }
+  },
+  "scope": "Portable retained evidence packet, raw local xcresults located by run-locations-and-scope.json"
+}
