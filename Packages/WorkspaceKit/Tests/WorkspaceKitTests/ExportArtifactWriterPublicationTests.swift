@@ -134,6 +134,8 @@ extension ExportArtifactWriterTests {
     }
 
     func testHardLinkInspectionUsesCurrentKernelSpelling() throws {
+        XCTAssertNil(ExportArtifactWriterHooks.production.kernelPathObserver)
+        XCTAssertNil(ExportArtifactWriterHooks.production.kernelPathOverrideForTesting)
         let fixture = try makeExportFixture(originalText: "existing")
         let link = fixture.directory.appendingPathComponent("link.html")
         try FileManager.default.linkItem(at: fixture.destination, to: link)
@@ -141,41 +143,93 @@ extension ExportArtifactWriterTests {
         XCTAssertEqual(linkedIdentity, fixture.originalIdentity)
         let selection = try ExportArtifactSelection.parse(link, kind: nil).get()
 
-        // F_GETPATH consults the shared vnode name, not the descriptor's open-time name.
-        // Lookup either hard-link name immediately before F_GETPATH to control the observation.
+        // A lookup need not select the shared vnode's spelling. Assert against this call's real bytes.
         for lookupURL in [link, fixture.destination] {
             let lookupPath = lookupURL.path(percentEncoded: false)
-            let probe = ExportBoundaryProbe()
-            let record = probe.hooks().observer
+            let paths = ExportKernelPathCapture()
             let hooks = ExportArtifactWriterHooks(observer: { call in
-                record?(call)
                 guard call.operation == .getPath else { return }
                 let descriptor = lookupPath.withCString { Darwin.open($0, O_RDONLY | O_CLOEXEC) }
+                let code = descriptor < 0 ? errno : 0
+                print(
+                    "F_GETPATH lookup path=\(lookupPath) descriptor=\(descriptor) errno=\(code)"
+                )
                 XCTAssertGreaterThanOrEqual(descriptor, 0)
-                if descriptor >= 0 { Darwin.close(descriptor) }
-            })
+                if descriptor >= 0 {
+                    Darwin.close(descriptor)
+                }
+            }, kernelPathObserver: { selected, returned in paths.record(selected, returned) })
             let inspection = ExportArtifactWriter.inspect(selection, hooks: hooks).map(\.inspection)
-
-            if lookupURL == link {
+            XCTAssertEqual(paths.values.count, 1)
+            let observed = try XCTUnwrap(paths.values.first)
+            XCTAssertEqual(observed.selectedPath, selection.leafPath)
+            print("F_GETPATH identity device=\(linkedIdentity.device) inode=\(linkedIdentity.inode)")
+            if observed.kernelPath.elementsEqual(selection.leafPath.utf8) {
                 let inspected = try inspection.get()
                 XCTAssertEqual(inspected.state, .regular(linkedIdentity))
                 XCTAssertEqual(inspected.canonicalLeafURL.path(percentEncoded: false), link.path(percentEncoded: false))
                 XCTAssertEqual(inspected.parentIdentity, try identity(at: fixture.directory))
             } else {
                 XCTAssertEqual(inspection, .failure(.destinationAlias))
-                XCTAssertEqual(
-                    export(to: link, disposition: .replaceConfirmed(linkedIdentity), probe: probe, hooks: hooks),
-                    .notCommitted(.destinationAlias)
-                )
-                XCTAssertFalse(probe.calls.isEmpty)
-                XCTAssertFalse(probe.createdStaging)
             }
-            XCTAssertEqual(try identity(at: link), linkedIdentity)
-            XCTAssertEqual(try identity(at: fixture.destination), linkedIdentity)
-            XCTAssertEqual(try text(at: link), "existing")
-            XCTAssertEqual(try text(at: fixture.destination), "existing")
-            XCTAssertEqual(try entries(in: fixture.directory), ["export.html", "link.html", Self.sentinelName].sorted())
+            try assertHardLinkUnchanged(fixture, link: link, identity: linkedIdentity)
         }
+    }
+
+    func testHardLinkMatchingKernelSpellingInspectsExactIdentity() throws {
+        try assertControlledHardLinkSpelling(matches: true)
+    }
+
+    func testHardLinkMismatchedKernelSpellingRefusesWithoutStaging() throws {
+        try assertControlledHardLinkSpelling(matches: false)
+    }
+
+    private func assertControlledHardLinkSpelling(matches: Bool) throws {
+        let fixture = try makeExportFixture(originalText: "existing")
+        let link = fixture.directory.appendingPathComponent("link.html")
+        try FileManager.default.linkItem(at: fixture.destination, to: link)
+        let linkedIdentity = try identity(at: link)
+        XCTAssertEqual(linkedIdentity, fixture.originalIdentity)
+        let selection = try ExportArtifactSelection.parse(link, kind: nil).get()
+        let paths = ExportKernelPathCapture()
+        let probe = ExportBoundaryProbe()
+        let alternatePath = fixture.destinationPath
+        let hooks = ExportArtifactWriterHooks(
+            observer: probe.hooks().observer,
+            kernelPathObserver: { selected, returned in paths.record(selected, returned) },
+            kernelPathOverrideForTesting: { selected, returned in
+                XCTAssertEqual(paths.values.last?.selectedPath, selected)
+                XCTAssertEqual(paths.values.last?.kernelPath, returned)
+                print("F_GETPATH controlled override matching=\(matches)")
+                return Array((matches ? selected : alternatePath).utf8)
+            }
+        )
+        let inspection = ExportArtifactWriter.inspect(selection, hooks: hooks).map(\.inspection)
+        if matches {
+            XCTAssertEqual(try inspection.get().state, .regular(linkedIdentity))
+            XCTAssertEqual(try inspection.get().canonicalLeafURL.path(percentEncoded: false), selection.leafPath)
+        } else {
+            XCTAssertEqual(inspection, .failure(.destinationAlias))
+            XCTAssertEqual(
+                export(to: link, disposition: .replaceConfirmed(linkedIdentity), probe: probe, hooks: hooks),
+                .notCommitted(.destinationAlias)
+            )
+        }
+        XCTAssertEqual(paths.values.count, matches ? 1 : 2)
+        XCTAssertEqual(probe.calls.filter { $0.operation == .getPath }.count, paths.values.count)
+        XCTAssertFalse(probe.createdStaging)
+        XCTAssertTrue(probe.calls(at: .publish).isEmpty)
+        try assertHardLinkUnchanged(fixture, link: link, identity: linkedIdentity)
+    }
+
+    private func assertHardLinkUnchanged(
+        _ fixture: ExportWriterFixture, link: URL, identity expected: WorkspaceFileSystemIdentity
+    ) throws {
+        XCTAssertEqual(try identity(at: link), expected)
+        XCTAssertEqual(try identity(at: fixture.destination), expected)
+        XCTAssertEqual(try text(at: link), "existing")
+        XCTAssertEqual(try text(at: fixture.destination), "existing")
+        XCTAssertEqual(try entries(in: fixture.directory), ["export.html", "link.html", Self.sentinelName].sorted())
     }
 
     /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes
@@ -326,5 +380,19 @@ extension ExportArtifactWriterTests {
 
         XCTAssertEqual(outcome, .notCommitted(.cancelled))
         XCTAssertEqual(try entries(in: fixture.directory), [Self.sentinelName])
+    }
+}
+
+private final class ExportKernelPathCapture: @unchecked Sendable {
+    typealias Observation = (selectedPath: String, kernelPath: [UInt8])
+    private let lock = NSLock()
+    private var stored: [Observation] = []
+    var values: [Observation] {
+        lock.withLock { stored }
+    }
+
+    func record(_ selectedPath: String, _ kernelPath: [UInt8]) {
+        lock.withLock { stored.append((selectedPath, kernelPath)) }
+        print("F_GETPATH real selectedUTF8=\(Array(selectedPath.utf8)) returnedUTF8=\(kernelPath)")
     }
 }
