@@ -42,10 +42,11 @@ make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 
 - archive 用 `CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO`；不使用需要簽名的
   `-exportArchive` 冒充 unsigned export。
-- `ios-ipa` 逐一檢查 app 內每個 `.framework`/`.appex`/`.xctest` 與 app 本身的
+- `ios-ipa` 逐一檢查 app 內每個 `.framework`/`.appex`/`.xctest`／`.dylib` 與 app 本身的
   `codesign -dv` 狀態（記錄 before）；非 unsigned 則 `codesign --remove-signature`
   並再驗證，殘留即交付失敗（exit 4）。`_CodeSignature` 殘餘與
-  `embedded.mobileprovision`／`*.p12` 移除並記錄；zip 前再掃，任一殘留 → 拒絕。
+  `embedded.mobileprovision` 在隔離 staging 移除並記錄；zip 前再掃 `_CodeSignature`、
+  `*.mobileprovision`、`*.p12` 與 `*.keychain`，任一殘留 → 拒絕。
 - `Payload/` 只允許 `PlainsongIOS.app`；混入任何其他檔案 → 拒絕 zip。
 - Mach-O 驗證：`vtool -show-build` 必須 `platform IOS`（`IOSSIMULATOR` 會失敗）、
   `lipo -archs` 必須只有 arm64。逐一驗證 app／framework／extension；不能用 substring 將 IOSSIMULATOR 當 IOS。

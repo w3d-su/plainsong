@@ -76,6 +76,15 @@ class RunnerEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "successful Release"):
             self.verify()
 
+    def testArchiveReceiptFromAnotherContractCannotBeRepackaged(self):
+        self.record()
+        receipt_path = self.metadata / "archive.json"
+        receipt = json.loads(receipt_path.read_text())
+        receipt["contract_version"] = "unreviewed-contract"
+        proof.write_json(receipt_path, receipt)
+        with self.assertRaisesRegex(ValueError, "successful Release"):
+            self.verify()
+
     def testMissingSuccessReceiptCannotBeRepackaged(self):
         with self.assertRaises(OSError):
             self.verify()

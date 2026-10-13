@@ -118,7 +118,8 @@ def verify_archive(archive, repository):
     archive = Path(archive).resolve()
     metadata = Path(str(archive) + "-meta")
     receipt = json.loads((metadata / "archive.json").read_text())
-    if (receipt.get("schema") != "IOS-ARCHIVE-v1" or type(receipt.get("exit_code")) is not int
+    if (receipt.get("schema") != "IOS-ARCHIVE-v1" or receipt.get("contract_version") != CONTRACT
+            or type(receipt.get("exit_code")) is not int
             or receipt["exit_code"] != 0 or receipt.get("configuration") != "Release"):
         raise ValueError("archive has no successful Release receipt")
     source_path = metadata / "source.json"
