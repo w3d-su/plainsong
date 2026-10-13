@@ -1,0 +1,29 @@
+{
+  "command": [
+    "lockf",
+    "-k",
+    "-t",
+    "45",
+    "/private/tmp/plainsong-xcodebuild-test.lock",
+    "swift",
+    "test",
+    "--package-path",
+    "Packages/EditorKit",
+    "--filter",
+    "EditorReplaceLayeringTests"
+  ],
+  "platform": "macOS",
+  "passed": 5,
+  "failed": 0,
+  "skipped": 0,
+  "exit_code": 0,
+  "cases": [
+    "EditorReplaceLayeringTests/testAppAndMarkdownCoreDoNotImportSTTextView",
+    "EditorReplaceLayeringTests/testEditorKitImportsNeitherAppNorWorkspaceKit",
+    "EditorReplaceLayeringTests/testIOSScaffoldDoesNotLinkMacOnlyProviders",
+    "EditorReplaceLayeringTests/testNoProjectOrPackageDependencyChange",
+    "EditorReplaceLayeringTests/testSingleReplaceDoesNotUseForbiddenMutationAPIs"
+  ],
+  "log_sha256": "87ab69199c58598d42e254c319a9e189534814f07dd353f3603526305316992a",
+  "source_scope": "unchanged since 6d52984; see proof-scope-verification.json; not exact-head hosted CI"
+}

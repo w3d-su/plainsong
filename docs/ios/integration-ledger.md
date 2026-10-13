@@ -4,6 +4,18 @@ Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main:
 
 C0 provides declarations and an unavailable app scaffold. **C0 overall acceptance remains OPEN because simulator smoke has not executed. Production composition is blocked by M0 + real providers.**
 
+## Current review update — 2026-10-13
+
+**Full v1 acceptance OPEN.** This dated update supersedes earlier environment/provider rows for current readiness; the historical C0 receipt below remains unchanged. Original published lane PR heads were read again and still match the audit baseline. A separate aggregate baseline `9ddd0c3cc0b3cb3439ed296400abbb701eb48886` receives the review fixes; original branches and PR bases are preserved.
+
+- 03/05/07/08/09/10/12 reviewed source fixes are integrated; 13 frozen hashes match. Last code head `4135301915c74080641a321ec465cdd1bed38f61` compiled all aggregate iOS test bundles and all 17 original audit cases, exit 0 / source verification exit 0, **0 executed**.
+- Current execution: Mac PreviewKit 94; architecture 5; aggregate WorkspaceCore 29; tooling 21; portable Authoring/Images 149. All passed in their stated scopes. Portable mutations executed five expected failing cases and one accepted-commit control pass. Historical storage41/authoring93 native passes do not cover the newest source changes.
+- 06 Access/Workspace still has zero Swift implementations/tests; 11 has no tracked acceptance harness/target; 13 production capabilities remain nil and the entrypoint remains C0 Text scaffolding. M0 physical gates therefore remain open and composition is not enabled.
+- Runtime exists and a task-owned device booted, but current CoreSimulator/DVT discovery/install attempts cannot execute tests. This differs from the original C0 environment's absent runtime. No global service reset or unrelated process termination was performed.
+- Default-branch GitHub has no registered iOS workflow. Mac CI does not execute UIKit tests. Latest 46 storage regressions, original17 iOS replay, real PreviewKit iOS execution, six storage guard probes, devices/IME/Files/iCloud/background/installation/performance remain open.
+
+[Review receipt and agent handoff](evidence/review-20261013/README.md) contains exact compiled symbols, scope hashes, failed attempts, immutable-source boundaries and rerun instructions. Lane12's unsigned C0 tooling IPA is not a functional v1 release or this aggregate's final-head binary. Claude review and maintainer merge remain pending.
+
 ## Shared implementation baseline
 
 | Field | Value |

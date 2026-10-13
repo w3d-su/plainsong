@@ -611,7 +611,9 @@ report executed named cases; skip, empty results, lock admission timeout, and si
 installation failure remain distinct. Real PreviewKit tests load byte-verified resources
 inside the test container with the original CSP, bounded JavaScript replies, and cleanup
 registered before the first await. M0 device and re-signed IPA installation gates stay
-open until owner evidence is recorded.
+open until owner evidence is recorded. The current review receipt and next-agent
+handoff live in `docs/ios/evidence/review-20261013/README.md`; an aggregate compilation
+and a portable Mac logic run do not close native or owner acceptance.
 
 ---
 
