@@ -7,6 +7,19 @@ import SwiftUI
 struct WorkspaceInspector: View {
     @EnvironmentObject private var appState: AppState
 
+    /// Folder path relative to the workspace root when inside it, else the full folder path.
+    /// Uses `JumpBarMenus.relativePath` so a symlinked root resolves the same way.
+    @MainActor
+    static func location(of fileURL: URL, rootURL: URL?) -> String {
+        let folder = fileURL.deletingLastPathComponent().standardizedFileURL
+        guard let relativePath = JumpBarMenus.relativePath(of: folder, under: rootURL) else {
+            return folder.path(percentEncoded: false)
+        }
+        let segments = ([rootURL?.lastPathComponent ?? ""]
+            + relativePath.split(separator: "/").map(String.init))
+        return segments.joined(separator: " › ")
+    }
+
     var body: some View {
         DocumentInspectorForm(
             session: appState.currentDocument,
@@ -51,7 +64,7 @@ private struct DocumentInspectorForm: View {
                     if let fileURL = session.fileURL {
                         InspectorRow("Location") {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(location(of: fileURL))
+                                Text(WorkspaceInspector.location(of: fileURL, rootURL: rootURL))
                                     .lineLimit(3)
                                     .truncationMode(.middle)
                                     .textSelection(.enabled)
@@ -87,21 +100,6 @@ private struct DocumentInspectorForm: View {
         for await change in session.textChanges(includeCurrent: true) {
             textSnapshot = change.text
         }
-    }
-
-    /// Folder path relative to the workspace root when inside it, else the full folder path.
-    private func location(of fileURL: URL) -> String {
-        let folder = fileURL.deletingLastPathComponent().standardizedFileURL
-        if let rootURL {
-            let root = rootURL.standardizedFileURL
-            let rootComponents = root.pathComponents
-            let folderComponents = folder.pathComponents
-            if folderComponents.starts(with: rootComponents) {
-                return ([root.lastPathComponent] + folderComponents.dropFirst(rootComponents.count))
-                    .joined(separator: " › ")
-            }
-        }
-        return folder.path(percentEncoded: false)
     }
 }
 

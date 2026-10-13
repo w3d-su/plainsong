@@ -140,12 +140,22 @@ enum JumpBarMenus {
     }
 
     /// `url`'s path below `rootURL`, joined with `/`, or `nil` when it is not inside it.
+    /// Both sides are symlink-resolved (`WorkspaceRootContainment`) so a workspace opened
+    /// through a symlinked root still matches session-canonical URLs. `url` equal to the
+    /// root maps to `""`: `folderSegments` calls this on the parent folder, which can be
+    /// the root itself, and `WorkspaceRootContainment.relativePath` throws there.
     static func relativePath(of url: URL, under rootURL: URL?) -> String? {
         guard let rootURL else { return nil }
-        let rootComponents = rootURL.standardizedFileURL.pathComponents
-        let components = url.standardizedFileURL.pathComponents
-        guard components.starts(with: rootComponents) else { return nil }
-        return components.dropFirst(rootComponents.count).joined(separator: "/")
+        let resolvedCandidate = WorkspaceRootContainment.normalizedDirectoryPath(
+            url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+        )
+        let resolvedRoot = WorkspaceRootContainment.normalizedDirectoryPath(
+            WorkspaceRootContainment.resolvedRootURL(rootURL).path(percentEncoded: false)
+        )
+        if resolvedCandidate == resolvedRoot {
+            return ""
+        }
+        return try? WorkspaceRootContainment.relativePath(for: url, rootURL: rootURL)
     }
 
     private static func copy(_ string: String) {
