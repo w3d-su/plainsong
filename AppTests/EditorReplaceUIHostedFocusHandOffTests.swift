@@ -55,7 +55,7 @@ extension EditorFindHostedGateTests {
         assertFindCommandsStayEligible(hosted)
     }
 
-    func testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField() async throws {
+    func testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllWhenEnabledElseTheField() async throws {
         let source = String(repeating: "hit ", count: 200)
         // Pressed: Cancel unmounts and Replace All takes focus.
         var hosted = try await makeHostedReplaceRow(source: source)
@@ -82,6 +82,33 @@ extension EditorFindHostedGateTests {
             return XCTFail("the plan must commit")
         }
         try await assertCancelHandedFocus(to: EditorFindAccessibility.replaceAllButton, hosted)
+
+        // Superseded while the recount is held: the committed query keeps Replace All enabled.
+        hosted = try await makeHostedReplaceRow(source: source)
+        hold = try await startHeldBarReplaceAll(hosted) {
+            try await self.click(EditorFindAccessibility.replaceAllButton, in: hosted.window)
+        }
+        cancel = try await waitForBarButton(EditorFindAccessibility.replaceCancelButton, in: hosted.window)
+        XCTAssertTrue(hosted.window.makeFirstResponder(cancel))
+        let controller = hosted.appState.editorFindHost.controller
+        let recount = EditorFindMatchHold()
+        controller.testMatchHold = recount
+        defer {
+            recount.release()
+            controller.testMatchHold = nil
+        }
+        hosted.appState.handleEditorFindQueryTextChange("hi")
+        XCTAssertNil(controller.session, "precondition: the recount is held")
+        XCTAssertFalse(
+            hosted.appState.editorFindHost.ui.hasActiveQuery,
+            "precondition: the session-derived flag is false"
+        )
+        hold.release()
+        await awaitBarReplaceAll(hosted.appState)
+        try await assertCancelHandedFocus(to: EditorFindAccessibility.replaceAllButton, hosted)
+        XCTAssertNil(controller.session, "the hand-off happened while the recount was still held")
+        recount.release()
+        controller.testMatchHold = nil
 
         // Superseded with Replace All disabled (the query was cleared): the field takes focus.
         hosted = try await makeHostedReplaceRow(source: source)

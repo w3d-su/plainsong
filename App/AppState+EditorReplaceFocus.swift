@@ -40,7 +40,7 @@ extension AppState {
         var targets: [String] = []
         if ui.isReplaceExpanded, identifier == EditorFindAccessibility.replaceCancelButton {
             // Read App state, not the button: SwiftUI may disable it later in this same update.
-            if ui.hasActiveQuery, ui.replacementValidity == .valid {
+            if editorReplaceHasQuery, ui.replacementValidity == .valid {
                 targets.append(EditorFindAccessibility.replaceAllButton)
             }
             targets.append(EditorFindAccessibility.replacementField)

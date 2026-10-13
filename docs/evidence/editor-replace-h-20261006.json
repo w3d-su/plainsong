@@ -155,7 +155,7 @@
         "hardening": "a focused field or focused row button collapsing hands focus to the query field"
       },
       {
-        "test": "EditorFindHostedGateTests/testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField",
+        "test": "EditorFindHostedGateTests/testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllWhenEnabledElseTheField",
         "result": "passed",
         "hardening": "focused Cancel unmounting hands focus to Replace All, or the replacement field when Replace All is ineligible"
       },
@@ -267,7 +267,7 @@
       "stale assertion in testHostedEscapeInTheReplacementFieldClosesCancelsAndRetainsEverythingForReopen corrected"
     ],
     "flakes": [
-      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField timed out once waiting for Cancel to mount in a mixed run; recorded here as machine load, but root-caused 2026-10-09 (handoff 27b/27c): the fixture's own post.md write was observed by the workspace watcher, its debounce fired before makeHostedBatchWorkspace's stop() ran, and the handler's already-queued Task { @MainActor } hop landed behind stop() \u2014 a hop stop() cannot recall \u2014 and the resulting disk inspection refused the held Replace All with externalObservationPending before preparation began, cascading into the Cancel-mount timeout. Fixed by the App main-actor hop guard plus watcher queue confinement; see watcherStopBoundaryFix."
+      "testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllWhenEnabledElseTheField timed out once waiting for Cancel to mount in a mixed run; recorded here as machine load, but root-caused 2026-10-09 (handoff 27b/27c): the fixture's own post.md write was observed by the workspace watcher, its debounce fired before makeHostedBatchWorkspace's stop() ran, and the handler's already-queued Task { @MainActor } hop landed behind stop() \u2014 a hop stop() cannot recall \u2014 and the resulting disk inspection refused the held Replace All with externalObservationPending before preparation began, cascading into the Cancel-mount timeout. Fixed by the App main-actor hop guard plus watcher queue confinement; see watcherStopBoundaryFix."
     ],
     "evidence": "/private/tmp/plainsong-prh-hardening/focushandoff.xcresult"
   },

@@ -1509,10 +1509,11 @@ hosted spike PR #112.
     `willCommitForTesting`, then proves a selection that leaves and returns
     during that frame still fails the recheck with `.superseded` and no write.
   - Focus hand-off on unmount:
-    `testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllOrTheField` covers
-    focused Cancel leaving while the row stays — after a press, after commit,
-    and after supersession with Replace All disabled — with focus landing on
-    Replace All, or on the replacement field when Replace All is ineligible;
+    `testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllWhenEnabledElseTheField`
+    covers focused Cancel leaving while the row stays — after a press, after
+    commit, during a held recount with no Find session but an enabled Replace All,
+    and after supersession with the query cleared — with focus landing on Replace
+    All when enabled, or on the replacement field when it is ineligible;
     `testHostedCollapseWhileARowControlHasFocusHandsFocusToTheQueryField` covers
     a focused replacement field and a focused row button collapsing to the
     query field, after which every Find command stays eligible. Routing is a

@@ -17,13 +17,8 @@ struct EditorReplaceRowModel: Equatable {
         let ui = appState.editorFindHost.ui
         replacementText = ui.replacementText
         replacementValidity = ui.replacementValidity
-        // The session is nil while matches recompute — including the recount inside a
-        // committed Replace — so a session-derived flag would flap disabled and force a
-        // focused row button to resign first responder mid-action. The committed query is
-        // stable across recomputes, matching menu eligibility (`isReplaceRowActive` never
-        // consults session state either).
-        hasActiveQuery = appState.editorFindHost.controller.query.map { !$0.pattern.isEmpty }
-            ?? false
+        // Use editorReplaceHasQuery, not the session-derived ui.hasActiveQuery.
+        hasActiveQuery = appState.editorReplaceHasQuery
         isTruncated = ui.isTruncated
         activity = appState.editorReplaceActivity
         status = appState.editorFindHost.replaceStatus

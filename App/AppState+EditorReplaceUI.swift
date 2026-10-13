@@ -13,6 +13,16 @@ extension AppState {
         editorFindHost.replaceBatch.activity
     }
 
+    /// The session is nil while matches recompute — including the recount inside a
+    /// committed Replace — so a session-derived flag would flap disabled and force a
+    /// focused row button to resign first responder mid-action. The committed query is
+    /// stable across recomputes, matching menu eligibility (`isReplaceRowActive` never
+    /// consults session state either). The row's Replace / Replace All and the Cancel
+    /// focus hand-off both read this, so they cannot disagree.
+    var editorReplaceHasQuery: Bool {
+        editorFindHost.controller.query.map { !$0.pattern.isEmpty } ?? false
+    }
+
     /// Replace All progress reaches SwiftUI through `objectWillChange`, coalesced onto the next
     /// main turn: the runtime can change inside a representable update (an owner mount
     /// advances the authority generation), and publishing there is undefined.
