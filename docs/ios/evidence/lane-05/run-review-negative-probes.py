@@ -76,7 +76,7 @@ def run(label, selector=None):
     key = f"{label}-{attempt}"
     result = output / f"{key}.xcresult"
     command = ["lockf", "-k", "-t", "45", "/private/tmp/plainsong-xcodebuild-test.lock",
-               "xcodebuild", "test", "-scheme", "WorkspaceKitIOS",
+               "xcodebuild", "test", "-scheme", "WorkspaceKitIOS", "-sdk", "iphonesimulator",
                "-destination", f"platform=iOS Simulator,id={args.device}",
                "-derivedDataPath", str(output / "DerivedData"),
                "-resultBundlePath", str(result), "-parallel-testing-enabled", "NO",

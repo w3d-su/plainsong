@@ -14,7 +14,7 @@ Successful save acknowledgement still uses `rebaseSavedText(to:)` exclusively. I
 
 ## Current verification status (2026-10-13)
 
-The final 43-case source is ready for review. Both current generic build attempts received canonical-lock admission exit 75, so neither compiled nor executed tests. Native simulator discovery also failed in a separate team lane; this lane did not bypass the lock or replace native execution with a portable stub. The five failing guard probes and restored module execution remain pending. The earlier 41-case candidate passed on 2026-10-09; its retained inputs are separate from the final-source fingerprint.
+The final source passed generic iOS Simulator build-for-testing on the third attempt (`exit 0`, `TEST BUILD SUCCEEDED`). Its XCTest binary has all 43 unique declared test methods, with no missing or additional test-method symbols. All 147 fingerprinted source/test/manifest inputs match both the review checkout and the compiled snapshot. This is compilation evidence with 0 executed tests. The first two attempts received canonical-lock admission exit 75. Native simulator discovery also failed in a separate team lane; this lane did not bypass the lock or replace native execution with a portable stub. The five failing guard probes and restored module execution remain pending. The earlier 41-case candidate passed on 2026-10-09; its retained inputs are separate from the final-source fingerprint.
 
 ## Executable verification
 

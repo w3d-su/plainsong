@@ -14,7 +14,7 @@ Status: **module-ready**. Not product-integration-ready. M0 device gates are ope
 
 The additive batch on `codex/ios-storage-review-fixes` addresses the external-observation write race, suspended-close draft loss, and generation retirement. See [review-fixes.md](review-fixes.md) and the structured [review-verification.json](review-verification.json).
 
-Final source declares **43 cases**. Two current generic build attempts ended at canonical-lock admission (`exit 75`), with **0 compiled / 0 executed**; five mutation probes and the final restored simulator run remain pending. The earlier 2026-10-09 candidate actually passed **41 / 0 failed / 0 skipped**, with exact retained source inputs, but that result is version-bound and does not close final-source acceptance. All 13 frozen contract hashes match and SwiftFormat 0.62.1 reports 0/25 document files needing formatting.
+Final source declares **43 cases**. The third generic iOS Simulator build-for-testing attempt completed with **exit 0 / TEST BUILD SUCCEEDED**; the generated XCTest binary contains all **43 unique declared test methods**, with **0 executed**. The first two attempts ended at canonical-lock admission (`exit 75`). Five mutation probes and the final restored simulator run remain pending. The earlier 2026-10-09 candidate actually passed **41 / 0 failed / 0 skipped**, with exact retained source inputs, but that result is version-bound and does not close final-source acceptance. All 13 frozen contract hashes match and SwiftFormat 0.62.1 reports 0/25 document files needing formatting.
 
 ## What landed
 
