@@ -1,0 +1,17 @@
+{
+  "head": "46ef53e74cc433f328a0833ded82190f3176d1a5",
+  "run": 38359852530,
+  "conclusion": "failure",
+  "failed_case": "WorkspaceKitTests/ExportArtifactWriterTests/testHardLinkInspectionUsesCurrentKernelSpelling",
+  "assertion_line": 160,
+  "failure": "caught destinationAlias in matching-spelling branch",
+  "workspace_executed": 360,
+  "workspace_failures": 1,
+  "preview_executed": 94,
+  "preview_failures": 0,
+  "markdown_executed": 322,
+  "markdown_failures": 0,
+  "runtime_scope": "macOS hosted CI; iOS execution0",
+  "causal_boundary": "actual F_GETPATH path bytes were not captured; kernel/cache mechanism unconfirmed",
+  "next": "test seam and observation plan; no production safety relaxation"
+}

@@ -6,7 +6,7 @@
 
 - Frozen C0：`642cb212703220409874a2741c5adbfb8c80fe8a`，13 frozen files 保持原 SHA-256。
 - 原 11 個已交付 lanes 的精確 source heads 被組成審查基準 `9ddd0c3cc0b3cb3439ed296400abbb701eb48886`。
-- 獨立 worktree：`codex/ios-review-integration`；本批最後 source head `4135301`。其後的 receipts/docs 不等於重新測試產品。
+- 獨立 worktree：`codex/ios-review-integration`；本批 iOS source head `4135301`；Mac CI 觀察/測試修正後的最後 code head `0f97875`。其後的 receipts/docs 不等於重新測試產品。
 - owner checkout、原 lane branches/PR bases、`main` 未修改；沒有自行 merge。
 
 ## 本批修正
@@ -33,7 +33,7 @@ Readonly Undo 的原始反例已通過，沒有為未證實問題修改 editor h
 | 檢查 | 真正取得的結果 | 能證明的範圍 |
 |---|---|---|
 | Mac PreviewKit | 94 XCTest PASS、0 fail、0 skip；exit 0 | Mac 共用預覽回歸，包含真實 tables/code/math/Mermaid/MDX 與 deadline tests |
-| Mac architecture inventory | 5 named XCTest PASS、0 fail、0 skip；exit 0 | parser/workspace 抽取的 dependency inventory/layering |
+| Mac architecture inventory | 新code head0f97875上5 named XCTest PASS、0 fail、0 skip；exit 0 | parser/workspace 抽取的 dependency inventory/layering |
 | Mac WorkspaceCore | 整合後29 XCTest PASS、0 fail、0 skip；exit 0 | 包含原始 opaque identity 反例；lane歷史28另外保留 |
 | Tooling fixtures | 21 unittest PASS；exit 0 | receipts/ZIP/named-result/lock 的正反向工具測試；不是正式 provider |
 | Authoring/Images portable harness | 149 XCTest PASS、0 fail、0 skip；exit 0 | 89 Authoring＋60 Images 的 Mac 可攜邏輯；排除 UIKit views/native adapters，2 manifests 是測試 copy 專用 Mac metadata |
@@ -41,13 +41,19 @@ Readonly Undo 的原始反例已通過，沒有為未證實問題修改 editor h
 | Document lane | 最新 46 declared＝46 compiled；generic iOS BFT exit 0；0 executed | aggregate storage相關117/117 inputs一致；完整lane manifest138/148一致，10差異都是完整PreviewKit port/tests，不是148/148 |
 | Authoring/Images lane | 155 named App cases compiled；generic BFT exit 0；0 native executed | 149 邏輯＋6 contract cases；native Undo/IME/provider 不在此證據內 |
 | PreviewKit iOS package | generic BFT exit 0；0 executed | UIKit/真實 bundle 測試分支可編譯；不代替 iOS real WebKit runtime |
-| Aggregate iOS BFT | exit 0、source verify exit 0；原17 cases全部編入 | 6 test bundles：App192、Editor17、MarkdownCore322、Syntax8、WorkspaceCore29、WorkspaceKitIOS46個unique symbols；全為編譯／0 execution |
+| Aggregate iOS BFT | 新code head0f97875再驗 exit 0、source verify exit 0；原17 cases全部編入 | 6 test bundles：App192、Editor17、MarkdownCore322、Syntax8、WorkspaceCore29、WorkspaceKitIOS46個unique symbols；全為編譯／0 execution |
 | 2026-10-09 native歷史樣本 | storage41、authoring93 PASS | 舊候選快照；不涵蓋新 close/autosave3與async-source2，不當作最新 source 的驗收 |
-| Exact-head Mac CI | PENDING_PUBLICATION | 必須讀本批 PR 當前完整 head 的 run；歷史 CI 不代替 |
+| Exact-head Mac CI | 初次 head46ef53e / run38359852530 FAIL：WorkspaceKit360中的1個既有hard-link test；修正後待新head CI | 初次Typecheck/lint、MarkdownCore322、Preview94通過；full Test在WorkspaceKit停止，Build skipped；保留失敗，不當作iOS結果 |
 | iOS runtime / 原17反例重播 | OPEN | 保留 Oct9 的10 PASS/7 FAIL原始結果；最新 source尚未完成完整重播 |
 | 真機 / 安裝 / 效能 / 無障礙 | OPEN | iPhone/iPad 實際 IME、Files/iCloud、background、owner re-sign/install與量測均待 owner |
 
 新 source 經後續 comment/formatter-only delta 才提交的情況，lane receipts 同時保留 tested bytes、final bytes 與 token/literal 相同比對，不能說 final bytes 已再次執行。Swift Testing 另行顯示 0 cases 的 footer 未算入 XCTest PASS 數。
+
+## Mac CI hard-link 回歸修正
+
+初次 exact-head CI 在未經本批修改的 `testHardLinkInspectionUsesCurrentKernelSpelling` 出現 `destinationAlias`。舊測試假設最後一次open決定vnode pathname；當時未記錄actual bytes，具體kernel/cache原因仍未歸因。新增nil-default原始syscall observer與明確test-only spelling seam；production仍做一次真fcntl及同一byte-exact guard。Native測試依同次actual bytes、非空absolute path斷言；另兩個controlled cases要求matching成功、mismatch inspect/publish拒絕、零staging/零publish、原檔不變。
+
+Final source `f426077` 的**69 focused/362 full PASS、0 skip**；移除guard時**1 named FAIL**，恢復三個source hashes後重跑通過。這是Mac regression，不是iOS provider或IME證據。見[完整receipt](mac-ci-hardlink.md)、[proof](mac-ci-hardlink-proof.json)、[實際telemetry](mac-ci-hardlink-telemetry.json)。Local observation不解釋歷史CI kernel/cache cause。
 
 ## 模擬器與 hosted 入口
 
@@ -92,9 +98,9 @@ Lane12有已驗證的 unsigned **C0 tooling IPA**，source `3d4f671545eb41190b1b
 
 ## 直接證據索引
 
-- [完整aggregate編譯](aggregate-generic-receipt.json)、[當時source inputs](aggregate-tested-source.json)、[compiled methods](aggregate-compiled-test-symbols.json)
+- [最新aggregate編譯](aggregate-generic-receipt-2.json)、[當時source inputs](aggregate-tested-source-2.json)、[compiled methods](aggregate-compiled-test-symbols-2.json)
 - [跨快照source核對](proof-scope-verification.json)、[frozen合約](frozen-contracts-verification.json)
-- [MacPreview94](preview-mac-receipt.json)、[MacWorkspace29](workspace-core-receipt.json)、[lint](lint-receipt.json)、[原lane PR當前heads](original-lane-pr-heads.json)
+- [MacPreview94](preview-mac-receipt.json)、[MacWorkspace29](workspace-core-receipt.json)、[最新architecture](mac-architecture-receipt-2.json)、[最新lint](lint-receipt-2.json)、[原lane PR當前heads](original-lane-pr-heads.json)
 - [05 latest](../lane-05/autosave-review-receipt.json)、[08 latest](../lane-08/exact-source-delivery-review.md)、[09 latest](../lane-09/acceptance-review-fixes.md)、[03/10/12](../lane-12/review-fixes-20261013/README.md)
 
 Raw Xcode logs以可逆gzip保留，`gzip -dc <file.log.gz>`取得原始bytes；log-packaging.json列未壓縮/壓縮雜湊。沒有修改raw內容來通過diff check。
