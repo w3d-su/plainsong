@@ -1,0 +1,123 @@
+{
+  "source_sha": "3d4f671545eb41190b1b8e7262bcd27349aad36e",
+  "source_dirty": false,
+  "scope_commits": {
+    "03": "a718fc4",
+    "10": "5f2da57",
+    "12": "e97e0a3",
+    "12_additive": [
+      "3b1841c",
+      "3d4f671"
+    ]
+  },
+  "static_checks": {
+    "swiftformat_0_62_1": {
+      "files": 7,
+      "status": "PASS"
+    },
+    "bash_syntax": {
+      "files": 8,
+      "status": "PASS"
+    },
+    "python_ast": {
+      "files": 4,
+      "status": "PASS"
+    },
+    "diff_check": "PASS"
+  },
+  "tooling_attempts": [
+    {
+      "log": "/private/tmp/plainsong-ios-review-runner-fixtures-finish.log",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "before AppIOSTests drift test added; real nested lock admitted"
+    },
+    {
+      "log": "/private/tmp/plainsong-ios-review-runner-fixtures-final.log",
+      "passed": 19,
+      "infrastructure_pending": 1,
+      "cause": "positive canonical-lock admission exit 75; other authoring run held lock"
+    },
+    {
+      "log": "/private/tmp/plainsong-ios-review-runner-21-final.log",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "source_sha": "3b1841caeb0bb26cc7f64f2c7e9ff11dc5699bbb",
+      "scope": "full final tooling suite with real positive canonical-lock admission"
+    }
+  ],
+  "workspace_attempts": [
+    {
+      "log": "/private/tmp/plainsong-ios-review-workspacecore-finish.log",
+      "exit_code": 75,
+      "executed": 0
+    },
+    {
+      "log": "/private/tmp/plainsong-ios-review-workspacecore-finish-2.log",
+      "exit_code": 75,
+      "executed": 0
+    },
+    {
+      "log": "/private/tmp/plainsong-ios-review-workspacecore-finish-3.log",
+      "exit_code": 75,
+      "executed": 0
+    }
+  ],
+  "actual_core_tests": {
+    "status": "PASS",
+    "source_sha": "3b1841caeb0bb26cc7f64f2c7e9ff11dc5699bbb",
+    "executed": 28,
+    "failed": 0,
+    "skipped": 0,
+    "new_regressions_executed": 3,
+    "exit_code": 0,
+    "log": "/private/tmp/plainsong-ios-review-workspacecore-finish-4.log",
+    "framework": "XCTest; separate 0-case Swift Testing invocation excluded"
+  },
+  "shell_simulator": "PENDING",
+  "c0_build_test_archive_ipa": {
+    "build": "PASS",
+    "build_exit": 0,
+    "archive": "PASS",
+    "archive_exit": 0,
+    "archive_invocation": "real nested ios-archive from ios-ipa",
+    "ipa": "PASS",
+    "ipa_exit": 0,
+    "simulator_case_execution": "PENDING_ROOT_AGGREGATE",
+    "source_sha": "3d4f671545eb41190b1b8e7262bcd27349aad36e",
+    "source_dirty_at_build": false,
+    "source_fingerprint": "b0a6a7273be3da51500e210796e89fe7dee08a3abe6471e0bb5455e81fdc5343",
+    "archive_sha256": "73c6d00f2280569edaed781d843a195c7ce940d4edd0a78822cd61b7f4c84d10",
+    "ipa_sha256": "138096c65c31faa674864cf6f093119d3dbc055cb26df0e86797730c238becdd",
+    "ipa_bytes": 2516957,
+    "installation": "OPEN"
+  },
+  "physical_ime_files_icloud_background_installation": "OPEN",
+  "exact_head_hosted_ci": "NOT_RUN",
+  "source_hashes": {
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceSnapshotReconcile.swift": "74824a4d8ac23209704b79e61bdecc93e93100854f81d1c0d9d1bb57e0056110",
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotOpaqueIdentityTests.swift": "c7a1bd4bf84410bd6e92e8a81c90eeaf3015b803f82e80e5596549c06fdca915",
+    "AppIOS/UI/IOSShellSceneState.swift": "6de1093b80cc9f9f4e1837e21f045b378c6427c76fc24efd5010c05d24406160",
+    "AppIOS/UI/IOSShellWorkspaceProjection.swift": "c9f0f2fe0ee31ec2f0659f11c0047e00345773b8f2bca6f781b4e30d7a25bc03",
+    "AppIOSTests/Shell/IOSShellWorkspacePublicationTests.swift": "e9f9abac12fabd1106017b4816364c9948bd70964e5389585e9bdebceec00c41",
+    "Scripts/ios/ios-common.sh": "c4cb10e0057a224cafda4cb70c028cda3199437f19049efde2dfe3e87ae4dd26",
+    "Scripts/ios/ios-provenance.py": "a29377dbf4f70691d3c88258abe4ecccfce384dd3aafbe3e3cfcc7f29b637752",
+    "Scripts/ios/ios-packaging.py": "6e84f3e9344562301aaed8aabe7738800526a8c85db912a9daf37fe986a7fd5e",
+    "Scripts/ios/ios-test-results.py": "ca77503ebf6e3845d68b3ad12df76c0b594d1dbe9aae2a11a8f26faacb18f54a",
+    "Scripts/ios/tests/test_runner_evidence.py": "fc957aff20d49411e1e26c51ec994b3c452e3c8302cd6b0ddc1bd531842268dd"
+  },
+  "xcodebuild_cli_evidence": {
+    "path": "/private/tmp/plainsong-shell-build-review-20261013/xcodebuild-help.txt",
+    "sha256": "d51fc6ae6788ed6953ff3dfd55373b2389a65313993649c132c222d8adcff627",
+    "timeout_policy": {
+      "collect_test_diagnostics": "on-failure",
+      "enabled": true,
+      "default_allowance_seconds": 120,
+      "maximum_allowance_seconds": 180
+    },
+    "limitations": "Per-test timeout does not bound simulator install; Context7 official Xcode resolved, detailed CLI query found no matching page. Installed help is the primary evidence."
+  }
+}
