@@ -447,3 +447,55 @@ acceptance is inferred from a loaded run. R22’s SwiftUI scheduling root cause 
 
 `docs/native-macos-ui-pr-body.md` was removed. Remote #152 metadata was not changed.
 The orchestrator can take the PR body from this evidence after review.
+
+## PR #152 review fixes (2026-10-13)
+
+Two review findings on top of `5ab1c96`, each confirmed with a failing test before the
+fix. Runs were on a Devin VM (macOS 26.6.2 25G83, Xcode 26.6 17F113), not the owner's Mac,
+so the split-shell (macOS 27) cases skip. Load averages are 1/5/15 minutes.
+
+**Symlinked workspace root.** `JumpBarMenus.relativePath(of:under:)` and the inspector's
+location compared standardized path components, but `openWorkspace` keeps the root's
+literal spelling while `canonicalSessionURL` resolves symlinks. With a workspace opened at
+`link -> real`, `currentDocument.fileURL` was `…/real/sub/a.md` and `workspaceRootURL`
+was `…/link`; `relativePath` returned nil, so the jump bar lost its folder menus and
+checkmark, and the inspector showed an absolute path (6 assertion failures before the fix).
+Both now go through `WorkspaceRootContainment`, which resolves both sides. The root itself
+maps to `""`. The inspector uses a static `WorkspaceInspector.location(of:rootURL:)`.
+Tests: `testSymlinkedWorkspaceRootKeepsJumpBarAndInspectorRelativePaths` (hosted; covers
+the menu checkmark for `sub/a.md` and a precomposed `Café/b.md`) and
+`WorkspaceRelativeLocationTests` (7 cases: symlinked root, folder equal to the root,
+outside or nil root, NFC folder, non-symlinked root, inspector location). The hosted test
+opens through `openWorkspace`, because `openExternalFile(link)` rejects the symlink as
+"not a supported Markdown file". That rejection was not changed here.
+
+**Delayed Files pick focus.** A mouse pick retries for up to ~5 s while the capture lags,
+and its landing always requested editor focus. In
+`testNativeFilesDelayedMousePickKeepsFocusTheUserMovedElsewhere`, first responder moves to
+the find field before a held reload is released. Before the fix, `editorFocusRequestID`
+went 1→2 and `MarkdownSTTextView` took first responder. `FilesSelectionDeferral.open` now
+takes a `pickWindow` (the event's window), weakly remembers its first responder at pick
+time, and requests focus only if it is unchanged. The positive control
+`testNativeFilesDelayedMousePickFocusesEditorWhenFocusStayed` still sees a focus request.
+
+Evidence:
+
+- Negative controls (not committed): with only the containment change reverted, the
+  hosted test failed (6 assertions), and 5 of 7 pure tests failed. The outside/nil and
+  non-symlinked cases passed, as expected under the old comparison. With only the
+  `responderUnchanged` gate reverted, the keep-focus test failed (2 assertions) and the
+  positive control passed.
+- New tests ×10 (10 tests per run): **10/10 runs passed, 0 failures**. 1-minute load per
+  run: 2.26, 3.54, 3.34, 3.28, 3.72, 3.53, 5.28, 4.94, 5.47, 5.60.
+- Related hosted tests ran once at load 4.97: all `testNativeFiles*`,
+  `NativeSidebarDragTests`, `InspectorVisibilityTests`, `testHostedSearchFocus*`,
+  `EditorFindHostedFocusGateTests`, and the F6/F7 sections of `EditorFindUITests`. Result:
+  **29 tests, 1 skipped, 0 failures**. The skip was
+  `testNativeFilesSingleMouseClickStillSelectsDraggableRow`, which needs a key window. No
+  dedicated jump bar tests existed before this change.
+- Full gate (`-skip-testing:PlainsongUITests test`) ran at load 4.65. PlainsongTests:
+  **834 tests, 10 skipped, 0 failures**. PerformanceTests: **30 tests, 4 skipped,
+  0 failures**.
+- No focused-run log had a "Publishing changes from within view updates" warning. Pinned
+  SwiftFormat 0.62.1 formatted no files. SwiftLint reported 330 violations, 0 serious,
+  which matches the baseline. `git diff --check` was clean.
