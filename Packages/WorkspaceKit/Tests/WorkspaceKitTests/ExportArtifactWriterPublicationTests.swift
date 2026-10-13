@@ -162,6 +162,8 @@ extension ExportArtifactWriterTests {
             let inspection = ExportArtifactWriter.inspect(selection, hooks: hooks).map(\.inspection)
             XCTAssertEqual(paths.values.count, 1)
             let observed = try XCTUnwrap(paths.values.first)
+            XCTAssertFalse(observed.kernelPath.isEmpty)
+            XCTAssertEqual(observed.kernelPath.first, UInt8(ascii: "/"))
             XCTAssertEqual(observed.selectedPath, selection.leafPath)
             print("F_GETPATH identity device=\(linkedIdentity.device) inode=\(linkedIdentity.inode)")
             if observed.kernelPath.elementsEqual(selection.leafPath.utf8) {
