@@ -87,6 +87,7 @@ def run(label, selector=None):
     if selector:
         command.append(f"-only-testing:WorkspaceKitIOSTests/{selector}")
     record = {"label": label, "attempt": attempt, "command": command,
+              "xcresult_path": str(result),
               "cwd": str(snapshot / "Packages/WorkspaceKitIOS"),
               "started_epoch": time.time()}
     record["operation_timeout_seconds"] = args.operation_timeout
@@ -96,6 +97,9 @@ def run(label, selector=None):
         # Deadline cleanup never targets other tasks or the simulator daemon.
         process = subprocess.Popen(command, cwd=record["cwd"], stdout=log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
+        record["launcher_pid"] = process.pid
+        record["process_group_id"] = process.pid
+        record["pid_role"] = "runner-owned lockf launch process and child process group"
         try:
             process.wait(timeout=args.operation_timeout)
         except subprocess.TimeoutExpired:

@@ -10,6 +10,10 @@ Status: **module-ready**. Not product-integration-ready. M0 device gates are ope
 | Head | The commit that adds this file on `phase3-ios-document-io` |
 | PR base | `phase3-ios-integration` |
 
+## Native review acceptance (2026-10-13)
+
+The final reviewed 46-case source now has **six actual named negative failures with full 148-input restoration**, followed by **46 / 0 failed / 0 skipped** in the restored simulator module. Root runtime dependencies are **117/117 byte equal**; full aggregate comparison remains 138/148. See [native-guard-receipt.md](native-guard-receipt.md) and [native-guard-proof.json](native-guard-proof.json). Earlier compile-only/pending and 31/41-case sections below are retained as historical evidence; this native receipt supersedes their final46 runtime-pending status. Production/device/M0 gates remain open.
+
 ## Review repairs (2026-10-13)
 
 The additive batch on `codex/ios-storage-review-fixes` addresses the external-observation write race, suspended-close draft loss, and generation retirement. See [review-fixes.md](review-fixes.md) and the structured [review-verification.json](review-verification.json).
