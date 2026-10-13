@@ -277,6 +277,166 @@ extension EditorFindHostedGateTests {
                        "arrow selection must not request editor focus")
         XCTAssertTrue(host.window.firstResponder === list)
     }
+
+    /// A mouse pick retries for up to ~5 s while a reload's capture lags. If the user
+    /// moved first responder elsewhere (here, the find field) before the pick lands,
+    /// the landing must not yank focus back into the editor.
+    func testNativeFilesDelayedMousePickKeepsFocusTheUserMovedElsewhere() async throws {
+        let scanner = HeldWorkspaceDirectoryScanner()
+        let fixture = try makeWorkspaceFixture(
+            files: ["a.md": "alpha", "b.md": "beta"],
+            directoryScanner: scanner
+        )
+        let state = fixture.appState
+        state.setLayoutMode(.sourceOnly)
+        state.openExternalFile(fixture.root)
+        try await waitUntil("sidebar fixture opens") {
+            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+        }
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        let host = makeWorkspaceHost(appState: state)
+        registerTeardown(host: host, fixture: fixture)
+        var table: NSTableView?
+        try await waitUntil("native Files list mounts") {
+            table = self.firstDescendant(of: NSTableView.self, in: host.window.contentView)
+            return (table?.numberOfRows ?? 0) >= 3
+        }
+        let list = try XCTUnwrap(table)
+        host.window.makeKeyAndOrderFront(nil)
+
+        openFindBar(state, query: "zz")
+        let field = try await waitForFindQueryField(in: host.window)
+        // The hosted window never becomes key, so the find request can never apply;
+        // supersede it so its retry loop cannot re-arm and re-steal focus later.
+        var findUI = state.editorFindHost.ui
+        findUI.supersedePendingFocus()
+        state.setEditorFindUI(findUI)
+        XCTAssertTrue(host.window.makeFirstResponder(list))
+
+        let bID = try XCTUnwrap(
+            state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id
+        )
+        addTeardownBlock { @MainActor in
+            await scanner.release()
+        }
+
+        await scanner.hold()
+        state.scheduleWorkspaceReload(
+            root: fixture.root, selectFirstIfNeeded: false, errorTitle: "Reload"
+        )
+        try await waitUntil("the reload is parked in the scanner") { await scanner.isHeld }
+        XCTAssertNotEqual(
+            state.workspaceInstalledCaptureGeneration, state.workspaceGeneration,
+            "the held reload must leave the installed capture lagging"
+        )
+
+        let deferral = FilesSelectionDeferral()
+        deferral.open(
+            id: bID, requestingEditorFocus: true, pickWindow: host.window, appState: state
+        ) {}
+        try await waitUntil("the pick was refused under the lag") {
+            deferral.openAttempts.contains { $0.id == bID && !$0.landed }
+        }
+
+        // The user moves on to the find field while the pick is still retrying.
+        XCTAssertTrue(host.window.makeFirstResponder(field))
+        let fieldEditor = try XCTUnwrap(field.currentEditor())
+        XCTAssertTrue(host.window.firstResponder === fieldEditor)
+        let focusBefore = state.editorFocusRequestID
+
+        await scanner.release()
+        try await waitUntil("b.md opens after the capture installs") {
+            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+        }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        await Task.yield()
+
+        XCTAssertEqual(
+            deferral.openAttempts.filter { $0.id == bID && $0.landed }.count, 1,
+            "the pick must land exactly once: \(deferral.openAttempts)"
+        )
+        XCTAssertEqual(
+            state.editorFocusRequestID, focusBefore,
+            "a delayed pick must not steal focus the user already moved elsewhere"
+        )
+        XCTAssertTrue(
+            host.window.firstResponder === fieldEditor,
+            "first responder must stay on the find field, got \(String(describing: host.window.firstResponder))"
+        )
+    }
+
+    /// Positive control: the same delayed pick still focuses the editor when first
+    /// responder is unchanged since the pick — the user's focus never moved.
+    func testNativeFilesDelayedMousePickFocusesEditorWhenFocusStayed() async throws {
+        let scanner = HeldWorkspaceDirectoryScanner()
+        let fixture = try makeWorkspaceFixture(
+            files: ["a.md": "alpha", "b.md": "beta"],
+            directoryScanner: scanner
+        )
+        let state = fixture.appState
+        state.setLayoutMode(.sourceOnly)
+        state.openExternalFile(fixture.root)
+        try await waitUntil("sidebar fixture opens") {
+            state.currentDocument.fileURL?.lastPathComponent == "a.md"
+        }
+        try await waitUntil("the open reload installed its capture") {
+            state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
+        }
+        let host = makeWorkspaceHost(appState: state)
+        registerTeardown(host: host, fixture: fixture)
+        var table: NSTableView?
+        try await waitUntil("native Files list mounts") {
+            table = self.firstDescendant(of: NSTableView.self, in: host.window.contentView)
+            return (table?.numberOfRows ?? 0) >= 3
+        }
+        let list = try XCTUnwrap(table)
+        host.window.makeKeyAndOrderFront(nil)
+        XCTAssertTrue(host.window.makeFirstResponder(list))
+
+        let bID = try XCTUnwrap(
+            state.workspaceTree?.root.children.first { $0.name == "b.md" }?.id
+        )
+        addTeardownBlock { @MainActor in
+            await scanner.release()
+        }
+
+        await scanner.hold()
+        state.scheduleWorkspaceReload(
+            root: fixture.root, selectFirstIfNeeded: false, errorTitle: "Reload"
+        )
+        try await waitUntil("the reload is parked in the scanner") { await scanner.isHeld }
+        XCTAssertNotEqual(
+            state.workspaceInstalledCaptureGeneration, state.workspaceGeneration,
+            "the held reload must leave the installed capture lagging"
+        )
+
+        let focusBefore = state.editorFocusRequestID
+        let deferral = FilesSelectionDeferral()
+        deferral.open(
+            id: bID, requestingEditorFocus: true, pickWindow: host.window, appState: state
+        ) {}
+        try await waitUntil("the pick was refused under the lag") {
+            deferral.openAttempts.contains { $0.id == bID && !$0.landed }
+        }
+
+        await scanner.release()
+        try await waitUntil("b.md opens after the capture installs") {
+            state.currentDocument.fileURL?.lastPathComponent == "b.md"
+        }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        await Task.yield()
+
+        XCTAssertEqual(
+            deferral.openAttempts.filter { $0.id == bID && $0.landed }.count, 1,
+            "the pick must land exactly once: \(deferral.openAttempts)"
+        )
+        XCTAssertGreaterThan(
+            state.editorFocusRequestID, focusBefore,
+            "a mouse pick whose responder never moved still requests editor focus"
+        )
+    }
 }
 
 /// Sends one real down-arrow key event to `window`, the same path the arrow tests use.

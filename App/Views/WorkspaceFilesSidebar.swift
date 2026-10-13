@@ -185,12 +185,14 @@ struct WorkspaceFilesSidebar: View {
                 // the navigator focused. `FilesSelectionDeferral.open` retries a pick
                 // refused while a workspace reload's capture lags, drops an older pick
                 // that would land after a newer one, and reverts the row highlight when
-                // the pick is dropped.
+                // the pick is dropped. Editor focus is requested only if the window's
+                // first responder is still what it was at pick time.
                 let mouseSelection = NSApp.currentEvent
                     .map { [.leftMouseDown, .leftMouseUp].contains($0.type) } ?? false
                 selectionDeferral.open(
                     id: newValue,
                     requestingEditorFocus: mouseSelection,
+                    pickWindow: NSApp.currentEvent?.window,
                     appState: appState
                 ) {
                     selectionRevertTick += 1

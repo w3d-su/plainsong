@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import WorkspaceKit
 
@@ -43,12 +44,18 @@ final class FilesSelectionDeferral {
     /// outside the lag, ends the loop immediately, as does a newer applied pick, the
     /// picked document or workspace root changing under the pick, or cancellation.
     ///
+    /// `pickWindow` is the window the pick was made in; its first responder is remembered
+    /// at pick time and editor focus is requested only if it is still the same when an
+    /// attempt lands — a user who moved on while the pick retried keeps their focus.
+    /// A nil window keeps the previous always-request behaviour.
+    ///
     /// `onDroppedPick` runs only when this pick is still the newest and never landed: the
     /// view forces the List's selection back to the tree's selection so the dropped row is
     /// not left highlighted.
     func open(
         id nodeID: WorkspaceFileNode.ID,
         requestingEditorFocus: Bool,
+        pickWindow: NSWindow?,
         appState: AppState,
         onDroppedPick: @escaping @MainActor () -> Void
     ) {
@@ -60,7 +67,7 @@ final class FilesSelectionDeferral {
         pendingID = nodeID
         let pickedDocument = appState.currentDocument
         let pickedRoot = appState.workspaceRootURL
-        openTask = Task { @MainActor [weak self] in
+        openTask = Task { @MainActor [weak self, weak pickWindow, weak pickResponder = pickWindow?.firstResponder] in
             guard let self, sequence > applied else { return }
             applied = sequence
             var landed = false
@@ -70,7 +77,12 @@ final class FilesSelectionDeferral {
                 let attemptLimit = Self.retryAttemptLimit
             #endif
             for _ in 0 ..< attemptLimit {
-                appState.selectWorkspaceNode(id: nodeID, requestingEditorFocus: requestingEditorFocus)
+                let responderUnchanged = pickWindow
+                    .map { $0.firstResponder === pickResponder } ?? true
+                appState.selectWorkspaceNode(
+                    id: nodeID,
+                    requestingEditorFocus: requestingEditorFocus && responderUnchanged
+                )
                 landed = appState.workspaceTree?.selectedNodeID == nodeID
                 #if DEBUG
                     openAttempts.append((id: nodeID, landed: landed))
