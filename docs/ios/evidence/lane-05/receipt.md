@@ -16,6 +16,12 @@ The additive batch on `codex/ios-storage-review-fixes` addresses the external-ob
 
 Final source declares **43 cases**. The third generic iOS Simulator build-for-testing attempt completed with **exit 0 / TEST BUILD SUCCEEDED**; the generated XCTest binary contains all **43 unique declared test methods**, with **0 executed**. The first two attempts ended at canonical-lock admission (`exit 75`). Five mutation probes and the final restored simulator run remain pending. The earlier 2026-10-09 candidate actually passed **41 / 0 failed / 0 skipped**, with exact retained source inputs, but that result is version-bound and does not close final-source acceptance. All 13 frozen contract hashes match and SwiftFormat 0.62.1 reports 0/25 document files needing formatting.
 
+## Retained-close autosave follow-up (2026-10-13)
+
+Peer review found that a late-edit autosave could finish while `isClosing` fenced writes, leaving a retained, reopened dirty document without another autosave. Close now rechecks current authority, open/unfenced/writable status, and dirtiness after clearing that transient barrier; eligible drafts schedule a fresh autosave. Read-only, conflicted, retired, or closed entries cannot regain write admission from this follow-up.
+
+The controlled regression waits for the exact old autosave task to finish before releasing the provider close. It then expects a new task to save N+1 while preserving source/version and recovery. Two additional controls verify read-only and conflicting reopen paths do not write. Latest source passed generic build-for-testing (`exit 0`), and all **46 declared test methods appear in the XCTest binary; 0 executed**. The earlier 43-case compilation above is version-bound. The new single-guard failing probe and native regression are pending. See [autosave-review-receipt.json](autosave-review-receipt.json).
+
 ## What landed
 
 `IOSUIDocumentStore` is the UIDocument-backed `IOSDocumentStore`. One open instance owns one `DocumentSession`. Save completions call `rebaseSavedText(to:)` after identity, generation, and operation-order checks. They do not call `markSaved(text:url:)`.

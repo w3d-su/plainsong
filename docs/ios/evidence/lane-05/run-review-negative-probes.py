@@ -18,9 +18,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--source", required=True, type=Path)
 parser.add_argument("--output", required=True, type=Path)
 parser.add_argument("--device", required=True)
-parser.add_argument("--expected-count", type=int, default=43)
+parser.add_argument("--expected-count", type=int, default=46)
 parser.add_argument("--operation-timeout", type=int, default=600)
 parser.add_argument("--prepare-only", action="store_true")
+parser.add_argument("--only-probe", choices=["all", "close-autosave-resumption"], default="all")
 args = parser.parse_args()
 source = args.source.resolve()
 output = args.output.resolve()
@@ -126,6 +127,9 @@ def run(label, selector=None):
 prefix = "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/"
 lifecycle = prefix + "IOSDocumentLifecycle.swift"
 probes = [
+    ("close-autosave-resumption", lifecycle,
+     "            resumeAutosaveAfterClose(entry)\n", "",
+     "IOSDocumentAutosaveRecoveryTests/testRetainedCloseReschedulesAnAutosaveThatExitedDuringTheCloseBarrier"),
     ("external-barrier", prefix + "IOSDocumentWriteBarrier.swift",
      "entry.fenced || entry.externalToken != nil || entry.pendingProposal != nil",
      "entry.fenced || entry.pendingProposal != nil",
@@ -150,6 +154,8 @@ probes = [
      "            publishClosed(entry, superseded: true)",
      "IOSDocumentRetirementTests/testGenerationReplacementDrainsWriterAndRecoversEditsDuringPortClose"),
 ]
+if args.only_probe != "all":
+    probes = [probe for probe in probes if probe[0] == args.only_probe]
 for label, relative, before, after, selector in probes:
     previous = [r for r in records if r["label"] == label]
     if previous and previous[-1].get("accepted"):

@@ -4,14 +4,14 @@
   "implementation_base": "b82d0c27e69ebe9260a1c71a0a4deb8a2cceec6b",
   "status": "review-source and generic iOS Simulator compile ready; native execution pending",
   "current_source": {
-    "fingerprint_file": "review-source-inputs.json",
-    "fingerprinted_inputs": 147,
+    "fingerprint_file": "autosave-review-source-inputs.json",
+    "fingerprinted_inputs": 148,
     "current_source_matches_fingerprint": true,
-    "declared_test_count": 43,
-    "declarations_file": "review-declared-tests.json",
-    "compiled_test_count": 43,
-    "executed_test_count": 0,
-    "compiled_binary_file": "review-compiled-tests.json"
+    "declared_test_count": 46,
+    "declarations_file": "autosave-review-declared-tests.json",
+    "compiled_test_count": 46,
+    "compiled_binary_file": "autosave-review-compiled-tests.json",
+    "executed_test_count": 0
   },
   "generic_build_attempts": [
     {
@@ -180,6 +180,10 @@
     {
       "guard": "late-retirement-recovery",
       "selector": "IOSDocumentRetirementTests/testGenerationReplacementDrainsWriterAndRecoversEditsDuringPortClose"
+    },
+    {
+      "guard": "close-autosave-resumption",
+      "selector": "IOSDocumentAutosaveRecoveryTests/testRetainedCloseReschedulesAnAutosaveThatExitedDuringTheCloseBarrier"
     }
   ],
   "probe_restore_verification": {
@@ -216,15 +220,14 @@
   },
   "swiftlint": "not accepted: initial invocation linted repository plus cache permission error; script-input file-list invocation found no lintable files; logs retained in October13-r2 output",
   "pending": [
-    "final 43-case iOS simulator execution",
-    "five actual guard mutation failure probes and restored full run",
+    "final 46-case iOS simulator execution",
+    "six actual guard mutation failure probes and restored full run",
     "Mac regression / exact-head CI (root-owned)",
     "lane06 real access providers",
     "M0 physical IME/Undo / Files/iCloud / background persistence / re-signed IPA install",
     "lane13 production composition",
     "physical input latency measurement"
   ],
-  "source_commit": "a497a34af66a6ce1e48fff6d0f5999eca7f9c39e",
   "generic_build_result": {
     "exit_code": 0,
     "result": "TEST BUILD SUCCEEDED",
@@ -232,5 +235,30 @@
     "source_matches_fingerprint": true,
     "compiled_unique_methods": 43,
     "executed_tests": 0
-  }
+  },
+  "earlier_43_case_compile": {
+    "source_commit": "a497a34af66a6ce1e48fff6d0f5999eca7f9c39e",
+    "current_source": {
+      "fingerprint_file": "review-source-inputs.json",
+      "fingerprinted_inputs": 147,
+      "current_source_matches_fingerprint": true,
+      "declared_test_count": 43,
+      "declarations_file": "review-declared-tests.json",
+      "compiled_test_count": 43,
+      "executed_test_count": 0,
+      "compiled_binary_file": "review-compiled-tests.json"
+    },
+    "generic_build_result": {
+      "exit_code": 0,
+      "result": "TEST BUILD SUCCEEDED",
+      "xcresult": "/private/tmp/plainsong-storage-review-20261013-final/generic-build-3.xcresult",
+      "source_matches_fingerprint": true,
+      "compiled_unique_methods": 43,
+      "executed_tests": 0
+    },
+    "note": "version-bound evidence; superseded by autosave review source"
+  },
+  "latest_peer_review": "autosave-review-receipt.json",
+  "initial_review_source_commit": "a497a34af66a6ce1e48fff6d0f5999eca7f9c39e",
+  "latest_source_binding": "the additive autosave review commit is bound by the 148-source fingerprint; no self-referential commit hash"
 }

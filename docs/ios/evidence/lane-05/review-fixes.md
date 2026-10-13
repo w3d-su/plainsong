@@ -12,7 +12,16 @@ Replacing a resource with a newer access generation retains its registry slot wh
 
 Successful save acknowledgement still uses `rebaseSavedText(to:)` exclusively. It updates the saved baseline for that immutable operation, never live source or the newer source's revision. In-flight completion can acknowledge its old entry until retirement finishes; replay after replacement cannot revise the new entry.
 
+## Retained-close autosave follow-up
+
+A late edit can schedule an autosave while provider close is parked. That task may wake, see the close barrier, and exit. Recovery plus reopening previously restored writable state without scheduling another save. The close defer now refreshes state and reschedules only when authority is still current, the entry is open with no observation/lifecycle/conflict barrier, the provider allows writing, and the live source remains dirty.
+
+`testRetainedCloseReschedulesAnAutosaveThatExitedDuringTheCloseBarrier` captures that old task and awaits its completion before releasing close, then checks a fresh autosave generation and N+1 provider bytes, unchanged source/version, and durable recovery. Read-only and conflicting reopen controls verify no original-file write. Removing the resumption call is the additional single-guard probe; its native execution is still pending.
+
 ## Current verification status (2026-10-13)
+
+The autosave follow-up passed generic iOS Simulator build-for-testing with exit 0. All 46 declared test methods appear in its XCTest binary, and all 148 source/test/manifest inputs match the review source and compiled snapshot. Runtime execution remains 0. The earlier compilation below covers the preceding 43-case source version.
+
 
 The final source passed generic iOS Simulator build-for-testing on the third attempt (`exit 0`, `TEST BUILD SUCCEEDED`). Its XCTest binary has all 43 unique declared test methods, with no missing or additional test-method symbols. All 147 fingerprinted source/test/manifest inputs match both the review checkout and the compiled snapshot. This is compilation evidence with 0 executed tests. The first two attempts received canonical-lock admission exit 75. Native simulator discovery also failed in a separate team lane; this lane did not bypass the lock or replace native execution with a portable stub. The five failing guard probes and restored module execution remain pending. The earlier 41-case candidate passed on 2026-10-09; its retained inputs are separate from the final-source fingerprint.
 
@@ -27,10 +36,10 @@ python3 docs/ios/evidence/lane-05/run-review-negative-probes.py \
   --source "$PWD" \
   --output /private/tmp/plainsong-storage-review-reproduce \
   --device A24A1CB9-2861-4AA4-A79F-E53F768950D8 \
-  --expected-count 43
+  --expected-count 46
 ```
 
-The runner copies `MarkdownCore`, `WorkspaceCore`, `PreviewKit`, and `WorkspaceKitIOS`, excluding generated build folders, and never mutates the source checkout. Every Xcode execution uses the canonical lock with 45-second admission. Five guard probes cover pending external observation, post-close revision reconciliation, writer drain before retirement, read admission during retirement, and recovery after retirement close. The final restored run executes the complete 43-case WorkspaceKitIOS module. Xcode's verbose failure diagnostics are disabled for deliberate assertion failures; test failures and xcresults remain retained, with a 60-second per-test deadline and a 600-second operation deadline. A stalled operation is infrastructure failure, never a killed guard probe; cleanup signals only the private process group spawned for that operation.
+The runner copies `MarkdownCore`, `WorkspaceCore`, `PreviewKit`, and `WorkspaceKitIOS`, excluding generated build folders, and never mutates the source checkout. Every Xcode execution uses the canonical lock with 45-second admission. Six guard probes cover pending external observation, post-close revision reconciliation, writer drain before retirement, read admission during retirement, and recovery after retirement close, and retained-close autosave resumption. The final restored run executes the complete 46-case WorkspaceKitIOS module. Xcode's verbose failure diagnostics are disabled for deliberate assertion failures; test failures and xcresults remain retained, with a 60-second per-test deadline and a 600-second operation deadline. A stalled operation is infrastructure failure, never a killed guard probe; cleanup signals only the private process group spawned for that operation.
 
 ## Evidence boundaries
 
@@ -40,3 +49,13 @@ The runner copies `MarkdownCore`, `WorkspaceCore`, `PreviewKit`, and `WorkspaceK
 - The existing owner-only gates in `device-acceptance.md` remain open. No IPA or working production composition is produced here.
 
 Suggested central Decision Log addition: external observations and lifecycle transitions temporarily fence writes; replacement admission waits for writer/read drain, durable recovery, and lease-safe provider retirement. Publishing a new entry immediately or trusting the result of an earlier close was rejected because either can release a newer draft or overlap provider ownership. Root owns the architecture/Decision Log update.
+
+Run only the additional autosave guard probe, followed by the restored full module, when native simulator discovery is working:
+
+```sh
+python3 docs/ios/evidence/lane-05/run-review-negative-probes.py \
+  --source "$PWD" \
+  --output /private/tmp/plainsong-storage-autosave-probe \
+  --device A24A1CB9-2861-4AA4-A79F-E53F768950D8 \
+  --expected-count 46 --only-probe close-autosave-resumption
+```

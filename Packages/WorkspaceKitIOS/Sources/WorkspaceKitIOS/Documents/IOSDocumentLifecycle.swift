@@ -6,6 +6,7 @@ extension IOSUIDocumentStore {
         defer {
             entry.isClosing = false
             refreshWritableState(entry)
+            resumeAutosaveAfterClose(entry)
         }
         if entry.session?.isDirty == true, !writeBarrier(entry, allowsClosing: true), entry.allowsProviderWrite {
             _ = try? await saveSnapshot(entry, allowsClosing: true)

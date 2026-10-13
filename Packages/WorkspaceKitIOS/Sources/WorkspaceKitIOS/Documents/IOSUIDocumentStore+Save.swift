@@ -35,6 +35,13 @@ extension IOSUIDocumentStore {
         }
     }
 
+    func resumeAutosaveAfterClose(_ entry: IOSDocumentEntry) {
+        guard guardCurrentAuthority(entry, generation: entry.accessGeneration),
+              !writeBarrier(entry), entry.allowsProviderWrite, entry.session?.isDirty == true
+        else { return }
+        scheduleAutosave(entry)
+    }
+
     func scheduleAutosave(_ entry: IOSDocumentEntry) {
         entry.autosaveGeneration += 1
         let generation = entry.autosaveGeneration
