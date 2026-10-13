@@ -603,6 +603,16 @@ persistence. The first C0 PR owns declarations/scaffolds only; 02/03 perform sha
 core extraction, 13 retains contracts/composition, and 12 receives global build
 manifests after the recorded C0 transfer. iOS-only packages stay out of Mac `make test`.
 
+The iOS acceptance review uses a separate aggregate of the published lane heads;
+fix commits preserve the frozen declarations and unavailable C0 composition. Shared
+package dependency inventory tests pin SyntaxKit's two existing parser dependencies
+and WorkspaceKit's WorkspaceCore path after extraction. A successful test action must
+report executed named cases; skip, empty results, lock admission timeout, and simulator
+installation failure remain distinct. Real PreviewKit tests load byte-verified resources
+inside the test container with the original CSP, bounded JavaScript replies, and cleanup
+registered before the first await. M0 device and re-signed IPA installation gates stay
+open until owner evidence is recorded.
+
 ---
 
 ## 15. Build, Run, Tooling
