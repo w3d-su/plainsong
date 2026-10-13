@@ -24,6 +24,28 @@ final class EditorReplaceUIStateTests: XCTestCase {
         appState.handleEditorReplaceTextChange(replacement)
     }
 
+    func testANewOrSupersedingActionTakesOverTheApplyingStateFromTheEarlierAction() {
+        let runtime = EditorReplaceBatchRuntime()
+        _ = runtime.begin(total: 3)
+        runtime.beginApplying()
+        XCTAssertEqual(runtime.activity, .applying)
+        let first = runtime.actionID
+        _ = runtime.begin(total: 5)
+        XCTAssertFalse(runtime.isApplying)
+        XCTAssertEqual(runtime.activity, .preparing(completed: 0, total: 5), "a new plan shows Preparing, with Cancel")
+        runtime.beginApplying()
+        runtime.finish(action: first, result: .superseded)
+        XCTAssertEqual(runtime.activity, .applying, "the earlier action's finish leaves the current Applying frame")
+        runtime.finish(action: runtime.actionID, result: .cancelled)
+        XCTAssertEqual(runtime.activity, .idle)
+
+        _ = runtime.begin(total: 2)
+        runtime.beginApplying()
+        runtime.supersede()
+        XCTAssertFalse(runtime.isApplying)
+        XCTAssertEqual(runtime.activity, .idle)
+    }
+
     func testCollapseAndExpandAreTheAuthoritySeamAndCollapseKeepsTheValue() {
         let appState = makeAppState()
         openExpandedRow(appState)

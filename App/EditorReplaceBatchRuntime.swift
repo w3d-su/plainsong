@@ -51,8 +51,9 @@ final class EditorReplaceBatchRuntime {
         didSet { if isPreparing != oldValue { onPresentationChange?() } }
     }
 
-    /// From the end of preparation through the synchronous commit; rendered during the one
-    /// frame `performEditorReplaceAll` yields before its final recheck.
+    /// From the end of preparation through the synchronous commit, rendered during the one
+    /// frame before the final recheck. `supersede()` clears it; only the current action's
+    /// `finish` does.
     var isApplying = false {
         didSet { if isApplying != oldValue { onPresentationChange?() } }
     }
@@ -136,6 +137,8 @@ final class EditorReplaceBatchRuntime {
         actionID += 1
         cancellation?.cancel()
         isPreparing = false
+        // A superseded action no longer owns the Applying frame.
+        isApplying = false
     }
 
     func finish(action: UInt64, result: EditorReplaceBatchCommandResult) {
@@ -147,6 +150,7 @@ final class EditorReplaceBatchRuntime {
             lastResult = result
         }
         guard actionID == action else { return }
+        isApplying = false
         isPreparing = false
         cancellation = nil
         lastResult = result

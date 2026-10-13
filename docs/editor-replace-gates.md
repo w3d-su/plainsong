@@ -1508,6 +1508,9 @@ hosted spike PR #112.
     observes `Applying…` rendered (with Cancel withdrawn) inside
     `willCommitForTesting`, then proves a selection that leaves and returns
     during that frame still fails the recheck with `.superseded` and no write.
+    `testHostedReplaceAllPressedDuringAnotherApplyingFrameShowsPreparingAndKeepsItsOwnApplyingFrame`
+    presses the real Replace All button during A's Applying frame, observes B's
+    held Preparing state, then proves A's wake-up cannot clear B's Applying frame.
   - Focus hand-off on unmount:
     `testHostedCancelLeavingWhileFocusedHandsFocusToReplaceAllWhenEnabledElseTheField`
     covers focused Cancel leaving while the row stays — after a press, after

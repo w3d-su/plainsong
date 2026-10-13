@@ -133,7 +133,7 @@ extension AppState {
         observation?.stop()
         let result = finishEditorReplaceBatchPreparation(prepared, capture: capture, token: token)
         host.traceReplaceBarAction("replaceAllFinished result=\(result.replaceBatchTraceSummary)")
-        state.isApplying = false
+        // Only the current action clears its Applying frame inside `finish`.
         state.finish(action: capture.actionID, result: result)
         return result
     }

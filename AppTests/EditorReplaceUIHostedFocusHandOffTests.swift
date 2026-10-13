@@ -8,7 +8,7 @@ import XCTest
 
 /// Replace PR H review fixes on the real row: focus never strands on the window when a
 /// focused row control unmounts (B1), bar presses act only from the key window's bar (M3),
-/// `Applying…` renders before the final recheck (M1), and Escape from a focused row button.
+/// Applying frames remain owned by their action, and Escape from a focused row button.
 @MainActor
 extension EditorFindHostedGateTests {
     /// After focus moved away from a removed control, every Find command is still eligible.
@@ -196,6 +196,138 @@ extension EditorFindHostedGateTests {
         try assertHostedBatchDidNotWrite(hosted, since: before)
     }
 
+    func testHostedReplaceAllPressedDuringAnotherApplyingFrameShowsPreparingAndKeepsItsOwnApplyingFrame() async throws {
+        let hosted = try await makeHostedReplaceRow(source: String(repeating: "hit ", count: 200))
+        try await waitForHostedReplaceObservationQuiescence(hosted)
+        let app = hosted.appState
+        let window = hosted.window
+        let state = app.editorFindHost.replaceBatch
+        let bHold = HostedReplaceBatchHold()
+        let probe = HostedOverlappingApplyingProbe()
+        defer {
+            bHold.release()
+            state.didBeginApplyingForTesting = nil
+            state.applyingFrameDidElapseForTesting = nil
+            state.onChunkForTesting = nil
+        }
+        addTeardownBlock { @MainActor in
+            bHold.release()
+            state.didBeginApplyingForTesting = nil
+            state.applyingFrameDidElapseForTesting = nil
+            state.onChunkForTesting = nil
+        }
+
+        state.didBeginApplyingForTesting = {
+            probe.applyingBegins += 1
+            if probe.applyingBegins == 1 {
+                state.onChunkForTesting = { _ in bHold.checkpoint() }
+                let replaceAll = self.barButton(EditorFindAccessibility.replaceAllButton, in: window)
+                probe.bPressEnabled = replaceAll?.isEnabled
+                replaceAll?.performClick(nil)
+            } else if probe.applyingBegins == 2 {
+                probe.bBeganApplying = true
+            }
+        }
+        state.applyingFrameDidElapseForTesting = {
+            probe.applyingFrameEnds += 1
+            if probe.applyingFrameEnds == 1 {
+                do {
+                    try await self.waitUntil("B enters held preparation") { bHold.isEntered }
+                } catch {
+                    XCTFail("waiting for B's held preparation threw: \(error)" + self.replaceBarTraceDiagnostic(app))
+                    return
+                }
+                probe.bPreparationWasHeld = bHold.isEntered
+                probe.bPreparationRanOnMainThread = bHold.didRunOnMainThread
+                probe.isApplyingAtAFrameEnd = state.isApplying
+                probe.activityAtAFrameEnd = app.editorReplaceActivity
+                if case .preparing = app.editorReplaceActivity {
+                    probe.preparingAtAFrameEnd = true
+                }
+                do {
+                    try await self.waitUntil("B's Preparing label and Cancel render while held") {
+                        self.label(EditorFindAccessibility.replaceProgress, in: window)?.stringValue
+                            != EditorReplaceStatusText.applying
+                            && self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil
+                    }
+                } catch {
+                    XCTFail("waiting for B's Preparing row threw: \(error)" + self.replaceBarTraceDiagnostic(app))
+                }
+                let rendered = await self.observeAfterOneMainRunLoopTurn {
+                    (
+                        self.label(EditorFindAccessibility.replaceProgress, in: window)?.stringValue,
+                        self.barButton(EditorFindAccessibility.replaceCancelButton, in: window) != nil
+                    )
+                }
+                probe.progressAtAFrameEnd = rendered.0
+                probe.cancelMountedAtAFrameEnd = rendered.1
+                bHold.release()
+                do {
+                    try await self.waitUntil("B begins its Applying frame") { probe.bBeganApplying }
+                } catch {
+                    XCTFail("waiting for B's Applying frame threw: \(error)" + self.replaceBarTraceDiagnostic(app))
+                }
+            } else if probe.applyingFrameEnds == 2 {
+                _ = await probe.aTask?.value
+                probe.isApplyingAtBFrameEnd = state.isApplying
+                probe.activityAtBFrameEnd = app.editorReplaceActivity
+                probe.progressAtBFrameEnd = await self.observeAfterOneMainRunLoopTurn {
+                    self.label(EditorFindAccessibility.replaceProgress, in: window)?.stringValue
+                }
+            }
+        }
+        probe.aTask = Task { @MainActor in
+            await app.performEditorReplaceAll(
+                replacement: app.editorFindHost.ui.replacementText,
+                invocation: .barControl
+            )
+        }
+
+        guard let aTask = probe.aTask else { return XCTFail("A's task was not created") }
+        let aResult = await aTask.value
+        probe.aResult = aResult
+        await awaitBarReplaceAll(app)
+        probe.lastResult = state.lastResult
+        probe.finalActivity = app.editorReplaceActivity
+        let diagnostic = probe.diagnostic + replaceBarTraceDiagnostic(app)
+        #if DEBUG
+            if ProcessInfo.processInfo.environment["PLAINSONG_HOSTED_TRACE_STDOUT"] == "1" {
+                print("REPLPROBE \(probe.diagnostic)")
+            }
+        #endif
+
+        XCTAssertEqual(probe.aResult, .superseded, "A is superseded by the bar press: \(diagnostic)")
+        guard case .delivered(.replaced)? = probe.lastResult else {
+            return XCTFail("B commits: \(diagnostic)")
+        }
+        XCTAssertEqual(probe.applyingBegins, 2, "A and B each begin Applying: \(diagnostic)")
+        XCTAssertEqual(probe.applyingFrameEnds, 2, "A and B each reach frame end: \(diagnostic)")
+        XCTAssertTrue(probe.bPressEnabled == true, "B's real bar button was enabled: \(diagnostic)")
+        XCTAssertTrue(probe.bPreparationWasHeld, "B was held during preparation: \(diagnostic)")
+        XCTAssertFalse(probe.bPreparationRanOnMainThread, "B's preparation ran off-main: \(diagnostic)")
+        XCTAssertEqual(probe.isApplyingAtAFrameEnd, false, "B is not applying at A's frame end: \(diagnostic)")
+        XCTAssertTrue(probe.preparingAtAFrameEnd, "B shows Preparing at A's frame end: \(diagnostic)")
+        XCTAssertNotNil(probe.progressAtAFrameEnd, "B's progress label is mounted: \(diagnostic)")
+        XCTAssertNotEqual(
+            probe.progressAtAFrameEnd, EditorReplaceStatusText.applying,
+            "B does not render Applying at A's frame end: \(diagnostic)"
+        )
+        XCTAssertTrue(probe.cancelMountedAtAFrameEnd, "B's Cancel is mounted while preparing: \(diagnostic)")
+        XCTAssertTrue(probe.bBeganApplying, "B entered its Applying frame: \(diagnostic)")
+        XCTAssertEqual(probe.isApplyingAtBFrameEnd, true, "A's wake-up leaves B applying: \(diagnostic)")
+        XCTAssertEqual(probe.activityAtBFrameEnd, .applying, "B still owns the Applying activity: \(diagnostic)")
+        XCTAssertEqual(
+            probe.progressAtBFrameEnd, EditorReplaceStatusText.applying,
+            "B's Applying label survives A's finish: \(diagnostic)"
+        )
+        XCTAssertEqual(probe.finalActivity, .idle, "the current action finishes idle: \(diagnostic)")
+
+        bHold.release()
+        state.didBeginApplyingForTesting = nil
+        state.applyingFrameDidElapseForTesting = nil
+        state.onChunkForTesting = nil
+    }
+
     /// Records the row at commit. A Cancel mounted at the end of the Applying frame — only
     /// synchronous code separates it from `willCommit` — gets exactly one run-loop turn (one
     /// main-queue hop) to unmount while `Applying…` is still shown: SwiftUI can defer the
@@ -304,4 +436,44 @@ final class HostedCommitTimeRow {
     var rendered: String?
     var cancelShown = true
     var strayReport: String?
+}
+
+@MainActor
+final class HostedOverlappingApplyingProbe {
+    var aTask: Task<EditorReplaceBatchCommandResult, Never>?
+    var aResult: EditorReplaceBatchCommandResult?
+    var lastResult: EditorReplaceBatchCommandResult?
+    var applyingBegins = 0
+    var applyingFrameEnds = 0
+    var bPressEnabled: Bool?
+    var bBeganApplying = false
+    var bPreparationWasHeld = false
+    var bPreparationRanOnMainThread = true
+    var isApplyingAtAFrameEnd: Bool?
+    var activityAtAFrameEnd: EditorReplaceActivity?
+    var preparingAtAFrameEnd = false
+    var progressAtAFrameEnd: String?
+    var cancelMountedAtAFrameEnd = false
+    var isApplyingAtBFrameEnd: Bool?
+    var activityAtBFrameEnd: EditorReplaceActivity?
+    var progressAtBFrameEnd: String?
+    var finalActivity: EditorReplaceActivity?
+
+    var diagnostic: String {
+        "aResult=\(aResult?.replaceBatchTraceSummary ?? "nil") "
+            + "lastResult=\(lastResult?.replaceBatchTraceSummary ?? "nil") "
+            + "applyingBegins=\(applyingBegins) applyingFrameEnds=\(applyingFrameEnds) "
+            + "bPressEnabled=\(String(describing: bPressEnabled)) bBeganApplying=\(bBeganApplying) "
+            + "bPreparationWasHeld=\(bPreparationWasHeld) "
+            + "bPreparationRanOnMainThread=\(bPreparationRanOnMainThread) "
+            + "isApplyingAtAFrameEnd=\(String(describing: isApplyingAtAFrameEnd)) "
+            + "activityAtAFrameEnd=\(String(describing: activityAtAFrameEnd)) "
+            + "preparingAtAFrameEnd=\(preparingAtAFrameEnd) "
+            + "progressAtAFrameEnd=\(String(describing: progressAtAFrameEnd)) "
+            + "cancelMountedAtAFrameEnd=\(cancelMountedAtAFrameEnd) "
+            + "isApplyingAtBFrameEnd=\(String(describing: isApplyingAtBFrameEnd)) "
+            + "activityAtBFrameEnd=\(String(describing: activityAtBFrameEnd)) "
+            + "progressAtBFrameEnd=\(String(describing: progressAtBFrameEnd)) "
+            + "finalActivity=\(String(describing: finalActivity))"
+    }
 }
