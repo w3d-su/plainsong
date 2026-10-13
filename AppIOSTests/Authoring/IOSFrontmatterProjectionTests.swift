@@ -146,7 +146,9 @@ private final class FrontmatterObservedEditor: IOSSourceEditorBinding {
     func changeSource(_ text: String) {
         base.text = text
         base.version += 1
-        if let snapshot = captureSnapshot() { handler?(.snapshotChanged(snapshot)) }
+        if let snapshot = captureSnapshot() {
+            handler?(.snapshotChanged(snapshot))
+        }
     }
 }
 

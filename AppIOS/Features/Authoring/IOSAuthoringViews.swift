@@ -49,18 +49,32 @@ struct IOSAuthoringToolbar<Editor: IOSSourceEditorControlling>: View {
     }
 
     private var toolbarActions: [IOSAuthoringAction] {
-        controller.actions.filter { if case .toolbar = $0.placement { true } else { false } }
+        controller.actions.filter {
+            if case .toolbar = $0.placement {
+                true
+            } else {
+                false
+            }
+        }
     }
 
     private var formatActions: [IOSAuthoringAction] {
         controller.actions.filter {
-            if case .formatMenu = $0.placement { true } else { false }
+            if case .formatMenu = $0.placement {
+                true
+            } else {
+                false
+            }
         }
     }
 
     private func grouped(_ name: String) -> [IOSAuthoringAction] {
         controller.actions.filter {
-            if case let .toolbarGroup(group) = $0.placement { group == name } else { false }
+            if case let .toolbarGroup(group) = $0.placement {
+                group == name
+            } else {
+                false
+            }
         }
     }
 }
@@ -206,8 +220,16 @@ private struct CommitField: View {
         TextField(key, text: $text)
             .focused($isFocused)
             .accessibilityLabel(key)
-            .onChange(of: isFocused) { _, focused in if focused { begin() } }
-            .onChange(of: text) { _, value in if isFocused, value != initial { change(value) } }
+            .onChange(of: isFocused) {
+                _, focused in if focused {
+                    begin()
+                }
+            }
+            .onChange(of: text) {
+                _, value in if isFocused, value != initial {
+                    change(value)
+                }
+            }
             .onChange(of: initial) { _, value in text = value }
             .onSubmit { commit(text) }
     }

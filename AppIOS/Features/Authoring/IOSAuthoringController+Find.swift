@@ -189,7 +189,8 @@ extension IOSAuthoringController {
         guard generation == find.queryGeneration else { return }
         guard let live = editor.captureSnapshot(),
               live.bindingID == bindingID,
-              live.revision == revision
+              live.revision == revision,
+              find.context?.matches(live) == true
         else {
             find.pendingSteps = 0
             find.session = nil

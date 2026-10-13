@@ -52,6 +52,41 @@ final class IOSAcceptedFindProtectionTests: XCTestCase {
     }
 
     @MainActor
+    func testPendingFindDeliveryCannotBlessChangedSourceAtSameRevision() {
+        assertPendingSourceChangeIsDiscarded(original: "alpha beta", changed: "gamma beta", pattern: "alpha")
+    }
+
+    @MainActor
+    func testPendingFindDeliveryUsesRawUnicodeSourceRatherThanCanonicalEquality() {
+        let original = "café beta"
+        let changed = "cafe\u{301} beta"
+        XCTAssertEqual(original, changed)
+        XCTAssertFalse(ExactSourceText.matches(original, changed))
+        assertPendingSourceChangeIsDiscarded(original: original, changed: changed, pattern: "café")
+    }
+
+    @MainActor
+    private func assertPendingSourceChangeIsDiscarded(original: String, changed: String, pattern: String) {
+        let h = AuthoringHarness(text: original, selection: NSRange(location: 0, length: pattern.utf16.count))
+        h.controller.setFindQuery(pattern, using: h.editor)
+        let capturedRevision = h.editor.revision
+        h.editor.text = changed
+        XCTAssertEqual(h.editor.revision, capturedRevision)
+        h.scheduler.finishLatest()
+        XCTAssertNil(h.controller.find.session)
+        XCTAssertNil(h.controller.find.context)
+        XCTAssertEqual(h.controller.find.status, .empty)
+        XCTAssertEqual(h.editor.revealCalls, [])
+        h.controller.setReplacement("X")
+        h.controller.perform(.singleReplace, using: h.editor)
+        XCTAssertTrue(ExactSourceText.matches(h.editor.text, changed))
+        XCTAssertEqual(h.editor.applyCount, 0)
+        XCTAssertEqual(h.editor.undoCount, 0)
+        XCTAssertEqual(h.editor.revealCalls, [])
+        XCTAssertEqual(h.controller.find.status, .searching)
+    }
+
+    @MainActor
     private func prepared() -> AuthoringHarness {
         let h = AuthoringHarness(text: "alpha beta", selection: NSRange(location: 0, length: 5))
         h.controller.setFindQuery("alpha", using: h.editor)

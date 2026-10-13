@@ -157,7 +157,11 @@ extension IOSAuthoringController {
         frontmatter.needsRecapture = false
         let parsed = Frontmatter.parse(snapshot.document.text)
         let current = frontmatter.drafts[key] ?? parsed.block?.fieldValues[key]
-        let next: Bool = if case let .bool(value) = current { !value } else { true }
+        let next: Bool = if case let .bool(value) = current {
+            !value
+        } else {
+            true
+        }
         commitFrontmatter(key: key, value: .bool(next), using: editor)
     }
 
