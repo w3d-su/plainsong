@@ -149,12 +149,20 @@ final class PreviewIOSHostedTests: XCTestCase {
     }
 
     private func bundledPreviewIndex() throws -> URL {
-        let sourceRoot = repositoryRoot().appendingPathComponent("App/Resources/preview", isDirectory: true)
+        let sourceRoot = repositoryRoot()
+            .appendingPathComponent("App/Resources/preview", isDirectory: true)
+            .resolvingSymlinksInPath()
         #if os(iOS)
             // WebKit's read grant is for this XCTest-owned container directory.
             // Keep the real committed HTML/JS/CSS/fonts intact, including CSP.
             let destination = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
                 .appendingPathComponent("PlainsongPreviewFixture-" + UUID().uuidString, isDirectory: true)
+            var verifiedCopy = false
+            defer {
+                if !verifiedCopy {
+                    try? FileManager.default.removeItem(at: destination)
+                }
+            }
             try FileManager.default.copyItem(at: sourceRoot, to: destination)
             let enumerator = try XCTUnwrap(FileManager.default.enumerator(
                 at: sourceRoot,
@@ -163,12 +171,24 @@ final class PreviewIOSHostedTests: XCTestCase {
             var fileCount = 0
             for case let file as URL in enumerator {
                 guard try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else { continue }
-                let relative = String(file.path.dropFirst(sourceRoot.path.count + 1))
+                // Foundation can enumerate /tmp through its /private/tmp alias.
+                // Compare canonical components before deriving the fixture-relative path.
+                let rootComponents = sourceRoot.pathComponents
+                let fileComponents = file.resolvingSymlinksInPath().pathComponents
+                guard fileComponents.starts(with: rootComponents),
+                      fileComponents.count > rootComponents.count
+                else {
+                    throw CocoaError(.fileReadInvalidFileName)
+                }
+                let relative = fileComponents.dropFirst(rootComponents.count).joined(separator: "/")
                 let copied = destination.appendingPathComponent(relative)
-                XCTAssertEqual(try Data(contentsOf: copied), try Data(contentsOf: file), relative)
+                let expectedBytes = try Data(contentsOf: file)
+                let copiedBytes = try Data(contentsOf: copied)
+                XCTAssertEqual(copiedBytes, expectedBytes, relative)
                 fileCount += 1
             }
             XCTAssertGreaterThan(fileCount, 3, "Real preview resources must be present before WebKit loads")
+            verifiedCopy = true
             return destination.appendingPathComponent("index.html")
         #else
             let indexURL = sourceRoot.appendingPathComponent("index.html")
