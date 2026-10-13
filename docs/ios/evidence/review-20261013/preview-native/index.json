@@ -1,6 +1,6 @@
 {
   "created_date": "2026-10-13",
-  "file_count": 67,
+  "file_count": 68,
   "files": {
     "README.md": {
       "bytes": 7947,
@@ -32,13 +32,13 @@
       "original_sha256": "c164788dc8f8af297bd8947977aabc2924d00ce7a438d28eb04112a73da1fdc1",
       "sha256": "c164788dc8f8af297bd8947977aabc2924d00ce7a438d28eb04112a73da1fdc1"
     },
-    "candidate-fixture.patch": {
-      "bytes": 3272,
-      "codec": "identity",
+    "candidate-fixture.patch.gz": {
+      "bytes": 1133,
+      "codec": "gzip",
       "original_bytes": 3272,
       "original_path": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/candidate-fixture.patch",
       "original_sha256": "2debc5fcb3a16818449611fbffa2c091ad61be7a28939d01baa0425fd73eb1cc",
-      "sha256": "2debc5fcb3a16818449611fbffa2c091ad61be7a28939d01baa0425fd73eb1cc"
+      "sha256": "7f45a42319b9a5c5a2db0a151e4d5e287f6895f6ae1f0ff1ed684965ae6a9e28"
     },
     "candidate-hosted2-after-source-verify.json": {
       "bytes": 179,
@@ -494,6 +494,14 @@
       "original_sha256": "cb46709d6f391107c781ffb65b5e2882557f95556ed8065ed5621ec648795f9f",
       "sha256": "cb46709d6f391107c781ffb65b5e2882557f95556ed8065ed5621ec648795f9f"
     },
+    "original-packet-index.json.gz": {
+      "bytes": 5461,
+      "codec": "gzip",
+      "original_bytes": 28688,
+      "original_sha256": "311b5cb43f4136902b8225b0b729711a46b60a9c872d2884e19b4cddd32ab505",
+      "scope": "Original immutable67-file subagent packet index before reversible patch packaging",
+      "sha256": "ab32594a317b8e15729638370465c40e5e73251cf52f8aa8fa8b5cbc4b1872be"
+    },
     "run-locations-and-scope.json": {
       "bytes": 1581,
       "codec": "identity",
@@ -533,5 +541,6 @@
       "sha256": "16db830f641952bb163e1c7bb9e8aefb83f3f3a72dc2da9e0cdbfea26c4c7013"
     }
   },
+  "packaging_change": "Raw diff context whitespace preserved via reversible gzip; original packet/index remains retained.",
   "scope": "Portable retained evidence packet, raw local xcresults located by run-locations-and-scope.json"
 }
