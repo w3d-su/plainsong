@@ -15,7 +15,8 @@ Lane 12 交付（`docs/ios/handoffs/12-build-and-ipa.md`）。本檔描述固定
 - `xcodegen`、`/usr/bin/python3`、`codesign`、`vtool`、`lipo`、`ditto`、`zip`、`shasum`。
 - 共享鎖固定為 `/private/tmp/plainsong-xcodebuild-test.lock`；
   `PLAINSONG_XCODEBUILD_LOCK` 設成其他路徑會被明示拒絕（exit 64）。外層已持鎖時
-  不要呼叫這些 runner（內層不會再取鎖）。未取得鎖只回報排程等待（exit 75）。
+  不要呼叫這些 runner。`--locked` 公開旗標會被拒絕；runner 建立的 lockf
+  ancestor context 才能執行合法 nested archive。未取得鎖回報排程等待（exit 75）。
 
 ## 固定命令
 
@@ -33,9 +34,9 @@ make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 | 入口 | 行為 | 主要產物 |
 |---|---|---|
 | `ios-build` | preflight → `xcodegen generate` → `PlainsongIOS` Debug simulator build，`CODE_SIGNING_ALLOWED=NO`，per-head/run 隔離 DerivedData | `dd/<head>-build-*/`、`evidence/<head>-build-*/`（build.log、build.json、macho-platform.txt、archs.txt、signing-state.txt） |
-| `ios-test` | → build-for-testing → resource preflight（manifest＋preview 逐檔 SHA-256 parity）→ `test-without-building -parallel-testing-enabled NO` | `evidence/<head>-test-*/`（build-for-testing.log、resources.json、Results.xcresult、named-tests.txt、test.json）；exit code 保留 xcodebuild 結果 |
-| `ios-archive` | → `archive -destination 'generic/platform=iOS' -configuration Release`，signing 全關 | `PlainsongIOS-<head12>.xcarchive`＋`*.xcarchive-meta/`（head stamp、archive.json、signing.txt、resources.json） |
-| `ios-ipa` | 找 head-matched archive（無→同鎖內先跑 archive；**只有異 head 的 archive → 拒絕重包**）→ `Payload/` staging → 由內而外 strip 全部簽名並驗證 → zip | `PlainsongIOS-<head12>.ipa`＋`.ipa.sha256`＋`.xcarchive.sha256`（archive 內容 manifest digest）＋`ipa-meta-<head12>/ipa.json`＋`signing.txt` |
+| `ios-test` | → build-for-testing → resource preflight（manifest＋preview 逐檔 SHA-256 parity）→ `test-without-building -parallel-testing-enabled NO` | `evidence/<head>-test-*/`（source.json、resources.json、Results.xcresult、test-results.json、test-gate.json、named-tests.txt）；檢查 required named tests 的實際結果，零執行／全 skip／缺案例／壞 JSON 失敗 |
+| `ios-archive` | → `archive -destination 'generic/platform=iOS' -configuration Release`，signing 全關 | `archive-attempt-<head12>.<unique>/PlainsongIOS.xcarchive`＋`*.xcarchive-meta/`（source.json、success／failure receipt、完整 archive digest、preflight／resources／signing） |
+| `ios-ipa` | 驗證成功 Release receipt、同 head／source fingerprint、archive digest 與 device platform（無 current-head archive→合法 nested archive）→ isolated Payload→strip／檢查→全新 ZIP→原子替換 | `PlainsongIOS-<head12>.ipa`＋`.ipa.sha256`；每輪 `evidence/ipa-<head12>.<unique>/ipa.json` 與 signing/resource report，INSTALL 仍 OPEN |
 
 ## Unsigned 語意與檢查
 
@@ -47,14 +48,17 @@ make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
   `embedded.mobileprovision`／`*.p12` 移除並記錄；zip 前再掃，任一殘留 → 拒絕。
 - `Payload/` 只允許 `PlainsongIOS.app`；混入任何其他檔案 → 拒絕 zip。
 - Mach-O 驗證：`vtool -show-build` 必須 `platform IOS`（`IOSSIMULATOR` 會失敗）、
-  `lipo -info` 必須含 arm64。
+  `lipo -archs` 必須只有 arm64。逐一驗證 app／framework／extension；不能用 substring 將 IOSSIMULATOR 當 IOS。
+- IPA 重跑使用全新暫存 ZIP、核對 member set／CRC 後 `os.replace`。沒有舊 entries 殘留；驗證失敗保留上一份已發布 IPA。
+- 舊 head stamp 或 dirty 的舊 receipt 無法單獨授權重包。`source.json` 列出實際 build inputs（含 untracked inputs、精確 bytes／permissions）；同 head 但內容變動時必須重建。
+- `make test-ios-tooling` 執行工具負向 fixtures（未模擬產品 provider）：失敗 receipt、source drift、archive mutation、platform、ZIP freshness／atomic failure、required tests 和 lock ancestry。與產品 XCTest／真機證據分列。
 
 ## Metadata
 
 每個 runner 的 `*.json` 記錄：source SHA＋dirty、contract version（`IOS-C0-v1`）、
 `ios_base_sha`（tag 解出的 SHA）、命令與 destination、Xcode/SDK 版本
 （preflight.json）、configuration、resource manifest 每項 sha256（resources.json）、
-archive/IPA 路徑＋SHA-256＋bytes、每個 code bundle 的 before/after signing state、
+source input fingerprint／完整 archive digest、archive/IPA 路徑＋SHA-256＋bytes、每個 code bundle 的 before/after signing state、
 起訖時間、exit code。**不含環境 dump 與 credential。** 宣告的是可重現流程，
 不是逐位元一致 IPA。
 

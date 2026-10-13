@@ -2,17 +2,10 @@
 # C0 bootstrap only. Public invocation holds the same lock as every other lane.
 set -euo pipefail
 
-required_lock=/private/tmp/plainsong-xcodebuild-test.lock
-requested_lock=${PLAINSONG_XCODEBUILD_LOCK:-$required_lock}
-if [[ "$requested_lock" != "$required_lock" ]]; then
-    echo "C0 requires the shared Plainsong Xcode lock: $required_lock" >&2
-    exit 64
-fi
-
-if [[ "${1:-}" != --locked ]]; then
-    exec /usr/bin/lockf -k "$required_lock" /bin/bash "$0" --locked "$@"
-fi
-shift
+root=$(cd "$(dirname "$0")/../.." && pwd)
+cd "$root"
+source Scripts/ios/ios-common.sh
+ios_lock_or_exec "$0" "$@"
 if [[ $# != 1 || ( "$1" != build && "$1" != test ) ]]; then
     echo "Usage: Scripts/ios/c0.sh build|test" >&2
     exit 64
