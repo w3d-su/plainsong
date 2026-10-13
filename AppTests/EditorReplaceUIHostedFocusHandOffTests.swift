@@ -8,7 +8,8 @@ import XCTest
 
 /// Replace PR H review fixes on the real row: focus never strands on the window when a
 /// focused row control unmounts (B1), bar presses act only from the key window's bar (M3),
-/// Applying frames remain owned by their action, and Escape from a focused row button.
+/// `Applying…` renders before the final recheck and stays owned by its action (M1), and
+/// Escape from a focused row button.
 @MainActor
 extension EditorFindHostedGateTests {
     /// After focus moved away from a removed control, every Find command is still eligible.
