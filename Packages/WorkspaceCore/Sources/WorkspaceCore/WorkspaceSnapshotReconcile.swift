@@ -199,10 +199,13 @@ public enum WorkspaceSnapshotReconciler {
     ) -> [KeyedDraft] {
         drafts.map { draft in
             let material = rawMaterial(of: draft)
-            var bytes = material
-            if counts[material, default: 0] > 1 {
-                bytes.append(31)
-                bytes.append(contentsOf: draft.path.byteKey.bytes)
+            let isDuplicate = counts[material, default: 0] > 1
+            // Variant tags and length-delimited fields keep arbitrary provider
+            // bytes distinct from a duplicate's resource-plus-path encoding.
+            var bytes: [UInt8] = [isDuplicate ? 1 : 0]
+            appendField(material, to: &bytes)
+            if isDuplicate {
+                appendField(draft.path.byteKey.bytes, to: &bytes)
             }
             return KeyedDraft(
                 entry: draft.entry,
@@ -211,6 +214,14 @@ public enum WorkspaceSnapshotReconciler {
                 children: assignKeys(draft.children, counts: counts)
             )
         }
+    }
+
+    private static func appendField(_ field: [UInt8], to bytes: inout [UInt8]) {
+        let length = UInt64(field.count)
+        for shift in stride(from: 56, through: 0, by: -8) {
+            bytes.append(UInt8(truncatingIfNeeded: length >> shift))
+        }
+        bytes.append(contentsOf: field)
     }
 
     private static func rawMaterial(of draft: PathDraft) -> [UInt8] {
