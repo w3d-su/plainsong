@@ -62,7 +62,7 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
             return .cancelled
         }
         state.phase = .importing
-        if state.cancelRequested {
+        if cancellationRequested(state) {
             state.phase = .finished
             return .cancelled
         }
@@ -74,7 +74,7 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
         ) else {
             return state.earlyOutcome ?? .failed(.unsupportedType)
         }
-        if state.cancelRequested {
+        if cancellationRequested(state) {
             state.phase = .finished
             return .cancelled
         }
@@ -94,7 +94,7 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
             }.value
         } catch let error as IOSImageNormalizationError {
             state.phase = .finished
-            state.earlyOutcome = .failed(error.workspaceFailure)
+            state.earlyOutcome = cancellationRequested(state) ? .cancelled : .failed(error.workspaceFailure)
             return nil
         } catch is CancellationError {
             state.phase = .finished
@@ -102,7 +102,7 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
             return nil
         } catch {
             state.phase = .finished
-            state.earlyOutcome = .failed(.unsupportedType)
+            state.earlyOutcome = cancellationRequested(state) ? .cancelled : .failed(.unsupportedType)
             return nil
         }
     }
@@ -131,7 +131,7 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
             return .cancelled
         } catch {
             state.phase = .finished
-            return .failed(.coordinationFailed)
+            return cancellationRequested(state) ? .cancelled : .failed(.coordinationFailed)
         }
         state.staged = staged
         if let cancelled = await cancelledRollback(staged, state: state) {
@@ -140,10 +140,16 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
         do {
             try await writer.validate(staged)
         } catch let failure as IOSWorkspaceFailure {
+            if let cancelled = await cancelledRollback(staged, state: state) {
+                return cancelled
+            }
             return await complete(staged, state: state, request: .rollback(failure: failure))
         } catch is CancellationError {
             return await complete(staged, state: state, request: .rollback(cancelled: true))
         } catch {
+            if let cancelled = await cancelledRollback(staged, state: state) {
+                return cancelled
+            }
             return await complete(staged, state: state, request: .rollback(failure: .coordinationFailed))
         }
         return await applyValidated(staged, context: context, editor: editor, state: state)
@@ -171,7 +177,11 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
         else {
             return await complete(staged, state: state, request: .rollback(failure: .invalidPath))
         }
-        // Synchronous with the checks above. Do not retarget the latest caret after this await gap.
+        // No suspension between the last cancellation check and native apply.
+        if cancellationRequested(state) {
+            return await complete(staged, state: state, request: .rollback(cancelled: true))
+        }
+        // Once source accepts the edit, commit ownership even if the caller is cancelled inside apply.
         switch editor.apply(edit) {
         case let .applied(revision):
             return await complete(
@@ -184,11 +194,18 @@ final class IOSImageInsertionController: IOSImageInsertionControlling {
         }
     }
 
+    private func cancellationRequested(_ state: IOSImageOperationState) -> Bool {
+        if Task.isCancelled {
+            state.cancelRequested = true
+        }
+        return state.cancelRequested
+    }
+
     private func cancelledRollback(
         _ staged: IOSStagedImageAsset,
         state: IOSImageOperationState
     ) async -> IOSImageInsertionOutcome? {
-        guard state.cancelRequested else { return nil }
+        guard cancellationRequested(state) else { return nil }
         return await complete(staged, state: state, request: .rollback(cancelled: true))
     }
 

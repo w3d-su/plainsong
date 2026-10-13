@@ -23,7 +23,7 @@ struct IOSImageNormalizedPayload: Sendable, Equatable {
     let preferredFilename: String
 }
 
-/// Sniffs raster bytes and applies `MarkdownImageAssetPolicy` before any asset writer runs.
+/// Checks raster identity, policy, complete ImageIO source, and first-raster decoding before persistence.
 struct IOSImagePayloadNormalizer: Sendable {
     let transcoder: any IOSImageRasterTranscoding
 
@@ -65,6 +65,9 @@ struct IOSImagePayloadNormalizer: Sendable {
             throw IOSImageNormalizationError.mismatchedRepresentation
         }
         try rejectIfLargerThanPolicy(bytes.count)
+        guard IOSImageRasterValidation.isCompleteImage(bytes) else {
+            throw IOSImageNormalizationError.unsupportedType
+        }
         return IOSImageNormalizedPayload(
             bytes: bytes,
             contentType: kind.mimeType,
@@ -89,6 +92,9 @@ struct IOSImagePayloadNormalizer: Sendable {
             throw IOSImageNormalizationError.unsupportedType
         }
         try rejectIfLargerThanPolicy(png.count)
+        guard IOSImageRasterValidation.isCompleteImage(png) else {
+            throw IOSImageNormalizationError.unsupportedType
+        }
         return IOSImageNormalizedPayload(
             bytes: png,
             contentType: IOSImageRasterKind.png.mimeType,
