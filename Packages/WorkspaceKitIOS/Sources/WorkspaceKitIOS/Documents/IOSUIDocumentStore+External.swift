@@ -32,17 +32,28 @@ extension IOSUIDocumentStore {
     }
 
     func startExternalRead(_ entry: IOSDocumentEntry) {
-        guard entry.session != nil, guardCurrentAuthority(entry, generation: entry.accessGeneration) else { return }
+        guard !entry.isRetiring, entry.session != nil,
+              guardCurrentAuthority(entry, generation: entry.accessGeneration)
+        else { return }
         let token = UUID()
         entry.externalToken = token
+        entry.pendingProposal = nil
+        entry.autosaveTask?.cancel()
+        refreshWritableState(entry)
         let capturedVersion = entry.session?.version ?? 0
         let generation = entry.accessGeneration
         let identity = entry.identity
         let location = entry.location
         let lease = entry.lease
         let operationID = UUID()
-        Task { @MainActor in
+        let task = Task { @MainActor in
+            defer { entry.externalReadTasks[token] = nil }
             do {
+                // An already-issued provider write must finish before its own notice is read.
+                await entry.queue.drain()
+                guard entry.externalToken == token,
+                      self.guardCurrentAuthority(entry, generation: generation)
+                else { return }
                 let read = try await self.coordinatedAccess.read(
                     location,
                     lease: lease,
@@ -58,9 +69,10 @@ extension IOSUIDocumentStore {
                     read: read
                 )
             } catch {
-                self.failExternalRead(entry: entry, token: token, error: error)
+                await self.failExternalRead(entry: entry, token: token, error: error)
             }
         }
+        entry.externalReadTasks[token] = task
     }
 
     func completeExternalRead(
@@ -74,22 +86,29 @@ extension IOSUIDocumentStore {
         guard entry.externalToken == token, entry.identity == identity else { return }
         guard guardCurrentAuthority(entry, generation: generation) else { return }
         guard let externalText = IOSDocumentTextCodec.decode(read.data) else {
-            emit(.failed(entry.identity, operationID: read.operationID, reason: .access(.unsupportedType)))
+            await failExternalRead(entry: entry, token: token, error: IOSDocumentFailure.access(.unsupportedType))
             return
         }
         if matchesSelfWrite(entry, externalText) {
+            finishExternalObservation(entry, token: token)
             return
         }
         guard let session = entry.session else { return }
         if ExactSourceText.matches(externalText, session.text), !session.isDirty {
+            finishExternalObservation(entry, token: token)
             return
         }
         if session.version != capturedVersion || session.isDirty || entry.fenced {
             if session.isDirty || entry.fenced {
+                entry.externalToken = nil
                 await beginConflict(entry, reason: .externalConflict, allowRetry: true)
+            } else {
+                // An edit followed by Undo can be clean at a newer revision. Observe afresh.
+                startExternalRead(entry)
             }
             return
         }
+        entry.externalToken = nil
         publishReloadProposal(entry, text: externalText, fileURL: read.location.fileURL)
     }
 
@@ -103,17 +122,35 @@ extension IOSUIDocumentStore {
         return false
     }
 
-    func failExternalRead(entry: IOSDocumentEntry, token: UUID, error: Error) {
-        guard entry.externalToken == token, guardCurrentAuthority(entry, generation: entry.accessGeneration) else {
-            return
+    func finishExternalObservation(_ entry: IOSDocumentEntry, token: UUID) {
+        guard entry.externalToken == token else { return }
+        entry.externalToken = nil
+        refreshWritableState(entry)
+        if entry.session?.isDirty == true, !writeBarrier(entry) {
+            scheduleAutosave(entry)
         }
-        if error is CancellationError {
-            return
+    }
+
+    func failExternalRead(entry: IOSDocumentEntry, token: UUID, error: Error) async {
+        guard entry.externalToken == token,
+              guardCurrentAuthority(entry, generation: entry.accessGeneration)
+        else { return }
+        let failure = (mapped(error) as? IOSDocumentFailure) ?? .unavailable
+        // Unknown external bytes are not permission to resume overwriting the original.
+        entry.fenced = true
+        entry.externalToken = nil
+        entry.autosaveTask?.cancel()
+        if entry.session?.isDirty == true {
+            do {
+                _ = try await persistStableRecovery(entry, reason: .externalConflict)
+            } catch {
+                publishRecoveryFailure(entry, operationID: UUID())
+                return
+            }
         }
-        let failure = mapped(error)
-        if let documentFailure = failure as? IOSDocumentFailure {
-            emit(.failed(entry.identity, operationID: UUID(), reason: documentFailure))
-        }
+        guard guardCurrentAuthority(entry, generation: entry.accessGeneration) else { return }
+        setState(.unavailable(accessGeneration: entry.accessGeneration, reason: failure), entry: entry)
+        emit(.failed(entry.identity, operationID: UUID(), reason: failure))
     }
 
     func publishReloadProposal(_ entry: IOSDocumentEntry, text: String, fileURL: URL) {
@@ -129,6 +166,7 @@ extension IOSUIDocumentStore {
             statistics: TextStatistics(text: text)
         )
         entry.pendingProposal = proposal
+        refreshWritableState(entry)
         emit(.externalReloadRequested(proposal))
     }
 
@@ -141,22 +179,27 @@ extension IOSUIDocumentStore {
         guard let session = entry.session else { return }
         switch outcome {
         case let .installed(revision):
-            guard revision.documentID == entry.identity else { return }
+            guard revision.documentID == entry.identity, revision.version == session.version else { return }
+            guard !entry.isClosing, !entry.isRetiring, !entry.portClosed else { return }
             guard ExactSourceText.matches(session.text, proposal.text) else { return }
             session.rebaseSavedText(to: proposal.text)
             entry.lastPersistedText = proposal.text
             entry.pendingProposal = nil
             entry.fenced = false
-            entry.allowsProviderWrite = !entry.lease.isReleased
-            setState(
-                .ready(canWrite: entry.allowsProviderWrite, accessGeneration: entry.accessGeneration),
-                entry: entry
-            )
+            refreshWritableState(entry)
             emitSnapshot(entry)
         case .deferred:
             break
         case .refused:
             entry.pendingProposal = nil
+            entry.fenced = true
+            entry.autosaveTask?.cancel()
+            setState(.unavailable(accessGeneration: entry.accessGeneration, reason: .sourceChanged), entry: entry)
+            if session.isDirty {
+                Task { @MainActor in
+                    await self.beginConflict(entry, reason: .externalConflict, allowRetry: true)
+                }
+            }
         }
     }
 

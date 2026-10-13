@@ -5,16 +5,22 @@ extension IOSUIDocumentStore {
     public func save(_ identity: IOSDocumentIdentity) async throws -> IOSSaveAcknowledgement {
         try Task.checkCancellation()
         let entry = try requireEntry(identity)
-        guard let session = entry.session else {
-            throw IOSDocumentFailure.unavailable
-        }
+        guard entry.session != nil else { throw IOSDocumentFailure.unavailable }
+        guard !writeBarrier(entry) else { throw IOSDocumentFailure.conflict }
+        return try await saveSnapshot(entry, allowsClosing: false)
+    }
+
+    func saveSnapshot(_ entry: IOSDocumentEntry, allowsClosing: Bool) async throws -> IOSSaveAcknowledgement {
+        guard let session = entry.session else { throw IOSDocumentFailure.unavailable }
+        let identity = entry.identity
         let operation = IOSDocumentSaveOperation(
             sequence: entry.nextSequence + 1,
             operationID: UUID(),
             snapshotText: session.text,
             capturedVersion: session.version,
             accessGeneration: entry.accessGeneration,
-            identity: identity
+            identity: identity,
+            allowsClosing: allowsClosing
         )
         entry.nextSequence = operation.sequence
         return try await enqueue(entry, operation)
@@ -37,7 +43,7 @@ extension IOSUIDocumentStore {
             try? await Task.sleep(nanoseconds: self.timing.autosaveDelayNanoseconds)
             guard !Task.isCancelled, entry.autosaveGeneration == generation else { return }
             guard let session = entry.session, session.isDirty else { return }
-            guard !entry.fenced, entry.allowsProviderWrite else { return }
+            guard !self.writeBarrier(entry), entry.allowsProviderWrite else { return }
             guard self.guardCurrentAuthority(entry, generation: entry.accessGeneration) else { return }
             _ = try? await self.save(entry.identity)
         }
@@ -66,7 +72,7 @@ extension IOSUIDocumentStore {
         guard guardSaveAuthority(entry, operation) else {
             throw IOSDocumentFailure.documentChanged
         }
-        if entry.fenced {
+        if writeBarrier(entry, allowsClosing: operation.allowsClosing) {
             throw IOSDocumentFailure.conflict
         }
         if !entry.allowsProviderWrite {
@@ -78,7 +84,7 @@ extension IOSUIDocumentStore {
         entry.inFlightText = operation.snapshotText
         setState(
             .saving(
-                canWrite: true,
+                canWrite: !writeBarrier(entry) && entry.allowsProviderWrite && !entry.lease.isReleased,
                 accessGeneration: entry.accessGeneration,
                 operationID: operation.operationID
             ),
@@ -178,8 +184,7 @@ extension IOSUIDocumentStore {
         entry.inFlightText = nil
         let acknowledgement = acknowledgement(entry, operation)
         entry.lastAcknowledgement = acknowledgement
-        let writable = entry.allowsProviderWrite && !entry.fenced && !entry.lease.isReleased
-        setState(.ready(canWrite: writable, accessGeneration: entry.accessGeneration), entry: entry)
+        refreshWritableState(entry)
         emit(.saveCompleted(acknowledgement))
         emitSnapshot(entry)
     }
@@ -191,8 +196,7 @@ extension IOSUIDocumentStore {
     ) {
         entry.inFlightText = nil
         if guardSaveAuthority(entry, operation), !entry.fenced {
-            let writable = entry.allowsProviderWrite && !entry.lease.isReleased
-            setState(.ready(canWrite: writable, accessGeneration: entry.accessGeneration), entry: entry)
+            refreshWritableState(entry)
         }
         emit(.failed(entry.identity, operationID: operation.operationID, reason: failure))
     }

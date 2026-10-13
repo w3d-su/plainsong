@@ -112,17 +112,25 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         creating initialText: String?
     ) async throws -> IOSDocumentHandle {
         let key = IOSDocumentResourceKey(location: location)
-        if let existing = byResource[key] {
+        while let existing = byResource[key] {
+            guard location.accessGeneration >= existing.accessGeneration else {
+                throw IOSDocumentFailure.documentChanged
+            }
+            if let closing = existing.closeTask {
+                _ = try await closing.value
+                existing.closeTask = nil
+                continue
+            }
             let sameAuthority = existing.accessGeneration == location.accessGeneration
-                && !existing.superseded
-                && !existing.closed
+                && !existing.superseded && !existing.closed && !existing.isRetiring
             if sameAuthority {
                 if initialText != nil {
                     throw IOSDocumentFailure.access(.alreadyExists)
                 }
                 return try await existing.awaitReady()
             }
-            supersede(existing)
+            try await retireForReplacement(existing)
+            // Recheck after awaiting: a concurrent opener may have installed the new entry.
         }
 
         let entry = makeEntry(location: location, lease: lease, key: key)
@@ -198,7 +206,7 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         entry.lastPersistedText = text
         entry.allowsProviderWrite = canWrite
         entry.openFinished = true
-        setState(.ready(canWrite: canWrite, accessGeneration: entry.accessGeneration), entry: entry)
+        refreshWritableState(entry)
         emitSnapshot(entry)
         watchEdits(entry)
     }
@@ -225,17 +233,6 @@ public final class IOSUIDocumentStore: IOSDocumentStore {
         }
         byIdentity[entry.identity] = nil
         finishOpen(entry, result: .failure(failure))
-    }
-
-    func supersede(_ entry: IOSDocumentEntry) {
-        entry.superseded = true
-        entry.fenced = true
-        entry.allowsProviderWrite = false
-        entry.externalToken = nil
-        entry.autosaveTask?.cancel()
-        if byResource[entry.resourceKey] === entry {
-            byResource[entry.resourceKey] = nil
-        }
     }
 
     func guardCurrentAuthority(_ entry: IOSDocumentEntry, generation: UInt64) -> Bool {

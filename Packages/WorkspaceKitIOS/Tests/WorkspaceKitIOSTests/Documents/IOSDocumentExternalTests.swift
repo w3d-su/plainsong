@@ -40,8 +40,11 @@ final class IOSDocumentExternalTests: XCTestCase {
         await harness.coordinator.setBlockReads(true)
         port.emit(.externalChange)
         await waitUntil { await harness.coordinator.blockedReads() == 1 }
-        let replacement = try await harness.openNote(text: "fresh", generation: 2)
+        let replacing = Task { try await harness.openNote(text: "fresh", generation: 2) }
+        await waitUntil { harness.store.byIdentity[handle.identity]?.isRetiring == true }
+        XCTAssertEqual(harness.ports.created.count, 1)
         await harness.coordinator.unblockReads()
+        let replacement = try await replacing.value
         await waitUntil { await harness.coordinator.completedReads() == 1 }
         XCTAssertEqual(replacement.session.text, "fresh")
         XCTAssertEqual(replacement.session.version, 0)
@@ -234,5 +237,3 @@ private func reloadProposals(in events: [IOSDocumentEvent]) -> [IOSDocumentReloa
         return nil
     }
 }
-
-

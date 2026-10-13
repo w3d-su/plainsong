@@ -1,0 +1,191 @@
+{
+  "recorded_date": "2026-10-13",
+  "branch": "codex/ios-storage-review-fixes",
+  "implementation_base": "b82d0c27e69ebe9260a1c71a0a4deb8a2cceec6b",
+  "status": "review-source-ready; compile/runtime-infrastructure-pending",
+  "current_source": {
+    "fingerprint_file": "review-source-inputs.json",
+    "fingerprinted_inputs": 147,
+    "current_source_matches_fingerprint": true,
+    "declared_test_count": 43,
+    "declarations_file": "review-declared-tests.json",
+    "compiled_test_count": 0,
+    "executed_test_count": 0
+  },
+  "generic_build_attempts": [
+    {
+      "command": [
+        "lockf",
+        "-k",
+        "-t",
+        "45",
+        "/private/tmp/plainsong-xcodebuild-test.lock",
+        "xcodebuild",
+        "build-for-testing",
+        "-scheme",
+        "WorkspaceKitIOS",
+        "-destination",
+        "generic/platform=iOS Simulator",
+        "-sdk",
+        "iphonesimulator",
+        "-derivedDataPath",
+        "/private/tmp/plainsong-storage-review-20261013-final/DerivedData",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-storage-review-20261013-final/generic-build.xcresult",
+        "-collect-test-diagnostics",
+        "never",
+        "-parallel-testing-enabled",
+        "NO",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO"
+      ],
+      "cwd": "/private/tmp/plainsong-storage-review-20261013-final/probe-source/Packages/WorkspaceKitIOS",
+      "started_epoch": 1791869643.482204,
+      "timed_out": false,
+      "compiled_target_case_count_expected": 43,
+      "executed_tests": 0,
+      "exit_code": 75,
+      "finished_epoch": 1791869688.801522
+    },
+    {
+      "command": [
+        "lockf",
+        "-k",
+        "-t",
+        "45",
+        "/private/tmp/plainsong-xcodebuild-test.lock",
+        "xcodebuild",
+        "build-for-testing",
+        "-scheme",
+        "WorkspaceKitIOS",
+        "-destination",
+        "generic/platform=iOS Simulator",
+        "-sdk",
+        "iphonesimulator",
+        "-derivedDataPath",
+        "/private/tmp/plainsong-storage-review-20261013-final/DerivedData",
+        "-resultBundlePath",
+        "/private/tmp/plainsong-storage-review-20261013-final/generic-build-2.xcresult",
+        "-collect-test-diagnostics",
+        "never",
+        "-parallel-testing-enabled",
+        "NO",
+        "CODE_SIGNING_ALLOWED=NO",
+        "CODE_SIGNING_REQUIRED=NO"
+      ],
+      "cwd": "/private/tmp/plainsong-storage-review-20261013-final/probe-source/Packages/WorkspaceKitIOS",
+      "started_epoch": 1791869754.2760699,
+      "timed_out": false,
+      "compiled_target_case_count_expected": 43,
+      "executed_tests": 0,
+      "exit_code": 75,
+      "finished_epoch": 1791869799.306817
+    }
+  ],
+  "generic_build_logs": [
+    "/private/tmp/plainsong-storage-review-20261013-final/generic-build.log",
+    "/private/tmp/plainsong-storage-review-20261013-final/generic-build-2.log"
+  ],
+  "historical_positive": {
+    "date": "2026-10-09",
+    "xcodebuild_exit_code": 0,
+    "summary_file": "historical-module-41-summary.json",
+    "source_input_file": "historical-module-41-inputs.json",
+    "passed": 41,
+    "failed": 0,
+    "skipped": 0,
+    "scope": "version-bound earlier 41-case candidate; not final 43-case acceptance",
+    "log": "/private/tmp/plainsong-storage-review-20261009/module-final.log",
+    "log_sha256": "2b781b0dd5269f41139e38e301e815689a0bb66d840f1dd30a2ce54314e568ce",
+    "xcresult": "/private/tmp/plainsong-storage-review-20261009/module-final.xcresult"
+  },
+  "historical_probe_infrastructure_failure": {
+    "exit_code": 74,
+    "executed": 0,
+    "cause": "temporary graph omitted PreviewKit; not a killed guard probe",
+    "log": "/private/tmp/plainsong-storage-review-20261009/probe-external-barrier.log"
+  },
+  "review_probe_admission_attempts": [
+    {
+      "output": "/private/tmp/plainsong-storage-review-20261013",
+      "exit_code": 75,
+      "executed": 0
+    },
+    {
+      "output": "/private/tmp/plainsong-storage-review-20261013-r2",
+      "attempt": 1,
+      "exit_code": 75,
+      "executed": 0
+    },
+    {
+      "output": "/private/tmp/plainsong-storage-review-20261013-r2",
+      "attempt": 2,
+      "exit_code": 75,
+      "executed": 0
+    }
+  ],
+  "required_pending_probes": [
+    {
+      "guard": "external-barrier",
+      "selector": "IOSAuditCounterexampleTests/testPendingExternalReadMustFenceOriginalFileWrites"
+    },
+    {
+      "guard": "post-close-revision",
+      "selector": "IOSAuditCounterexampleTests/testEditWhilePortCloseIsSuspendedMustRetainDraft"
+    },
+    {
+      "guard": "retirement-drain",
+      "selector": "IOSDocumentRetirementTests/testGenerationReplacementDrainsWriterAndRecoversEditsDuringPortClose"
+    },
+    {
+      "guard": "retirement-read-admission",
+      "selector": "IOSDocumentRetirementTests/testRetirementDoesNotAdmitNewExternalReadsDuringProviderClose"
+    },
+    {
+      "guard": "late-retirement-recovery",
+      "selector": "IOSDocumentRetirementTests/testGenerationReplacementDrainsWriterAndRecoversEditsDuringPortClose"
+    }
+  ],
+  "probe_restore_verification": {
+    "executed_killed_probes": 0,
+    "completed_admission_attempts_restored_all_inputs": true,
+    "note": "admission mutations were restored and fingerprint-compared; no actual failing-test proof claimed"
+  },
+  "frozen_contracts": {
+    "version": "IOS-C0-v1",
+    "file_count": 13,
+    "mismatches": [],
+    "sha256": {
+      "AppIOS/State/Contracts.swift": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56",
+      "AppIOS/State/FeatureContracts.swift": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361",
+      "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567",
+      "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa",
+      "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe",
+      "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174",
+      "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6",
+      "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b",
+      "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748"
+    }
+  },
+  "format": {
+    "tool": "SwiftFormat",
+    "version": "0.62.1",
+    "document_swift_file_count": 25,
+    "files_needing_format": 0,
+    "git_diff_check_exit_code": 0
+  },
+  "swiftlint": "not accepted: initial invocation linted repository plus cache permission error; script-input file-list invocation found no lintable files; logs retained in October13-r2 output",
+  "pending": [
+    "final 43-case iOS simulator execution",
+    "five actual guard mutation failure probes and restored full run",
+    "Mac regression / exact-head CI (root-owned)",
+    "lane06 real access providers",
+    "M0 physical IME/Undo / Files/iCloud / background persistence / re-signed IPA install",
+    "lane13 production composition",
+    "physical input latency measurement"
+  ]
+}

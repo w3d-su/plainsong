@@ -10,6 +10,12 @@ Status: **module-ready**. Not product-integration-ready. M0 device gates are ope
 | Head | The commit that adds this file on `phase3-ios-document-io` |
 | PR base | `phase3-ios-integration` |
 
+## Review repairs (2026-10-13)
+
+The additive batch on `codex/ios-storage-review-fixes` addresses the external-observation write race, suspended-close draft loss, and generation retirement. See [review-fixes.md](review-fixes.md) and the structured [review-verification.json](review-verification.json).
+
+Final source declares **43 cases**. Two current generic build attempts ended at canonical-lock admission (`exit 75`), with **0 compiled / 0 executed**; five mutation probes and the final restored simulator run remain pending. The earlier 2026-10-09 candidate actually passed **41 / 0 failed / 0 skipped**, with exact retained source inputs, but that result is version-bound and does not close final-source acceptance. All 13 frozen contract hashes match and SwiftFormat 0.62.1 reports 0/25 document files needing formatting.
+
 ## What landed
 
 `IOSUIDocumentStore` is the UIDocument-backed `IOSDocumentStore`. One open instance owns one `DocumentSession`. Save completions call `rebaseSavedText(to:)` after identity, generation, and operation-order checks. They do not call `markSaved(text:url:)`.

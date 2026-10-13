@@ -7,7 +7,6 @@ extension IOSUIDocumentStore {
             return
         }
         entry.fenced = true
-        entry.allowsProviderWrite = false
         entry.autosaveTask?.cancel()
         let captured = session.text
         guard let record = recoveryRecord(entry, reason: reason) else { return }
@@ -32,7 +31,6 @@ extension IOSUIDocumentStore {
     /// Conflict becomes visible only after the recovery record is durable.
     func publishConflictAfterRecovery(_ entry: IOSDocumentEntry, _ receipt: IOSRecoveryReceipt) {
         entry.fenced = true
-        entry.allowsProviderWrite = false
         entry.recoveryReceipt = receipt
         setState(.conflict(accessGeneration: entry.accessGeneration, recovery: receipt), entry: entry)
         emit(.recoveryPersisted(receipt))
@@ -40,7 +38,6 @@ extension IOSUIDocumentStore {
 
     func publishRecoveryFailure(_ entry: IOSDocumentEntry, operationID: UUID) {
         entry.fenced = true
-        entry.allowsProviderWrite = false
         setState(
             .unavailable(accessGeneration: entry.accessGeneration, reason: .recoveryFailed),
             entry: entry
@@ -77,35 +74,20 @@ extension IOSUIDocumentStore {
 
     public func close(_ identity: IOSDocumentIdentity) async throws -> IOSDocumentCloseOutcome {
         let entry = try requireEntry(identity)
+        if let retirement = entry.retirementTask {
+            try await retirement.value
+            return .closed
+        }
+        if let closing = entry.closeTask {
+            return try await closing.value
+        }
+        entry.isClosing = true
         entry.autosaveTask?.cancel()
-        if let session = entry.session, session.isDirty, !entry.fenced, entry.allowsProviderWrite {
-            do {
-                _ = try await save(identity)
-            } catch {
-                // The draft stays. Close does not become success.
-            }
-        }
-        await entry.queue.drain()
-        if let session = entry.session, session.isDirty || entry.fenced {
-            let receipt = try? await persistRecovery(entry, reason: .closeIncomplete)
-            return .retained(recovery: receipt ?? entry.recoveryReceipt)
-        }
-        do {
-            try await entry.filePort.close()
-        } catch {
-            emit(.failed(identity, operationID: UUID(), reason: .closeFailed))
-            throw IOSDocumentFailure.closeFailed
-        }
-        entry.closed = true
-        entry.textTask?.cancel()
-        entry.allowsProviderWrite = false
-        setState(.closed(accessGeneration: entry.accessGeneration), entry: entry)
-        if byResource[entry.resourceKey] === entry {
-            byResource[entry.resourceKey] = nil
-        }
-        entry.lease.release()
-        emit(.closed(identity))
-        return .closed
+        refreshWritableState(entry)
+        let task = Task { @MainActor in try await self.performClose(entry) }
+        entry.closeTask = task
+        defer { entry.closeTask = nil }
+        return try await task.value
     }
 
     public func flushForBackground() async -> [IOSDocumentFlushOutcome] {
