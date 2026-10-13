@@ -67,3 +67,22 @@ Simulator target: `PlainsongIOSTests` on scheme `PlainsongIOS`. Private doubles:
 - `testPickedFileBytesAreNotTheMarkdownPath`
 
 Module results and the device Files/iCloud/Photos gate are recorded separately in `README.md` after the simulator run. Passing these classes does not close M0.
+
+## IOSImageTaskCancellationTests
+
+- `testCancelledCallerDoesNotBeginPersistence`
+- `testTaskCancelDuringNormalizationNeverStages`
+- `testTaskCancelDuringStageDrainsOneOwnedRollback`
+- `testTaskCancelDuringValidationDrainsWithoutApply`
+- `testCancellationDuringFinalSnapshotNeverApplies`
+- `testCancelledRollbackRetentionKeepsReceiptAndOwnedIdentity`
+- `testTaskCancellationInsideAcceptedApplyStillCommitsOnce`
+
+## IOSImageRasterValidationTests
+
+- `testRealRasterFixturesDecodeAndRemainUnchanged`
+- `testSignatureOnlyRastersNeverReachPersistence`
+- `testTruncatedRealRastersNeverReachPersistence`
+- `testHEICTranscoderMustReturnCompletePNG`
+
+Review-fix execution and exact-source provenance are recorded in `acceptance-review-fixes.md`. The legacy fixture signatures were replaced with complete one-pixel raster data; malformed signatures now belong only to explicit rejection tests.
