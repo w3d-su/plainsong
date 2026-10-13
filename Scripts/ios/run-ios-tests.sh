@@ -63,6 +63,8 @@ set +e
 xcodebuild -project Plainsong.xcodeproj -scheme PlainsongIOS -configuration Debug \
     -sdk iphonesimulator -destination "$destination" -derivedDataPath "$derived_data" \
     -parallel-testing-enabled NO -resultBundlePath "$evidence/Results.xcresult" \
+    -collect-test-diagnostics on-failure -test-timeouts-enabled YES \
+    -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
     test-without-building > "$evidence/test.log" 2>&1
 result=$?
@@ -98,6 +100,8 @@ ios_metadata "$evidence/test.json" \
     ios_base_sha="\"$(git rev-parse ios-c0-v1 2>/dev/null || echo unknown)\"" \
     scheme="\"PlainsongIOS\"" configuration="\"Debug\"" destination="\"$destination\"" \
     source_fingerprint="\"$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["source_fingerprint"])' "$evidence/source.json")\"" \
+    collect_test_diagnostics="\"on-failure\"" test_timeouts_enabled=true \
+    default_test_execution_time_allowance=120 maximum_test_execution_time_allowance=180 \
     manifest="\"$manifest\"" named_tests="$(wc -l < "$evidence/named-tests.txt" | tr -d ' ')" \
     exit_code="$result"
 

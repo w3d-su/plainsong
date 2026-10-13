@@ -27,6 +27,10 @@ make ios-archive [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 ```
 
+`ios-test` 明確採 `-collect-test-diagnostics on-failure`，保留失敗診斷；啟用個別 XCTest
+的 timeout，預設 120 秒、上限 180 秒。這些選項已以目前 Xcode 27 的 `xcodebuild -help`
+核對；不能代替 simulator 安裝／啟動的整體 deadline，也不會把 0-run 或中斷判成 PASS。
+
 `ios-test` 的 `IOS_DESTINATION` 必填且必須是已安裝 runtime 的實際 UUID；
 `Scripts/ios/ios-print-simulator-udid.sh` 可印出第一個可用的 iOS ≥ 26 iPhone UUID，
 錯誤/不存在的 UUID 會以 exit 64 失敗並列出可用選項。
