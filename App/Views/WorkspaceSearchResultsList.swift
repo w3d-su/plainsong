@@ -26,6 +26,7 @@ struct WorkspaceSearchResultsList: View {
             resultSections
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
         .accessibilityIdentifier(WorkspaceSearchAccessibility.resultsList)
         .accessibilityLabel("Search results")
         .focusable(presentationHasRows)
@@ -198,13 +199,17 @@ struct WorkspaceSearchResultsList: View {
                 }
             } header: {
                 HStack(spacing: 6) {
-                    Text(section.relativePath)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
+                    Image(systemName: "doc.text")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    WorkspaceSearchSectionPathLabel(relativePath: section.relativePath)
                     Spacer(minLength: 4)
                     Text("\(section.matchCount)")
-                        .font(.caption.monospacedDigit())
+                        .font(.caption.weight(.medium).monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(.quaternary, in: Capsule())
                     if section.isTruncated {
                         Image(systemName: "ellipsis.circle")
                             .font(.caption)

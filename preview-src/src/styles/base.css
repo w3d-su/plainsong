@@ -1,31 +1,64 @@
-:root {
+/* Apple system palette. Dark mode matches the macOS text background (#1e1e1e)
+   so the preview sits flush against the source editor. */
+:root,
+:root[data-theme="light"] {
   color-scheme: light dark;
   --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
+  --preview-fg: #1d1d1f;
+  --preview-muted: #6e6e73;
+  --preview-border: #d2d2d7;
+  --preview-separator: #e5e5ea;
+  --preview-code-bg: #f5f5f7;
+  --preview-stripe: #fafafc;
+  --preview-accent: #0068da;
+  --preview-caution-bg: #fff7d6;
+  --preview-caution-border: #e6b800;
+  --preview-caution-fg: #5c4300;
+  /* Xcode "Default (Light)" syntax colors. */
+  --hl-keyword: #9b2393;
+  --hl-string: #c41a16;
+  --hl-number: #1c00cf;
+  --hl-comment: #5d6c79;
+  --hl-type: #3900a0;
+  --hl-function: #6c36a9;
+  --hl-declaration: #0f68a0;
+  --hl-attribute: #815f03;
+  --hl-preprocessor: #643820;
+  --hl-link: #0e0eff;
+  --hl-addition-bg: rgba(52, 199, 89, 0.14);
+  --hl-deletion-bg: rgba(255, 59, 48, 0.12);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --preview-bg: #0d1117;
-  --preview-fg: #e6edf3;
-  --preview-muted: #8b949e;
-  --preview-border: #30363d;
-  --preview-code-bg: #161b22;
-  --preview-accent: #58a6ff;
+  --preview-bg: #1e1e1e;
+  --preview-fg: #e3e3e5;
+  --preview-muted: #98989d;
+  --preview-border: #48484a;
+  --preview-separator: #38383a;
+  --preview-code-bg: #2a2a2c;
+  --preview-stripe: #242426;
+  --preview-accent: #419cff;
+  --preview-caution-bg: #352c00;
+  --preview-caution-border: #8a6d00;
+  --preview-caution-fg: #f5d76e;
+  /* Xcode "Default (Dark)" syntax colors. */
+  --hl-keyword: #fc5fa3;
+  --hl-string: #fc6a5d;
+  --hl-number: #d0bf69;
+  --hl-comment: #929faa;
+  --hl-type: #d0a8ff;
+  --hl-function: #b184ef;
+  --hl-declaration: #41a1c0;
+  --hl-attribute: #bf8555;
+  --hl-preprocessor: #fd8f3f;
+  --hl-link: #6b94ff;
+  --hl-addition-bg: rgba(48, 209, 88, 0.18);
+  --hl-deletion-bg: rgba(255, 69, 58, 0.18);
 }
 
 body {
@@ -48,6 +81,11 @@ body {
 
 a {
   color: var(--preview-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 h1,
@@ -61,13 +99,13 @@ h6 {
 }
 
 h1 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 2em;
   padding-bottom: 0.3em;
 }
 
 h2 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 1.5em;
   padding-bottom: 0.25em;
 }
@@ -95,14 +133,14 @@ pre {
 
 code {
   background: var(--preview-code-bg);
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 0.9em;
   padding: 0.15em 0.35em;
 }
 
 pre {
   background: var(--preview-code-bg);
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: auto;
   padding: 14px 16px;
 }
@@ -112,6 +150,99 @@ pre code {
   border-radius: 0;
   display: block;
   padding: 0;
+}
+
+/* highlight.js output: the block already carries the code background and
+   padding, so the highlighted element adds neither (no nested box). */
+pre code.hljs {
+  color: inherit;
+  overflow-x: auto;
+}
+
+.hljs-keyword,
+.hljs-doctag,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-selector-tag,
+.hljs-variable.language_,
+.hljs-meta .hljs-keyword {
+  color: var(--hl-keyword);
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-code,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-char.escape_ {
+  color: var(--hl-number);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-formula {
+  color: var(--hl-comment);
+  font-style: normal;
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ {
+  color: var(--hl-type);
+}
+
+.hljs-title,
+.hljs-title.function_ {
+  color: var(--hl-function);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-name,
+.hljs-section,
+.hljs-property {
+  color: var(--hl-declaration);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo {
+  color: var(--hl-attribute);
+}
+
+.hljs-meta,
+.hljs-bullet {
+  color: var(--hl-preprocessor);
+}
+
+.hljs-link {
+  color: var(--hl-link);
+}
+
+.hljs-section,
+.hljs-strong {
+  font-weight: 600;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-addition {
+  background: var(--hl-addition-bg);
+}
+
+.hljs-deletion {
+  background: var(--hl-deletion-bg);
 }
 
 table {
@@ -128,8 +259,12 @@ td {
   padding: 6px 10px;
 }
 
+th {
+  background: var(--preview-code-bg);
+}
+
 tr:nth-child(2n) {
-  background: #f6f8fa;
+  background: var(--preview-stripe);
 }
 
 img {
@@ -151,7 +286,7 @@ input[type="checkbox"] {
 .export-image-placeholder {
   background: var(--preview-code-bg);
   border: 1px dashed var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--preview-muted);
   display: inline-block;
   font-size: 0.88em;
@@ -159,10 +294,10 @@ input[type="checkbox"] {
 }
 
 .mdx-error-banner {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   display: grid;
   gap: 4px;
   margin: 0 0 16px;
@@ -201,7 +336,7 @@ input[type="checkbox"] {
 
 .mdx-component-card {
   border: 1px solid var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   box-sizing: border-box;
 }
 
@@ -292,10 +427,10 @@ input[type="checkbox"] {
 }
 
 .mermaid-error {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   font-family: "SF Mono", Menlo, Consolas, monospace;
   padding: 12px;
   white-space: pre-wrap;
@@ -303,33 +438,28 @@ input[type="checkbox"] {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --preview-bg: #0d1117;
-    --preview-fg: #e6edf3;
-    --preview-muted: #8b949e;
-    --preview-border: #30363d;
-    --preview-code-bg: #161b22;
-    --preview-accent: #58a6ff;
+    --preview-bg: #1e1e1e;
+    --preview-fg: #e3e3e5;
+    --preview-muted: #98989d;
+    --preview-border: #48484a;
+    --preview-separator: #38383a;
+    --preview-code-bg: #2a2a2c;
+    --preview-stripe: #242426;
+    --preview-accent: #419cff;
+    --preview-caution-bg: #352c00;
+    --preview-caution-border: #8a6d00;
+    --preview-caution-fg: #f5d76e;
+    --hl-keyword: #fc5fa3;
+    --hl-string: #fc6a5d;
+    --hl-number: #d0bf69;
+    --hl-comment: #929faa;
+    --hl-type: #d0a8ff;
+    --hl-function: #b184ef;
+    --hl-declaration: #41a1c0;
+    --hl-attribute: #bf8555;
+    --hl-preprocessor: #fd8f3f;
+    --hl-link: #6b94ff;
+    --hl-addition-bg: rgba(48, 209, 88, 0.18);
+    --hl-deletion-bg: rgba(255, 69, 58, 0.18);
   }
-
-  :root:not([data-theme="light"]) tr:nth-child(2n) {
-    background: #161b22;
-  }
-
-  :root:not([data-theme="light"]) .mdx-error-banner,
-  :root:not([data-theme="light"]) .mermaid-error {
-    background: #332b00;
-    border-color: #9e7f14;
-    color: #f0d98c;
-  }
-}
-
-:root[data-theme="dark"] tr:nth-child(2n) {
-  background: #161b22;
-}
-
-:root[data-theme="dark"] .mdx-error-banner,
-:root[data-theme="dark"] .mermaid-error {
-  background: #332b00;
-  border-color: #9e7f14;
-  color: #f0d98c;
 }

@@ -80,7 +80,7 @@ file inside a folder workspace so file switching and preview rendering are also 
 ## Frontmatter Panel
 
 - [ ] Open `Fixtures/kitchen-sink.md` or another Markdown file whose first bytes are `---` and whose frontmatter includes `title`, `date`, `tags`, `draft`, and at least one custom key.
-- [ ] Edit `title` in the sidebar panel and confirm the source text changes while the body and custom key remain unchanged.
+- [ ] Edit `title` in the inspector (⌃⌘I) and confirm the source text changes while the body and custom key remain unchanged.
 - [ ] Change `date` with the date picker and confirm the YAML value stays in `yyyy-MM-dd` form.
 - [ ] Edit `tags` as comma-separated tokens and confirm the source rewrites only the `tags` key as a YAML list.
 - [ ] Toggle `draft` and confirm it writes `true` or `false`.
