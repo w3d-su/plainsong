@@ -16,9 +16,13 @@ final class ExportPDFPaginationDesignStopTests: XCTestCase {
         controller.setTheme("light")
         let fixture = ExportPDFMechanismSpikeTests.tallFixture
         let columns = (0 ..< 12).map { String(format: "GCOLUMN%02dSENTINEL", $0) }
-        let table = "| " + columns.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "---" }.joined(separator: " | ") + " |\n"
-            + "| " + columns.map { _ in "value" }.joined(separator: " | ") + " |\n"
+        // Built row by row: Xcode 16.4 times out type-checking one long `+` chain.
+        let rows: [[String]] = [
+            columns,
+            [String](repeating: "---", count: columns.count),
+            [String](repeating: "value", count: columns.count),
+        ]
+        let table = rows.map { "| " + $0.joined(separator: " | ") + " |\n" }.joined()
         let source = table + "\n" + fixture.markdown
         let render = await controller.renderForExport(DocumentTextChange(
             text: source, version: 1, fileKind: .markdown, fileURL: nil
