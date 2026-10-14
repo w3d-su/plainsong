@@ -76,7 +76,7 @@ blogeditor/
 ├── App/                      # Thin app target (SwiftUI)
 │   ├── PlainsongApp.swift   # @main, WindowGroup, Settings scene
 │   ├── AppState.swift        # open workspaces, recent items
-│   ├── Views/                # SwiftUI views: WorkspaceWindow, Sidebar, EditorSplit, StatusBar, FrontmatterPanel
+│   ├── Views/                # SwiftUI views: WorkspaceWindow (split view), WorkspaceSidebar, WorkspaceDetail, DocumentJumpBar, WorkspaceInspector, WorkspaceToolbar, WorkspaceStatusBar
 │   └── Resources/            # Assets, preview dist bundle (generated), themes
 ├── Packages/
 │   ├── MarkdownCore/         # Pure logic: document model, markdown utilities, completion engine, scroll-sync mapping. No AppKit/SwiftUI imports. Testable via `swift test`.
@@ -87,7 +87,7 @@ blogeditor/
 │   ├── package.json
 │   ├── src/index.ts          # bridge protocol impl, render(), morphdom patching, scroll sync
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
-│   ├── src/styles/           # preview CSS themes (github-light/dark, etc.)
+│   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
 └── .github/workflows/ci.yml  # macOS runner: swiftformat --lint, swiftlint, swift test, xcodebuild test, npm test
 ```
@@ -168,6 +168,13 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   (import-declare `net.daringfireball.markdown`, and export a UTI for `.mdx`:
   `app.plainsong.mdx` conforming to `public.plain-text` — the `public.*` namespace
   is reserved for Apple).
+- Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
+  (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
+  (R17), then the document column and a right inspector for frontmatter and file details.
+  Inspector intent and width are per-window scene state; visibility is derived
+  (`docs/window-state-gates.md` §10.1). The `HStack` shell's window minimum is 780 pt
+  and the macOS 27 split shell's is 841 pt (320 pt sidebar, 0 pt measured chrome, and
+  the 521 pt Split floor). The inspector auto-collapses when the document column cannot fit it.
 - Open folder: sidebar shows the tree; filter to show only markdown-related files by
   default (`.md`, `.markdown`, `.mdx`), toggle "Show all files". Images shown so they can
   be drag-inserted.
@@ -262,7 +269,8 @@ replacement local to EditorKit.
 | Quote | ⌘⇧Q | toggle `> ` |
 | Code fence | ⌘⇧K | wrap selection in fences |
 | Toggle preview pane | ⌘⇧P | show/hide right pane |
-| Toggle sidebar | ⌘⇧S (or native ⌃⌘S) | |
+| Toggle sidebar | ⌃⌘S | native View › Show/Hide Sidebar (`SidebarCommands`; macOS 27+ split view only) |
+| Toggle inspector | ⌃⌘I | View › Show/Hide Inspector (`InspectorToggleCommands`, key window) |
 | Format table | ⌥⌘F | |
 | Toggle checkbox | ⌘L | |
 | New file | ⌘N | workspace: dedup `Untitled.md` at root; single-file: save panel |
@@ -378,7 +386,10 @@ the Frontmatter panel, §10). Optional toggle to show it as a styled block.
 ### 7.4 Build
 
 `make preview-bundle`: `npm ci && esbuild src/index.ts --bundle --minify` →
-`App/Resources/preview/`. KaTeX fonts/CSS, highlight.js theme CSS, mermaid bundled
+`App/Resources/preview/`. KaTeX fonts/CSS and Mermaid are bundled; syntax highlighting uses the preview
+stylesheet’s Apple system palette and Xcode-inspired light/dark token colors, with dark
+function/link/comment colors raised to meet 4.5:1 on code background `#2a2a2c`.
+The highlight.js `github.css` theme is no longer bundled. All assets are bundled
 locally. No CDN, app must work fully offline. Commit the dist output.
 
 ---
@@ -433,8 +444,9 @@ attempt without a Decision Log entry.
 ## 10. Frontmatter Panel
 
 - Detect YAML frontmatter (`---` fences at byte 0). Parse with `Yams` (SPM).
-- Sidebar-attached collapsible form panel: key/value editing with type-aware controls
-  (string, date picker for `date`, tag token field for `tags`, toggle for `draft`).
+- Inspector form (right column, ⌃⌘I, Frontmatter section): key/value editing with
+  type-aware controls (string, date picker for `date`, tag token field for `tags`, toggle
+  for `draft`).
 - Edits write back into the source text (panel ↔ text always derived from the document;
   the text is the single source of truth).
 - Malformed YAML → panel shows raw text + error, never crashes, never rewrites what it
@@ -518,7 +530,7 @@ editor *folds* markdown tokens via rendering, not text mutation:
   reset presentation caches and request one fresh derivation; real-IME and full
   performance acceptance remain open.
 - The two-pane mode remains available behind a toggle forever (⌘⇧P cycles: source+preview
-  / source only / WYSIWYG once it ships).
+  / source only / WYSIWYG once it ships; the toolbar layout picker selects a mode directly).
 
 ---
 

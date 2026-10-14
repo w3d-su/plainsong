@@ -65,13 +65,13 @@ struct WorkspaceSearchSidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 queryField
                 optionToggles
             }
-            .padding(12)
-
-            Divider()
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
 
             WorkspaceSearchResultsList(
                 presentation: resultsPresentation,
@@ -290,23 +290,16 @@ struct WorkspaceSearchSidebar: View {
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-        )
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(.quaternary))
     }
 
     private var optionToggles: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Toggle(isOn: matchCaseBinding) {
                 Text("Aa")
-                    .font(.system(.body, design: .rounded).weight(.medium))
+                    .font(.system(.callout, design: .rounded).weight(.semibold))
             }
             .toggleStyle(.button)
             .help("Match Case (off = smart case)")
@@ -316,7 +309,7 @@ struct WorkspaceSearchSidebar: View {
 
             Toggle(isOn: wholeWordBinding) {
                 Text("Whole Word")
-                    .font(.caption)
+                    .font(.callout)
             }
             .toggleStyle(.button)
             .help("Match whole words only")

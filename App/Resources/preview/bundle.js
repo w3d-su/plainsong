@@ -3613,34 +3613,67 @@ Defaulting to 2020, but this will stop working in the future.`)),t.ecmaVersion=1
 `});++n<e.length;)n&&r.push({type:"text",value:`
 `}),r.push(e[n]);return t&&e.length>0&&r.push({type:"text",value:`
 `}),r}function uXe(e){let t=0,r=e.charCodeAt(t);for(;r===9||r===32;)t++,r=e.charCodeAt(t);return e.slice(t)}function iN(e,t){let r=hXe(e,t),n=r.one(e,void 0),i=cXe(r),a=Array.isArray(n)?{type:"root",children:n}:n||{type:"root",children:[]};return i&&("children"in a,a.children.push({type:"text",value:`
-`},i)),a}function FE(e,t){return e&&"run"in e?async function(r,n){let i=iN(r,{file:n,...t});await e.run(i,n)}:function(r,n){return iN(r,{file:n,...e||t})}}function $ee(e){if(e)throw e}var oN=ls(bXe(),1);function $E(e){if(typeof e!="object"||e===null)return!1;let t=Object.getPrototypeOf(e);return(t===null||t===Object.prototype||Object.getPrototypeOf(t)===null)&&!(Symbol.toStringTag in e)&&!(Symbol.iterator in e)}function zee(){let e=[],t={run:r,use:n};return t;function r(...i){let a=-1,s=i.pop();if(typeof s!="function")throw new TypeError("Expected function as last argument, not "+s);o(null,...i);function o(l,...u){let h=e[++a],f=-1;if(l){s(l);return}for(;++f<i.length;)(u[f]===null||u[f]===void 0)&&(u[f]=i[f]);i=u,h?TXe(h,o)(...u):s(null,...u)}}function n(i){if(typeof i!="function")throw new TypeError("Expected `middelware` to be a function, not "+i);return e.push(i),t}}function TXe(e,t){let r;return n;function n(...s){let o=e.length>s.length,l;o&&s.push(i);try{l=e.apply(this,s)}catch(u){let h=u;if(o&&r)throw h;return i(h)}o||(l&&l.then&&typeof l.then=="function"?l.then(a,i):l instanceof Error?i(l):a(l))}function i(s,...o){r||(r=!0,t(s,...o))}function a(s){i(null,s)}}var Uu={basename:aQt,dirname:sQt,extname:oQt,join:lQt,sep:"/"};function aQt(e,t){if(t!==void 0&&typeof t!="string")throw new TypeError('"ext" argument must be a string');zE(e);let r=0,n=-1,i=e.length,a;if(t===void 0||t.length===0||t.length>e.length){for(;i--;)if(e.codePointAt(i)===47){if(a){r=i+1;break}}else n<0&&(a=!0,n=i+1);return n<0?"":e.slice(r,n)}if(t===e)return"";let s=-1,o=t.length-1;for(;i--;)if(e.codePointAt(i)===47){if(a){r=i+1;break}}else s<0&&(a=!0,s=i+1),o>-1&&(e.codePointAt(i)===t.codePointAt(o--)?o<0&&(n=i):(o=-1,n=s));return r===n?n=s:n<0&&(n=e.length),e.slice(r,n)}function sQt(e){if(zE(e),e.length===0)return".";let t=-1,r=e.length,n;for(;--r;)if(e.codePointAt(r)===47){if(n){t=r;break}}else n||(n=!0);return t<0?e.codePointAt(0)===47?"/":".":t===1&&e.codePointAt(0)===47?"//":e.slice(0,t)}function oQt(e){zE(e);let t=e.length,r=-1,n=0,i=-1,a=0,s;for(;t--;){let o=e.codePointAt(t);if(o===47){if(s){n=t+1;break}continue}r<0&&(s=!0,r=t+1),o===46?i<0?i=t:a!==1&&(a=1):i>-1&&(a=-1)}return i<0||r<0||a===0||a===1&&i===r-1&&i===n+1?"":e.slice(i,r)}function lQt(...e){let t=-1,r;for(;++t<e.length;)zE(e[t]),e[t]&&(r=r===void 0?e[t]:r+"/"+e[t]);return r===void 0?".":cQt(r)}function cQt(e){zE(e);let t=e.codePointAt(0)===47,r=uQt(e,!t);return r.length===0&&!t&&(r="."),r.length>0&&e.codePointAt(e.length-1)===47&&(r+="/"),t?"/"+r:r}function uQt(e,t){let r="",n=0,i=-1,a=0,s=-1,o,l;for(;++s<=e.length;){if(s<e.length)o=e.codePointAt(s);else{if(o===47)break;o=47}if(o===47){if(!(i===s-1||a===1))if(i!==s-1&&a===2){if(r.length<2||n!==2||r.codePointAt(r.length-1)!==46||r.codePointAt(r.length-2)!==46){if(r.length>2){if(l=r.lastIndexOf("/"),l!==r.length-1){l<0?(r="",n=0):(r=r.slice(0,l),n=r.length-1-r.lastIndexOf("/")),i=s,a=0;continue}}else if(r.length>0){r="",n=0,i=s,a=0;continue}}t&&(r=r.length>0?r+"/..":"..",n=2)}else r.length>0?r+="/"+e.slice(i+1,s):r=e.slice(i+1,s),n=s-i-1;i=s,a=0}else o===46&&a>-1?a++:a=-1}return r}function zE(e){if(typeof e!="string")throw new TypeError("Path must be a string. Received "+JSON.stringify(e))}var wXe={cwd:hQt};function hQt(){return"/"}function $2(e){return!!(e!==null&&typeof e=="object"&&"href"in e&&e.href&&"protocol"in e&&e.protocol&&e.auth===void 0)}function kXe(e){if(typeof e=="string")e=new URL(e);else if(!$2(e)){let t=new TypeError('The "path" argument must be of type string or an instance of URL. Received `'+e+"`");throw t.code="ERR_INVALID_ARG_TYPE",t}if(e.protocol!=="file:"){let t=new TypeError("The URL must be of scheme file");throw t.code="ERR_INVALID_URL_SCHEME",t}return fQt(e)}function fQt(e){if(e.hostname!==""){let n=new TypeError('File URL host must be "localhost" or empty on darwin');throw n.code="ERR_INVALID_FILE_URL_HOST",n}let t=e.pathname,r=-1;for(;++r<t.length;)if(t.codePointAt(r)===37&&t.codePointAt(r+1)===50){let n=t.codePointAt(r+2);if(n===70||n===102){let i=new TypeError("File URL path must not include encoded / characters");throw i.code="ERR_INVALID_FILE_URL_PATH",i}}return decodeURIComponent(t)}var Vee=["history","path","basename","stem","extname","dirname"],VE=class{constructor(t){let r;t?$2(t)?r={path:t}:typeof t=="string"||dQt(t)?r={value:t}:r=t:r={},this.cwd="cwd"in r?"":wXe.cwd(),this.data={},this.history=[],this.messages=[],this.value,this.map,this.result,this.stored;let n=-1;for(;++n<Vee.length;){let a=Vee[n];a in r&&r[a]!==void 0&&r[a]!==null&&(this[a]=a==="history"?[...r[a]]:r[a])}let i;for(i in r)Vee.includes(i)||(this[i]=r[i])}get basename(){return typeof this.path=="string"?Uu.basename(this.path):void 0}set basename(t){Uee(t,"basename"),Gee(t,"basename"),this.path=Uu.join(this.dirname||"",t)}get dirname(){return typeof this.path=="string"?Uu.dirname(this.path):void 0}set dirname(t){CXe(this.basename,"dirname"),this.path=Uu.join(t||"",this.basename)}get extname(){return typeof this.path=="string"?Uu.extname(this.path):void 0}set extname(t){if(Gee(t,"extname"),CXe(this.dirname,"extname"),t){if(t.codePointAt(0)!==46)throw new Error("`extname` must start with `.`");if(t.includes(".",1))throw new Error("`extname` cannot contain multiple dots")}this.path=Uu.join(this.dirname,this.stem+(t||""))}get path(){return this.history[this.history.length-1]}set path(t){$2(t)&&(t=kXe(t)),Uee(t,"path"),this.path!==t&&this.history.push(t)}get stem(){return typeof this.path=="string"?Uu.basename(this.path,this.extname):void 0}set stem(t){Uee(t,"stem"),Gee(t,"stem"),this.path=Uu.join(this.dirname||"",t+(this.extname||""))}fail(t,r,n){let i=this.message(t,r,n);throw i.fatal=!0,i}info(t,r,n){let i=this.message(t,r,n);return i.fatal=void 0,i}message(t,r,n){let i=new gn(t,r,n);return this.path&&(i.name=this.path+":"+i.name,i.file=this.path),i.fatal=!1,this.messages.push(i),i}toString(t){return this.value===void 0?"":typeof this.value=="string"?this.value:new TextDecoder(t||void 0).decode(this.value)}};function Gee(e,t){if(e&&e.includes(Uu.sep))throw new Error("`"+t+"` cannot be a path: did not expect `"+Uu.sep+"`")}function Uee(e,t){if(!e)throw new Error("`"+t+"` cannot be empty")}function CXe(e,t){if(!e)throw new Error("Setting `"+t+"` requires `path` to be set too")}function dQt(e){return!!(e&&typeof e=="object"&&"byteLength"in e&&"byteOffset"in e)}var SXe=(function(e){let n=this.constructor.prototype,i=n[e],a=function(){return i.apply(a,arguments)};return Object.setPrototypeOf(a,n),a});var pQt={}.hasOwnProperty,Yee=class e extends SXe{constructor(){super("copy"),this.Compiler=void 0,this.Parser=void 0,this.attachers=[],this.compiler=void 0,this.freezeIndex=-1,this.frozen=void 0,this.namespace={},this.parser=void 0,this.transformers=zee()}copy(){let t=new e,r=-1;for(;++r<this.attachers.length;){let n=this.attachers[r];t.use(...n)}return t.data((0,oN.default)(!0,{},this.namespace)),t}data(t,r){return typeof t=="string"?arguments.length===2?(Hee("data",this.frozen),this.namespace[t]=r,this):pQt.call(this.namespace,t)&&this.namespace[t]||void 0:t?(Hee("data",this.frozen),this.namespace=t,this):this.namespace}freeze(){if(this.frozen)return this;let t=this;for(;++this.freezeIndex<this.attachers.length;){let[r,...n]=this.attachers[this.freezeIndex];if(n[0]===!1)continue;n[0]===!0&&(n[0]=void 0);let i=r.call(t,...n);typeof i=="function"&&this.transformers.use(i)}return this.frozen=!0,this.freezeIndex=Number.POSITIVE_INFINITY,this}parse(t){this.freeze();let r=sN(t),n=this.parser||this.Parser;return qee("parse",n),n(String(r),r)}process(t,r){let n=this;return this.freeze(),qee("process",this.parser||this.Parser),Wee("process",this.compiler||this.Compiler),r?i(void 0,r):new Promise(i);function i(a,s){let o=sN(t),l=n.parse(o);n.run(l,o,function(h,f,d){if(h||!f||!d)return u(h);let p=f,m=n.stringify(p,d);gQt(m)?d.value=m:d.result=m,u(h,d)});function u(h,f){h||!f?s(h):a?a(f):r(void 0,f)}}}processSync(t){let r=!1,n;return this.freeze(),qee("processSync",this.parser||this.Parser),Wee("processSync",this.compiler||this.Compiler),this.process(t,i),AXe("processSync","process",r),n;function i(a,s){r=!0,$ee(a),n=s}}run(t,r,n){EXe(t),this.freeze();let i=this.transformers;return!n&&typeof r=="function"&&(n=r,r=void 0),n?a(void 0,n):new Promise(a);function a(s,o){let l=sN(r);i.run(t,l,u);function u(h,f,d){let p=f||t;h?o(h):s?s(p):n(void 0,p,d)}}}runSync(t,r){let n=!1,i;return this.run(t,r,a),AXe("runSync","run",n),i;function a(s,o){$ee(s),i=o,n=!0}}stringify(t,r){this.freeze();let n=sN(r),i=this.compiler||this.Compiler;return Wee("stringify",i),EXe(t),i(t,n)}use(t,...r){let n=this.attachers,i=this.namespace;if(Hee("use",this.frozen),t!=null)if(typeof t=="function")l(t,r);else if(typeof t=="object")Array.isArray(t)?o(t):s(t);else throw new TypeError("Expected usable value, not `"+t+"`");return this;function a(u){if(typeof u=="function")l(u,[]);else if(typeof u=="object")if(Array.isArray(u)){let[h,...f]=u;l(h,f)}else s(u);else throw new TypeError("Expected usable value, not `"+u+"`")}function s(u){if(!("plugins"in u)&&!("settings"in u))throw new Error("Expected usable value but received an empty preset, which is probably a mistake: presets typically come with `plugins` and sometimes with `settings`, but this has neither");o(u.plugins),u.settings&&(i.settings=(0,oN.default)(!0,i.settings,u.settings))}function o(u){let h=-1;if(u!=null)if(Array.isArray(u))for(;++h<u.length;){let f=u[h];a(f)}else throw new TypeError("Expected a list of plugins, not `"+u+"`")}function l(u,h){let f=-1,d=-1;for(;++f<n.length;)if(n[f][0]===u){d=f;break}if(d===-1)n.push([u,...h]);else if(h.length>0){let[p,...m]=h,g=n[d][1];$E(g)&&$E(p)&&(p=(0,oN.default)(!0,g,p)),n[d]=[u,p,...m]}}}},lN=new Yee().freeze();function qee(e,t){if(typeof t!="function")throw new TypeError("Cannot `"+e+"` without `parser`")}function Wee(e,t){if(typeof t!="function")throw new TypeError("Cannot `"+e+"` without `compiler`")}function Hee(e,t){if(t)throw new Error("Cannot call `"+e+"` on a frozen processor.\nCreate a new processor first, by calling it: use `processor()` instead of `processor`.")}function EXe(e){if(!$E(e)||typeof e.type!="string")throw new TypeError("Expected node, got `"+e+"`")}function AXe(e,t,r){if(!r)throw new Error("`"+e+"` finished async. Use `"+t+"` instead")}function sN(e){return mQt(e)?e:new VE(e)}function mQt(e){return!!(e&&typeof e=="object"&&"message"in e&&"messages"in e)}function gQt(e){return typeof e=="string"||yQt(e)}function yQt(e){return!!(e&&typeof e=="object"&&"byteLength"in e&&"byteOffset"in e)}var jee={trust:!1,output:"htmlAndMathml",strict:"ignore",maxExpand:1e3,maxSize:20},vQt="plainsong-math-block",xQt="plainsong-math-inline",bQt="math-error-hint",TQt=140,RXe="dataMathIndex";function Xee(){return(e,t)=>{let r=[];LXe(e,r),t.data.mathProvenance=r}}function Kee(){return(e,t)=>{let r=t.messages.filter(o=>o.source==="rehype-katex");if(r.length===0)return;let n=t.data.mathProvenance??[],i=CQt(e),a=new Set,s=[];for(let o of r){let l=SQt(o,n,i);if(l===void 0){s.push(o);continue}a.has(l.index)||(DXe(l.node,OXe(o)),a.add(l.index))}AQt(e,s,a)}}function LXe(e,t){let r=e.children;if(r)for(let n=0;n<r.length;n+=1){let i=r[n];if(wQt(i)){let a=IXe(i);a&&!a.position&&i.position&&(a.position=i.position),r[n]=_Xe(i,"div",vQt,t,{withEndLine:!0});continue}if(kQt(i)){r[n]=_Xe(i,"span",xQt,t,{withEndLine:!1});continue}LXe(i,t)}}function _Xe(e,t,r,n,i){let a=n.length;n.push({index:a,offset:e.position?.start?.offset});let s={className:[r],[RXe]:String(a)},o=e.position?.start?.line,l=e.position?.end?.line;return o!==void 0&&(s.dataLine=String(o)),i.withEndLine&&l!==void 0&&(s.dataLineEnd=String(l)),{type:"element",tagName:t,properties:s,position:e.position,children:[e]}}function wQt(e){return IXe(e)!==void 0}function IXe(e){if(e.type!=="element"||e.tagName!=="pre")return;let t=(e.children??[]).filter(i=>i.type!=="text"||(i.value??"").trim()!=="");if(t.length!==1)return;let r=t[0];if(r.type!=="element"||r.tagName!=="code")return;let n=Array.isArray(r.properties?.className)?r.properties.className:[];return n.includes("language-math")||n.includes("math-display")?r:void 0}function kQt(e){return e.type!=="element"||e.tagName!=="code"?!1:(Array.isArray(e.properties?.className)?e.properties.className:[]).includes("math-inline")}function CQt(e){let t=new Map;return PXe(e,r=>{let n=MXe(r);n!==void 0&&t.set(n,r)}),t}function MXe(e){if(e.type!=="element")return;let t=e.properties?.[RXe];if(t===void 0)return;let r=Number(t);return Number.isInteger(r)?r:void 0}function SQt(e,t,r){let n=EQt(e),i=n===void 0?void 0:t.find(s=>s.offset===n);if(i===void 0)return;let a=r.get(i.index);return a===void 0?void 0:{index:i.index,node:a}}function EQt(e){let t=e.place;return t?.start?.offset??t?.offset}function AQt(e,t,r){t.length!==0&&NXe(e,[...t],r,void 0)}function NXe(e,t,r,n){let i=e.children;if(!i)return;let a=MXe(e),s=a===void 0?n:{index:a,node:e};if(!(s!==void 0&&r.has(s.index)))for(let o of i){if(RQt(o)){if(DXe(s?.node??e,OXe(_Qt(o,t))),s!==void 0){r.add(s.index);return}continue}NXe(o,t,r,s)}}function _Qt(e,t){let r=LQt(e,t)??t[0];return r!==void 0&&t.splice(t.indexOf(r),1),r}function DXe(e,t){e.children=[...e.children??[],t]}function RQt(e){return e.type!=="element"?!1:(Array.isArray(e.properties?.className)?e.properties.className:[]).includes("katex-error")}function LQt(e,t){let r=String(e.properties?.title??"");return t.find(n=>String(n.cause)===r)??t.find(n=>r.includes(String(n.cause)))}function IQt(e){return e.replace(/ at position \d+:[\s\S]*$/u,"").replace(/̲/gu,"").trim()}function OXe(e){let t=e?.cause,r=t instanceof Error?t.message.replace(/^KaTeX parse error:\s*/u,""):void 0,n=r===void 0?void 0:IQt(r),i=n?`KaTeX: ${MQt(n,TQt)}`:"KaTeX could not render this formula";return{type:"element",tagName:"span",properties:{className:[bQt],role:"note"},children:[{type:"text",value:i}]}}function PXe(e,t){t(e);for(let r of e.children??[])PXe(r,t)}function MQt(e,t){return e.length<=t?e:`${e.slice(0,Math.max(0,t-1))}\u2026`}var NQt=96,BXe=4,DQt=120,OQt=96,Zee=["className",/^[A-Za-z0-9_-]+$/],PQt=new Set(["height","style","width"]),$Xe={...As,required:{...As.required,input:{type:"checkbox"}},attributes:{...As.attributes,"*":[...x0(As.attributes?.["*"]),"dataLine","dataTaskCheckbox",Zee,"ariaHidden"],a:[...x0(As.attributes?.a),"href","title"],code:[...x0(As.attributes?.code).filter(e=>(typeof e=="string"?e:e[0])!=="className"),Zee],div:[...x0(As.attributes?.div)],input:[...x0(As.attributes?.input),["type","checkbox"],"checked","disabled","dataTaskCheckbox"],img:[...x0(As.attributes?.img),"alt","title"],li:[...x0(As.attributes?.li)],math:["xmlns","display","overflow","alttext","altimg","altimgWidth","altimgHeight","altimgValign"],mi:["mathvariant"],mn:[],mo:["stretchy","fence","lspace","rspace","separator"],mrow:[],mtext:[],msup:[],msub:[],msubsup:[],mfrac:["linethickness"],mtable:["rowspacing","columnalign","columnspacing"],mtr:[],mtd:[],mover:["accent"],mstyle:["scriptlevel","displaystyle"],semantics:[],annotation:["encoding"],span:[...x0(As.attributes?.span),Zee,"ariaHidden"]},tagNames:[...As.tagNames??[],"math","mi","mn","mo","mrow","mtext","msup","msub","msubsup","mfrac","mtable","mtr","mtd","mover","mstyle","semantics","annotation"]};function x0(e=[]){return e.filter(t=>{let r=Array.isArray(t)?t[0]:t;return!(typeof r=="string"&&PQt.has(r))})}function zXe(){return e=>{VXe(e)}}function VXe(e){if(e.children)for(let t=0;t<e.children.length;t+=1){let r=e.children[t];VXe(r),e.children[t]=BQt(r)??r}}function BQt(e){switch(e.type){case"mdxjsEsm":return FQt(e);case"mdxFlowExpression":return $Qt(e);case"mdxTextExpression":return zQt(e);case"mdxJsxFlowElement":return FXe(e,"flow");case"mdxJsxTextElement":return FXe(e,"text");default:return}}function FQt(e){return Jd("mdxEsmPlaceholder","div",{className:["mdx-esm-placeholder"]},[cN(`\u27E8${z2(GE(e.value),DQt)}\u27E9`)],e.position)}function $Qt(e){return Jd("mdxExpressionRow","p",{className:["mdx-expression-row"]},[GXe(e.value,e.position)],e.position)}function zQt(e){return GXe(e.value,e.position)}function GXe(e,t){return Jd("mdxExpressionChip","code",{className:["mdx-expression-chip"]},[cN(`{${z2(GE(e),OQt)}}`)],t)}function FXe(e,t){let r=e.name??"Fragment";return XQt(r)?VQt(e,t):GQt(e,r,t)}function VQt(e,t){return Jd("mdxLowercaseElement",e.name??(t==="flow"?"div":"span"),qQt(e.attributes),e.children,e.position)}function GQt(e,t,r){let n=e.children.length>0,i=r==="flow"?"div":"span",a=r==="flow"?"div":"span",s=UQt(e.attributes),o=[Jd("mdxComponentName","span",{className:["mdx-component-name"]},[cN(t)],e.position)];s&&o.push(Jd("mdxComponentProps","code",{className:["mdx-component-props"]},[cN(s)],e.position));let l=[Jd("mdxComponentHeader",r==="flow"?"div":"span",{className:["mdx-component-header"]},o,e.position)];return n&&l.push(Jd("mdxComponentBody",a,{className:["mdx-component-body"]},e.children,e.position)),Jd("mdxComponentCard",i,{className:["mdx-component-card",r==="flow"?"mdx-component-card-flow":"mdx-component-card-text"]},l,e.position)}function UQt(e){let t=e.slice(0,BXe).map(r=>{if(r.type==="mdxJsxExpressionAttribute")return`{${z2(GE(r.value),32)}}`;let n=r.value;return n==null?r.name:typeof n=="string"?`${r.name}="${z2(GE(n),32)}"`:`${r.name}={${z2(GE(n.value),32)}}`});return e.length>BXe&&t.push("..."),z2(t.join(" "),NQt)}function qQt(e){let t={};for(let r of e){if(r.type==="mdxJsxExpressionAttribute")continue;let n=YQt(r.name);if(!jQt(n))continue;let i=r.value;i==null?t[n]=!0:typeof i=="string"?t[n]=n==="className"?i.split(/\s+/u).filter(Boolean):i:WQt(i)&&(t[n]=HQt(i.value))}return t}function WQt(e){return/^['"][\s\S]*['"]$/u.test(e.value)}function HQt(e){return e.slice(1,-1)}function YQt(e){return e==="class"?"className":e==="for"?"htmlFor":e}function jQt(e){return/^[A-Za-z][\w:.-]*$/u.test(e)&&!/^on/i.test(e)&&e!=="dangerouslySetInnerHTML"&&e!=="style"&&e!=="srcDoc"}function XQt(e){return/^[a-z][\w.-]*$/u.test(e)}function Jd(e,t,r,n,i){return{type:e,children:n,position:i,data:{hName:t,hProperties:r}}}function cN(e){return{type:"text",value:e}}function GE(e){return e.replace(/\s+/gu," ").trim()}function z2(e,t){return e.length<=t?e:`${e.slice(0,Math.max(0,t-1))}\u2026`}var KQt=new Set(["address","article","aside","blockquote","dd","details","div","dl","dt","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hr","li","main","ol","p","pre","section","table","tbody","td","th","thead","tr","ul"]),ZQt=new Set(["base","embed","iframe","link","meta","object","script","style"]),JQt=new Set(["path","svg"]);async function UXe(e){return String(await QQt.process(e))}async function qXe(e){return String(await eer.process(e))}var QQt=lN().use(BE).use(RE).use(wE,["yaml"]).use(WXe).use(LE).use(FE).use(TJ).use(Xee).use(dE,jee).use(Kee).use(HXe).use(vE),eer=lN().use(BE).use(tN).use(RE).use(wE,["yaml"]).use(WXe).use(LE).use(zXe).use(FE).use(rer).use(ter).use(yM,$Xe).use(TJ).use(Xee).use(dE,jee).use(Kee).use(HXe).use(vE);function WXe(){return e=>{e.children&&(e.children=e.children.filter(t=>t.type!=="yaml"&&t.type!=="toml"))}}function HXe(){return e=>{YXe(e,t=>{if(t.type!=="element"||!t.tagName)return;let r=t.position?.start?.line;r&&KQt.has(t.tagName)&&(t.properties=t.properties??{},t.properties.dataLine=String(r)),t.tagName==="input"&&t.properties?.type==="checkbox"&&(delete t.properties.disabled,t.properties.dataTaskCheckbox="true")})}}function ter(){return e=>{Jee(e,ZQt)}}function rer(){return e=>{Jee(e,JQt)}}function Jee(e,t){if(e.children){e.children=e.children.filter(r=>r.type!=="element"||!r.tagName?!0:!t.has(r.tagName.toLowerCase()));for(let r of e.children)Jee(r,t)}}function YXe(e,t){t(e);for(let r of e.children??[])YXe(r,t)}var Zo=per(),V2=-1,jXe=-1,XXe=-1,KXe=null,ZXe="",JXe=!1,ete="none",uN,Qee,tte=new iM((e,t)=>hJ.render(e,t),e=>hJ.initialize(e));der();tKe("system");window.PlainsongBridge={receive(e){ner(e)}};window.PlainsongPreview={PROTOCOL_VERSION:8};window.addEventListener("scroll",()=>{Qee===void 0&&(Qee=window.requestAnimationFrame(()=>{Qee=void 0,ler()}))},{passive:!0});Zo.addEventListener("click",e=>{let t=e.target;if(!(t instanceof Element))return;let r=t.closest('input[data-task-checkbox="true"]');if(r){let a=her(r);a!==void 0&&s0({name:"checkboxToggled",payload:{line:a,checked:r.checked,version:jXe,renderID:XXe}});return}let n=t.closest("a[href]");if(!n)return;e.preventDefault();let i=n.getAttribute("href")??"";if(i.startsWith("#")){rte("preview"),Pqe(Zo,i);return}s0({name:"linkClicked",payload:{href:i}})});s0({name:"ready",payload:{protocolVersion:8}});async function ner(e){switch(e.name){case"render":await ier(e.payload);break;case"scrollToLine":oer(e.payload.line,e.payload.animated);break;case"setTheme":{let t=eKe(e.payload.theme,e.payload.allowRemoteImages);bJ(Zo,KXe,JXe,ZXe),t&&await Zqe(Zo,tte);break}case"exportHTML":await Rqe(e.payload,{previewRoot:Zo,latestRenderID:V2,documentTheme:document.documentElement.dataset.theme??"system",bundledStyleText:`:root {
+`},i)),a}function FE(e,t){return e&&"run"in e?async function(r,n){let i=iN(r,{file:n,...t});await e.run(i,n)}:function(r,n){return iN(r,{file:n,...e||t})}}function $ee(e){if(e)throw e}var oN=ls(bXe(),1);function $E(e){if(typeof e!="object"||e===null)return!1;let t=Object.getPrototypeOf(e);return(t===null||t===Object.prototype||Object.getPrototypeOf(t)===null)&&!(Symbol.toStringTag in e)&&!(Symbol.iterator in e)}function zee(){let e=[],t={run:r,use:n};return t;function r(...i){let a=-1,s=i.pop();if(typeof s!="function")throw new TypeError("Expected function as last argument, not "+s);o(null,...i);function o(l,...u){let h=e[++a],f=-1;if(l){s(l);return}for(;++f<i.length;)(u[f]===null||u[f]===void 0)&&(u[f]=i[f]);i=u,h?TXe(h,o)(...u):s(null,...u)}}function n(i){if(typeof i!="function")throw new TypeError("Expected `middelware` to be a function, not "+i);return e.push(i),t}}function TXe(e,t){let r;return n;function n(...s){let o=e.length>s.length,l;o&&s.push(i);try{l=e.apply(this,s)}catch(u){let h=u;if(o&&r)throw h;return i(h)}o||(l&&l.then&&typeof l.then=="function"?l.then(a,i):l instanceof Error?i(l):a(l))}function i(s,...o){r||(r=!0,t(s,...o))}function a(s){i(null,s)}}var Uu={basename:aQt,dirname:sQt,extname:oQt,join:lQt,sep:"/"};function aQt(e,t){if(t!==void 0&&typeof t!="string")throw new TypeError('"ext" argument must be a string');zE(e);let r=0,n=-1,i=e.length,a;if(t===void 0||t.length===0||t.length>e.length){for(;i--;)if(e.codePointAt(i)===47){if(a){r=i+1;break}}else n<0&&(a=!0,n=i+1);return n<0?"":e.slice(r,n)}if(t===e)return"";let s=-1,o=t.length-1;for(;i--;)if(e.codePointAt(i)===47){if(a){r=i+1;break}}else s<0&&(a=!0,s=i+1),o>-1&&(e.codePointAt(i)===t.codePointAt(o--)?o<0&&(n=i):(o=-1,n=s));return r===n?n=s:n<0&&(n=e.length),e.slice(r,n)}function sQt(e){if(zE(e),e.length===0)return".";let t=-1,r=e.length,n;for(;--r;)if(e.codePointAt(r)===47){if(n){t=r;break}}else n||(n=!0);return t<0?e.codePointAt(0)===47?"/":".":t===1&&e.codePointAt(0)===47?"//":e.slice(0,t)}function oQt(e){zE(e);let t=e.length,r=-1,n=0,i=-1,a=0,s;for(;t--;){let o=e.codePointAt(t);if(o===47){if(s){n=t+1;break}continue}r<0&&(s=!0,r=t+1),o===46?i<0?i=t:a!==1&&(a=1):i>-1&&(a=-1)}return i<0||r<0||a===0||a===1&&i===r-1&&i===n+1?"":e.slice(i,r)}function lQt(...e){let t=-1,r;for(;++t<e.length;)zE(e[t]),e[t]&&(r=r===void 0?e[t]:r+"/"+e[t]);return r===void 0?".":cQt(r)}function cQt(e){zE(e);let t=e.codePointAt(0)===47,r=uQt(e,!t);return r.length===0&&!t&&(r="."),r.length>0&&e.codePointAt(e.length-1)===47&&(r+="/"),t?"/"+r:r}function uQt(e,t){let r="",n=0,i=-1,a=0,s=-1,o,l;for(;++s<=e.length;){if(s<e.length)o=e.codePointAt(s);else{if(o===47)break;o=47}if(o===47){if(!(i===s-1||a===1))if(i!==s-1&&a===2){if(r.length<2||n!==2||r.codePointAt(r.length-1)!==46||r.codePointAt(r.length-2)!==46){if(r.length>2){if(l=r.lastIndexOf("/"),l!==r.length-1){l<0?(r="",n=0):(r=r.slice(0,l),n=r.length-1-r.lastIndexOf("/")),i=s,a=0;continue}}else if(r.length>0){r="",n=0,i=s,a=0;continue}}t&&(r=r.length>0?r+"/..":"..",n=2)}else r.length>0?r+="/"+e.slice(i+1,s):r=e.slice(i+1,s),n=s-i-1;i=s,a=0}else o===46&&a>-1?a++:a=-1}return r}function zE(e){if(typeof e!="string")throw new TypeError("Path must be a string. Received "+JSON.stringify(e))}var wXe={cwd:hQt};function hQt(){return"/"}function $2(e){return!!(e!==null&&typeof e=="object"&&"href"in e&&e.href&&"protocol"in e&&e.protocol&&e.auth===void 0)}function kXe(e){if(typeof e=="string")e=new URL(e);else if(!$2(e)){let t=new TypeError('The "path" argument must be of type string or an instance of URL. Received `'+e+"`");throw t.code="ERR_INVALID_ARG_TYPE",t}if(e.protocol!=="file:"){let t=new TypeError("The URL must be of scheme file");throw t.code="ERR_INVALID_URL_SCHEME",t}return fQt(e)}function fQt(e){if(e.hostname!==""){let n=new TypeError('File URL host must be "localhost" or empty on darwin');throw n.code="ERR_INVALID_FILE_URL_HOST",n}let t=e.pathname,r=-1;for(;++r<t.length;)if(t.codePointAt(r)===37&&t.codePointAt(r+1)===50){let n=t.codePointAt(r+2);if(n===70||n===102){let i=new TypeError("File URL path must not include encoded / characters");throw i.code="ERR_INVALID_FILE_URL_PATH",i}}return decodeURIComponent(t)}var Vee=["history","path","basename","stem","extname","dirname"],VE=class{constructor(t){let r;t?$2(t)?r={path:t}:typeof t=="string"||dQt(t)?r={value:t}:r=t:r={},this.cwd="cwd"in r?"":wXe.cwd(),this.data={},this.history=[],this.messages=[],this.value,this.map,this.result,this.stored;let n=-1;for(;++n<Vee.length;){let a=Vee[n];a in r&&r[a]!==void 0&&r[a]!==null&&(this[a]=a==="history"?[...r[a]]:r[a])}let i;for(i in r)Vee.includes(i)||(this[i]=r[i])}get basename(){return typeof this.path=="string"?Uu.basename(this.path):void 0}set basename(t){Uee(t,"basename"),Gee(t,"basename"),this.path=Uu.join(this.dirname||"",t)}get dirname(){return typeof this.path=="string"?Uu.dirname(this.path):void 0}set dirname(t){CXe(this.basename,"dirname"),this.path=Uu.join(t||"",this.basename)}get extname(){return typeof this.path=="string"?Uu.extname(this.path):void 0}set extname(t){if(Gee(t,"extname"),CXe(this.dirname,"extname"),t){if(t.codePointAt(0)!==46)throw new Error("`extname` must start with `.`");if(t.includes(".",1))throw new Error("`extname` cannot contain multiple dots")}this.path=Uu.join(this.dirname,this.stem+(t||""))}get path(){return this.history[this.history.length-1]}set path(t){$2(t)&&(t=kXe(t)),Uee(t,"path"),this.path!==t&&this.history.push(t)}get stem(){return typeof this.path=="string"?Uu.basename(this.path,this.extname):void 0}set stem(t){Uee(t,"stem"),Gee(t,"stem"),this.path=Uu.join(this.dirname||"",t+(this.extname||""))}fail(t,r,n){let i=this.message(t,r,n);throw i.fatal=!0,i}info(t,r,n){let i=this.message(t,r,n);return i.fatal=void 0,i}message(t,r,n){let i=new gn(t,r,n);return this.path&&(i.name=this.path+":"+i.name,i.file=this.path),i.fatal=!1,this.messages.push(i),i}toString(t){return this.value===void 0?"":typeof this.value=="string"?this.value:new TextDecoder(t||void 0).decode(this.value)}};function Gee(e,t){if(e&&e.includes(Uu.sep))throw new Error("`"+t+"` cannot be a path: did not expect `"+Uu.sep+"`")}function Uee(e,t){if(!e)throw new Error("`"+t+"` cannot be empty")}function CXe(e,t){if(!e)throw new Error("Setting `"+t+"` requires `path` to be set too")}function dQt(e){return!!(e&&typeof e=="object"&&"byteLength"in e&&"byteOffset"in e)}var SXe=(function(e){let n=this.constructor.prototype,i=n[e],a=function(){return i.apply(a,arguments)};return Object.setPrototypeOf(a,n),a});var pQt={}.hasOwnProperty,Yee=class e extends SXe{constructor(){super("copy"),this.Compiler=void 0,this.Parser=void 0,this.attachers=[],this.compiler=void 0,this.freezeIndex=-1,this.frozen=void 0,this.namespace={},this.parser=void 0,this.transformers=zee()}copy(){let t=new e,r=-1;for(;++r<this.attachers.length;){let n=this.attachers[r];t.use(...n)}return t.data((0,oN.default)(!0,{},this.namespace)),t}data(t,r){return typeof t=="string"?arguments.length===2?(Hee("data",this.frozen),this.namespace[t]=r,this):pQt.call(this.namespace,t)&&this.namespace[t]||void 0:t?(Hee("data",this.frozen),this.namespace=t,this):this.namespace}freeze(){if(this.frozen)return this;let t=this;for(;++this.freezeIndex<this.attachers.length;){let[r,...n]=this.attachers[this.freezeIndex];if(n[0]===!1)continue;n[0]===!0&&(n[0]=void 0);let i=r.call(t,...n);typeof i=="function"&&this.transformers.use(i)}return this.frozen=!0,this.freezeIndex=Number.POSITIVE_INFINITY,this}parse(t){this.freeze();let r=sN(t),n=this.parser||this.Parser;return qee("parse",n),n(String(r),r)}process(t,r){let n=this;return this.freeze(),qee("process",this.parser||this.Parser),Wee("process",this.compiler||this.Compiler),r?i(void 0,r):new Promise(i);function i(a,s){let o=sN(t),l=n.parse(o);n.run(l,o,function(h,f,d){if(h||!f||!d)return u(h);let p=f,m=n.stringify(p,d);gQt(m)?d.value=m:d.result=m,u(h,d)});function u(h,f){h||!f?s(h):a?a(f):r(void 0,f)}}}processSync(t){let r=!1,n;return this.freeze(),qee("processSync",this.parser||this.Parser),Wee("processSync",this.compiler||this.Compiler),this.process(t,i),AXe("processSync","process",r),n;function i(a,s){r=!0,$ee(a),n=s}}run(t,r,n){EXe(t),this.freeze();let i=this.transformers;return!n&&typeof r=="function"&&(n=r,r=void 0),n?a(void 0,n):new Promise(a);function a(s,o){let l=sN(r);i.run(t,l,u);function u(h,f,d){let p=f||t;h?o(h):s?s(p):n(void 0,p,d)}}}runSync(t,r){let n=!1,i;return this.run(t,r,a),AXe("runSync","run",n),i;function a(s,o){$ee(s),i=o,n=!0}}stringify(t,r){this.freeze();let n=sN(r),i=this.compiler||this.Compiler;return Wee("stringify",i),EXe(t),i(t,n)}use(t,...r){let n=this.attachers,i=this.namespace;if(Hee("use",this.frozen),t!=null)if(typeof t=="function")l(t,r);else if(typeof t=="object")Array.isArray(t)?o(t):s(t);else throw new TypeError("Expected usable value, not `"+t+"`");return this;function a(u){if(typeof u=="function")l(u,[]);else if(typeof u=="object")if(Array.isArray(u)){let[h,...f]=u;l(h,f)}else s(u);else throw new TypeError("Expected usable value, not `"+u+"`")}function s(u){if(!("plugins"in u)&&!("settings"in u))throw new Error("Expected usable value but received an empty preset, which is probably a mistake: presets typically come with `plugins` and sometimes with `settings`, but this has neither");o(u.plugins),u.settings&&(i.settings=(0,oN.default)(!0,i.settings,u.settings))}function o(u){let h=-1;if(u!=null)if(Array.isArray(u))for(;++h<u.length;){let f=u[h];a(f)}else throw new TypeError("Expected a list of plugins, not `"+u+"`")}function l(u,h){let f=-1,d=-1;for(;++f<n.length;)if(n[f][0]===u){d=f;break}if(d===-1)n.push([u,...h]);else if(h.length>0){let[p,...m]=h,g=n[d][1];$E(g)&&$E(p)&&(p=(0,oN.default)(!0,g,p)),n[d]=[u,p,...m]}}}},lN=new Yee().freeze();function qee(e,t){if(typeof t!="function")throw new TypeError("Cannot `"+e+"` without `parser`")}function Wee(e,t){if(typeof t!="function")throw new TypeError("Cannot `"+e+"` without `compiler`")}function Hee(e,t){if(t)throw new Error("Cannot call `"+e+"` on a frozen processor.\nCreate a new processor first, by calling it: use `processor()` instead of `processor`.")}function EXe(e){if(!$E(e)||typeof e.type!="string")throw new TypeError("Expected node, got `"+e+"`")}function AXe(e,t,r){if(!r)throw new Error("`"+e+"` finished async. Use `"+t+"` instead")}function sN(e){return mQt(e)?e:new VE(e)}function mQt(e){return!!(e&&typeof e=="object"&&"message"in e&&"messages"in e)}function gQt(e){return typeof e=="string"||yQt(e)}function yQt(e){return!!(e&&typeof e=="object"&&"byteLength"in e&&"byteOffset"in e)}var jee={trust:!1,output:"htmlAndMathml",strict:"ignore",maxExpand:1e3,maxSize:20},vQt="plainsong-math-block",xQt="plainsong-math-inline",bQt="math-error-hint",TQt=140,RXe="dataMathIndex";function Xee(){return(e,t)=>{let r=[];LXe(e,r),t.data.mathProvenance=r}}function Kee(){return(e,t)=>{let r=t.messages.filter(o=>o.source==="rehype-katex");if(r.length===0)return;let n=t.data.mathProvenance??[],i=CQt(e),a=new Set,s=[];for(let o of r){let l=SQt(o,n,i);if(l===void 0){s.push(o);continue}a.has(l.index)||(DXe(l.node,OXe(o)),a.add(l.index))}AQt(e,s,a)}}function LXe(e,t){let r=e.children;if(r)for(let n=0;n<r.length;n+=1){let i=r[n];if(wQt(i)){let a=IXe(i);a&&!a.position&&i.position&&(a.position=i.position),r[n]=_Xe(i,"div",vQt,t,{withEndLine:!0});continue}if(kQt(i)){r[n]=_Xe(i,"span",xQt,t,{withEndLine:!1});continue}LXe(i,t)}}function _Xe(e,t,r,n,i){let a=n.length;n.push({index:a,offset:e.position?.start?.offset});let s={className:[r],[RXe]:String(a)},o=e.position?.start?.line,l=e.position?.end?.line;return o!==void 0&&(s.dataLine=String(o)),i.withEndLine&&l!==void 0&&(s.dataLineEnd=String(l)),{type:"element",tagName:t,properties:s,position:e.position,children:[e]}}function wQt(e){return IXe(e)!==void 0}function IXe(e){if(e.type!=="element"||e.tagName!=="pre")return;let t=(e.children??[]).filter(i=>i.type!=="text"||(i.value??"").trim()!=="");if(t.length!==1)return;let r=t[0];if(r.type!=="element"||r.tagName!=="code")return;let n=Array.isArray(r.properties?.className)?r.properties.className:[];return n.includes("language-math")||n.includes("math-display")?r:void 0}function kQt(e){return e.type!=="element"||e.tagName!=="code"?!1:(Array.isArray(e.properties?.className)?e.properties.className:[]).includes("math-inline")}function CQt(e){let t=new Map;return PXe(e,r=>{let n=MXe(r);n!==void 0&&t.set(n,r)}),t}function MXe(e){if(e.type!=="element")return;let t=e.properties?.[RXe];if(t===void 0)return;let r=Number(t);return Number.isInteger(r)?r:void 0}function SQt(e,t,r){let n=EQt(e),i=n===void 0?void 0:t.find(s=>s.offset===n);if(i===void 0)return;let a=r.get(i.index);return a===void 0?void 0:{index:i.index,node:a}}function EQt(e){let t=e.place;return t?.start?.offset??t?.offset}function AQt(e,t,r){t.length!==0&&NXe(e,[...t],r,void 0)}function NXe(e,t,r,n){let i=e.children;if(!i)return;let a=MXe(e),s=a===void 0?n:{index:a,node:e};if(!(s!==void 0&&r.has(s.index)))for(let o of i){if(RQt(o)){if(DXe(s?.node??e,OXe(_Qt(o,t))),s!==void 0){r.add(s.index);return}continue}NXe(o,t,r,s)}}function _Qt(e,t){let r=LQt(e,t)??t[0];return r!==void 0&&t.splice(t.indexOf(r),1),r}function DXe(e,t){e.children=[...e.children??[],t]}function RQt(e){return e.type!=="element"?!1:(Array.isArray(e.properties?.className)?e.properties.className:[]).includes("katex-error")}function LQt(e,t){let r=String(e.properties?.title??"");return t.find(n=>String(n.cause)===r)??t.find(n=>r.includes(String(n.cause)))}function IQt(e){return e.replace(/ at position \d+:[\s\S]*$/u,"").replace(/̲/gu,"").trim()}function OXe(e){let t=e?.cause,r=t instanceof Error?t.message.replace(/^KaTeX parse error:\s*/u,""):void 0,n=r===void 0?void 0:IQt(r),i=n?`KaTeX: ${MQt(n,TQt)}`:"KaTeX could not render this formula";return{type:"element",tagName:"span",properties:{className:[bQt],role:"note"},children:[{type:"text",value:i}]}}function PXe(e,t){t(e);for(let r of e.children??[])PXe(r,t)}function MQt(e,t){return e.length<=t?e:`${e.slice(0,Math.max(0,t-1))}\u2026`}var NQt=96,BXe=4,DQt=120,OQt=96,Zee=["className",/^[A-Za-z0-9_-]+$/],PQt=new Set(["height","style","width"]),$Xe={...As,required:{...As.required,input:{type:"checkbox"}},attributes:{...As.attributes,"*":[...x0(As.attributes?.["*"]),"dataLine","dataTaskCheckbox",Zee,"ariaHidden"],a:[...x0(As.attributes?.a),"href","title"],code:[...x0(As.attributes?.code).filter(e=>(typeof e=="string"?e:e[0])!=="className"),Zee],div:[...x0(As.attributes?.div)],input:[...x0(As.attributes?.input),["type","checkbox"],"checked","disabled","dataTaskCheckbox"],img:[...x0(As.attributes?.img),"alt","title"],li:[...x0(As.attributes?.li)],math:["xmlns","display","overflow","alttext","altimg","altimgWidth","altimgHeight","altimgValign"],mi:["mathvariant"],mn:[],mo:["stretchy","fence","lspace","rspace","separator"],mrow:[],mtext:[],msup:[],msub:[],msubsup:[],mfrac:["linethickness"],mtable:["rowspacing","columnalign","columnspacing"],mtr:[],mtd:[],mover:["accent"],mstyle:["scriptlevel","displaystyle"],semantics:[],annotation:["encoding"],span:[...x0(As.attributes?.span),Zee,"ariaHidden"]},tagNames:[...As.tagNames??[],"math","mi","mn","mo","mrow","mtext","msup","msub","msubsup","mfrac","mtable","mtr","mtd","mover","mstyle","semantics","annotation"]};function x0(e=[]){return e.filter(t=>{let r=Array.isArray(t)?t[0]:t;return!(typeof r=="string"&&PQt.has(r))})}function zXe(){return e=>{VXe(e)}}function VXe(e){if(e.children)for(let t=0;t<e.children.length;t+=1){let r=e.children[t];VXe(r),e.children[t]=BQt(r)??r}}function BQt(e){switch(e.type){case"mdxjsEsm":return FQt(e);case"mdxFlowExpression":return $Qt(e);case"mdxTextExpression":return zQt(e);case"mdxJsxFlowElement":return FXe(e,"flow");case"mdxJsxTextElement":return FXe(e,"text");default:return}}function FQt(e){return Jd("mdxEsmPlaceholder","div",{className:["mdx-esm-placeholder"]},[cN(`\u27E8${z2(GE(e.value),DQt)}\u27E9`)],e.position)}function $Qt(e){return Jd("mdxExpressionRow","p",{className:["mdx-expression-row"]},[GXe(e.value,e.position)],e.position)}function zQt(e){return GXe(e.value,e.position)}function GXe(e,t){return Jd("mdxExpressionChip","code",{className:["mdx-expression-chip"]},[cN(`{${z2(GE(e),OQt)}}`)],t)}function FXe(e,t){let r=e.name??"Fragment";return XQt(r)?VQt(e,t):GQt(e,r,t)}function VQt(e,t){return Jd("mdxLowercaseElement",e.name??(t==="flow"?"div":"span"),qQt(e.attributes),e.children,e.position)}function GQt(e,t,r){let n=e.children.length>0,i=r==="flow"?"div":"span",a=r==="flow"?"div":"span",s=UQt(e.attributes),o=[Jd("mdxComponentName","span",{className:["mdx-component-name"]},[cN(t)],e.position)];s&&o.push(Jd("mdxComponentProps","code",{className:["mdx-component-props"]},[cN(s)],e.position));let l=[Jd("mdxComponentHeader",r==="flow"?"div":"span",{className:["mdx-component-header"]},o,e.position)];return n&&l.push(Jd("mdxComponentBody",a,{className:["mdx-component-body"]},e.children,e.position)),Jd("mdxComponentCard",i,{className:["mdx-component-card",r==="flow"?"mdx-component-card-flow":"mdx-component-card-text"]},l,e.position)}function UQt(e){let t=e.slice(0,BXe).map(r=>{if(r.type==="mdxJsxExpressionAttribute")return`{${z2(GE(r.value),32)}}`;let n=r.value;return n==null?r.name:typeof n=="string"?`${r.name}="${z2(GE(n),32)}"`:`${r.name}={${z2(GE(n.value),32)}}`});return e.length>BXe&&t.push("..."),z2(t.join(" "),NQt)}function qQt(e){let t={};for(let r of e){if(r.type==="mdxJsxExpressionAttribute")continue;let n=YQt(r.name);if(!jQt(n))continue;let i=r.value;i==null?t[n]=!0:typeof i=="string"?t[n]=n==="className"?i.split(/\s+/u).filter(Boolean):i:WQt(i)&&(t[n]=HQt(i.value))}return t}function WQt(e){return/^['"][\s\S]*['"]$/u.test(e.value)}function HQt(e){return e.slice(1,-1)}function YQt(e){return e==="class"?"className":e==="for"?"htmlFor":e}function jQt(e){return/^[A-Za-z][\w:.-]*$/u.test(e)&&!/^on/i.test(e)&&e!=="dangerouslySetInnerHTML"&&e!=="style"&&e!=="srcDoc"}function XQt(e){return/^[a-z][\w.-]*$/u.test(e)}function Jd(e,t,r,n,i){return{type:e,children:n,position:i,data:{hName:t,hProperties:r}}}function cN(e){return{type:"text",value:e}}function GE(e){return e.replace(/\s+/gu," ").trim()}function z2(e,t){return e.length<=t?e:`${e.slice(0,Math.max(0,t-1))}\u2026`}var KQt=new Set(["address","article","aside","blockquote","dd","details","div","dl","dt","figcaption","figure","footer","h1","h2","h3","h4","h5","h6","header","hr","li","main","ol","p","pre","section","table","tbody","td","th","thead","tr","ul"]),ZQt=new Set(["base","embed","iframe","link","meta","object","script","style"]),JQt=new Set(["path","svg"]);async function UXe(e){return String(await QQt.process(e))}async function qXe(e){return String(await eer.process(e))}var QQt=lN().use(BE).use(RE).use(wE,["yaml"]).use(WXe).use(LE).use(FE).use(TJ).use(Xee).use(dE,jee).use(Kee).use(HXe).use(vE),eer=lN().use(BE).use(tN).use(RE).use(wE,["yaml"]).use(WXe).use(LE).use(zXe).use(FE).use(rer).use(ter).use(yM,$Xe).use(TJ).use(Xee).use(dE,jee).use(Kee).use(HXe).use(vE);function WXe(){return e=>{e.children&&(e.children=e.children.filter(t=>t.type!=="yaml"&&t.type!=="toml"))}}function HXe(){return e=>{YXe(e,t=>{if(t.type!=="element"||!t.tagName)return;let r=t.position?.start?.line;r&&KQt.has(t.tagName)&&(t.properties=t.properties??{},t.properties.dataLine=String(r)),t.tagName==="input"&&t.properties?.type==="checkbox"&&(delete t.properties.disabled,t.properties.dataTaskCheckbox="true")})}}function ter(){return e=>{Jee(e,ZQt)}}function rer(){return e=>{Jee(e,JQt)}}function Jee(e,t){if(e.children){e.children=e.children.filter(r=>r.type!=="element"||!r.tagName?!0:!t.has(r.tagName.toLowerCase()));for(let r of e.children)Jee(r,t)}}function YXe(e,t){t(e);for(let r of e.children??[])YXe(r,t)}var Zo=per(),V2=-1,jXe=-1,XXe=-1,KXe=null,ZXe="",JXe=!1,ete="none",uN,Qee,tte=new iM((e,t)=>hJ.render(e,t),e=>hJ.initialize(e));der();tKe("system");window.PlainsongBridge={receive(e){ner(e)}};window.PlainsongPreview={PROTOCOL_VERSION:8};window.addEventListener("scroll",()=>{Qee===void 0&&(Qee=window.requestAnimationFrame(()=>{Qee=void 0,ler()}))},{passive:!0});Zo.addEventListener("click",e=>{let t=e.target;if(!(t instanceof Element))return;let r=t.closest('input[data-task-checkbox="true"]');if(r){let a=her(r);a!==void 0&&s0({name:"checkboxToggled",payload:{line:a,checked:r.checked,version:jXe,renderID:XXe}});return}let n=t.closest("a[href]");if(!n)return;e.preventDefault();let i=n.getAttribute("href")??"";if(i.startsWith("#")){rte("preview"),Pqe(Zo,i);return}s0({name:"linkClicked",payload:{href:i}})});s0({name:"ready",payload:{protocolVersion:8}});async function ner(e){switch(e.name){case"render":await ier(e.payload);break;case"scrollToLine":oer(e.payload.line,e.payload.animated);break;case"setTheme":{let t=eKe(e.payload.theme,e.payload.allowRemoteImages);bJ(Zo,KXe,JXe,ZXe),t&&await Zqe(Zo,tte);break}case"exportHTML":await Rqe(e.payload,{previewRoot:Zo,latestRenderID:V2,documentTheme:document.documentElement.dataset.theme??"system",bundledStyleText:`/* Apple system palette. Dark mode matches the macOS text background (#1e1e1e)
+   so the preview sits flush against the source editor. */
+:root,
+:root[data-theme="light"] {
   color-scheme: light dark;
   --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
+  --preview-fg: #1d1d1f;
+  --preview-muted: #6e6e73;
+  --preview-border: #d2d2d7;
+  --preview-separator: #e5e5ea;
+  --preview-code-bg: #f5f5f7;
+  --preview-stripe: #fafafc;
+  --preview-accent: #0068da;
+  --preview-caution-bg: #fff7d6;
+  --preview-caution-border: #e6b800;
+  --preview-caution-fg: #5c4300;
+  /* Xcode "Default (Light)" syntax colors. */
+  --hl-keyword: #9b2393;
+  --hl-string: #c41a16;
+  --hl-number: #1c00cf;
+  --hl-comment: #5d6c79;
+  --hl-type: #3900a0;
+  --hl-function: #6c36a9;
+  --hl-declaration: #0f68a0;
+  --hl-attribute: #815f03;
+  --hl-preprocessor: #643820;
+  --hl-link: #0e0eff;
+  --hl-addition-bg: rgba(52, 199, 89, 0.14);
+  --hl-deletion-bg: rgba(255, 59, 48, 0.12);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --preview-bg: #0d1117;
-  --preview-fg: #e6edf3;
-  --preview-muted: #8b949e;
-  --preview-border: #30363d;
-  --preview-code-bg: #161b22;
-  --preview-accent: #58a6ff;
+  --preview-bg: #1e1e1e;
+  --preview-fg: #e3e3e5;
+  --preview-muted: #98989d;
+  --preview-border: #48484a;
+  --preview-separator: #38383a;
+  --preview-code-bg: #2a2a2c;
+  --preview-stripe: #242426;
+  --preview-accent: #419cff;
+  --preview-caution-bg: #352c00;
+  --preview-caution-border: #8a6d00;
+  --preview-caution-fg: #f5d76e;
+  /* Xcode "Default (Dark)" syntax colors. */
+  --hl-keyword: #fc5fa3;
+  --hl-string: #fc6a5d;
+  --hl-number: #d0bf69;
+  --hl-comment: #929faa;
+  --hl-type: #d0a8ff;
+  --hl-function: #b184ef;
+  --hl-declaration: #41a1c0;
+  --hl-attribute: #bf8555;
+  --hl-preprocessor: #fd8f3f;
+  --hl-link: #6b94ff;
+  --hl-addition-bg: rgba(48, 209, 88, 0.18);
+  --hl-deletion-bg: rgba(255, 69, 58, 0.18);
 }
 
 body {
@@ -3663,6 +3696,11 @@ body {
 
 a {
   color: var(--preview-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 h1,
@@ -3676,13 +3714,13 @@ h6 {
 }
 
 h1 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 2em;
   padding-bottom: 0.3em;
 }
 
 h2 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 1.5em;
   padding-bottom: 0.25em;
 }
@@ -3710,14 +3748,14 @@ pre {
 
 code {
   background: var(--preview-code-bg);
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 0.9em;
   padding: 0.15em 0.35em;
 }
 
 pre {
   background: var(--preview-code-bg);
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: auto;
   padding: 14px 16px;
 }
@@ -3727,6 +3765,99 @@ pre code {
   border-radius: 0;
   display: block;
   padding: 0;
+}
+
+/* highlight.js output: the block already carries the code background and
+   padding, so the highlighted element adds neither (no nested box). */
+pre code.hljs {
+  color: inherit;
+  overflow-x: auto;
+}
+
+.hljs-keyword,
+.hljs-doctag,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-selector-tag,
+.hljs-variable.language_,
+.hljs-meta .hljs-keyword {
+  color: var(--hl-keyword);
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-code,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-char.escape_ {
+  color: var(--hl-number);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-formula {
+  color: var(--hl-comment);
+  font-style: normal;
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ {
+  color: var(--hl-type);
+}
+
+.hljs-title,
+.hljs-title.function_ {
+  color: var(--hl-function);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-name,
+.hljs-section,
+.hljs-property {
+  color: var(--hl-declaration);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo {
+  color: var(--hl-attribute);
+}
+
+.hljs-meta,
+.hljs-bullet {
+  color: var(--hl-preprocessor);
+}
+
+.hljs-link {
+  color: var(--hl-link);
+}
+
+.hljs-section,
+.hljs-strong {
+  font-weight: 600;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-addition {
+  background: var(--hl-addition-bg);
+}
+
+.hljs-deletion {
+  background: var(--hl-deletion-bg);
 }
 
 table {
@@ -3743,8 +3874,12 @@ td {
   padding: 6px 10px;
 }
 
+th {
+  background: var(--preview-code-bg);
+}
+
 tr:nth-child(2n) {
-  background: #f6f8fa;
+  background: var(--preview-stripe);
 }
 
 img {
@@ -3766,7 +3901,7 @@ input[type="checkbox"] {
 .export-image-placeholder {
   background: var(--preview-code-bg);
   border: 1px dashed var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--preview-muted);
   display: inline-block;
   font-size: 0.88em;
@@ -3774,10 +3909,10 @@ input[type="checkbox"] {
 }
 
 .mdx-error-banner {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   display: grid;
   gap: 4px;
   margin: 0 0 16px;
@@ -3816,7 +3951,7 @@ input[type="checkbox"] {
 
 .mdx-component-card {
   border: 1px solid var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   box-sizing: border-box;
 }
 
@@ -3907,10 +4042,10 @@ input[type="checkbox"] {
 }
 
 .mermaid-error {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   font-family: "SF Mono", Menlo, Consolas, monospace;
   padding: 12px;
   white-space: pre-wrap;
@@ -3918,186 +4053,95 @@ input[type="checkbox"] {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --preview-bg: #0d1117;
-    --preview-fg: #e6edf3;
-    --preview-muted: #8b949e;
-    --preview-border: #30363d;
-    --preview-code-bg: #161b22;
-    --preview-accent: #58a6ff;
+    --preview-bg: #1e1e1e;
+    --preview-fg: #e3e3e5;
+    --preview-muted: #98989d;
+    --preview-border: #48484a;
+    --preview-separator: #38383a;
+    --preview-code-bg: #2a2a2c;
+    --preview-stripe: #242426;
+    --preview-accent: #419cff;
+    --preview-caution-bg: #352c00;
+    --preview-caution-border: #8a6d00;
+    --preview-caution-fg: #f5d76e;
+    --hl-keyword: #fc5fa3;
+    --hl-string: #fc6a5d;
+    --hl-number: #d0bf69;
+    --hl-comment: #929faa;
+    --hl-type: #d0a8ff;
+    --hl-function: #b184ef;
+    --hl-declaration: #41a1c0;
+    --hl-attribute: #bf8555;
+    --hl-preprocessor: #fd8f3f;
+    --hl-link: #6b94ff;
+    --hl-addition-bg: rgba(48, 209, 88, 0.18);
+    --hl-deletion-bg: rgba(255, 69, 58, 0.18);
   }
-
-  :root:not([data-theme="light"]) tr:nth-child(2n) {
-    background: #161b22;
-  }
-
-  :root:not([data-theme="light"]) .mdx-error-banner,
-  :root:not([data-theme="light"]) .mermaid-error {
-    background: #332b00;
-    border-color: #9e7f14;
-    color: #f0d98c;
-  }
-}
-
-:root[data-theme="dark"] tr:nth-child(2n) {
-  background: #161b22;
-}
-
-:root[data-theme="dark"] .mdx-error-banner,
-:root[data-theme="dark"] .mermaid-error {
-  background: #332b00;
-  border-color: #9e7f14;
-  color: #f0d98c;
 }
 
 
 @font-face{font-display:block;font-family:KaTeX_AMS;font-style:normal;font-weight:400;src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2"),url(fonts/KaTeX_AMS-Regular.woff) format("woff"),url(fonts/KaTeX_AMS-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Caligraphic-Bold.woff2) format("woff2"),url(fonts/KaTeX_Caligraphic-Bold.woff) format("woff"),url(fonts/KaTeX_Caligraphic-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Caligraphic-Regular.woff2) format("woff2"),url(fonts/KaTeX_Caligraphic-Regular.woff) format("woff"),url(fonts/KaTeX_Caligraphic-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Fraktur-Bold.woff2) format("woff2"),url(fonts/KaTeX_Fraktur-Bold.woff) format("woff"),url(fonts/KaTeX_Fraktur-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Fraktur-Regular.woff2) format("woff2"),url(fonts/KaTeX_Fraktur-Regular.woff) format("woff"),url(fonts/KaTeX_Fraktur-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Main-Bold.woff2) format("woff2"),url(fonts/KaTeX_Main-Bold.woff) format("woff"),url(fonts/KaTeX_Main-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:700;src:url(fonts/KaTeX_Main-BoldItalic.woff2) format("woff2"),url(fonts/KaTeX_Main-BoldItalic.woff) format("woff"),url(fonts/KaTeX_Main-BoldItalic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:400;src:url(fonts/KaTeX_Main-Italic.woff2) format("woff2"),url(fonts/KaTeX_Main-Italic.woff) format("woff"),url(fonts/KaTeX_Main-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Main-Regular.woff2) format("woff2"),url(fonts/KaTeX_Main-Regular.woff) format("woff"),url(fonts/KaTeX_Main-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:700;src:url(fonts/KaTeX_Math-BoldItalic.woff2) format("woff2"),url(fonts/KaTeX_Math-BoldItalic.woff) format("woff"),url(fonts/KaTeX_Math-BoldItalic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:400;src:url(fonts/KaTeX_Math-Italic.woff2) format("woff2"),url(fonts/KaTeX_Math-Italic.woff) format("woff"),url(fonts/KaTeX_Math-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:700;src:url(fonts/KaTeX_SansSerif-Bold.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Bold.woff) format("woff"),url(fonts/KaTeX_SansSerif-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:italic;font-weight:400;src:url(fonts/KaTeX_SansSerif-Italic.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Italic.woff) format("woff"),url(fonts/KaTeX_SansSerif-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:400;src:url(fonts/KaTeX_SansSerif-Regular.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Regular.woff) format("woff"),url(fonts/KaTeX_SansSerif-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Script;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Script-Regular.woff2) format("woff2"),url(fonts/KaTeX_Script-Regular.woff) format("woff"),url(fonts/KaTeX_Script-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size1;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size1-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size1-Regular.woff) format("woff"),url(fonts/KaTeX_Size1-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size2;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size2-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size2-Regular.woff) format("woff"),url(fonts/KaTeX_Size2-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size3;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size3-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size3-Regular.woff) format("woff"),url(fonts/KaTeX_Size3-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size4;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size4-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size4-Regular.woff) format("woff"),url(fonts/KaTeX_Size4-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Typewriter;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Typewriter-Regular.woff2) format("woff2"),url(fonts/KaTeX_Typewriter-Regular.woff) format("woff"),url(fonts/KaTeX_Typewriter-Regular.ttf) format("truetype")}.katex{font:normal 1.21em KaTeX_Main,Times New Roman,serif;line-height:1.2;position:relative;text-indent:0;text-rendering:auto}.katex *{-ms-high-contrast-adjust:none!important;border-color:currentColor}.katex .katex-version:after{content:"0.16.47"}.katex .katex-mathml{border:0;-webkit-clip-path:inset(50%);clip-path:inset(50%);height:1px;overflow:hidden;padding:0;position:absolute;width:1px}.katex .katex-html>.newline{display:block}.katex .base{position:relative;white-space:nowrap;width:-webkit-min-content;width:-moz-min-content;width:min-content}.katex .base,.katex .strut{display:inline-block}.katex .textbf{font-weight:700}.katex .textit{font-style:italic}.katex .textrm{font-family:KaTeX_Main}.katex .textsf{font-family:KaTeX_SansSerif}.katex .texttt{font-family:KaTeX_Typewriter}.katex .mathnormal{font-family:KaTeX_Math;font-style:italic}.katex .mathit{font-family:KaTeX_Main;font-style:italic}.katex .mathrm{font-style:normal}.katex .mathbf{font-family:KaTeX_Main;font-weight:700}.katex .boldsymbol{font-family:KaTeX_Math;font-style:italic;font-weight:700}.katex .amsrm,.katex .mathbb,.katex .textbb{font-family:KaTeX_AMS}.katex .mathcal{font-family:KaTeX_Caligraphic}.katex .mathfrak,.katex .textfrak{font-family:KaTeX_Fraktur}.katex .mathboldfrak,.katex .textboldfrak{font-family:KaTeX_Fraktur;font-weight:700}.katex .mathtt{font-family:KaTeX_Typewriter}.katex .mathscr,.katex .textscr{font-family:KaTeX_Script}.katex .mathsf,.katex .textsf{font-family:KaTeX_SansSerif}.katex .mathboldsf,.katex .textboldsf{font-family:KaTeX_SansSerif;font-weight:700}.katex .mathitsf,.katex .mathsfit,.katex .textitsf{font-family:KaTeX_SansSerif;font-style:italic}.katex .mainrm{font-family:KaTeX_Main;font-style:normal}.katex .vlist-t{border-collapse:collapse;display:inline-table;table-layout:fixed}.katex .vlist-r{display:table-row}.katex .vlist{display:table-cell;position:relative;vertical-align:bottom}.katex .vlist>span{display:block;height:0;position:relative}.katex .vlist>span>span{display:inline-block}.katex .vlist>span>.pstrut{overflow:hidden;width:0}.katex .vlist-t2{margin-right:-2px}.katex .vlist-s{display:table-cell;font-size:1px;min-width:2px;vertical-align:bottom;width:2px}.katex .vbox{align-items:baseline;display:inline-flex;flex-direction:column}.katex .hbox{width:100%}.katex .hbox,.katex .thinbox{display:inline-flex;flex-direction:row}.katex .thinbox{max-width:0;width:0}.katex .msupsub{text-align:left}.katex .mfrac>span>span{text-align:center}.katex .mfrac .frac-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline,.katex .hline,.katex .mfrac .frac-line,.katex .overline .overline-line,.katex .rule,.katex .underline .underline-line{min-height:1px}.katex .mspace{display:inline-block}.katex .smash{display:inline;line-height:0}.katex .clap,.katex .llap,.katex .rlap{position:relative;width:0}.katex .clap>.inner,.katex .llap>.inner,.katex .rlap>.inner{position:absolute}.katex .clap>.fix,.katex .llap>.fix,.katex .rlap>.fix{display:inline-block}.katex .llap>.inner{right:0}.katex .clap>.inner,.katex .rlap>.inner{left:0}.katex .clap>.inner>span{margin-left:-50%;margin-right:50%}.katex .rule{border:0 solid;display:inline-block;position:relative}.katex .hline,.katex .overline .overline-line,.katex .underline .underline-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline{border-bottom-style:dashed;display:inline-block;width:100%}.katex .sqrt>.root{margin-left:.2777777778em;margin-right:-.5555555556em}.katex .fontsize-ensurer.reset-size1.size1,.katex .sizing.reset-size1.size1{font-size:1em}.katex .fontsize-ensurer.reset-size1.size2,.katex .sizing.reset-size1.size2{font-size:1.2em}.katex .fontsize-ensurer.reset-size1.size3,.katex .sizing.reset-size1.size3{font-size:1.4em}.katex .fontsize-ensurer.reset-size1.size4,.katex .sizing.reset-size1.size4{font-size:1.6em}.katex .fontsize-ensurer.reset-size1.size5,.katex .sizing.reset-size1.size5{font-size:1.8em}.katex .fontsize-ensurer.reset-size1.size6,.katex .sizing.reset-size1.size6{font-size:2em}.katex .fontsize-ensurer.reset-size1.size7,.katex .sizing.reset-size1.size7{font-size:2.4em}.katex .fontsize-ensurer.reset-size1.size8,.katex .sizing.reset-size1.size8{font-size:2.88em}.katex .fontsize-ensurer.reset-size1.size9,.katex .sizing.reset-size1.size9{font-size:3.456em}.katex .fontsize-ensurer.reset-size1.size10,.katex .sizing.reset-size1.size10{font-size:4.148em}.katex .fontsize-ensurer.reset-size1.size11,.katex .sizing.reset-size1.size11{font-size:4.976em}.katex .fontsize-ensurer.reset-size2.size1,.katex .sizing.reset-size2.size1{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size2.size2,.katex .sizing.reset-size2.size2{font-size:1em}.katex .fontsize-ensurer.reset-size2.size3,.katex .sizing.reset-size2.size3{font-size:1.1666666667em}.katex .fontsize-ensurer.reset-size2.size4,.katex .sizing.reset-size2.size4{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size2.size5,.katex .sizing.reset-size2.size5{font-size:1.5em}.katex .fontsize-ensurer.reset-size2.size6,.katex .sizing.reset-size2.size6{font-size:1.6666666667em}.katex .fontsize-ensurer.reset-size2.size7,.katex .sizing.reset-size2.size7{font-size:2em}.katex .fontsize-ensurer.reset-size2.size8,.katex .sizing.reset-size2.size8{font-size:2.4em}.katex .fontsize-ensurer.reset-size2.size9,.katex .sizing.reset-size2.size9{font-size:2.88em}.katex .fontsize-ensurer.reset-size2.size10,.katex .sizing.reset-size2.size10{font-size:3.4566666667em}.katex .fontsize-ensurer.reset-size2.size11,.katex .sizing.reset-size2.size11{font-size:4.1466666667em}.katex .fontsize-ensurer.reset-size3.size1,.katex .sizing.reset-size3.size1{font-size:.7142857143em}.katex .fontsize-ensurer.reset-size3.size2,.katex .sizing.reset-size3.size2{font-size:.8571428571em}.katex .fontsize-ensurer.reset-size3.size3,.katex .sizing.reset-size3.size3{font-size:1em}.katex .fontsize-ensurer.reset-size3.size4,.katex .sizing.reset-size3.size4{font-size:1.1428571429em}.katex .fontsize-ensurer.reset-size3.size5,.katex .sizing.reset-size3.size5{font-size:1.2857142857em}.katex .fontsize-ensurer.reset-size3.size6,.katex .sizing.reset-size3.size6{font-size:1.4285714286em}.katex .fontsize-ensurer.reset-size3.size7,.katex .sizing.reset-size3.size7{font-size:1.7142857143em}.katex .fontsize-ensurer.reset-size3.size8,.katex .sizing.reset-size3.size8{font-size:2.0571428571em}.katex .fontsize-ensurer.reset-size3.size9,.katex .sizing.reset-size3.size9{font-size:2.4685714286em}.katex .fontsize-ensurer.reset-size3.size10,.katex .sizing.reset-size3.size10{font-size:2.9628571429em}.katex .fontsize-ensurer.reset-size3.size11,.katex .sizing.reset-size3.size11{font-size:3.5542857143em}.katex .fontsize-ensurer.reset-size4.size1,.katex .sizing.reset-size4.size1{font-size:.625em}.katex .fontsize-ensurer.reset-size4.size2,.katex .sizing.reset-size4.size2{font-size:.75em}.katex .fontsize-ensurer.reset-size4.size3,.katex .sizing.reset-size4.size3{font-size:.875em}.katex .fontsize-ensurer.reset-size4.size4,.katex .sizing.reset-size4.size4{font-size:1em}.katex .fontsize-ensurer.reset-size4.size5,.katex .sizing.reset-size4.size5{font-size:1.125em}.katex .fontsize-ensurer.reset-size4.size6,.katex .sizing.reset-size4.size6{font-size:1.25em}.katex .fontsize-ensurer.reset-size4.size7,.katex .sizing.reset-size4.size7{font-size:1.5em}.katex .fontsize-ensurer.reset-size4.size8,.katex .sizing.reset-size4.size8{font-size:1.8em}.katex .fontsize-ensurer.reset-size4.size9,.katex .sizing.reset-size4.size9{font-size:2.16em}.katex .fontsize-ensurer.reset-size4.size10,.katex .sizing.reset-size4.size10{font-size:2.5925em}.katex .fontsize-ensurer.reset-size4.size11,.katex .sizing.reset-size4.size11{font-size:3.11em}.katex .fontsize-ensurer.reset-size5.size1,.katex .sizing.reset-size5.size1{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size5.size2,.katex .sizing.reset-size5.size2{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size5.size3,.katex .sizing.reset-size5.size3{font-size:.7777777778em}.katex .fontsize-ensurer.reset-size5.size4,.katex .sizing.reset-size5.size4{font-size:.8888888889em}.katex .fontsize-ensurer.reset-size5.size5,.katex .sizing.reset-size5.size5{font-size:1em}.katex .fontsize-ensurer.reset-size5.size6,.katex .sizing.reset-size5.size6{font-size:1.1111111111em}.katex .fontsize-ensurer.reset-size5.size7,.katex .sizing.reset-size5.size7{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size5.size8,.katex .sizing.reset-size5.size8{font-size:1.6em}.katex .fontsize-ensurer.reset-size5.size9,.katex .sizing.reset-size5.size9{font-size:1.92em}.katex .fontsize-ensurer.reset-size5.size10,.katex .sizing.reset-size5.size10{font-size:2.3044444444em}.katex .fontsize-ensurer.reset-size5.size11,.katex .sizing.reset-size5.size11{font-size:2.7644444444em}.katex .fontsize-ensurer.reset-size6.size1,.katex .sizing.reset-size6.size1{font-size:.5em}.katex .fontsize-ensurer.reset-size6.size2,.katex .sizing.reset-size6.size2{font-size:.6em}.katex .fontsize-ensurer.reset-size6.size3,.katex .sizing.reset-size6.size3{font-size:.7em}.katex .fontsize-ensurer.reset-size6.size4,.katex .sizing.reset-size6.size4{font-size:.8em}.katex .fontsize-ensurer.reset-size6.size5,.katex .sizing.reset-size6.size5{font-size:.9em}.katex .fontsize-ensurer.reset-size6.size6,.katex .sizing.reset-size6.size6{font-size:1em}.katex .fontsize-ensurer.reset-size6.size7,.katex .sizing.reset-size6.size7{font-size:1.2em}.katex .fontsize-ensurer.reset-size6.size8,.katex .sizing.reset-size6.size8{font-size:1.44em}.katex .fontsize-ensurer.reset-size6.size9,.katex .sizing.reset-size6.size9{font-size:1.728em}.katex .fontsize-ensurer.reset-size6.size10,.katex .sizing.reset-size6.size10{font-size:2.074em}.katex .fontsize-ensurer.reset-size6.size11,.katex .sizing.reset-size6.size11{font-size:2.488em}.katex .fontsize-ensurer.reset-size7.size1,.katex .sizing.reset-size7.size1{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size7.size2,.katex .sizing.reset-size7.size2{font-size:.5em}.katex .fontsize-ensurer.reset-size7.size3,.katex .sizing.reset-size7.size3{font-size:.5833333333em}.katex .fontsize-ensurer.reset-size7.size4,.katex .sizing.reset-size7.size4{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size7.size5,.katex .sizing.reset-size7.size5{font-size:.75em}.katex .fontsize-ensurer.reset-size7.size6,.katex .sizing.reset-size7.size6{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size7.size7,.katex .sizing.reset-size7.size7{font-size:1em}.katex .fontsize-ensurer.reset-size7.size8,.katex .sizing.reset-size7.size8{font-size:1.2em}.katex .fontsize-ensurer.reset-size7.size9,.katex .sizing.reset-size7.size9{font-size:1.44em}.katex .fontsize-ensurer.reset-size7.size10,.katex .sizing.reset-size7.size10{font-size:1.7283333333em}.katex .fontsize-ensurer.reset-size7.size11,.katex .sizing.reset-size7.size11{font-size:2.0733333333em}.katex .fontsize-ensurer.reset-size8.size1,.katex .sizing.reset-size8.size1{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size8.size2,.katex .sizing.reset-size8.size2{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size8.size3,.katex .sizing.reset-size8.size3{font-size:.4861111111em}.katex .fontsize-ensurer.reset-size8.size4,.katex .sizing.reset-size8.size4{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size8.size5,.katex .sizing.reset-size8.size5{font-size:.625em}.katex .fontsize-ensurer.reset-size8.size6,.katex .sizing.reset-size8.size6{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size8.size7,.katex .sizing.reset-size8.size7{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size8.size8,.katex .sizing.reset-size8.size8{font-size:1em}.katex .fontsize-ensurer.reset-size8.size9,.katex .sizing.reset-size8.size9{font-size:1.2em}.katex .fontsize-ensurer.reset-size8.size10,.katex .sizing.reset-size8.size10{font-size:1.4402777778em}.katex .fontsize-ensurer.reset-size8.size11,.katex .sizing.reset-size8.size11{font-size:1.7277777778em}.katex .fontsize-ensurer.reset-size9.size1,.katex .sizing.reset-size9.size1{font-size:.2893518519em}.katex .fontsize-ensurer.reset-size9.size2,.katex .sizing.reset-size9.size2{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size9.size3,.katex .sizing.reset-size9.size3{font-size:.4050925926em}.katex .fontsize-ensurer.reset-size9.size4,.katex .sizing.reset-size9.size4{font-size:.462962963em}.katex .fontsize-ensurer.reset-size9.size5,.katex .sizing.reset-size9.size5{font-size:.5208333333em}.katex .fontsize-ensurer.reset-size9.size6,.katex .sizing.reset-size9.size6{font-size:.5787037037em}.katex .fontsize-ensurer.reset-size9.size7,.katex .sizing.reset-size9.size7{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size9.size8,.katex .sizing.reset-size9.size8{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size9.size9,.katex .sizing.reset-size9.size9{font-size:1em}.katex .fontsize-ensurer.reset-size9.size10,.katex .sizing.reset-size9.size10{font-size:1.2002314815em}.katex .fontsize-ensurer.reset-size9.size11,.katex .sizing.reset-size9.size11{font-size:1.4398148148em}.katex .fontsize-ensurer.reset-size10.size1,.katex .sizing.reset-size10.size1{font-size:.2410800386em}.katex .fontsize-ensurer.reset-size10.size2,.katex .sizing.reset-size10.size2{font-size:.2892960463em}.katex .fontsize-ensurer.reset-size10.size3,.katex .sizing.reset-size10.size3{font-size:.337512054em}.katex .fontsize-ensurer.reset-size10.size4,.katex .sizing.reset-size10.size4{font-size:.3857280617em}.katex .fontsize-ensurer.reset-size10.size5,.katex .sizing.reset-size10.size5{font-size:.4339440694em}.katex .fontsize-ensurer.reset-size10.size6,.katex .sizing.reset-size10.size6{font-size:.4821600771em}.katex .fontsize-ensurer.reset-size10.size7,.katex .sizing.reset-size10.size7{font-size:.5785920926em}.katex .fontsize-ensurer.reset-size10.size8,.katex .sizing.reset-size10.size8{font-size:.6943105111em}.katex .fontsize-ensurer.reset-size10.size9,.katex .sizing.reset-size10.size9{font-size:.8331726133em}.katex .fontsize-ensurer.reset-size10.size10,.katex .sizing.reset-size10.size10{font-size:1em}.katex .fontsize-ensurer.reset-size10.size11,.katex .sizing.reset-size10.size11{font-size:1.1996142719em}.katex .fontsize-ensurer.reset-size11.size1,.katex .sizing.reset-size11.size1{font-size:.2009646302em}.katex .fontsize-ensurer.reset-size11.size2,.katex .sizing.reset-size11.size2{font-size:.2411575563em}.katex .fontsize-ensurer.reset-size11.size3,.katex .sizing.reset-size11.size3{font-size:.2813504823em}.katex .fontsize-ensurer.reset-size11.size4,.katex .sizing.reset-size11.size4{font-size:.3215434084em}.katex .fontsize-ensurer.reset-size11.size5,.katex .sizing.reset-size11.size5{font-size:.3617363344em}.katex .fontsize-ensurer.reset-size11.size6,.katex .sizing.reset-size11.size6{font-size:.4019292605em}.katex .fontsize-ensurer.reset-size11.size7,.katex .sizing.reset-size11.size7{font-size:.4823151125em}.katex .fontsize-ensurer.reset-size11.size8,.katex .sizing.reset-size11.size8{font-size:.578778135em}.katex .fontsize-ensurer.reset-size11.size9,.katex .sizing.reset-size11.size9{font-size:.6945337621em}.katex .fontsize-ensurer.reset-size11.size10,.katex .sizing.reset-size11.size10{font-size:.8336012862em}.katex .fontsize-ensurer.reset-size11.size11,.katex .sizing.reset-size11.size11{font-size:1em}.katex .delimsizing.size1{font-family:KaTeX_Size1}.katex .delimsizing.size2{font-family:KaTeX_Size2}.katex .delimsizing.size3{font-family:KaTeX_Size3}.katex .delimsizing.size4{font-family:KaTeX_Size4}.katex .delimsizing.mult .delim-size1>span{font-family:KaTeX_Size1}.katex .delimsizing.mult .delim-size4>span{font-family:KaTeX_Size4}.katex .nulldelimiter{display:inline-block;width:.12em}.katex .delimcenter,.katex .op-symbol{position:relative}.katex .op-symbol.small-op{font-family:KaTeX_Size1}.katex .op-symbol.large-op{font-family:KaTeX_Size2}.katex .accent>.vlist-t,.katex .op-limits>.vlist-t{text-align:center}.katex .accent .accent-body{position:relative}.katex .accent .accent-body:not(.accent-full){width:0}.katex .overlay{display:block}.katex .mtable .vertical-separator{display:inline-block;min-width:1px}.katex .mtable .arraycolsep{display:inline-block}.katex .mtable .col-align-c>.vlist-t{text-align:center}.katex .mtable .col-align-l>.vlist-t{text-align:left}.katex .mtable .col-align-r>.vlist-t{text-align:right}.katex .svg-align{text-align:left}.katex svg{fill:currentColor;stroke:currentColor;display:block;height:inherit;position:absolute;width:100%}.katex svg path{stroke:none}.katex svg{fill-rule:nonzero;fill-opacity:1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1}.katex img{border-style:none;max-height:none;max-width:none;min-height:0;min-width:0}.katex .stretchy{display:block;overflow:hidden;position:relative;width:100%}.katex .stretchy:after,.katex .stretchy:before{content:""}.katex .hide-tail{overflow:hidden;position:relative;width:100%}.katex .halfarrow-left{left:0;overflow:hidden;position:absolute;width:50.2%}.katex .halfarrow-right{overflow:hidden;position:absolute;right:0;width:50.2%}.katex .brace-left{left:0;overflow:hidden;position:absolute;width:25.1%}.katex .brace-center{left:25%;overflow:hidden;position:absolute;width:50%}.katex .brace-right{overflow:hidden;position:absolute;right:0;width:25.1%}.katex .x-arrow-pad{padding:0 .5em}.katex .cd-arrow-pad{padding:0 .55556em 0 .27778em}.katex .mover,.katex .munder,.katex .x-arrow{text-align:center}.katex .boxpad{padding:0 .3em}.katex .fbox,.katex .fcolorbox{border:.04em solid;box-sizing:border-box}.katex .cancel-pad{padding:0 .2em}.katex .cancel-lap{margin-left:-.2em;margin-right:-.2em}.katex .sout{border-bottom-style:solid;border-bottom-width:.08em}.katex .angl{border-right:.049em solid;border-top:.049em solid;box-sizing:border-box;margin-right:.03889em}.katex .anglpad{padding:0 .03889em}.katex .eqn-num:before{content:"(" counter(katexEqnNo) ")";counter-increment:katexEqnNo}.katex .mml-eqn-num:before{content:"(" counter(mmlEqnNo) ")";counter-increment:mmlEqnNo}.katex .mtr-glue{width:50%}.katex .cd-vert-arrow{display:inline-block;position:relative}.katex .cd-label-left{display:inline-block;position:absolute;right:calc(50% + .3em);text-align:left}.katex .cd-label-right{display:inline-block;left:calc(50% + .3em);position:absolute;text-align:right}.katex-display{display:block;margin:1em 0;text-align:center}.katex-display>.katex{display:block;text-align:center;white-space:nowrap}.katex-display>.katex>.katex-html{display:block;position:relative}.katex-display>.katex>.katex-html>.tag{position:absolute;right:0}.katex-display.leqno>.katex>.katex-html>.tag{left:0;right:auto}.katex-display.fleqn>.katex{padding-left:2em;text-align:left}body{counter-reset:katexEqnNo mmlEqnNo}
-
-
-pre code.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 1em
-}
-code.hljs {
-  padding: 3px 5px
-}
-/*!
-  Theme: GitHub
-  Description: Light theme as seen on github.com
-  Author: github.com
-  Maintainer: @Hirse
-  Updated: 2021-05-15
-
-  Outdated base version: https://github.com/primer/github-syntax-light
-  Current colors taken from GitHub's CSS
-*/
-.hljs {
-  color: #24292e;
-  background: #ffffff
-}
-.hljs-doctag,
-.hljs-keyword,
-.hljs-meta .hljs-keyword,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-variable.language_ {
-  /* prettylights-syntax-keyword */
-  color: #d73a49
-}
-.hljs-title,
-.hljs-title.class_,
-.hljs-title.class_.inherited__,
-.hljs-title.function_ {
-  /* prettylights-syntax-entity */
-  color: #6f42c1
-}
-.hljs-attr,
-.hljs-attribute,
-.hljs-literal,
-.hljs-meta,
-.hljs-number,
-.hljs-operator,
-.hljs-variable,
-.hljs-selector-attr,
-.hljs-selector-class,
-.hljs-selector-id {
-  /* prettylights-syntax-constant */
-  color: #005cc5
-}
-.hljs-regexp,
-.hljs-string,
-.hljs-meta .hljs-string {
-  /* prettylights-syntax-string */
-  color: #032f62
-}
-.hljs-built_in,
-.hljs-symbol {
-  /* prettylights-syntax-variable */
-  color: #e36209
-}
-.hljs-comment,
-.hljs-code,
-.hljs-formula {
-  /* prettylights-syntax-comment */
-  color: #6a737d
-}
-.hljs-name,
-.hljs-quote,
-.hljs-selector-tag,
-.hljs-selector-pseudo {
-  /* prettylights-syntax-entity-tag */
-  color: #22863a
-}
-.hljs-subst {
-  /* prettylights-syntax-storage-modifier-import */
-  color: #24292e
-}
-.hljs-section {
-  /* prettylights-syntax-markup-heading */
-  color: #005cc5;
-  font-weight: bold
-}
-.hljs-bullet {
-  /* prettylights-syntax-markup-list */
-  color: #735c0f
-}
-.hljs-emphasis {
-  /* prettylights-syntax-markup-italic */
-  color: #24292e;
-  font-style: italic
-}
-.hljs-strong {
-  /* prettylights-syntax-markup-bold */
-  color: #24292e;
-  font-weight: bold
-}
-.hljs-addition {
-  /* prettylights-syntax-markup-inserted */
-  color: #22863a;
-  background-color: #f0fff4
-}
-.hljs-deletion {
-  /* prettylights-syntax-markup-deleted */
-  color: #b31d28;
-  background-color: #ffeef0
-}
-.hljs-char.escape_,
-.hljs-link,
-.hljs-params,
-.hljs-property,
-.hljs-punctuation,
-.hljs-tag {
-  /* purposely ignored */
-
-}`,collectStyleText:()=>Aqe(document,`:root {
+`,collectStyleText:()=>Aqe(document,`/* Apple system palette. Dark mode matches the macOS text background (#1e1e1e)
+   so the preview sits flush against the source editor. */
+:root,
+:root[data-theme="light"] {
   color-scheme: light dark;
   --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
+  --preview-fg: #1d1d1f;
+  --preview-muted: #6e6e73;
+  --preview-border: #d2d2d7;
+  --preview-separator: #e5e5ea;
+  --preview-code-bg: #f5f5f7;
+  --preview-stripe: #fafafc;
+  --preview-accent: #0068da;
+  --preview-caution-bg: #fff7d6;
+  --preview-caution-border: #e6b800;
+  --preview-caution-fg: #5c4300;
+  /* Xcode "Default (Light)" syntax colors. */
+  --hl-keyword: #9b2393;
+  --hl-string: #c41a16;
+  --hl-number: #1c00cf;
+  --hl-comment: #5d6c79;
+  --hl-type: #3900a0;
+  --hl-function: #6c36a9;
+  --hl-declaration: #0f68a0;
+  --hl-attribute: #815f03;
+  --hl-preprocessor: #643820;
+  --hl-link: #0e0eff;
+  --hl-addition-bg: rgba(52, 199, 89, 0.14);
+  --hl-deletion-bg: rgba(255, 59, 48, 0.12);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --preview-bg: #ffffff;
-  --preview-fg: #24292f;
-  --preview-muted: #57606a;
-  --preview-border: #d0d7de;
-  --preview-code-bg: #f6f8fa;
-  --preview-accent: #0969da;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --preview-bg: #0d1117;
-  --preview-fg: #e6edf3;
-  --preview-muted: #8b949e;
-  --preview-border: #30363d;
-  --preview-code-bg: #161b22;
-  --preview-accent: #58a6ff;
+  --preview-bg: #1e1e1e;
+  --preview-fg: #e3e3e5;
+  --preview-muted: #98989d;
+  --preview-border: #48484a;
+  --preview-separator: #38383a;
+  --preview-code-bg: #2a2a2c;
+  --preview-stripe: #242426;
+  --preview-accent: #419cff;
+  --preview-caution-bg: #352c00;
+  --preview-caution-border: #8a6d00;
+  --preview-caution-fg: #f5d76e;
+  /* Xcode "Default (Dark)" syntax colors. */
+  --hl-keyword: #fc5fa3;
+  --hl-string: #fc6a5d;
+  --hl-number: #d0bf69;
+  --hl-comment: #929faa;
+  --hl-type: #d0a8ff;
+  --hl-function: #b184ef;
+  --hl-declaration: #41a1c0;
+  --hl-attribute: #bf8555;
+  --hl-preprocessor: #fd8f3f;
+  --hl-link: #6b94ff;
+  --hl-addition-bg: rgba(48, 209, 88, 0.18);
+  --hl-deletion-bg: rgba(255, 69, 58, 0.18);
 }
 
 body {
@@ -4120,6 +4164,11 @@ body {
 
 a {
   color: var(--preview-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 h1,
@@ -4133,13 +4182,13 @@ h6 {
 }
 
 h1 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 2em;
   padding-bottom: 0.3em;
 }
 
 h2 {
-  border-bottom: 1px solid var(--preview-border);
+  border-bottom: 1px solid var(--preview-separator);
   font-size: 1.5em;
   padding-bottom: 0.25em;
 }
@@ -4167,14 +4216,14 @@ pre {
 
 code {
   background: var(--preview-code-bg);
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 0.9em;
   padding: 0.15em 0.35em;
 }
 
 pre {
   background: var(--preview-code-bg);
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: auto;
   padding: 14px 16px;
 }
@@ -4184,6 +4233,99 @@ pre code {
   border-radius: 0;
   display: block;
   padding: 0;
+}
+
+/* highlight.js output: the block already carries the code background and
+   padding, so the highlighted element adds neither (no nested box). */
+pre code.hljs {
+  color: inherit;
+  overflow-x: auto;
+}
+
+.hljs-keyword,
+.hljs-doctag,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-selector-tag,
+.hljs-variable.language_,
+.hljs-meta .hljs-keyword {
+  color: var(--hl-keyword);
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-code,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-char.escape_ {
+  color: var(--hl-number);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-formula {
+  color: var(--hl-comment);
+  font-style: normal;
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ {
+  color: var(--hl-type);
+}
+
+.hljs-title,
+.hljs-title.function_ {
+  color: var(--hl-function);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-name,
+.hljs-section,
+.hljs-property {
+  color: var(--hl-declaration);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo {
+  color: var(--hl-attribute);
+}
+
+.hljs-meta,
+.hljs-bullet {
+  color: var(--hl-preprocessor);
+}
+
+.hljs-link {
+  color: var(--hl-link);
+}
+
+.hljs-section,
+.hljs-strong {
+  font-weight: 600;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-addition {
+  background: var(--hl-addition-bg);
+}
+
+.hljs-deletion {
+  background: var(--hl-deletion-bg);
 }
 
 table {
@@ -4200,8 +4342,12 @@ td {
   padding: 6px 10px;
 }
 
+th {
+  background: var(--preview-code-bg);
+}
+
 tr:nth-child(2n) {
-  background: #f6f8fa;
+  background: var(--preview-stripe);
 }
 
 img {
@@ -4223,7 +4369,7 @@ input[type="checkbox"] {
 .export-image-placeholder {
   background: var(--preview-code-bg);
   border: 1px dashed var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--preview-muted);
   display: inline-block;
   font-size: 0.88em;
@@ -4231,10 +4377,10 @@ input[type="checkbox"] {
 }
 
 .mdx-error-banner {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   display: grid;
   gap: 4px;
   margin: 0 0 16px;
@@ -4273,7 +4419,7 @@ input[type="checkbox"] {
 
 .mdx-component-card {
   border: 1px solid var(--preview-border);
-  border-radius: 6px;
+  border-radius: 8px;
   box-sizing: border-box;
 }
 
@@ -4364,10 +4510,10 @@ input[type="checkbox"] {
 }
 
 .mermaid-error {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  border-radius: 6px;
-  color: #3b2300;
+  background: var(--preview-caution-bg);
+  border: 1px solid var(--preview-caution-border);
+  border-radius: 8px;
+  color: var(--preview-caution-fg);
   font-family: "SF Mono", Menlo, Consolas, monospace;
   padding: 12px;
   white-space: pre-wrap;
@@ -4375,159 +4521,35 @@ input[type="checkbox"] {
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --preview-bg: #0d1117;
-    --preview-fg: #e6edf3;
-    --preview-muted: #8b949e;
-    --preview-border: #30363d;
-    --preview-code-bg: #161b22;
-    --preview-accent: #58a6ff;
+    --preview-bg: #1e1e1e;
+    --preview-fg: #e3e3e5;
+    --preview-muted: #98989d;
+    --preview-border: #48484a;
+    --preview-separator: #38383a;
+    --preview-code-bg: #2a2a2c;
+    --preview-stripe: #242426;
+    --preview-accent: #419cff;
+    --preview-caution-bg: #352c00;
+    --preview-caution-border: #8a6d00;
+    --preview-caution-fg: #f5d76e;
+    --hl-keyword: #fc5fa3;
+    --hl-string: #fc6a5d;
+    --hl-number: #d0bf69;
+    --hl-comment: #929faa;
+    --hl-type: #d0a8ff;
+    --hl-function: #b184ef;
+    --hl-declaration: #41a1c0;
+    --hl-attribute: #bf8555;
+    --hl-preprocessor: #fd8f3f;
+    --hl-link: #6b94ff;
+    --hl-addition-bg: rgba(48, 209, 88, 0.18);
+    --hl-deletion-bg: rgba(255, 69, 58, 0.18);
   }
-
-  :root:not([data-theme="light"]) tr:nth-child(2n) {
-    background: #161b22;
-  }
-
-  :root:not([data-theme="light"]) .mdx-error-banner,
-  :root:not([data-theme="light"]) .mermaid-error {
-    background: #332b00;
-    border-color: #9e7f14;
-    color: #f0d98c;
-  }
-}
-
-:root[data-theme="dark"] tr:nth-child(2n) {
-  background: #161b22;
-}
-
-:root[data-theme="dark"] .mdx-error-banner,
-:root[data-theme="dark"] .mermaid-error {
-  background: #332b00;
-  border-color: #9e7f14;
-  color: #f0d98c;
 }
 
 
 @font-face{font-display:block;font-family:KaTeX_AMS;font-style:normal;font-weight:400;src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2"),url(fonts/KaTeX_AMS-Regular.woff) format("woff"),url(fonts/KaTeX_AMS-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Caligraphic-Bold.woff2) format("woff2"),url(fonts/KaTeX_Caligraphic-Bold.woff) format("woff"),url(fonts/KaTeX_Caligraphic-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Caligraphic;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Caligraphic-Regular.woff2) format("woff2"),url(fonts/KaTeX_Caligraphic-Regular.woff) format("woff"),url(fonts/KaTeX_Caligraphic-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Fraktur-Bold.woff2) format("woff2"),url(fonts/KaTeX_Fraktur-Bold.woff) format("woff"),url(fonts/KaTeX_Fraktur-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Fraktur;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Fraktur-Regular.woff2) format("woff2"),url(fonts/KaTeX_Fraktur-Regular.woff) format("woff"),url(fonts/KaTeX_Fraktur-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:700;src:url(fonts/KaTeX_Main-Bold.woff2) format("woff2"),url(fonts/KaTeX_Main-Bold.woff) format("woff"),url(fonts/KaTeX_Main-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:700;src:url(fonts/KaTeX_Main-BoldItalic.woff2) format("woff2"),url(fonts/KaTeX_Main-BoldItalic.woff) format("woff"),url(fonts/KaTeX_Main-BoldItalic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:italic;font-weight:400;src:url(fonts/KaTeX_Main-Italic.woff2) format("woff2"),url(fonts/KaTeX_Main-Italic.woff) format("woff"),url(fonts/KaTeX_Main-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Main;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Main-Regular.woff2) format("woff2"),url(fonts/KaTeX_Main-Regular.woff) format("woff"),url(fonts/KaTeX_Main-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:700;src:url(fonts/KaTeX_Math-BoldItalic.woff2) format("woff2"),url(fonts/KaTeX_Math-BoldItalic.woff) format("woff"),url(fonts/KaTeX_Math-BoldItalic.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Math;font-style:italic;font-weight:400;src:url(fonts/KaTeX_Math-Italic.woff2) format("woff2"),url(fonts/KaTeX_Math-Italic.woff) format("woff"),url(fonts/KaTeX_Math-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:700;src:url(fonts/KaTeX_SansSerif-Bold.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Bold.woff) format("woff"),url(fonts/KaTeX_SansSerif-Bold.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:italic;font-weight:400;src:url(fonts/KaTeX_SansSerif-Italic.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Italic.woff) format("woff"),url(fonts/KaTeX_SansSerif-Italic.ttf) format("truetype")}@font-face{font-display:block;font-family:"KaTeX_SansSerif";font-style:normal;font-weight:400;src:url(fonts/KaTeX_SansSerif-Regular.woff2) format("woff2"),url(fonts/KaTeX_SansSerif-Regular.woff) format("woff"),url(fonts/KaTeX_SansSerif-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Script;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Script-Regular.woff2) format("woff2"),url(fonts/KaTeX_Script-Regular.woff) format("woff"),url(fonts/KaTeX_Script-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size1;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size1-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size1-Regular.woff) format("woff"),url(fonts/KaTeX_Size1-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size2;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size2-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size2-Regular.woff) format("woff"),url(fonts/KaTeX_Size2-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size3;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size3-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size3-Regular.woff) format("woff"),url(fonts/KaTeX_Size3-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Size4;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Size4-Regular.woff2) format("woff2"),url(fonts/KaTeX_Size4-Regular.woff) format("woff"),url(fonts/KaTeX_Size4-Regular.ttf) format("truetype")}@font-face{font-display:block;font-family:KaTeX_Typewriter;font-style:normal;font-weight:400;src:url(fonts/KaTeX_Typewriter-Regular.woff2) format("woff2"),url(fonts/KaTeX_Typewriter-Regular.woff) format("woff"),url(fonts/KaTeX_Typewriter-Regular.ttf) format("truetype")}.katex{font:normal 1.21em KaTeX_Main,Times New Roman,serif;line-height:1.2;position:relative;text-indent:0;text-rendering:auto}.katex *{-ms-high-contrast-adjust:none!important;border-color:currentColor}.katex .katex-version:after{content:"0.16.47"}.katex .katex-mathml{border:0;-webkit-clip-path:inset(50%);clip-path:inset(50%);height:1px;overflow:hidden;padding:0;position:absolute;width:1px}.katex .katex-html>.newline{display:block}.katex .base{position:relative;white-space:nowrap;width:-webkit-min-content;width:-moz-min-content;width:min-content}.katex .base,.katex .strut{display:inline-block}.katex .textbf{font-weight:700}.katex .textit{font-style:italic}.katex .textrm{font-family:KaTeX_Main}.katex .textsf{font-family:KaTeX_SansSerif}.katex .texttt{font-family:KaTeX_Typewriter}.katex .mathnormal{font-family:KaTeX_Math;font-style:italic}.katex .mathit{font-family:KaTeX_Main;font-style:italic}.katex .mathrm{font-style:normal}.katex .mathbf{font-family:KaTeX_Main;font-weight:700}.katex .boldsymbol{font-family:KaTeX_Math;font-style:italic;font-weight:700}.katex .amsrm,.katex .mathbb,.katex .textbb{font-family:KaTeX_AMS}.katex .mathcal{font-family:KaTeX_Caligraphic}.katex .mathfrak,.katex .textfrak{font-family:KaTeX_Fraktur}.katex .mathboldfrak,.katex .textboldfrak{font-family:KaTeX_Fraktur;font-weight:700}.katex .mathtt{font-family:KaTeX_Typewriter}.katex .mathscr,.katex .textscr{font-family:KaTeX_Script}.katex .mathsf,.katex .textsf{font-family:KaTeX_SansSerif}.katex .mathboldsf,.katex .textboldsf{font-family:KaTeX_SansSerif;font-weight:700}.katex .mathitsf,.katex .mathsfit,.katex .textitsf{font-family:KaTeX_SansSerif;font-style:italic}.katex .mainrm{font-family:KaTeX_Main;font-style:normal}.katex .vlist-t{border-collapse:collapse;display:inline-table;table-layout:fixed}.katex .vlist-r{display:table-row}.katex .vlist{display:table-cell;position:relative;vertical-align:bottom}.katex .vlist>span{display:block;height:0;position:relative}.katex .vlist>span>span{display:inline-block}.katex .vlist>span>.pstrut{overflow:hidden;width:0}.katex .vlist-t2{margin-right:-2px}.katex .vlist-s{display:table-cell;font-size:1px;min-width:2px;vertical-align:bottom;width:2px}.katex .vbox{align-items:baseline;display:inline-flex;flex-direction:column}.katex .hbox{width:100%}.katex .hbox,.katex .thinbox{display:inline-flex;flex-direction:row}.katex .thinbox{max-width:0;width:0}.katex .msupsub{text-align:left}.katex .mfrac>span>span{text-align:center}.katex .mfrac .frac-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline,.katex .hline,.katex .mfrac .frac-line,.katex .overline .overline-line,.katex .rule,.katex .underline .underline-line{min-height:1px}.katex .mspace{display:inline-block}.katex .smash{display:inline;line-height:0}.katex .clap,.katex .llap,.katex .rlap{position:relative;width:0}.katex .clap>.inner,.katex .llap>.inner,.katex .rlap>.inner{position:absolute}.katex .clap>.fix,.katex .llap>.fix,.katex .rlap>.fix{display:inline-block}.katex .llap>.inner{right:0}.katex .clap>.inner,.katex .rlap>.inner{left:0}.katex .clap>.inner>span{margin-left:-50%;margin-right:50%}.katex .rule{border:0 solid;display:inline-block;position:relative}.katex .hline,.katex .overline .overline-line,.katex .underline .underline-line{border-bottom-style:solid;display:inline-block;width:100%}.katex .hdashline{border-bottom-style:dashed;display:inline-block;width:100%}.katex .sqrt>.root{margin-left:.2777777778em;margin-right:-.5555555556em}.katex .fontsize-ensurer.reset-size1.size1,.katex .sizing.reset-size1.size1{font-size:1em}.katex .fontsize-ensurer.reset-size1.size2,.katex .sizing.reset-size1.size2{font-size:1.2em}.katex .fontsize-ensurer.reset-size1.size3,.katex .sizing.reset-size1.size3{font-size:1.4em}.katex .fontsize-ensurer.reset-size1.size4,.katex .sizing.reset-size1.size4{font-size:1.6em}.katex .fontsize-ensurer.reset-size1.size5,.katex .sizing.reset-size1.size5{font-size:1.8em}.katex .fontsize-ensurer.reset-size1.size6,.katex .sizing.reset-size1.size6{font-size:2em}.katex .fontsize-ensurer.reset-size1.size7,.katex .sizing.reset-size1.size7{font-size:2.4em}.katex .fontsize-ensurer.reset-size1.size8,.katex .sizing.reset-size1.size8{font-size:2.88em}.katex .fontsize-ensurer.reset-size1.size9,.katex .sizing.reset-size1.size9{font-size:3.456em}.katex .fontsize-ensurer.reset-size1.size10,.katex .sizing.reset-size1.size10{font-size:4.148em}.katex .fontsize-ensurer.reset-size1.size11,.katex .sizing.reset-size1.size11{font-size:4.976em}.katex .fontsize-ensurer.reset-size2.size1,.katex .sizing.reset-size2.size1{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size2.size2,.katex .sizing.reset-size2.size2{font-size:1em}.katex .fontsize-ensurer.reset-size2.size3,.katex .sizing.reset-size2.size3{font-size:1.1666666667em}.katex .fontsize-ensurer.reset-size2.size4,.katex .sizing.reset-size2.size4{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size2.size5,.katex .sizing.reset-size2.size5{font-size:1.5em}.katex .fontsize-ensurer.reset-size2.size6,.katex .sizing.reset-size2.size6{font-size:1.6666666667em}.katex .fontsize-ensurer.reset-size2.size7,.katex .sizing.reset-size2.size7{font-size:2em}.katex .fontsize-ensurer.reset-size2.size8,.katex .sizing.reset-size2.size8{font-size:2.4em}.katex .fontsize-ensurer.reset-size2.size9,.katex .sizing.reset-size2.size9{font-size:2.88em}.katex .fontsize-ensurer.reset-size2.size10,.katex .sizing.reset-size2.size10{font-size:3.4566666667em}.katex .fontsize-ensurer.reset-size2.size11,.katex .sizing.reset-size2.size11{font-size:4.1466666667em}.katex .fontsize-ensurer.reset-size3.size1,.katex .sizing.reset-size3.size1{font-size:.7142857143em}.katex .fontsize-ensurer.reset-size3.size2,.katex .sizing.reset-size3.size2{font-size:.8571428571em}.katex .fontsize-ensurer.reset-size3.size3,.katex .sizing.reset-size3.size3{font-size:1em}.katex .fontsize-ensurer.reset-size3.size4,.katex .sizing.reset-size3.size4{font-size:1.1428571429em}.katex .fontsize-ensurer.reset-size3.size5,.katex .sizing.reset-size3.size5{font-size:1.2857142857em}.katex .fontsize-ensurer.reset-size3.size6,.katex .sizing.reset-size3.size6{font-size:1.4285714286em}.katex .fontsize-ensurer.reset-size3.size7,.katex .sizing.reset-size3.size7{font-size:1.7142857143em}.katex .fontsize-ensurer.reset-size3.size8,.katex .sizing.reset-size3.size8{font-size:2.0571428571em}.katex .fontsize-ensurer.reset-size3.size9,.katex .sizing.reset-size3.size9{font-size:2.4685714286em}.katex .fontsize-ensurer.reset-size3.size10,.katex .sizing.reset-size3.size10{font-size:2.9628571429em}.katex .fontsize-ensurer.reset-size3.size11,.katex .sizing.reset-size3.size11{font-size:3.5542857143em}.katex .fontsize-ensurer.reset-size4.size1,.katex .sizing.reset-size4.size1{font-size:.625em}.katex .fontsize-ensurer.reset-size4.size2,.katex .sizing.reset-size4.size2{font-size:.75em}.katex .fontsize-ensurer.reset-size4.size3,.katex .sizing.reset-size4.size3{font-size:.875em}.katex .fontsize-ensurer.reset-size4.size4,.katex .sizing.reset-size4.size4{font-size:1em}.katex .fontsize-ensurer.reset-size4.size5,.katex .sizing.reset-size4.size5{font-size:1.125em}.katex .fontsize-ensurer.reset-size4.size6,.katex .sizing.reset-size4.size6{font-size:1.25em}.katex .fontsize-ensurer.reset-size4.size7,.katex .sizing.reset-size4.size7{font-size:1.5em}.katex .fontsize-ensurer.reset-size4.size8,.katex .sizing.reset-size4.size8{font-size:1.8em}.katex .fontsize-ensurer.reset-size4.size9,.katex .sizing.reset-size4.size9{font-size:2.16em}.katex .fontsize-ensurer.reset-size4.size10,.katex .sizing.reset-size4.size10{font-size:2.5925em}.katex .fontsize-ensurer.reset-size4.size11,.katex .sizing.reset-size4.size11{font-size:3.11em}.katex .fontsize-ensurer.reset-size5.size1,.katex .sizing.reset-size5.size1{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size5.size2,.katex .sizing.reset-size5.size2{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size5.size3,.katex .sizing.reset-size5.size3{font-size:.7777777778em}.katex .fontsize-ensurer.reset-size5.size4,.katex .sizing.reset-size5.size4{font-size:.8888888889em}.katex .fontsize-ensurer.reset-size5.size5,.katex .sizing.reset-size5.size5{font-size:1em}.katex .fontsize-ensurer.reset-size5.size6,.katex .sizing.reset-size5.size6{font-size:1.1111111111em}.katex .fontsize-ensurer.reset-size5.size7,.katex .sizing.reset-size5.size7{font-size:1.3333333333em}.katex .fontsize-ensurer.reset-size5.size8,.katex .sizing.reset-size5.size8{font-size:1.6em}.katex .fontsize-ensurer.reset-size5.size9,.katex .sizing.reset-size5.size9{font-size:1.92em}.katex .fontsize-ensurer.reset-size5.size10,.katex .sizing.reset-size5.size10{font-size:2.3044444444em}.katex .fontsize-ensurer.reset-size5.size11,.katex .sizing.reset-size5.size11{font-size:2.7644444444em}.katex .fontsize-ensurer.reset-size6.size1,.katex .sizing.reset-size6.size1{font-size:.5em}.katex .fontsize-ensurer.reset-size6.size2,.katex .sizing.reset-size6.size2{font-size:.6em}.katex .fontsize-ensurer.reset-size6.size3,.katex .sizing.reset-size6.size3{font-size:.7em}.katex .fontsize-ensurer.reset-size6.size4,.katex .sizing.reset-size6.size4{font-size:.8em}.katex .fontsize-ensurer.reset-size6.size5,.katex .sizing.reset-size6.size5{font-size:.9em}.katex .fontsize-ensurer.reset-size6.size6,.katex .sizing.reset-size6.size6{font-size:1em}.katex .fontsize-ensurer.reset-size6.size7,.katex .sizing.reset-size6.size7{font-size:1.2em}.katex .fontsize-ensurer.reset-size6.size8,.katex .sizing.reset-size6.size8{font-size:1.44em}.katex .fontsize-ensurer.reset-size6.size9,.katex .sizing.reset-size6.size9{font-size:1.728em}.katex .fontsize-ensurer.reset-size6.size10,.katex .sizing.reset-size6.size10{font-size:2.074em}.katex .fontsize-ensurer.reset-size6.size11,.katex .sizing.reset-size6.size11{font-size:2.488em}.katex .fontsize-ensurer.reset-size7.size1,.katex .sizing.reset-size7.size1{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size7.size2,.katex .sizing.reset-size7.size2{font-size:.5em}.katex .fontsize-ensurer.reset-size7.size3,.katex .sizing.reset-size7.size3{font-size:.5833333333em}.katex .fontsize-ensurer.reset-size7.size4,.katex .sizing.reset-size7.size4{font-size:.6666666667em}.katex .fontsize-ensurer.reset-size7.size5,.katex .sizing.reset-size7.size5{font-size:.75em}.katex .fontsize-ensurer.reset-size7.size6,.katex .sizing.reset-size7.size6{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size7.size7,.katex .sizing.reset-size7.size7{font-size:1em}.katex .fontsize-ensurer.reset-size7.size8,.katex .sizing.reset-size7.size8{font-size:1.2em}.katex .fontsize-ensurer.reset-size7.size9,.katex .sizing.reset-size7.size9{font-size:1.44em}.katex .fontsize-ensurer.reset-size7.size10,.katex .sizing.reset-size7.size10{font-size:1.7283333333em}.katex .fontsize-ensurer.reset-size7.size11,.katex .sizing.reset-size7.size11{font-size:2.0733333333em}.katex .fontsize-ensurer.reset-size8.size1,.katex .sizing.reset-size8.size1{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size8.size2,.katex .sizing.reset-size8.size2{font-size:.4166666667em}.katex .fontsize-ensurer.reset-size8.size3,.katex .sizing.reset-size8.size3{font-size:.4861111111em}.katex .fontsize-ensurer.reset-size8.size4,.katex .sizing.reset-size8.size4{font-size:.5555555556em}.katex .fontsize-ensurer.reset-size8.size5,.katex .sizing.reset-size8.size5{font-size:.625em}.katex .fontsize-ensurer.reset-size8.size6,.katex .sizing.reset-size8.size6{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size8.size7,.katex .sizing.reset-size8.size7{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size8.size8,.katex .sizing.reset-size8.size8{font-size:1em}.katex .fontsize-ensurer.reset-size8.size9,.katex .sizing.reset-size8.size9{font-size:1.2em}.katex .fontsize-ensurer.reset-size8.size10,.katex .sizing.reset-size8.size10{font-size:1.4402777778em}.katex .fontsize-ensurer.reset-size8.size11,.katex .sizing.reset-size8.size11{font-size:1.7277777778em}.katex .fontsize-ensurer.reset-size9.size1,.katex .sizing.reset-size9.size1{font-size:.2893518519em}.katex .fontsize-ensurer.reset-size9.size2,.katex .sizing.reset-size9.size2{font-size:.3472222222em}.katex .fontsize-ensurer.reset-size9.size3,.katex .sizing.reset-size9.size3{font-size:.4050925926em}.katex .fontsize-ensurer.reset-size9.size4,.katex .sizing.reset-size9.size4{font-size:.462962963em}.katex .fontsize-ensurer.reset-size9.size5,.katex .sizing.reset-size9.size5{font-size:.5208333333em}.katex .fontsize-ensurer.reset-size9.size6,.katex .sizing.reset-size9.size6{font-size:.5787037037em}.katex .fontsize-ensurer.reset-size9.size7,.katex .sizing.reset-size9.size7{font-size:.6944444444em}.katex .fontsize-ensurer.reset-size9.size8,.katex .sizing.reset-size9.size8{font-size:.8333333333em}.katex .fontsize-ensurer.reset-size9.size9,.katex .sizing.reset-size9.size9{font-size:1em}.katex .fontsize-ensurer.reset-size9.size10,.katex .sizing.reset-size9.size10{font-size:1.2002314815em}.katex .fontsize-ensurer.reset-size9.size11,.katex .sizing.reset-size9.size11{font-size:1.4398148148em}.katex .fontsize-ensurer.reset-size10.size1,.katex .sizing.reset-size10.size1{font-size:.2410800386em}.katex .fontsize-ensurer.reset-size10.size2,.katex .sizing.reset-size10.size2{font-size:.2892960463em}.katex .fontsize-ensurer.reset-size10.size3,.katex .sizing.reset-size10.size3{font-size:.337512054em}.katex .fontsize-ensurer.reset-size10.size4,.katex .sizing.reset-size10.size4{font-size:.3857280617em}.katex .fontsize-ensurer.reset-size10.size5,.katex .sizing.reset-size10.size5{font-size:.4339440694em}.katex .fontsize-ensurer.reset-size10.size6,.katex .sizing.reset-size10.size6{font-size:.4821600771em}.katex .fontsize-ensurer.reset-size10.size7,.katex .sizing.reset-size10.size7{font-size:.5785920926em}.katex .fontsize-ensurer.reset-size10.size8,.katex .sizing.reset-size10.size8{font-size:.6943105111em}.katex .fontsize-ensurer.reset-size10.size9,.katex .sizing.reset-size10.size9{font-size:.8331726133em}.katex .fontsize-ensurer.reset-size10.size10,.katex .sizing.reset-size10.size10{font-size:1em}.katex .fontsize-ensurer.reset-size10.size11,.katex .sizing.reset-size10.size11{font-size:1.1996142719em}.katex .fontsize-ensurer.reset-size11.size1,.katex .sizing.reset-size11.size1{font-size:.2009646302em}.katex .fontsize-ensurer.reset-size11.size2,.katex .sizing.reset-size11.size2{font-size:.2411575563em}.katex .fontsize-ensurer.reset-size11.size3,.katex .sizing.reset-size11.size3{font-size:.2813504823em}.katex .fontsize-ensurer.reset-size11.size4,.katex .sizing.reset-size11.size4{font-size:.3215434084em}.katex .fontsize-ensurer.reset-size11.size5,.katex .sizing.reset-size11.size5{font-size:.3617363344em}.katex .fontsize-ensurer.reset-size11.size6,.katex .sizing.reset-size11.size6{font-size:.4019292605em}.katex .fontsize-ensurer.reset-size11.size7,.katex .sizing.reset-size11.size7{font-size:.4823151125em}.katex .fontsize-ensurer.reset-size11.size8,.katex .sizing.reset-size11.size8{font-size:.578778135em}.katex .fontsize-ensurer.reset-size11.size9,.katex .sizing.reset-size11.size9{font-size:.6945337621em}.katex .fontsize-ensurer.reset-size11.size10,.katex .sizing.reset-size11.size10{font-size:.8336012862em}.katex .fontsize-ensurer.reset-size11.size11,.katex .sizing.reset-size11.size11{font-size:1em}.katex .delimsizing.size1{font-family:KaTeX_Size1}.katex .delimsizing.size2{font-family:KaTeX_Size2}.katex .delimsizing.size3{font-family:KaTeX_Size3}.katex .delimsizing.size4{font-family:KaTeX_Size4}.katex .delimsizing.mult .delim-size1>span{font-family:KaTeX_Size1}.katex .delimsizing.mult .delim-size4>span{font-family:KaTeX_Size4}.katex .nulldelimiter{display:inline-block;width:.12em}.katex .delimcenter,.katex .op-symbol{position:relative}.katex .op-symbol.small-op{font-family:KaTeX_Size1}.katex .op-symbol.large-op{font-family:KaTeX_Size2}.katex .accent>.vlist-t,.katex .op-limits>.vlist-t{text-align:center}.katex .accent .accent-body{position:relative}.katex .accent .accent-body:not(.accent-full){width:0}.katex .overlay{display:block}.katex .mtable .vertical-separator{display:inline-block;min-width:1px}.katex .mtable .arraycolsep{display:inline-block}.katex .mtable .col-align-c>.vlist-t{text-align:center}.katex .mtable .col-align-l>.vlist-t{text-align:left}.katex .mtable .col-align-r>.vlist-t{text-align:right}.katex .svg-align{text-align:left}.katex svg{fill:currentColor;stroke:currentColor;display:block;height:inherit;position:absolute;width:100%}.katex svg path{stroke:none}.katex svg{fill-rule:nonzero;fill-opacity:1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1}.katex img{border-style:none;max-height:none;max-width:none;min-height:0;min-width:0}.katex .stretchy{display:block;overflow:hidden;position:relative;width:100%}.katex .stretchy:after,.katex .stretchy:before{content:""}.katex .hide-tail{overflow:hidden;position:relative;width:100%}.katex .halfarrow-left{left:0;overflow:hidden;position:absolute;width:50.2%}.katex .halfarrow-right{overflow:hidden;position:absolute;right:0;width:50.2%}.katex .brace-left{left:0;overflow:hidden;position:absolute;width:25.1%}.katex .brace-center{left:25%;overflow:hidden;position:absolute;width:50%}.katex .brace-right{overflow:hidden;position:absolute;right:0;width:25.1%}.katex .x-arrow-pad{padding:0 .5em}.katex .cd-arrow-pad{padding:0 .55556em 0 .27778em}.katex .mover,.katex .munder,.katex .x-arrow{text-align:center}.katex .boxpad{padding:0 .3em}.katex .fbox,.katex .fcolorbox{border:.04em solid;box-sizing:border-box}.katex .cancel-pad{padding:0 .2em}.katex .cancel-lap{margin-left:-.2em;margin-right:-.2em}.katex .sout{border-bottom-style:solid;border-bottom-width:.08em}.katex .angl{border-right:.049em solid;border-top:.049em solid;box-sizing:border-box;margin-right:.03889em}.katex .anglpad{padding:0 .03889em}.katex .eqn-num:before{content:"(" counter(katexEqnNo) ")";counter-increment:katexEqnNo}.katex .mml-eqn-num:before{content:"(" counter(mmlEqnNo) ")";counter-increment:mmlEqnNo}.katex .mtr-glue{width:50%}.katex .cd-vert-arrow{display:inline-block;position:relative}.katex .cd-label-left{display:inline-block;position:absolute;right:calc(50% + .3em);text-align:left}.katex .cd-label-right{display:inline-block;left:calc(50% + .3em);position:absolute;text-align:right}.katex-display{display:block;margin:1em 0;text-align:center}.katex-display>.katex{display:block;text-align:center;white-space:nowrap}.katex-display>.katex>.katex-html{display:block;position:relative}.katex-display>.katex>.katex-html>.tag{position:absolute;right:0}.katex-display.leqno>.katex>.katex-html>.tag{left:0;right:auto}.katex-display.fleqn>.katex{padding-left:2em;text-align:left}body{counter-reset:katexEqnNo mmlEqnNo}
-
-
-pre code.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 1em
-}
-code.hljs {
-  padding: 3px 5px
-}
-/*!
-  Theme: GitHub
-  Description: Light theme as seen on github.com
-  Author: github.com
-  Maintainer: @Hirse
-  Updated: 2021-05-15
-
-  Outdated base version: https://github.com/primer/github-syntax-light
-  Current colors taken from GitHub's CSS
-*/
-.hljs {
-  color: #24292e;
-  background: #ffffff
-}
-.hljs-doctag,
-.hljs-keyword,
-.hljs-meta .hljs-keyword,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-variable.language_ {
-  /* prettylights-syntax-keyword */
-  color: #d73a49
-}
-.hljs-title,
-.hljs-title.class_,
-.hljs-title.class_.inherited__,
-.hljs-title.function_ {
-  /* prettylights-syntax-entity */
-  color: #6f42c1
-}
-.hljs-attr,
-.hljs-attribute,
-.hljs-literal,
-.hljs-meta,
-.hljs-number,
-.hljs-operator,
-.hljs-variable,
-.hljs-selector-attr,
-.hljs-selector-class,
-.hljs-selector-id {
-  /* prettylights-syntax-constant */
-  color: #005cc5
-}
-.hljs-regexp,
-.hljs-string,
-.hljs-meta .hljs-string {
-  /* prettylights-syntax-string */
-  color: #032f62
-}
-.hljs-built_in,
-.hljs-symbol {
-  /* prettylights-syntax-variable */
-  color: #e36209
-}
-.hljs-comment,
-.hljs-code,
-.hljs-formula {
-  /* prettylights-syntax-comment */
-  color: #6a737d
-}
-.hljs-name,
-.hljs-quote,
-.hljs-selector-tag,
-.hljs-selector-pseudo {
-  /* prettylights-syntax-entity-tag */
-  color: #22863a
-}
-.hljs-subst {
-  /* prettylights-syntax-storage-modifier-import */
-  color: #24292e
-}
-.hljs-section {
-  /* prettylights-syntax-markup-heading */
-  color: #005cc5;
-  font-weight: bold
-}
-.hljs-bullet {
-  /* prettylights-syntax-markup-list */
-  color: #735c0f
-}
-.hljs-emphasis {
-  /* prettylights-syntax-markup-italic */
-  color: #24292e;
-  font-style: italic
-}
-.hljs-strong {
-  /* prettylights-syntax-markup-bold */
-  color: #24292e;
-  font-weight: bold
-}
-.hljs-addition {
-  /* prettylights-syntax-markup-inserted */
-  color: #22863a;
-  background-color: #f0fff4
-}
-.hljs-deletion {
-  /* prettylights-syntax-markup-deleted */
-  color: #b31d28;
-  background-color: #ffeef0
-}
-.hljs-char.escape_,
-.hljs-link,
-.hljs-params,
-.hljs-property,
-.hljs-punctuation,
-.hljs-tag {
-  /* purposely ignored */
-
-}`),waitForFonts:async()=>{document.fonts?.ready&&await document.fonts.ready},decodeImage:_qe,postResult:t=>{s0({name:"exportHTMLResult",payload:t})}});break;case"ready":case"renderComplete":case"previewScrolled":case"linkClicked":case"checkboxToggled":case"exportHTMLResult":break}}async function ier(e){if(e.renderID<V2)return;Sqe(),V2=e.renderID,eKe(e.theme,e.allowRemoteImages);let t;try{t=e.fileKind==="md"?await UXe(e.text):await qXe(e.text)}catch(i){if(e.fileKind!=="mdx")throw i;if(e.renderID<V2)return;aer(i),s0({name:"renderComplete",payload:{renderID:e.renderID,version:e.version,blockCount:Zo.querySelectorAll("[data-line]").length}});return}if(e.renderID<V2)return;let r=document.createElement("main");r.id="preview-root",r.innerHTML=t,bJ(r,e.baseDir,e.allowRemoteImages,e.assetRootID),ser();let n=Xqe(Zo,r,tte);XXe=e.renderID,jXe=e.version,KXe=e.baseDir,ZXe=e.assetRootID,fer(),await n,!(e.renderID<V2)&&s0({name:"renderComplete",payload:{renderID:e.renderID,version:e.version,blockCount:Zo.querySelectorAll("[data-line]").length}})}function aer(e){Zo.classList.add("preview-stale");let t=kqe(e),r=Zo.querySelector(".mdx-error-banner");r||(r=document.createElement("aside"),r.className="mdx-error-banner",r.setAttribute("role","status"),Zo.prepend(r));let n=document.createElement("strong");n.textContent=t.line===void 0?"MDX syntax error":`MDX syntax error on line ${t.line}`;let i=document.createElement("span");i.textContent=t.message,r.replaceChildren(n,i)}function ser(){Zo.classList.remove("preview-stale"),Zo.querySelector(".mdx-error-banner")?.remove()}function oer(e,t){let r=cer(e);r!==void 0&&(rte("editor"),window.scrollTo({top:Math.max(0,r-12),behavior:t?"smooth":"auto"}))}function ler(){if(ete==="editor")return;let e=uer();e!==void 0&&(rte("preview"),s0({name:"previewScrolled",payload:{topVisibleLine:e}}))}function rte(e){ete=e,uN!==void 0&&window.clearTimeout(uN),uN=window.setTimeout(()=>{ete="none",uN=void 0},100)}function QXe(){return Array.from(Zo.querySelectorAll("[data-line]")).map(e=>({element:e,line:Number.parseInt(e.dataset.line??"",10)})).filter(({line:e})=>Number.isFinite(e)).sort((e,t)=>e.line-t.line)}function cer(e){let t=QXe();if(t.length===0)return;let r=t[0],n=t[t.length-1];for(let a of t)if(a.line<=e&&(r=a),a.line>e){n=a;break}if(r===n||n.line<=r.line)return r.element.offsetTop;let i=(e-r.line)/(n.line-r.line);return r.element.offsetTop+(n.element.offsetTop-r.element.offsetTop)*i}function uer(){let e=window.scrollY+16,t;for(let r of QXe()){if(r.element.offsetTop>e)break;t=r.line}return t}function her(e){let t=e.closest("[data-line]"),r=Number.parseInt(t?.dataset.line??"",10);return Number.isFinite(r)?r:void 0}function eKe(e,t){return document.documentElement.dataset.theme=e,JXe=t,tKe(e)}function fer(){for(let e of Zo.querySelectorAll("pre code"))e.classList.contains("language-mermaid")||e.dataset.highlighted||Yi.highlightElement(e)}function der(){Yi.registerLanguage("bash",xN),Yi.registerLanguage("css",Ste),Yi.registerLanguage("go",Ete),Yi.registerLanguage("html",AN),Yi.registerLanguage("javascript",bN),Yi.registerLanguage("js",bN),Yi.registerLanguage("json",Ite),Yi.registerLanguage("markdown",XE),Yi.registerLanguage("md",XE),Yi.registerLanguage("python",TN),Yi.registerLanguage("py",TN),Yi.registerLanguage("rust",wN),Yi.registerLanguage("rs",wN),Yi.registerLanguage("sh",xN),Yi.registerLanguage("swift",$te),Yi.registerLanguage("typescript",EN),Yi.registerLanguage("ts",EN),Yi.registerLanguage("xml",AN),Yi.registerLanguage("yaml",_N),Yi.registerLanguage("yml",_N),Yi.registerLanguage("mermaid",XE)}function per(){let e=document.getElementById("preview-root");if(!e)throw new Error("Missing preview root");return e}function tKe(e){return tte.initializeTheme(e)}return oKe(mer);})();
+`),waitForFonts:async()=>{document.fonts?.ready&&await document.fonts.ready},decodeImage:_qe,postResult:t=>{s0({name:"exportHTMLResult",payload:t})}});break;case"ready":case"renderComplete":case"previewScrolled":case"linkClicked":case"checkboxToggled":case"exportHTMLResult":break}}async function ier(e){if(e.renderID<V2)return;Sqe(),V2=e.renderID,eKe(e.theme,e.allowRemoteImages);let t;try{t=e.fileKind==="md"?await UXe(e.text):await qXe(e.text)}catch(i){if(e.fileKind!=="mdx")throw i;if(e.renderID<V2)return;aer(i),s0({name:"renderComplete",payload:{renderID:e.renderID,version:e.version,blockCount:Zo.querySelectorAll("[data-line]").length}});return}if(e.renderID<V2)return;let r=document.createElement("main");r.id="preview-root",r.innerHTML=t,bJ(r,e.baseDir,e.allowRemoteImages,e.assetRootID),ser();let n=Xqe(Zo,r,tte);XXe=e.renderID,jXe=e.version,KXe=e.baseDir,ZXe=e.assetRootID,fer(),await n,!(e.renderID<V2)&&s0({name:"renderComplete",payload:{renderID:e.renderID,version:e.version,blockCount:Zo.querySelectorAll("[data-line]").length}})}function aer(e){Zo.classList.add("preview-stale");let t=kqe(e),r=Zo.querySelector(".mdx-error-banner");r||(r=document.createElement("aside"),r.className="mdx-error-banner",r.setAttribute("role","status"),Zo.prepend(r));let n=document.createElement("strong");n.textContent=t.line===void 0?"MDX syntax error":`MDX syntax error on line ${t.line}`;let i=document.createElement("span");i.textContent=t.message,r.replaceChildren(n,i)}function ser(){Zo.classList.remove("preview-stale"),Zo.querySelector(".mdx-error-banner")?.remove()}function oer(e,t){let r=cer(e);r!==void 0&&(rte("editor"),window.scrollTo({top:Math.max(0,r-12),behavior:t?"smooth":"auto"}))}function ler(){if(ete==="editor")return;let e=uer();e!==void 0&&(rte("preview"),s0({name:"previewScrolled",payload:{topVisibleLine:e}}))}function rte(e){ete=e,uN!==void 0&&window.clearTimeout(uN),uN=window.setTimeout(()=>{ete="none",uN=void 0},100)}function QXe(){return Array.from(Zo.querySelectorAll("[data-line]")).map(e=>({element:e,line:Number.parseInt(e.dataset.line??"",10)})).filter(({line:e})=>Number.isFinite(e)).sort((e,t)=>e.line-t.line)}function cer(e){let t=QXe();if(t.length===0)return;let r=t[0],n=t[t.length-1];for(let a of t)if(a.line<=e&&(r=a),a.line>e){n=a;break}if(r===n||n.line<=r.line)return r.element.offsetTop;let i=(e-r.line)/(n.line-r.line);return r.element.offsetTop+(n.element.offsetTop-r.element.offsetTop)*i}function uer(){let e=window.scrollY+16,t;for(let r of QXe()){if(r.element.offsetTop>e)break;t=r.line}return t}function her(e){let t=e.closest("[data-line]"),r=Number.parseInt(t?.dataset.line??"",10);return Number.isFinite(r)?r:void 0}function eKe(e,t){return document.documentElement.dataset.theme=e,JXe=t,tKe(e)}function fer(){for(let e of Zo.querySelectorAll("pre code"))e.classList.contains("language-mermaid")||e.dataset.highlighted||Yi.highlightElement(e)}function der(){Yi.registerLanguage("bash",xN),Yi.registerLanguage("css",Ste),Yi.registerLanguage("go",Ete),Yi.registerLanguage("html",AN),Yi.registerLanguage("javascript",bN),Yi.registerLanguage("js",bN),Yi.registerLanguage("json",Ite),Yi.registerLanguage("markdown",XE),Yi.registerLanguage("md",XE),Yi.registerLanguage("python",TN),Yi.registerLanguage("py",TN),Yi.registerLanguage("rust",wN),Yi.registerLanguage("rs",wN),Yi.registerLanguage("sh",xN),Yi.registerLanguage("swift",$te),Yi.registerLanguage("typescript",EN),Yi.registerLanguage("ts",EN),Yi.registerLanguage("xml",AN),Yi.registerLanguage("yaml",_N),Yi.registerLanguage("yml",_N),Yi.registerLanguage("mermaid",XE)}function per(){let e=document.getElementById("preview-root");if(!e)throw new Error("Missing preview root");return e}function tKe(e){return tte.initializeTheme(e)}return oKe(mer);})();
 /*! Bundled license information:
 
 dompurify/dist/purify.es.mjs:

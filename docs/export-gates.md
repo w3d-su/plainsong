@@ -1490,3 +1490,11 @@ are Debug 49.577 ms and Release 24.767 ms, so the hundreds-of-ms trigger is not 
 These are observed under recorded load; no budgets are frozen. The absolute typing
 budget bullet stays unchecked. Keyboard/VoiceOver, physical input, Powerbox/iCloud
 and full-suite regression acceptance stay open. Product/writer code is unchanged.
+
+### PR L preview stylesheet note (2026-10-08)
+
+The preview’s Apple system palette replaces highlight.js `github.css`; dark function,
+link and comment colors are adjusted for at least 4.5:1 on `#2a2a2c`. Because export
+captures the bundled preview stylesheet, this also changes embedded HTML export CSS and
+rendered PDF CSS. ExportHTML/ExportPDF hosted regression tests must rerun with the
+regenerated bundle; this change does not close owner PDF/Print or performance gates.
