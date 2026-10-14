@@ -83,9 +83,12 @@ extension ExportPDFPagePlanner {
             }
         }
         let lastSpanMax = intervals.last?.maxY ?? 0
-        let paintedEnd = request.paintedBottom.map {
-            min(contentHeight, max($0.isFinite ? $0 : 0, lastSpanMax))
-        }
+        // A document with nothing painted (empty, or frontmatter only) has no
+        // painted-end evidence; it keeps the content-height page instead of
+        // collapsing to an empty plan.
+        let paintedEnd = request.paintedBottom
+            .map { min(contentHeight, max($0.isFinite ? $0 : 0, lastSpanMax)) }
+            .flatMap { $0 > epsilon ? $0 : nil }
         let end = paintedEnd ?? contentHeight
         guard end > 0 else { throw .emptyDocument }
         let extents = request.widthExtents

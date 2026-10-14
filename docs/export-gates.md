@@ -473,7 +473,9 @@ clipped text).** Under the same sign-off:
   hard budget, and may finally occupy an end-tail sliver page. For stale height,
   `excess = contentHeight - E - bottomInset`; when `excess > 1 pt`,
   `droppedTrailingBlankPages = ceil(excess / softBudget(baseline))`, otherwise
-  it is zero.
+  it is zero. When nothing is painted (E ≤ ε: an empty or frontmatter-only
+  document) there is no painted-end evidence, so the plan keeps the single
+  content-height page instead of failing as `emptyDocument`.
 - **Clipped text is not content width (X2).** A measured right edge is first
   intersected with the padding box of every ancestor whose computed `overflow-x`
   is not `visible` — `hidden`, `clip`, `auto` and `scroll` all clip what is

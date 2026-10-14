@@ -18,9 +18,13 @@ final class ExportPDFPaintedTailAppTests: XCTestCase {
             let source = "```text\n\(code)\n```"
             let controller = try await Support.preparedController(source)
             defer { controller.invalidate() }
+            // A whole-pixel line height: WebKit on macOS 15 lays a fractional one
+            // (21.494px) out at 21px while macOS 27 keeps it fractional, which put
+            // both blocks past 14,400 there. At 21px every WebKit paints the end at
+            // 21n + 43 (14,386 / 14,407), straddling the side cap.
             try await controller.webView.evaluateJavaScript("""
             document.querySelectorAll("#preview-root pre, #preview-root pre code")
-              .forEach(element => element.style.setProperty("line-height", "21.494px", "important"));
+              .forEach(element => element.style.setProperty("line-height", "21px", "important"));
             const pre = document.querySelector("#preview-root pre");
             pre?.style.setProperty("margin-top", "-15px", "important");
             pre?.style.setProperty("border-bottom", "2px solid #111", "important");
@@ -53,6 +57,20 @@ final class ExportPDFPaintedTailAppTests: XCTestCase {
                 hasInkWithinBottom(2, of: last),
                 "The last page lost its bottom border ink"
             )
+        }
+    }
+
+    /// Nothing painted — an empty post or a frontmatter-only draft — still exports a
+    /// single page instead of failing as `emptyDocument`.
+    func testEmptyAndFrontmatterOnlyDocumentsExportOnePage() async throws {
+        for source in ["", "---\ntitle: Draft\n---\n"] {
+            let controller = try await Support.preparedController(source)
+            defer { controller.invalidate() }
+            let pdf = try await controller.captureExportPDF()
+            XCTAssertEqual(pdf.plannedPageCount, 1, "source: \(source.debugDescription)")
+            XCTAssertEqual(pdf.droppedTrailingBlankPages, 0)
+            let document = try XCTUnwrap(PDFDocument(data: pdf.data))
+            XCTAssertEqual(document.pageCount, 1)
         }
     }
 

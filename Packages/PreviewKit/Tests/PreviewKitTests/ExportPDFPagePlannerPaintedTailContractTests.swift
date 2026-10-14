@@ -29,4 +29,20 @@ final class ExportPDFPaintedTailTests: XCTestCase {
         )
         XCTAssertGreaterThan(stale.droppedTrailingBlankPages, 0)
     }
+
+    /// An empty or frontmatter-only document paints nothing (`paintedBottom` 0) and
+    /// has no spans; it still exports its single root-padding page.
+    func testNothingPaintedKeepsTheContentHeightPage() throws {
+        let plan = try ExportPDFPagePlanner.plan(
+            contentSize: CGSize(width: 800, height: 76),
+            baselineWidth: 800,
+            unsplittable: [],
+            widthExtents: [],
+            paintedBottom: 0,
+            bottomInset: 48
+        )
+        XCTAssertEqual(plan.pages.count, 1)
+        XCTAssertEqual(plan.pages[0].rect.maxY, 76, accuracy: 0.5)
+        XCTAssertEqual(plan.droppedTrailingBlankPages, 0)
+    }
 }
