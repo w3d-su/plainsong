@@ -57,16 +57,24 @@ extension PreviewController {
 
     /// Resizes the offscreen WebView to the settled full scroll size — no zoom, no width
     /// ceiling. The width includes the document's left/right padding.
+    ///
+    /// The caller's frame width is the layout width and a floor: an offscreen WebView on
+    /// macOS 15 hands a frame change to WebContent only on the next layout pass, so the
+    /// first measure could still see the `.zero` creation viewport, settle on the
+    /// longest word's width (~138 pt), and lay the whole export out as a narrow column.
     func settleExportGeometry(timeoutNanoseconds: UInt64 = 10_000_000_000) async throws -> CGSize {
         guard webView.bounds.width > 0, webView.bounds.height > 0 else {
             throw ExportPDFCaptureError.geometryUnstable
         }
+        let layoutWidth = webView.bounds.width
+        webView.layoutSubtreeIfNeeded()
         let start = DispatchTime.now().uptimeNanoseconds
         var previous: CGSize?
         while DispatchTime.now().uptimeNanoseconds &- start < timeoutNanoseconds {
             try checkExportAlive()
             try Task.checkCancellation()
-            let measured = try await measureExportContentSize()
+            var measured = try await measureExportContentSize()
+            measured.width = max(measured.width, layoutWidth)
             webView.frame = CGRect(origin: .zero, size: measured)
             webView.layoutSubtreeIfNeeded()
             let remeasured = try await measureExportContentSize()
