@@ -76,6 +76,12 @@ struct PlainsongCommands: Commands {
             .keyboardShortcut("f", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
 
+            // Replace PR H: no global shortcut — ⌥⌘F stays Format Table (agent.md §6.4).
+            Button("Find and Replace…") {
+                EditorFindCommandDelivery.performShowFindAndReplace()
+            }
+            .disabled(!snapshot.hasOpenDocument)
+
             Button("Find Next") {
                 EditorFindCommandDelivery.performFindNext()
             }
@@ -93,6 +99,16 @@ struct PlainsongCommands: Commands {
             }
             .keyboardShortcut("e", modifiers: .command)
             .disabled(!snapshot.hasOpenDocument)
+
+            Button("Replace") {
+                EditorFindCommandDelivery.performReplace()
+            }
+            .disabled(!snapshot.canReplace)
+
+            Button("Replace All") {
+                EditorFindCommandDelivery.performReplaceAll()
+            }
+            .disabled(!snapshot.canReplace)
         }
 
         // Placed inside the system-provided View menu (sidebar/toolbar commands live there).

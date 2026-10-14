@@ -172,6 +172,8 @@ final class EditorReplaceSingleReplaceAppTests: XCTestCase {
         appState.ensureEditorFindSessionObserverInstalled()
         var ui = appState.editorFindHost.ui
         ui.isBarVisible = true
+        // Replace PR H: Replace executes only from a visible bar with an expanded row.
+        ui.isReplaceExpanded = true
         appState.setEditorFindUI(ui)
         controller.debounceNanoseconds = 0
         controller.rebindDocument(
