@@ -132,8 +132,9 @@ extension EditorFindHostedGateTests {
 
     func testHostedReplaceAllCollapseLifecycleWhilePreparingDropsPlanWithoutUndo() async throws {
         try await assertHeldHostedBatchSupersession { hosted in
-            // The replacement disclosure arrives in PR H. This is the existing
-            // lifecycle-generation seam H must call when the row collapses.
+            // The lifecycle-generation seam the real disclosure calls on collapse;
+            // `testHostedCollapseThroughTheDisclosureCancelsThePlanAndHidesTheRetainedValue`
+            // drives it from the production control (Replace PR H).
             hosted.appState.advanceEditorReplaceAuthorityGeneration()
         }
     }

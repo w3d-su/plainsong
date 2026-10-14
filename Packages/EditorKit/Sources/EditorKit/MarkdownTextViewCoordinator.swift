@@ -942,29 +942,6 @@ extension MarkdownTextViewCoordinator {
         }
     }
 
-    private func synchronizeInstalledSource(
-        _ snapshot: EditorDocumentSourceSnapshot,
-        in textView: STTextView
-    ) -> Bool {
-        guard !hasPendingWriterLease,
-              !textView.hasMarkedText()
-        else {
-            return false
-        }
-
-        let selectedRange = textView.selectedRange()
-        isUpdating = true
-        textView.text = snapshot.source
-        textView.textSelection = selectedRange.clamped(
-            toLength: (snapshot.source as NSString).length
-        )
-        isUpdating = false
-        installedDocument.acceptSourceSnapshot(snapshot)
-        isNativeSourceSynchronized = true
-        isUserEditing = false
-        return true
-    }
-
     private func shouldDeferTextSync(from textView: STTextView) -> Bool {
         if let textView = textView as? MarkdownSTTextView,
            textView.isSuppressingIntermediateMarkedTextRemoval

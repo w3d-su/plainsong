@@ -32,6 +32,8 @@ enum EditorReplaceBatchSpikeSupport {
         var reconcilesPublication: ((String) -> String)?
         /// Called after an accepted publication, as App routes it to Find.
         var onAcceptedPublication: ((EditorDocumentSourceSnapshot) -> Void)?
+        /// The coordinator's exact-installation synchronizer, as App retains it for Reload / Keep Mine.
+        var sourceSynchronizer: EditorDocumentSourceSynchronizer?
 
         init(source: String) {
             self.source = source
@@ -79,6 +81,12 @@ enum EditorReplaceBatchSpikeSupport {
                     let snapshot = self.snapshot
                     self.onAcceptedPublication?(snapshot)
                     return .accepted(snapshot, sourceWasReconciled: reconciled != nil)
+                },
+                registerSourceSynchronizer: { _, synchronizer in
+                    self.sourceSynchronizer = synchronizer
+                },
+                unregisterSourceSynchronizer: { _ in
+                    self.sourceSynchronizer = nil
                 }
             )
         }

@@ -119,13 +119,13 @@ extension EditorFindHostedGateTests {
         try assertReconciledPresentationMatchesFreshParse(hosted, editor: editor, coordinator: coordinator)
     }
 
-    private func assertReconciledFindDecoration(in storage: NSTextStorage, match: NSRange) {
+    func assertReconciledFindDecoration(in storage: NSTextStorage, match: NSRange) {
         storage.enumerateAttribute(EditorFindMatchHighlightMarker.attribute, in: match) { value, _, _ in
             XCTAssertNotNil(value, "The current Find match must retain decoration after the restore")
         }
     }
 
-    private func assertReconciledPresentationMatchesFreshParse(
+    func assertReconciledPresentationMatchesFreshParse(
         _ hosted: HostedReplaceWorkspace,
         editor: MarkdownSTTextView,
         coordinator: MarkdownTextViewCoordinator
@@ -161,7 +161,7 @@ extension EditorFindHostedGateTests {
         XCTAssertEqual(reconciledSyntaxAttributes(storage), reconciledSyntaxAttributes(expected))
     }
 
-    private func settleReconciledHighlight(_ coordinator: MarkdownTextViewCoordinator) async throws {
+    func settleReconciledHighlight(_ coordinator: MarkdownTextViewCoordinator) async throws {
         let deadline = Date().addingTimeInterval(3)
         var revision = coordinator.lastAppliedHighlightRevision
         var quietSince = Date()
@@ -177,7 +177,7 @@ extension EditorFindHostedGateTests {
         XCTFail("Initial highlight never settled before the rejection probe")
     }
 
-    private func reconciledPresentation(_ editor: MarkdownSTTextView) -> ReconciledHostedPresentation {
+    func reconciledPresentation(_ editor: MarkdownSTTextView) -> ReconciledHostedPresentation {
         guard let storage = MarkdownTextView.textStorage(of: editor) else {
             return ReconciledHostedPresentation(syntax: NSAttributedString(string: ""), foldedRanges: [],
                                                 imageMarkerRanges: [], imageVisualStates: [])
@@ -201,7 +201,7 @@ extension EditorFindHostedGateTests {
                                             imageVisualStates: imageVisualStates)
     }
 
-    private func reconciledFixturePNG() throws -> Data {
+    func reconciledFixturePNG() throws -> Data {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8,
             samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -215,7 +215,7 @@ extension EditorFindHostedGateTests {
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 
-    private func reconciledSyntaxAttributes(_ text: NSAttributedString) -> NSAttributedString {
+    func reconciledSyntaxAttributes(_ text: NSAttributedString) -> NSAttributedString {
         let syntax = NSMutableAttributedString(string: text.string)
         let keys: Set<NSAttributedString.Key> = [
             .font, .foregroundColor, .backgroundColor, .underlineStyle, .strikethroughStyle,
@@ -232,7 +232,7 @@ extension EditorFindHostedGateTests {
     }
 }
 
-private struct ReconciledHostedPresentation: Equatable {
+struct ReconciledHostedPresentation: Equatable {
     let syntax: NSAttributedString
     let foldedRanges: IndexSet
     let imageMarkerRanges: IndexSet

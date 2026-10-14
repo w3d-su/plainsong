@@ -5,6 +5,7 @@ import Foundation
 @testable import PreviewKit
 import SwiftUI
 import WebKit
+import WorkspaceKit
 import XCTest
 
 @MainActor
@@ -163,7 +164,10 @@ extension EditorFindHostedGateTests {
         XCTFail(report)
     }
 
-    func makeWorkspaceFixture(files: [String: String]) throws -> WorkspaceFixture {
+    func makeWorkspaceFixture(
+        files: [String: String],
+        directoryScanner: any WorkspaceDirectoryScanning = WorkspaceDirectoryScanner()
+    ) throws -> WorkspaceFixture {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("EditorFindHostedGates")
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -183,6 +187,7 @@ extension EditorFindHostedGateTests {
         let appState = AppState(
             lastOpenedFileStore: MemoryLastOpenedFileStore(),
             recentItemStore: MemoryRecentItemStore(),
+            directoryScanner: directoryScanner,
             shouldRestoreLastOpenedFile: false,
             userDefaults: defaults
         )

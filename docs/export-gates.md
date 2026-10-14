@@ -1982,3 +1982,11 @@ PDF/Print E9 timing is **pending idle-machine run**.
 - Still open: real NSSavePanel/print-panel owner smoke, Powerbox/iCloud,
   keyboard-only and VoiceOver acceptance, PDF/Print E9 (**pending idle-machine
   run**), and the E5 finalized-images/highlighted-code assertions.
+
+### PR L preview stylesheet note (2026-10-08)
+
+The preview’s Apple system palette replaces highlight.js `github.css`; dark function,
+link and comment colors are adjusted for at least 4.5:1 on `#2a2a2c`. Because export
+captures the bundled preview stylesheet, this also changes embedded HTML export CSS and
+rendered PDF CSS. ExportHTML/ExportPDF hosted regression tests must rerun with the
+regenerated bundle; this change does not close owner PDF/Print or performance gates.

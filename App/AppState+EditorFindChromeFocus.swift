@@ -14,13 +14,16 @@ extension AppState {
     /// Whether the **key** window reports find-bar chrome focus of its own.
     ///
     /// Reads only the key window's entry: another window's focus is real, but it is not focus
-    /// in the window the user is typing in, so it grants nothing here.
+    /// in the window the user is typing in, so it grants nothing here. The key window comes
+    /// through the same seams `editorFindKeyWindow()` uses — an installed `keyWindowOverride`
+    /// is authoritative, then `keyWindowNumberOverride`, then `NSApp.keyWindow`.
     func hasKeyWindowFindChromeFocus() -> Bool {
-        guard let keyWindowNumber = editorFindHost.keyWindowNumberOverride
-            ?? NSApp.keyWindow?.windowNumber
-        else {
-            return false
+        let keyWindowNumber = if let override = editorFindHost.keyWindowOverride {
+            override()?.windowNumber
+        } else {
+            editorFindHost.keyWindowNumberOverride ?? NSApp.keyWindow?.windowNumber
         }
+        guard let keyWindowNumber else { return false }
         return editorFindHost.chromeFocusByWindow[keyWindowNumber] != nil
     }
 
