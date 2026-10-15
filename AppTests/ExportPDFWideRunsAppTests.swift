@@ -285,4 +285,31 @@ final class ExportPDFWideRunsAppTests: XCTestCase {
         XCTAssertEqual(measured.baselineWidth, CGFloat(edge ?? -1), accuracy: 1)
         XCTAssertGreaterThan(measured.baselineWidth, 700)
     }
+
+    /// A stale offscreen viewport must not leave prose in a narrow column even
+    /// when the native frame already has the requested export width. A zero-width
+    /// containing block reproduces that DOM layout independently of the host OS.
+    func testExportGeometryEstablishesTheLayoutFloorInTheDOM() async throws {
+        let heading = "GEOMETRYFLOOR Baseline Width"
+        let controller = try await Support.preparedController("# \(heading)\n\nGEOMETRYBODY Some prose.\n")
+        defer { controller.invalidate() }
+        let layoutWidth = controller.webView.bounds.width
+        let beforeWidth = try await controller.webView.evaluateJavaScript("""
+        document.documentElement.style.width = "0px";
+        document.getElementById("preview-root").getBoundingClientRect().width;
+        """) as? Double
+        XCTAssertLessThan(try CGFloat(XCTUnwrap(beforeWidth)), layoutWidth)
+
+        let pdf = try await controller.captureExportPDF()
+        let measured = try await controller.measureUnsplittableSpans()
+        XCTAssertGreaterThanOrEqual(pdf.contentSize.width, layoutWidth)
+        XCTAssertGreaterThanOrEqual(measured.baselineWidth, layoutWidth)
+        XCTAssertEqual(pdf.pageCount, 1)
+        XCTAssertEqual(pdf.pageScales, [1])
+        let text = Support.text(of: pdf.data)
+        XCTAssertTrue(text.contains(heading), "The heading must retain its normal-width layout: \(text)")
+        try ExportPDFMechanismSpikeTests.assertEverySentinelAppearsOnceInOrder(
+            ["GEOMETRYFLOOR", "GEOMETRYBODY"], in: text
+        )
+    }
 }

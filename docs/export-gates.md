@@ -1990,3 +1990,35 @@ link and comment colors are adjusted for at least 4.5:1 on `#2a2a2c`. Because ex
 captures the bundled preview stylesheet, this also changes embedded HTML export CSS and
 rendered PDF CSS. ExportHTML/ExportPDF hosted regression tests must rerun with the
 regenerated bundle; this change does not close owner PDF/Print or performance gates.
+
+
+### PR G DOM layout-width floor repair — 2026-10-15
+
+- PR #147 head `259f3c378ed8f18645a2b2cf6800af711de79699` failed CI run
+  `38601864817` on macOS 15.7.9: 28 hosted PDF/Print cases failed, primarily
+  after the 10-second `geometryUnstable` timeout. The settle loop floored only
+  the native frame width, then compared that frame against the raw DOM width;
+  a stable DOM narrower than the floor could never satisfy the equality check.
+  The failed log does not expose per-iteration widths, so the precise WebKit
+  frame-propagation mechanism remains unproven.
+- `settleExportGeometry` now applies the invocation's layout width as an
+  important `min-width` on the dedicated export document's `html` element
+  before measuring. This establishes the containing block in WebContent and
+  preserves the existing root maximum, overflow growth, content-height measure,
+  and geometry-stability check. PDF and Print share this setup.
+- Deterministic regression:
+  `ExportPDFWideRunsAppTests.testExportGeometryEstablishesTheLayoutFloorInTheDOM`
+  forces a zero-width HTML containing block while the native view is 800 pt.
+  Before the fix, the root measured 68 pt and the extracted PDF heading split
+  across lines. After the fix, the root reaches the layout width, the complete
+  heading and both ordered sentinels survive, and the PDF is one unscaled page.
+  `ExportPDFLayoutAppTests.testExportOverflowStyleDoesNotChangeAnotherController`
+  also asserts that a live controller receives no minimum-width override.
+- Local red/green evidence (macOS 27.0, shared Xcode lock):
+  `/private/tmp/pr147-geometry-red.xcresult` executed the new regression with two
+  expected assertion failures; `/private/tmp/pr147-geometry-green.xcresult`
+  executed the regression and live-preview isolation case, 2 tests, 0 failures.
+  These local results do not establish macOS 15 acceptance; that requires CI
+  on the updated PR head.
+- Owner panel/Powerbox/iCloud, keyboard/VoiceOver, E5's remaining content
+  assertions, and idle-machine E9 gates retain their existing status.

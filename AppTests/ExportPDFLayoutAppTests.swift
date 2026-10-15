@@ -162,8 +162,12 @@ final class ExportPDFLayoutAppTests: XCTestCase {
         let exportStyle = try await exportController.webView.evaluateJavaScript(
             "Boolean(document.getElementById('plainsong-export-layout'))"
         ) as? Bool
+        let liveMinimumWidth = try await live.webView.evaluateJavaScript(
+            "document.documentElement.style.minWidth"
+        ) as? String
         XCTAssertEqual(liveOverflow, "auto")
         XCTAssertEqual(exportStyle, true)
+        XCTAssertEqual(liveMinimumWidth, "")
         XCTAssertNil(live.webView.window)
     }
 
