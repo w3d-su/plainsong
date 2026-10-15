@@ -63,7 +63,13 @@ Performance：每裝置／fixture 先 warm-up，再至少 60 次固定位置與�
 
 本次執行的起點是 PR #164 head `59f374ff9341289b91c0a4090b216dcf16510797`（`codex/ios-review-fixes-20261013`），分支 `codex/ios-11-validation-harness-20261015`。上文的 `phase3-ios-validation` 起點不適用於這次提交。M0 核取方塊維持未勾。
 
-- **local automated：** 最新 Mac `swift test` 是 26 項、0 失敗、exit 0（V11：deadline、第二個 replace hit、中間 symlink）。第一輪 18 項紀錄仍留在收據。其後 `BoundedWait` 的 handle 發布有 Thread Sanitizer data race：相同 bytes 的探針 return `-6`，報告保留在 `docs/ios/evidence/validation/bounded-wait-race/`。修正後同一探針 return 0、印出 `PROBE_DONE`、沒有 sanitizer warning。這不是那 26 項的替代，也不是產品 PASS。名單是 `docs/ios/evidence/validation/required-component-tests.txt`。收據、指令與 SHA-256 在 `docs/ios/evidence/validation/README.md`。
+- **local automated：** `6d65210` 的 `required-component-tests.txt` 有 29 個名稱。留存紀錄分開計，沒有一份 log 是這個 head 的完整 29 項：
+  - `4d16e2b`：`component-run-20261015.log`，18 項、0 失敗。這是最早一輪。
+  - `bcc8ab6`：`component-run-20261015-v11.log`，全套 component **26/26**、exit 0。該 log 的 `BoundedWaitFenceTests` 是 4 項，不含 `testPreCancelCompletesOnceAndDropsALaterTrue`、`testCancelWhileWaitingCompletesOnceAndDropsALaterTrue`、`testDeadlineRacesHandlePublicationAndResumesOnce`。
+  - `6d65210`：`bounded-wait-race/fence-tests.log`，`BoundedWaitFenceTests` **7/7**、`fence_exit:0`。這是 `--filter` 的 class run。
+  - isolated TSan：racy source exit **-6**、named data race（`racy-BoundedWait.swift:112`）；fixed source exit **0**、`PROBE_DONE`、無 warning。探針在 `docs/ios/evidence/validation/bounded-wait-race/`，不是 XCTest，也不併入上面任一份 log。
+  - 最新 head 完整 29-case run：**尚未留存**。
+  收據、指令與 SHA-256 在 `docs/ios/evidence/validation/README.md`。以上都不是產品 PASS。
 - **exact-head hosted：** 未跑。沒有本分支的 CI，也沒有 `IOSAcceptance` xcresult。
 - **owner device & manual：** 未跑。`docs/ios/evidence/validation/manual-matrix.md` 每一列仍是 OPEN。
 - **performance：** 未採樣。少於 60 次可視樣本、`textDidChange` 耗時，以及模擬器樣本都不能關閉關卡。
