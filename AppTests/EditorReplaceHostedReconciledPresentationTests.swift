@@ -207,9 +207,11 @@ extension EditorFindHostedGateTests {
             samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
             bytesPerRow: 0, bitsPerPixel: 0
         ))
+        // Device RGB, or setColor writes nothing (`ExportPDFWideRunsAppSupport.fixtureTeal`).
+        let red = NSColor(deviceRed: 1, green: 0, blue: 0, alpha: 1)
         for x in 0 ..< 8 {
             for y in 0 ..< 8 {
-                bitmap.setColor(.red, atX: x, y: y)
+                bitmap.setColor(red, atX: x, y: y)
             }
         }
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))

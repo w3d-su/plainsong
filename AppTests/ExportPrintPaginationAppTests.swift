@@ -72,7 +72,7 @@ final class ExportPrintPaginationAppTests: XCTestCase {
         let fixture = try support.makeFixture(text: text)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         if let imageName {
-            try Self.pngData(size: imageSize)
+            try ExportPDFWideRunsAppSupport.pngData(size: imageSize)
                 .write(to: fixture.root.appendingPathComponent("assets/\(imageName)"))
         }
         let printInfo = Self.portraitPrintInfo()
@@ -308,26 +308,5 @@ final class ExportPrintPaginationAppTests: XCTestCase {
 
     private static func tableRow(_ cells: [String]) -> String {
         "| " + cells.joined(separator: " | ") + " |\n"
-    }
-
-    private static func pngData(size: NSSize) throws -> Data {
-        let bitmap = try XCTUnwrap(NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int(size.width),
-            pixelsHigh: Int(size.height),
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ))
-        for x in stride(from: 0, to: Int(size.width), by: 8) {
-            for y in stride(from: 0, to: Int(size.height), by: 8) {
-                bitmap.setColor(.systemTeal, atX: x, y: y)
-            }
-        }
-        return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 }

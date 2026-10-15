@@ -17,8 +17,9 @@ final class PreviewRenderingRegressionTests: XCTestCase {
                 samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                 bytesPerRow: 0, bitsPerPixel: 0
             ))
+            // Device RGB, or setColor writes nothing (`ExportPDFWideRunsAppSupport.fixtureTeal`).
             for x in 0 ..< width {
-                bitmap.setColor(.red, atX: x, y: 0)
+                bitmap.setColor(NSColor(deviceRed: 1, green: 0, blue: 0, alpha: 1), atX: x, y: 0)
             }
             try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
                 .write(to: directory.appendingPathComponent("image.png"))
