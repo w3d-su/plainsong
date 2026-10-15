@@ -10,6 +10,7 @@ struct WorkspaceTreeNodeRow: View {
     let rootURL: URL?
     let onRename: (WorkspaceFileNode) -> Void
     let onCreate: (WorkspaceSidebarCreationKind, WorkspaceFileNode.ID?) -> Void
+    let onFileClick: (WorkspaceFileNode.ID) -> Void
 
     var body: some View {
         if node.isDirectory {
@@ -19,7 +20,8 @@ struct WorkspaceTreeNodeRow: View {
                         node: child,
                         rootURL: rootURL,
                         onRename: onRename,
-                        onCreate: onCreate
+                        onCreate: onCreate,
+                        onFileClick: onFileClick
                     )
                 }
             } label: {
@@ -47,6 +49,13 @@ struct WorkspaceTreeNodeRow: View {
         .onDrag {
             WorkspaceSidebarDragProvider.make(nodeID: node.id, imageURL: imageURL)
         }
+        // On macOS 15 the drag hit view can consume a filename click before the
+        // List's selection binding sees it. A completed tap joins the same deferred
+        // selection path; dragging still uses the native provider above.
+        .simultaneousGesture(node.isEditableMarkdown ? TapGesture().onEnded {
+            onFileClick(node.id)
+        } : nil)
+        .accessibilityIdentifier("plainsong.workspaceFiles.row.\(node.relativePath)")
         .help(node.relativePath)
         .contextMenu {
             if node.isDirectory {

@@ -5,6 +5,14 @@ import XCTest
 @MainActor
 extension EditorFindHostedGateTests {
     func testNativeFilesSingleClickOnDraggableFilenameOpensEveryPick() async throws {
+        try await assertFilenameClicks(shell: .automatic)
+    }
+
+    func testNativeFilesSingleClickOnDraggableFilenameOpensInFixedShell() async throws {
+        try await assertFilenameClicks(shell: .fixed)
+    }
+
+    private func assertFilenameClicks(shell: WorkspaceShell) async throws {
         let fixture = try makeWorkspaceFixture(files: ["a.md": "alpha", "b.md": "beta"])
         let state = fixture.appState
         state.setLayoutMode(.sourceOnly)
@@ -13,13 +21,19 @@ extension EditorFindHostedGateTests {
             state.workspaceInstalledCaptureGeneration == state.workspaceGeneration
                 && state.currentDocument.fileURL?.lastPathComponent == "a.md"
         }
-        let host = makeWorkspaceHost(appState: state)
+        let host = makeWorkspaceHost(appState: state, shellOverride: shell)
         registerTeardown(host: host, fixture: fixture)
         let list = try await waitForView(NSTableView.self, in: host.window)
         try await waitUntil("both file rows mount") { list.numberOfRows >= 3 }
         host.window.makeKeyAndOrderFront(nil)
         XCTAssertTrue(host.window.makeFirstResponder(list))
-        for (file, index) in [("b.md", 2), ("a.md", 1), ("b.md", 2)] {
+        hostedTimeoutDiagnostics.append {
+            let deferral = FilesSelectionDeferral.latestDebugInstance
+            return "Files selectedRow=\(list.selectedRow) issued=\(String(describing: deferral?.issued)) "
+                + "pending=\(String(describing: deferral?.pendingID)) attempts=\(String(describing: deferral?.openAttempts))"
+        }
+        for (pick, item) in [("b.md", 2), ("a.md", 1), ("b.md", 2)].enumerated() {
+            let (file, index) = item
             let row = list.rect(ofRow: index)
             // Hit the draggable icon/name, not empty space at the row's midpoint.
             let point = list.convert(NSPoint(x: row.minX + 72, y: row.midY), to: nil)
@@ -40,8 +54,15 @@ extension EditorFindHostedGateTests {
             host.window.sendEvent(down)
             try await waitUntil("filename click opens \(file)") {
                 state.currentDocument.fileURL?.lastPathComponent == file
+                    && state.workspaceTree?.selectedNode?.name == file
+                    && list.selectedRow == index
             }
             XCTAssertEqual(state.workspaceTree?.selectedNode?.name, file)
+            XCTAssertEqual(state.currentDocument.text, file == "a.md" ? "alpha" : "beta")
+            XCTAssertEqual(list.selectedRow, index)
+            let deferral = try XCTUnwrap(FilesSelectionDeferral.latestDebugInstance)
+            XCTAssertEqual(deferral.issued, pick + 1, "Native selection and the filename tap must enqueue once")
+            XCTAssertEqual(deferral.openAttempts.filter(\.landed).count, pick + 1)
         }
     }
 }
@@ -274,7 +295,7 @@ extension EditorFindHostedGateTests {
         XCTAssertNil(state.presentedError)
     }
 
-    private func makeReadyFilesSwitchFixture() async throws -> WorkspaceFixture {
+    func makeReadyFilesSwitchFixture() async throws -> WorkspaceFixture {
         let fixture = try makeWorkspaceFixture(files: ["a.md": "alpha", "b.md": "beta", "c.md": "gamma"])
         let state = fixture.appState
         addTeardownBlock { @MainActor in
@@ -296,7 +317,7 @@ extension EditorFindHostedGateTests {
     }
 }
 
-private final class HeldFilesSelectionRead: @unchecked Sendable {
+final class HeldFilesSelectionRead: @unchecked Sendable {
     private let lock = NSLock()
     private let gate = DispatchSemaphore(value: 0)
     private var readCount = 0

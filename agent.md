@@ -191,7 +191,9 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
   selection to switch the single editor pane (like Typora). Files selections defer out of
   the native List update, read and verify the file off the main actor, and commit only the
-  latest still-current request against its installed workspace capture. Publish the tree
+  latest still-current request against its installed workspace capture. Draggable filename
+  labels also forward completed taps to that same deduplicated selection path, because
+  native List selection alone misses those clicks on macOS 15. Publish the tree
   selection only after activation succeeds; a failed read keeps the current file selected
   and allows retrying the same row. Multiple open
   `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.

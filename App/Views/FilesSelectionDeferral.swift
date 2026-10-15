@@ -22,6 +22,10 @@ final class FilesSelectionDeferral {
     /// The deferred open driving `pendingID`. The tracker outlives the view (per-view
     /// `@State`), so `cancelPendingOpen` must stop it when the navigator unmounts.
     private var openTask: Task<Void, Never>?
+    private weak var pickWindow: NSWindow?
+    private weak var pickResponder: NSResponder?
+    private weak var pickEvent: NSEvent?
+    private var requestsEditorFocus = false
     private static let retryAttemptLimit = 200
 
     #if DEBUG
@@ -57,6 +61,7 @@ final class FilesSelectionDeferral {
         id nodeID: WorkspaceFileNode.ID,
         requestingEditorFocus: Bool,
         pickWindow: NSWindow?,
+        pickEvent: NSEvent? = nil,
         appState: AppState,
         onDroppedPick: @escaping @MainActor () -> Void
     ) {
@@ -67,9 +72,13 @@ final class FilesSelectionDeferral {
         issued += 1
         let sequence = issued
         pendingID = nodeID
+        self.pickWindow = pickWindow
+        pickResponder = pickWindow?.firstResponder
+        self.pickEvent = pickEvent
+        requestsEditorFocus = requestingEditorFocus
         let pickedDocument = appState.currentDocument
         let pickedRoot = appState.workspaceRootURL
-        openTask = Task { @MainActor [weak self, weak pickWindow, weak pickResponder = pickWindow?.firstResponder] in
+        openTask = Task { @MainActor [weak self] in
             guard let self, !Task.isCancelled, sequence == issued else { return }
             applied = sequence
             var landed = false
@@ -101,11 +110,11 @@ final class FilesSelectionDeferral {
                           appState.workspaceRootURL == pickedRoot
                     else { break }
                     if let prepared {
-                        let responderUnchanged = pickWindow
+                        let responderUnchanged = self.pickWindow
                             .map { $0.firstResponder === pickResponder } ?? true
                         landed = try appState.commitWorkspaceNodeSelection(
                             prepared,
-                            requestingEditorFocus: requestingEditorFocus && responderUnchanged
+                            requestingEditorFocus: requestsEditorFocus && responderUnchanged
                         )
                         needsFreshRead = !landed
                     }
@@ -142,8 +151,27 @@ final class FilesSelectionDeferral {
             guard sequence == issued, !Task.isCancelled else { return }
             openTask = nil
             pendingID = nil
+            clearPickFocus()
             if !landed { onDroppedPick() }
         }
+    }
+
+    /// The filename tap can run before native List selection finishes acquiring its
+    /// responder. Let a duplicate report from that exact mouse event settle the
+    /// snapshot, without starting a second read or accepting a later focus change.
+    func reaffirmPendingMousePick(id: WorkspaceFileNode.ID, window: NSWindow?, event: NSEvent?) {
+        guard pendingID == id, requestsEditorFocus, pickWindow === window,
+              let event, event === pickEvent,
+              [.leftMouseDown, .leftMouseUp].contains(event.type)
+        else { return }
+        pickResponder = window?.firstResponder
+    }
+
+    private func clearPickFocus() {
+        pickWindow = nil
+        pickResponder = nil
+        pickEvent = nil
+        requestsEditorFocus = false
     }
 
     /// Stop the pending open and forget its row (the view is gone; nothing reverts).
@@ -152,5 +180,6 @@ final class FilesSelectionDeferral {
         issued += 1
         openTask = nil
         pendingID = nil
+        clearPickFocus()
     }
 }

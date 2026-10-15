@@ -122,7 +122,13 @@ without changing authority contracts.
 Rows retain native `.tag` and selection, with an `onDrag` provider carrying the existing
 plain-text node ID for workspace moves and, for images, a file URL consumed by the
 editor’s existing image insertion path. The reviewed String-only payload could not reach
-that image path; the additional URL representation repairs it. No tap gesture is added
-that could compete with native selection or dragging.
+that image path; the additional URL representation repairs it. macOS 15 CI later showed
+that clicking the draggable filename can leave native selection unchanged. A simultaneous
+completed-tap handler forwards editable filename clicks to the same deferred selection
+queue; its pending/current-node guard deduplicates a native selection from the same
+click. A duplicate from that exact mouse event may settle the native List's responder
+snapshot; later events cannot reset it, and the original focus intent is retained.
+Directory disclosure and non-Markdown selection rules stay native. Real filename
+drag acceptance checks the actual move and editor source, in addition to provider types.
 
 Review verification and owner commands are recorded in `native-macos-ui-review-evidence.md`.
