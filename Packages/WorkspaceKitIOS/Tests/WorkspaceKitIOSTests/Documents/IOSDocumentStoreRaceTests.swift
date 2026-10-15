@@ -158,15 +158,15 @@ final class IOSDocumentStoreRaceTests: XCTestCase {
         original.session.replaceText("live-v2")
         let liveVersion = original.session.version
         harness.ports.openedData = Data("fresh".utf8)
-        let replacement = try await harness.openNote(text: "fresh", generation: 2)
-        XCTAssertFalse(original.session === replacement.session)
+        let reopening = Task { try await harness.openNote(text: "fresh", generation: 2) }
+        await waitUntil { harness.store.byIdentity[original.identity]?.isRetiring == true }
+        XCTAssertEqual(harness.ports.created.count, 1)
         oldPort.releaseOne()
-        do {
-            _ = try await saving.value
-            XCTFail("stale generation completion must not acknowledge the replacement")
-        } catch let error as IOSDocumentFailure {
-            XCTAssertEqual(error, .documentChanged)
-        }
+        let acknowledgement = try await saving.value
+        let replacement = try await reopening.value
+        XCTAssertFalse(original.session === replacement.session)
+        // The drained save belonged to the old entry; a replay after replacement must be stale.
+        oldPort.replay(acknowledgement.operationID)
         XCTAssertEqual(original.session.text, "live-v2")
         XCTAssertEqual(original.session.version, liveVersion)
         XCTAssertEqual(replacement.session.text, "fresh")

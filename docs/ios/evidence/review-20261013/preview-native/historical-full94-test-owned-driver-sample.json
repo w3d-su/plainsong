@@ -1,0 +1,53 @@
+{
+  "driver": {
+    "command": [
+      "xcodebuild",
+      "-scheme",
+      "PreviewKit-Package",
+      "-configuration",
+      "Debug",
+      "-sdk",
+      "iphonesimulator",
+      "-destination",
+      "platform=iOS Simulator,id=A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+      "-derivedDataPath",
+      "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/DerivedData",
+      "-parallel-testing-enabled",
+      "NO",
+      "CODE_SIGNING_ALLOWED=NO",
+      "CODE_SIGNING_REQUIRED=NO",
+      "-resultBundlePath",
+      "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/Results.xcresult",
+      "-collect-test-diagnostics",
+      "on-failure",
+      "-test-timeouts-enabled",
+      "YES",
+      "-default-test-execution-time-allowance",
+      "60",
+      "-maximum-test-execution-time-allowance",
+      "120",
+      "-only-testing:PreviewKitTests",
+      "test-without-building"
+    ],
+    "destination": "A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+    "pgid": 14084,
+    "phase_timeout_seconds": 600,
+    "pid": 14084,
+    "source_manifest": "/private/tmp/plainsong-preview-ios-native-c1-20261013/prepared-source.json",
+    "started_at": "2026-10-13T08:20:19.296328+00:00"
+  },
+  "result": {
+    "command": [
+      "/usr/bin/sample",
+      "14084",
+      "2",
+      "1",
+      "-file",
+      "/private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-owned-driver-sample.txt"
+    ],
+    "exit": 0,
+    "stderr": "Sampling process 14084 for 2 seconds with 1 millisecond of run time between samples\nSampling completed, processing symbols...\nSample analysis of process 14084 written to file /private/tmp/plainsong-preview-ios-native-c1-20261013/runs/20261013-162003/test-owned-driver-sample.txt\n",
+    "stdout": ""
+  },
+  "scope": "Bounded 2-second sample of only own still-live unreaped xcodebuild test driver"
+}

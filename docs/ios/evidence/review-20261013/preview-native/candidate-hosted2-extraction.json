@@ -1,0 +1,15 @@
+{
+  "command": [
+    "xcrun",
+    "xcresulttool",
+    "get",
+    "test-results",
+    "tests",
+    "--path",
+    "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/Results.xcresult",
+    "--format",
+    "json"
+  ],
+  "exit": 0,
+  "stderr": ""
+}

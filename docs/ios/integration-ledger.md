@@ -2,7 +2,20 @@
 
 Created 2026-10-08. Contract: **IOS-C0-v1 declarations implemented**. Live main: `b13aa620c7444f2ccd3a8fe3a5b8b0afe0e997b2`; specification ancestor #153: `2144c46c888360c84a42fef79e676e60b518048b`.
 
-C0 provides declarations and an unavailable app scaffold. **C0 overall acceptance remains OPEN because simulator smoke has not executed. Production composition is blocked by M0 + real providers.**
+C0 provides declarations and an unavailable app scaffold. **Current aggregate C0 simulator smoke12 now PASS. Full v1 acceptance remains OPEN/preview FAIL; production composition is blocked by M0 + real providers.**
+
+## Current review update — 2026-10-13
+
+**Full v1 acceptance OPEN.** This dated update supersedes earlier environment/provider rows for current readiness; the historical C0 receipt below remains unchanged. Original published lane PR heads were read again and still match the audit baseline. A separate aggregate baseline `9ddd0c3cc0b3cb3439ed296400abbb701eb48886` receives the review fixes; original branches and PR bases are preserved.
+
+- Fixes for 03/05/07/08/09/10/12 are integrated; all 13 frozen hashes match. The public runner at c1 actually executed 294 unique cases, all Passed with zero skips. The original 17 cases and C0 smoke 12 passed. MarkdownCore had 322 compiled symbols but only 2 selected iOS cases.
+- Six native storage guard removals each caused one named assertion failure with zero skips. Every one of the 148 inputs restored after each mutation; the final module ran 46 Passed cases. All 117 storage dependency inputs equal the aggregate. Full 148-input equality is only 138 because full PreviewKit is outside this scheme's dependency graph.
+- Full PreviewKit-Package native execution was 94 cases: 90 Passed, 4 Failed, zero skips. The old product scheme had no test bundle and the old 46-case inventory was incorrect; both attempts are retained. A proven fixture alias defect is corrected in one test file, but the subsequent targeted 2-case run still had one pass and one failure: real bundle readiness timed out. The preview gate is FAIL; three Export failures remain unconfirmed.
+- Mac PreviewKit 94, architecture 5, WorkspaceCore 29, tooling 21 and portable 149 source-bound passes are retained. C1 Mac CI passed WorkspaceKit 362/focused 69, then failed the manual sandbox link because WorkspaceCore objects were missing. The one-line wiring fix passed local 69 and the actual signed sandbox probe. Updated exact-head CI is separate.
+- Lane 06 has no real Access/Workspace implementations; lane 11 lacks the acceptance harness/target; lane 13 capabilities are nil and its entry point is C0. M0 devices, real Files/iCloud, background, IPA installation, accessibility and performance remain OPEN.
+- The owner authorized the shared CoreSimulator service reset, after which discovery worked. No unrelated xctest was directly signalled and no shutdown-all was used. All heavy work used the canonical lock. Old blocked attempts are retained; the reset does not establish their historical root cause.
+
+[Review receipt and next-agent handoff](evidence/review-20261013/README.md) records current completion evidence, immutable source scopes and all failed attempts. The C0 receipts below are historical. Lane 12's tooling IPA is not a functional v1 or this aggregate's final-head binary. Claude review and maintainer merge remain pending; exact current-head CI is reported in the delivery packet.
 
 ## Shared implementation baseline
 

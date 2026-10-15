@@ -1,0 +1,3299 @@
+{
+  "contract_version": "IOS-C0-v1",
+  "files": {
+    "App/Resources/preview/bundle.css": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "94d264a5a431d0c184d83c5943d6f3179ed178e74e1330396694e77839124294"
+    },
+    "App/Resources/preview/bundle.js": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1e7784e4b13886ccf23c75a36403fd1b505a68f09f2536de7bd14ec2d63b2917"
+    },
+    "App/Resources/preview/font-manifest.json": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cb9aa207391a171bc683027ad6acb8bbacd7d9f7b29ba6112560849176961cc8"
+    },
+    "App/Resources/preview/fonts/KaTeX_AMS-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "68534840bcfdd2bffb6f0e8deb48684dd01e7f04ea2813267577afb906de1d13"
+    },
+    "App/Resources/preview/fonts/KaTeX_AMS-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "30da91e84c893f875e252689faebdc590b2871145e8adc7f9a9d4dbd8ce0b251"
+    },
+    "App/Resources/preview/fonts/KaTeX_AMS-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Bold.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "07d8e303ce4fc12b4bb54f1004170dd190a1f3db45d400fe68060df3e0897268"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Bold.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1ae6bd7475590e97e7f145a89e09ccde322f7a6bc0b91607b1c8b8ee28290fed"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Bold.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ed0b74372feefcbb9c0666b2e210da37b7e49fa7fbbf3eeb11db5f693dacfbb7"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3398dd02302557a793f2863f88e02d96ce10df2abffa07c8e9fa90775116e65c"
+    },
+    "App/Resources/preview/fonts/KaTeX_Caligraphic-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Bold.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9163df9c7122432e6495b4229fa9071cf9ae86a758ae5efc4924ec2e1a6dbce1"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Bold.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9be7ceb88004ab8ad124082246fbfcca4091e36385d4ec6ed1df67375dad50fb"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Bold.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1e6f9579e90e2cac37f8f60a597c436e075c114385652b7cbeb0dec0421291b3"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5e28753be717dac97f559f49bc10be9cf3c124ddcabda6659d11cb68febc6463"
+    },
+    "App/Resources/preview/fonts/KaTeX_Fraktur-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Bold.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "138ac28d1663b3037e9c5f52371fa5c63d8324f4a38d22cd573e6ea3a3fd0cf8"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Bold.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c76c5d696297d51b9cb1639c7da4334f0e7dec81b42b11213b5e25ef671bb822"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Bold.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-BoldItalic.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "70ee1f64a20f2048c21940ef46d0144fd215baa953ca69afd1e31e98544f708f"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-BoldItalic.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a6f7ec0d846ac7ad975adb8959c37ed49b94acbc4ae436db9ce9e20287e4a64c"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-BoldItalic.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Italic.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0d85ae7cc30f23790a7f1a58c4a112fdca8aae769b6ba11429af1d98b1b6cb3a"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Italic.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f1d6ef86f3b11a528bd5185199bd2443ecb2b0dead96d88674b5a2c12be24bdf"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Italic.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d0332f52868370fd83ae7fa46470f90c8f2eab2fcf12bc4f88080b340c95a830"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c6368d87e8a1a3a5d337623d83d8dc4b868f242a9ad476237d6f8d1e0f168cdc"
+    },
+    "App/Resources/preview/fonts/KaTeX_Main-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-BoldItalic.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f9377ab0271cda59af24bcffbd46a4d0c8a3572ffafdbb38de2ad5ea7b0d5ee5"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-BoldItalic.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "850c0af5c2238497febaf5e461d880bf458c341f42f4f330f1b1ab5698b1998e"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-BoldItalic.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-Italic.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "08ce98e51b04d58945a301e639e02b6998af29fdfd61a7b8afdd07bbfc479d4a"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-Italic.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8a8d244581371912b8f3f5a23e2437cb2a59cd9bcaebb0346e722c05737a2571"
+    },
+    "App/Resources/preview/fonts/KaTeX_Math-Italic.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Bold.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1ece03f79f95277d57dc7f6b435a74e1379b0d46104a8530286b60ff49369ea0"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Bold.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ece03cfd83e22c212cdef66feb8442d25a083beb988db3f1883f3f9738d750ba"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Bold.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Italic.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3931dd81faed86ba021bb2bbdc36f5bed9a38d6b4f4077aca59b265aa1b02083"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Italic.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "91ee67500cc0129aa0ace3ac5c61ff1692102f0f31d02b69347fba35dcb75bf2"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Italic.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f36ea897e19f4a2e571d1e900e4e3710e438deb05a842486045ba0a3e616a4ad"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "11e4dc8a6471ff6d6ee561d53d10fde8f7489e798257ff449c5d37c197435605"
+    },
+    "App/Resources/preview/fonts/KaTeX_SansSerif-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+    },
+    "App/Resources/preview/fonts/KaTeX_Script-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1c67f068fea8bb09bf099c088b1cf64bd27516a6e07f4684344873564bb66a67"
+    },
+    "App/Resources/preview/fonts/KaTeX_Script-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d96cdf2b3bdd4d64a8fd5f74a4c467f123a8a73931cd435889f08ffaf9bf947a"
+    },
+    "App/Resources/preview/fonts/KaTeX_Script-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size1-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "95b6d2f1a50173bfedb8c63e1d1c99b10427d0a4df4201cb44513b226951a22b"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size1-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c943cc986384f59e86bea5fd7dc50a9c4dfe567a7c05eb40d6790720dead97c9"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size1-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size2-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a6b2099fb555c60e3a0db3a08842ebf1d732c6eb4e4bf44913613bed4fc4e39b"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size2-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2014c523c3210bcc166648c4d4cc57f05b747df07a24277bf71c51e67dc79e3d"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size2-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size3-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "500e04d54f0d51666332c9d2089aa803be22aa878eca539e59fa53c6e522b082"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size3-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6ab6b62e9b62dae2c00dd90f791bd10950be0ecc3490d7d6045f51c2e8fe0949"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size3-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size4-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c647367d1dd4e162468717d020e1fc0f1dc5c26ebfdffbe55261713bf88c5877"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size4-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "99f9c6750b489c9462bf04900bd3f939df9b829339daaaaa99ef5495cdddea58"
+    },
+    "App/Resources/preview/fonts/KaTeX_Size4-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+    },
+    "App/Resources/preview/fonts/KaTeX_Typewriter-Regular.ttf": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f01f3e87d9c6a61c0c081ceb577abd864eb00a612f7ac1620dd6915fad2ef5aa"
+    },
+    "App/Resources/preview/fonts/KaTeX_Typewriter-Regular.woff": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e14fed02b1aba7ce9f5afd5844b5d0321b22351febc720e0de8b8723527609f7"
+    },
+    "App/Resources/preview/fonts/KaTeX_Typewriter-Regular.woff2": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+    },
+    "App/Resources/preview/index.html": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547"
+    },
+    "AppIOS/App/PlainsongIOSApp.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4c7f359731b86686c7feb6b6410cc17a3074da9a463edf02ea312b746e91be31"
+    },
+    "AppIOS/Composition/IOSProductionComposition.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3905da734543b564b4597bf95ced2265ac5e037bdece3e13da6b45840a3a0bf"
+    },
+    "AppIOS/Features/Authoring/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringCatalog.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ebbb9bdd1b95111d2fdce21f42d5d8a8aea8e6b50e8bf6cf62530b2e96afa201"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringController+Find.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ebf5222522dd60ac0b5d1cfda3d39313a1459f2c69be58148f6756a9d4cfcb77"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringController+Frontmatter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4fd2f3bb9d039fe6c620c42b27d54937ddf974c43e05a1d4e8f272031f6d1e6c"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringController+Link.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7cd1b1c7690666750577c1af7716be9d5051616b64949c83cbd5a58350df434d"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "557b3184a40e66af5113e9c123bd676d8730da103e6059db05a73ebcd6a0edd8"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringFindScheduler.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "df7753fb2433fad3565d80a5f4742cfa3087d35778c2045a5c736f2494eda618"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringLink.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7bd60d63d7d7c9644a640d35315efa90010358423a04c9a9df8b0ac68cd2a002"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringModels.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b38e52e7ae3dc867959e92926e97b2b311cf690f843cd07bd3896621704b9f06"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringSourceDiff.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9c4f2137bbb07058cda130a47f7d5ee73e188f5d8c28ec2c8564f77642794698"
+    },
+    "AppIOS/Features/Authoring/IOSAuthoringViews.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0a2eec76fae78e14dc0e56311a719f17bcdb3b04b1e66947e0d4a112163fab02"
+    },
+    "AppIOS/Features/Images/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOS/Features/Images/IOSImageInsertionController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "28d704bd33ad36bf0d5491775f06a626f9be32539bb5921238cb08f662ef5610"
+    },
+    "AppIOS/Features/Images/IOSImageInsertionGuard.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9fa26c0bdd31bc85549d24b64d310140054b7f96887b319723f30aace9ad85a8"
+    },
+    "AppIOS/Features/Images/IOSImageInsertionSession.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c78e2c5e049eaeeaea9bbbd8d1397a8974d16b30df902007bfd89f20a49139f4"
+    },
+    "AppIOS/Features/Images/IOSImageInsertionTerminal.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1abfc456154a0740206e7dd748847891890a682a1ae3c415cbfada2145afb803"
+    },
+    "AppIOS/Features/Images/IOSImageInsertionView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "557f737144160d8716fd6e1925a0bd72bb56a57ac7878f246a0e5e39be4b08fe"
+    },
+    "AppIOS/Features/Images/IOSImagePayloadNormalizer.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "98dd386b1f8e64c16c002af0bf5fcfd4781d5b6fb65f9646ee929183d5195c35"
+    },
+    "AppIOS/Features/Images/IOSImagePickers.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "06ada2cb3e1fade908fbcc5751db75b946df5beb101415a498ca97e19d649ee6"
+    },
+    "AppIOS/Features/Images/IOSImageRasterTranscoder.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "00bce42c9cea77e8191a088b2bcd4f513430311ebfa8d1efa3c890ca9523714c"
+    },
+    "AppIOS/Features/Images/IOSImageRasterValidation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c467f76331553d4736563b671e4ecefebfe03a86bc3c3ad7f6f865418dd4281b"
+    },
+    "AppIOS/Navigation/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOS/Navigation/IOSShellRootView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b8f48c3dbe922521328fcf76febad1a2d6064a1340e06029d73fd4c0da133c5d"
+    },
+    "AppIOS/Navigation/IOSWorkspaceBrowser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "48a695ee3d21db070b46a91b5f9c736d2442c8bee5dea0197830d32866abbc38"
+    },
+    "AppIOS/Navigation/IOSWorkspaceQueries.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5b738a845376d1e5854ab052d4bda62ec85874214a49b31fcd495c4e4a940124"
+    },
+    "AppIOS/State/Contracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d5146a1a803e2e890fed799d8f4020103f72fb22d1262e3861c8bb5e5bf82b56"
+    },
+    "AppIOS/State/FeatureContracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c6b19edb56e69d3ef64b7230ebbb9c1440ad7c2db09c9019435afa1bbfe78361"
+    },
+    "AppIOS/UI/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOS/UI/IOSAuthoringToolbar.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c62a124b47d1c654bb3281d45fd2f974c9ad3a9f5f9a4b36b3ec88a8fb74612c"
+    },
+    "AppIOS/UI/IOSChromeProjection.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "423bca7bd163e9894cf8f5c9f3693c0950bdf724e3bdf6ab43ba62fbf22ae810"
+    },
+    "AppIOS/UI/IOSContentLayout.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a56599b7f237d83e9c684023eeaee63fd531a760effa7d433f0f1e77be1b16db"
+    },
+    "AppIOS/UI/IOSDocumentScreen.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5f65c2d4c2af01f1723b70c2bc9cbd86746503032d19ccfe5a69c54f972b0238"
+    },
+    "AppIOS/UI/IOSDocumentStatusChrome.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "07c34a3a50bb69c815ce282178b5db39cbc773461d08cf2e379abcae7c500bb3"
+    },
+    "AppIOS/UI/IOSEditorPreviewContainer.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "74f45b800123fc2b3e661da8ef827d232e245803f555944c5de949216a5ec7ff"
+    },
+    "AppIOS/UI/IOSSceneHostedViews.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "11fed4241423f082f704ce33f45cca22f0f155c151dc002263e3623c2ddf50bb"
+    },
+    "AppIOS/UI/IOSShellActionRouter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a3672ed71334e6a6b861710401213463238a2ed61895ef8b01b29e7855ab01ef"
+    },
+    "AppIOS/UI/IOSShellFeatureSurfaces.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d18b859e2a79f24851b317376530612c6f1838be9d7bc7b8d9be93a0114d0176"
+    },
+    "AppIOS/UI/IOSShellSceneState.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6de1093b80cc9f9f4e1837e21f045b378c6427c76fc24efd5010c05d24406160"
+    },
+    "AppIOS/UI/IOSShellWorkspaceProjection.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c9f0f2fe0ee31ec2f0659f11c0047e00345773b8f2bca6f781b4e30d7a25bc03"
+    },
+    "AppIOSTests/Authoring/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOSTests/Authoring/AuditFindProtectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1a7b3d21a9bf5d8b0f2ea4a505dcef2a6fa2ffeebcabb2ddfa46197628898c24"
+    },
+    "AppIOSTests/Authoring/AuthoringTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9c7a18c1ec9ef7c6d515e1680900a1721d32e7093dc3a0ad79b865bb402a1a24"
+    },
+    "AppIOSTests/Authoring/IOSAcceptedFindProtectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5ff41135c1132d1952a67904849f36cc80d73422e70f10c82c4b0f96dee73562"
+    },
+    "AppIOSTests/Authoring/IOSAuthoringGuardedEditTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f0843eaea61f86933cc55f4d0859906634a3538b8a6f5d2b2804b6482a7b4c02"
+    },
+    "AppIOSTests/Authoring/IOSFindGenerationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8141e03590c1e939cdbbf205cc0d0a4eb6e9b5db2a1e65afb80f02bacc0c5d00"
+    },
+    "AppIOSTests/Authoring/IOSFormattingActionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "51e9364722670de216522099097a9e48e8d28b8eab780a5ccd03094912587cd2"
+    },
+    "AppIOSTests/Authoring/IOSFrontmatterPanelTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4542564f5c49511e23b9af853a779aa6131ec9b9820ba9030f3f30fb71f5dfee"
+    },
+    "AppIOSTests/Authoring/IOSFrontmatterProjectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "41192b84677ce094d41ce6494ff5ad27afeaa1714fdd61d6ca509845465bbf2c"
+    },
+    "AppIOSTests/Authoring/IOSProductionFindSchedulerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0cfb3c03431e21f933a3351d3117193f68a0be7a3eec45ef881fa8df7d2a6f16"
+    },
+    "AppIOSTests/Authoring/IOSSingleReplaceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "88af0a5696f43f1af0be76e989f7335d32bd4fe5972513d3760bf2f84fe2b8a8"
+    },
+    "AppIOSTests/Images/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOSTests/Images/AuditImageCancellationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "634ebaa7107f653cbddec6646b32c7d2daa401a35ccf5b6904c5fcdd5713d23d"
+    },
+    "AppIOSTests/Images/IOSImageInsertionOrderingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "583b8ea3c4f7dfd8cc91c26bd0898900b9302fbbd5c8911ed23de11fb52121ed"
+    },
+    "AppIOSTests/Images/IOSImageInsertionPathTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7780978715b5cd87560dafed04b3a05a50e54ea25fa9332d75264f1a0188428c"
+    },
+    "AppIOSTests/Images/IOSImageInsertionPolicyTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "99e3d53a290c6e34fe8c449910878327ab9b4c9380ee51d52fe1785e53869d52"
+    },
+    "AppIOSTests/Images/IOSImageInsertionStaleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c57a0b54f4accd4d521efd2023a89a48547774bd2f05733aeb20aea1a86e17db"
+    },
+    "AppIOSTests/Images/IOSImageInsertionTerminalTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2c4d542135f61ea04e0d71c24a2228278b123db0230bb103032594f2c8d45e60"
+    },
+    "AppIOSTests/Images/IOSImageRasterValidationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "12c7e8dfb4199c56349c513f696b3e1e24dfca56f0580168fc228c34e85b62e9"
+    },
+    "AppIOSTests/Images/IOSImageTaskCancellationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "df1dcd69c3d5e6ad9bf18507954786ef5114420336cdcafbbe13e93fd5a20a6b"
+    },
+    "AppIOSTests/Images/ImageInsertionHarness.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a75796d859fa684de253ad21a5e7089945b25b161250df75295401de2ad4e001"
+    },
+    "AppIOSTests/Images/ImageInsertionTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c96a1d03c12301ac06284ff4cebc1a8a118a574c21e6d8645e87661dde8c4766"
+    },
+    "AppIOSTests/Images/PausableImageWriter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e65565f8059fd8b018a17c3ef25d0f1f952a729037b5457fb93030f197c6fe94"
+    },
+    "AppIOSTests/Integration/AuthoringContractConsumerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1b4f29a18e670ec28eaa715d3445fcc617b0bcecdc3fed9ac7e1a589cdd65f12"
+    },
+    "AppIOSTests/Integration/PersistenceAssetContractConsumerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9d913ca2f5212899e8f607bd131ca722072e3ad601883eb9c7511330b355ac87"
+    },
+    "AppIOSTests/Shell/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "AppIOSTests/Shell/AuditWorkspacePublicationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f779434aa45f3a5c04889718983fe90bbd06ac97ff4ae58bdef6eaa76269d279"
+    },
+    "AppIOSTests/Shell/IOSShellActionRoutingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "683b71192ebc84c7dbadf4e1fea67aadf3f92031f4f099efc380aa164a803caf"
+    },
+    "AppIOSTests/Shell/IOSShellChromeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "88e1538bb9b1e76df0f685618292f2fa50398cce4ecbb3f23acf5cab23366428"
+    },
+    "AppIOSTests/Shell/IOSShellLayoutTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d159cf52cd67d91056d9102e48d9f70d6d8153f98630e0f5a2dedf23a3ddb760"
+    },
+    "AppIOSTests/Shell/IOSShellSheetTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cb5af06d3817b86257f78525705d80d13aa314c05931369e65191001ac9978ef"
+    },
+    "AppIOSTests/Shell/IOSShellTestDoubles.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ead6e9feb64e9f71be8671765cd0f9c17a95111f1d84da569703e2beab7b49ad"
+    },
+    "AppIOSTests/Shell/IOSShellWorkspacePublicationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e9f9abac12fabd1106017b4816364c9948bd70964e5389585e9bdebceec00c41"
+    },
+    "Makefile": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cdf779456e7d19ecec6ff81b111928781c29856963cafab64409dafff00782e4"
+    },
+    "Packages/EditorKit/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c1e756f3d0670fdd08887f63217313d8960e5e15e1deb850224ade73a6487387"
+    },
+    "Packages/EditorKit/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0f8a05a929ff06c0114ae30627e2589d3fbf6ed2d04b61ed32f6a29748476537"
+    },
+    "Packages/EditorKit/Sources/EditorKit/CompletionSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "16b6ee3a922cb61436b94b1626a69b7f414f6f6d160a719c3970dc273a555ef1"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport+Math.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "10d58cfbad2797004ee047833a3f8a7149870756b9e12a44cb23b051d7a88a13"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditingBehaviorsSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a6f8ac46ee727cf1731d43bc4265c44dcf4e6f38684ebabf4dce0de69d768efc"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorAccessibility.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0f387ecbdaf5bdf3c849e6405da8ce374e382f5e39b11ae9cce204b0004d2914"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorDocumentBinding.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1d0fbb451cd76dad5739344cb9c83ca67cb111b12a99dfd2b4f532f7f2660aaf"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindActionHooks.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1a7887ffa32282fddc3c36fb72ef12fc7055c7a495dbafa1d0dfaedceb280a24"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindCommandDispatcher.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a9b0f5aea436ce76fb815851d5852d3598f94a9743d1b4483d185ab763f29e1c"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindController+Replacement.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ae9c240d465705f25b05c815208292051c18bc50200d73cd8ec09cf8c9f2a20b"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d1ae4ac063aeed1a2f7c3870345dd91f86cde1db576418c9ff7290a85f464fdc"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindDocumentBinding.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "23353202e53f0c4e41414c0fb85a9fb424615e528a8cb76867d812c70df2e8ad"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchHighlight+Clearing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4a5006e365324169fa7908b6c3cca525c519fd564417d64d23fffc74f86c35f6"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchHighlight.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6085fa70f946aef13f8a8a4090ab91147e36c4204f4300b48e893382b677552e"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchHold.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "058fc9674c69fd8c7b9c4097cf0d506d24cf89aa0f1c8fcc22c1d0e365145441"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindMatchWorker.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d7096b9f19fdb616c9e5dd543a61c663dc2315fa5a75a76034ce06c28d50adb3"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindScheduleReason.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3dbba47940f78040345e5b5671146e65019d6dd832ae91d14f872f3cf0559b0e"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindSpike.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ca2dacd8fa4209f7ebea9f94141bf7ea69326ca6cbc76ae6d7e700acf3b3d04e"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorFindStepIntentState.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "50071b57a837d6aa26357372d0f68018402196ae220acfbab1bc7ea1b3c48ea2"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorHighlightScheduler.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0ea669c0ce09ff83d2601e0f790547734eb1cc8721032ccff6d9fdbf2cbb78e9"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorImageAsset.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d826454cc9fbf5f1896f75e01edb928e33186589a0c5c2894b33ffa3383097a1"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorImageThumbnailLoading.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2e1c5760b823982216c3ae0a6b52bb20f729f99e1754c76fa4c4b2d2a01a1489"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorKit.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4cda38a8acaf420e65593a8468603b9af5ce16c11d6e070e09b1eb2005572a52"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorNavigation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bc993af395ffa755ff0dc24c575d2277c6f67aff8611cd20e4ba32ee199fae33"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorPerformanceProbe.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ad811c088ed7d8f5247a8363e2319f4c615fa1f6e8c399b31e114bec991db510"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchCommandDispatcher.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b95e0d07f17b9f8fc6a5a8b6b3f180e57bcf9a32f522b4e8642578e5105b4829"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor+WYSIWYG.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "350a8309aaf80795eb913508f730143d8e03fd1663f2a58740a52b00ed0fbcff"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchExecutor.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3956d28b2ea9b4620585efbc93a1a4dd23698805638016cd3439eb4f4bda3d2a"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchSelectionObservation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cd8a1fc3cdd5d7a2ec695f8dc1c6fb116303ca63eec0249ff6a622ebc181df68"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchSelectionUndo.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2936a03df84e2c6cf16e0c0f635b4554e830bbe1827d3cc6150397909d056925"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchSpike.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "62de8a83321e88fb4bf9392f7f23e6e018c281895d05f172fa75bc64359367d4"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceBatchTypes.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cd7774b183f3e05b4d839e0a080531cfcfdd5559808ac994a03e89a99274961a"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceCommandDispatcher.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cdd02116468d54b437ac1fbec321904daecc876b440405cc710dc1385430600e"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceExecutor+WYSIWYG.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c0094dc12759e5f5d73154096da20a53d13712491d0c7969fb0a01265b524aaa"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceExecutor.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0ef33ca76fbb8609c55f90769e64667a7b19a770d0f38ee33f138432abaab5fd"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceRejectedWriteUndo.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c0dc6fe65cdb6fd602aa63c93da169a6e85440a7d36c54a75517bf2fd7af3bfb"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorReplaceTypes.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "af11463cffb709278ce929593b3abea0637a1e0523ea34d781985d553b39d4d7"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorScrollSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "81b084d4b5538992d8c4308ef3be330c22f166e7642f099617c1c49d1e958c90"
+    },
+    "Packages/EditorKit/Sources/EditorKit/EditorSelectionProbe.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4ff56c2bfa54267ec624a901891848a02d6d027e0989162b1729a1b544e3ceeb"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownEditorView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7b332b8da4d809e1dc92fe771518534749588708469b3e943718b3a08ab99030"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView+ImageThumbnailPresentation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "eff1bd8b6dee98b4e5cca656789d0e25dba07fb20108e698aacb1b84ae975c9b"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView+Selection.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "03cb6768a707c0305abeb6cd3c20405d9a1de95b7b90a6a0e2c7ca3387bf5f3b"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView+WYSIWYGAccessibility.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "351c27ebc240b668f46001289f4fe579b8af0fab365ef4233368e50642a741d6"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView+WYSIWYGCaret.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7574556473092ae32090374d366df27bcd6bb7439f4735a93c70ae2c4c3c2e0f"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSTTextView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b711ee510c1aab33961c7d33c9883a3bda0878b7e622d79acdedbfcce66dd520"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxHighlighter+Utilities.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "77b08d9dd8411a9f163c49989fc4eba9b5bfad5dbc80f11daa0bee742010b546"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxHighlighter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bc28e9eba86e341bbaf4678bb538d783f2c5ce50cb1ba7e7793832700643a46b"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxParser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a12859ceaca79dec5d717deddf1fc2baf877e71d11e81668373b3d1ccdaf88bd"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxTheme.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c45f02d42ac6857f82d37bdc021df0516bb23fc80b3510245a60bddb3b673e41"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownSyntaxToken.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4a5fc021d32c839799e7ed1c1127bf26aca3de37329d7ad14e8720a1e87d3eee"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView+Dismantle.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e213cefa11fe96ac457c26c4d3313efb8ba240ba4035468b8f8749371bac7c83"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView+FindMatchHighlight.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "12cca21bd4d81cbb5be07ebc3593b0ee5f04c25fec2cb165e461a6f1a7150cb9"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView+HighlightApply.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "62f6db43fa67c98a7a9d20f075019b99847ad5b7ed04fa9b2d115837f70bbe46"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "135629d89187e079787340eb8c401fa3ddfbd2d3c7593f6fac5c6b37748d5158"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Bridges.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "460dfd2637cdc068e41eef99abe180fa6808e9310c41ec10ec55f67b5eb41415"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+DocumentTransition.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "43816d88e67da58fcea8723fe8f9604304d175a7bd44fc8061c6fb7dc3dbd857"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+ImageThumbnails.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a30a2aea18f0982bb8c24960b1f5515dc64055decbd3e76d09dceea712910e27"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Input.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0fadc9aee46ecb905b09531d54686d939004be0cd0fe537f6051df12b1ba251d"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+Navigation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4dc82e6ef9e78d9ca7625b31fa84d8405b1573aacaaabac22cfd0a2c01b2bc0b"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+SelectionPublication.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8606cd050ec07923ae30b6e861f3da6f5a30265b21ae238fcbc05ee7bfeae0ec"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+SourceSync.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cd9a4589c836dc2d5204ed1e78cfd761dfce19a15a0a8fe99725fd1530a6f31f"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator+WriterActivation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b12eb4b2f8d57cad8ee0018d1a6887ae7d8b4d42fec9025b80506df3e59814aa"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewCoordinator.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6b53f2f7db4e055b9bde95322364ea605772fccb79aacf8ccaa4d31f8c13b171"
+    },
+    "Packages/EditorKit/Sources/EditorKit/MarkdownTextViewUpdateSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "12f7fe08ef4e02ac1c1e9dd237af66b3cb3016411d87e65e8700e4625d37daa7"
+    },
+    "Packages/EditorKit/Sources/EditorKit/NSRange+EditorKit.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6ee291c9780dea5aee8d470bfe792e234e52c68382fd3951711b1a8b76e6d4e1"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGFoldModel.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6b1ebaff06382d8c99f570ca721539b4f006454687f2b7075ff964a1584e5bbf"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGFoldParser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "68fb97fe72dade11e632c2db378481e3750263c518992105bb19aac542fd222a"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGImageThumbnailPresentation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d8e4d70b6e070fac9a69a9155ebdfaf9ad2b0355474cf9b2f5885b6390c7d87d"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGImageThumbnailPresentationController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "605664b507c471fcc338b88cf5951e1a8895546c4fb4ec59fab8d5076f7266d5"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGInlineFoldPresentation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4dbbd122213e73b9899819dbeae32484121d25fda0ad7502ebff1dd66badafc6"
+    },
+    "Packages/EditorKit/Sources/EditorKit/WYSIWYGZeroWidthTextContentProjection.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6c7b017cfd40b2a1349193899d3a27943b7fae74c5ec49ba6a30d7347cedb56c"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/CompletionSupportTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6d0dc1492caef02fc2fee2f5c7c86c33485a47677dc4eb14d7243472c0fabf8a"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditingBehaviorsSupportMathUndoTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "289605935d34e6bef686e44719f87e0c90d643a18e728e23a39708d13dbab188"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditingBehaviorsSupportTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "16a4c280e521790ece934370f405bacba523d2f7a2decd33f0ccd37e67cf7142"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorDocumentBindingLifecycle+ReconciledPresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4431c0d64ff3851d71ded65ad982e42c1b5ec3f793c0472b2aaae7751505a099"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorDocumentBindingLifecycleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "17bc0dd16a109e8b36274377f12d75c9753b25b86c65eb4672d8b8e2f8935e0d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerLifecycleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fffb3f7b42ff685f8ccaf47cc6bb1ff91b939cb0a4ab5f692c23a9b598325e22"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerLifetimeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "260268e45a8b8b761a60873f278960f289a06f24b7627a3107228d9e4d869926"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerPresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "92061ae51caa2cc0de4cc0fbe2748809c774aa89cc673511dbe5679f7bd7fae6"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerStepIntentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "61cda0e07b710fed1b0e53dad7fc32005199681f9970e6670940dd0a0ab54a9a"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerSuspendTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e51bce1b93c30e6a23d7312703fdb77fb205f78ada668eef5f2d6800c39a0ed3"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b4c2a99e95bf472fd4894684dc5d58c0d691526a486291ecb61d38610c0bd76a"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindControllerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b2c72b7f990babee0bb7c8adb442382234ab4b3dc6be727bf2f70f5caeeae0a7"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindMatchHighlightEditRegressionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f3096d6e451dc4a180426f87ffe2ebf437e976add6107162db577d2f089bc724"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindMatchHighlightMarkerIdentityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4b1a8d3eb467057ee16ded08f999a9c0239956aff9bc99f01ddd9bc18d11499b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindMatchHighlightRepresentableTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "acf01d48059623074c71465ba561909d7d88fb2075db8045f04742f7b78dc9d4"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindMatchHighlightTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d24f5c4259bcc80caf8a5e6a3141fda074499af20d082db2135c3f26b3b352e8"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindMatchHighlightViewportTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fdd58e2bbfdd12fd4972a957cff939eb3857a7c566f61968cf4799931fb3eff8"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindNavigationFocusTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c36e1ecdba5d9c5ade5431cc5e8e9b6e1d9547c1170ce96b98de5586eeb4dd96"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorFindSpikeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5667d6a3508596c880144c0c49ad123267ff6b51e5ef2a4a5ec80ccd0189729f"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorHighlightSchedulerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a11510669565f051bdc0dcd56a291eacb1ccb9c54ca729599e13306ac8b7245e"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorInstalledDocumentTransitionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f606978ab7d201545981b6a1eb5b2ff444b8f1c7e6fdc9969cfb2b28bf4b6b8f"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorInteractionRegressionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3cc514d73d7ff0d10960411fd6c439e08fb879118320092ade12dd8bca005c61"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorKeepMinePresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4462077fb8706540a3586b0438779f871b352c8ff1fb6cdb378cca9426066b35"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorNavigationCancellationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1fffb81cb64ac3b119a13c9d7a1e7fb204319d5f65741f3b0b6bec88be102ca4"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorNavigationIntegrationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "540555687a204e25d64c333fa5567db5a13c5f91fb9fd6a8c37c2ae1f19d0fd6"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorNavigationStateMachineTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c126273b88b74587066391cafd2ac2fb22942ce7f9631c1447ea29df40a1dc42"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorNavigationTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "df506d1a6f82392c67f128bc59efe29831c628e4e18870234ddc06b46113fd4b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorProgrammaticWriterActivationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "db3df4fba84fdbddf0f404d61c1dd88e419dcec3298bc96be0c22efeb4eb7e63"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReconciledPresentationTestDriver.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "60788355bc453d4f94252c8cc6c43b8b4ee2ee40aae8a22e422c2edcb4c192ad"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReconciledSourcePresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e09a07e921c88df81df1406995af3388df81546e72f4364749bc7913ef195c06"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchExecutorTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2835e866e25c4c05b93471bc0f12d2c582eaf8197b15edbe18775fd8f0552fb6"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchProductSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "03bc472bdab12c65d32654e313da54396918493deae1052d6be47e354fb70db8"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchSpikeLargeDocumentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "92b1764be2c26bdd23fb61520b0bb0b7711a0c5d8380f554263c774c6599b181"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchSpikeSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "db2e7f29ebef5ee860a761e202743a1fe78ac3b1896eb54cd9989fe6eff30566"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchSpikeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "78390f4c36537220b276b3e8725b80b799e48690edd7f5f6febd4a84aa891cff"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchSpikeUndoTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4d9cacdd8527ede7cdcc644193f9d20e4c30cfda99c99b7ffd10eded724b5d1a"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchSpikeWYSIWYGTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "069db9b53bc5f6f41186c1c2fd091ce7f57190d2cb35ce8eb3c558a94e2a3fc6"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceBatchWYSIWYGRecoveryTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4a78dca6dff51db3452feaee9e1f5d3cc5393cb9e46669c481865b4544c7b3dd"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceCommandDispatcherTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4a582ec9e869b5da52a2aed0f44d700731295bdede7196ca15c45c42da1744a0"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceExecutorTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "11c252b1c6d2f9faa716791e3a18b6db91eb4018bc07784cbaa1c0ba0975ef7b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceLayeringTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2cf7d5ec99f63a80b0011cf790400d89c4eab4cd0ee2170456e8cd1cf9060bf3"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplacePublicationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "32215c3fa48d522651ed1d2b30bb838314727cfbe156a56867ced3569b0857ac"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceSingleSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "86328eccc60f6e9c6aac30bc75510843701bbc5715c40e5517765e1f56794858"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceWYSIWYGPerformanceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0d7255cc4cc51e89a9d9f7514ea5aa5891414890594d1297f546351a3b890e4b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceWYSIWYGTests+NestedFold.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "011db2f7751ace3ed4e4561456c4839623b70f23e968abfd750e34d6a8a38586"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceWYSIWYGTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "32b752f34fbcc665b63ad835919d78ba1dfc458931dfee5c4e44bd7903447ec3"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorReplaceWriteOutcomeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "15c00e429db8a4584f2bc87ecbb89341d11eb05c03de1b67cf5c890fe9e70da8"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorScrollIntentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ce49eac84a8604ffe2c4aff4677f48da5c985d7d06aa37a85ca791db3e674b9c"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorSelectionProbeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "79d385057b9b6ad6d261541dff2a01b638c8c47c5b363848933c700d0362a08d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/EditorSelectionPublicationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b608465bf66cde834b714f82ffda7e9dba7edcb834fed03a4830bf824b4eb0c7"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/ExactUTF16TextTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c37329ceca6e8e535914213870024e63486a2f565b0724abb707d8f970280871"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/MarkdownEditorInputTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ec358b9ae5b2563ca1d5e736898c8daf83c53d1ef0723bfdb5a2c7a3f8d88b49"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/MarkdownEditorViewTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4775be4f2fea67ca63baf1422c0a0427be2633b3d0bef03a22149dca95630c48"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/MarkdownSyntaxHighlighterTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "29fb65407a5f54878061119717bc9014868967baa1a5aa771800a3c3cd39c824"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/PerformanceBudgetAssertion.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a069e22ec45be4d70afd31dc0af2f2a2cab7f9469095e9c8e54be044c541577a"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGActualIMEEventAssertions.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "74c4c1ed9422ff257c78f7e0d41838b90c870e06b07f8382a097379758246363"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGActualIMEEventFixtures.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1c1aebacfa9df40d790d7b87ec49091a9f1837b5852a65c4cda63502ccfcd876"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGActualIMEEventGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "12007ed0a4848dd1858e4c5d091d8b9b9e79d689eac714f173fa2c32d011644d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGActualIMEEventHarness.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8be834f84b81f9cd4082a03e38fe2d7fa4d482c153d4aa9812f2787c291cf659"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGActualIMEImageEventAssertions.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6153e909dc515373cce3ade8a6256ab8b95ea36d526022391aa3a6bb76f06e9b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGEdgeSnappingGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "02ce1a79cad42d54410ca04e66b8479c3c41aa15158b03c2720b320f381af601"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGFoldModelTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "66f93003b3f9c5002ca7f0c1331937f33381be67a31be335430d20e55c269db7"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGIMESpikeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ff6fc1435f5275fa89fa0f5ed9caa5c372d16962ea2de0453b2dc39c1c14ce5c"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageRegionModelTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c43d8781616ae11391d866d10a8d75c0304795f316549aef44347d76b24bee08"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailGateSupport+Geometry.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bc212c2ea53ed70b87159dc25ff7ccde07986c08a63e675965e0001f4b61b1af"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailMarkedTextTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b1147d50e419556fe6efdcb0ae3f14898441ec1fa3aca05bff33110cd9b17509"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailNativeGateTests+CopyAXUndo.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8bfacab3c8e018732f1b63302b3f40424553aca900933eec39c80d4c0f70624f"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailNativeGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ec5cb205a4d788445c1d7cf19deb80564acef51d5c26fda4cfc036f67dbd1944"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailNativePointerGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1d2d616a2d3a5863744e208353861c6f334dbc3aae29ab7451617c366c82ebae"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailPerformanceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "728a58d68cbbbb045349f52eafbecfc929b8c1661684082b65e50ac71d71ef0d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailPresentationTestSupport+PresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0ed0c28d8305e00a5a756d64f497783417e63acd08b1ec3226d865f632a49234"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailPresentationTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "187954bc5275221dd054eb969dc4c68593fe2665663a2df5a771b45c9b94785b"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailPresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4e7c354c66a20816ec8381765daa5c202e4c857a9f8f94dd6277b0b16e9bd35c"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGImageThumbnailRenderPolicyTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7a3e6a9341440b7fc75c2e689d1d5ca464a33874add1eba1dfdd2f31ce783bc1"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGLinkFoldingGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "837657103be50b7ce84b4cda36709632185d9b080fdbb45469fa22ab2de97b60"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGLinkFoldingTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2a70f0b9d99fa8d49a31ebc8f7f03938f23d21ecdeff8a5577bb4827f6d93efb"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGLinkNativeGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5d1cdea449cd41e88a7344f18694280b059045e7073e369a3c248062ac27305d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGLinkNativePointerGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f3ec8be6de999f33664c185b88b6d7ed51e605c25a2e3f3f0751fb7fb8718ad7"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGLinkPerformanceGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4dfb7249d1eab165587405a0daf1a1d2d66e284fc7037ed7a5d716367b0b09d5"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativeInteractionGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3dcd5d731cb45f6fc0789fa14f854b11d530e6f28bd6740354570222e4cef37d"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGNativePointerGateTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "aaa2a0047860d22de7acf150675ec797890ae1279812420cce5843e72004c482"
+    },
+    "Packages/EditorKit/Tests/EditorKitTests/WYSIWYGSelectionMappingSpikeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f07375680f22e7fcb4e62a3783e96bb63fb6c14af7cd1a2a087e7adc79c98371"
+    },
+    "Packages/EditorKitIOS/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3fa6abb603cf8849f954e310cdb5a8954cdcc75dd31f1a227a5f3f3ac7127abf"
+    },
+    "Packages/EditorKitIOS/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "311dc44460b357d7a3383a71c7867ffbbb7dfc5a4f0f549812631ce77ab47e0a"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Contracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fc07a44c9743be3444bb47ddd15e9a12d1cf2b2de6602650558ef97966f0e567"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSEditorBehavior.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7903d261b700aa1dacbe86d76c0b7bd9d566f423294b692639606382728c7460"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSMarkdownEditorRepresentable.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9f0f322e044fe0f2515cf6e3b54286de1bdb133ceef80e3c959d60548da518c0"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSMarkdownTextView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e7add9880c1ee71a1c78900aa02d423b804e7ee88fb5325f280ca0b4c4b2aa58"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSNativeTextMutation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "60b9375fae0e9fdba5b97a6a1e620fd2b57c506a6e391b280d886e8b7532a0ed"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorController+Delegate.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e2fa45bf16714ae0479251f26d75c35fe11d6dc02ff9d84b80f376c9e3f32ddc"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorController+Highlight.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f460a780dea82255f65dd1f56fc55cc94408918dea20ede40da1062de7ec40a7"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorController+Mutation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "acb9c857cac863f543bd44dcf4c8edd3aba6a364e13e4c27c2c3d8dde0e08f94"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorController+Reconciliation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dd5e2d0be4f234ec55a2f3d3782230e1f36e2abf4908a47a5ea09eaa05178449"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4f1f745219e479b94c27fdd3a4c56e5e69b6bac6ae45ee0b9ce2e3d9e1a9e79a"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSSourceEditorObservation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c73fd376f6483c40fc25a36a448eb77972ebd53b6f29da6981b78bc93d03a833"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Editor/IOSTextRanges.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "76038f1da7c441b8274e1f93ffc0e731a6ec0458a2c9a469d8b50d496bac3c11"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/IOSEditorTheme.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "971d5f37d635cda2ac804f4e7f3cd20cdb0caabc7085f8260f748a8c02476da5"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/IOSHighlightPresenter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "db7d996b5188952b334adbd985ab1ba831ea646488369ff42b0e36dc4e2a83f8"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/IOSHighlightScheduler.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cafc194365a4996b061397512de1fa0001ef315ee9ad6d5510be1a65fc7f6966"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/IOSSyntaxAttribute.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "eafcd181cb2b5df3ac723b204483fb2d288a35f9df7e53e8991a3ca5c0795824"
+    },
+    "Packages/EditorKitIOS/Sources/EditorKitIOS/Presentation/IOSViewport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5c9e5ec42a8cfb5e7d3552233cb2c0a9b8e0ea36ee1c82bf4b124718c54f366f"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/AuditHistoryProtectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "66ef7354c3679f9536a81976b90c20af46b826d5edb737862bba853e037337ba"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/EditorContractConsumerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "694cd2431f99f86665ac09a496e86fe229096a918c8f888dbd50146352804df1"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSAuthorizedEditTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "266da6e6e9d6abda592e40a28698c7747216e6cdf41ad4087d6d956c9649e53f"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSEditorTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e77e546798d131945a67273f2adb4802b610608ac90039c0549455f0ff782f65"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSHighlightPerformanceDiagnosticTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "09d62af831a05fd5fb3c9ffb3778a204de9446a30c7cd3647714cb97ccfbc260"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSHighlightPresentationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "25475c895b32a9c6596c4ac589babfea841dedbd39b37fae9e3335dbd9a00b7e"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSHighlightSchedulerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fbb5748069a2bb4f3648070d1e719fd1fa3245cf938e31bf1952e1d468208174"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSMarkedTextGuardTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dcf6ee813d75d8a4f5838a54e81317763199f4011e95a54a8c15291a01e374f5"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSReconciliationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ede2f5c32e20c300e542f066e6b8b23ced7d46ff38afe9333c047d2892d116c4"
+    },
+    "Packages/EditorKitIOS/Tests/EditorKitIOSTests/IOSSourceEditorInputTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7265b51269b1e454c161252d9982f6138f2e0e5f05e659ed6968d678a122344f"
+    },
+    "Packages/MarkdownCore/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1559b4aef54e126f72dc1798de7fdaded1e73e2c8ed7abac24f8747c64512fa1"
+    },
+    "Packages/MarkdownCore/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f48f36e7802f1300a00f79787bdb5dcd41d0a4bd1b0b3ee7f698c53adb8ab398"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/AutoPairing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "40927365b9bb3b5586ae27e6ad7b93b6f8c6da8b8323b19a32a091c1518106c3"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CheckboxEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7c09c5907525bed13be5962ff4f7b17558f30a005386b22e4a073d6215b01a9d"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CodeFenceEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ab21e17fb2895485f3108b8b79b9d6aecc6b5725cea701bf6428e6b5715fe0c7"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Completions.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "26d3cd16c45e7470510d54e3b747103bfc33e3a0966f146a8d30ce6f49ed62d7"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Contexts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "40f701d47786777169e8db1cffe8ca3ccb07b490aff61e91fed5df540dce8f1f"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine+Ranking.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e211221878d8b95f49db6516996689b53bed4f30f1e2153354493cce92db2adb"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/CompletionEngine.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a31c7ef33bf7962b279b5e477866603a53e864ea17909082d2989ab8a17e1643"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSession.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e61c400ef4af3d617d99e627ee4e4c657d72d5aa5d944c85d3e54b521f3a3fd7"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/DocumentSnapshot.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "809a87186be11393bb3cb299abe8e8612e8c2eee6536c1c1fa05a91e78e980ba"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/DocumentTextChange.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5d9d3b156b363fa66a151bcc3b8a4e615bca8caff30d958d6c26e75085f55e28"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorFindSession.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cb0bfade1e45720fb03dfd7c6d0b0767a6e22902fd18d142e711a4f0719c63c5"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceBatchPreparation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fcd5a114b503aa98f34f039fd2bcf871f575cbe5cada9fa70e21bfb9d6d88fa7"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceContinuation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "96ee6368b18e21e715ab27a4292b302a1234d7349d8788842db15a6d9a601844"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceLimits.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ae176804119de87031626dcd5bd75939cd873a2dc87b34438af53f3e6d7c9f58"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanner.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9486a7f61b870d146ede3de2a7fb3c1bb03e3efa0c36e885de0b52c7a469dbf6"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplacePlanning.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fc34457847b705d097250710003aa31ef037c7e617fa0d411659db87c87115cc"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/EditorReplaceSourceConstruction.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "556b52a6b3603e49591742c6321629ae5fc3182c803c108c6bc1b1c6deec87be"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceReconciliation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d1ac5e301a15f8fee1ce96535513f63975cd9cf16585e70f21fe5140d49bf0ca"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/ExactSourceText.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f1f0a7c116a4a10e1139944462649c4a9569c96f1303d0dd668f60d8a57a4002"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/FormattingEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f619219670f7694107dac813d8d453fd8ad9366a8838bac81dbb0e6afc1dae70"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/Frontmatter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d767f871e6d072aa5733ceb2c4716bcc6b2e62d807294485ce96a51912160344"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/FrontmatterTextSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ecd99a9ab444b8df163d2bc38690ed22d6c75a72e35342dd0fa01b9047e83d26"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/IOSDocumentContracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f2bec4e93b0262d45ae4456b4b2c0cdb2a0cb0abe5176424ef0599ae4362d285"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/ListEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b5e82a56a0518bd0bcd936d11562871331515178210d5ecf85d44537171fe3b8"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MDXImportParser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4d5de87416327e08eb7e98a8e75d4bfddcd606f345ecf7c5cf445ae4f2a3572e"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownCore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f543f244e2c27d2e91742137aa3463f460bfa3380c12174aa0e2b1413e30abf6"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownEditTypes.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "00d4c67f205ea396d540da8f596aee0cb8aab8ca861da24d33a009ce4c31fe62"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownImageRegions.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dc10e9a7727720972ff158017991d185f6506335beabc43ff31f213c1da052a3"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MarkdownTextEditingSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "60eccebbf5c34508db8e52895a3d9564a2d2831f606b7fe8f9654eaf83363b7b"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MathEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "055abdd742cb0ef3bb127cc95105046692af4e578c842d459ef3f1e32554c55a"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/MathInsertionContext.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "924c4384acfdac9b4e4cf5590c64d564d236b5b29b1ef7a51f1edd872fafdf51"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/SmartPaste.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c95225ae27f4e1496e4c47035467f7ab8849ce9ded6eb66e7dfbfa478db65361"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TableEditing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "940816fba6a7b3399388f2854aeb1569d268fd4232587f5cffa3957267632e94"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearch.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b9fe57407f68960652a15565a35005a8fb23ba4d17f6ee946e426d35d8473fe7"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchComposedSequences.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "740242370fecfd9fffed81ab746c0db5c3eb2080b550af029a0e4133b404043e"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchInputValidation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ed577c5400768aa7f804be2d61218a03cec6c8457c39910dfbe959725ce42755"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchLiteralCursor.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6d0a6f8b4b275bb39b7c88685fba117983d6f6b6fe35edc454d1cb565ea6b01b"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchPreview.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ab94ceda39dc5e115d932c7c964f92d98269914ce8be20ffa55537914d2757ce"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextSearchScanner.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "645440ead35818c8a0db90431c8a6019c126ae58eeabd4510be9e228ac8410b6"
+    },
+    "Packages/MarkdownCore/Sources/MarkdownCore/TextStatistics.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "15adfc8e043bcc06f7a4b50e2075780a2ee31ee6bf87d2661f6f512c445a8cb9"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/CompletionEngineTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "855c6f6ee22ec352d58e37274e9c739e4282f56a23b72b33006b315b7b2beac3"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionRelocationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "729e3583c684f69cb781b03a6964033d3275ec648d75d13c29c05d85ca2ef032"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/DocumentSessionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4c45272a5cfea3dff9af992ef18eff561c3adaf93ba4869130d365a3c6207a14"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "aa711184178b554bc1cd5ac74a1f9c25fc2e55c1e1fd4cf498d1c58481741931"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorFindSessionUnresolvedCurrentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "70989fbfbe22dd50021d42291a77e4b7c4d9f12e4a97c7b525b6d08e94d99334"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchDifferentialTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7a7f1c1d62c68c6ff88b90c9ac38342017ded16572f7a9b7870ad22f09f2adc8"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPlanTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1cffde7f730d76b6659668dbed2fb960e0408345f845b32e966eec17dd646999"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceBatchPreparationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8cdcde7c45cebda753d82c526cde6a56d44814391222673efad74817143e2f6a"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationRescanTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a85acd4a4823413873c8602bba5ced731d1241515be45d1daadfe6cd5eb769f7"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceContinuationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "49abfb36de12e9ea4f7ecb854201e72c93c3b66cd98db42b9250715f78c0c64d"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceFindAgreementTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d74a20231bd6c3f7d3563ee510d27ec406ce70bf513303ed73cf209594903b3a"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOffsetMappingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1183ada3a750ea56fe79c8ae422381a9f17510bbbe418af51a5bc06cbe38cb08"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceOneMatchPlanTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7875cf29529caf63ff6f9ccd9c00c38ef84037e5d6b220cd7c2550aea4a1ef3b"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceSourceConstructionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1ae785769d47d037a22a3b4bc155f012bb59d9965b07b8b1ba155948ada42cc5"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/EditorReplaceValidationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "039efb856efa462a416c17dbb462c15ca77c8b73f80c7a9b8457d949eeb8be59"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/ExactSourceReconciliationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b756e263cabdbed0bf584d1a3695f89077f3cc2aa05c2a1c063c1b959543476b"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/FileKindTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a4959aaa2ead625a11e39b2dad96cde340501be3778eab693e332ffa71ec9893"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterStringRoundTripTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "08defe08c4fca56baa15e03f15c9715469fe6835a50d0ccedaba67129bc24af6"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/FrontmatterTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4ab8766f1d0633bec39bab16c30f1537e0bacf632caa950d0f03db15577e80e0"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/IOSDocumentContractTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4301e95fa5712c4470baaa7acfd17355084b9d0107156ed8203dae08bc20512e"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownEditingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5e823eae24580f6e21bf16c49bdbbbc90983a7c99a0e4d6a3d98f3df52cce202"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/MarkdownImageRegionsTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b3bd6b31777e50decca088c582614bd09209db63c2bbbe1942159c3d06def878"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a41a707ba401490a999c62acffd6a656384c12ced1f7169d74cb2c6cbd9568d7"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathEditingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "587cf6ec652c899f9d912005cc0b691f4a23a2b6dfa98a8a8f68bfcaf6bebf43"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/MathInsertionContextTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e73d0cabd72a733639068d5034914e70b24b6f1c75ed79958fa40b415e413fe5"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/SmartPasteTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c535963eeaa48244d3ccfca3f2eef8a15f6aa1e9508f133a83cdaf34002bccff"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchPreviewBudgetTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "acdf3270286411d211478e46a1e8faacb3e14576bb83f86aba7dd4b958547225"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchResourceBoundTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8a85852440ee6a355ca45fca1cccd70d7e38d6d966a447c5688ed1dceba0030a"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchScalingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ed4bb969855ecfa5f8c110f606e5b602bb6f83d05b44383bea2a15f5413fe1f3"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "86b1905a9773659392dd470b3876c58be534d08a7109b17b2145256fe558fd1d"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "49bb9f15d818092cd60f3226cc1ced12ac868c2cd463dfebc537824f25d2f3dd"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchUnicodeAndSnippetTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "39b35b7c66611259f241342229d8f25099ff9401fbe7ee1882289ddf640b2098"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWholeWordTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "23f89fffde1baaa6d8e1dc9fbb02bc2eb76f4bf74e4b14bcf83a96790f8cd14b"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextSearchWordBoundaryScalarTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "756e0f53c2e5c6ade54e08cd9bffa516a956fc0d8c05a14cbaa8a9fa68975a8b"
+    },
+    "Packages/MarkdownCore/Tests/MarkdownCoreTests/TextStatisticsTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "99ab6e9fa2c53961c1541db588d7e44658564baa1e2781d353d9fdd4b36fc568"
+    },
+    "Packages/PreviewKit/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "07999ac7b74c5ba347a1512c857c20cc7d8dcc8c4d7fd03c911e3a7a1fc8567b"
+    },
+    "Packages/PreviewKit/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dab2663999869fafa412effe795e7389c900581b228764cf98c35e1781ea53ca"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/AssetReadFence.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5ac1caa877017be8b582508b90793ebae5d89596ae93a7cbd67cbbb970b70386"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/AssetURLResolver.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0f76afdf6ac846605bdcd4c0ce900f96ac5f3797af2b39fe5d6e4063922438e8"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/AssetURLSchemeHandler.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1cd066315ae9b4141c572b5469ddf9b684df49f223934ddbc2d15a0094565b94"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/AssetURLSchemeHandlerState.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b5b2677c334e8818a1c0e047eaf028325967b6e030ca50167359bb901e2c27da"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/BridgeMessage.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "223bd321d08443d1ea7b6c043dfe40884df3b87d032cb32d37b947c9042721c8"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/DirectPreviewAssetReader.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "73be77367cd19cde78aefaa8891b23f0d2378e21a418d61d90c45ed94ea525ea"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/ExportBridgeMessages.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2dba08097099c24d1a787c676ea1dd01231865b2679c4756c5805ea886d8cb05"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/ExportFontManifest.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "16c4532fb9518dee31ce2250aae272dc71db53e710b1626e526869374008cb4e"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/ExportHTMLResultPayload+Bridge.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9412fbc0e6052b37bcb26b6e19978c04f90488acfb223603705fc2e382a4c92f"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/ExportRasterSniffer.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f3146ed3998f69cfbc695eb0476b437b95eda507b1d423573d582b6648c64979"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/ExportResourceResolver.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "322d3496667c0be042880f69902d6e092bfb3bcdb9396ad9b008dfcb0716f42f"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/MarkdownPreviewWebView.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e798e7033c7673acf06205672608398e374036346b769953c523010871bda1e3"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewAssetReading.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5ec2bfc76bb6237f5ff019cc3381361f5219b2fa8e0f2d6eff8a43412113b593"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewContractExports.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bea8b7f635a3705691f5c1016d08b2f016663b498409463d6b2f2453096f39fa"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewContracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ffae81620f5ceb09ea28aa4bab49a4319dfd30a965bbb89ad7ead81fa2d0fdfe"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+BridgeReceipt.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b1b8356311eededc58200722c84e59604cdd255163a29e334aad22cb88166f7a"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+Export.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "864f20c51632d5944ff18572d63f6a52708c100f677e126b63e3591cd3d66351"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportNetworkPolicy.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "af25b86a5c96475eb2577b2fcc759eb554c1d033a400d682441ac168ade28467"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ExportRender.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "febd80f6006e04cc069dfe25fe426da730bcf02e2634d430c7fc464252b45270"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+IOS.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "87e7a619f2fd1c4de02e6e9e0d47fc5a6e2b63b189034301c96f2a855d84a2b4"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController+ScrollDelivery.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e277ce70a5da05179362bdf35df47c9ffb77d7f9784d914930e84d8210efd0c9"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewController.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "69ae1f877c7a6c23711a343f5bfa9ed7c6717d5a271490d970542c9ed5034a95"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewHTMLExportResult+Omissions.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "65e59045f6359208d48f9fe529c02ac3e68bc331f3faf5a6a05a8857c75bf7d4"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewKit.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3e310b7903b2f47ee458fb4fc8514dbb66d4e53912af4682b95de25bd172d05f"
+    },
+    "Packages/PreviewKit/Sources/PreviewKit/PreviewPlatform.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8f62913ac9d6e77eb2d13bba55df6b142a9185c18eae636d6415b3a64020ddd8"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLBridgeDecodingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4ad82d4fe2c7d7537b6677fb67884ba4f12a78626f1d160dbb69e2eec2d4cdfa"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLHostedTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a46475e8164072e0ac993595689be50daa8a574b60100713e10487701a97e234"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLLifecycleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9249ba9dbf683c7bad551f548d7876825742e6ec7a08e7e2b97d858a2a291e9d"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOfflineTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "677a58ca8116f45f5882c199c0412799fcd819ff81eb49ac233d1f8638c99737"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLOmissionCountTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2d9cab1bc6e8290a42a131e488815cbbef9ed37cb269444fae82bf25914e1f42"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLProtocolTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b5c9d4101a30a8f8412c6cb54fc6fbd98080d41649c575a761ca1ce886a3643c"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportHTMLTitleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "11d6ed8192b8e1df74321dd19cb0fd4741fd7c9229b163576a4a8d3474c3f3cc"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportNetworkInterceptorTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "17899fbb724dc665890f1bc03907a0343f9befc64a78d10b96449a2857361624"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportRenderLifecycleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "52693dcb82f077d08fcdb2be03ef2c8d71f3a6b05e16e762df61e43478c7fc94"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverReviewTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "670b06bda9cae7f8e95e66fc4d1317b3ccc495c68453eaf2051c5c05cabab72c"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/ExportResourceResolverTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "db31cd446f9df72c748a1a5638a7a525fe7912ec00b87987c40b6a24a5480dd0"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewAssetFenceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d692d6d30610fdf4c211843feaba9dbaa39faa065e9bfc2bc615043392aae7f9"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewAssetTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0e110f06379f4c8117d98dbedc5711a134864c2d96894684ff1b81c49069c8da"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewHostedDeadlineTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e8f96710a16741db3e49100adbed2f81bca299ca5285ac25f433cb3a2d5bc4fc"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewHostedTestWait.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f21cb176b2d934ad4718bde2bb2743d57e65202491d54596bc47eab9a49150b4"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewIOSHostedTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0240b362ea7237e7bf9f85edf1a57c2b1e290af8c925e3481222742111c13746"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewIdentityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "18e8d051ce88a81fe298f5c49320d861d1326c7d9679299db8bf5fbf6f0113c3"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewKitTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c39787f0d342d3bd7ce1d9d7c9cfdee962d49569ab69c57cd4631dfbac5e1745"
+    },
+    "Packages/PreviewKit/Tests/PreviewKitTests/PreviewScrollDeliveryTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "84dd4d4e1611f5273527a7a31f0ea939b0702c0ac051d9e30f87791dc8e4efb0"
+    },
+    "Packages/SyntaxKit/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0138fe19aacdfd38b27b546f0dd407fbf83bfadd43351ac3d33fcff511447abe"
+    },
+    "Packages/SyntaxKit/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "21f6b1c7689891ca2e087e6adf9ed1fee683f045391947647c726451e4a8e3d2"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/Contracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "77ae739d3ad480b9380eb12f85cb171c2277576dd4c633ca215731b30f767174"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxParser+MDX.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c6a8d1252e66e920e0c0aeefdbca9433fd83cc8645afc018d96059c4958a871c"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxParser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8ba2f52ca5f7ddf078e34ec6e5da2cd9095020a7263c8129a1982514ca5983e8"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxToken.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0be329653fb003ef5c1a9adac577d809a570779a8fe198a8f244032b51a7bed6"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/MarkdownSyntaxTokenizer.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a09781076b6162914a31615f3b529404ab4a3a1b40f65152d4210fa3208224cb"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/NSRange+SyntaxKit.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6ee291c9780dea5aee8d470bfe792e234e52c68382fd3951711b1a8b76e6d4e1"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/WYSIWYGFoldModel.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "94e9f9df212fb524803e27e04ec83b2a6dd2b6d978a5abcbfd9826f8a5c7cf24"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/WYSIWYGFoldParser+Inline.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "287dc3e70cd1237c19f9f338f9bbd33555aa3bfd21d98b9cb626e36dee1a9d49"
+    },
+    "Packages/SyntaxKit/Sources/SyntaxKit/WYSIWYGFoldParser.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "17341ca97d7679d74994a4ebdb87da234a11829e05629212325d9f5fbcad8f20"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/LICENSE": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "49bf33cf78ef5897e4e161ce1517df7de1ae5042a65b6bcfd44401e0fc606559"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/VENDORED.md": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f21813a97be4fc6ba688a0bae897772106dcb73bedc41c9b99e1ef6eec46f16d"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/common/scanner.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "da66ef2bd14a3f7ea743e25ba068c6c9aae2c3509db200ff80c4a0e6116e564c"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/include/tsx.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3e04f8aa2ec39e0d2f0df383fb2bb81a1b5543bc268e3e16d9fc653cf5f28fa0"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/src/parser.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1902cb53fa7ff5179df89b2eea863165e84c8cc866226419dc26921d8c055885"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/src/scanner.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f4118d8616dde68b9aaba1344ce7099defd12eee7277aedcc78bd57d3b4f4342"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/src/tree_sitter/alloc.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/src/tree_sitter/array.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4ff743903dc46f5db6aa54f31c6b4d160a8a9779e5b2ab1ee59ae7ebcd850ea1"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterTSXFixed/src/tree_sitter/parser.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a1f6ef161fbaf48a0e10fca90ef5290a062462b307b3898aa562993853b9f80a"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/LICENSE": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2d181298822a124f6d106118dcc69c8d4d26ac668559be29682c452e712b0947"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/include/yaml.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b03b74d6fca5ff3e9339610153ea1772e9f2e1d6189acb918a249de0a3fb6107"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/parser.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8a3baaab33fb63cf9a89f97ec61dbb3ab0d4ef69be9f0f229092c79d129617c9"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/scanner.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5e6cdb5907eba9f2d520f3bac7699e1eb571a1258d6be65ab8ce2a114d830515"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/schema.core.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "91e56c3f3ae6fad1803b739ce4eb4568a782a9aec710f733db2f3e38d407a4d5"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/schema.json.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3a18e4406aa8cdaea2806483e11c50e1a392fd72cf8f54ab7f189b3728836949"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/schema.legacy.c": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4f7ca12361e848214beceaa95ae615048317039ea4736c6eec956e3e8da4694c"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/tree_sitter/alloc.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b29c1c9fb7cc82f58c84b376df1297d6e2737a1d655fd356db0859e3c29c2fea"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/tree_sitter/array.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5bdf6ed1a78e3409fd443e085ca967a64c188a5d082aaf7f819bccd53a471c94"
+    },
+    "Packages/SyntaxKit/Sources/TreeSitterYAMLFixed/src/tree_sitter/parser.h": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "180b893c8734778fd32f372dfbc27bd6ad1cd2221f26150b31256ff6716320d2"
+    },
+    "Packages/SyntaxKit/Tests/SyntaxKitTests/SyntaxContractConsumerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5b98fc0ae5358eda52c20adc600d8a48bee6566924bed6261657bc6a3de9e443"
+    },
+    "Packages/SyntaxKit/Tests/SyntaxKitTests/SyntaxDifferentialTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8657205aaa94cae5a256cb549eec05439f2535ba6dd202aadb41f357c32aa81b"
+    },
+    "Packages/SyntaxKit/Tests/SyntaxKitTests/SyntaxProviderTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "926f87f65a21702b3c25ec74efd35f2d16cd7c0c4c2331a07c464b3c34521749"
+    },
+    "Packages/WorkspaceCore/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "33a099cdb5e4ccdf428d8568b95935e157f3c159fabfe40de1c243010b3e7967"
+    },
+    "Packages/WorkspaceCore/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6e707eff61c122f575d84e1c388796236086746eded040bd41df246cb6a51622"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/Contracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e56ba2961c82d2192994b96ef355813ca13aaec2598e2ff4ae7671a333ce0f8e"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceDisplayNodeID.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "71aa50ac18c37450e0d849b6f5e613d86130297701957abbcd746ee1bf9b9e2c"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceFileKind.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e5babd3665c6d4e72ff0a05ce55c57f4168a73efb35447e18b25ef38bf56ee94"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePathByteKey.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "33f8576bef912d0402b29d2ce6a582e86065c2949cec7a783cc0feb75860f7f7"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspacePureTree.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0c8694dbb23896e04788549da93443291704dcceac7be6d881b2669d43ac69f1"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceRelativePath.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4c99a41c46b09a71d4093e770f3af1f80ac703a035f854b04c3ae7e4b47eacb5"
+    },
+    "Packages/WorkspaceCore/Sources/WorkspaceCore/WorkspaceSnapshotReconcile.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "74824a4d8ac23209704b79e61bdecc93e93100854f81d1c0d9d1bb57e0056110"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/AuditOpaqueIdentityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d24c4a9ea6fe2d8dafbe5715c4b678efffeb78e2d1ef1dcfc775ec18c395c863"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceContractTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "475e01afa578b1192fafd82d4cdad2b3b8a9833ff0ff8bff2476405f39a98870"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspacePathIdentityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "67f764a6cbc20957a58276ff53123be1ad5177539aa8d4f8ed265845a92e91bb"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspacePureTreeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "83455ad57845349e85c416ab38973f9c0efd8bf6305619ff79c34fd890eccdff"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotFixtures.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6d9555ece7c8e33a6cf7cd363e0823ed14a7abce11678a0c2d540675479478e4"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotOpaqueIdentityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c7a1bd4bf84410bd6e92e8a81c90eeaf3015b803f82e80e5596549c06fdca915"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotReconcileTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5a1f9d450c3d58c608f49b8c6cc97773a5f3c8ff3dd7428b62ff8f69209af0bb"
+    },
+    "Packages/WorkspaceCore/Tests/WorkspaceCoreTests/WorkspaceSnapshotRejectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "489e124d44140bae6992052dedf05e6df68c5689b612c4df64c99d890e527174"
+    },
+    "Packages/WorkspaceKit/Package.resolved": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6e3b177e727b76d5e0a2e53af778fa84e318a7b6f3e00a42579baf889b2dc6fc"
+    },
+    "Packages/WorkspaceKit/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ff489943ba40e371b6aafd2f9ccdd0eeedf2c77b74be1fa3b414e0c17adaeded"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/CompletionWorkspaceProvider.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "976002062280ca85ae9618be8360ba0e3595440f6144d046e57a0113917608c9"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+FoundationScaffolding.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "865cd29be6a2f2ebea1faf8a9af2c509c14aa38b38338af4d908c65465251701"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+Hooks.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9cbc58dd95bc76c0cae75dda19f9a444e000c7c3a10a82ac0a9c47a64fdd4871"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+Outcome.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3253f01c4356c7b527bf62737bef209079e5aefc58c9f84d8e9ec619e436bb7"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+Preflight.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9c337874ad1d76a6af42620b0bcac1418a49706ff7c0a71013031d0cbe668331"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+Publication.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7636e580bad062e3f11e464ccd4e9f12becddda74cae14516e1855b74ebe2f3b"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+Staging.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7dcf728884522a8fb3223d5a9ed616e4529a59d9c5779cd01341dbfca68f291e"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter+StagingDirectory.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b9421d3ec591d5352568470e2c713d7febbe14d5e6c9e07c6845245bb9b04e7f"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/ExportArtifactWriter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "56ecd6478bfe243b9bb47e155ac880a06d929c1a77b7d6d3b999d4ea99c2e839"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/LastOpenedFileStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3a27c18fc4d5ec7b132c5864379b1a63aa9844adefcee6892496354ef0ed8ff5"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/MarkdownFileStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2b7f82c89f599ca87f8cf8b4673f3bf176b1b01f916b6e8f77752344826595a2"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/RecentItemStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7fd1304e4549baf2517423d2bc7ac9a5373e9bbd8e4d00bb75c8bce460678484"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/SecurityScopedAccess.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f0526143360b6bbbb533d2cfb37807535057329edc23702cf3916ca172ec3fa9"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+ArtifactCleanup.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ab988d043896eedb719749716b1240a729db6bb57ea0cb971213f0081a38350c"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+Primitives.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7443de6574839f8f528439c7d837b7bd9e2513aadddc0f7bf238b9962f28ca43"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+Rollback.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7715bc8d29dcd3d97d9fe945e0d1454df87c5e30cb1d4a927ee804ef59314f57"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+TargetInspection.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dff9f8b1c04a7e8e4930fd99402bd21749205df89b7ac1423b0cb1e1d0be5687"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+WriteTargets.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "52ca6e1cc844eced1a1cd967a9d79c8232ffc4d60e826075de7844897e4d44b1"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+WriteValidation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dd7221adf3323557361f6f7647590074974f2c8ccbebad176c0893440de6b420"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem+Writing.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "768dcb2c13a73e83d1ea778a811d149f7ecba85ef70cd223dbbf8e33908b4d87"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredFileSystem.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "299918ed9ef8ae82b64d1ffd8913c9b6eb186baa19c6300df37e21532bdc5d5e"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredItemCreation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ba496df3903e06d1032451a6e00024afd385e1a5b09bae80ac7eba992c751811"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredItemMutation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "20579c0b28fb11460f9868b5f55a62d29c8894ef3dddc0c12d61022547d5a5bd"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceAnchoredItemTrash.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6c32de9fc646a5bc1ddf1af12bfe96c4723e46b06b4fa03d02529979beb871fb"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceCoherentFileReader.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "304b2f023ace129f46c2646c0c83b9f507824d35fe901cbc95465ae917ec2d6a"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceCoreAdapter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bdf5e75a5dc7dd089a5ba5eb4bfc20e5685126be72af02df0a5acb07f0a594ba"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceDirectoryCloneSourceSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "85db45508077474987afd5ba207f27f9933672cd6f1a588590cfe397e0986118"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceDirectoryScanner.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2acbd09c049d9fdbfc1053f1eb1d033e2e9af766a980d4e0f5e3e63a5fdaa15b"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceEventWatcher.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "595f263604ba9e4db915cdd22f2b59fea11c765fa34264174e822058ee954aac"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileOperations.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ad9b65646deb0f733c6b269d8b88c4352516918bbb12e70d7e7b5737a2e7aaae"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileSystemRootAuthority.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6a12c5fb5f22275ec9994a4ebcf2b023934974459e3883cee31272785cac4129"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceFileTree.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "63a8057c0a094126619be844978834580e5ab337af9ee9e449c8686a28776f24"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceImageAssetStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8565ff7e848200f3fd745cb32871ab75e5df75cbfe5e29a3dd52a74c1c0f613a"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceImageThumbnailCache.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e4837944d8e7aa83da1575b564e791cc19adb8d793176d4325b9255b8387d00a"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceImageThumbnailDecoder.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "72db214ac0fac0a1a52b029752d7cc3fce5ee0e264048b269d39d35a56bca4c6"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceImageThumbnailModels.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "89f0ff34aa2651b7b57c7956fcc7c76b4701dfc1c57581d474682ad821a06954"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceImageThumbnailProvider.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fce2e9f15ad1798c906d12448190c703547781e4a870498c2d844e0ec5ad7a8f"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceItemCreationTypes.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e9e0c14870e79fea4fb4a1a79b225c8de57a33ceecd0b71223cf11878db8cb03"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceKit.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "72e1c7c49013ca895651b11d0b06f9103d1e63b62c1e7a0c5b8f559b391127c5"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspacePathByteKey.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b6d606931fe5862a80cbacb709a16c1584255791ceb4092bf07729f53e5d3d7e"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceRootContainment.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d6225e4e21135b3dc79f7b1fedfcfcaa1ee599c08349c30171f2b2a29020aa73"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchCandidates.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "52831dd31347046b3468ba3d68edbfa9add071f6460fd4b6fa63857754d610a8"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchContentFingerprint.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d5298f394a56cbec1161a64d9fc9996ae9376f361bf144f6bee1c3c38ab2c700"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchExecution.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "2276b587cee2c70eeabfa94a72f3c999fb147c886f16db78c57eab6a0d73365c"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchFileReading.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6aa27c38213e825fe6cdadb9ab463f67e5749fe60f43d96323333aa441ab6bb1"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchIgnorePolicy.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "84ef0997f411d1410faf1416b3b907179f859459f50fac6cfd74cce8f422a86a"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchModels.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d2437cb87afc0098486fd2c2ca8e667c2ca18426a6b45855d4a41d4ad2cce59c"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchOverlays.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fdf9931e48de956a71fc44bea04176f11391d4cf472da35cec07705aada9619f"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchPipeline.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bb9e60d7590db3af018e5fd13c955fe1bf5193d82e3447cc626f75ebd645e1c9"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchPipelineSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "79cf8772ae6a7f208e922ce0ac94093a9eb64b44c05048fa92978c5338046716"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchReadPipeline.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "146b3e7a705975fe1a2621b8d63a71e34660a2680592776823bbc276bebaabcd"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSearchService.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "df35d8bbc6b33ca597405a878848f26ca56f150630d1267b97b707d63d8bc483"
+    },
+    "Packages/WorkspaceKit/Sources/WorkspaceKit/WorkspaceSessionLRUPolicy.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "db3aebbc5d82399fbeff1781ed2f218cea5b37ec82cc6a29eac06fcffa830443"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/CompletionWorkspaceProviderTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f3cd7d8956f60e3dd71698c703cc494f0cacb91ac5b4372a431d5ab5c3eb80e1"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterCanonicalSpellingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6deb43f3a3675f1ce17ecc0356cd39f72e84f7fb08ca2fc407a4c0937139e3f1"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterContainmentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8f8371388de74d2486c2b8bf71258633e6142a2cf6e751f1437cc5a6d85bc09e"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterCoordinationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4d507612225a7fd315a6089dc7551ec8afd7b58367701be8da38f28e11589f89"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterFaultInjectionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8033b6a47e04a32d063d9f44912837dc0bf747deb2322990896287e2ad1c1ec6"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterFoundationScaffoldingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d7e33825582d3dfb448245aabba38a2a769813cf944f8ad494b019a95718856a"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterPrivateRootTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "901f2ee10c1af54c2fd9ac34e7c93dc6725e15af20b82df0dd6761cd1134bd91"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterPublicationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6351b05155846556740ebf6ce32ca3ac19674237d9cec5a9a970431a6b1b1fec"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterRefusalTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "9f99cf2f577cf53346ff3ad410d52a2d3d27291d628a95f7741838d5add4aa2e"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterStagingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "52c64e8569675e9aa143071242d962f8ab54c656fb18ca1d9cad704350e615ed"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/ExportArtifactWriterTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d65df35fe00f3e1d8ca7e7cb3f587f411fdd523601f69c8f22ca6cefc13f2648"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/PerformanceBudgetAssertion.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a069e22ec45be4d70afd31dc0af2f2a2cab7f9469095e9c8e54be044c541577a"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/RecentItemStoreTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f4673e7ffc1bba7721f6536f4c9ad28ce16058a023b66b234988c561a7dc03cb"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredFileSystemTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "87f68f54b28c0735266c80a1a77bc86439e0b2308528995a64c298ff885ada7a"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredItemCreationTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "91d6e0280c2ac4d8631ccb3bb4ce32dcc703c26437922d602692d261b30b7f0b"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredItemCreationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4d0022ee076a93061d45413430264875751f02f6cbfa2bcb638b73967e2b9d71"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredItemMutationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f8fef154f723b6be8e57c1ded4160b07d92d96c57b30f1900fe7528ef25fd911"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredItemTrashTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c4aab148483d564f5432ec9c364ddc249f5dfcd8e8bba8c6f1cc6bf113f5523c"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceAnchoredWalkSandboxTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1837cc1128f7fe405f1f330a308b6052fb13e00ec12e484a459ab9b730193041"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceCoherentFileReaderTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c863759c4c45bc1881fd71aa5a8b73e3a2184dc2afe2a73fb556746f9cab0482"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceCoreAdapterTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "30a47f8ffad5352adc4cb779f1b9cda258b872473683d62ce76a0ad94a217a07"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceDirectoryScannerTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7c4ec0548ac416ff0e6be56a2f46579288434e70bf04502aee303c72bfcc5480"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileOperationsPathValidationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "84fcdd3ddc80dc33f4dae184108aa482fc981c8c2edb9019f9bf0d1a6d6c1a28"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileOperationsTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "8795686052a6092da61b6568b2ee3043e75efbe45ef49c322798b4bdb1915236"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileTreeTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1e6c9313ffcf5bda885d2699d1b81b9b4b585a8ef93e1655867c45c540dea272"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteBoundaryRaceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0b71d2c4d157fee9db82bdca8b065fa6c5d49f62fecc21c4fac767b699d34143"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteDurabilityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bc6e5f2eabd1d33be86df5e9341ed09ee6b48565f31a248eaefdb6d3a05a1a18"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteExactContentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "524de3167d212ac8faba1b3a869eb122e8e24ae9c60645cc2e2d1d56c69f110f"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteIdentityCleanupTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "818604fd5ca8617536268ad08310ec5669cd8b276e31e975e39905078ab49873"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteModePreservationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4e5acbd99cbf7346cea99dd3ed726d8d16d76725398230bf194dc450407a8e26"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteNamespaceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "53a845e6158c9f35a10cc3e8c47c10971e2e45dfaba708fd5b1e423c4541c37d"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWritePostflightTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "bc9a6b4e5c35640cf100a5c465c7a52f4cdaeb233692a787c2f79b4d6c3d53ee"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3265f270dc607524aaff02d8342c8da3b72e1b4411192648aabcd61838d26c95"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceFileWriteTransactionTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "01a6a7bb00c14792cfd3795e1d04ae032ee018d9caa38972f93c2623d1ede151"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceImageAssetStoreTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b62f540c2bf708a0f6f99a46b13ab3caf9723a2fc38ee220daa615d4f569998f"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceImageThumbnailProviderTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "08e40069d8c781a5e07ac629d58bad298eadaaa653446389dec34b2e5a4e8cbc"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceKitTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "94c6345910c06169337077cf805157878065a2ec53d56bd12ecb586f7a6fc423"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceLiteralSpellingTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3183efb4a92bf5bd292b26cfbcd866a7edec16ca38aed9e4564bd60c40d0c150"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceNamespaceAuthorityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c9172f66e29b50f20ba504253484c1bf6d4c1e6fb39c28fe2236b9a0e419dd58"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceRootAuthorityCaptureTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6fd1af8af73057c11a92a4b4555a40fb44f2a7662cef29dbde8843ac48f69097"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchAnchoredRaceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "48c0d504d070cb92e43c6a40242ee28d58b0a56fcb31755d4d1f00f5d30cd7d6"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchFileAuthorityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "912a33664c29cb2f1ac01f9d68d273ee356adb621ba754cbb4540b347816e95d"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchFingerprintAndOverlayTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b7f6c266707c3d7e7d68e3cca32ca27cb0ceaac22b6884f50b85449622ba204e"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchHardeningTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cf1173a3a11e68954cbc6661395637e9dc79ec417be7c081c4d103c244346cd3"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchIgnoreAndContainmentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "25ec5d72152bd336ab4149aab86a796a2ae184fa2026fa64eee421ab1e4c2cae"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchOffMainActorTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f13e014ddf6effe4b71c719d841e72b500a5c6ba152f85015193385a050ef27a"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchResourceContractTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c48d5efbce26105c28cd59d1c82d71c252243cb72a94a5869d748ef97521a4c2"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchResourceTestSupport.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "614d3708918d9fa2c97ecc1fd75a1182884348ca26518b33a0990141d49fc0bf"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchRootAuthorityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0109791062deee2062e36e75434c57fd83073974698e96efc9255497e5ab250e"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchServiceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "b7514c6bc36cee808e44a5ece86a4131c61cff428147294e9b8a1c5617d400ef"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSearchSymlinkEligibilityTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "427181da45d241a03539551ee3f8092b63563caae409d8683a7dbdcf3e6a6a5d"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSessionLRUPolicyTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7342b54911c44cb72bdedc0f5c8f9c4127b8bb25e346efa47093204335d4422c"
+    },
+    "Packages/WorkspaceKit/Tests/WorkspaceKitTests/WorkspaceSessionRelocationTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c1812ca5aefae9cef212a2dc4e549c7b50484ad99608d28bc05b6cc0aa3cedd1"
+    },
+    "Packages/WorkspaceKitIOS/Package.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0d338cdb207cc8d36b7c7bf4f00308269af635632ba742d127110c60651a1e4c"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Access/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Contracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "eec068b9deaf94912de7af2654b54f11650d0e2c8d76e8b7f9e2d3a43269eb14"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/DocumentContracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "beb9d47293b3aeb029de4fa9716d7d8b8af18f2971eec9495354936185c0c06b"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentEntry.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "59341a69f9c392c0727166280f313541ef3233b0bd0d3d324ff23ba69b934699"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentFilePort.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1162337bb27090e746e73402f8412546570300c9208c7ea8fa1f86958970c3c0"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentLifecycle.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a9fd7e6e3a68e65938974f72b13a9828c222ca66a96c9df0cfbfefe627134d81"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentLocationGuard.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a0d449caa9dfa397d8e38fa6fe6533d40369d071ab07b77463154c73d82e1551"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentResourceKey.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4e4c406299d11f3dcfc692b3196c4527b0e660cb12b4fec7c5ef873ad75bfbe9"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentStoreObservation.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0537cd2a8fb01aec330de5dba78f396b03b1865b6ee8e603799d263494c5f7d5"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentTextCodec.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "97b6dae1a56eb63da33b590efd3f4f331d615be87f0800c707e1c9395036b0a6"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentTiming.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "627f99be75e856bd74e95fdeac1e9968a56310a1cb8bc54f97debda94579ae29"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentWriteBarrier.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "0ea35ee96c566aa5460fb0c55cce9c8a3d3b39b65d108c685713e7756f8dfffc"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSDocumentWriteQueue.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "aa9f351f3c0eeaa1f66e73e5616747c095ab44c297ab60b3efb707a158d53ca4"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSUIDocumentStore+External.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "cec8c2c4aa04a0a11f66d78a1c99ea6761b2687218c4cb5fd3929158afd84cf9"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSUIDocumentStore+Recovery.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "eade546b70883db5e54fdf6251232d1accd0a676f4f53fc80909f732d0d7caab"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSUIDocumentStore+Save.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e1ba09e2c8192aed42e2a561930223c987eee4efb0ca116894503627489b4dc7"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/IOSUIDocumentStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1a8fbb20780f157e0b1526329610c74e94de568cd1778b9613799eb687a9c92f"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/MarkdownUIDocument.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "07c15b6004e03a2d3806d6572cb322f25e17e4a8ce90ebf32d98ed2d81587805"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Documents/UIDocumentFileAdapter.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "438a43348b5b62e4d02358f50fd4cf59de35af38d0e1a20cae37fd5cb5f8281c"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/ImageContracts.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "259d40b8b25c997db2d0f44c34ef2c16517132dfbadd123178349070c53a2748"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/IOSDocumentRecoveryStore.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "dd60ac73d633d25983faf41b52c71e5395e022810036ea3229016da7e24580e1"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/IOSDurableFile.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "eb64edfaa4db66e6fac63a5af542e35bbf959ddea56f70a88a2fea24408462ef"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Recovery/IOSRecoveryRecord.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "86971232977481e90bb265d9f6a2745144c5f9b76e0f7533fe73f173602a2cbd"
+    },
+    "Packages/WorkspaceKitIOS/Sources/WorkspaceKitIOS/Workspace/.gitkeep": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Contracts/DocumentStateContractTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "64a4df69d3a95216e6c17040f43f45253232132816f4f294797951dcaa515116"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSAuditCounterexampleTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4d3ab816c36384039d5bc18020a889483db2e9ef0a7368625575eaee2b2a727a"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentAutosaveRecoveryTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f8fe7b20503a12d68d620de240ee34f141ad08a527a5b97997b7edbc737ba20d"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "c805a6b9ea7bbdd05b5cfdb5402bcf868edaea8e94071ce164ce49558a507535"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "3cae2c2268ffdd97a60841931ad9dd9bc718e9a6fa5b1b967c57e66182595d30"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentObservationBarrierTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "af7bcc3e44d1047ee64e0925048cbd46d124e1c9f0d579ce85d1a891d44ab835"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "7c27c3d3fa9eed5e292ac7acc3435d7aecb2ef1fc761321a639ab88cdedda003"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "590659ce991757df218bdd6d4ef355378e3d1ca1f75bb5b6b1754acfabe808f2"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/MarkdownUIDocumentTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "1e76d9bbc251129c4bdb5acfe25f01a6b633e99f6b2e302f32832ac47c0bd61d"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/Support/DocumentIOHarness.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "4ab3e7f1d0a2177941e0e038d11f36bb158ad973a7f15c6ab3a42fc76633b04e"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/Support/DocumentIOWait.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "22e3a10eac98c733af59a0c394e8f3feddeb086ea1adf2dcc9793f78a24d8f8b"
+    },
+    "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Recovery/IOSDocumentRecoveryTests.swift": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "51d4a2bfc5e494ed1bc6e0ab4e68ee27af8cac84734f286e1e2ae489acb57eac"
+    },
+    "Scripts/ios/c0.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "e8f86866f1d33fbd2b4c7df5dae147784f99a25889e326bd783ad6be2b07aa75"
+    },
+    "Scripts/ios/ios-common.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "c4cb10e0057a224cafda4cb70c028cda3199437f19049efde2dfe3e87ae4dd26"
+    },
+    "Scripts/ios/ios-packaging.py": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "6e84f3e9344562301aaed8aabe7738800526a8c85db912a9daf37fe986a7fd5e"
+    },
+    "Scripts/ios/ios-preflight.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "553a53bd9c3ad994ddf140e3f34141f05210cf51262cd66bde23f3dfe4afa0c2"
+    },
+    "Scripts/ios/ios-print-simulator-udid.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "4faff4ff43829de64ae5854818ab0b11f964f23dcfb43f8c380de7e1d5c4864c"
+    },
+    "Scripts/ios/ios-provenance.py": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "a29377dbf4f70691d3c88258abe4ecccfce384dd3aafbe3e3cfcc7f29b637752"
+    },
+    "Scripts/ios/ios-resource-preflight.py": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "928829d89e3edabff4c612f1047de1e3b781f2ad1bef77ff5033684b869c387c"
+    },
+    "Scripts/ios/ios-test-results.py": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "ca77503ebf6e3845d68b3ad12df76c0b594d1dbe9aae2a11a8f26faacb18f54a"
+    },
+    "Scripts/ios/required-app-resources.txt": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "d5e0966503079cc4fc19d113b0b0f9fabd43a73cb73f57b12d48c11f565c5afc"
+    },
+    "Scripts/ios/required-named-tests.txt": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "5965fd08bc71d72b2a6b0396e82b1eadb9e3f6185199e2eb905505521f8196ac"
+    },
+    "Scripts/ios/required-test-resources.txt": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "15c4a01bfeec259c53be2771c842384745caf33905ac929e85e233b0902e6113"
+    },
+    "Scripts/ios/run-ios-archive.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "68a189c2a84d1d2a585c04efa2408feea042efb237a5464c32cbd60e90e92240"
+    },
+    "Scripts/ios/run-ios-build.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "5927855f700ad9998cba90fdd3364f619ce9ae0f441791ee5b4c067179047feb"
+    },
+    "Scripts/ios/run-ios-ipa.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "d666d41e9e4b41e01a52d5ee6d66a53e4c1ded359eaca525ea6b137c8296fc98"
+    },
+    "Scripts/ios/run-ios-tests.sh": {
+      "kind": "file",
+      "mode": 493,
+      "sha256": "81f290682d59e2d44ecfd91e43e116216a09823e8bb2c6f33f5b00eef226d310"
+    },
+    "Scripts/ios/tests/test_runner_evidence.py": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "fc957aff20d49411e1e26c51ec994b3c452e3c8302cd6b0ddc1bd531842268dd"
+    },
+    "project.yml": {
+      "kind": "file",
+      "mode": 420,
+      "sha256": "f72bdc3bc08d9751be39821e2f7b03429fa303eb21fac573c26467be9d4e43b0"
+    }
+  },
+  "schema": "IOS-SOURCE-v1",
+  "source_dirty": false,
+  "source_fingerprint": "4e4722626b41776e9f96fdc8f2256a25311652e752d69cb91569e1fd7e4839bf",
+  "source_sha": "c1c250a2b5c3e518108356b0c598064d4d1b0bb4"
+}

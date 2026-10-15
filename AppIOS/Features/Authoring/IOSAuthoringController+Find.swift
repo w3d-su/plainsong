@@ -34,7 +34,14 @@ extension IOSAuthoringController {
         find.queryGeneration &+= 1
         find.pendingSteps = 0
         find.session = nil
-        guard let snapshot = editor.captureSnapshot() else { return }
+        find.context = nil
+        findScheduler.cancel()
+        guard let snapshot = editor.captureSnapshot() else {
+            find.status = .empty
+            find.counterText = ""
+            find.message = ""
+            return
+        }
         find.editorSelection = snapshot.selection
         find.hasEditorSelection = true
         switch IOSFindQuery.classify(find.queryText) {
@@ -53,6 +60,7 @@ extension IOSAuthoringController {
             let text = snapshot.document.text
             let query = makeQuery()
             let caret = max(0, snapshot.selection.location)
+            find.context = IOSAuthoringFindContext(snapshot: snapshot)
             find.status = .searching
             find.message = ""
             findScheduler.schedule(operation: {
@@ -70,7 +78,16 @@ extension IOSAuthoringController {
     }
 
     func stepFind(by steps: Int, using editor: any IOSSourceEditorControlling) {
-        guard steps != 0, let snapshot = editor.captureSnapshot(), !snapshot.hasMarkedText else { return }
+        guard steps != 0, let snapshot = editor.captureSnapshot(), snapshot.isFocused,
+              !snapshot.hasMarkedText
+        else { return }
+        guard find.context?.matches(snapshot) == true else {
+            beginFindQuery(using: editor)
+            if find.status == .searching {
+                find.pendingSteps = steps
+            }
+            return
+        }
         if find.status == .searching {
             find.pendingSteps += steps
             return
@@ -103,6 +120,12 @@ extension IOSAuthoringController {
         guard let snapshot = editor.captureSnapshot() else { return }
         if snapshot.hasMarkedText {
             statusMessage = IOSAuthoringCatalog.compositionRefusal
+            return
+        }
+        guard snapshot.isFocused else { return }
+        guard find.context?.matches(snapshot) == true else {
+            beginFindQuery(using: editor)
+            statusMessage = "The document changed. Find results are being refreshed."
             return
         }
         guard find.status != .searching,
@@ -166,9 +189,12 @@ extension IOSAuthoringController {
         guard generation == find.queryGeneration else { return }
         guard let live = editor.captureSnapshot(),
               live.bindingID == bindingID,
-              live.revision == revision
+              live.revision == revision,
+              find.context?.matches(live) == true
         else {
             find.pendingSteps = 0
+            find.session = nil
+            find.context = nil
             if find.status == .searching {
                 find.status = .empty
                 find.counterText = ""
@@ -182,6 +208,7 @@ extension IOSAuthoringController {
             resolved = resolved.stepped(by: steps)
             find.pendingSteps = 0
         }
+        find.context = IOSAuthoringFindContext(snapshot: live)
         find.session = resolved
         publishFind(resolved)
         if steps != 0 {
@@ -194,6 +221,7 @@ extension IOSAuthoringController {
         snapshot: IOSSourceEditorSnapshot,
         using editor: any IOSSourceEditorControlling
     ) {
+        find.context = IOSAuthoringFindContext(snapshot: snapshot)
         find.session = continuation.session
         publishFind(continuation.session)
         if continuation.session.currentOrdinal != nil {

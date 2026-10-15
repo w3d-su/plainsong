@@ -1,0 +1,174 @@
+[
+  {
+    "selector": "DocumentStateContractTests/testConflictUnavailableAndClosedStatesFenceWritingAndRetainGeneration",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Contracts/DocumentStateContractTests.swift"
+  },
+  {
+    "selector": "IOSAuditCounterexampleTests/testPendingExternalReadMustFenceOriginalFileWrites",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSAuditCounterexampleTests.swift"
+  },
+  {
+    "selector": "IOSAuditCounterexampleTests/testEditWhilePortCloseIsSuspendedMustRetainDraft",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSAuditCounterexampleTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testExternalReadDroppedAfterGenerationSessionOrEditChanges",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testStaleExternalReadCannotUpdateAReplacementRoot",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testCleanExternalReloadStaysAProposalUntilAcknowledged",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testDeferredReloadDoesNotChangeBaseline",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testDirtyConflictFencesWritesAndAutosaveDoesNotTouchTheOriginal",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testConflictEventRequiresDurableRecovery",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testOwnSavedBytesAreNotAnExternalConflict",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testResolveReloadRereadsAndKeepsRecovery",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentExternalTests/testSaveCopyRefusesExistingDestinationAndLeavesOriginal",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentExternalTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testOpeningFailurePublishesNoSnapshot",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testFailedAndIndeterminateSavesKeepDraftAndOriginal",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testReadOnlyOfflineRemovedRevokeAndCloseKeepTheDraft",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testCreateRefusesExistingDestination",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testCloseWaitsForTheBlockedSave",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testBackgroundDeadlinePersistsRecoveryWithoutClaimingSave",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentFailureTests/testScopeRevokeRejectsTheNextSave",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentFailureTests.swift"
+  },
+  {
+    "selector": "IOSDocumentObservationBarrierTests/testOwnNoticeDrainsInFlightAndRejectsQueuedWritesBeforeRestoringAutosave",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentObservationBarrierTests.swift"
+  },
+  {
+    "selector": "IOSDocumentObservationBarrierTests/testExternalReadFailureKeepsOriginalFencedAndPersistsDirtyDraft",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentObservationBarrierTests.swift"
+  },
+  {
+    "selector": "IOSDocumentObservationBarrierTests/testDeferredReloadContinuesBlockingTheOriginalAndRefusalRecoversNewEdit",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentObservationBarrierTests.swift"
+  },
+  {
+    "selector": "IOSDocumentObservationBarrierTests/testCleanNewerRevisionRestartsExternalObservationInsteadOfStayingFenced",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentObservationBarrierTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testGenerationReplacementDrainsWriterAndRecoversEditsDuringPortClose",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testRetirementDoesNotAdmitNewExternalReadsDuringProviderClose",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testRecoveryFailureRefusesReplacementAndRetainsTheOldLeaseAndSource",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testOlderGenerationCannotRetireTheCurrentResource",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testCloseSaveKeepsWriteAdmissionBlockedUntilTheProviderFinishes",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRetirementTests/testConcurrentCloseRequestsShareOneProviderClose",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentRetirementTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testBlockedSaveThenNewerEditKeepsLiveSourceDirtyUntilSecondSave",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testStaleSaveCompletionCannotRewriteNewerSource",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testSerializedWriterNeverOverlapsProviderSaves",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testAliasedOpensShareOneSessionAndOneWriter",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testUnscopedUnicodeSpellingsDoNotShareAWriter",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testStaleGenerationSaveCannotReviseTheReplacement",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "IOSDocumentStoreRaceTests/testCancelledSaveKeepsTheDraftAndRetryCanFinish",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/IOSDocumentStoreRaceTests.swift"
+  },
+  {
+    "selector": "MarkdownUIDocumentTests/testContentsForTypeReturnsTheInstalledSnapshotOnly",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/MarkdownUIDocumentTests.swift"
+  },
+  {
+    "selector": "MarkdownUIDocumentTests/testLoadRejectsBytesThatDoNotRoundTrip",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/MarkdownUIDocumentTests.swift"
+  },
+  {
+    "selector": "MarkdownUIDocumentTests/testCreateDoesNotOverwriteExistingBytes",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/MarkdownUIDocumentTests.swift"
+  },
+  {
+    "selector": "MarkdownUIDocumentTests/testRoundTripPreservesUTF8",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Documents/MarkdownUIDocumentTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRecoveryTests/testRecoverySurvivesStoreRecreationAndRejectsEarlyDiscard",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Recovery/IOSDocumentRecoveryTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRecoveryTests/testCorruptRecoveryDoesNotDropSiblingOrLiveSource",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Recovery/IOSDocumentRecoveryTests.swift"
+  },
+  {
+    "selector": "IOSDocumentRecoveryTests/testDiskFullPersistThrowsAndLeavesNoReceiptFile",
+    "path": "Packages/WorkspaceKitIOS/Tests/WorkspaceKitIOSTests/Recovery/IOSDocumentRecoveryTests.swift"
+  }
+]

@@ -93,15 +93,20 @@ final class EditorReplaceLayeringTests: XCTestCase {
                 #".package(path: "../MarkdownCore")"#,
                 #".package(path: "../SyntaxKit")"#,
                 #".package(url: "https://github.com/krzyzanowskim/STTextView.git", exact: "2.3.10")"#,
-                #".package(url: "https://github.com/tree-sitter/swift-tree-sitter.git", exact: "0.10.0")"#,
-                #".package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git", exact: "0.5.3")"#,
             ],
             "MarkdownCore": [
                 #".package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2")"#,
             ],
             "PreviewKit": [#".package(path: "../MarkdownCore")"#],
-            "WorkspaceKit": [#".package(path: "../MarkdownCore")"#],
-            "SyntaxKit": [#".package(path: "../MarkdownCore")"#],
+            "WorkspaceKit": [
+                #".package(path: "../MarkdownCore")"#,
+                #".package(path: "../WorkspaceCore")"#,
+            ],
+            "SyntaxKit": [
+                #".package(path: "../MarkdownCore")"#,
+                #".package(url: "https://github.com/tree-sitter/swift-tree-sitter.git", exact: "0.10.0")"#,
+                #".package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown.git", exact: "0.5.3")"#,
+            ],
             "WorkspaceCore": [#".package(path: "../MarkdownCore")"#],
             "EditorKitIOS": [#".package(path: "../MarkdownCore")"#, #".package(path: "../SyntaxKit")"#],
             "WorkspaceKitIOS": [

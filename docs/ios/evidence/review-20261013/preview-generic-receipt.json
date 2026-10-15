@@ -1,0 +1,33 @@
+{
+  "source_head": "689424d814c2ba545804c7909afea65bc0a76652",
+  "command": [
+    "/usr/bin/lockf",
+    "-k",
+    "-t",
+    "45",
+    "/private/tmp/plainsong-xcodebuild-test.lock",
+    "xcodebuild",
+    "build-for-testing",
+    "-scheme",
+    "PreviewKit",
+    "-destination",
+    "generic/platform=iOS Simulator",
+    "-sdk",
+    "iphonesimulator",
+    "-derivedDataPath",
+    "/private/tmp/plainsong-ios-review-preview-compile-20261013/DerivedData",
+    "-resultBundlePath",
+    "/private/tmp/plainsong-ios-review-preview-compile-20261013/Build.xcresult",
+    "-parallel-testing-enabled",
+    "NO",
+    "CODE_SIGNING_ALLOWED=NO",
+    "CODE_SIGNING_REQUIRED=NO"
+  ],
+  "cwd": "/Users/davis._.su/.codex/worktrees/ios-review-integration/blogeditor/Packages/PreviewKit",
+  "exit_code": 0,
+  "timed_out": false,
+  "started_epoch": 1791873778.197029,
+  "finished_epoch": 1791873812.042381,
+  "executed": 0,
+  "scope": "generic iOS compile only; no runtime acceptance"
+}

@@ -1,0 +1,4 @@
+    -test-timeouts-enabled YES|NO                            enable or disable test timeout behavior
+    -default-test-execution-time-allowance SECONDS           the default execution time an individual test is given to execute, if test timeouts are enabled
+    -maximum-test-execution-time-allowance SECONDS           the maximum execution time an individual test is given to execute, regardless of the test's preferred allowance
+    -collect-test-diagnostics on-failure|never               Whether or not testing collects verbose diagnostics (like a sysdiagnose) when encountering a failure

@@ -119,3 +119,7 @@ test-portable-core:
 		echo "==> portable swift test: $$pkg"; \
 		(cd Packages/$$pkg && swift test); \
 	done
+
+.PHONY: test-ios-tooling
+test-ios-tooling:
+	PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s Scripts/ios/tests -p 'test_*.py' -v

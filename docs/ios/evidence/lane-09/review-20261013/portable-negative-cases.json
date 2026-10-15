@@ -1,0 +1,44 @@
+{
+  "by_class": {
+    "IOSAcceptedFindProtectionTests": 2,
+    "IOSImageRasterValidationTests": 2,
+    "IOSImageTaskCancellationTests": 2
+  },
+  "cases": [
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testPendingFindDeliveryCannotBlessChangedSourceAtSameRevision",
+      "status": "failed"
+    },
+    {
+      "class": "IOSAcceptedFindProtectionTests",
+      "name": "testPendingFindDeliveryUsesRawUnicodeSourceRatherThanCanonicalEquality",
+      "status": "failed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testSignatureOnlyRastersNeverReachPersistence",
+      "status": "failed"
+    },
+    {
+      "class": "IOSImageRasterValidationTests",
+      "name": "testTruncatedRealRastersNeverReachPersistence",
+      "status": "failed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancelDuringStageDrainsOneOwnedRollback",
+      "status": "failed"
+    },
+    {
+      "class": "IOSImageTaskCancellationTests",
+      "name": "testTaskCancellationInsideAcceptedApplyStillCommitsOnce",
+      "status": "passed"
+    }
+  ],
+  "statuses": {
+    "failed": 5,
+    "passed": 1
+  },
+  "total": 6
+}

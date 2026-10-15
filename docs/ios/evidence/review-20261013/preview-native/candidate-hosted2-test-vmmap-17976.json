@@ -1,0 +1,26 @@
+{
+  "pid": 17976,
+  "proof": {
+    "destination": "A24A1CB9-2861-4AA4-A79F-E53F768950D8",
+    "identity": [
+      17976,
+      501,
+      "Tue Oct 13 16:34:54 2026",
+      "/Applications/Xc"
+    ],
+    "image_sha256": "a1d0b36bedc33cceee5a8846e33e978939bcf6b61dcf184cfa9ca3b651c96fe9",
+    "loaded_test_image": "/private/tmp/plainsong-preview-ios-native-fixture-candidate-20261013/runs/20261013-163426/DerivedData/Build/Products/Debug-iphonesimulator/PreviewKitTests.xctest/PreviewKitTests",
+    "ownership": "new native process with exact loaded test image on the designated device or unique task derived-data root"
+  },
+  "result": {
+    "command": [
+      "/usr/bin/vmmap",
+      "-summary",
+      "17976"
+    ],
+    "exit": 124,
+    "stderr": "utility timeout",
+    "stdout": ""
+  },
+  "scope": "Bounded observed physical-footprint summary; not peak allocation attribution"
+}

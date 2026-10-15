@@ -1,0 +1,14 @@
+{
+  "command": "PATH=/private/tmp/plainsong-swiftformat-0.62.1:$PATH make lint",
+  "head_before_docs_seal": "bc0fa51fb9f7999faf82c14c653a6f79e4922266",
+  "last_code_head": "3570d31",
+  "exit_code": 0,
+  "swiftformat_version": "0.62.1",
+  "swiftlint_files": 617,
+  "swiftlint_warnings": 367,
+  "swiftlint_serious": 0,
+  "fixture_sha256": "332662043130266384c3005a76e2fdc2457c81b6cee258ad10a94d94cdb107e2",
+  "raw_sha256": "b4e6a924a3ce684116ad43527e9c35738e4264de76ecec73277482ed958d72b5",
+  "gzip_sha256": "93d0576082fe8314a05f20f283b62e865c9e74c1495824405d5a08619ff0d254",
+  "scope": "final source lint after native fixture correction; native realbundle remains failed"
+}

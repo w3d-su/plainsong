@@ -141,10 +141,12 @@ final class IOSShellChromeTests: XCTestCase {
                 editor: nil, documents: nil, workspace: nil, preview: nil, assets: nil
             )
         )
-        let scene = IOSShellSceneState(facade: facade)
+        let scene = IOSShellSceneState(
+            facade: facade, surfaces: IOSShellFeatureSurfaces(currentGrant: { ShellFixtures.grant() })
+        )
         scene.startObserving()
 
-        // Nothing selected → parent of first top-level entry → workspace root.
+        // Nothing selected uses the explicit directory grant's root.
         XCTAssertEqual(scene.newFileTarget?.relativePath, "")
 
         scene.selectedEntryID = directory.id

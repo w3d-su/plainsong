@@ -11,7 +11,6 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source Scripts/ios/ios-common.sh
 ios_lock_or_exec "$0" "$@"
-if [ "${1:-}" = "--locked" ]; then shift; fi
 
 output_root="${1:-${IOS_OUTPUT_ROOT:-/private/tmp/plainsong-ios-release}}"
 
@@ -33,6 +32,8 @@ stamp="$(date +%Y%m%d-%H%M%S)-$$"
 derived_data="$output_root/dd/$head12-build-$stamp"
 evidence="$output_root/evidence/$head12-build-$stamp"
 mkdir -p "$derived_data" "$evidence"
+Scripts/ios/ios-preflight.sh --write-evidence "$evidence"
+/usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
 
 echo "ios-build: destination=$destination"
 start_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -55,6 +56,10 @@ if [ -n "$app" ]; then
     vtool -show-build "$app/PlainsongIOS" > "$evidence/macho-platform.txt" 2>&1 || true
     lipo -info "$app/PlainsongIOS" > "$evidence/archs.txt" 2>&1 || true
     ios_signing_state "$app" > "$evidence/signing-state.txt"
+fi
+
+if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-source "$evidence/source.json"; then
+    [ "$result" != 0 ] || result=65
 fi
 
 ios_metadata "$evidence/build.json" \

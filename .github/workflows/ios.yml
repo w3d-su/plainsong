@@ -63,6 +63,9 @@ jobs:
             echo "No iOS >= 26 simulator on this runner; ios-test will report it" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Validate iOS tooling negative fixtures
+        run: make test-ios-tooling
+
       - name: Simulator build
         run: make ios-build
 
@@ -84,8 +87,7 @@ jobs:
             ${{ env.IOS_OUTPUT_ROOT }}/evidence/
             ${{ env.IOS_OUTPUT_ROOT }}/*.ipa
             ${{ env.IOS_OUTPUT_ROOT }}/*.ipa.sha256
-            ${{ env.IOS_OUTPUT_ROOT }}/*-meta/
-            ${{ env.IOS_OUTPUT_ROOT }}/*.xcarchive-meta/
+            ${{ env.IOS_OUTPUT_ROOT }}/archive-attempt-*/*.xcarchive-meta/
             ${{ runner.temp }}/toolchain.txt
           retention-days: 14
           if-no-files-found: warn

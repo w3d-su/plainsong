@@ -13,7 +13,6 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source Scripts/ios/ios-common.sh
 ios_lock_or_exec "$0" "$@"
-if [ "${1:-}" = "--locked" ]; then shift; fi
 
 output_root="${1:-${IOS_OUTPUT_ROOT:-/private/tmp/plainsong-ios-release}}"
 manifest="${IOS_RESOURCE_MANIFEST:-Scripts/ios/required-test-resources.txt}"
@@ -35,6 +34,8 @@ stamp="$(date +%Y%m%d-%H%M%S)-$$"
 derived_data="$output_root/dd/$head12-test-$stamp"
 evidence="$output_root/evidence/$head12-test-$stamp"
 mkdir -p "$derived_data" "$evidence"
+Scripts/ios/ios-preflight.sh --need-simulator --write-evidence "$evidence"
+/usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
 
 echo "ios-test: destination=$destination"
 set +e
@@ -62,34 +63,34 @@ set +e
 xcodebuild -project Plainsong.xcodeproj -scheme PlainsongIOS -configuration Debug \
     -sdk iphonesimulator -destination "$destination" -derivedDataPath "$derived_data" \
     -parallel-testing-enabled NO -resultBundlePath "$evidence/Results.xcresult" \
+    -collect-test-diagnostics on-failure -test-timeouts-enabled YES \
+    -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180 \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
     test-without-building > "$evidence/test.log" 2>&1
 result=$?
 set -e
 tail -10 "$evidence/test.log" >&2 || true
 
-# Named tests actually executed; an empty file is itself evidence of zero tests.
+# Keep extraction failure and complete case statuses; a zero-test or all-skip
+# action cannot become PASS simply because xcodebuild returned zero.
 set +e
 xcrun xcresulttool get test-results tests --path "$evidence/Results.xcresult" --format json \
-    2>"$evidence/xcresulttool.err" | /usr/bin/python3 -c '
-import json, sys
-try:
-    doc = json.load(sys.stdin)
-except Exception:
-    sys.exit(0)
-def walk(node):
-    if isinstance(node, dict):
-        name = node.get("testName") or node.get("name")
-        if "testStatus" in node or node.get("nodeType") == "Test Case":
-            print(name or "?")
-        for v in node.values():
-            walk(v)
-    elif isinstance(node, list):
-        for v in node:
-            walk(v)
-walk(doc)
-' | sort -u > "$evidence/named-tests.txt"
+    > "$evidence/test-results.json" 2> "$evidence/xcresulttool.err"
+extraction_result=$?
 set -e
+if [ "$extraction_result" != 0 ]; then
+    [ "$result" != 0 ] || result=65
+else
+    if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "$evidence/test-results.json" \
+        --required Scripts/ios/required-named-tests.txt \
+        --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt"; then
+        [ "$result" != 0 ] || result=65
+    fi
+fi
+if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-source "$evidence/source.json"; then
+    [ "$result" != 0 ] || result=65
+fi
+[ -f "$evidence/named-tests.txt" ] || : > "$evidence/named-tests.txt"
 
 ios_metadata "$evidence/test.json" \
     command="\"make ios-test\"" \
@@ -98,6 +99,9 @@ ios_metadata "$evidence/test.json" \
     contract_version="\"$IOS_CONTRACT_VERSION\"" \
     ios_base_sha="\"$(git rev-parse ios-c0-v1 2>/dev/null || echo unknown)\"" \
     scheme="\"PlainsongIOS\"" configuration="\"Debug\"" destination="\"$destination\"" \
+    source_fingerprint="\"$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["source_fingerprint"])' "$evidence/source.json")\"" \
+    collect_test_diagnostics="\"on-failure\"" test_timeouts_enabled=true \
+    default_test_execution_time_allowance=120 maximum_test_execution_time_allowance=180 \
     manifest="\"$manifest\"" named_tests="$(wc -l < "$evidence/named-tests.txt" | tr -d ' ')" \
     exit_code="$result"
 

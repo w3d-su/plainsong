@@ -134,6 +134,10 @@ struct ExportArtifactWriterHooks: Sendable {
     /// Supplies the coordinator for a ubiquitous destination, so a test can cancel a real one.
     let fileCoordinator: (@Sendable () -> NSFileCoordinator)?
     let observer: (@Sendable (ExportArtifactWriterCall) -> Void)?
+    /// Observes the unmodified bytes from the successful real `F_GETPATH`, before any test override.
+    let kernelPathObserver: (@Sendable (String, [UInt8]) -> Void)?
+    /// Controls only the spelling comparison in tests; production keeps the real returned bytes.
+    let kernelPathOverrideForTesting: (@Sendable (String, [UInt8]) -> [UInt8])?
     let beforeStep: (@Sendable (ExportArtifactWriterStep) -> Void)?
     let injectedFailure: (@Sendable (ExportArtifactWriterStep) -> Int32?)?
     let afterPreflight: (@Sendable () -> Void)?
@@ -145,6 +149,8 @@ struct ExportArtifactWriterHooks: Sendable {
         isUbiquitous: (@Sendable (URL) -> Bool)? = nil,
         fileCoordinator: (@Sendable () -> NSFileCoordinator)? = nil,
         observer: (@Sendable (ExportArtifactWriterCall) -> Void)? = nil,
+        kernelPathObserver: (@Sendable (String, [UInt8]) -> Void)? = nil,
+        kernelPathOverrideForTesting: (@Sendable (String, [UInt8]) -> [UInt8])? = nil,
         beforeStep: (@Sendable (ExportArtifactWriterStep) -> Void)? = nil,
         injectedFailure: (@Sendable (ExportArtifactWriterStep) -> Int32?)? = nil,
         afterPreflight: (@Sendable () -> Void)? = nil,
@@ -155,6 +161,8 @@ struct ExportArtifactWriterHooks: Sendable {
         self.isUbiquitous = isUbiquitous
         self.fileCoordinator = fileCoordinator
         self.observer = observer
+        self.kernelPathObserver = kernelPathObserver
+        self.kernelPathOverrideForTesting = kernelPathOverrideForTesting
         self.beforeStep = beforeStep
         self.injectedFailure = injectedFailure
         self.afterPreflight = afterPreflight

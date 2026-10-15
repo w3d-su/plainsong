@@ -188,6 +188,13 @@ final class RecordingFindScheduler: IOSAuthoringFindScheduling {
         retained = Pending(operation: operation, deliver: deliver)
     }
 
+    func cancel() {
+        if let retained {
+            discarded.append(retained)
+        }
+        retained = nil
+    }
+
     func finishLatest() {
         guard let retained else { return }
         self.retained = nil

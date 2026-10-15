@@ -1,0 +1,15 @@
+{
+  "verified_before_documentation_commit": true,
+  "source_sha": "3d4f671545eb41190b1b8e7262bcd27349aad36e",
+  "ipa_sha256": "138096c65c31faa674864cf6f093119d3dbc055cb26df0e86797730c238becdd",
+  "bytes": 2516957,
+  "minimum_os": "26.0",
+  "zip_members": 71,
+  "zip_crc": "PASS",
+  "archive_source_device_revalidation": "PASS",
+  "installation": "OPEN",
+  "product_composition": "UNAVAILABLE",
+  "hosted_shell_required_cases": "PENDING_ROOT_AGGREGATE",
+  "exact_head_ci": "NOT_RUN",
+  "source_dirty_at_build": false
+}
