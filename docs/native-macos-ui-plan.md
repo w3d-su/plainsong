@@ -109,8 +109,12 @@ dropped (Save As convention).
 
 Keyboard/AX selection in the native Files List opens the file without requesting editor
 focus; mouse selections can focus the editor. The event kind is read synchronously inside
-the List's selection update; the activation itself is deferred one main-actor turn so it
-does not publish inside that update (R22). A pick refused while a workspace reload's
+the List's selection update; activation starts on the next main-actor turn so it
+does not publish inside that update (R22). The descriptor-verified file read runs off the
+main actor, then the still-current request commits against the same installed capture. A
+new pick cancels the previous read; cancellation/unmount/workspace or document changes
+discard late results. Tree selection is published only after activation succeeds, so a
+failed read retains the current file and the same row can be retried. A pick refused while a workspace reload's
 installed capture still lags the workspace generation retries at 25 ms for a bounded
 window, the newest pick wins, and a dropped pick reverts the row highlight to the current
 document. The activation carries that choice through its anchored/cached/retired paths
@@ -118,7 +122,13 @@ without changing authority contracts.
 Rows retain native `.tag` and selection, with an `onDrag` provider carrying the existing
 plain-text node ID for workspace moves and, for images, a file URL consumed by the
 editor’s existing image insertion path. The reviewed String-only payload could not reach
-that image path; the additional URL representation repairs it. No tap gesture is added
-that could compete with native selection or dragging.
+that image path; the additional URL representation repairs it. macOS 15 CI later showed
+that clicking the draggable filename can leave native selection unchanged. A simultaneous
+completed-tap handler forwards editable filename clicks to the same deferred selection
+queue; its pending/current-node guard deduplicates a native selection from the same
+click. A duplicate from that exact mouse event may settle the native List's responder
+snapshot; later events cannot reset it, and the original focus intent is retained.
+Directory disclosure and non-Markdown selection rules stay native. Real filename
+drag acceptance checks the actual move and editor source, in addition to provider types.
 
 Review verification and owner commands are recorded in `native-macos-ui-review-evidence.md`.

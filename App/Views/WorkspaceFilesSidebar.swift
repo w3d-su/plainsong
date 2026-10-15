@@ -72,7 +72,8 @@ struct WorkspaceFilesSidebar: View {
                         node: node,
                         rootURL: appState.workspaceRootURL,
                         onRename: beginRename(_:),
-                        onCreate: beginCreation(_:inDirectoryID:)
+                        onCreate: beginCreation(_:inDirectoryID:),
+                        onFileClick: { selectFile(id: $0, requestingEditorFocus: true) }
                     )
                 }
             } label: {
@@ -174,9 +175,6 @@ struct WorkspaceFilesSidebar: View {
         Binding(
             get: { selectionDeferral.pendingID ?? appState.workspaceTree?.selectedNodeID },
             set: { newValue in
-                let current = selectionDeferral.pendingID ?? appState.workspaceTree?.selectedNodeID
-                // Clicking empty space or a non-file row must not drop the open file's highlight.
-                guard let newValue, newValue != current else { return }
                 // This setter runs inside the List/NavigationAuthority view update that
                 // changed the selection, so `currentEvent` is read now while it is still
                 // that event. The open itself is deferred one main-actor turn: mutating
@@ -189,16 +187,34 @@ struct WorkspaceFilesSidebar: View {
                 // first responder is still what it was at pick time.
                 let mouseSelection = NSApp.currentEvent
                     .map { [.leftMouseDown, .leftMouseUp].contains($0.type) } ?? false
-                selectionDeferral.open(
-                    id: newValue,
-                    requestingEditorFocus: mouseSelection,
-                    pickWindow: NSApp.currentEvent?.window,
-                    appState: appState
-                ) {
-                    selectionRevertTick += 1
-                }
+                selectFile(id: newValue, requestingEditorFocus: mouseSelection)
             }
         )
+    }
+
+    /// Native selection and filename taps can both report one click. Record it once,
+    /// before starting any async work, so they share cancellation/retry/focus ownership.
+    private func selectFile(id nodeID: WorkspaceFileNode.ID?, requestingEditorFocus: Bool) {
+        let current = selectionDeferral.pendingID ?? appState.workspaceTree?.selectedNodeID
+        // Empty space and non-file rows must not drop the open file's highlight.
+        guard let nodeID else { return }
+        let event = NSApp.currentEvent
+        let window = event?.window ?? NSApp.keyWindow
+        if nodeID == current {
+            if requestingEditorFocus {
+                selectionDeferral.reaffirmPendingMousePick(id: nodeID, window: window, event: event)
+            }
+            return
+        }
+        selectionDeferral.open(
+            id: nodeID,
+            requestingEditorFocus: requestingEditorFocus,
+            pickWindow: window,
+            pickEvent: event,
+            appState: appState
+        ) {
+            selectionRevertTick += 1
+        }
     }
 
     private var showAllFilesBinding: Binding<Bool> {

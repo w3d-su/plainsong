@@ -146,24 +146,6 @@ extension AppState {
         return sessions
     }
 
-    func selectWorkspaceNode(id nodeID: WorkspaceFileNode.ID, requestingEditorFocus: Bool = true) {
-        guard var tree = workspaceTree,
-              let node = tree.node(id: nodeID),
-              node.isEditableMarkdown,
-              let rootAuthority = workspaceSearchRootAuthority,
-              workspaceInstalledCaptureGeneration == workspaceGeneration,
-              let fileURL = try? rootAuthority.location(relativePath: node.relativePath).fileURL
-        else {
-            return
-        }
-
-        tree.selectNode(id: nodeID)
-        workspaceTree = tree
-        WorkspaceSelectionFocus.$requestsEditorFocus.withValue(requestingEditorFocus) {
-            openWorkspaceFile(fileURL)
-        }
-    }
-
     func setWorkspaceNodeExpanded(_ isExpanded: Bool, id nodeID: WorkspaceFileNode.ID) {
         workspaceTree?.setExpanded(isExpanded, for: nodeID)
     }
