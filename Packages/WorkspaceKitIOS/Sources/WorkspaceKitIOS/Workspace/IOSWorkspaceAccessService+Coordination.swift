@@ -31,7 +31,6 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 throw IOSWorkspaceFailure.tooLarge
             }
             var data = Data()
-            var coordinatedURL = location.fileURL
             do {
                 let payload = try await perform(context.ticket) {
                     try await context.files.readFile(
@@ -42,7 +41,6 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                     )
                 }
                 data = payload.data
-                coordinatedURL = payload.coordinatedURL
             } catch {
                 // LANE06_GUARD_EMPTY_FAILURE
                 throw error
@@ -52,14 +50,7 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             }
             _ = try await acceptWork(context.ticket)
             await finishWork(context.ticket)
-            let proven = IOSFileLocation(
-                workspaceID: location.workspaceID,
-                accessGeneration: location.accessGeneration,
-                relativePath: location.relativePath,
-                fileURL: coordinatedURL,
-                resourceID: location.resourceID
-            )
-            return IOSCoordinatedRead(operationID: operationID, location: proven, data: data)
+            return IOSCoordinatedRead(operationID: operationID, location: location, data: data)
         } catch let draining as IOSDrainingCoordinationFailure {
             try throwDraining(draining)
         } catch {
@@ -82,14 +73,12 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             requestID: nil
         )
         do {
-            let created = try await perform(context.ticket) {
-                try await context.files.createFile(
-                    url: location.fileURL,
-                    relativePath: location.relativePath,
-                    data: data,
-                    root: context.rootURL
-                )
-            }
+            let created = try await ownedCreateFile(
+                context: context,
+                location: location,
+                data: data,
+                operationID: operationID
+            )
             let leaf = IOSPersistedLeaf(
                 url: created.url,
                 relativePath: location.relativePath,
@@ -117,6 +106,8 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 location: createdLocation,
                 resourceID: IOSWorkspaceResourceIdentity(rawValue: identity)
             )
+        } catch let settled as IOSSettledWriteFailure {
+            throw settled.error
         } catch let persisted as IOSFilePersistedButUnreadable {
             let leaf = persistedLeaf(persisted, root: context.rootURL)
             await notePersisted(leaf, operationID: operationID)

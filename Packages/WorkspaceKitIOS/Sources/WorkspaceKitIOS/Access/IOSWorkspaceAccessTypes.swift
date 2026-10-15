@@ -35,6 +35,8 @@ struct IOSWorkspaceFileItem: Sendable {
     /// Nil means the provider did not supply a stable identity. Never an inode or URL.
     var providerIdentity: Data?
     var bytes: Data?
+    /// Real path used for the coordinated read or listing. `url` stays the logical grant location.
+    var provedURL: URL?
 }
 
 struct IOSWorkspaceFilePayload: Sendable {

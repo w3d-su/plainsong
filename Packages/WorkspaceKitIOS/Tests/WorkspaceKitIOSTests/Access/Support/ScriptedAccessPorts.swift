@@ -2,91 +2,6 @@ import Foundation
 import WorkspaceCore
 @testable import WorkspaceKitIOS
 
-final class ScriptedScopePort: IOSSecurityScopePort, @unchecked Sendable {
-    private let lock = NSLock()
-    private var began: [URL] = []
-    private var ended: [URL] = []
-    var admission: IOSScopeAdmission = .started
-
-    func begin(url: URL, provenance: IOSAccessProvenance) -> IOSScopeAdmission {
-        lock.lock()
-        defer { lock.unlock() }
-        began.append(url)
-        _ = provenance
-        return admission
-    }
-
-    func end(url: URL) {
-        lock.lock()
-        defer { lock.unlock() }
-        ended.append(url)
-    }
-
-    var beganURLs: [URL] {
-        lock.lock()
-        defer { lock.unlock() }
-        return began
-    }
-
-    var endCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return ended.count
-    }
-}
-
-final class ScriptedBookmarkPort: IOSBookmarkPort, @unchecked Sendable {
-    private let lock = NSLock()
-    var resolution = IOSBookmarkResolution(url: nil, isStale: false, failure: nil)
-    var refreshed = Data("refreshed-bookmark".utf8)
-    private(set) var bookmarkCalls = 0
-
-    func bookmark(for url: URL) throws -> Data {
-        lock.lock()
-        defer { lock.unlock() }
-        bookmarkCalls += 1
-        _ = url
-        return refreshed
-    }
-
-    func resolve(_ bookmark: Data) throws -> IOSBookmarkResolution {
-        _ = bookmark
-        return resolution
-    }
-
-    var bookmarkCallCount: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return bookmarkCalls
-    }
-}
-
-final class ScriptedIdentityPort: IOSProviderIdentityPort, @unchecked Sendable {
-    var identity: Data?
-
-    func identity(for url: URL, relativePath: String) -> Data? {
-        _ = (url, relativePath)
-        return identity
-    }
-}
-
-final class ScriptedRecentStore: IOSRecentWorkspaceStoring, @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [IOSStoredRecentWorkspace] = []
-
-    func load() -> [IOSStoredRecentWorkspace] {
-        lock.lock()
-        defer { lock.unlock() }
-        return items
-    }
-
-    func save(_ items: [IOSStoredRecentWorkspace]) {
-        lock.lock()
-        defer { lock.unlock() }
-        self.items = items
-    }
-}
-
 final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     private let lock = NSLock()
     var rootIsDirectory = true
@@ -96,6 +11,8 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     var readResult: Result<Data, Error> = .success(Data("bytes".utf8))
     var parkReads = false
     var parkLists = false
+    var parkMetadata = false
+    var parkRemoves = false
     var parkAfterPersist = false
     var failMetadataAfterPersist = false
     var nestedListing: (@Sendable (URL, String) -> [IOSWorkspaceFileItem])?
@@ -108,6 +25,8 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     private var parkedReads: [CheckedContinuation<IOSWorkspaceFilePayload, Error>] = []
     private var parkedReadURLs: [URL] = []
     private var parkedLists: [CheckedContinuation<[IOSWorkspaceFileItem], Error>] = []
+    private var parkedMetadata: [(CheckedContinuation<IOSWorkspaceFileItem, Error>, IOSWorkspaceFileItem)] = []
+    private var parkedRemoves: [(CheckedContinuation<Void, Error>, URL, String, Data)] = []
     private var parkedCreates: [(CheckedContinuation<IOSWorkspaceFileItem, Error>, IOSWorkspaceFileItem)] = []
     private var listedURLs: [URL] = []
     private(set) var metadataCalls = 0
@@ -117,33 +36,18 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     private(set) var removeURLs: [URL] = []
 
     func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
+        let item = nextMetadataItem(url: url, relativePath: relativePath, root: root)
         lock.lock()
-        metadataCalls += 1
-        let stored = files[relativePath]
-        let directory = rootIsDirectory
-        if let stored, !stored.isDirectory, let swap = swapIdentityAfterMetadata {
-            swapIdentityAfterMetadata = nil
-            replacementIdentity = swap
-            if var bytes = fileBytes[relativePath], !bytes.isEmpty {
-                bytes[0] ^= 0xFF
-                fileBytes[relativePath] = bytes
+        let shouldPark = parkMetadata
+        lock.unlock()
+        if shouldPark {
+            return try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                parkedMetadata.append((continuation, item))
+                lock.unlock()
             }
         }
-        lock.unlock()
-        _ = root
-        if let stored {
-            return stored
-        }
-        return IOSWorkspaceFileItem(
-            relativePath: relativePath,
-            url: url,
-            isDirectory: directory,
-            isSymlink: false,
-            fileSize: directory ? nil : 0,
-            availability: .available(canWrite: true),
-            providerIdentity: nil,
-            bytes: nil
-        )
+        return item
     }
 
     func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem] {
@@ -223,18 +127,18 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
 
     func removeIfOwned(url: URL, relativePath: String, root: URL, providerIdentity: Data) async throws {
         lock.lock()
-        defer { lock.unlock() }
+        let shouldPark = parkRemoves
+        lock.unlock()
         _ = root
-        let current = replacementIdentity ?? files[relativePath]?.providerIdentity ?? Data(relativePath.utf8)
-        guard current == providerIdentity else {
-            throw IOSWorkspaceFailure.indeterminate
+        if shouldPark {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                lock.lock()
+                parkedRemoves.append((continuation, url, relativePath, providerIdentity))
+                lock.unlock()
+            }
+            return
         }
-        guard fileBytes[relativePath] != nil else {
-            throw IOSWorkspaceFailure.notFound
-        }
-        removeURLs.append(url)
-        files[relativePath] = nil
-        fileBytes[relativePath] = nil
+        try removeStored(url: url, relativePath: relativePath, providerIdentity: providerIdentity)
     }
 
     private enum CreateDecision {
@@ -318,6 +222,96 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
         let parked = parkedCreates.removeFirst()
         lock.unlock()
         parked.0.resume(returning: parked.1)
+    }
+
+    func resumeCreateUnreadable() {
+        lock.lock()
+        let parked = parkedCreates.removeFirst()
+        lock.unlock()
+        let item = parked.1
+        parked.0.resume(throwing: IOSFilePersistedButUnreadable(
+            url: item.url,
+            relativePath: item.relativePath,
+            byteCount: item.fileSize ?? 0,
+            providerIdentity: item.providerIdentity,
+            reason: .coordinationFailed
+        ))
+    }
+
+    func resumeMetadata() {
+        lock.lock()
+        let parked = parkedMetadata.removeFirst()
+        lock.unlock()
+        parked.0.resume(returning: parked.1)
+    }
+
+    func resumeRemove() {
+        lock.lock()
+        let parked = parkedRemoves.removeFirst()
+        lock.unlock()
+        do {
+            try removeStored(url: parked.1, relativePath: parked.2, providerIdentity: parked.3)
+            parked.0.resume()
+        } catch {
+            parked.0.resume(throwing: error)
+        }
+    }
+
+    var parkedMetadataCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return parkedMetadata.count
+    }
+
+    var parkedRemoveCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return parkedRemoves.count
+    }
+
+    private func nextMetadataItem(url: URL, relativePath: String, root: URL) -> IOSWorkspaceFileItem {
+        lock.lock()
+        defer { lock.unlock() }
+        metadataCalls += 1
+        let stored = files[relativePath]
+        let directory = rootIsDirectory
+        if let stored, !stored.isDirectory, let swap = swapIdentityAfterMetadata {
+            swapIdentityAfterMetadata = nil
+            replacementIdentity = swap
+            if var bytes = fileBytes[relativePath], !bytes.isEmpty {
+                bytes[0] ^= 0xFF
+                fileBytes[relativePath] = bytes
+            }
+        }
+        _ = root
+        if let stored {
+            return stored
+        }
+        return IOSWorkspaceFileItem(
+            relativePath: relativePath,
+            url: url,
+            isDirectory: directory,
+            isSymlink: false,
+            fileSize: directory ? nil : 0,
+            availability: .available(canWrite: true),
+            providerIdentity: nil,
+            bytes: nil
+        )
+    }
+
+    private func removeStored(url: URL, relativePath: String, providerIdentity: Data) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let current = replacementIdentity ?? files[relativePath]?.providerIdentity ?? Data(relativePath.utf8)
+        guard current == providerIdentity else {
+            throw IOSWorkspaceFailure.indeterminate
+        }
+        guard fileBytes[relativePath] != nil else {
+            throw IOSWorkspaceFailure.notFound
+        }
+        removeURLs.append(url)
+        files[relativePath] = nil
+        fileBytes[relativePath] = nil
     }
 
     var parkedCreateCount: Int {

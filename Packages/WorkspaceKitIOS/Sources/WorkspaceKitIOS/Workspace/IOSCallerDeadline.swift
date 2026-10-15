@@ -106,6 +106,129 @@ enum IOSCallerDeadline {
     }
 }
 
+struct IOSEffectResult<T: Sendable>: Sendable {
+    var result: Result<T, Error>
+    var abandon: IOSEffectAbandon?
+}
+
+enum IOSEffectAbandon: Sendable {
+    case deadline
+    case cancelled
+}
+
+/// The write already finished the ticket, or a later drain will. Callers must not finish it again.
+struct IOSSettledWriteFailure: Error {
+    var error: Error
+}
+
+/// Stage already returned this failure. The drain still holds the lease until the port returns.
+struct IOSStageLeaseHandoff: Error {
+    var failure: IOSAssetStageFailure
+}
+
+extension IOSCallerDeadline {
+    /// Waits until `body` returns. A deadline or cancellation cancels `body` and is recorded,
+    /// but the caller does not continue until the late result can be owned.
+    static func awaitEffect<T: Sendable>(
+        timeoutNanoseconds: UInt64,
+        body: @escaping @Sendable () async throws -> T
+    ) async -> IOSEffectResult<T> {
+        let abandon = IOSAbandonBox()
+        let operation = Task {
+            try await body()
+        }
+        let timeoutTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+            } catch {
+                return
+            }
+            if abandon.claim(.deadline) {
+                operation.cancel()
+            }
+        }
+        let result = await withTaskCancellationHandler {
+            await operation.result
+        } onCancel: {
+            if abandon.claim(.cancelled) {
+                operation.cancel()
+            }
+        }
+        timeoutTask.cancel()
+        return IOSEffectResult(result: result, abandon: abandon.value)
+    }
+
+    /// Resumes the caller at the deadline. `onDrain` observes the body result after that resume.
+    static func raceDrained<T: Sendable>(
+        timeoutNanoseconds: UInt64,
+        onDrain: @escaping @Sendable (Result<T, Error>) async -> Void,
+        body: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let race = IOSDeadlineRace<T>()
+        let operation = Task {
+            try await body()
+        }
+        let timeoutTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+            } catch {
+                return
+            }
+            guard race.claim(.failure(IOSDrainingCoordinationFailure(
+                isCancellation: false,
+                failure: .coordinationFailed
+            ))) else {
+                return
+            }
+            operation.cancel()
+            await onDrain(operation.result)
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                race.store(continuation)
+                Task {
+                    let result = await operation.result
+                    timeoutTask.cancel()
+                    _ = race.claim(result)
+                }
+            }
+        } onCancel: {
+            operation.cancel()
+            timeoutTask.cancel()
+            guard race.claim(.failure(IOSDrainingCoordinationFailure(
+                isCancellation: true,
+                failure: .unavailable
+            ))) else {
+                return
+            }
+            Task {
+                await onDrain(operation.result)
+            }
+        }
+    }
+}
+
+private final class IOSAbandonBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reason: IOSEffectAbandon?
+
+    func claim(_ reason: IOSEffectAbandon) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if self.reason != nil {
+            return false
+        }
+        self.reason = reason
+        return true
+    }
+
+    var value: IOSEffectAbandon? {
+        lock.lock()
+        defer { lock.unlock() }
+        return reason
+    }
+}
+
 /// One continuation, resumed by the first of success, failure, deadline, or cancellation.
 private final class IOSDeadlineRace<T: Sendable>: @unchecked Sendable {
     private let lock = NSLock()

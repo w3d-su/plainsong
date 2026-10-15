@@ -7,7 +7,8 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
     func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
         try await coordinate(url: url, reading: [.withoutChanges, .immediatelyAvailableMetadataOnly]) { readURL in
             let proven = try IOSWorkspaceRootAuthority.proveExisting(readURL, root: root)
-            return try item(url: proven, relativePath: relativePath)
+            let logical = logicalFileURL(requested: url, relativePath: relativePath, root: root)
+            return try item(logicalURL: logical, statURL: proven, relativePath: relativePath, provedURL: proven)
         }
     }
 
@@ -22,7 +23,10 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
             return try children.map { child in
                 let name = child.lastPathComponent
                 let spelling = IOSWorkspacePathAuthority.childSpelling(parent: relativePath, name: name)
-                return try item(url: child, relativePath: spelling)
+                let logical = IOSWorkspacePathAuthority.fileURL(
+                    path: IOSWorkspacePathAuthority.joined(root: root, relativePath: spelling)
+                )
+                return try item(logicalURL: logical, statURL: child, relativePath: spelling, provedURL: child)
             }
         }
     }
@@ -38,7 +42,12 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
             if try isSymbolicLink(readURL) {
                 throw IOSWorkspaceFailure.outsideGrant
             }
-            let info = try item(url: proven, relativePath: relativePath)
+            let info = try item(
+                logicalURL: url,
+                statURL: proven,
+                relativePath: relativePath,
+                provedURL: proven
+            )
             if info.isSymlink {
                 throw IOSWorkspaceFailure.outsideGrant
             }
@@ -98,7 +107,12 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
                 throw IOSWorkspaceFailure.indeterminate
             }
             let proven = try IOSWorkspaceRootAuthority.proveExisting(coordinatedURL, root: root)
-            let info = try item(url: proven, relativePath: relativePath)
+            let info = try item(
+                logicalURL: url,
+                statURL: proven,
+                relativePath: relativePath,
+                provedURL: proven
+            )
             if info.isSymlink || info.isDirectory {
                 throw IOSWorkspaceFailure.indeterminate
             }
@@ -125,19 +139,35 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         .ubiquitousItemIsDownloadingKey,
     ]
 
-    private func item(url: URL, relativePath: String) throws -> IOSWorkspaceFileItem {
-        let values = try url.resourceValues(forKeys: Set(Self.resourceKeys))
+    private func logicalFileURL(requested: URL, relativePath: String, root: URL) -> URL {
+        if IOSWorkspacePathAuthority.sameFile(requested, root) {
+            return requested
+        }
+        guard WorkspaceRelativePath(spelling: relativePath) != nil else { return requested }
+        return IOSWorkspacePathAuthority.fileURL(
+            path: IOSWorkspacePathAuthority.joined(root: root, relativePath: relativePath)
+        )
+    }
+
+    private func item(
+        logicalURL: URL,
+        statURL: URL,
+        relativePath: String,
+        provedURL: URL
+    ) throws -> IOSWorkspaceFileItem {
+        let values = try statURL.resourceValues(forKeys: Set(Self.resourceKeys))
         let isDirectory = values.isDirectory ?? false
         let isSymlink = values.isSymbolicLink ?? false
         return IOSWorkspaceFileItem(
             relativePath: relativePath,
-            url: url,
+            url: logicalURL,
             isDirectory: isDirectory,
             isSymlink: isSymlink,
             fileSize: values.fileSize,
             availability: availability(values),
             providerIdentity: nil,
-            bytes: nil
+            bytes: nil,
+            provedURL: provedURL
         )
     }
 

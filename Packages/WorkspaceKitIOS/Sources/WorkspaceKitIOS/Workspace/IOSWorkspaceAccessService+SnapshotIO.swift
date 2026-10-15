@@ -91,38 +91,17 @@ extension IOSWorkspaceAccessService {
         operationID: UUID,
         reason: IOSWorkspaceFailure
     ) async throws -> Never {
-        let removed = await reclaim(leaf)
-        await clearPersisted(operationID)
-        await finishWork(context.ticket)
-        if removed {
+        switch await reclaimBounded(leaf, ticket: context.ticket) {
+        case .removed:
+            await clearPersisted(operationID)
+            await finishWork(context.ticket)
             throw reason
-        }
-        throw IOSUnpublishedLeaf(
-            operationID: operationID,
-            workspaceID: context.ticket.workspaceID,
-            generation: context.ticket.generation,
-            relativePath: leaf.relativePath,
-            url: leaf.url,
-            providerIdentity: leaf.providerIdentity,
-            byteCount: leaf.byteCount,
-            reason: reason
-        )
-    }
-
-    func reclaim(_ leaf: IOSPersistedLeaf) async -> Bool {
-        guard let identity = leaf.providerIdentity else { return false }
-        do {
-            try await ports.files.removeIfOwned(
-                url: leaf.url,
-                relativePath: leaf.relativePath,
-                root: leaf.root,
-                providerIdentity: identity
-            )
-            return true
-        } catch let failure as IOSWorkspaceFailure where failure == .notFound {
-            return true
-        } catch {
-            return false
+        case .kept:
+            await clearPersisted(operationID)
+            await finishWork(context.ticket)
+            throw unpublishedLeaf(leaf, context: context, operationID: operationID, reason: reason)
+        case .handedOff:
+            throw unpublishedLeaf(leaf, context: context, operationID: operationID, reason: reason)
         }
     }
 

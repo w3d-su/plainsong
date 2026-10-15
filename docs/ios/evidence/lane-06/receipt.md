@@ -35,9 +35,13 @@ Lane 05 keeps owning document bytes and calls `rebaseSavedText(to:)` on a succes
 
 A single-file grant authorizes that file alone. Directory listing is metadata-only (`NSFileCoordinator.ReadingWithoutChanges` and `immediatelyAvailableMetadataOnly`). Each listed directory is the grant root joined with that directory's root-relative path. A seen set of raw UTF-8 spellings keeps canonical-equal names distinct and stops one path from being queued twice. Symlink directories are not descended. Drawing the tree does not download file bodies. An offline refresh publishes `.unavailable(reason: .offline)` and leaves `latestSnapshot` in place.
 
-Inside each coordinated accessor, read, list, create, and delete resolve the real path and require it to stay inside the grant root. An ancestor symlink that reaches another root is `.outsideGrant` for read, write, and delete. The accessor returns that proved URL. Literal path comparison remains the single-file scope check. It is not the ancestry proof.
+Inside each coordinated accessor, read, list, create, and delete resolve the real path and require it to stay inside the grant root. An ancestor symlink that reaches another root is `.outsideGrant` for read, write, and delete. Public snapshot entries and `read` results use the logical grant location: the original root joined with the root-relative path. `authorize` still requires that logical URL byte for byte. The proved real path stays internal, on `IOSWorkspaceFileItem.provedURL` and on the read payload's coordinated URL. A location built from the proved path is `.outsideGrant`. Literal path comparison stays the authorize check. It is the single-file scope check, and it is separate from the ancestry proof.
 
-The caller deadline is separate from coordinator drain. When the deadline fires, the caller receives `.coordinationFailed`, the coordinator is cancelled, and a later port result cannot replace that failure. The scope stays up until the port returns and `finish` runs. `NSUserCancelledError` from a coordinator cancel still maps to `.unavailable`. The deadline failure itself is `.coordinationFailed`.
+The caller deadline is separate from coordinator drain. A read or list that hits the deadline returns `.coordinationFailed`. The coordinator is cancelled, and a later port result cannot replace that caller failure. The scope stays up until the port returns and `finish` runs. `NSUserCancelledError` from a coordinator cancel still maps to `.unavailable`. The deadline failure itself is `.coordinationFailed`.
+
+A create does not use that discardable race. `createNewLeaf` waits for the file-port body after the deadline or cancellation, then owns the late result before the caller returns. A proved identity is removed, and only then does a deadline return `.coordinationFailed` or a cancellation return `CancellationError`. A nil identity, or a remove that cannot prove ownership, keeps the bytes and returns `.retained`. A late `IOSFilePersistedButUnreadable` follows the same rule. The abandoned create is not published. Settlement of an already-cancelled create waits on a detached remove, so that cancellation is not treated as an immediate reclaim handoff.
+
+Stage metadata, validate, rollback remove, unpublished reclaim, and adopt metadata bound the caller and still drain the port. When that caller stops waiting, a write or delete keeps a receipt or finishes the proved remove. The lease or started scope stays up until that drain. These paths were checked with a scripted port that parks inside the accessor. This run did not observe a live Files provider hang.
 
 Production bookmarks use `options: []` on create. Resolve uses `.withoutUI`, `.withoutMounting`, and `.withoutImplicitStartAccessing`, then an explicit `startAccessingSecurityScopedResource`. `NSURLBookmarkCreationWithSecurityScope` and `NSURLBookmarkResolutionWithSecurityScope` are unavailable on iOS. The production identity port returns nil until a File Provider port supplies opaque bytes. URL, inode, and `NSURLDocumentIdentifierKey` are not provider identity. Recents keep the last 10 successful opens, dedupe only when a real provider identity exists, and store bookmark bytes off `IOSRecentWorkspaceItem`. `removeRecent` does not delete the file.
 
@@ -45,7 +49,7 @@ External presenter callbacks enqueue `resourceChanged` or `unavailable` and retu
 
 The preview reader holds its lease until the coordinated read finishes, checks the access context again, then releases the lease on the main actor. It returns the original `PreviewAssetAccessContext`. Root, type, size, symlink, and token policy stay with lane 07. `isCurrent` checks root URL, root token, grant identity, generation, and that the grant is still running. It does not grant access.
 
-The image writer requires `grant.scope == .directory` before it creates anything. It returns `IOSStagedImageAsset` only after the leaf exists. Commit and rollback touch that operation's leaf. Rollback deletes the leaf only inside one `removeIfOwned` coordination, and only when that coordination proves the provider identity still matches. A nil identity, a same-size replacement, or a file owned by another operation stays on disk with a receipt. The byte count is not ownership. If `createFile` has stored bytes and the grant cannot be published, the service keeps that leaf on the operation from that moment. It deletes the leaf only when the same protected remove proves ownership. Otherwise `stage` throws `.retained` and the file stays with a receipt. `CancellationError` is used only when no operation-owned leaf remains. Markdown extensions are refused. A missing folder grant surfaces `requiresDirectoryGrant`.
+The image writer requires `grant.scope == .directory` before it creates anything. It returns `IOSStagedImageAsset` only after the leaf exists. Commit and rollback touch that operation's leaf. Rollback deletes the leaf only inside one `removeIfOwned` coordination, and only when that coordination proves the provider identity still matches. A nil identity, a same-size replacement, or a file owned by another operation stays on disk with a receipt. The byte count is not ownership. If `createFile` has stored bytes and the grant cannot be published, the service keeps that leaf on the operation from that moment. It deletes the leaf only when the same protected remove proves ownership. Otherwise `stage` throws `.retained` and the file stays with a receipt. The same ownership rule applies when the create's own deadline or cancellation wins before the port returns. `CancellationError` is used only when no operation-owned leaf remains. Markdown extensions are refused. A missing folder grant surfaces `requiresDirectoryGrant`.
 
 ## Typed failures
 
@@ -61,7 +65,7 @@ A thrown coordinated read stays a failure. An empty file that the provider succe
 |---|---|---|
 | Scripted scope, bookmark, identity, and file ports | Lease, bookmark, snapshot, asset, and preview tests below | Simulator pass |
 | Local temp-file bookmark (`IOSSystemAccessPorts`, no security-scope bookmark option) | `testLocalBookmarkRoundTripLeavesProviderIdentityUnknown` | Simulator pass. Provider identity is nil. This is a local bookmark round trip |
-| `NSFileCoordinator` production file port | Two-level temp-directory listing, ancestor-symlink refusal, nil-identity remove, and a blocking-presenter deadline. Race tests still use the scripted port | Files and iCloud in-place use is open |
+| `NSFileCoordinator` production file port | Two-level temp-directory listing, ancestor-symlink refusal, nil-identity remove, an alias-root list and repeat-read, and a blocking-presenter deadline. Race tests still use the scripted port | Files and iCloud in-place use is open |
 | File Provider opaque identity | Production port returns nil | Open until a port supplies provider bytes |
 | iCloud placeholder / not downloaded | Scripted offline refresh keeps the previous tree. Ubiquitous error codes are mapped in source | Device iCloud is open |
 | Security-scoped bookmark options | Unavailable on the iOS SDK. Production uses a plain bookmark plus `startAccessingSecurityScopedResource` | Device Files grant lifetime is open |
@@ -71,6 +75,55 @@ Copy-in sandbox directories and the scripted provider are component evidence. Th
 ## Simulator module run
 
 ### This head
+
+Command, from `Packages/WorkspaceKitIOS`, under `/private/tmp/plainsong-xcodebuild-test.lock`:
+
+```sh
+xcodebuild test -scheme WorkspaceKitIOS \
+  -destination 'platform=iOS Simulator,id=59CB04BD-26CC-4841-8D06-E75A2EDEBC66' \
+  -derivedDataPath /tmp/plainsong-ios-06-r3-dd \
+  -resultBundlePath /tmp/plainsong-ios-06-r3d-results.xcresult \
+  -parallel-testing-enabled NO \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+```
+
+| Item | Value |
+|---|---|
+| When | 2026-10-16 00:18:53 +0800 through 00:19:08 +0800 |
+| Destination | iPhone 17 Pro `59CB04BD-26CC-4841-8D06-E75A2EDEBC66`, iOS 27.0 (`24A5355p`), arm64 simulator |
+| Xcode | 27.0 build `27A5194q` at `/Applications/Xcode-beta.app` |
+| Compile SDK | iPhoneSimulator 27.0, target `arm64-apple-ios26.0-simulator` |
+| Result | `TEST SUCCEEDED`. `totalTestCount` 104, `passedTests` 104, `failedTests` 0, `skippedTests` 0 |
+| Log | `/tmp/plainsong-ios-06-r3d-test.log` SHA-256 `452cf2726bbcbf2f5a225c80ec7ed2b2f9078a10ebf889b36deb5c8277820de9` |
+| Summary | `/tmp/plainsong-ios-06-r3d-summary.json` SHA-256 `a7f5e3f6eab55f9ab288677f998501e5ed84aed2d72d70474e392acdf910dbc9` |
+| XCResult content hash | `/tmp/plainsong-ios-06-r3d-results.xcresult` SHA-256 of sorted relative path, a NUL byte, then file bytes `5bca3e2ffe743f1b464faa6ab7dc8c2d45d1d058677d2ca4795c5155ff11bdc9` (248 files) |
+
+The 104 cases are the previous 84 plus these 20:
+
+- `IOSWorkspaceWriteDeadlineTests/testDeadlineNilIdentityLateSuccessRetainsTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testDeadlineNilIdentityLateUnreadableRetainsTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testDeadlineProvedIdentityLateSuccessRemovesTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testDeadlineProvedIdentityLateUnreadableRemovesTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testCancelNilIdentityLateSuccessRetainsTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testCancelNilIdentityLateUnreadableRetainsTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testCancelProvedIdentityLateSuccessRemovesTheLeaf`
+- `IOSWorkspaceWriteDeadlineTests/testCancelProvedIdentityLateUnreadableRemovesTheLeaf`
+- `IOSWorkspaceEffectDeadlineTests/testValidateDeadlineReturnsWhileMetadataStaysParked`
+- `IOSWorkspaceEffectDeadlineTests/testValidateCancelReturnsWhileMetadataStaysParked`
+- `IOSWorkspaceEffectDeadlineTests/testAdoptDeadlineEndsScopeOnlyAfterMetadataDrains`
+- `IOSWorkspaceEffectDeadlineTests/testAdoptCancelEndsScopeOnlyAfterMetadataDrains`
+- `IOSWorkspaceEffectDeadlineTests/testStageMetadataDeadlineHoldsTheLeaseUntilDrain`
+- `IOSWorkspaceEffectDeadlineTests/testStageMetadataDeadlineRemovesAProvedLeafOnDrain`
+- `IOSWorkspaceEffectDeadlineTests/testStageMetadataCancelHoldsTheLeaseUntilDrain`
+- `IOSWorkspaceEffectDeadlineTests/testStageMetadataDeadlineKeepsScopeUntilDrainAfterInvalidate`
+- `IOSWorkspaceEffectDeadlineTests/testRollbackDeadlineRetainsUntilTheRemoveDrains`
+- `IOSWorkspaceEffectDeadlineTests/testRollbackCancelRetainsUntilTheRemoveDrains`
+- `IOSWorkspaceEffectDeadlineTests/testReclaimDeadlineHoldsTheOperationUntilTheRemoveDrains`
+- `IOSWorkspaceAliasRootTests/testAliasRootListReadAndRepeatReadUseTheLogicalGrantLocation`
+
+SwiftFormat 0.62.1 (`/private/tmp/plainsong-swiftformat-0.62.1/swiftformat`, with `--disable wrapIfStatementBodies,wrapIfExpressionBodies`) reports 0/13 touched files require formatting. Mac `make test` was not run. Swift 6 would reject `NSLock` inside the scripted port's async methods; this package is not in Swift 6 language mode, and those warnings did not fail the run.
+
+### Previous head `fe6b7f0`
 
 Command, from `Packages/WorkspaceKitIOS`, under `/private/tmp/plainsong-xcodebuild-test.lock`:
 
@@ -166,7 +219,7 @@ The 65 cases are the existing lane 05 document suite plus these 19:
 
 SwiftFormat 0.62.1 (`/private/tmp/plainsong-swiftformat-0.62.1/swiftformat`, with `--disable wrapIfStatementBodies,wrapIfExpressionBodies`) reports 0/20 lane files need formatting. After the simulator run it reordered one modifier in `IOSWorkspaceAccessService+Preview.swift`: `nonisolated fileprivate static func previewFailure` became `fileprivate nonisolated static func previewFailure`. Probed file SHA-256 `32159d3390f082b3cfae77e7ba1d7bda8084de48230a5de72a43e4d303494197`. Committed file SHA-256 `394d3ae37ab8bd46a225590afa2fb01a0dd9a5eb8d0aa2fbb98aecd29af40cac`. No other probed Swift input differs. SwiftLint 0.65.0 reports warnings only on the new files (`type_body_length`, `function_body_length`, `optional_data_string_conversion`) and exits 0. Mac `make test` was not run.
 
-The 65-test run above is the previous head. It is not this head. Other historical results that are not this head: public simulator c1 294/294, storage 46/46, Mac CI run `38372199432`.
+The 84-test run at `fe6b7f0` and the 65-test run at `576c206` are previous heads. They are not this head. Other historical results that are not this head: public simulator c1 294/294, storage 46/46, Mac CI run `38372199432`. Partial bundles from this fix (`/tmp/plainsong-ios-06-r3-results.xcresult`, `r3b`, and `r3c`) are not this head.
 
 ## Guard-removal probes
 
@@ -177,12 +230,36 @@ The 65-test run above is the previous head. It is not this head. Other historica
 ```sh
 python3 docs/ios/evidence/lane-06/run-negative-probes.py \
   --source /private/tmp/plainsong-ios-06-workspace-access \
+  --output /tmp/plainsong-ios-06-r3-probes \
+  --device 59CB04BD-26CC-4841-8D06-E75A2EDEBC66 \
+  --expected-count 104
+```
+
+Recorded `runs.json` SHA-256 `fee2ad31c4e502be5d5ffc60e6a1e9146faf33d1459d3e525640981250bbb779`. Input fingerprint file SHA-256 `b1ebe0e0ce6375adbbe91b1cec9e6d33a42db2a3e4cae21f8bb370c7cab0d653`. Raw logs, xcresults, and DerivedData stay under `/tmp/plainsong-ios-06-r3-probes` and are not committed. The restored module passed 104, failed 0, skipped 0.
+
+| Label | Guard removed | Named failure | Exit | Accepted |
+|---|---|---|---|---|
+| `empty-failure` | `LANE06_GUARD_EMPTY_FAILURE` swallows the read error into empty `Data` | `IOSWorkspaceSnapshotRaceTests/testReadFailureDoesNotReturnEmptyBytes` — `failed read returned 0 bytes` | 65 | yes |
+| `directory-grant` | `LANE06_GUARD_DIRECTORY_GRANT` skips `requiresDirectoryGrant` | `IOSWorkspaceAssetAndPreviewTests/testSingleFileGrantDoesNotStageIntoParent` — `single-file grant staged an image` | 65 | yes |
+| `single-file-scope` | `LANE06_GUARD_SINGLE_FILE_SCOPE` authorizes the parent directory | `IOSWorkspaceBookmarkTests/testSingleFileGrantDoesNotReadASibling` — `sibling read succeeded` | 65 | yes |
+| `denied-bookmark` | `LANE06_GUARD_DENIED_BOOKMARK` ignores bookmark resolution failure | `IOSWorkspaceBookmarkTests/testFreshStaleDeniedAndOfflineBookmarks` — `denied bookmark issued a grant` | 65 | yes |
+| `consumer-count` | `LANE06_GUARD_CONSUMER_COUNT` skips the decrement | `IOSWorkspaceLeaseRaceTests/testTwoConsumersEarlyReleaseDoesNotStopScope` — `XCTAssertEqual failed: ("Optional(2)") is not equal to ("Optional(1)")` | 65 | yes |
+| `generation` | `LANE06_GUARD_GENERATION` accepts a stale generation | `IOSWorkspaceLeaseRaceTests/testLateReadAfterInvalidationDoesNotReturnBytes` — `late read published bytes` | 65 | yes |
+| `restored-module` | Sources restored to the probe fingerprint | 104 passed, 0 failed, 0 skipped | 0 | yes |
+
+Every probe row has `restored_all_inputs: true`.
+
+### Previous head `fe6b7f0`
+
+```sh
+python3 docs/ios/evidence/lane-06/run-negative-probes.py \
+  --source /private/tmp/plainsong-ios-06-workspace-access \
   --output /tmp/plainsong-ios-06-fix-probes \
   --device 59CB04BD-26CC-4841-8D06-E75A2EDEBC66 \
   --expected-count 84
 ```
 
-Recorded `runs.json` SHA-256 `64ecc112fba256e30383e72461a8f69bb45906c080ce6e880ac98640dda49b63`. Input fingerprint file SHA-256 `6acfa044010075f4550ba97c075ece331032429f391bf1599f68921450ee5b1c`. Raw logs, xcresults, and DerivedData stay under `/tmp/plainsong-ios-06-fix-probes` and are not committed. The restored module passed 84, failed 0, skipped 0.
+Recorded `runs.json` SHA-256 `64ecc112fba256e30383e72461a8f69bb45906c080ce6e880ac98640dda49b63`. Input fingerprint file SHA-256 `6acfa044010075f4550ba97c075ece331032429f391bf1599f68921450ee5b1c`. Raw logs, xcresults, and DerivedData stay under `/tmp/plainsong-ios-06-fix-probes` and are not committed. This record is historical. The restored module passed 84, failed 0, skipped 0.
 
 | Label | Guard removed | Named failure | Exit | Accepted |
 |---|---|---|---|---|
@@ -219,4 +296,4 @@ Recorded `runs.json` SHA-256 `684436f7ad7dbf55872d25da53c3c83088e69d5317ec18d483
 
 ## Suggested Decision Log row for lane 13
 
-Date 2026-10-15. Decision: iOS workspace access is one `IOSWorkspaceAccessService` from `IOSWorkspaceAccessFactory.makeProduction()`, with explicit single-file and directory grants, reference-counted leases, and scope release only after revoke and idle drain. Nested listing uses each directory URL. Rollback and unpublished cleanup delete a leaf only when one coordinated remove proves provider identity; otherwise the leaf stays with a receipt. External notices stay on the originating grant. Realpath ancestry inside the accessor rejects an ancestor symlink. The caller deadline does not wait out a blocked coordinator. Why: a URL or inode is not a File Provider identity, a single-file grant must not authorize its parent, a same-size replacement is not ownership, and a late read after invalidation must not publish bytes. Alternatives: security-scoped bookmark options (unavailable on iOS), treating empty `Data` as a failed read, treating byte count as ownership, and downloading every ubiquitous item to draw the tree. Those were rejected.
+Date 2026-10-16. Decision: iOS workspace access is one `IOSWorkspaceAccessService` from `IOSWorkspaceAccessFactory.makeProduction()`, with explicit single-file and directory grants, reference-counted leases, and scope release only after revoke and idle drain. Nested listing uses each directory URL. Rollback and unpublished cleanup delete a leaf only when one coordinated remove proves provider identity; otherwise the leaf stays with a receipt. A late create is owned before the caller returns: a proved leaf is removed, and a leaf that cannot be proved stays with a receipt. Public snapshot and read locations stay on the logical grant URL. The proved path is internal I/O metadata. Stage metadata, validate, rollback, reclaim, and adopt metadata return on a deadline and drain afterward. External notices stay on the originating grant. Realpath ancestry inside the accessor rejects an ancestor symlink. The caller deadline does not wait out a blocked coordinator. Why: a URL or inode is not a File Provider identity, a single-file grant must not authorize its parent, a same-size replacement is not ownership, a canonical listing must still authorize against the original grant, a timed-out write must not leave an unreceipted file, and a late read after invalidation must not publish bytes. Alternatives: security-scoped bookmark options (unavailable on iOS), treating empty `Data` as a failed read, treating byte count as ownership, relaxing literal containment for canonical paths, discarding a late write the way a late read is discarded, and downloading every ubiquitous item to draw the tree. Those were rejected.

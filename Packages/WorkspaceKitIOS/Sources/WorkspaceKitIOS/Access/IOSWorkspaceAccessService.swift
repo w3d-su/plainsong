@@ -187,7 +187,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         let displayName = url.lastPathComponent
         let relative = displayName.isEmpty ? "file" : displayName
         do {
-            let item = try await ports.files.metadata(url: url, relativePath: relative, root: url)
+            let item = try await metadataForAdopt(url: url, relativePath: relative, admission: admission)
             if scope == .directory, !item.isDirectory {
                 throw IOSWorkspaceFailure.invalidPath
             }
@@ -214,6 +214,8 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
             remember(record: record, bookmark: bookmark)
             startWatching(record)
             return record.grant
+        } catch let draining as IOSDrainingCoordinationFailure {
+            try throwDraining(draining)
         } catch {
             if admission == .started {
                 ports.scope.end(url: url)
