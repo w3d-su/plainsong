@@ -189,7 +189,11 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   Phase 1 currently shares one App-scoped `AppState` across the `WindowGroup`. Separate
   windows mirror the same workspace/current document until window-scoped state is built.
 - Tabs: native window tabs (`NSWindow.tabbingMode`) deferred; Phase 1 uses sidebar
-  selection to switch the single editor pane (like Typora). Multiple open
+  selection to switch the single editor pane (like Typora). Files selections defer out of
+  the native List update, read and verify the file off the main actor, and commit only the
+  latest still-current request against its installed workspace capture. Publish the tree
+  selection only after activation succeeds; a failed read keeps the current file selected
+  and allows retrying the same row. Multiple open
   `DocumentSession`s kept warm in an LRU (target 8) so switching files is instant.
   A failed or fenced eviction candidate is retained and protected for the whole trim
   pass; each candidate is tried at most once per pass. The cache may exceed 8 while

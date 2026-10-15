@@ -109,8 +109,12 @@ dropped (Save As convention).
 
 Keyboard/AX selection in the native Files List opens the file without requesting editor
 focus; mouse selections can focus the editor. The event kind is read synchronously inside
-the List's selection update; the activation itself is deferred one main-actor turn so it
-does not publish inside that update (R22). A pick refused while a workspace reload's
+the List's selection update; activation starts on the next main-actor turn so it
+does not publish inside that update (R22). The descriptor-verified file read runs off the
+main actor, then the still-current request commits against the same installed capture. A
+new pick cancels the previous read; cancellation/unmount/workspace or document changes
+discard late results. Tree selection is published only after activation succeeds, so a
+failed read retains the current file and the same row can be retried. A pick refused while a workspace reload's
 installed capture still lags the workspace generation retries at 25 ms for a bounded
 window, the newest pick wins, and a dropped pick reverts the row highlight to the current
 document. The activation carries that choice through its anchored/cached/retired paths

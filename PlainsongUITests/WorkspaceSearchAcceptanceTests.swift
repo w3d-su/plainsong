@@ -95,6 +95,35 @@ final class WorkspaceSearchAcceptanceTests: XCTestCase, @unchecked Sendable {
         workspaceWindow = nil
     }
 
+    func testFilesSingleClicksKeepSelectionAndEditorInSync() {
+        launchApplication()
+        makeFixtureWindowKey()
+        let editor = workspaceWindow.textViews["plainsong.editor.textView"]
+        let fileName = workspaceWindow.staticTexts["plainsong.editor.fileName"]
+        let picks = [
+            ("z-last.md", "最後一篇：搜尋\n"),
+            ("a-overview.md", "前言\n搜尋 alpha\n"),
+        ]
+        for _ in 0 ..< 3 {
+            for (name, source) in picks {
+                let sidebar = workspaceWindow.outlines["Sidebar"]
+                let fileLabel = sidebar.descendants(matching: .staticText)
+                    .matching(NSPredicate(format: "value == %@", name)).firstMatch
+                XCTAssertTrue(fileLabel.waitForExistence(timeout: 5), "Missing Files row \(name)")
+                XCTAssertTrue(fileLabel.isHittable)
+                // The filename is the draggable area, not trailing row whitespace.
+                fileLabel.click()
+                waitForValue(name, of: fileName, description: "clicked file name")
+                waitForValue(source, of: editor, description: "clicked file source")
+                let selected = sidebar.descendants(matching: .any)
+                    .matching(NSPredicate(format: "isSelected == true")).firstMatch
+                XCTAssertTrue(selected.descendants(matching: .staticText)
+                    .matching(NSPredicate(format: "value == %@", name)).firstMatch.exists,
+                    "Files selection must match the editor")
+            }
+        }
+    }
+
     func testShortcutKeyboardActivationAndEscapeTransitions() throws {
         launchApplication()
         let queryField = try openSearchWithShortcut()
