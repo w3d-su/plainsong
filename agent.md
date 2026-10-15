@@ -346,7 +346,10 @@ Two unified pipelines selected by `fileKind`:
 - `mdx`: same + `remark-mdx`; a custom remark plugin transforms `mdxJsxFlowElement` /
   `mdxJsxTextElement` / `mdxjsEsm` nodes into placeholder HTML (§9) instead of compiling.
 
-Post-render in browser: `highlight.js` handles non-Mermaid code fences. Before the live
+Post-render in browser: `highlight.js` handles non-Mermaid code fences. A fence with no
+info string auto-detects its language only up to 4,000 UTF-16 units
+(`AUTO_DETECT_MAX_LENGTH`); a longer bare fence renders as plain text, because
+auto-detection cost grows superlinearly with line length. Before the live
 DOM patch, Mermaid fences become `div.mermaid-rendered` placeholders carrying the exact
 fence source, its Mermaid-fence ordinal, and the current Mermaid-theme generation.
 `morphdom` keeps a matching successful live wrapper. A changed wrapper receives the new

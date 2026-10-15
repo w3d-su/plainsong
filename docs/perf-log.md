@@ -2640,3 +2640,39 @@ Known follow-up, not fixed here: `MarkdownTextView.applyIncomingTextIfNeeded` as
 (conflict-free) external reload, or any App text replacement, with the same UTF-16 length
 and the same first and last 64 units therefore restores folds but leaves no image markers.
 A throwaway hosted test reproduced it two of two times (folds 36, markers 0 after 3 s).
+
+## Bare-fence highlight auto-detection cap — 2026-10-15
+
+`highlightCodeBlocks()` (`preview-src/src/code-highlight.ts`) now skips highlight.js language
+auto-detection for a fence with no `language-*`/`lang-*` class whose code text exceeds
+`AUTO_DETECT_MAX_LENGTH` = 4,000 UTF-16 units; it renders as plain text with the `hljs`
+block class. Explicit-language fences are unchanged. Machine: Apple M1 Pro, recorded load
+average 135-700 (heavily loaded; numbers are relative, not gates).
+
+Auto-detection cost (`hljs.highlightAuto`, the 21 registered grammars, esbuild bundle run in
+the system `jsc` JavaScriptCore shell, single call after a warm-up):
+
+| Content | 1,000 | 2,000 | 4,000 | 8,000 | 16,000 | 40,000 chars |
+|---|---|---|---|---|---|---|
+| One line of `W` | 6.8 ms | 18.5 ms | 54.5 ms (median of 5) | 278 ms | 982 ms | 6,657 ms |
+| Minified JS (one line) | 20 ms | 34 ms | 27 ms (median of 5) | 76 ms | 300 ms | 750 ms |
+| Ordinary JS, 40-char lines | 17 ms | 12 ms | 13 ms (median of 5) | 54 ms | 132 ms | 511 ms |
+
+The superlinear term follows line length, not total size: 8,000 chars of `W` as one line took
+309 ms, as eight 1,000-char lines 54 ms; 16,000 chars took 666 ms vs 50 ms. At the 4,000 cap
+the pathological single line stays near 55 ms locally (about 200 ms at the ~3.6x hosted-CI
+factor from PR #169), while a typical ~100-line snippet still auto-detects in ~13 ms.
+
+40,000-char single-line bare fence, full preview render (`render` bridge message through
+`renderComplete`, Vitest/jsdom, five samples each, interleaved before/after/after):
+
+| Build | Samples (ms) | Median |
+|---|---|---|
+| Before (cap disabled) | 10,399 / 10,261 / 10,189 / 9,716 / 9,667 | 10,189 ms |
+| After | 74.9 / 69.7 / 67.4 / 62.2 / 75.6 | 69.7 ms |
+| After (repeat) | 66.0 / 59.7 / 57.4 / 57.3 / 59.7 | 59.7 ms |
+
+For reference, PR #169 measured the same fixture at ~3.5 s locally and ~12.6 s on hosted CI
+in the WKWebView export path, and 240,000 chars at ~113 s (past the 15 s export render
+timeout). `preview-src/test/code-highlight.test.ts` renders the 240,000-char bare fence and
+requires completion under 5 s without calling `highlightElement`.
