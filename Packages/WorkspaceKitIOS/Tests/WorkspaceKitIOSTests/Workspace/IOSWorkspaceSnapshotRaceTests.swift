@@ -97,10 +97,19 @@ final class IOSWorkspaceSnapshotRaceTests: XCTestCase {
         var seen: [IOSWorkspaceEvent] = []
         _ = harness.service.observe { seen.append($0) }
         let before = harness.files.ioCalls
-        harness.service.report(.changed(relativePath: "Note.md"))
-        harness.service.report(.deleted(relativePath: "Note.md"))
-        harness.service.report(.moved(from: "Note.md", to: "Renamed.md"))
-        harness.service.report(.offlineRoot)
+        let record = try XCTUnwrap(harness.service.records[grant.workspaceID])
+        func queued(_ notice: IOSExternalWorkspaceNotice) -> IOSQueuedWorkspaceNotice {
+            IOSQueuedWorkspaceNotice(
+                workspaceID: grant.workspaceID,
+                generation: record.generation,
+                rootToken: record.rootToken,
+                notice: notice
+            )
+        }
+        harness.service.report(queued(.changed(relativePath: "Note.md")))
+        harness.service.report(queued(.deleted(relativePath: "Note.md")))
+        harness.service.report(queued(.moved(from: "Note.md", to: "Renamed.md")))
+        harness.service.report(queued(.offlineRoot))
         XCTAssertEqual(harness.files.ioCalls, before)
         XCTAssertEqual(seen.filter {
             if case .resourceChanged = $0 {

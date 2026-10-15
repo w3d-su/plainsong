@@ -4,77 +4,114 @@ import WorkspaceCore
 struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
     var timeoutNanoseconds: UInt64 = IOSWorkspaceAccessPorts.defaultTimeoutNanoseconds
 
-    func metadata(url: URL, relativePath: String) async throws -> IOSWorkspaceFileItem {
+    func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
         try await coordinate(url: url, reading: [.withoutChanges, .immediatelyAvailableMetadataOnly]) { readURL in
-            try item(url: readURL, relativePath: relativePath, includeBytes: false, maximumByteCount: 0)
+            let proven = try IOSWorkspaceRootAuthority.proveExisting(readURL, root: root)
+            return try item(url: proven, relativePath: relativePath)
         }
     }
 
-    func list(url: URL, relativePath: String) async throws -> [IOSWorkspaceFileItem] {
+    func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem] {
         try await coordinate(url: url, reading: [.withoutChanges, .immediatelyAvailableMetadataOnly]) { readURL in
+            let proven = try IOSWorkspaceRootAuthority.proveExisting(readURL, root: root)
             let children = try FileManager.default.contentsOfDirectory(
-                at: readURL,
+                at: proven,
                 includingPropertiesForKeys: Self.resourceKeys,
                 options: []
             )
             return try children.map { child in
                 let name = child.lastPathComponent
                 let spelling = IOSWorkspacePathAuthority.childSpelling(parent: relativePath, name: name)
-                return try item(url: child, relativePath: spelling, includeBytes: false, maximumByteCount: 0)
+                return try item(url: child, relativePath: spelling)
             }
         }
     }
 
-    func readFile(url: URL, relativePath: String, maximumByteCount: Int) async throws -> Data {
+    func readFile(
+        url: URL,
+        relativePath: String,
+        maximumByteCount: Int,
+        root: URL
+    ) async throws -> IOSWorkspaceFilePayload {
         try await coordinate(url: url, reading: [.withoutChanges]) { readURL in
-            let info = try item(url: readURL, relativePath: relativePath, includeBytes: false, maximumByteCount: 0)
+            let proven = try IOSWorkspaceRootAuthority.proveExisting(readURL, root: root)
+            if try isSymbolicLink(readURL) {
+                throw IOSWorkspaceFailure.outsideGrant
+            }
+            let info = try item(url: proven, relativePath: relativePath)
             if info.isSymlink {
                 throw IOSWorkspaceFailure.outsideGrant
             }
             if let size = info.fileSize, size > maximumByteCount {
                 throw IOSWorkspaceFailure.tooLarge
             }
-            let data = try Data(contentsOf: readURL)
+            let data = try Data(contentsOf: proven)
             if data.count > maximumByteCount {
                 throw IOSWorkspaceFailure.tooLarge
             }
-            return data
+            return IOSWorkspaceFilePayload(data: data, coordinatedURL: proven)
         }
     }
 
-    func createFile(url: URL, relativePath: String, data: Data) async throws -> IOSWorkspaceFileItem {
+    func createFile(url: URL, relativePath: String, data: Data, root: URL) async throws -> IOSWorkspaceFileItem {
         if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
             throw IOSWorkspaceFailure.alreadyExists
         }
         let parent = url.deletingLastPathComponent()
         if !FileManager.default.fileExists(atPath: parent.path(percentEncoded: false)) {
             try await coordinate(url: parent, writing: []) { coordinatedParent in
+                let provenParent = try IOSWorkspaceRootAuthority.proveNewLeaf(coordinatedParent, root: root)
                 try FileManager.default.createDirectory(
-                    at: coordinatedParent,
+                    at: provenParent,
                     withIntermediateDirectories: false
                 )
             }
         }
         try await coordinate(url: url, writing: []) { coordinatedURL in
-            if FileManager.default.fileExists(atPath: coordinatedURL.path(percentEncoded: false)) {
+            let proven = try IOSWorkspaceRootAuthority.proveNewLeaf(coordinatedURL, root: root)
+            if FileManager.default.fileExists(atPath: proven.path(percentEncoded: false)) {
                 throw IOSWorkspaceFailure.alreadyExists
             }
-            guard FileManager.default.createFile(atPath: coordinatedURL.path(percentEncoded: false), contents: data)
-            else {
+            guard FileManager.default.createFile(
+                atPath: proven.path(percentEncoded: false),
+                contents: data
+            ) else {
                 throw IOSWorkspaceFailure.coordinationFailed
             }
         }
-        return try await metadata(url: url, relativePath: relativePath)
+        do {
+            return try await metadata(url: url, relativePath: relativePath, root: root)
+        } catch {
+            throw IOSFilePersistedButUnreadable(
+                url: url,
+                relativePath: relativePath,
+                byteCount: data.count,
+                providerIdentity: nil,
+                reason: (error as? IOSWorkspaceFailure) ?? IOSWorkspaceFailureMapping.map(error)
+            )
+        }
     }
 
-    func removeFile(url: URL, relativePath: String) async throws {
-        _ = relativePath
+    func removeIfOwned(url: URL, relativePath: String, root: URL, providerIdentity: Data) async throws {
         try await coordinate(url: url, writing: .forDeleting) { coordinatedURL in
-            guard IOSWorkspacePathAuthority.sameFile(url, coordinatedURL) else {
+            if try isSymbolicLink(coordinatedURL) {
                 throw IOSWorkspaceFailure.indeterminate
             }
-            try FileManager.default.removeItem(at: coordinatedURL)
+            let proven = try IOSWorkspaceRootAuthority.proveExisting(coordinatedURL, root: root)
+            let info = try item(url: proven, relativePath: relativePath)
+            if info.isSymlink || info.isDirectory {
+                throw IOSWorkspaceFailure.indeterminate
+            }
+            guard let identity = info.providerIdentity, identity == providerIdentity else {
+                throw IOSWorkspaceFailure.indeterminate
+            }
+            try FileManager.default.removeItem(at: proven)
         }
+    }
+
+    private func isSymbolicLink(_ url: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey])
+        return values.isSymbolicLink == true
     }
 
     private static let resourceKeys: [URLResourceKey] = [
@@ -88,31 +125,10 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         .ubiquitousItemIsDownloadingKey,
     ]
 
-    private func item(
-        url: URL,
-        relativePath: String,
-        includeBytes: Bool,
-        maximumByteCount: Int
-    ) throws -> IOSWorkspaceFileItem {
-        _ = includeBytes
-        _ = maximumByteCount
+    private func item(url: URL, relativePath: String) throws -> IOSWorkspaceFileItem {
         let values = try url.resourceValues(forKeys: Set(Self.resourceKeys))
         let isDirectory = values.isDirectory ?? false
         let isSymlink = values.isSymbolicLink ?? false
-        if isSymlink, let target = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) {
-            if IOSWorkspacePathAuthority.rejectsSymlinkTarget(target) {
-                return IOSWorkspaceFileItem(
-                    relativePath: relativePath,
-                    url: url,
-                    isDirectory: isDirectory,
-                    isSymlink: true,
-                    fileSize: values.fileSize,
-                    availability: .unavailable,
-                    providerIdentity: nil,
-                    bytes: nil
-                )
-            }
-        }
         return IOSWorkspaceFileItem(
             relativePath: relativePath,
             url: url,
@@ -142,10 +158,9 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         reading options: NSFileCoordinator.ReadingOptions,
         body: @escaping @Sendable (URL) throws -> T
     ) async throws -> T {
-        try await run(timeoutNanoseconds: timeoutNanoseconds) {
+        try await run { coordinator in
             var coordinationError: NSError?
             var result: Result<T, Error>?
-            let coordinator = NSFileCoordinator()
             coordinator.coordinate(readingItemAt: url, options: options, error: &coordinationError) { readURL in
                 result = Result { try body(readURL) }
             }
@@ -162,10 +177,9 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         writing options: NSFileCoordinator.WritingOptions,
         body: @escaping @Sendable (URL) throws -> Void
     ) async throws {
-        try await run(timeoutNanoseconds: timeoutNanoseconds) {
+        try await run { coordinator in
             var coordinationError: NSError?
             var result: Result<Void, Error>?
-            let coordinator = NSFileCoordinator()
             coordinator.coordinate(writingItemAt: url, options: options, error: &coordinationError) { writeURL in
                 result = Result { try body(writeURL) }
             }
@@ -177,23 +191,34 @@ struct IOSSystemWorkspaceFilePort: IOSWorkspaceFilePort {
         }
     }
 
+    /// Cancels the coordinator at the deadline. The continuation resumes only after `coordinate` returns,
+    /// so a presenter stall ends when `cancel()` runs instead of when a task group finishes the child.
     private func run<T: Sendable>(
-        timeoutNanoseconds: UInt64,
-        _ body: @escaping @Sendable () throws -> T
+        _ body: @escaping @Sendable (NSFileCoordinator) throws -> T
     ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask {
-                try body()
+        let handle = IOSCoordinatorHandle()
+        let once = IOSOnceFlag()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let timeout = Task {
+                    do {
+                        try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                    } catch {
+                        return
+                    }
+                    handle.cancel()
+                }
+                Task.detached {
+                    let coordinator = handle.begin()
+                    let result = Result { try body(coordinator) }
+                    timeout.cancel()
+                    if once.claim() {
+                        continuation.resume(with: result)
+                    }
+                }
             }
-            group.addTask {
-                try await Task.sleep(nanoseconds: timeoutNanoseconds)
-                throw IOSWorkspaceFailure.coordinationFailed
-            }
-            guard let value = try await group.next() else {
-                throw IOSWorkspaceFailure.coordinationFailed
-            }
-            group.cancelAll()
-            return value
+        } onCancel: {
+            handle.cancel()
         }
     }
 }

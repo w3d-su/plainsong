@@ -11,7 +11,8 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
     var records: [IOSWorkspaceIdentity: IOSWorkspaceScopeRecord] = [:]
     var observations: [UUID: IOSWorkspaceObservation] = [:]
     var ownedAssets: [UUID: IOSOwnedAssetRecord] = [:]
-    var pendingNotices: [String: IOSExternalWorkspaceNotice] = [:]
+    var pendingNotices: [String: IOSQueuedWorkspaceNotice] = [:]
+    var persistedLeaves: [UUID: IOSPersistedLeaf] = [:]
     var noticeFlushScheduled = false
     public var includesHiddenEntries = false
     public var includesAllFiles = false
@@ -153,7 +154,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         )
     }
 
-    func ingest(_ notice: IOSExternalWorkspaceNotice) {
+    func ingest(_ notice: IOSQueuedWorkspaceNotice) {
         pendingNotices[notice.coalesceKey] = notice
         guard !noticeFlushScheduled else { return }
         noticeFlushScheduled = true
@@ -186,7 +187,7 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         let displayName = url.lastPathComponent
         let relative = displayName.isEmpty ? "file" : displayName
         do {
-            let item = try await ports.files.metadata(url: url, relativePath: relative)
+            let item = try await ports.files.metadata(url: url, relativePath: relative, root: url)
             if scope == .directory, !item.isDirectory {
                 throw IOSWorkspaceFailure.invalidPath
             }
@@ -326,9 +327,17 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
 
     func startWatching(_ record: IOSWorkspaceScopeRecord) {
         let identity = record.workspaceID
+        let generation = record.generation
+        let rootToken = record.rootToken
         ports.watcher.start(root: record.rootURL, identity: identity) { [weak self] notice in
+            let queued = IOSQueuedWorkspaceNotice(
+                workspaceID: identity,
+                generation: generation,
+                rootToken: rootToken,
+                notice: notice
+            )
             Task { @MainActor in
-                self?.ingest(notice)
+                self?.ingest(queued)
             }
         }
     }

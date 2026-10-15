@@ -17,7 +17,13 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             requestID: nil
         )
         do {
-            let item = try await context.files.metadata(url: location.fileURL, relativePath: location.relativePath)
+            let item = try await perform(context.ticket) {
+                try await context.files.metadata(
+                    url: location.fileURL,
+                    relativePath: location.relativePath,
+                    root: context.rootURL
+                )
+            }
             if item.isSymlink {
                 throw IOSWorkspaceFailure.outsideGrant
             }
@@ -25,12 +31,18 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 throw IOSWorkspaceFailure.tooLarge
             }
             var data = Data()
+            var coordinatedURL = location.fileURL
             do {
-                data = try await context.files.readFile(
-                    url: location.fileURL,
-                    relativePath: location.relativePath,
-                    maximumByteCount: maximumByteCount
-                )
+                let payload = try await perform(context.ticket) {
+                    try await context.files.readFile(
+                        url: location.fileURL,
+                        relativePath: location.relativePath,
+                        maximumByteCount: maximumByteCount,
+                        root: context.rootURL
+                    )
+                }
+                data = payload.data
+                coordinatedURL = payload.coordinatedURL
             } catch {
                 // LANE06_GUARD_EMPTY_FAILURE
                 throw error
@@ -40,7 +52,16 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             }
             _ = try await acceptWork(context.ticket)
             await finishWork(context.ticket)
-            return IOSCoordinatedRead(operationID: operationID, location: location, data: data)
+            let proven = IOSFileLocation(
+                workspaceID: location.workspaceID,
+                accessGeneration: location.accessGeneration,
+                relativePath: location.relativePath,
+                fileURL: coordinatedURL,
+                resourceID: location.resourceID
+            )
+            return IOSCoordinatedRead(operationID: operationID, location: proven, data: data)
+        } catch let draining as IOSDrainingCoordinationFailure {
+            try throwDraining(draining)
         } catch {
             await finishWork(context.ticket)
             try rethrowWorkspace(error)
@@ -61,15 +82,27 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             requestID: nil
         )
         do {
-            let created = try await context.files.createFile(
-                url: location.fileURL,
+            let created = try await perform(context.ticket) {
+                try await context.files.createFile(
+                    url: location.fileURL,
+                    relativePath: location.relativePath,
+                    data: data,
+                    root: context.rootURL
+                )
+            }
+            let leaf = IOSPersistedLeaf(
+                url: created.url,
                 relativePath: location.relativePath,
-                data: data
+                byteCount: data.count,
+                providerIdentity: created.providerIdentity,
+                root: context.rootURL
             )
+            await notePersisted(leaf, operationID: operationID)
             let accepted = try await MainActor.run { () throws -> (IOSWorkspaceIdentity, UInt64) in
                 let record = try accept(context.ticket)
                 return (record.workspaceID, record.generation)
             }
+            await clearPersisted(operationID)
             await finishWork(context.ticket)
             let identity = created.providerIdentity ?? IOSWorkspaceOwnedIdentity.bytes(operationID)
             let createdLocation = IOSFileLocation(
@@ -84,7 +117,26 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 location: createdLocation,
                 resourceID: IOSWorkspaceResourceIdentity(rawValue: identity)
             )
+        } catch let persisted as IOSFilePersistedButUnreadable {
+            let leaf = persistedLeaf(persisted, root: context.rootURL)
+            await notePersisted(leaf, operationID: operationID)
+            try await throwUnpublishedOrClean(
+                leaf,
+                context: context,
+                operationID: operationID,
+                reason: persisted.reason
+            )
+        } catch let draining as IOSDrainingCoordinationFailure {
+            try throwDraining(draining)
         } catch {
+            if let leaf = await takePersisted(operationID) {
+                try await throwUnpublishedOrClean(
+                    leaf,
+                    context: context,
+                    operationID: operationID,
+                    reason: workspaceFailure(error) ?? .coordinationFailed
+                )
+            }
             await finishWork(context.ticket)
             try rethrowWorkspace(error)
         }
@@ -103,6 +155,8 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
             try await publishIfCurrent(snapshot, ticket: context.ticket)
             await finishWork(context.ticket)
             return snapshot
+        } catch let draining as IOSDrainingCoordinationFailure {
+            try throwDraining(draining)
         } catch {
             await finishWork(context.ticket)
             if workspaceFailure(error) == .offline {
@@ -139,6 +193,13 @@ func rethrowWorkspace(_ error: Error) throws -> Never {
     throw (error as? IOSWorkspaceFailure) ?? IOSWorkspaceFailureMapping.map(error)
 }
 
+func throwDraining(_ draining: IOSDrainingCoordinationFailure) throws -> Never {
+    if draining.isCancellation {
+        throw CancellationError()
+    }
+    throw draining.failure
+}
+
 func workspaceFailure(_ error: Error) -> IOSWorkspaceFailure? {
     if error is CancellationError {
         return nil
@@ -154,7 +215,7 @@ enum IOSWorkspaceOwnedIdentity {
     }
 }
 
-private extension IOSWorkspaceAccessService {
+extension IOSWorkspaceAccessService {
     func begin(
         location: IOSFileLocation,
         lease: any IOSWorkspaceAccessLease,
@@ -239,53 +300,14 @@ private extension IOSWorkspaceAccessService {
         finish(ticket)
     }
 
-    func loadSnapshot(
-        context: IOSDetachedAdmission,
-        requestID: UUID
-    ) async throws -> IOSWorkspaceSnapshot {
-        if context.scope == .singleFile {
-            let relative = WorkspaceRelativePath(spelling: context.displayName) == nil ? "file" : context.displayName
-            let item = try await context.files.metadata(url: context.rootURL, relativePath: relative)
-            return try await MainActor.run {
-                let record = try accept(context.ticket)
-                guard let entry = IOSWorkspaceTreeBuilder.singleFileEntry(record: record, item: item) else {
-                    throw IOSWorkspaceFailure.invalidPath
-                }
-                return IOSWorkspaceSnapshot(
-                    workspaceID: record.workspaceID,
-                    accessGeneration: record.generation,
-                    requestID: requestID,
-                    entries: [entry]
-                )
-            }
-        }
-        let items = try await listTree(context: context)
-        return try await MainActor.run {
-            let record = try accept(context.ticket)
-            return IOSWorkspaceTreeBuilder.makeSnapshot(
-                record: record,
-                items: items,
-                requestID: requestID,
-                includesHiddenEntries: context.includesHiddenEntries,
-                includesAllFiles: context.includesAllFiles
-            )
-        }
-    }
-
-    func listTree(context: IOSDetachedAdmission) async throws -> [IOSWorkspaceFileItem] {
-        var output: [IOSWorkspaceFileItem] = []
-        var pending = [""]
-        while let parent = pending.popLast() {
-            try Task.checkCancellation()
-            let children = try await context.files.list(url: context.rootURL, relativePath: parent)
-            for child in children {
-                output.append(child)
-                if child.isDirectory, !child.isSymlink {
-                    pending.append(child.relativePath)
-                }
-            }
-        }
-        return output
+    func perform<T: Sendable>(
+        _ ticket: IOSOperationTicket,
+        _ body: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let timeout = await MainActor.run { ports.coordinationTimeoutNanoseconds }
+        return try await IOSCallerDeadline.race(timeoutNanoseconds: timeout, onDrain: { [ticket] in
+            await self.finishWork(ticket)
+        }, body: body)
     }
 
     func publishIfCurrent(_ snapshot: IOSWorkspaceSnapshot, ticket: IOSOperationTicket) async throws {

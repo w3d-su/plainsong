@@ -17,11 +17,17 @@ protocol IOSProviderIdentityPort: Sendable {
 }
 
 protocol IOSWorkspaceFilePort: Sendable {
-    func metadata(url: URL, relativePath: String) async throws -> IOSWorkspaceFileItem
-    func list(url: URL, relativePath: String) async throws -> [IOSWorkspaceFileItem]
-    func readFile(url: URL, relativePath: String, maximumByteCount: Int) async throws -> Data
-    func createFile(url: URL, relativePath: String, data: Data) async throws -> IOSWorkspaceFileItem
-    func removeFile(url: URL, relativePath: String) async throws
+    func metadata(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem
+    func list(url: URL, relativePath: String, root: URL) async throws -> [IOSWorkspaceFileItem]
+    func readFile(
+        url: URL,
+        relativePath: String,
+        maximumByteCount: Int,
+        root: URL
+    ) async throws -> IOSWorkspaceFilePayload
+    func createFile(url: URL, relativePath: String, data: Data, root: URL) async throws -> IOSWorkspaceFileItem
+    /// Identity check and delete run inside one coordinated write. A nil or mismatched identity must not delete.
+    func removeIfOwned(url: URL, relativePath: String, root: URL, providerIdentity: Data) async throws
 }
 
 protocol IOSRecentWorkspaceStoring: Sendable {

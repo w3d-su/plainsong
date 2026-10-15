@@ -37,9 +37,11 @@ extension IOSWorkspaceAccessService: IOSWorkspaceAssetWriting {
         try Task.checkCancellation()
         let record = try await requireOwned(asset)
         let files = await filePort()
+        let root = await MainActor.run { ownedAssets[asset.ownershipToken]?.rootURL ?? asset.targetLocation.fileURL }
         let item = try await files.metadata(
             url: asset.targetLocation.fileURL,
-            relativePath: asset.targetLocation.relativePath
+            relativePath: asset.targetLocation.relativePath,
+            root: root
         )
         guard !item.isSymlink, !item.isDirectory else { throw IOSWorkspaceFailure.invalidPath }
         if let identity = item.providerIdentity, identity != asset.ownedFileIdentity.rawValue {
@@ -69,35 +71,22 @@ extension IOSWorkspaceAccessService: IOSWorkspaceAssetWriting {
             return .retained(receipt(asset, reason: reason))
         case .alreadyRemoved:
             return .removed
-        case let .delete(relativePath, url):
+        case let .delete(relativePath, url, root, identity):
+            guard let identity else {
+                return .retained(receipt(asset, reason: .indeterminate))
+            }
             let files = await filePort()
             do {
-                let item = try await files.metadata(url: url, relativePath: relativePath)
-                if item.isSymlink || item.isDirectory {
-                    return .retained(receipt(asset, reason: .indeterminate))
-                }
-                if let identity = item.providerIdentity, identity != asset.ownedFileIdentity.rawValue {
-                    return .retained(receipt(asset, reason: .indeterminate))
-                }
-                let ownedSize = await MainActor.run { ownedAssets[asset.ownershipToken]?.byteCount }
-                if item.providerIdentity == nil, item.fileSize == nil || item.fileSize != ownedSize {
-                    return .retained(receipt(asset, reason: .indeterminate))
-                }
-                try await files.removeFile(url: url, relativePath: relativePath)
-                await MainActor.run {
-                    if var owned = ownedAssets[asset.ownershipToken] {
-                        owned.removed = true
-                        ownedAssets[asset.ownershipToken] = owned
-                    }
-                }
+                try await files.removeIfOwned(
+                    url: url,
+                    relativePath: relativePath,
+                    root: root,
+                    providerIdentity: identity
+                )
+                await markRemoved(asset.ownershipToken)
                 return .removed
             } catch let failure as IOSWorkspaceFailure where failure == .notFound {
-                await MainActor.run {
-                    if var owned = ownedAssets[asset.ownershipToken] {
-                        owned.removed = true
-                        ownedAssets[asset.ownershipToken] = owned
-                    }
-                }
+                await markRemoved(asset.ownershipToken)
                 return .removed
             } catch {
                 return .retained(receipt(asset, reason: IOSWorkspaceFailureMapping.map(error)))
@@ -107,7 +96,7 @@ extension IOSWorkspaceAccessService: IOSWorkspaceAssetWriting {
 }
 
 private enum IOSAssetRollbackDecision: Sendable {
-    case delete(relativePath: String, url: URL)
+    case delete(relativePath: String, url: URL, root: URL, identity: Data?)
     case alreadyRemoved
     case keep(IOSWorkspaceFailure)
 }
@@ -136,7 +125,12 @@ private extension IOSWorkspaceAccessService {
         guard let paths = await plannedPaths(request) else {
             throw IOSAssetStageFailure.failed(.invalidPath)
         }
-        let written = try await createAssetLeaf(request, grant: grant, lease: lease, paths: paths)
+        let written: (leaf: IOSCreatedLeaf, markdownRelative: String)
+        do {
+            written = try await createAssetLeaf(request, grant: grant, lease: lease, paths: paths)
+        } catch let unpublished as IOSUnpublishedLeaf {
+            throw IOSAssetStageFailure.retained(receipt(unpublished))
+        }
         let asset = IOSStagedImageAsset(
             operationID: request.operationID,
             targetLocation: written.leaf.location,
@@ -150,6 +144,7 @@ private extension IOSWorkspaceAccessService {
                 ownershipToken: ownershipToken,
                 rootRelative: written.leaf.location.relativePath,
                 url: written.leaf.location.fileURL,
+                rootURL: grant.rootURL,
                 providerIdentity: written.leaf.location.resourceID?.rawValue,
                 byteCount: request.bytes.count
             )
@@ -159,7 +154,8 @@ private extension IOSWorkspaceAccessService {
             let files = await filePort()
             let item = try await files.metadata(
                 url: written.leaf.location.fileURL,
-                relativePath: written.leaf.location.relativePath
+                relativePath: written.leaf.location.relativePath,
+                root: grant.rootURL
             )
             guard !item.isSymlink, !item.isDirectory else { throw IOSWorkspaceFailure.invalidPath }
             if let identity = item.providerIdentity, identity != written.leaf.resourceID.rawValue {
@@ -223,8 +219,12 @@ private extension IOSWorkspaceAccessService {
             }
             let leaf = try await createLeaf(request, grant: grant, lease: lease, rootRelative: retry.rootRelative)
             return (leaf, retry.markdownRelative)
+        } catch let unpublished as IOSUnpublishedLeaf {
+            throw unpublished
         } catch is CancellationError {
             throw CancellationError()
+        } catch let failure as IOSAssetStageFailure {
+            throw failure
         } catch {
             throw IOSAssetStageFailure.failed(IOSWorkspaceFailureMapping.map(error))
         }
@@ -311,7 +311,36 @@ private extension IOSWorkspaceAccessService {
         if owned.rootRelative != asset.targetLocation.relativePath {
             return .keep(.indeterminate)
         }
-        return .delete(relativePath: owned.rootRelative, url: owned.url)
+        return .delete(
+            relativePath: owned.rootRelative,
+            url: owned.url,
+            root: owned.rootURL,
+            identity: owned.providerIdentity
+        )
+    }
+
+    func markRemoved(_ token: UUID) async {
+        await MainActor.run {
+            if var owned = ownedAssets[token] {
+                owned.removed = true
+                ownedAssets[token] = owned
+            }
+        }
+    }
+
+    func receipt(_ unpublished: IOSUnpublishedLeaf) -> IOSAssetRecoveryReceipt {
+        IOSAssetRecoveryReceipt(
+            operationID: unpublished.operationID,
+            targetLocation: IOSFileLocation(
+                workspaceID: unpublished.workspaceID,
+                accessGeneration: unpublished.generation,
+                relativePath: unpublished.relativePath,
+                fileURL: unpublished.url,
+                resourceID: unpublished.providerIdentity.map { IOSWorkspaceResourceIdentity(rawValue: $0) }
+            ),
+            ownershipToken: UUID(),
+            reason: unpublished.reason
+        )
     }
 
     nonisolated func receipt(

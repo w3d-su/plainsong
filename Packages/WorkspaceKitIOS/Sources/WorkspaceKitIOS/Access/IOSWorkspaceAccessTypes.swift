@@ -37,6 +37,40 @@ struct IOSWorkspaceFileItem: Sendable {
     var bytes: Data?
 }
 
+struct IOSWorkspaceFilePayload: Sendable {
+    var data: Data
+    var coordinatedURL: URL
+}
+
+/// The provider persisted a leaf and a later read of that leaf failed. The bytes may still be on disk.
+struct IOSFilePersistedButUnreadable: Error, Sendable {
+    var url: URL
+    var relativePath: String
+    var byteCount: Int
+    var providerIdentity: Data?
+    var reason: IOSWorkspaceFailure
+}
+
+struct IOSPersistedLeaf: Sendable {
+    var url: URL
+    var relativePath: String
+    var byteCount: Int
+    var providerIdentity: Data?
+    var root: URL
+}
+
+/// A write reached disk and this generation can no longer publish it.
+struct IOSUnpublishedLeaf: Error, Sendable {
+    var operationID: UUID
+    var workspaceID: IOSWorkspaceIdentity
+    var generation: UInt64
+    var relativePath: String
+    var url: URL
+    var providerIdentity: Data?
+    var byteCount: Int
+    var reason: IOSWorkspaceFailure
+}
+
 enum IOSExternalWorkspaceNotice: Sendable {
     case changed(relativePath: String)
     case deleted(relativePath: String)
@@ -51,8 +85,19 @@ enum IOSExternalWorkspaceNotice: Sendable {
         case let .moved(from, _):
             from
         case .offlineRoot:
-            ""
+            "offline"
         }
+    }
+}
+
+struct IOSQueuedWorkspaceNotice: Sendable {
+    var workspaceID: IOSWorkspaceIdentity
+    var generation: UInt64
+    var rootToken: UUID
+    var notice: IOSExternalWorkspaceNotice
+
+    var coalesceKey: String {
+        "\(workspaceID.rawValue.uuidString)|\(generation)|\(rootToken.uuidString)|\(notice.coalesceKey)"
     }
 }
 
@@ -121,6 +166,8 @@ struct IOSOwnedAssetRecord: Sendable {
     var ownershipToken: UUID
     var rootRelative: String
     var url: URL
+    var rootURL: URL
+    /// Provider identity captured at create. Nil cannot prove a later delete.
     var providerIdentity: Data?
     var byteCount: Int
     var committed = false

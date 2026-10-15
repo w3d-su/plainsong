@@ -87,25 +87,20 @@ extension IOSWorkspaceAccessService {
         }
     }
 
-    func report(_ notice: IOSExternalWorkspaceNotice) {
-        let live = records.values.filter { !$0.stopped }
-        switch notice {
+    func report(_ queued: IOSQueuedWorkspaceNotice) {
+        guard let record = records[queued.workspaceID], !record.stopped else { return }
+        guard record.generation == queued.generation, record.rootToken == queued.rootToken else { return }
+        switch queued.notice {
         case .offlineRoot:
-            for record in live {
-                publish(.unavailable(workspaceID: record.workspaceID, reason: .offline))
-            }
+            publish(.unavailable(workspaceID: record.workspaceID, reason: .offline))
         case let .changed(path), let .deleted(path), let .availability(path, _):
-            for record in live {
-                guard let location = reportLocation(path, record: record) else { continue }
-                publish(.resourceChanged(location))
-            }
+            guard let location = reportLocation(path, record: record) else { return }
+            publish(.resourceChanged(location))
         case let .moved(from, to):
-            for record in live {
-                guard let location = reportLocation(from, record: record) else { continue }
-                publish(.resourceChanged(location))
-                if let destination = reportLocation(to, record: record) {
-                    publish(.resourceChanged(destination))
-                }
+            guard let location = reportLocation(from, record: record) else { return }
+            publish(.resourceChanged(location))
+            if let destination = reportLocation(to, record: record) {
+                publish(.resourceChanged(destination))
             }
         }
     }
