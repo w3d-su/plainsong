@@ -56,7 +56,8 @@ jobs:
 
       - name: Install tools
         run: |
-          brew install swiftlint
+          brew install xcodegen swiftlint
+          echo "xcodegen: $(xcodegen --version)"
           echo "swiftlint: $(swiftlint --version)"
 
       # swiftformat is pinned to an exact release binary instead of `brew install`.

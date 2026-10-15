@@ -39,7 +39,9 @@ build: generate
 # `make test` still runs all of them in sequence.
 test: test-packages test-hosted test-preview
 
-test-packages:
+# generate: the sandbox-root check signs its probe with the XcodeGen-generated
+# App/Plainsong.entitlements.
+test-packages: generate
 	$(MAKE) test-f2-tooling
 	@set -e; for pkg in $(PACKAGES); do \
 		echo "==> swift test: $$pkg"; \
