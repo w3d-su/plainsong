@@ -85,7 +85,8 @@ final class ExportPrintWideRunsAppTests: XCTestCase {
         )
         for marker in Self.markers(columnMarkers, ["PB2CELLSENTINEL"]) {
             XCTAssertEqual(
-                text.components(separatedBy: marker).count - 1, 1, marker
+                ExportPDFMechanismSpikeTests.occurrences(of: marker, in: text as NSString).count,
+                1, marker
             )
         }
     }

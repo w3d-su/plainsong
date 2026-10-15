@@ -16,7 +16,9 @@ final class ExportPDFShrunkPagesAppTests: XCTestCase {
     /// 14,400 pt wide, so its page shrinks to ~7% and the file still commits.
     func testMinifiedLongLineWritesFileWithAShrunkPagesWarning() async throws {
         let support = ExportHTMLCommandAppTests()
-        let source = "# Minified\n\n```\n" + String(repeating: "W", count: 40000) + "\n```\n"
+        // `text`, not a bare fence: highlight.js auto-detection of a 40,000-char line
+        // took ~12 s a test on hosted CI and does not change the line's width.
+        let source = "# Minified\n\n```text\n" + String(repeating: "W", count: 40000) + "\n```\n"
         let fixture = try support.makeFixture(text: source)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let destination = fixture.exportsDirectory.appendingPathComponent("minified.pdf")
@@ -63,7 +65,7 @@ final class ExportPDFShrunkPagesAppTests: XCTestCase {
     /// print path reports no notice.
     func testShrunkPrintStaysSilent() async throws {
         let support = ExportHTMLCommandAppTests()
-        let source = "```\n" + String(repeating: "W", count: 40000) + "\n```\n"
+        let source = "```text\n" + String(repeating: "W", count: 40000) + "\n```\n"
         let fixture = try support.makeFixture(text: source)
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         var results: [ExportHTMLOperationResult] = []

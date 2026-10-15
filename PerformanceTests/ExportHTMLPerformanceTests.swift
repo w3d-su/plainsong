@@ -23,7 +23,9 @@ final class ExportHTMLPerformanceTests: XCTestCase {
                                                         pixelsHigh: 16, bitsPerSample: 8, samplesPerPixel: 4,
                                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                                         bytesPerRow: 0, bitsPerPixel: 0))
-            let color = NSColor(srgbRed: Double(index) / 24, green: 0.5, blue: 0.8, alpha: 1)
+            // Device RGB to match the bitmap: setColor leaves the pixel transparent for an
+            // sRGB color, which made all twenty-four PNGs identical.
+            let color = NSColor(deviceRed: Double(index) / 24, green: 0.5, blue: 0.8, alpha: 1)
             for y in 0 ..< 16 {
                 for x in 0 ..< 16 {
                     bitmap.setColor(color, atX: x, y: y)

@@ -282,7 +282,7 @@ extension ExportHTMLCommandAppTests {
             bytesPerRow: 0,
             bitsPerPixel: 0
         ))
-        bitmap.setColor(.systemTeal, atX: 0, y: 0)
+        bitmap.setColor(ExportPDFWideRunsAppSupport.fixtureTeal, atX: 0, y: 0)
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
 
