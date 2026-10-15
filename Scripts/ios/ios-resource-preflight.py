@@ -36,11 +36,16 @@ def realpath_inside(root, relative):
     return candidate if candidate == root or candidate.startswith(root + os.sep) else None
 
 
-def check_manifest(manifest, roots):
+def manifest_entries(manifest):
     with open(manifest, encoding="utf-8") as stream:
-        wanted = [l.strip() for l in stream if l.strip() and not l.strip().startswith("#")]
+        return [line.strip() for line in stream if line.strip() and not line.strip().startswith("#")]
+
+
+def check_manifest(manifest, roots):
+    wanted = manifest_entries(manifest)
     if not wanted:
-        raise SystemExit(f"ios-resource-preflight: manifest has no entries: {manifest}")
+        print(f"ios-resource-preflight: manifest has no entries: {manifest}", file=sys.stderr)
+        raise SystemExit(65)
     found, missing = [], []
     for relative in wanted:
         hit = None

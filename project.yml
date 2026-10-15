@@ -270,6 +270,22 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.tests
         GENERATE_INFOPLIST_FILE: YES
 
+  # Lane 11 hosted smoke. Kept off the PlainsongIOS scheme so a 0-run or
+  # all-skip acceptance action cannot inherit the module suite's result.
+  IOSAcceptanceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: IOSAcceptanceTests/UI
+    dependencies:
+      - target: PlainsongIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.plainsong.editor.ios.acceptance-ui
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: PlainsongIOS
+
 schemes:
   PlainsongIOS:
     build:
@@ -290,4 +306,16 @@ schemes:
         - package: EditorKitIOS/EditorKitIOSTests
           parallelizable: false
         - package: WorkspaceKitIOS/WorkspaceKitIOSTests
+          parallelizable: false
+  IOSAcceptance:
+    build:
+      targets:
+        PlainsongIOS: [run, test]
+        IOSAcceptanceUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - name: IOSAcceptanceUITests
           parallelizable: false

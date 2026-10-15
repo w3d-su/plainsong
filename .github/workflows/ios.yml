@@ -72,6 +72,12 @@ jobs:
       - name: Simulator tests
         run: make ios-test
 
+      - name: Acceptance component package
+        run: make ios-acceptance-components
+
+      - name: Acceptance hosted smoke
+        run: make ios-acceptance
+
       - name: Device archive (unsigned)
         run: make ios-archive
 

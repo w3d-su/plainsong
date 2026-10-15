@@ -12,7 +12,10 @@ import subprocess
 import tempfile
 
 CONTRACT = "IOS-C0-v1"
-INPUT_ROOTS = ("AppIOS/", "AppIOSTests/", "App/Resources/preview/", "Packages/", "Scripts/ios/")
+INPUT_ROOTS = (
+    "AppIOS/", "AppIOSTests/", "IOSAcceptanceTests/", "App/Resources/preview/",
+    "Packages/", "Scripts/ios/",
+)
 INPUT_FILES = {"project.yml", "Makefile"}
 
 

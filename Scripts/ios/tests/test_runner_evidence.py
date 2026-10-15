@@ -101,6 +101,17 @@ class RunnerEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fingerprint changed"):
             self.verify()
 
+    def testAcceptanceSourceDriftIsIncludedInInputFingerprint(self):
+        directory = self.repository / "IOSAcceptanceTests/UI"
+        directory.mkdir(parents=True)
+        source = directory / "IOSAcceptanceLaunchSmokeTests.swift"
+        source.write_text("// original acceptance input\n")
+        proof.write_json(self.metadata / "source.json", proof.source_snapshot(self.repository))
+        self.record()
+        source.write_text("// changed acceptance input\n")
+        with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+            self.verify()
+
     def testHostedTestSourceDriftIsIncludedInInputFingerprint(self):
         tests = self.repository / "AppIOSTests"
         tests.mkdir()
@@ -224,7 +235,11 @@ class RunnerLockTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.probe = Path(self.temporary.name) / "probe.sh"
         self.probe.write_text("#!/bin/bash\nset -euo pipefail\nsource " + shlex.quote(str(SCRIPTS / "ios-common.sh")) +
-                              '\nios_lock_or_exec "$0" "$@"\nif [ "${1:-}" = nested ]; then "$0" inner; else echo entered; fi\n')
+                              '\nios_lock_or_exec "$0" "$@"\n'
+                              'if [ "${1:-}" = nested ]; then "$0" inner\n'
+                              'elif [ "${1:-}" = fail75 ]; then echo entered; exit 75\n'
+                              'elif [ "${1:-}" = fail65 ]; then echo entered; exit 65\n'
+                              'else echo entered; fi\n')
         self.probe.chmod(0o700)
         self.environment = dict(os.environ, IOS_LOCK_WAIT_SECONDS="0")
         self.environment.pop("IOS_RUNNER_LOCK_OWNER", None)
@@ -248,6 +263,49 @@ class RunnerLockTests(unittest.TestCase):
         result = self.run_probe("nested")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "entered")
+
+    def testPayloadFailureStaysDistinctFromAdmission(self):
+        for argument, code in (("fail65", 65), ("fail75", 75)):
+            with self.subTest(argument=argument):
+                result = self.run_probe(argument, IOS_LOCK_WAIT_SECONDS="30")
+                self.assertEqual(result.returncode, code, result.stderr)
+                self.assertEqual(result.stdout.strip(), "entered")
+                self.assertNotIn("admission timeout", result.stderr)
+
+    def testBusyLockAdmissionExits75WithoutRunningPayload(self):
+        import os
+        import signal
+        import time
+        lock = "/private/tmp/plainsong-xcodebuild-test.lock"
+        probe = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        holder = None
+        if probe.returncode == 0:
+            holder = subprocess.Popen(
+                ["/usr/bin/lockf", "-k", "-t", "0", lock, "sleep", "8"], start_new_session=True)
+            held = False
+            for _ in range(50):
+                busy = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if busy.returncode != 0:
+                    held = True
+                    break
+                time.sleep(0.05)
+            self.assertTrue(held, "canonical lock was not observed busy")
+        try:
+            result = self.run_probe()
+            self.assertEqual(result.returncode, 75, result.stderr)
+            self.assertIn("admission timeout", result.stderr)
+            self.assertNotIn("entered", result.stdout)
+        finally:
+            if holder is not None:
+                os.killpg(holder.pid, signal.SIGKILL)
+                holder.wait(timeout=5)
+
+    def testDefaultAdmissionWaitIs45Seconds(self):
+        text = (SCRIPTS / "ios-common.sh").read_text()
+        self.assertIn('IOS_LOCK_WAIT_SECONDS:-45', text)
+        self.assertNotIn('IOS_LOCK_WAIT_SECONDS:-300', text)
 
 
 if __name__ == "__main__":
