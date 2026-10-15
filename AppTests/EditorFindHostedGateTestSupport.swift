@@ -61,12 +61,13 @@ extension EditorFindHostedGateTests {
     func makeWorkspaceHost(
         appState: AppState,
         width: CGFloat = 1000,
-        height: CGFloat = 680
+        height: CGFloat = 680,
+        shellOverride: WorkspaceShell = .automatic
     ) -> HostedWorkspace {
         #if DEBUG
             EditorPreviewScrollCoordinator.latestDebugInstance = nil
         #endif
-        let root = WorkspaceWindow()
+        let root = WorkspaceWindow(shellOverride: shellOverride)
             .environmentObject(appState)
             .frame(width: width, height: height)
         let disposal = HostedRootDisappearance()

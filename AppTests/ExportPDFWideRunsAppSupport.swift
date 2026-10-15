@@ -180,7 +180,13 @@ enum ExportPDFWideRunsAppSupport {
         }
     }
 
-    /// A solid-color PNG at an exact pixel size, for atomic boxes of a known
+    /// `setColor(_:atX:y:)` writes only a color whose `colorSpaceName` is the
+    /// bitmap's own `NSDeviceRGBColorSpace`. A catalog color such as `.systemTeal`, or
+    /// an sRGB one such as `.red`, leaves the pixel transparent and logs two or three
+    /// "colorspace" lines per call (~90,000 lines per CI run before this color).
+    static let fixtureTeal = NSColor(deviceRed: 0.19, green: 0.69, blue: 0.78, alpha: 1)
+
+    /// A teal-dotted PNG at an exact pixel size, for atomic boxes of a known
     /// rendered height.
     static func pngData(size: NSSize) throws -> Data {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
@@ -197,7 +203,7 @@ enum ExportPDFWideRunsAppSupport {
         ))
         for x in stride(from: 0, to: Int(size.width), by: 8) {
             for y in stride(from: 0, to: Int(size.height), by: 8) {
-                bitmap.setColor(.systemTeal, atX: x, y: y)
+                bitmap.setColor(fixtureTeal, atX: x, y: y)
             }
         }
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
