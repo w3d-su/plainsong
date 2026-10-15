@@ -1,0 +1,3 @@
+# Phase B hosted smoke only. A pass shows the unavailable scaffold.
+# It does not close launch-reopen, preview, save, Files, IME, or performance.
+IOSAcceptanceLaunchSmokeTests/testLaunchShowsUnavailableScaffold
