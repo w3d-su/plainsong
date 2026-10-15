@@ -5,10 +5,17 @@
 > notarization scripted later; direct distribution first, App Store optional. This document
 > turns that into ordered work packages with gates. Owner decisions are marked **[owner]**.
 
-Created 2026-07-02. Current state (2026-07-10): MIT `LICENSE` committed; packaging
+Created 2026-07-02. Current state (2026-10-15): MIT `LICENSE` committed; packaging
 (`make release`, P3) and unsigned release CI (`release.yml`, P4) landed; v0.1.0-alpha.1 is
 published. The `v0.1.0-alpha.2` tag completed the first end-to-end P4 CI run and created a
-draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`. Per-DMG
+draft prerelease with the build-67 unsigned DMG and filename-only `.sha256`; that GitHub
+release was never published and stayed a draft. **v0.1.0-alpha.3 was published 2026-10-15**
+as a GitHub prerelease, built by Release workflow run 38696363613 from `main` at `05bcc30`
+(build 146). Its asset `Plainsong-0.1.0-146-unsigned.dmg` (SHA-256
+`5707c4623a4fd4dce2255864d8972af46c0c0477d4fd55e01208647f5e5e47fc`) was verified as
+universal (arm64 + x86_64) with a valid ad-hoc signature and the sandbox +
+`com.apple.security.network.client` entitlements present. Because alpha.2 was never
+published, alpha.3's auto-generated changelog compares against alpha.1. Per-DMG
 clean-machine spot-checking remains good practice and is not a release blocker after R14/P5
 closed with alpha.1. Developer ID signing and notarization remain deferred with P1/P2. The
 app builds and runs locally with the sandbox and `com.apple.security.network.client`
