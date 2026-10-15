@@ -54,6 +54,7 @@ SHA-256: `17709c2048b60ecfc5650cbaaa9e7de97e1180e0227828d99cd84fefa5900fc5`
 Same command and build path as the first run. Swift Testing again reported 0 tests; the XCTest count is the result.
 
 - A zero timeout does not accept an immediate `true`. A `true` that arrives only after the 20 ms deadline, including a predicate that stays silent for 250 ms, is `.timedOut` and the wait returns in under 150 ms. A `true` inside the deadline still succeeds.
+- The same waiter then had an unsynchronized `predicateTask` read. That failure is preserved in `bounded-wait-race/`: Thread Sanitizer aborted the unchanged bytes with return `-6` at `racy-BoundedWait.swift:112` and `:116`. After the lock fix, the same probe returned 0 and printed `PROBE_DONE` with no sanitizer warning. The filtered fence tests are not that check.
 - The selection `{14, 5}` replaces only the second `👩‍💻`. A prefix selection, a moved selection, and a stale range leave source, selection, and the probe counter unchanged. That counter is not an `UndoManager` registration.
 - `owned/linked-parent/fixture.md` is refused on read and write. The outside directory stays unchanged, and the symlink remains. A direct `open` with `O_NOFOLLOW` still followed that parent in a separate OS probe; `openat` with `O_DIRECTORY | O_NOFOLLOW` returned `ENOTDIR`. The probe is not this Swift run.
 

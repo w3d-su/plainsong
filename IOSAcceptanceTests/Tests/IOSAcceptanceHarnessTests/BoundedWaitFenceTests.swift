@@ -41,6 +41,61 @@ final class BoundedWaitFenceTests: XCTestCase {
         XCTAssertLessThan(clock.now - start, .milliseconds(150))
     }
 
+    func testPreCancelCompletesOnceAndDropsALaterTrue() async {
+        for _ in 0 ..< 40 {
+            let parked = ParkedPredicate()
+            let task = Task {
+                try await BoundedWait.until(timeoutNanoseconds: 2_000_000_000) {
+                    await Task.yield()
+                    return await parked.park()
+                }
+            }
+            task.cancel()
+            await expectCancellation(task)
+            parked.release(true)
+        }
+    }
+
+    func testCancelWhileWaitingCompletesOnceAndDropsALaterTrue() async {
+        let parked = ParkedPredicate()
+        let entered = WaitSignal()
+        let task = Task {
+            try await BoundedWait.until(timeoutNanoseconds: 2_000_000_000) {
+                entered.signal()
+                return await parked.park()
+            }
+        }
+        await entered.wait()
+        task.cancel()
+        await expectCancellation(task)
+        parked.release(true)
+    }
+
+    func testDeadlineRacesHandlePublicationAndResumesOnce() async {
+        var completions = 0
+        for _ in 0 ..< 40 {
+            let clock = ContinuousClock()
+            let start = clock.now
+            do {
+                try await BoundedWait.until(timeoutNanoseconds: 2_000_000) {
+                    while !Task.isCancelled {
+                        await Task.yield()
+                    }
+                    return true
+                }
+                XCTFail("deadline accepted a true that arrived after cancellation")
+                return
+            } catch is BoundedWaitError {
+                completions += 1
+                XCTAssertLessThan(clock.now - start, .milliseconds(80))
+            } catch {
+                XCTFail("unexpected \(error)")
+                return
+            }
+        }
+        XCTAssertEqual(completions, 40)
+    }
+
     func testSilentPredicateTimesOutBeforeALateTrue() async {
         let parked = ParkedPredicate()
         Thread {
@@ -62,6 +117,17 @@ final class BoundedWaitFenceTests: XCTestCase {
         XCTAssertLessThan(clock.now - start, .milliseconds(150))
     }
 
+    private func expectCancellation(_ task: Task<Void, Error>) async {
+        do {
+            _ = try await task.value
+            XCTFail("cancelled wait accepted a result")
+        } catch is CancellationError {
+            return
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+    }
+
     private static func pause(seconds: TimeInterval) async {
         await withCheckedContinuation { continuation in
             let thread = Thread {
@@ -69,6 +135,34 @@ final class BoundedWaitFenceTests: XCTestCase {
                 continuation.resume()
             }
             thread.start()
+        }
+    }
+}
+
+private final class WaitSignal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var signaled = false
+
+    func signal() {
+        lock.lock()
+        signaled = true
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.lock.lock()
+            if signaled {
+                self.lock.unlock()
+                continuation.resume()
+                return
+            }
+            self.continuation = continuation
+            self.lock.unlock()
         }
     }
 }

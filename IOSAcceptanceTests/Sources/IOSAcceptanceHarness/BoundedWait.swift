@@ -63,13 +63,19 @@ private enum WaitAttempt: Sendable {
 }
 
 /// One predicate attempt raced against the deadline. The continuation resumes
-/// once. Cancellation and the timer both drop a result that arrives afterwards.
+/// once. Every read and write of the stored handles uses `lock`. `finish`
+/// copies those handles while holding the lock and cancels them after releasing
+/// it. The timer must not touch the handles: a deadline that arrives before
+/// publication, or a sleep that returns because the timer was cancelled, used
+/// to race the publication write.
 private final class AttemptRace: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<WaitAttempt, Never>?
     private var predicateTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
     private var finished = false
+    private var storedAttempt: WaitAttempt?
+    private var resumeCount = 0
 
     static func run(
         predicate: @escaping @Sendable () async -> Bool,
@@ -92,8 +98,9 @@ private final class AttemptRace: @unchecked Sendable {
     ) {
         lock.lock()
         if finished {
+            let attempt = storedAttempt ?? .cancelled
             lock.unlock()
-            continuation.resume(returning: .cancelled)
+            resume(continuation, attempt)
             return
         }
         self.continuation = continuation
@@ -109,7 +116,6 @@ private final class AttemptRace: @unchecked Sendable {
             if remaining > .zero {
                 try? await clock.sleep(for: remaining)
             }
-            self.predicateTask?.cancel()
             finish(.expired)
         }
         lock.lock()
@@ -130,13 +136,30 @@ private final class AttemptRace: @unchecked Sendable {
             return
         }
         finished = true
+        storedAttempt = attempt
         let continuation = continuation
         self.continuation = nil
         let predicateTask = predicateTask
         let timerTask = timerTask
+        self.predicateTask = nil
+        self.timerTask = nil
         lock.unlock()
         predicateTask?.cancel()
         timerTask?.cancel()
-        continuation?.resume(returning: attempt)
+        if let continuation {
+            resume(continuation, attempt)
+        }
+    }
+
+    private func resume(
+        _ continuation: CheckedContinuation<WaitAttempt, Never>,
+        _ attempt: WaitAttempt
+    ) {
+        lock.lock()
+        resumeCount += 1
+        let count = resumeCount
+        lock.unlock()
+        precondition(count == 1, "AttemptRace continuation resumed \(count) times")
+        continuation.resume(returning: attempt)
     }
 }
