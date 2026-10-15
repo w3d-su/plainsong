@@ -4,7 +4,7 @@ Base is PR #164 head `fdbcd44444f958589cb1e662d67ce3015e5e9f30` on `codex/ios-re
 
 Worktree: `/private/tmp/plainsong-ios-12-validation-wiring`. Branch: `codex/ios-12-validation-wiring-20261015`.
 
-The runs below were dirty at `fdbcd444` because these wiring files were uncommitted. Both runs share source fingerprint `6ab05e5271444fde94da8952002c98743e4e3c67734e283b41d21a4f0e077cb8` and the same `source.json` SHA-256 `fa478b817d5343692a806e1570aece1fc2a27d84848b6f62caf517425b5a3547`. That fingerprint covers `project.yml`, `Makefile`, `Scripts/ios/`, `IOSAcceptanceTests/`, `AppIOS/`, `AppIOSTests/`, `App/Resources/preview/`, and `Packages/`. Evidence markdown is not part of it.
+The runs below were dirty at `fdbcd444` because these wiring files were uncommitted. Both runs share source fingerprint `6ab05e5271444fde94da8952002c98743e4e3c67734e283b41d21a4f0e077cb8` and the same `source.json` SHA-256 `fa478b817d5343692a806e1570aece1fc2a27d84848b6f62caf517425b5a3547`. That fingerprint covers `project.yml`, `Makefile`, `Scripts/ios/`, `IOSAcceptanceTests/`, `AppIOS/`, `AppIOSTests/`, `App/Resources/preview/`, and `Packages/`. Evidence markdown is not part of it. Commit `dc9d02d8e03928ba56c3daecfde66d479cce3f0e` contains those wiring bytes. All 679 fingerprinted files match that commit; only the receipt's recorded `source_sha` and dirty bit still name the parent.
 
 ## What this wires
 
