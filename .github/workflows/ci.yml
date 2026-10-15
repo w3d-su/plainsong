@@ -14,22 +14,45 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Jobs only read the checkout; cache and artifact actions use the runtime
+# token, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# The suite runs as parallel jobs instead of one serial macOS job; the
+# `build-and-test` job at the bottom keeps the check name the main ruleset
+# requires and passes only when every job passed. Three macOS jobs per run fit
+# GitHub's 5-concurrent macOS job cap (non-Enterprise plans); when two PRs run
+# at once, one of the second run's jobs waits for a free runner.
 jobs:
-  build-and-test:
-    runs-on: macos-15
-    timeout-minutes: 40
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare CI evidence paths
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: preview-src/package-lock.json
+
+      - name: Install preview dependencies
         run: |
-          artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          mkdir -p "$artifact_dir"
-          {
-            printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
-            printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
-            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
-          } >> "$GITHUB_ENV"
+          cd preview-src
+          npm ci
+
+      - name: Typecheck preview
+        run: cd preview-src && npm run typecheck
+
+      - name: Test preview
+        run: make test-preview
+
+  packages:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install tools
         run: |
@@ -70,12 +93,6 @@ jobs:
           echo "resolved: $(command -v swiftformat)"
           echo "swiftformat: $(swiftformat --version)"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: preview-src/package-lock.json
-
       - name: Cache Swift package builds
         uses: actions/cache@v4
         with:
@@ -88,27 +105,60 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Packages/**/Package.swift', 'Packages/**/Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: Install preview dependencies
-        run: |
-          cd preview-src
-          npm ci
-
-      - name: Typecheck preview
-        run: cd preview-src && npm run typecheck
-
       - name: Lint
         run: make lint
 
-      - name: Test
-        run: make test
+      - name: Test packages
+        run: make test-packages
+
+  # Hosted XCTest bundles, split across two runners by measured wall time on
+  # macos-15 (run 38697469851): PlainsongTests ~7.5 min alone; PlainsongUITests
+  # ~4.5 min plus PerformanceTests ~1 min. Each shard still builds every bundle
+  # (~3 min; -only-testing narrows execution, not the build).
+  hosted:
+    name: hosted (${{ matrix.shard }})
+    runs-on: macos-15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: app
+            targets: PlainsongTests
+          - shard: ui-performance
+            targets: PlainsongUITests PerformanceTests
+            build_app: true
+    env:
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare CI evidence paths
+        run: |
+          artifact_dir="$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD"
+          mkdir -p "$artifact_dir"
+          {
+            printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir"
+            printf 'XCODE_RESULT_BUNDLE=%s/Results.xcresult\n' "$artifact_dir"
+            printf 'XCODE_DERIVED_DATA=%s/plainsong-dd-%s-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$SHARD"
+          } >> "$GITHUB_ENV"
+
+      - name: Install tools
+        run: |
+          brew install xcodegen
+          echo "xcodegen: $(xcodegen --version)"
+
+      - name: Test ${{ matrix.targets }}
+        run: make test-hosted XCODE_TEST_TARGETS="${{ matrix.targets }}"
 
       - name: Build app
+        if: ${{ matrix.build_app }}
         run: make build
 
       - name: Capture failure environment
         if: ${{ failure() || cancelled() }}
         run: |
-          artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT}"
+          artifact_dir="${XCODE_ARTIFACT_DIR:-$RUNNER_TEMP/plainsong-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$SHARD}"
           mkdir -p "$artifact_dir"
           printf 'XCODE_ARTIFACT_DIR=%s\n' "$artifact_dir" >> "$GITHUB_ENV"
           {
@@ -125,7 +175,23 @@ jobs:
         if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: plainsong-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          name: plainsong-ci-failure-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.XCODE_ARTIFACT_DIR }}/
           retention-days: 14
           if-no-files-found: warn
+
+  # Required status check (main ruleset): keep this job id. Any failed, cancelled
+  # or skipped job above fails it.
+  build-and-test:
+    if: ${{ always() }}
+    needs: [preview, packages, hosted]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every CI job to pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null

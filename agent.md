@@ -89,7 +89,7 @@ blogeditor/
 │   ├── src/pipeline.ts       # unified pipeline (md and mdx variants)
 │   ├── src/styles/           # preview CSS (Apple system palette, Xcode-style syntax colors)
 │   └── test/                 # vitest specs
-└── .github/workflows/ci.yml  # macOS runner: swiftformat --lint, swiftlint, swift test, xcodebuild test, npm test
+└── .github/workflows/ci.yml  # parallel jobs: preview (Linux npm), packages (lint + swift test), hosted XCTest shards; `build-and-test` gate
 ```
 
 Build artifacts: `preview-src` builds to `App/Resources/preview/` (`index.html`, `bundle.js`,
@@ -624,7 +624,8 @@ make bootstrap        # brew install xcodegen swiftformat swiftlint node; npm ci
 make generate         # xcodegen generate  (run after editing project.yml)
 make preview-bundle   # build preview-src → App/Resources/preview/ (commit the output)
 make build            # xcodebuild -scheme Plainsong build
-make test             # swift test (packages) + xcodebuild test + (cd preview-src && npm test)
+make test             # test-packages (swift test) + test-hosted (xcodebuild test) + test-preview (npm test)
+make test-hosted XCODE_TEST_TARGETS=PlainsongTests  # one hosted bundle subset, as a CI shard runs it
 make release          # DMG pipeline (Scripts/release.sh); PLAINSONG_UNSIGNED=1 for the alpha path
 cd preview-src && npm run typecheck  # preview TypeScript check; CI runs this separately
 make format           # swiftformat . && swiftlint --fix
