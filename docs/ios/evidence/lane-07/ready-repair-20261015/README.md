@@ -1,56 +1,55 @@
-# Lane 07 ready-load diagnosis — 2026-10-15
+# Lane 07 ready-load evidence — 2026-10-15
 
-The hosted preview ready gate remains **FAILED**. No product code changed. This record is the controlled timeline for the first `loadFileURL` on review head `59f374ff9341289b91c0a4090b216dcf16510797`.
+The hosted preview ready gate remains **FAILED**. Commit `9ae2b78` adds this note only. It does not change product or test code. Head `59f374ff9341289b91c0a4090b216dcf16510797` is the review tree these notes started from. Branch `codex/ios-07-ready-repair-20261015`. The owner checkout was not modified.
 
-Scheme `PreviewKit-Package`, destination `platform=iOS Simulator,id=A24A1CB9-2861-4AA4-A79F-E53F768950D8` (iOS 27.0, `iPhone18,3`), `-parallel-testing-enabled NO`, `CODE_SIGNING_ALLOWED=NO`. The 8-second throwing wait and the 2-second JavaScript callback deadline were not lengthened. Worktree: `/private/tmp/plainsong-ios-07-ready-repair-20261015`, branch `codex/ios-07-ready-repair-20261015`. The owner checkout was not modified.
+## Open gate
 
-## Still failing
+`PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible` is still open. This lane did not produce a passing first-controller run of the real bundle, and it did not run the kitchen-sink table, code, math, Mermaid, or MDX DOM assertions to a pass. The full iOS 94-case `PreviewKit-Package` gate was not run and is not closed. The three previously recorded export failures were not re-executed.
 
-`PreviewIOSHostedTests/testBundledKitchenSinkAndMDXStayVisible` still throws `Timed out waiting for bundle ready` from the unchanged 8-second wait when that case is the first WebKit load in the process. The synthetic case fails the same way when it is the first load. Kitchen-sink table, code, math, Mermaid, and MDX DOM assertions have not passed on this head.
+A later controller, created after another load has already consumed the 8-second wait, is not a first-load pass. Cold-start synthetic failure and real-bundle failure stay separate observations. `UIApplication` or test-host differences are not a demonstrated cause.
 
-A later page in the same process can become ready. That does not make the first page ready.
+A later fix has to make the first controller ready in a real app-hosted, production-equivalent process. It must keep the 8-second throwing wait and the 2-second JavaScript callback deadline. It must not pass by warming a second load, by deleting assertions, or by lengthening either deadline. A test host or scheme change belongs to lanes 12 and 13.
 
-## What the timelines show
+## Unmodified baseline
 
-Every first `loadFileURL` followed the same sequence:
+This lane did not archive an unmodified execution of `59f374f`. Every simulator log below was produced from a worktree that had already been edited and was later restored with `git checkout`. The restored tree has no `PLAINSONG_READY` symbol. The committed source therefore cannot rebuild those logs.
 
-1. The read grant is the index file's parent directory (`hasDirectoryPath=true`). Copied bundle hashes matched the repo for the real page (`index.html` `0d13d50cad21da80a8642f8e45919aa79fbbd9b2ded1b1184ac907e6e4ca3547`, `bundle.js` `1e7784e4b13886ccf23c75a36403fd1b505a68f09f2536de7bd14ec2d63b2917`, `bundle.css` `94d264a5a431d0c184d83c5943d6f3179ed178e74e1330396694e77839124294`).
-2. `decidePolicy` allows the exact index URL (`WKNavigationActionPolicy.allow`, raw value 1) after WebContent has launched.
-3. `didStart`, `didCommit`, `didFinish`, and `didFail` do not arrive. A 20-second observation of an otherwise unmodified first load also had no `didStart`.
-4. The document stays unreadable or, once a later web view can run script, remains `about:blank`.
+The historical candidate note in `docs/ios/evidence/review-20261013/preview-native/README.md` is a different commit (`3fc31d4`). It is not an unmodified run of this head.
 
-The xctest process logs `This process does not have a UIApplication object`. Calling `UIApplication.shared` before the load returned a nil delegate and did not remove that log line or start navigation. ExtensionKit "Client not entitled" lines appear when a web process is torn down. They were not treated as the cause.
+## Modified diagnostics are observations only
 
-| Run | What changed | Result |
-| --- | --- | --- |
-| diag1 | Real bundle, then synthetic page, same process | Bundle failed, 14.510s, no `didStart`. Synthetic passed, 1.870s: `didStart`, `didFinish`, protocol `Optional(8)`, `isReady`. |
-| diag2 | Synthetic page only, fresh process | Failed. Policy allow, no `didStart`. |
-| diag3 | Allow reply deferred to the next turn | Failed. `decision-delivered` after WebContent launch, still no `didStart`. |
-| diag4 | `stopLoading` and a second `loadFileURL` on the same web view | Failed. The second call produced no navigation callbacks. |
-| diag5 | Unmodified first load observed for 20 seconds | Failed at 20.882s. Still no `didStart`. |
-| diag6 | Sacrificial file load, then the visible web view after that allow | Both allows logged. Neither reached `didStart`. |
-| diag7 / diag8 | Second controller immediately after the first allow, held or released | Second allow logged. No `didStart`. |
-| diag9 | First controller kept for the full 8 seconds, released, then a new controller | **Passed, 10.392s.** The 8-second clock covered only the second controller. Its load reached `didStart`, `didCommit`, `didFinish`, protocol 8, and `isReady` about 2 seconds after it was created. Wall time from the first load was about 10.4 seconds. |
-| diag11 | Controller replaces its web view 2 seconds after the first allow | Failed, 10.161s. Replacement process became unresponsive. DOM was `about:blank` with no bridge. |
-| diag12 | `UIApplication.shared` before the first load | Failed, 12.304s. Same policy-allow stall. Runtime still reported no `UIApplication`. |
+No per-run patch, instrumentation helper, or input manifest was kept. A baseline SHA plus a log hash does not prove that a run changed only the variable described in the previous revision of this note. Those descriptions are withdrawn. The logs remain local observations. They are not a causal attribution.
 
-diag1's passing synthetic case is the same shape as diag9: it ran only after another web view had already lived through a full stuck load. It is not evidence that a cold first load succeeds.
+Each log begins with the `xcodebuild` command that the driver wrote. Scheme `PreviewKit-Package`, destination `platform=iOS Simulator,id=A24A1CB9-2861-4AA4-A79F-E53F768950D8`, derived data `/private/tmp/plainsong-ios-07-ready-diag1-dd`, `-parallel-testing-enabled NO`, `CODE_SIGNING_ALLOWED=NO`. The selection and the driver exit are what the log file records. Source identity for that command was not archived.
 
-## Rejected changes
+| Run | Selection recorded in the log | Driver exit | Result bundle | Patch retained |
+| --- | --- | --- | --- | --- |
+| diag1 | `PreviewIOSHostedTests` | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag2 | synthetic case only | `DIAG_EXIT -15`, banner `** BUILD INTERRUPTED **` | incomplete; see below | no |
+| diag3 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag4 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag5 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag6 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag7 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag8 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag9 | synthetic case only | `DIAG_EXIT 0`, banner `** TEST SUCCEEDED **` | `Info.plist` present | no |
+| diag10 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present; log has compile errors and no `Test Case` | no |
+| diag11 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
+| diag12 | synthetic case only | `DIAG_EXIT 65`, banner `** TEST FAILED **` | `Info.plist` present | no |
 
-These were tried in the worktree and reverted. None made the first controller ready within 8 seconds:
+diag9's success banner is not a first-load pass. Its source patch was not retained, so the log cannot show which test edits produced that banner.
 
-- Delivering the allow decision on the next main-actor turn.
-- Reloading the same web view.
-- Starting a sacrificial file load and then loading the visible web view.
-- Replacing the web view two seconds after the allow.
-- Touching `UIApplication.shared` from the test.
+diag11's driver also logged `Failure collecting diagnostics from simulator` after a 600-second `simctl diagnose` wait. That collection delay is separate from the test banner.
 
-The 8-second wait was not increased. Root, token, and reader fences were not edited.
+## diag2 is three separate facts
 
-## Logs
+1. **Log observation of a named failure.** Before the driver stopped, the log printed `Test Case '-[PreviewKitTests.PreviewIOSHostedTests testHostedPageBecomesReadyAndRendersTheLatestDocument]' failed (15.254 seconds).` The caught string in that same log is `InvalidTransition`. The source that printed it was not retained.
+2. **Driver interruption.** The same log then prints `** BUILD INTERRUPTED **` and `DIAG_EXIT -15`. Exit `-15` is the driver's record that `xcodebuild` was signaled. It is not a completed test status.
+3. **Incomplete result bundle.** `/private/tmp/plainsong-ios-07-ready-diag2.xcresult` contains `Data/` and `Staging/` and has no `Info.plist`. It is not a parseable xcresult. Do not cite it as the result of the named failure.
 
-Simulator logs and xcresults are local scratch, not committed. SHA-256 of each log:
+## Log hashes
+
+These hashes identify the observation files. They do not identify the source that was compiled.
 
 | File | SHA-256 |
 | --- | --- |
@@ -63,19 +62,21 @@ Simulator logs and xcresults are local scratch, not committed. SHA-256 of each l
 | `/private/tmp/plainsong-ios-07-ready-diag7.log` | `f629c68dd2b901e0a474ef0b65569cda3713453455f33fa470e603f765aa9d93` |
 | `/private/tmp/plainsong-ios-07-ready-diag8.log` | `94abb42647d8261ca2514c2b2005558eb499033a38e4ee385966c9e55b137a47` |
 | `/private/tmp/plainsong-ios-07-ready-diag9.log` | `30faaacd291ac00ccc5b08ac1a7074aa1eddb945018e6873d04278095131b474` |
+| `/private/tmp/plainsong-ios-07-ready-diag10.log` | `f0d29c0f415c2fba18f1f0cb8c03a309faf1c37b343554621ffa417e6a88ef28` |
 | `/private/tmp/plainsong-ios-07-ready-diag11.log` | `1759795a571b634e563bb2e9021a225593bf3323917c2736c211e4c200cf6481` |
 | `/private/tmp/plainsong-ios-07-ready-diag12.log` | `5ed11231eb93530a056a74257bd9e354e71d3a24344cc6b0dd74a9d8b4fce43a` |
 
-xcresults: `/private/tmp/plainsong-ios-07-ready-diag1.xcresult` through `diag12.xcresult`, excluding the compile-only diag10 attempt. Derived data: `/private/tmp/plainsong-ios-07-ready-diag1-dd`. xctest image: `.../Build/Products/Debug-iphonesimulator/PreviewKitTests.xctest/PreviewKitTests`.
+## What a later diagnostic must archive before it is interpreted
 
-diag11's failure collection waited on `simctl diagnose` until the 600-second simulator timeout (`Failure collecting diagnostics from simulator`). Later runs passed `-collect-test-diagnostics never`. diag12's test session finished in 27.449 seconds.
+For each run, under this directory, before any cause is claimed:
+
+- A patch against `59f374f`, or against the previous archived patch, plus the SHA-256 of every changed source file.
+- The instrumentation helper, if the run emits probe lines.
+- The exact command and the driver exit status.
+- Whether the xcresult has `Info.plist`. An interrupted driver and a missing `Info.plist` stay separate from a named test failure.
 
 ## Not run
 
-- Mac `swift test --package-path Packages/PreviewKit`. No product delta remains, so this was not re-run.
-- Full `PreviewKit-Package` iOS suite. The three previously recorded export failures were not re-executed. The full 94-case gate is not green.
-- Exact-head CI, device, Files/iCloud, background save, owner-signed install, and performance. Those stay open. M0 device IME and Undo stay open.
-
-## Next measurement
-
-A fix has to make the **first** controller's file load reach `didStart` and `isReady` inside the existing 8-second wait. Creating another controller after one stuck load has already consumed 8 seconds does not meet that gate. The production app has a `UIApplication`; this package test host does not. That difference is still only a hypothesis, because constructing `UIApplication.shared` inside the test did not start the navigation.
+- Mac `swift test --package-path Packages/PreviewKit`.
+- Full iOS `PreviewKit-Package`.
+- Exact-head CI, device, Files/iCloud, background save, owner-signed install, and performance. M0 device IME and Undo stay open.
