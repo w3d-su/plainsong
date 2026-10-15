@@ -1,4 +1,5 @@
 import AppKit
+@testable import EditorKit
 @testable import Plainsong
 import XCTest
 
@@ -22,7 +23,10 @@ extension EditorFindHostedGateTests {
         state.setLayoutMode(.sourceOnly)
         let host = makeWorkspaceHost(appState: state)
         registerTeardown(host: host, fixture: fixture)
-        let editor = try await waitForView(NSTextView.self, in: host.window)
+        try await waitUntil("production editor mounts") {
+            self.editorTextView(in: host.window) != nil
+        }
+        let editor = try XCTUnwrap(editorTextView(in: host.window))
         let list = try await waitForView(NSTableView.self, in: host.window)
         host.window.makeKeyAndOrderFront(nil)
         XCTAssertTrue(host.window.makeFirstResponder(editor))

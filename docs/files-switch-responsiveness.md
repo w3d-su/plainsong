@@ -129,3 +129,11 @@ from the matching PR-head run, separately from this local macOS 27 artifact. Fin
 artifacts use `plainsong-pr166-final.xcresult` / `.log`; pinned format/lint logs use
 `plainsong-pr166-final-format.log` and `plainsong-pr166-final-lint.log` (352 SwiftLint
 warnings, 0 serious).
+
+The first final-boundary run exposed a test locator mistake: `NSTextView` is not the
+EditorKit production text view. The new cases now use the existing identifier-checked
+`editorTextView(in:)` helper. That run also had a UI-automation initialization timeout
+and executed no UI cases; it is not passing evidence. The corrected final run uses
+`plainsong-pr166-final2.xcresult` / `.log`. Main was synchronized through an ordinary
+merge after #165/#167/#168 landed; the only conflict was appending Decision Log rows,
+and both main's CI row and this PR's two rows are retained.
