@@ -2020,5 +2020,14 @@ regenerated bundle; this change does not close owner PDF/Print or performance ga
   executed the regression and live-preview isolation case, 2 tests, 0 failures.
   These local results do not establish macOS 15 acceptance; that requires CI
   on the updated PR head.
+- The first full local run also exposed an independent positive-control race in
+  `ExportNetworkInterceptorTests`: the recorder publishes an accepted connection
+  before receiving its request line. The old nonempty wait could finish on that
+  placeholder, fail the hostname assertion, and then print a completed CONNECT
+  request in its diagnostic. A localhost-only probe reproduced both states
+  (`/private/tmp/pr147-recorder-race.log`). The positive control now waits for
+  the expected hostname and checks one recorded snapshot. Negative zero-network
+  checks still count an accepted connection immediately; their strictness and
+  the existing 20-second deadline are unchanged.
 - Owner panel/Powerbox/iCloud, keyboard/VoiceOver, E5's remaining content
   assertions, and idle-machine E9 gates retain their existing status.
