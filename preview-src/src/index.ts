@@ -1,16 +1,3 @@
-import hljs from "highlight.js/lib/core";
-import bash from "highlight.js/lib/languages/bash";
-import css from "highlight.js/lib/languages/css";
-import go from "highlight.js/lib/languages/go";
-import javascript from "highlight.js/lib/languages/javascript";
-import json from "highlight.js/lib/languages/json";
-import markdown from "highlight.js/lib/languages/markdown";
-import python from "highlight.js/lib/languages/python";
-import rust from "highlight.js/lib/languages/rust";
-import swift from "highlight.js/lib/languages/swift";
-import typescript from "highlight.js/lib/languages/typescript";
-import xml from "highlight.js/lib/languages/xml";
-import yaml from "highlight.js/lib/languages/yaml";
 import mermaid from "mermaid";
 import {
   type BridgeMessage,
@@ -23,6 +10,10 @@ import {
   handleExportHTML,
   resetExportHTMLSession,
 } from "./export-html";
+import {
+  highlightCodeBlocks,
+  registerHighlightLanguages,
+} from "./code-highlight";
 import { rewriteImageSources } from "./image-rewrite";
 import { scrollPreviewAnchor } from "./heading-anchors";
 import {
@@ -215,7 +206,7 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   currentRenderedVersion = payload.version;
   currentBaseDir = payload.baseDir;
   currentAssetRootID = payload.assetRootID;
-  highlightCodeBlocks();
+  highlightCodeBlocks(previewRoot);
   await mermaidPatch;
   if (payload.renderID < latestRenderID) return;
 
@@ -349,39 +340,6 @@ function applyPreviewSettings(theme: string, allowRemoteImages: boolean): boolea
   document.documentElement.dataset.theme = theme;
   currentAllowRemoteImages = allowRemoteImages;
   return initializeMermaid(theme);
-}
-
-function highlightCodeBlocks(): void {
-  for (const code of previewRoot.querySelectorAll<HTMLElement>("pre code")) {
-    if (code.classList.contains("language-mermaid")) continue;
-    if (code.dataset.highlighted) continue;
-
-    hljs.highlightElement(code);
-  }
-}
-
-function registerHighlightLanguages(): void {
-  hljs.registerLanguage("bash", bash);
-  hljs.registerLanguage("css", css);
-  hljs.registerLanguage("go", go);
-  hljs.registerLanguage("html", xml);
-  hljs.registerLanguage("javascript", javascript);
-  hljs.registerLanguage("js", javascript);
-  hljs.registerLanguage("json", json);
-  hljs.registerLanguage("markdown", markdown);
-  hljs.registerLanguage("md", markdown);
-  hljs.registerLanguage("python", python);
-  hljs.registerLanguage("py", python);
-  hljs.registerLanguage("rust", rust);
-  hljs.registerLanguage("rs", rust);
-  hljs.registerLanguage("sh", bash);
-  hljs.registerLanguage("swift", swift);
-  hljs.registerLanguage("typescript", typescript);
-  hljs.registerLanguage("ts", typescript);
-  hljs.registerLanguage("xml", xml);
-  hljs.registerLanguage("yaml", yaml);
-  hljs.registerLanguage("yml", yaml);
-  hljs.registerLanguage("mermaid", markdown);
 }
 
 function requirePreviewRoot(): HTMLElement {
