@@ -106,8 +106,10 @@ final class SaveBaselineOracleTests: XCTestCase {
 final class AuthoringAcceptanceTests: XCTestCase {
     func testUnicodeSingleReplaceEditsOnlyTheCurrentMatch() {
         let source = "see 👩‍💻 and 👩‍💻"
-        var probe = EditorProbe(source: source, selection: NSRange(location: 0, length: 0))
-        let authority = authority(source: source)
+        let match = NSRange(location: 4, length: 5)
+        XCTAssertEqual((source as NSString).substring(with: match), "👩‍💻")
+        var probe = EditorProbe(source: source, selection: match)
+        let authority = authority(source: source, selection: match)
         let applied = AuthoringAcceptance.singleReplace(
             probe: &probe,
             captured: authority,

@@ -3,8 +3,10 @@ import Foundation
 
 public enum FixtureLeaseError: Error, Equatable {
     case hostilePath(String)
+    case symlinkEscape(String)
     case missingOwnership
     case foreignToken
+    case unreadable(String, Int32)
 }
 
 /// A temporary root owned by one acceptance task. Cleanup deletes only a directory
@@ -28,13 +30,12 @@ public final class FixtureLease: @unchecked Sendable {
     }
 
     public func write(relativePath: String, data: Data) throws -> URL {
-        let url = try Self.resolve(root: root, relativePath: relativePath)
-        try FileManager.default.createDirectory(
-            at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try data.write(to: url, options: .atomic)
-        return url
+        do {
+            try ContainedPath.write(root: root, relativePath: relativePath, data: data)
+        } catch let error as ContainedPathError {
+            throw Self.leaseError(error)
+        }
+        return Self.lexicalURL(root: root, relativePath: relativePath)
     }
 
     public func cleanup() throws {
@@ -62,22 +63,23 @@ public final class FixtureLease: @unchecked Sendable {
         try FileManager.default.removeItem(at: root)
     }
 
-    static func resolve(root: URL, relativePath: String) throws -> URL {
-        if relativePath.isEmpty || relativePath.hasPrefix("/") || relativePath.contains("\0") {
-            throw FixtureLeaseError.hostilePath(relativePath)
+    private static func leaseError(_ error: ContainedPathError) -> FixtureLeaseError {
+        switch error {
+        case let .hostile(path):
+            .hostilePath(path)
+        case let .symlink(path):
+            .symlinkEscape(path)
+        case let .missing(path):
+            .unreadable(path, ENOENT)
+        case let .unreadable(path, code):
+            .unreadable(path, code)
         }
-        let parts = relativePath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        if parts.isEmpty || parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) {
-            throw FixtureLeaseError.hostilePath(relativePath)
-        }
-        var url = root.standardizedFileURL
-        for part in parts {
-            url.append(component: part)
-        }
-        let rootPath = root.standardizedFileURL.path
-        let resolved = url.standardizedFileURL.path
-        guard resolved == rootPath || resolved.hasPrefix(rootPath + "/") else {
-            throw FixtureLeaseError.hostilePath(relativePath)
+    }
+
+    private static func lexicalURL(root: URL, relativePath: String) -> URL {
+        var url = root
+        for part in relativePath.split(separator: "/") {
+            url.append(component: String(part))
         }
         return url
     }

@@ -38,6 +38,8 @@ public struct AuthoringAuthority: Equatable, Sendable {
 public struct EditorProbe: Equatable, Sendable {
     public var source: String
     public var selection: NSRange
+    /// Probe counter only. This is not an `UndoManager` registration and is not
+    /// native Undo evidence.
     public var undoRegistrations: Int
 
     public init(source: String, selection: NSRange, undoRegistrations: Int = 0) {
@@ -48,8 +50,12 @@ public struct EditorProbe: Equatable, Sendable {
 }
 
 public enum AuthoringAcceptance {
-    /// Plans one literal replace against the captured authority. Refusal leaves the
-    /// probe's source, selection, and undo registration count untouched.
+    /// Plans one literal replace of the session's current match.
+    ///
+    /// The caret is the live selection's UTF-16 location. The match is accepted
+    /// only when that selection is exactly `currentMatch.range`. Any other hit,
+    /// a moved selection, or a stale range leaves the probe untouched.
+    /// `undoRegistrations` increments on the probe only.
     @discardableResult
     public static func singleReplace(
         probe: inout EditorProbe,
@@ -64,15 +70,24 @@ public enum AuthoringAcceptance {
         else {
             return false
         }
+        let caret = max(0, live.selection.location)
         let session = EditorFindSession.search(
             in: live.source,
-            query: TextSearchQuery(pattern: pattern, caseSensitivity: .sensitive)
+            query: TextSearchQuery(pattern: pattern, caseSensitivity: .sensitive),
+            caretAnchorUTF16: caret
         )
+        guard let ordinal = session.currentOrdinal,
+              let accepted = session.currentMatch,
+              accepted.range == live.selection
+        else {
+            return false
+        }
+        let authorized = session.withCurrentOrdinal(ordinal, caretAnchorUTF16: caret)
         guard case let .success(plan) = EditorReplacePlanner.planOneMatch(
-            session: session,
+            session: authorized,
             source: live.source,
             replacement: replacement
-        ), !plan.isLiteralIdentical else {
+        ), !plan.isLiteralIdentical, plan.match.range == accepted.range else {
             return false
         }
         guard let updated = EditorReplaceSourceConstruction.replacedSource(

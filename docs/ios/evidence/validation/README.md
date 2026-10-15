@@ -12,7 +12,7 @@ This receipt covers the Mac component package only. It does not close product ac
 
 | Item | Result |
 |---|---|
-| Local automated component suite | PASS — 18 tests, 0 failures, exit 0 |
+| Local automated component suite | PASS — latest 26 tests, 0 failures, exit 0. The first run recorded below was 18. |
 | Hosted UI smoke | BLOCKED — source only, not compiled or run |
 | Simulator XCUI / device | not run |
 | Exact-head CI for this branch | not run |
@@ -37,9 +37,25 @@ SHA-256: `8cc5b760e64b6a319575031208ff043ff1d92ee308badf5e78e8b8a394b2aff2`
 
 The same bytes were at `/private/tmp/plainsong-ios-11-validation-harness-swift-test-2.log` when this receipt was written. An earlier wrapper printed a passing 18/0 suite and then died on zsh's read-only `status` variable. That log is not this receipt.
 
-Required names, all present in the log:
+Required names, all present in the latest log:
 
 `docs/ios/evidence/validation/required-component-tests.txt`
+
+## V11 follow-up
+
+The first run accepted a late `BoundedWait` success, replaced the first find hit when the selection was the second, and let an intermediate symlink leave the lease. This run is the fix.
+
+Window: start `2026-10-15T14:37:54Z`, XCTest suite `2026-10-15 22:37:57 +0800`, end `2026-10-15T14:37:58Z`. Build 1.99 seconds. Suite 0.650 seconds. Exit 0. Executed 26 tests, 0 failures. The log has no compiler warnings.
+
+Log: `docs/ios/evidence/validation/component-run-20261015-v11.log`
+
+SHA-256: `17709c2048b60ecfc5650cbaaa9e7de97e1180e0227828d99cd84fefa5900fc5`
+
+Same command and build path as the first run. Swift Testing again reported 0 tests; the XCTest count is the result.
+
+- A zero timeout does not accept an immediate `true`. A `true` that arrives only after the 20 ms deadline, including a predicate that stays silent for 250 ms, is `.timedOut` and the wait returns in under 150 ms. A `true` inside the deadline still succeeds.
+- The selection `{14, 5}` replaces only the second `👩‍💻`. A prefix selection, a moved selection, and a stale range leave source, selection, and the probe counter unchanged. That counter is not an `UndoManager` registration.
+- `owned/linked-parent/fixture.md` is refused on read and write. The outside directory stays unchanged, and the symlink remains. A direct `open` with `O_NOFOLLOW` still followed that parent in a separate OS probe; `openat` with `O_DIRECTORY | O_NOFOLLOW` returned `ENOTDIR`. The probe is not this Swift run.
 
 ## Named positive results
 
@@ -51,9 +67,9 @@ Required names, all present in the log:
 
 ## Named negative results
 
-- Empty, hostile, tampered, and symlink resources fail closed (`O_NOFOLLOW`).
+- Empty, hostile, tampered, leaf-symlink, and ancestor-symlink resources fail closed. `O_NOFOLLOW` on the leaf is not the ancestor check.
 - Lease cleanup removes only its own temp root. A sibling `plainsong-user-recents-*` directory stays. A foreign directory without the lease marker throws `missingOwnership` and is not deleted.
-- `BoundedWait` records `.timedOut(nanoseconds: 20_000_000)` instead of succeeding.
+- `BoundedWait` records `.timedOut(nanoseconds: 20_000_000)` for an immediate `false`, a late `true`, and a predicate that has not replied. A `true` observed at or after the deadline is discarded.
 - An older save acknowledgement leaves live text `N+1 繁中` dirty. A later order-1 completion cannot clean an order-2 acknowledgement.
 - A dirty draft is not replaced by persisted bytes. On a separate session, `markSaved(text: "N")` would clobber the live draft; the oracle never calls `markSaved`.
 - Stale source, a different document id, a bumped selection generation, a missing pattern, and a replacement containing a newline leave source, selection, and undo registrations unchanged.

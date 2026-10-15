@@ -66,10 +66,11 @@ public enum ResourcePreflight {
     }
 
     public static func inspect(root: URL, relativePath: String) throws -> ResourceRecord {
-        let url = try resolve(root: root, relativePath: relativePath)
-        let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW)
-        guard descriptor >= 0 else {
-            throw ResourcePreflightError.unreadable(relativePath, errno)
+        let descriptor: Int32
+        do {
+            descriptor = try ContainedPath.openForReading(root: root, relativePath: relativePath)
+        } catch let error as ContainedPathError {
+            throw preflightError(error)
         }
         defer { close(descriptor) }
         var metadata = stat()
@@ -125,6 +126,19 @@ public enum ResourcePreflight {
             entries.append((String(parts[1]), digest))
         }
         return entries
+    }
+
+    private static func preflightError(_ error: ContainedPathError) -> ResourcePreflightError {
+        switch error {
+        case let .hostile(path):
+            .hostilePath(path)
+        case let .missing(path):
+            .missing(path)
+        case let .symlink(path):
+            .notRegularFile(path)
+        case let .unreadable(path, code):
+            .unreadable(path, code)
+        }
     }
 
     static func resolve(root: URL, relativePath: String) throws -> URL {

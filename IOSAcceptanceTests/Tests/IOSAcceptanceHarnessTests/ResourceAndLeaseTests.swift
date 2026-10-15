@@ -65,6 +65,50 @@ final class ResourceAndLeaseTests: XCTestCase {
         }
     }
 
+    func testAncestorSymlinkCannotBeRead() throws {
+        let lease = try makeLease()
+        let outside = try makeOutsideDirectory()
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try Data("secret".utf8).write(to: outside.appendingPathComponent("fixture.md"))
+        _ = try linkParent(lease: lease, to: outside)
+        let inside = try lease.write(relativePath: "owned/real/fixture.md", data: Data("inside".utf8))
+        let record = try ResourcePreflight.inspect(root: lease.root, relativePath: "owned/real/fixture.md")
+        XCTAssertEqual(record.byteCount, Data("inside".utf8).count)
+        XCTAssertEqual(try String(contentsOf: inside, encoding: .utf8), "inside")
+        XCTAssertThrowsError(
+            try ResourcePreflight.inspect(
+                root: lease.root,
+                relativePath: "owned/linked-parent/fixture.md"
+            )
+        ) { error in
+            guard case .notRegularFile = error as? ResourcePreflightError else {
+                return XCTFail("expected a refused symlink, got \(String(describing: error))")
+            }
+        }
+        XCTAssertEqual(
+            try String(contentsOf: outside.appendingPathComponent("fixture.md"), encoding: .utf8),
+            "secret"
+        )
+    }
+
+    func testAncestorSymlinkCannotBeWritten() throws {
+        let lease = try makeLease()
+        let outside = try makeOutsideDirectory()
+        defer { try? FileManager.default.removeItem(at: outside) }
+        let link = try linkParent(lease: lease, to: outside)
+        XCTAssertThrowsError(
+            try lease.write(relativePath: "owned/linked-parent/fixture.md", data: Data("pwned".utf8))
+        ) { error in
+            guard case .symlinkEscape = error as? FixtureLeaseError else {
+                return XCTFail("expected symlink escape, got \(String(describing: error))")
+            }
+        }
+        let values = try link.resourceValues(forKeys: [.isSymbolicLinkKey])
+        XCTAssertEqual(values.isSymbolicLink, true)
+        let escaped = try FileManager.default.contentsOfDirectory(at: outside, includingPropertiesForKeys: nil)
+        XCTAssertTrue(escaped.isEmpty)
+    }
+
     func testSymlinkResourceIsNotFollowed() throws {
         let lease = try makeLease()
         let outside = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -108,6 +152,25 @@ final class ResourceAndLeaseTests: XCTestCase {
         let lease = try FixtureLease()
         self.lease = lease
         return lease
+    }
+
+    private func makeOutsideDirectory() throws -> URL {
+        let outside = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "plainsong-ios-acceptance-outside-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: false)
+        return outside
+    }
+
+    private func linkParent(lease: FixtureLease, to outside: URL) throws -> URL {
+        try FileManager.default.createDirectory(
+            at: lease.root.appendingPathComponent("owned"),
+            withIntermediateDirectories: false
+        )
+        let link = lease.root.appendingPathComponent("owned/linked-parent")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        return link
     }
 
     private func repositoryRoot() throws -> URL {
