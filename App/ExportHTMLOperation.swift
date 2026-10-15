@@ -2,9 +2,49 @@ import AppKit
 import Combine
 import Foundation
 import MarkdownCore
+import PDFKit
 import PreviewKit
 import WebKit
 import WorkspaceKit
+
+/// Which File-menu export the shared snapshot is running. HTML and PDF choose a
+/// destination first; Print renders first because its panel paginates that render.
+enum ExportCommandProduct: Equatable {
+    case html
+    case pdf
+    case print
+
+    var pathExtension: String {
+        switch self {
+        case .html: "html"
+        case .pdf, .print: "pdf"
+        }
+    }
+
+    var progressNoun: String {
+        switch self {
+        case .html: "HTML"
+        case .pdf: "PDF"
+        case .print: "Print"
+        }
+    }
+
+    /// HTML keeps the original sentence so existing notices stay byte-identical.
+    var saveFirstVerb: String {
+        switch self {
+        case .html: "export it as HTML"
+        case .pdf: "export it as PDF"
+        case .print: "print it"
+        }
+    }
+
+    var artifactNoun: String {
+        switch self {
+        case .html, .print: "exported HTML"
+        case .pdf: "exported PDF"
+        }
+    }
+}
 
 /// The built-in preview theme frozen into one export (`docs/export-gates.md` D3): `system`
 /// is resolved to the appearance at invocation so the file never changes theme later.
@@ -42,6 +82,7 @@ struct ExportHTMLOperationSnapshot {
     let workspaceRootURL: URL?
     private(set) weak var workspaceAccess: SecurityScopedResourceAccess?
     let theme: ExportHTMLTheme
+    let product: ExportCommandProduct
     private(set) weak var window: NSWindow?
     let requiresWindow: Bool
     let defaultFileName: String
@@ -55,6 +96,7 @@ struct ExportHTMLOperationSnapshot {
         workspaceRootURL: URL?,
         workspaceAccess: SecurityScopedResourceAccess?,
         theme: ExportHTMLTheme,
+        product: ExportCommandProduct = .html,
         window: NSWindow? = nil
     ) {
         self.operationID = operationID
@@ -64,15 +106,18 @@ struct ExportHTMLOperationSnapshot {
         self.workspaceRootURL = workspaceRootURL
         self.workspaceAccess = workspaceAccess
         self.theme = theme
+        self.product = product
         self.window = window
         requiresWindow = window != nil
-        defaultFileName = Self.defaultFileName(for: session.fileURL)
+        defaultFileName = Self.defaultFileName(for: session.fileURL, pathExtension: product.pathExtension)
         defaultDirectoryURL = session.fileURL?.deletingLastPathComponent()
     }
 
     /// A valid nonempty string title wins; malformed frontmatter and non-string titles fall
     /// back to the source basename. Control characters and path separators cannot enter a leaf.
-    static func defaultFileName(for documentURL: URL?, source: String = "") -> String {
+    static func defaultFileName(
+        for documentURL: URL?, source: String = "", pathExtension: String = "html"
+    ) -> String {
         let parsed = Frontmatter.parse(source)
         let title: String? = if !parsed.isMalformed,
                                 case let .string(value)? = parsed.block?.fieldValues["title"]
@@ -97,7 +142,7 @@ struct ExportHTMLOperationSnapshot {
         let base = sanitizedTitle.isEmpty
             ? sanitize(documentURL?.deletingPathExtension().lastPathComponent ?? "Untitled")
             : sanitizedTitle
-        return "\(base.isEmpty ? "Untitled" : base).html"
+        return "\(base.isEmpty ? "Untitled" : base).\(pathExtension)"
     }
 }
 
@@ -105,12 +150,17 @@ struct ExportHTMLOperationSnapshot {
 struct ExportHTMLDestinationRequest: Equatable {
     let defaultFileName: String
     let directoryURL: URL?
-    var allowedExtension: String {
-        "html"
+    var allowedExtension: String
+
+    init(defaultFileName: String, directoryURL: URL?, allowedExtension: String = "html") {
+        self.defaultFileName = defaultFileName
+        self.directoryURL = directoryURL
+        self.allowedExtension = allowedExtension
     }
 
     var accessibilityLabel: String {
-        "Export as HTML. Choose a destination for \(defaultFileName)."
+        let format = allowedExtension == "pdf" ? "PDF" : "HTML"
+        return "Export as \(format). Choose a destination for \(defaultFileName)."
     }
 }
 
@@ -132,6 +182,8 @@ enum ExportHTMLStopReason: Error, Equatable {
     case pendingEditorSource
     /// The offscreen render or the D2 export barrier failed (for example `mdx-stale-or-error`).
     case renderFailed(reason: String)
+    /// The PDF capture after the barrier failed with a typed cause.
+    case captureFailed(ExportPDFCaptureError)
     /// `ExportArtifactWriter.inspectDestination` refused the panel URL before any write.
     case destinationRefused(ExportArtifactFailure)
 }
@@ -140,7 +192,15 @@ enum ExportHTMLOperationResult: Equatable {
     case stopped(ExportHTMLStopReason)
     /// The writer ran; its typed committed / not-committed / indeterminate outcome.
     case written(ExportArtifactWriteOutcome)
-    case exported(ExportArtifactCommit, omittedImageCount: Int)
+    /// `shrunkPages` lists the PDF pages scaled down past the 200-inch user-space limit;
+    /// a committed export with any still succeeds but warns instead of reporting success.
+    case exported(
+        ExportArtifactCommit,
+        omittedImageCount: Int,
+        shrunkPages: [ExportPDFShrunkPage] = []
+    )
+    /// Print finished through AppKit. Plainsong wrote no file.
+    case printed
 }
 
 /// App-owned bookkeeping for Export as HTML…: the monotonic operation counter, the one
@@ -171,4 +231,22 @@ struct ExportHTMLOperationRegistry {
     var didPrepareArtifact: (@MainActor () async -> Void)?
     /// Test seam: observes every finished operation's typed result.
     var didFinishOperation: (@MainActor (UInt64, ExportHTMLOperationResult) -> Void)?
+    /// Test seam: replaces the standard print panel. Return false for cancellation.
+    var printOperationRunner: (@MainActor (NSPrintOperation, NSWindow) async -> Bool)?
+    /// Test seam: the print info the real path copies (for job disposition / save URL).
+    var printInfoProvider: (@MainActor () -> NSPrintInfo)?
+    /// The print info the last completed print panel run used, so the next Print… keeps
+    /// the paper size and orientation the user chose. Cancelled runs never write it, and
+    /// `NSPrintInfo.shared` is never mutated.
+    var lastPrintInfo: NSPrintInfo?
+    /// Test seam: observes the captured `PDFDocument` just before its print operation is
+    /// created, so hosted tests can assert the real content Print sends to PDFKit.
+    var printDocumentObserver: (@MainActor (PDFDocument) -> Void)?
+    /// Test seam: keeps the real runModal path but suppresses both panels so a hosted
+    /// print job completes without user interaction.
+    var printPanelSuppressedForTesting = false
+    weak var printHostWindow: NSWindow?
+    /// Retained until AppKit's `didRun` arrives — `NSPrintOperation` does not retain its
+    /// delegate, so a completion must never dangle between `runModal` and the callback.
+    var printCompletions: [ObjectIdentifier: ExportPrintCompletion] = [:]
 }

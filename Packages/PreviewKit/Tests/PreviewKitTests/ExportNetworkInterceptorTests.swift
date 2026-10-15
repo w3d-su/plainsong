@@ -83,16 +83,17 @@ final class ExportNetworkInterceptorTests: XCTestCase {
             fileURL: directory.appendingPathComponent("post.md")
         ))
         let deadline = Date().addingTimeInterval(20)
-        while proxy.connections.isEmpty, Date() < deadline {
+        while !proxy.connections.contains(where: { $0.contains(Self.remoteHost) }), Date() < deadline {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
+        let controlRequests = proxy.connections
         XCTAssertFalse(
-            proxy.connections.isEmpty,
+            controlRequests.isEmpty,
             "the interceptor never saw the live preview's remote image, so it is not in the request path"
         )
         XCTAssertTrue(
-            proxy.connections.contains { $0.contains(Self.remoteHost) },
-            "control requests: \(proxy.connections)"
+            controlRequests.contains { $0.contains(Self.remoteHost) },
+            "control requests: \(controlRequests)"
         )
     }
 

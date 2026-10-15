@@ -16,6 +16,11 @@ final class E0OffscreenPDFProbe {
         configureController()
     }
 
+    init(controller: PreviewController) {
+        self.controller = controller
+        configureController()
+    }
+
     init(previewIndexURL: URL?) {
         controller = PreviewController(previewIndexURL: previewIndexURL)
         configureController()
@@ -172,67 +177,31 @@ final class E0OffscreenPDFProbe {
         )
     }
 
-    func chooseFixedPaginationHeight(
+    /// The production A1 plan over the probe's settled geometry: variable-height,
+    /// per-page-width page rects whose breaks cut no line box or atomic box.
+    func planPagination(
         contentBounds: CGRect,
-        minimumHeight: Int = 6000,
-        boundaryClearance: CGFloat = 0.5
-    ) async throws -> CGFloat {
-        let script = """
-        JSON.stringify(Array.from(document.querySelectorAll("#preview-root h3[data-line]")).map(element => {
-          const rect = element.getBoundingClientRect();
-          return { minY: rect.top + window.scrollY, maxY: rect.bottom + window.scrollY };
-        }))
-        """
-        guard let json = try await evaluateJavaScript(script, label: "pagination block bounds") as? String,
-              let data = json.data(using: .utf8)
-        else {
-            throw E0ProbeError.invalidJavaScriptResult("pagination block bounds")
-        }
-        let blocks = try JSONDecoder().decode([E0ContentBlockBounds].self, from: data)
-        guard !blocks.isEmpty else {
-            throw E0ProbeError.invalidJavaScriptResult("empty pagination block bounds")
-        }
-
-        for candidate in stride(from: 14400, through: minimumHeight, by: -1) {
-            let pageHeight = CGFloat(candidate)
-            var boundary = contentBounds.minY + pageHeight
-            var isSafe = true
-            while boundary < contentBounds.maxY - 0.5 {
-                if blocks.contains(where: {
-                    boundary >= $0.minY - boundaryClearance
-                        && boundary <= $0.maxY + boundaryClearance
-                }) {
-                    isSafe = false
-                    break
-                }
-                boundary += pageHeight
-            }
-            if isSafe {
-                return pageHeight
-            }
-        }
-
-        throw E0ProbeError.noSafeFixedPaginationHeight
+        pageAspect: CGFloat? = nil
+    ) async throws -> [CGRect] {
+        let measurement = try await controller.measureUnsplittableSpans()
+        let plan = try ExportPDFPagePlanner.plan(
+            contentSize: contentBounds.size,
+            baselineWidth: min(contentBounds.width, max(measurement.baselineWidth, 1)),
+            unsplittable: measurement.spans,
+            widthExtents: measurement.wide,
+            targetAspect: pageAspect
+        )
+        return plan.pages.map(\.rect)
     }
 
     func scroll(toY offset: CGFloat) async throws {
         _ = try await evaluateJavaScript("window.scrollTo(0, \(offset))", label: "preview scroll")
     }
 
-    func captureFixedHeightPages(
-        contentBounds: CGRect,
-        pageHeight: CGFloat = 7200
-    ) async throws -> [E0PDFSnapshot] {
-        guard pageHeight > 0, pageHeight <= 14400 else {
-            throw E0ProbeError.invalidPaginationHeight(pageHeight)
-        }
-
+    func capturePlannedPages(rects: [CGRect]) async throws -> [E0PDFSnapshot] {
         var pages: [E0PDFSnapshot] = []
-        var offset = contentBounds.minY
-        while offset < contentBounds.maxY - 0.5 {
+        for rect in rects {
             try Task.checkCancellation()
-            let height = min(pageHeight, contentBounds.maxY - offset)
-            let rect = CGRect(x: contentBounds.minX, y: offset, width: contentBounds.width, height: height)
             do {
                 try await pages.append(capturePDF(rect: rect))
             } catch {
@@ -242,7 +211,6 @@ final class E0OffscreenPDFProbe {
                     underlying: String(describing: error)
                 )
             }
-            offset += height
         }
         return pages
     }
@@ -360,9 +328,4 @@ struct E0DOMState: Codable, Equatable {
 private struct E0ContentMeasurement: Codable {
     let width: Double
     let height: Double
-}
-
-private struct E0ContentBlockBounds: Codable {
-    let minY: CGFloat
-    let maxY: CGFloat
 }
