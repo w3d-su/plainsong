@@ -1,6 +1,7 @@
 import Foundation
 import WorkspaceCore
 @testable import WorkspaceKitIOS
+import XCTest
 
 final class ScriptedWorkspaceWatcher: IOSWorkspaceChangeWatching, @unchecked Sendable {
     private let lock = NSLock()
@@ -100,11 +101,16 @@ struct AccessHarness {
     }
 }
 
-func waitUntil(_ predicate: @escaping () -> Bool) async {
+func waitUntil(
+    _ predicate: @escaping () -> Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
     for _ in 0 ..< 50 {
         if predicate() {
             return
         }
         try? await Task.sleep(nanoseconds: 20_000_000)
     }
+    XCTFail("timed out waiting for condition", file: file, line: line)
 }

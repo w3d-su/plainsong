@@ -23,8 +23,14 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         await waitUntil { outcome.result != nil }
         XCTAssertEqual(outcome.result?.error as? IOSWorkspaceFailure, .coordinationFailed)
         XCTAssertEqual(harness.files.parkedMetadataCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
         harness.files.resumeMetadata()
-        await waitUntil { harness.files.parkedMetadataCount == 0 }
+        await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
+        XCTAssertEqual(harness.files.parkedMetadataCount, 0)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
         _ = task
     }
 
@@ -47,8 +53,14 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         await waitUntil { outcome.result != nil }
         XCTAssertTrue(outcome.result?.error is CancellationError)
         XCTAssertEqual(harness.files.parkedMetadataCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
         harness.files.resumeMetadata()
-        await waitUntil { harness.files.parkedMetadataCount == 0 }
+        await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
+        XCTAssertEqual(harness.files.parkedMetadataCount, 0)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
     }
 
     func testAdoptDeadlineEndsScopeOnlyAfterMetadataDrains() async throws {
@@ -144,6 +156,7 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 1)
         harness.files.resumeMetadata()
         await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 0)
         XCTAssertEqual(harness.files.bytes(for: assetPath), Data([5, 5, 5]))
     }
@@ -154,6 +167,39 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
 
     func testRollbackCancelRetainsUntilTheRemoveDrains() async throws {
         try await assertRollback(cancel: true)
+    }
+
+    func testStageMetadataDeadlineKeepsScopeUntilTheProvedRemoveDrains() async throws {
+        let harness = AccessHarness(coordinationTimeoutNanoseconds: 300_000_000)
+        let grant = try await harness.openDirectory()
+        harness.files.mintedIdentity = { _ in Data("proved-remove".utf8) }
+        harness.files.parkMetadata = true
+        harness.files.parkRemoves = true
+        let bytes = Data([9, 9, 4])
+        let outcome = try await parkedStage(harness: harness, grant: grant, bytes: bytes)
+        guard case let .failure(error as IOSAssetStageFailure) = outcome, case .retained = error else {
+            XCTFail("proved metadata deadline had no receipt: \(String(describing: outcome))")
+            return
+        }
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 1)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        harness.files.resumeMetadata()
+        await waitUntil {
+            harness.files.parkedRemoveCount == 1
+                && harness.service.records[grant.workspaceID]?.consumerCount == 0
+        }
+        XCTAssertEqual(harness.files.parkedRemoveCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 0)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        XCTAssertEqual(harness.files.bytes(for: assetPath), bytes)
+        harness.files.resumeRemove()
+        await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
+        XCTAssertNil(harness.files.bytes(for: assetPath))
     }
 
     func testReclaimDeadlineHoldsTheOperationUntilTheRemoveDrains() async throws {
@@ -186,6 +232,7 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         XCTAssertEqual(harness.scope.endCount, 0)
         harness.files.resumeRemove()
         await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
         XCTAssertNil(harness.files.bytes(for: assetPath))
         _ = task
@@ -220,6 +267,7 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         }
         harness.files.resumeMetadata()
         await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
         XCTAssertTrue(harness.service.records.isEmpty)
     }
 
@@ -245,8 +293,13 @@ final class IOSWorkspaceEffectDeadlineTests: XCTestCase {
         }
         let path = assetPath
         XCTAssertEqual(harness.files.bytes(for: path), bytes)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
         harness.files.resumeRemove()
-        await waitUntil { harness.files.bytes(for: path) == nil }
+        await waitUntil { harness.scope.endCount == 1 }
+        XCTAssertEqual(harness.scope.endCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
         XCTAssertNil(harness.files.bytes(for: path))
     }
 

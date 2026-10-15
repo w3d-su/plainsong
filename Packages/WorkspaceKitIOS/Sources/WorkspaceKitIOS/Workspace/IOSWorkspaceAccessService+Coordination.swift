@@ -106,8 +106,6 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 location: createdLocation,
                 resourceID: IOSWorkspaceResourceIdentity(rawValue: identity)
             )
-        } catch let settled as IOSSettledWriteFailure {
-            throw settled.error
         } catch let persisted as IOSFilePersistedButUnreadable {
             let leaf = persistedLeaf(persisted, root: context.rootURL)
             await notePersisted(leaf, operationID: operationID)
@@ -118,7 +116,15 @@ extension IOSWorkspaceAccessService: IOSCoordinatedFileAccess {
                 reason: persisted.reason
             )
         } catch let draining as IOSDrainingCoordinationFailure {
-            try throwDraining(draining)
+            let leaf = IOSPersistedLeaf(
+                url: location.fileURL,
+                relativePath: location.relativePath,
+                byteCount: data.count,
+                providerIdentity: nil,
+                root: context.rootURL
+            )
+            let reason: IOSWorkspaceFailure = draining.isCancellation ? .unavailable : .coordinationFailed
+            throw await unpublishedLeaf(leaf, context: context, operationID: operationID, reason: reason)
         } catch {
             if let leaf = await takePersisted(operationID) {
                 try await throwUnpublishedOrClean(

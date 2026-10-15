@@ -37,6 +37,49 @@ final class IOSWorkspaceWriteDeadlineTests: XCTestCase {
         try await assertLateWrite(identity: Data("proved".utf8), unreadable: true, cancel: true, remaining: nil)
     }
 
+    func testDeadlineReturnsAReceiptWhileCreateStaysParked() async throws {
+        let harness = AccessHarness(coordinationTimeoutNanoseconds: 300_000_000)
+        let grant = try await harness.openDirectory()
+        let bytes = Data([5, 5, 5])
+        harness.files.mintedIdentity = { _ in nil }
+        harness.files.parkAfterPersist = true
+        let outcome = try await parkedCreate(harness: harness, grant: grant, bytes: bytes)
+        assertRetained(outcome)
+        XCTAssertEqual(harness.files.parkedCreateCount, 1)
+        XCTAssertEqual(harness.files.bytes(for: assetPath), bytes)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 0)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        XCTAssertEqual(harness.files.parkedCreateCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+    }
+
+    func testLateCreateKeepsScopeWhileRemoveStaysParked() async throws {
+        let harness = AccessHarness(coordinationTimeoutNanoseconds: 300_000_000)
+        let grant = try await harness.openDirectory()
+        let bytes = Data([6, 6, 6])
+        harness.files.mintedIdentity = { _ in Data("proved-late".utf8) }
+        harness.files.parkAfterPersist = true
+        harness.files.parkRemoves = true
+        let outcome = try await parkedCreate(harness: harness, grant: grant, bytes: bytes)
+        assertRetained(outcome)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        _ = harness.service.invalidate(grant.workspaceID)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        harness.files.resumeCreate()
+        await waitUntil { harness.files.parkedRemoveCount == 1 }
+        XCTAssertEqual(harness.files.parkedRemoveCount, 1)
+        XCTAssertEqual(harness.files.bytes(for: assetPath), bytes)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(harness.scope.endCount, 0)
+        XCTAssertEqual(harness.files.parkedRemoveCount, 1)
+    }
+
     private func assertLateWrite(
         identity: Data?,
         unreadable: Bool,
@@ -63,45 +106,54 @@ final class IOSWorkspaceWriteDeadlineTests: XCTestCase {
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
         if cancel {
             task.cancel()
-            try await Task.sleep(nanoseconds: 100_000_000)
-        } else {
-            try await Task.sleep(nanoseconds: 500_000_000)
         }
-        XCTAssertNil(outcome.result, "caller finished before the parked write settled")
+        await waitUntil { outcome.result != nil }
+        try assertRetained(XCTUnwrap(outcome.result))
+        XCTAssertEqual(harness.files.bytes(for: assetPath), bytes)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 1)
+        XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 0)
+        XCTAssertEqual(harness.files.parkedCreateCount, 1)
         if unreadable {
             harness.files.resumeCreateUnreadable()
         } else {
             harness.files.resumeCreate()
         }
-        await waitUntil { outcome.result != nil }
-        let result = try XCTUnwrap(outcome.result)
+        await waitUntil { harness.service.records[grant.workspaceID]?.operationCount == 0 }
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.operationCount, 0)
         XCTAssertEqual(harness.service.records[grant.workspaceID]?.consumerCount, 0)
-        if let remaining {
-            guard case let .failure(error) = result,
-                  let failure = error as? IOSAssetStageFailure,
-                  case .retained = failure
-            else {
-                XCTFail("persisted leaf had no receipt: \(result)")
-                return
-            }
-            XCTAssertFalse(result.error is CancellationError)
-            XCTAssertEqual(harness.files.bytes(for: assetPath), remaining)
-        } else {
-            XCTAssertNil(harness.files.bytes(for: assetPath))
-            guard case let .failure(error) = result else {
-                XCTFail("removed leaf was published")
-                return
-            }
-            if cancel {
-                XCTAssertTrue(error is CancellationError, "\(error)")
-            } else if let failure = error as? IOSAssetStageFailure, case let .failed(reason) = failure {
-                XCTAssertEqual(reason, .coordinationFailed)
-            } else {
-                XCTFail("removed leaf was retained: \(error)")
+        XCTAssertEqual(harness.files.bytes(for: assetPath), remaining)
+        _ = task
+    }
+
+    private func parkedCreate(
+        harness: AccessHarness,
+        grant: IOSWorkspaceGrant,
+        bytes: Data
+    ) async throws -> Result<Void, Error> {
+        let outcome = StoredResult()
+        let task = Task {
+            do {
+                _ = try await harness.service.stage(self.request(bytes: bytes, grant: grant), grant: grant)
+                outcome.store(.success(()))
+            } catch {
+                outcome.store(.failure(error))
             }
         }
+        await waitUntil { harness.files.parkedCreateCount == 1 }
+        await waitUntil { outcome.result != nil }
         _ = task
+        return try XCTUnwrap(outcome.result)
+    }
+
+    private func assertRetained(_ result: Result<Void, Error>) {
+        guard case let .failure(error) = result,
+              let failure = error as? IOSAssetStageFailure,
+              case .retained = failure
+        else {
+            XCTFail("persisted leaf had no receipt: \(result)")
+            return
+        }
+        XCTAssertFalse(error is CancellationError)
     }
 
     private let assetPath = "notes/assets/hero.png"
@@ -122,15 +174,6 @@ final class IOSWorkspaceWriteDeadlineTests: XCTestCase {
                 resourceID: nil
             )
         )
-    }
-}
-
-private extension Result where Failure == Error {
-    var error: Failure? {
-        if case let .failure(error) = self {
-            return error
-        }
-        return nil
     }
 }
 

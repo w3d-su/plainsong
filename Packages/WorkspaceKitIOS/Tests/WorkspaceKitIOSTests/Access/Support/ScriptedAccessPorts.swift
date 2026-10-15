@@ -2,6 +2,13 @@ import Foundation
 import WorkspaceCore
 @testable import WorkspaceKitIOS
 
+private struct ParkedRemove {
+    var continuation: CheckedContinuation<Void, Error>
+    var url: URL
+    var relativePath: String
+    var providerIdentity: Data
+}
+
 final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     private let lock = NSLock()
     var rootIsDirectory = true
@@ -26,7 +33,7 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
     private var parkedReadURLs: [URL] = []
     private var parkedLists: [CheckedContinuation<[IOSWorkspaceFileItem], Error>] = []
     private var parkedMetadata: [(CheckedContinuation<IOSWorkspaceFileItem, Error>, IOSWorkspaceFileItem)] = []
-    private var parkedRemoves: [(CheckedContinuation<Void, Error>, URL, String, Data)] = []
+    private var parkedRemoves: [ParkedRemove] = []
     private var parkedCreates: [(CheckedContinuation<IOSWorkspaceFileItem, Error>, IOSWorkspaceFileItem)] = []
     private var listedURLs: [URL] = []
     private(set) var metadataCalls = 0
@@ -133,7 +140,12 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
         if shouldPark {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 lock.lock()
-                parkedRemoves.append((continuation, url, relativePath, providerIdentity))
+                parkedRemoves.append(ParkedRemove(
+                    continuation: continuation,
+                    url: url,
+                    relativePath: relativePath,
+                    providerIdentity: providerIdentity
+                ))
                 lock.unlock()
             }
             return
@@ -250,10 +262,14 @@ final class ScriptedWorkspaceFiles: IOSWorkspaceFilePort, @unchecked Sendable {
         let parked = parkedRemoves.removeFirst()
         lock.unlock()
         do {
-            try removeStored(url: parked.1, relativePath: parked.2, providerIdentity: parked.3)
-            parked.0.resume()
+            try removeStored(
+                url: parked.url,
+                relativePath: parked.relativePath,
+                providerIdentity: parked.providerIdentity
+            )
+            parked.continuation.resume()
         } catch {
-            parked.0.resume(throwing: error)
+            parked.continuation.resume(throwing: error)
         }
     }
 

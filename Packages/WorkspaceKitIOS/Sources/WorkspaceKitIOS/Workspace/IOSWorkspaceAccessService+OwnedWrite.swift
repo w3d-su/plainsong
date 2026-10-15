@@ -16,48 +16,26 @@ extension IOSWorkspaceAccessService {
         operationID: UUID
     ) async throws -> IOSWorkspaceFileItem {
         let timeout = ports.coordinationTimeoutNanoseconds
-        let effect = await IOSCallerDeadline.awaitEffect(timeoutNanoseconds: timeout) {
-            try await context.files.createFile(
-                url: location.fileURL,
-                relativePath: location.relativePath,
-                data: data,
-                root: context.rootURL
-            )
-        }
-        if let abandon = effect.abandon {
-            try await settleAbandonedCreate(
-                effect.result,
-                abandon: abandon,
-                context: context,
-                location: location,
-                byteCount: data.count,
-                operationID: operationID
-            )
-        }
-        return try effect.result.get()
-    }
-
-    /// Settlement already has the caller. Wait for the delete instead of treating task cancellation as a handoff.
-    func reclaimWaiting(_ leaf: IOSPersistedLeaf) async -> IOSReclaimSettlement {
-        guard let identity = leaf.providerIdentity else { return .kept }
-        let files = ports.files
-        let operation = Task.detached {
-            try await files.removeIfOwned(
-                url: leaf.url,
-                relativePath: leaf.relativePath,
-                root: leaf.root,
-                providerIdentity: identity
-            )
-        }
-        switch await operation.result {
-        case .success:
-            return .removed
-        case let .failure(error):
-            if (error as? IOSWorkspaceFailure) == .notFound {
-                return .removed
+        return try await IOSCallerDeadline.raceDrained(
+            timeoutNanoseconds: timeout,
+            onDrain: { result in
+                await self.settleLateCreate(
+                    result,
+                    context: context,
+                    location: location,
+                    byteCount: data.count,
+                    operationID: operationID
+                )
+            },
+            body: {
+                try await context.files.createFile(
+                    url: location.fileURL,
+                    relativePath: location.relativePath,
+                    data: data,
+                    root: context.rootURL
+                )
             }
-            return .kept
-        }
+        )
     }
 
     func reclaimBounded(
@@ -102,11 +80,24 @@ extension IOSWorkspaceAccessService {
         }
     }
 
-    func metadataForValidation(url: URL, relativePath: String, root: URL) async throws -> IOSWorkspaceFileItem {
+    func metadataForValidation(
+        url: URL,
+        relativePath: String,
+        root: URL,
+        workspaceID: IOSWorkspaceIdentity
+    ) async throws -> IOSWorkspaceFileItem {
+        let ticket = retainOperation(workspaceID: workspaceID)
         do {
-            return try await boundedMetadata(url: url, relativePath: relativePath, root: root) { _ in }
+            let item = try await boundedMetadata(url: url, relativePath: relativePath, root: root) { _ in
+                await self.finishHeld(ticket)
+            }
+            await finishHeld(ticket)
+            return item
         } catch let draining as IOSDrainingCoordinationFailure {
             try throwDraining(draining)
+        } catch {
+            await finishHeld(ticket)
+            throw error
         }
     }
 
@@ -121,6 +112,7 @@ extension IOSWorkspaceAccessService {
                 relativePath: asset.targetLocation.relativePath,
                 root: root
             ) { _ in
+                // Rollback can return while its remove is still parked. The remove holds its own ticket.
                 _ = await self.rollback(asset)
                 await MainActor.run { lease.release() }
             }
@@ -137,6 +129,7 @@ extension IOSWorkspaceAccessService {
         root: URL,
         identity: Data
     ) async -> IOSAssetRollbackOutcome {
+        let ticket = retainOperation(workspaceID: asset.targetLocation.workspaceID)
         let timeout = ports.coordinationTimeoutNanoseconds
         let files = ports.files
         do {
@@ -146,6 +139,7 @@ extension IOSWorkspaceAccessService {
                     if removalSucceeded(result) {
                         await self.markOwnedRemoved(token)
                     }
+                    await self.finishHeld(ticket)
                 },
                 body: {
                     try await files.removeIfOwned(
@@ -157,14 +151,17 @@ extension IOSWorkspaceAccessService {
                 }
             )
             await markOwnedRemoved(asset.ownershipToken)
+            await finishHeld(ticket)
             return .removed
         } catch let failure as IOSWorkspaceFailure where failure == .notFound {
             await markOwnedRemoved(asset.ownershipToken)
+            await finishHeld(ticket)
             return .removed
         } catch let draining as IOSDrainingCoordinationFailure {
             let reason: IOSWorkspaceFailure = draining.isCancellation ? .unavailable : .coordinationFailed
             return .retained(stagedReceipt(asset, reason: reason))
         } catch {
+            await finishHeld(ticket)
             return .retained(stagedReceipt(asset, reason: IOSWorkspaceFailureMapping.map(error)))
         }
     }
@@ -194,89 +191,52 @@ extension IOSWorkspaceAccessService {
         )
     }
 
-    private func settleAbandonedCreate(
+    /// The caller already holds a receipt. This waits for the create, then for a proved remove.
+    /// It does not use another deadline race: that race would treat this cancelled drain as finished.
+    private func settleLateCreate(
         _ result: Result<IOSWorkspaceFileItem, Error>,
-        abandon: IOSEffectAbandon,
         context: IOSDetachedAdmission,
         location: IOSFileLocation,
         byteCount: Int,
         operationID: UUID
-    ) async throws -> Never {
+    ) async {
+        let leaf: IOSPersistedLeaf
         switch result {
         case let .success(item):
-            let leaf = IOSPersistedLeaf(
+            leaf = IOSPersistedLeaf(
                 url: item.url,
                 relativePath: location.relativePath,
                 byteCount: byteCount,
                 providerIdentity: item.providerIdentity,
                 root: context.rootURL
             )
-            await notePersisted(leaf, operationID: operationID)
-            try await finishAbandonedLeaf(
-                leaf,
-                context: context,
-                operationID: operationID,
-                abandon: abandon,
-                reason: abandonReason(abandon, persisted: nil)
-            )
-        case let .failure(error):
-            if let persisted = error as? IOSFilePersistedButUnreadable {
-                let leaf = persistedLeaf(persisted, root: context.rootURL)
-                await notePersisted(leaf, operationID: operationID)
-                try await finishAbandonedLeaf(
-                    leaf,
-                    context: context,
-                    operationID: operationID,
-                    abandon: abandon,
-                    reason: abandonReason(abandon, persisted: persisted.reason)
+        case let .failure(error as IOSFilePersistedButUnreadable):
+            leaf = persistedLeaf(error, root: context.rootURL)
+        default:
+            await finishWork(context.ticket)
+            return
+        }
+        await notePersisted(leaf, operationID: operationID)
+        if let identity = leaf.providerIdentity {
+            do {
+                try await context.files.removeIfOwned(
+                    url: leaf.url,
+                    relativePath: leaf.relativePath,
+                    root: leaf.root,
+                    providerIdentity: identity
                 )
+            } catch {
+                // The port has returned. A missing file is clean; any other error keeps the receipt.
+                _ = error
             }
-            await finishWork(context.ticket)
-            if abandon == .cancelled || error is CancellationError {
-                throw IOSSettledWriteFailure(error: CancellationError())
-            }
-            throw IOSSettledWriteFailure(error: workspaceFailure(error) ?? .coordinationFailed)
         }
+        await clearPersisted(operationID)
+        await finishWork(context.ticket)
     }
 
-    private func finishAbandonedLeaf(
-        _ leaf: IOSPersistedLeaf,
-        context: IOSDetachedAdmission,
-        operationID: UUID,
-        abandon: IOSEffectAbandon,
-        reason: IOSWorkspaceFailure
-    ) async throws -> Never {
-        switch await reclaimWaiting(leaf) {
-        case .removed:
-            await clearPersisted(operationID)
-            await finishWork(context.ticket)
-            if abandon == .cancelled {
-                throw IOSSettledWriteFailure(error: CancellationError())
-            }
-            throw IOSSettledWriteFailure(error: reason)
-        case .kept:
-            await clearPersisted(operationID)
-            await finishWork(context.ticket)
-            throw IOSSettledWriteFailure(
-                error: unpublishedLeaf(leaf, context: context, operationID: operationID, reason: reason)
-            )
-        case .handedOff:
-            throw IOSSettledWriteFailure(
-                error: unpublishedLeaf(leaf, context: context, operationID: operationID, reason: reason)
-            )
-        }
-    }
-
-    private func abandonReason(
-        _ abandon: IOSEffectAbandon,
-        persisted: IOSWorkspaceFailure?
-    ) -> IOSWorkspaceFailure {
-        switch abandon {
-        case .cancelled:
-            .unavailable
-        case .deadline:
-            persisted ?? .coordinationFailed
-        }
+    private func finishHeld(_ ticket: IOSOperationTicket?) async {
+        guard let ticket else { return }
+        await finishWork(ticket)
     }
 
     private func finishReclaim(_ ticket: IOSOperationTicket, result: Result<Void, Error>) async {

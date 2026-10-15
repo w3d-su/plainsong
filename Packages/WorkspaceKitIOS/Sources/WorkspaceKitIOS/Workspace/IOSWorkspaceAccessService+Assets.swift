@@ -42,7 +42,8 @@ extension IOSWorkspaceAccessService: IOSWorkspaceAssetWriting {
         let item = try await metadataForValidation(
             url: asset.targetLocation.fileURL,
             relativePath: asset.targetLocation.relativePath,
-            root: root
+            root: root,
+            workspaceID: asset.targetLocation.workspaceID
         )
         guard !item.isSymlink, !item.isDirectory else { throw IOSWorkspaceFailure.invalidPath }
         if let identity = item.providerIdentity, identity != asset.ownedFileIdentity.rawValue {

@@ -318,6 +318,20 @@ public final class IOSWorkspaceAccessService: IOSWorkspaceAccessProviding, Previ
         stopIfIdle(record)
     }
 
+    /// Holds the scope for a port call that continues after the caller returns.
+    /// A revoked grant can still take the hold. `finish` releases it.
+    func retainOperation(workspaceID: IOSWorkspaceIdentity) -> IOSOperationTicket? {
+        guard let record = records[workspaceID], !record.stopped else { return nil }
+        record.addOperation()
+        return IOSOperationTicket(
+            workspaceID: record.workspaceID,
+            generation: record.generation,
+            rootToken: record.rootToken,
+            operationID: UUID(),
+            requestID: nil
+        )
+    }
+
     func stopIfIdle(_ record: IOSWorkspaceScopeRecord) {
         guard record.revoked, record.isIdle, !record.stopped else { return }
         record.stopped = true
