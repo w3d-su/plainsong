@@ -26,4 +26,4 @@ The timer no longer reads the stored handles. `finish` copies them while holding
 
 ## Functional checks
 
-`fence-tests.log`, SHA-256 `aff3e4abbb85b1718d224737359bc8276ea73906b9872786613bdebfcab59a6c`, is `swift test --filter BoundedWaitFenceTests`: 7 tests, 0 failures. That run has no Thread Sanitizer and does not replace the probe above. Product gates stay open.
+`fence-tests.log`, SHA-256 `aff3e4abbb85b1718d224737359bc8276ea73906b9872786613bdebfcab59a6c`, is `swift test --filter BoundedWaitFenceTests` on `6d652107e4ab6007e7f941f727b7a61bd65b4d0f`: 7 tests, 0 failures. That run has no Thread Sanitizer and does not replace the probe above. It is the fence class only. The `bcc8ab6` full component log remains `../component-run-20261015-v11.log` at 26 tests, whose `BoundedWaitFenceTests` count is 4. A 29-case run of the required list on this head is not retained. Product gates stay open.
