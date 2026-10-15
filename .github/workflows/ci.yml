@@ -14,6 +14,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Jobs only read the checkout; cache and artifact actions use the runtime
+# token, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
 # The suite runs as parallel jobs instead of one serial macOS job; the
 # `build-and-test` job at the bottom keeps the check name the main ruleset
 # requires and passes only when every job passed. Three macOS jobs per run fit
@@ -181,6 +186,7 @@ jobs:
     needs: [preview, packages, hosted]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions: {}
     steps:
       - name: Require every CI job to pass
         env:
