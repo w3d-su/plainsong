@@ -53,6 +53,7 @@ final class OpenDocumentAdmissionTests: XCTestCase {
             return XCTFail("The first admission must install one writer")
         }
         let other = IOSOpenDocumentAdmission.Ticket(
+            issuance: UUID(),
             documentID: IOSDocumentIdentity(rawValue: UUID())
         )
 
@@ -80,5 +81,28 @@ final class OpenDocumentAdmissionTests: XCTestCase {
         }
         XCTAssertEqual(next.documentID, second)
         XCTAssertEqual(admission.active, next)
+    }
+
+    func testStaleTicketDoesNotReleaseALaterAdmissionOfTheSameDocument() {
+        var admission = IOSOpenDocumentAdmission()
+        let documentID = IOSDocumentIdentity(rawValue: UUID())
+        let otherID = IOSDocumentIdentity(rawValue: UUID())
+        guard case let .success(first) = admission.begin(documentID: documentID) else {
+            return XCTFail("The first admission must install one writer")
+        }
+        admission.end(first)
+        guard case let .success(second) = admission.begin(documentID: documentID) else {
+            return XCTFail("Ending the first ticket must allow the same document again")
+        }
+
+        XCTAssertEqual(first.documentID, second.documentID)
+        XCTAssertNotEqual(first.issuance, second.issuance)
+        admission.end(first)
+
+        XCTAssertEqual(admission.active, second)
+        guard case let .failure(refusal) = admission.begin(documentID: otherID) else {
+            return XCTFail("A stale end must not admit another document")
+        }
+        XCTAssertEqual(refusal, .writerAlreadyActive(second))
     }
 }

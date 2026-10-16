@@ -20,7 +20,9 @@ The prompt start `59f374ff9341289b91c0a4090b216dcf16510797` is an ancestor of PR
 
 Frozen IOS-C0-v1 file bytes match tag `642cb212703220409874a2741c5adbfb8c80fe8a` on `fdbcd44`, `142e07d`, `4607874`, and `767c0cf` (13 files, 0 hash mismatches). No contract bump.
 
-Dependency direction stays `WorkspaceKitIOS` → `PreviewKitContracts` and `PreviewKit` → `PreviewKitContracts`. Lane 06 does not import `PreviewKit`. One access service is the future reader injection; it is not a second access manager and it is not the document writer. Lane 05's `IOSUIDocumentStore` remains the only document-byte writer. Each lane 06 `open` mints a new workspace identity, and its production identity port returns nil. Phase B must not dedupe opens by URL, inode, or `NSURLDocumentIdentifierKey`. A second document while one ticket is active is refused by `IOSOpenDocumentAdmission`.
+Dependency direction stays `WorkspaceKitIOS` → `PreviewKitContracts` and `PreviewKit` → `PreviewKitContracts`. Lane 06 does not import `PreviewKit`. One access service is the future reader injection; it is not a second access manager and it is not the document writer. Lane 05's `IOSUIDocumentStore` remains the only document-byte writer. Each lane 06 `open` mints a new workspace identity, and its production identity port returns nil. Phase B must not dedupe opens by URL, inode, or `NSURLDocumentIdentifierKey`. A second document while one ticket is active is refused by `IOSOpenDocumentAdmission`. `end` matches the ticket's issuance, not document identity alone. An older issuance cannot clear a later admission of the same document. The app still does not call this type.
+
+Phase B start and final acceptance are different lists. Wiring may start after named M0 IME/Undo, Files/iCloud, and background-save evidence, a pre-composition owner re-sign, the lane 06 service on the candidate, and a recorded lane 07 package-host bundle result. Lane 11 product acceptance and the lane 12 IPA of the composed head come after that wiring. They are not start conditions. v1 stays open until those final rows pass.
 
 `PreviewAssetReadResult.coordinatedURL` from the unmerged lane 06 reader is the logical grant `IOSFileLocation.fileURL`. The file port's proved URL stays internal because a location built from it is `.outsideGrant` under `authorize`. Symlink files are refused before bytes. Do not publish the proved URL without a contract revision.
 
@@ -28,7 +30,7 @@ iPhoneSimulator 27.0 SDK `NSURL.h` marks `NSURLBookmarkCreationWithSecurityScope
 
 Merge batches, maintainer-owned, without retargeting existing PRs: #174 docs, then #173 docs, then #172 as a module-only merge. None of those merges authorizes calling `makeProduction` or replacing `c0`. M0 rows below stay unchecked.
 
-Local PlainsongIOS simulator run on this dirty phase A tree: public `make ios-test`, iPhone 17 Pro `59CB04BD-26CC-4841-8D06-E75A2EDEBC66`, iOS 27.0, Xcode 27.0 (27A5194q). The first build failed because `Refusal` did not conform to `Error` (runner exit 65). After that conformance, the same runner executed 299 tests, 299 passed, 0 skipped. That is not the historical 294, not Mac CI, and not a device gate. Detail: [phase A packet](evidence/lane-13/phase-a-20261016.md).
+Local PlainsongIOS simulator run on this dirty phase A tree: public `make ios-test`, iPhone 17 Pro `59CB04BD-26CC-4841-8D06-E75A2EDEBC66`, iOS 27.0, Xcode 27.0 (27A5194q). The first build failed because `Refusal` did not conform to `Error` (runner exit 65). After that conformance, the same runner executed 299 tests, 299 passed, 0 skipped. The review fix rerun executed 300, passed 300, skipped 0, including the stale-ticket case. Neither run is the historical 294, Mac CI, or a device gate. Detail: [phase A packet](evidence/lane-13/phase-a-20261016.md).
 
 ## Review update — 2026-10-13
 
