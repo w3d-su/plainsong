@@ -148,6 +148,59 @@ class RunnerEvidenceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "fingerprint changed"):
                     self.verify()
 
+    def required_copy_fixture(self, contents="Suite/requiredA\n"):
+        relative = "docs/ios/evidence/validation/required-hosted-smoke.txt"
+        manifest = self.repository / relative
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(contents)
+        copied = self.root / "evidence/required-tests.txt"
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        copied.write_bytes(manifest.read_bytes())
+        copied.chmod(0o444)
+        return relative, manifest, copied
+
+    def verify_required_copy_cli(self, source, copied, relative):
+        return subprocess.run([
+            sys.executable, str(SCRIPTS / "ios-provenance.py"), "verify-required-copy",
+            str(source), "--copy", str(copied), "--required-relative", relative,
+        ], text=True, capture_output=True)
+
+    def testRequiredCopyMatchesCapturedSourceIsAccepted(self):
+        relative, _, copied = self.required_copy_fixture()
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def testCopyThenManifestEditBeforeCaptureIsRejected(self):
+        relative, manifest, copied = self.required_copy_fixture()
+        manifest.write_text("Suite/requiredA\nSuite/requiredB\n")
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("does not match captured source", result.stderr)
+
+    def testRequiredCopyReplacementAfterCaptureIsRejected(self):
+        relative, _, copied = self.required_copy_fixture()
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        copied.chmod(0o644)
+        copied.write_text("Suite/replaced\n")
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("does not match captured source", result.stderr)
+
+    def testMissingRequiredSourceRecordExits65(self):
+        relative = "docs/ios/evidence/validation/required-hosted-smoke.txt"
+        copied = self.root / "required-tests.txt"
+        copied.write_text("Suite/requiredA\n")
+        source = self.root / "source.json"
+        proof.write_json(source, proof.source_snapshot(self.repository))
+        result = self.verify_required_copy_cli(source, copied, relative)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("lacks required-name file record", result.stderr)
+
     def testChangedHeadRejectsReuseEvenWhenCompiledInputsAreEqual(self):
         self.record()
         (self.repository / "README.md").write_text("receipt documentation\n")

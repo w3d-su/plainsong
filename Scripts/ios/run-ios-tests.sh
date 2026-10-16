@@ -64,6 +64,11 @@ cp "$required_tests" "$captured_required"
 chmod 0444 "$captured_required"
 Scripts/ios/ios-preflight.sh --need-simulator --write-evidence "$evidence"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
+if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+    "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
+    echo "$command_label: required-name copy does not match captured source; refusing to start tests" >&2
+    exit 65
+fi
 
 echo "$command_label: destination=$destination scheme=$scheme"
 set +e
@@ -118,9 +123,15 @@ set -e
 if [ "$extraction_result" != 0 ]; then
     [ "$result" != 0 ] || result=65
 else
-    if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "$evidence/test-results.json" \
+    if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+        "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
+        [ "$result" != 0 ] || result=65
+    elif ! /usr/bin/python3 Scripts/ios/ios-test-results.py "$evidence/test-results.json" \
         --required "$captured_required" \
         --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt"; then
+        [ "$result" != 0 ] || result=65
+    elif ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+        "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
         [ "$result" != 0 ] || result=65
     fi
 fi

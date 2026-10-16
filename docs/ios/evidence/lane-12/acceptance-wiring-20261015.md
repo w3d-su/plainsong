@@ -71,9 +71,9 @@ The first build-for-testing of this scheme, `fdbcd44444f9-acceptance-20261016-01
 ## Review fixes — 2026-10-16
 
 1. **P1 (`EditorReplaceLayeringTests` target inventory and Decision Log):** `Packages/EditorKit/Tests/EditorKitTests/EditorReplaceLayeringTests.swift` now includes `IOSAcceptanceUITests` in `project.targets` while keeping package, dependency, and macOS layering assertions intact (`Executed 5 tests, with 0 failures`). The corresponding row is recorded in `docs/decision-log.md`.
-2. **P2 (Validation required-name manifest provenance):** `Scripts/ios/ios-provenance.py` includes `docs/ios/evidence/validation/required-hosted-smoke.txt` and `docs/ios/evidence/validation/required-component-tests.txt` in `INPUT_FILES` (681 fingerprinted files total). `Scripts/ios/run-ios-tests.sh` and `Scripts/ios/run-ios-acceptance-components.sh` also copy the active required-name manifest to a read-only `required-tests.txt` inside the run's evidence directory before `capture`, consume that immutable copy in the result gate, and record its SHA-256 in the receipt metadata. `testRequiredValidationManifestDriftFailsSourceVerification` in `Scripts/ios/tests/test_runner_evidence.py` verifies that mutating either manifest after capture fails `verify_source` and archive verification (`make test-ios-tooling`: `Ran 36 tests in 5.535s`, `OK`).
+2. **P2 (Validation required-name manifest provenance):** `Scripts/ios/ios-provenance.py` includes `docs/ios/evidence/validation/required-hosted-smoke.txt` and `docs/ios/evidence/validation/required-component-tests.txt` in `INPUT_FILES` (681 fingerprinted files total). Both runners copy the active required-name manifest to a read-only `required-tests.txt` in run evidence and record its SHA-256 in receipt metadata. `verify-required-copy` compares the consumed copy with the corresponding `source.json` file record immediately after capture, before any build/test starts, and before and after the result parser consumes names; missing records or mismatches exit 65. `testRequiredValidationManifestDriftFailsSourceVerification` covers post-capture source drift, while `testCopyThenManifestEditBeforeCaptureIsRejected`, `testRequiredCopyMatchesCapturedSourceIsAccepted`, `testRequiredCopyReplacementAfterCaptureIsRejected`, and `testMissingRequiredSourceRecordExits65` cover the copy binding.
 
-Updated runs at `394b04840d77` (dirty with these review fixes; all 681 fingerprinted files match the committed review-fix tree, `source_fingerprint` `73ef703fc75db9d878d525d2e7dd234b6f0f8841f6be80802a344ada7554c180`, `source.json` SHA-256 `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d`):
+Historical runs at `394b04840d77` (dirty review-fix snapshot associated with PR #176, before the required-copy guard in this update; all 681 fingerprinted files match that snapshot, `source_fingerprint` `73ef703fc75db9d878d525d2e7dd234b6f0f8841f6be80802a344ada7554c180`, `source.json` SHA-256 `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d`). These retained 29/29 component and 1/1 hosted-smoke results document the earlier source snapshot only; they do not validate the copy-to-source binding guard added after the reviewed PR #176 head `7f49ccf4056b29cf642ad6845d0d9f22fac15d13`.
 
 - `make ios-acceptance-components` (`/private/tmp/plainsong-ios-12-validation-wiring-output/evidence/394b04840d77-components-20261016-144435-28858`): exit 0, 29 executed, 29 passed, 0 skipped.
 
@@ -98,6 +98,10 @@ Updated runs at `394b04840d77` (dirty with these review fixes; all 681 fingerpri
 | `named-tests.txt` | `cbd1d87a3e32f82ac4fdbc62330ec44ab403d567e0d65f46baaf157cb7ebfa36` |
 | `required-tests.txt` | `5bc42032a889023dc7aa15d71b52027797f209d8dd4bc8b67a9f828eeb4bfc83` |
 | `source.json` | `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d` |
+
+## Required-copy guard local validation — 2026-10-16
+
+After adding `verify-required-copy`, the local tooling suite passed: `make test-ios-tooling`, exit 0, 40 tests in 4.585 seconds. It ran outside the sandbox because lock ancestry fixtures invoke `ps`. Raw output: `/private/tmp/plainsong-ios-12-copy-fix-20261016/tooling-tests-final.log`, SHA-256 `1827aed61b99996d3a2fb8c392d991fd70d0c62b84d827b0879742f171d89d85`. `bash -n Scripts/ios/run-ios-tests.sh Scripts/ios/run-ios-acceptance-components.sh` and `git diff --check` passed. This update did not run native tests, simulator tests, an archive, or CI; no new native result is claimed.
 
 ## Seams
 

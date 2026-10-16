@@ -86,6 +86,20 @@ def verify_source(receipt, repository):
     return recorded
 
 
+def verify_required_copy(source_manifest, required_copy, relative_path):
+    """Ensure a run-local required-name copy matches the captured source input."""
+    source = json.loads(Path(source_manifest).read_text())
+    record = source.get("files", {}).get(relative_path)
+    if not isinstance(record, dict) or record.get("kind") != "file" or not record.get("sha256"):
+        raise ValueError("source manifest lacks required-name file record: " + relative_path)
+    copied = Path(required_copy)
+    if not copied.is_file() or copied.is_symlink():
+        raise ValueError("required-name copy is not a regular file: " + str(copied))
+    digest = file_record(copied)["sha256"]
+    if digest != record["sha256"]:
+        raise ValueError("required-name copy does not match captured source: " + relative_path)
+
+
 def tree_digest(directory):
     directory = Path(directory)
     if not directory.is_dir() or directory.is_symlink():
@@ -177,18 +191,24 @@ def select_archive(output_root, repository):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["capture", "verify-source", "tree-digest", "verify-device", "verify-archive", "select-archive", "record-archive"])
+    parser.add_argument("action", choices=["capture", "verify-source", "verify-required-copy", "tree-digest", "verify-device", "verify-archive", "select-archive", "record-archive"])
     parser.add_argument("path")
     parser.add_argument("--repository", default=".")
     parser.add_argument("--result", type=int)
     parser.add_argument("--start", default="")
     parser.add_argument("--end", default="")
+    parser.add_argument("--copy")
+    parser.add_argument("--required-relative")
     args = parser.parse_args()
     try:
         if args.action == "capture":
             write_json(args.path, source_snapshot(args.repository))
         elif args.action == "verify-source":
             verify_source(args.path, args.repository)
+        elif args.action == "verify-required-copy":
+            if not args.copy or not args.required_relative:
+                raise ValueError("verify-required-copy requires --copy and --required-relative")
+            verify_required_copy(args.path, args.copy, args.required_relative)
         elif args.action == "tree-digest":
             print(tree_digest(args.path))
         elif args.action == "verify-device":
