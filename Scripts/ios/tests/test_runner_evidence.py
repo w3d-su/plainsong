@@ -123,6 +123,31 @@ class RunnerEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fingerprint changed"):
             self.verify()
 
+    def testRequiredValidationManifestDriftFailsSourceVerification(self):
+        manifests = (
+            "docs/ios/evidence/validation/required-hosted-smoke.txt",
+            "docs/ios/evidence/validation/required-component-tests.txt",
+        )
+        validation = self.repository / "docs/ios/evidence/validation"
+        validation.mkdir(parents=True)
+        for relative in manifests:
+            (self.repository / relative).write_text("Suite/requiredA\nSuite/requiredB\n")
+        self.git("add", "docs/ios/evidence/validation")
+        self.git("commit", "-qm", "Required validation manifests")
+        for relative in manifests:
+            with self.subTest(manifest=relative):
+                for item in manifests:
+                    (self.repository / item).write_text("Suite/requiredA\nSuite/requiredB\n")
+                snapshot = proof.source_snapshot(self.repository)
+                self.assertIn(relative, snapshot["files"])
+                proof.write_json(self.metadata / "source.json", snapshot)
+                self.record()
+                (self.repository / relative).write_text("Suite/requiredA\n")
+                with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+                    proof.verify_source(self.metadata / "source.json", self.repository)
+                with self.assertRaisesRegex(ValueError, "fingerprint changed"):
+                    self.verify()
+
     def testChangedHeadRejectsReuseEvenWhenCompiledInputsAreEqual(self):
         self.record()
         (self.repository / "README.md").write_text("receipt documentation\n")
@@ -301,6 +326,12 @@ class RunnerLockTests(unittest.TestCase):
             if holder is not None:
                 os.killpg(holder.pid, signal.SIGKILL)
                 holder.wait(timeout=5)
+                for _ in range(50):
+                    released = subprocess.run(["/usr/bin/lockf", "-k", "-t", "0", lock, "true"],
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if released.returncode == 0:
+                        break
+                    time.sleep(0.05)
 
     def testDefaultAdmissionWaitIs45Seconds(self):
         text = (SCRIPTS / "ios-common.sh").read_text()

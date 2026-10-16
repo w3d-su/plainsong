@@ -68,8 +68,39 @@ The first build-for-testing of this scheme, `fdbcd44444f9-acceptance-20261016-01
 - M0 device, Files/iCloud, IME/Undo, background save, and owner re-sign remain open. Production composition stays the unavailable scaffold.
 - `make test` / `make ios-test` do not include `IOSAcceptanceTests` or the iOS-only packages.
 
+## Review fixes — 2026-10-16
+
+1. **P1 (`EditorReplaceLayeringTests` target inventory and Decision Log):** `Packages/EditorKit/Tests/EditorKitTests/EditorReplaceLayeringTests.swift` now includes `IOSAcceptanceUITests` in `project.targets` while keeping package, dependency, and macOS layering assertions intact (`Executed 5 tests, with 0 failures`). The corresponding row is recorded in `docs/decision-log.md`.
+2. **P2 (Validation required-name manifest provenance):** `Scripts/ios/ios-provenance.py` includes `docs/ios/evidence/validation/required-hosted-smoke.txt` and `docs/ios/evidence/validation/required-component-tests.txt` in `INPUT_FILES` (681 fingerprinted files total). `Scripts/ios/run-ios-tests.sh` and `Scripts/ios/run-ios-acceptance-components.sh` also copy the active required-name manifest to a read-only `required-tests.txt` inside the run's evidence directory before `capture`, consume that immutable copy in the result gate, and record its SHA-256 in the receipt metadata. `testRequiredValidationManifestDriftFailsSourceVerification` in `Scripts/ios/tests/test_runner_evidence.py` verifies that mutating either manifest after capture fails `verify_source` and archive verification (`make test-ios-tooling`: `Ran 36 tests in 5.535s`, `OK`).
+
+Updated runs at `394b04840d77` (dirty with these review fixes; all 681 fingerprinted files match the committed review-fix tree, `source_fingerprint` `73ef703fc75db9d878d525d2e7dd234b6f0f8841f6be80802a344ada7554c180`, `source.json` SHA-256 `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d`):
+
+- `make ios-acceptance-components` (`/private/tmp/plainsong-ios-12-validation-wiring-output/evidence/394b04840d77-components-20261016-144435-28858`): exit 0, 29 executed, 29 passed, 0 skipped.
+
+| File | SHA-256 |
+|---|---|
+| `component-gate.json` | `a7ba5fedffd4a96f8687e68ba357cb5474bd9d0a13578cda67f6347dd6a22bd7` |
+| `swift-test.log` | `7c62ef4c0d481db39d336ad7d7fbd3c0b04b4884846d0086c6d8667706f572c4` |
+| `components.json` | `98a82b90e15d59217572c4abcc5ad54b99d51109a1cebce712861e56eb153252` |
+| `named-tests.txt` | `7d58b860fd643b50c8a5ac61ccc830cf82e869373a67c3e85bd1ae823ff926e6` |
+| `required-tests.txt` | `7a97ebf30cecc34f0f42710b4e393376d4a22fa3ae8d7a7cd42c40996afad050` |
+| `source.json` | `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d` |
+
+- `make ios-acceptance` (`/private/tmp/plainsong-ios-12-validation-wiring-output/evidence/394b04840d77-acceptance-20261016-144509-29580`): exit 0, 1 executed, 1 passed, 0 skipped.
+
+| File | SHA-256 |
+|---|---|
+| `test-gate.json` | `7b83016c772f04e44e0d0f31b805a50c45e2c5567ae49163f05f5c4901ecb933` |
+| `admission.json` | `f31a169f932c27474615d4578f00f7c8dd5aa0670a8dfdb797bb55e84bb60c91` |
+| `test-results.json` | `b5161cfca5fc3097a88a04ec7a2a9fc5ffbe576bc5e79cf90c8f754ddbba9749` |
+| `resources.json` | `5cffcb93ce6cde552708a9ff434902b4e8ed3ca758802d2b57e848ae906bf06c` |
+| `test.json` | `ca0d0fa099e7fdf22f70f16e37e60379d68d9c79c44f93a389541fd52e4c2502` |
+| `named-tests.txt` | `cbd1d87a3e32f82ac4fdbc62330ec44ab403d567e0d65f46baaf157cb7ebfa36` |
+| `required-tests.txt` | `5bc42032a889023dc7aa15d71b52027797f209d8dd4bc8b67a9f828eeb4bfc83` |
+| `source.json` | `65c645e05738af2a0276cdaa81f586986d93782a453b384a4888caf0d111365d` |
+
 ## Seams
 
-- Lane 13: the acceptance scheme and the separate make targets need a Decision Log row. No DEBUG seam was added. `AcceptanceDebugSeam` stays off.
+- Lane 13: the acceptance target pin in `EditorReplaceLayeringTests` and its Decision Log row in `docs/decision-log.md` are included on this branch so exact-head Mac CI passes; reconcile with Lane 13's phase A Decision Log row at merge time. No DEBUG seam was added. `AcceptanceDebugSeam` stays off.
 - Lane 07: a preview runner, if added later, must use scheme `PreviewKit-Package` and lane 07's full required list, including the current ready failure.
 - Lane 11: test sources were not edited. The hosted required name is the one case in `required-hosted-smoke.txt`.

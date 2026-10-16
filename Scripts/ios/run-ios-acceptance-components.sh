@@ -21,6 +21,9 @@ stamp="$(date +%Y%m%d-%H%M%S)-$$"
 build_path="$output_root/dd/$head12-components-$stamp"
 evidence="$output_root/evidence/$head12-components-$stamp"
 mkdir -p "$build_path" "$evidence"
+captured_required="$evidence/required-tests.txt"
+cp "$required" "$captured_required"
+chmod 0444 "$captured_required"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
 
 echo "ios-acceptance-components: build_path=$build_path"
@@ -34,7 +37,7 @@ set -e
 tail -15 "$evidence/swift-test.log" >&2 || true
 
 if ! /usr/bin/python3 Scripts/ios/ios-component-results.py "$evidence/swift-test.log" \
-    --required "$required" \
+    --required "$captured_required" \
     --report "$evidence/component-gate.json" \
     --names "$evidence/named-tests.txt"; then
     [ "$result" != 0 ] || result=65
@@ -53,6 +56,7 @@ ios_metadata "$evidence/components.json" \
     result_format="\"swift-test-xctest-log\"" \
     source_fingerprint="\"$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["source_fingerprint"])' "$evidence/source.json")\"" \
     manifest="\"$required\"" \
+    manifest_sha256="\"$(shasum -a 256 "$captured_required" | awk '{print $1}')\"" \
     named_tests="$(wc -l < "$evidence/named-tests.txt" | tr -d ' ')" \
     exit_code="$result"
 

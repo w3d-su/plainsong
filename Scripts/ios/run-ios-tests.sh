@@ -59,6 +59,9 @@ stamp="$(date +%Y%m%d-%H%M%S)-$$"
 derived_data="$output_root/dd/$head12-$evidence_label-$stamp"
 evidence="$output_root/evidence/$head12-$evidence_label-$stamp"
 mkdir -p "$derived_data" "$evidence"
+captured_required="$evidence/required-tests.txt"
+cp "$required_tests" "$captured_required"
+chmod 0444 "$captured_required"
 Scripts/ios/ios-preflight.sh --need-simulator --write-evidence "$evidence"
 /usr/bin/python3 Scripts/ios/ios-provenance.py capture "$evidence/source.json"
 
@@ -116,7 +119,7 @@ if [ "$extraction_result" != 0 ]; then
     [ "$result" != 0 ] || result=65
 else
     if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "$evidence/test-results.json" \
-        --required "$required_tests" \
+        --required "$captured_required" \
         --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt"; then
         [ "$result" != 0 ] || result=65
     fi
@@ -136,7 +139,9 @@ ios_metadata "$evidence/test.json" \
     source_fingerprint="\"$(/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["source_fingerprint"])' "$evidence/source.json")\"" \
     collect_test_diagnostics="\"on-failure\"" test_timeouts_enabled=true \
     default_test_execution_time_allowance=120 maximum_test_execution_time_allowance=180 \
-    manifest="\"$manifest\"" named_tests="$(wc -l < "$evidence/named-tests.txt" | tr -d ' ')" \
+    manifest="\"$manifest\"" required_manifest="\"$required_tests\"" \
+    required_manifest_sha256="\"$(shasum -a 256 "$captured_required" | awk '{print $1}')\"" \
+    named_tests="$(wc -l < "$evidence/named-tests.txt" | tr -d ' ')" \
     exit_code="$result"
 
 echo "$command_label: exit=$result evidence=$evidence"

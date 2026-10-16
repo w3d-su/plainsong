@@ -16,7 +16,12 @@ INPUT_ROOTS = (
     "AppIOS/", "AppIOSTests/", "IOSAcceptanceTests/", "App/Resources/preview/",
     "Packages/", "Scripts/ios/",
 )
-INPUT_FILES = {"project.yml", "Makefile"}
+INPUT_FILES = {
+    "project.yml",
+    "Makefile",
+    "docs/ios/evidence/validation/required-hosted-smoke.txt",
+    "docs/ios/evidence/validation/required-component-tests.txt",
+}
 
 
 def write_json(path, value):
