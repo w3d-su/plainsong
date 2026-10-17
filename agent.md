@@ -171,10 +171,15 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
 - Descriptor-backed parent capture and document/image authority fall back to `O_SEARCH`
   when directory read access is denied. A single-file Powerbox grant permits parent lookup
   without directory enumeration; ordinary read descriptors retain permission-loss behavior.
-  Known limitation: saving a file opened through a single-file grant still fails
-  (`Could Not Save File`), because the save transaction stages its temporary file beside
-  the document and the grant does not permit creating siblings. Open the containing folder
-  to edit and save until the transaction stages elsewhere.
+- Saves stage their temporary file beside the document and publish it with
+  `renameatx_np`. A file-only grant (Open panel or Finder "Open With") refuses that sibling
+  with `EPERM`; only then does the transaction stage in Foundation's item-replacement
+  directory for the document (same device, never the parent itself), anchored by its own
+  root authority and descriptor chain, and swap across directories with the same identity,
+  expected-content, no-follow, durability and rollback checks. Folder-grant saves keep
+  sibling staging. Any recovery artifact is reported at its staging-directory path;
+  the emptied directory is removed. `Scripts/check-single-file-save-sandbox.sh` exercises
+  this in a signed sandboxed probe under a LaunchServices file-only grant.
 - Window chrome: a native `NavigationSplitView` with a resizable, collapsible sidebar
   (Files / Search navigators) on macOS 27+, a fixed-width sidebar in an `HStack` before
   (R17), then the document column and a right inspector for frontmatter and file details.

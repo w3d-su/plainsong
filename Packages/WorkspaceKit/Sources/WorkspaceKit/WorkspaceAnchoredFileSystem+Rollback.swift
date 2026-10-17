@@ -140,11 +140,12 @@ extension WorkspaceAnchoredFileSystem {
         }
 
         context.commit.hooks.emit(.willRollback)
+        let stagingDescriptor = context.commit.staging.descriptor
         var didReverseSwap = false
         do {
-            try chain.validateNamespace()
+            try context.commit.validateNamespaces()
             try validateNameStillReferencesEntry(
-                parentDescriptor: parentDescriptor,
+                parentDescriptor: stagingDescriptor,
                 leaf: prepared.name,
                 entry: displacedEntry
             )
@@ -154,9 +155,9 @@ extension WorkspaceAnchoredFileSystem {
                 metadata: prepared.metadata
             )
             try context.commit.hooks.check(.renameRollback)
-            try chain.validateNamespace()
+            try context.commit.validateNamespaces()
             try validateNameStillReferencesEntry(
-                parentDescriptor: parentDescriptor,
+                parentDescriptor: stagingDescriptor,
                 leaf: prepared.name,
                 entry: displacedEntry
             )
@@ -165,17 +166,12 @@ extension WorkspaceAnchoredFileSystem {
                 leaf: leaf,
                 metadata: prepared.metadata
             )
-            try chain.validateNamespace()
+            try context.commit.validateNamespaces()
             // macOS cannot condition RENAME_SWAP on the two validated inode identities. This
             // hook is the final instrumented boundary; an injected race fails before the swap.
             // Production still has an honest residual last-check-to-syscall name race.
             try context.commit.hooks.check(.renameRollbackAfterValidation)
-            guard secureRename(
-                parentDescriptor: parentDescriptor,
-                from: prepared.name,
-                to: leaf,
-                flags: UInt32(RENAME_SWAP)
-            ) == 0 else {
+            guard context.commit.swapStagedNameWithLeaf() == 0 else {
                 throw WorkspaceAnchoredFileSystemError.unreadable
             }
             didReverseSwap = true
@@ -186,9 +182,9 @@ extension WorkspaceAnchoredFileSystem {
                 leaf: leaf,
                 entry: displacedEntry
             )
-            try chain.validateNamespace()
+            try context.commit.validateNamespaces()
             try validateNameStillReferencesDescriptor(
-                parentDescriptor: parentDescriptor,
+                parentDescriptor: stagingDescriptor,
                 leaf: prepared.name,
                 metadata: prepared.metadata
             )
@@ -239,19 +235,12 @@ extension WorkspaceAnchoredFileSystem {
         context: WriteCommitContext
     ) -> WorkspaceFileWriteOutcome {
         context.hooks.emit(.willRollback)
-        guard let destinationLocation = context.prepared.location.sibling(named: context.leaf) else {
-            return indeterminate(
-                reason: .cleanupFailed,
-                preparedMetadata: context.prepared.metadata,
-                artifactState: .removalIndeterminate(context.prepared.location)
-            )
-        }
         let removal = removeArtifactResult(
             named: context.leaf,
-            location: destinationLocation,
+            location: context.location,
             expectedIdentity: context.prepared.metadata.identity,
             borrowedDescriptor: context.prepared.descriptor,
-            context: context.artifactRemovalContext,
+            context: context.destinationRemovalContext,
             unlinkCall: .unlinkCreatedDestination,
             syncCall: .syncRollbackDirectory
         )
@@ -323,11 +312,11 @@ extension WorkspaceAnchoredFileSystem {
             metadata: commit.prepared.metadata
         )
         try validateNameStillReferencesEntry(
-            parentDescriptor: commit.parentDescriptor,
+            parentDescriptor: commit.staging.descriptor,
             leaf: commit.prepared.name,
             entry: displacedEntry
         )
-        try commit.chain.validateNamespace()
+        try commit.validateNamespaces()
     }
 
     static func validateCommittedDestination(context: WriteCommitContext) throws {

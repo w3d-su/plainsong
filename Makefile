@@ -39,7 +39,7 @@ build: generate
 # `make test` still runs all of them in sequence.
 test: test-packages test-hosted test-preview
 
-# generate: the sandbox-root check signs its probe with the XcodeGen-generated
+# generate: the sandbox checks sign their probes with the XcodeGen-generated
 # App/Plainsong.entitlements.
 test-packages: generate
 	$(MAKE) test-f2-tooling
@@ -48,6 +48,7 @@ test-packages: generate
 		(cd Packages/$$pkg && swift test); \
 	done
 	Scripts/check-export-sandbox-root.sh
+	Scripts/check-single-file-save-sandbox.sh
 
 # XCODE_TEST_TARGETS="PlainsongTests" (space-separated bundle names) runs a subset.
 test-hosted: generate

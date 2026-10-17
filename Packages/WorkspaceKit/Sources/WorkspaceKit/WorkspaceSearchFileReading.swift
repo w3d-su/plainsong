@@ -243,7 +243,8 @@ extension WorkspaceSearchDiskFileReader {
             eventHandler?(.parentAnchored(attempt, locationPath))
         case .fileOpened:
             eventHandler?(.fileOpened(attempt, locationPath))
-        case .temporaryFileCreated,
+        case .separateStagingAnchored,
+             .temporaryFileCreated,
              .temporaryFilePrepared,
              .willCommit,
              .didCommit,

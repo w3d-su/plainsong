@@ -146,31 +146,22 @@ extension WorkspaceAnchoredFileSystem {
         }
     }
 
-    private static func performWrite(
+    static func performStagedWrite(
         _ data: Data,
-        to location: WorkspaceFileSystemLocation,
-        expectation: WorkspaceNoFollowFileWriteExpectation,
-        chain: DirectoryDescriptorChain,
-        parentDescriptor: Int32,
-        leaf: String,
+        target: WriteTarget,
+        staging: WriteStaging,
+        destination: WriteDestination,
         hooks: Hooks
     ) throws -> WorkspaceFileWriteOutcome {
+        let location = destination.location
+        let chain = destination.chain
+        let parentDescriptor = destination.parentDescriptor
+        let leaf = destination.leaf
         let artifactRemovalContext = ArtifactRemovalContext(
-            chain: chain,
-            parentDescriptor: parentDescriptor,
+            chain: staging.chain,
+            parentDescriptor: staging.descriptor,
             hooks: hooks
         )
-        let target: WriteTarget
-        do {
-            target = try openWriteTarget(
-                parentDescriptor: parentDescriptor,
-                leaf: leaf,
-                expectation: expectation
-            )
-        } catch {
-            return notCommitted(reason: normalizedError(error), artifactState: .none)
-        }
-        defer { closeWriteTarget(target) }
         let postCleanupContext = PostCleanupDestinationContext(
             target: target,
             location: location,
@@ -184,10 +175,11 @@ extension WorkspaceAnchoredFileSystem {
             prepared = try prepareTemporaryWrite(
                 data,
                 target: target,
-                location: location,
-                parentDescriptor: parentDescriptor,
+                staging: staging,
                 hooks: hooks
             )
+        } catch let refusal as SiblingStagingRefused {
+            throw refusal
         } catch let error as TemporaryPreparationError {
             defer { Darwin.close(error.descriptor) }
             let artifactState = removeArtifact(
@@ -210,15 +202,15 @@ extension WorkspaceAnchoredFileSystem {
         defer { Darwin.close(prepared.descriptor) }
 
         do {
-            try chain.validateNamespace()
+            try staging.validateNamespace(destination: chain)
             hooks.emit(.namespaceValidated)
-            try validatePreparedWrite(prepared, parentDescriptor: parentDescriptor)
+            try validatePreparedWrite(prepared, parentDescriptor: staging.descriptor)
             try revalidateTarget(
                 target,
                 parentDescriptor: parentDescriptor,
                 leaf: leaf
             )
-            try chain.validateNamespace()
+            try staging.validateNamespace(destination: chain)
             try checkCancellation()
         } catch {
             let artifactState = removeArtifact(
@@ -239,6 +231,7 @@ extension WorkspaceAnchoredFileSystem {
 
         let commit = WriteCommitContext(
             prepared: prepared,
+            staging: staging,
             location: location,
             chain: chain,
             parentDescriptor: parentDescriptor,
@@ -287,11 +280,11 @@ extension WorkspaceAnchoredFileSystem {
         do {
             try commit.hooks.check(.captureDisplacedEntry)
             displacedEntry = try directoryEntryIdentity(
-                parentDescriptor: commit.parentDescriptor,
+                parentDescriptor: commit.staging.descriptor,
                 component: commit.prepared.name
             )
             try validateNameStillReferencesEntry(
-                parentDescriptor: commit.parentDescriptor,
+                parentDescriptor: commit.staging.descriptor,
                 leaf: commit.prepared.name,
                 entry: displacedEntry
             )
@@ -362,19 +355,20 @@ extension WorkspaceAnchoredFileSystem {
             try checkCancellation()
             context.hooks.emit(.willCommit(.exclusiveCreate))
             try context.hooks.check(.renameExclusive)
-            try context.chain.validateNamespace()
+            try context.validateNamespaces()
             try validatePreparedWrite(
                 context.prepared,
-                parentDescriptor: context.parentDescriptor
+                parentDescriptor: context.staging.descriptor
             )
             try validateMissingName(
                 parentDescriptor: context.parentDescriptor,
                 leaf: context.leaf
             )
             guard secureRename(
-                parentDescriptor: context.parentDescriptor,
-                from: context.prepared.name,
-                to: context.leaf,
+                from: context.staging.descriptor,
+                context.prepared.name,
+                to: context.parentDescriptor,
+                context.leaf,
                 flags: UInt32(RENAME_EXCL)
             ) == 0 else {
                 throw errno == EEXIST
