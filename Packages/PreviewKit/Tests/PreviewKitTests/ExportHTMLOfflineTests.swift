@@ -220,15 +220,7 @@ final class ExportHTMLOfflineTests: XCTestCase {
     }
 
     private func makeController() throws -> PreviewController {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let indexURL = repositoryRoot.appendingPathComponent("App/Resources/preview/index.html")
-        let controller = PreviewController(previewIndexURL: indexURL)
+        let controller = try PreviewController(previewIndexURL: PreviewBundleFixture.indexURL())
         addTeardownBlock { @MainActor [weak controller] in controller?.invalidate() }
         return controller
     }
