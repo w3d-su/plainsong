@@ -39,7 +39,10 @@ final class SingleFileOpeningTests: XCTestCase {
         XCTAssertNil(state.workspaceRootURL)
         XCTAssertNil(state.presentedError)
         XCTAssertEqual(state.currentDocument.text, "# Original\n")
-        XCTAssertNotNil(state.editorImageAssetDocumentAuthorities[ObjectIdentifier(state.currentDocument)])
+        let observation = try state.observeRetainedFileVersion(for: state.currentDocument)
+        let preparedAuthority = try XCTUnwrap(observation.preparedImageAssetAuthority)
+        XCTAssertEqual(observation.file.text, "# Original\n")
+        try preparedAuthority.validateLoadedIdentityAndNamespace(observation.identity)
 
         state.replaceDocumentText("# Saved\n")
         state.cancelAutosave(for: state.currentDocument)
