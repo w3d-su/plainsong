@@ -259,7 +259,7 @@ extension AppState {
         editorDocumentSourceSynchronizers = editorDocumentSourceSynchronizers.filter { installation, _ in
             installation.bindingID != bindingID
         }
-        releaseUnreferencedUntitledSessionOwnership(for: session)
+        releaseUnreferencedSessionOwnership(for: session)
     }
 
     func isRetiredEditorSession(_ session: DocumentSession) -> Bool {
