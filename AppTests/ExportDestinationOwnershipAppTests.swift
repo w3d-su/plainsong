@@ -231,8 +231,11 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
         XCTAssertEqual(try text(at: exportURL), "appeared after the writer's inspection")
     }
 
-    /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes a
-    /// parent descriptor impossible; the adapter still answers from leaf-path metadata alone.
+    /// A save-panel grant covers only the leaf. Mode `0300` (write + search, no read) makes
+    /// listing the parent impossible; the adapter still answers from leaf-path metadata alone.
+    /// Root capture may fall back to a search-only parent descriptor, so the precondition
+    /// asserts the denied listing and an existing-leaf inspection, which must enumerate the
+    /// parent for its canonical spelling.
     func testWriteOnlyParentNeedsNoParentHandleForOwnership() throws {
         let fixture = try makeWorkspaceFixture(ownedName: "posts/owned.md")
         let subfolder = fixture.ownedURL.deletingLastPathComponent()
@@ -242,8 +245,13 @@ final class ExportDestinationOwnershipAppTests: XCTestCase {
         let subfolderPath = subfolder.path(percentEncoded: false)
         XCTAssertEqual(Darwin.chmod(subfolderPath, 0o300), 0)
         defer { _ = Darwin.chmod(subfolderPath, 0o700) }
+        let listingDescriptor = Darwin.open(subfolderPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        let listingError = errno
+        if listingDescriptor >= 0 { Darwin.close(listingDescriptor) }
+        XCTAssertEqual(listingDescriptor, -1, "the fixture must deny listing the parent")
+        XCTAssertEqual(listingError, EACCES)
         XCTAssertThrowsError(
-            try WorkspaceNoFollowFileInspector.inspectFileTarget(at: WorkspaceFileSystemLocation(fileURL: controlURL)),
+            try WorkspaceNoFollowFileInspector.inspectFileTarget(at: WorkspaceFileSystemLocation(fileURL: linkURL)),
             "the retired parent-anchored inspection cannot run under a leaf-only grant"
         )
 
