@@ -66,13 +66,56 @@ class AdmissionFixtures(unittest.TestCase):
             "TestHostPath": "__TESTROOT__/Debug-iphonesimulator/PlainsongIOS.app",
         }
 
-    def admit(self, scheme):
-        result = subprocess.run([
+    def admit(self, scheme, require_app_host=False):
+        command = [
             sys.executable, str(SCRIPTS / "ios-test-admission.py"),
             "--derived-data", str(self.derived), "--scheme", scheme, "--report", str(self.report),
-        ], text=True, capture_output=True)
+        ]
+        if require_app_host:
+            command.append("--require-app-host")
+        result = subprocess.run(command, text=True, capture_output=True)
         body = json.loads(self.report.read_text())
         return result, body
+
+    def testPreviewRequiresBuiltAppHostedUnitTests(self):
+        self.bundle("IOSPreviewTests")
+        app = self.products / "Debug-iphonesimulator" / "PlainsongIOS.app"
+        self.macho(app / "PlainsongIOS")
+        (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "PlainsongIOS"}))
+        target = self.target("IOSPreviewTests", "IOSPreviewTests.xctest")
+        target["IsAppHostedTestBundle"] = True
+        self.plan("IOSPreview", [target])
+        result, body = self.admit("IOSPreview", require_app_host=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(body["images"][0]["app_hosted"])
+        self.assertEqual(body["images"][0]["host_app"], "PlainsongIOS.app")
+
+    def testPreviewRejectsHostlessBundleEvenWhenItsTestImageExists(self):
+        self.bundle("IOSPreviewTests")
+        target = self.target("IOSPreviewTests", "IOSPreviewTests.xctest")
+        target["TestHostPath"] = "__PLATFORMS__/xctest"
+        self.plan("IOSPreview", [target])
+        result, body = self.admit("IOSPreview", require_app_host=True)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("requires an app-hosted unit-test bundle", body["reason"])
+
+    def testPreviewRejectsUIRunnerAndMissingHostImage(self):
+        self.bundle("IOSPreviewTests")
+        app = self.products / "Debug-iphonesimulator" / "PlainsongIOS.app"
+        self.macho(app / "PlainsongIOS")
+        (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "PlainsongIOS"}))
+        target = self.target("IOSPreviewTests", "IOSPreviewTests.xctest")
+        target.update(IsAppHostedTestBundle=True, IsUITestBundle=True)
+        self.plan("IOSPreview", [target])
+        result, body = self.admit("IOSPreview", require_app_host=True)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("requires an app-hosted unit-test bundle", body["reason"])
+        target["IsUITestBundle"] = False
+        (app / "PlainsongIOS").unlink()
+        self.plan("IOSPreview", [target])
+        result, body = self.admit("IOSPreview", require_app_host=True)
+        self.assertEqual(result.returncode, 65, result.stderr)
+        self.assertIn("host has no Mach-O image", body["reason"])
 
     def testEnabledMachOImageIsCompiled(self):
         self.bundle("IOSAcceptanceUITests")

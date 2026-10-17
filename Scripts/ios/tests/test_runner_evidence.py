@@ -306,6 +306,27 @@ class RunnerEvidenceTests(unittest.TestCase):
         self.assertEqual(report["executed"], 1)
         self.assertEqual(report["skipped"], 1)
 
+    def testFullSuiteCLIRejectsSkippedCasesOutsideTheRequiredList(self):
+        document = {"testNodes": [
+            {"nodeType": "Test Case", "nodeIdentifier": "Suite/required()", "result": "Passed"},
+            {"nodeType": "Test Case", "nodeIdentifier": "Suite/additional()", "result": "Skipped"},
+        ]}
+        source = self.root / "tests.json"
+        required = self.root / "required.txt"
+        required.write_text("Suite/required\n")
+        report = self.root / "report.json"
+        for status, expected in (("Skipped", 65), ("Passed", 0)):
+            document["testNodes"][1]["result"] = status
+            source.write_text(json.dumps(document))
+            result = subprocess.run([
+                sys.executable, str(SCRIPTS / "ios-test-results.py"), str(source),
+                "--required", str(required), "--report", str(report),
+                "--names", str(self.root / "names.txt"), "--no-skips",
+            ], text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected, result.stderr)
+            if expected:
+                self.assertIn("skipped cases", json.loads(report.read_text())["reason"])
+
 
 class RunnerLockTests(unittest.TestCase):
     def setUp(self):

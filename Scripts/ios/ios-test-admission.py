@@ -119,7 +119,7 @@ def plan_targets(plist):
             and enabled(value)]
 
 
-def image_for_target(target, test_root, derived):
+def image_for_target(target, test_root, derived, require_app_host=False):
     raw_host = target.get("TestHostPath") or ""
     host = None
     if isinstance(raw_host, str) and raw_host.endswith(".app"):
@@ -129,6 +129,9 @@ def image_for_target(target, test_root, derived):
         host_executable = bundle_executable(host)
         if host_executable is None or not inside(derived, host_executable) or not is_macho(host_executable):
             raise ValueError("enabled test host has no Mach-O image: " + os.path.basename(host))
+    if require_app_host and (host is None or target.get("IsAppHostedTestBundle") is not True
+                             or target.get("IsUITestBundle", False)):
+        raise ValueError("preview suite requires an app-hosted unit-test bundle with a built Mach-O host")
     app = target.get("UITargetAppPath")
     if isinstance(app, str) and app.endswith(".app"):
         app_path = resolve(app, test_root, host)
@@ -146,10 +149,12 @@ def image_for_target(target, test_root, derived):
     if executable is None or not inside(derived, executable) or not is_macho(executable):
         raise ValueError("enabled test bundle has no Mach-O xctest image: " + os.path.basename(bundle))
     return {"bundle": os.path.basename(bundle), "executable": os.path.basename(executable),
-            "bytes": os.path.getsize(executable), "target": target.get("BlueprintName")}
+            "bytes": os.path.getsize(executable), "target": target.get("BlueprintName"),
+            "app_hosted": target.get("IsAppHostedTestBundle", False),
+            "host_app": os.path.basename(host) if host else None}
 
 
-def admit(derived_data, scheme):
+def admit(derived_data, scheme, require_app_host=False):
     derived = os.path.realpath(derived_data)
     products = os.path.join(derived, "Build", "Products")
     report = {"scheme": scheme, "tests_compiled": False, "compiled_test_images": 0,
@@ -177,7 +182,7 @@ def admit(derived_data, scheme):
     if targets is None:
         report["reason"] = "xctestrun TestConfigurations is empty; library-only build-for-testing is not tests compiled"
         return report
-    images = [image_for_target(target, os.path.dirname(path), derived) for target in targets]
+    images = [image_for_target(target, os.path.dirname(path), derived, require_app_host) for target in targets]
     if not images:
         report["reason"] = "no enabled Mach-O xctest image; library-only build-for-testing is not tests compiled"
         return report
@@ -191,9 +196,10 @@ def main():
     parser.add_argument("--derived-data", required=True)
     parser.add_argument("--scheme", required=True)
     parser.add_argument("--report", required=True)
+    parser.add_argument("--require-app-host", action="store_true")
     args = parser.parse_args()
     try:
-        report = admit(args.derived_data, args.scheme)
+        report = admit(args.derived_data, args.scheme, args.require_app_host)
     except (OSError, plistlib.InvalidFileException, ValueError) as error:
         return fail(args.report, {"scheme": args.scheme, "images": [], "reason": str(error)})
     if not report["tests_compiled"]:

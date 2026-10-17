@@ -11,8 +11,8 @@
 #
 # IOS_DESTINATION is required: a real installed iOS >= 26 simulator UUID —
 # the suite is never run against an invented or generic destination.
-# IOS_SCHEME selects PlainsongIOS (module suite) or IOSAcceptance (hosted
-# scaffold smoke). The two required-name manifests are not interchangeable.
+# IOSPreview runs the full PreviewKit suite in a dedicated UIApplication host.
+# Required-name manifests are not interchangeable across schemes.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source Scripts/ios/ios-common.sh
@@ -29,8 +29,13 @@ case "$scheme" in
         command_label="make ios-acceptance"
         evidence_label="acceptance"
         ;;
+    IOSPreview)
+        required_tests="Scripts/ios/required-preview-tests.txt"
+        command_label="make ios-preview"
+        evidence_label="preview"
+        ;;
     *)
-        ios_die "unsupported IOS_SCHEME '$scheme'. A preview entry must use the PreviewKit-Package scheme and lane 07's required cases; this runner does not select a subset" 64
+        ios_die "unsupported IOS_SCHEME '$scheme'. Use make ios-preview for the full app-hosted suite. PreviewKit-Package is a separate hostless diagnostic; PreviewKit is a library-only scheme" 64
         ;;
 esac
 ios_lock_or_exec "$0" "$@"
@@ -82,9 +87,9 @@ set -e
 
 # Admission is before any test run. An empty plan or a library product is not
 # tests compiled, even when xcodebuild returned zero.
-if ! /usr/bin/python3 Scripts/ios/ios-test-admission.py \
-    --derived-data "$derived_data" --scheme "$scheme" \
-    --report "$evidence/admission.json"; then
+admission_args=(--derived-data "$derived_data" --scheme "$scheme" --report "$evidence/admission.json")
+if [ "$scheme" = IOSPreview ]; then admission_args+=(--require-app-host); fi
+if ! /usr/bin/python3 Scripts/ios/ios-test-admission.py "${admission_args[@]}"; then
     echo "$command_label: admission failed; not tests compiled" >&2
     exit 65
 fi
@@ -126,11 +131,15 @@ else
     if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
         "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
         [ "$result" != 0 ] || result=65
-    elif ! /usr/bin/python3 Scripts/ios/ios-test-results.py "$evidence/test-results.json" \
-        --required "$captured_required" \
-        --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt"; then
-        [ "$result" != 0 ] || result=65
-    elif ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
+    else
+        result_args=("$evidence/test-results.json" --required "$captured_required"
+            --report "$evidence/test-gate.json" --names "$evidence/named-tests.txt")
+        if [ "$scheme" = IOSPreview ]; then result_args+=(--no-skips); fi
+        if ! /usr/bin/python3 Scripts/ios/ios-test-results.py "${result_args[@]}"; then
+            [ "$result" != 0 ] || result=65
+        fi
+    fi
+    if ! /usr/bin/python3 Scripts/ios/ios-provenance.py verify-required-copy \
         "$evidence/source.json" --copy "$captured_required" --required-relative "$required_tests"; then
         [ "$result" != 0 ] || result=65
     fi
