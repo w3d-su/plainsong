@@ -71,13 +71,13 @@ extension EditorFindHostedGateTests {
         recordScrollReport("Editor scroll", ["milliseconds": samples, "highlightApplications": appliedRevisions.count])
     }
 
-    private func requireScrollProbe() throws {
+    func requireScrollProbe() throws {
         guard ProcessInfo.processInfo.environment["PLAINSONG_RUN_SCROLL_PROBE"] == "1" else {
             throw XCTSkip("Paired scroll diagnostics are opt-in: TEST_RUNNER_PLAINSONG_RUN_SCROLL_PROBE=1")
         }
     }
 
-    private func recordScrollReport(_ name: String, _ value: [String: Any]) {
+    func recordScrollReport(_ name: String, _ value: [String: Any]) {
         let data = try! JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
         let report = String(decoding: data, as: UTF8.self)
         print("\(name): \(report)")

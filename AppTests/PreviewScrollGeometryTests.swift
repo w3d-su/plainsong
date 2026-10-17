@@ -70,6 +70,34 @@ final class PreviewScrollGeometryTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(resized), 12, accuracy: 2)
     }
 
+    /// The editor's top line often survives a window resize, so no new `scrollToLine`
+    /// arrives; the preview must keep that line in place across its own reflow.
+    func testWidthChangeKeepsTheSyncedLineInPlaceWithoutANewRequest() async throws {
+        let controller = PreviewController()
+        defer { controller.shutdownForTesting() }
+        controller.webView.frame = NSRect(x: 0, y: 0, width: 700, height: 300)
+        let source = String(repeating: "A long paragraph with wrapping text and **bold** words.\n\n", count: 200)
+        try await render(source: source, in: controller)
+        let targetTop = "document.querySelector('[data-line=\"201\"]').getBoundingClientRect().top"
+        let initial = try await controller.webView.evaluateJavaScript("""
+        window.PlainsongBridge.receive({name:'scrollToLine',payload:{line:201,animated:false}});
+        \(targetTop)
+        """) as? Double
+        XCTAssertEqual(try XCTUnwrap(initial), 12, accuracy: 2)
+        let scrollBefore = try await controller.webView.evaluateJavaScript("scrollY") as? Double
+        for width in [420, 300, 360] {
+            controller.webView.frame.size.width = CGFloat(width)
+            // The resize observer runs in a later rendering update; poll across frames.
+            try await waitUntil {
+                try await controller.webView.evaluateJavaScript(
+                    "innerWidth === \(width) && Math.abs(\(targetTop) - 12) <= 2"
+                ) as? Bool == true
+            }
+        }
+        let scrollAfter = try await controller.webView.evaluateJavaScript("scrollY") as? Double
+        XCTAssertNotEqual(scrollBefore, scrollAfter, "the reflow must actually have moved the content")
+    }
+
     private func render(source: String, in controller: PreviewController) async throws {
         try await waitUntil { controller.isReady }
         var completed: Int?

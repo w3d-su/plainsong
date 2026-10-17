@@ -48,6 +48,12 @@ let currentAllowRemoteImages = false;
 let scrollOwner: ScrollOwner = "none";
 let scrollOwnerTimer: number | undefined;
 let scrollFrame: number | undefined;
+// Fractional source line kept at the top of the viewport. A width change reflows the
+// content under an unchanged scrollY, and the editor reports nothing new when its own
+// top line survives the resize, so the preview re-places this position itself.
+let anchoredPosition: number | undefined;
+let layoutWidth: number | undefined;
+const scrollAnchorOffset = 12;
 
 const mermaidRenderer = new MermaidRenderCoordinator(
   (id, source) => mermaid.render(id, source),
@@ -79,6 +85,18 @@ window.addEventListener(
   },
   { passive: true },
 );
+
+// Resize callbacks run after layout and before paint, so the re-anchored scroll
+// position is what the next frame shows. (jsdom has no ResizeObserver.)
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(([entry]) => {
+    const width = entry.contentRect.width;
+    if (width === layoutWidth) return;
+    const isReflow = layoutWidth !== undefined;
+    layoutWidth = width;
+    if (isReflow && anchoredPosition !== undefined) placeSourcePosition(anchoredPosition, false);
+  }).observe(previewRoot);
+}
 
 previewRoot.addEventListener("click", (event) => {
   const target = event.target;
@@ -136,7 +154,6 @@ async function receive(message: BridgeMessage): Promise<void> {
       if (themeChanged) {
         await rerenderVisibleMermaidBlocks(previewRoot, mermaidRenderer);
       }
-      scrollIndex.invalidate();
       break;
     }
     case "exportHTML":
@@ -210,10 +227,8 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   currentBaseDir = payload.baseDir;
   currentAssetRootID = payload.assetRootID;
   highlightCodeBlocks(previewRoot);
-  scrollIndex.invalidate();
   await mermaidPatch;
   if (payload.renderID < latestRenderID) return;
-  scrollIndex.invalidate();
 
   postBridgeMessage({
     name: "renderComplete",
@@ -253,12 +268,18 @@ function clearMdxErrorBanner(): void {
 }
 
 function scrollToLine(line: number, animated: boolean): void {
-  const targetTop = scrollIndex.topForLine(line);
+  anchoredPosition = line;
+  placeSourcePosition(line, animated);
+}
+
+function placeSourcePosition(position: number, animated: boolean): void {
+  const targetTop = scrollIndex.topForLine(position);
   if (targetTop === undefined) return;
 
+  // Programmatic scrolling is never reported back to the editor.
   setScrollOwner("editor");
   window.scrollTo({
-    top: Math.max(0, targetTop - 12),
+    top: Math.max(0, targetTop - scrollAnchorOffset),
     behavior: animated ? "smooth" : "auto",
   });
 }
@@ -266,6 +287,7 @@ function scrollToLine(line: number, animated: boolean): void {
 function handlePreviewScroll(): void {
   if (scrollOwner === "editor") return;
 
+  anchoredPosition = scrollIndex.positionAtTop(window.scrollY + scrollAnchorOffset) ?? anchoredPosition;
   const topVisibleLine = scrollIndex.lineAtTop(window.scrollY + 16);
   if (topVisibleLine === undefined) return;
 
