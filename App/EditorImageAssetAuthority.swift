@@ -412,9 +412,10 @@ private func editorImageAssetVerifiedNamespaceEntryPath(
     else {
         return nil
     }
-    let verificationDescriptor = directoryPath.withCString {
-        Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
-    }
+    let verificationDescriptor = openEditorImageAssetDirectory(
+        path: directoryPath,
+        noFollowAny: true
+    )
     guard verificationDescriptor >= 0 else { return nil }
     defer { Darwin.close(verificationDescriptor) }
     guard editorImageNamespaceEntryIdentity(
@@ -651,9 +652,9 @@ func makeEditorImageDirectoryLease(
         selectedRootURL: rootAuthority.originalRootURL
     )
     let rootURL = rootAuthority.canonicalRootURL
-    let rootDescriptor = Darwin.open(
-        rootURL.path(percentEncoded: false),
-        O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY
+    let rootDescriptor = openEditorImageAssetDirectory(
+        path: rootURL.path(percentEncoded: false),
+        noFollowAny: true
     )
     guard rootDescriptor >= 0 else { throw editorImagePOSIXError() }
 
@@ -723,13 +724,7 @@ private func openEditorImageDirectory(
     createIfMissing: Bool
 ) throws -> Int32 {
     func open() -> Int32 {
-        component.withCString {
-            Darwin.openat(
-                parentDescriptor,
-                $0,
-                O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
-            )
-        }
+        openEditorImageAssetDirectory(parentDescriptor: parentDescriptor, path: component)
     }
 
     var descriptor = open()
