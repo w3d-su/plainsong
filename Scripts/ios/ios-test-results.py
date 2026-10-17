@@ -31,13 +31,15 @@ def executed_tests(document):
     return results
 
 
-def validate_results(document, required):
+def validate_results(document, required, no_skips=False):
     results = executed_tests(document)
     if not required:
         raise ValueError("required named-test manifest is empty")
     if not results or "Passed" not in results.values():
         raise ValueError("zero executed cases or all cases skipped")
     failed = sorted(name for name, result in results.items() if result == "Failed")
+    if no_skips and any(result == "Skipped" for result in results.values()):
+        raise ValueError("full suite contains skipped cases")
     missing = sorted(name for name in required if results.get(name) != "Passed")
     if failed or missing:
         raise ValueError("failed cases=" + repr(failed) + "; missing/not-passed required=" + repr(missing))
@@ -53,11 +55,12 @@ def main():
     parser.add_argument("--required", required=True)
     parser.add_argument("--report", required=True)
     parser.add_argument("--names", required=True)
+    parser.add_argument("--no-skips", action="store_true")
     args = parser.parse_args()
     try:
         required = {line.strip() for line in Path(args.required).read_text().splitlines()
                     if line.strip() and not line.lstrip().startswith("#")}
-        report = validate_results(json.loads(Path(args.results).read_text()), required)
+        report = validate_results(json.loads(Path(args.results).read_text()), required, args.no_skips)
         Path(args.names).write_text("\n".join(sorted(report["cases"])) + "\n")
         Path(args.report).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     except (ValueError, OSError, KeyError) as error:

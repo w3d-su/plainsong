@@ -96,16 +96,31 @@ ios-c0-test:
 #
 #   make ios-build   [IOS_DESTINATION='platform=iOS Simulator,id=<uuid>']
 #   make ios-test    IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-preview IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-acceptance IOS_DESTINATION='platform=iOS Simulator,id=<installed-uuid>'
+#   make ios-acceptance-components
 #   make ios-archive [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
 #   make ios-ipa     [IOS_OUTPUT_ROOT=/private/tmp/plainsong-ios-release]
+# ios-acceptance is the hosted scaffold smoke only. It is not part of
+# `make test` or `make ios-test`. ios-acceptance-components is the Mac
+# package suite and is also outside those loops.
 IOS_OUTPUT_ROOT ?= /private/tmp/plainsong-ios-release
 
-.PHONY: ios-build ios-test ios-archive ios-ipa
+.PHONY: ios-build ios-test ios-preview ios-acceptance ios-acceptance-components ios-archive ios-ipa
 ios-build:
 	Scripts/ios/run-ios-build.sh "$(IOS_OUTPUT_ROOT)"
 
 ios-test:
 	Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-preview:
+	IOS_SCHEME=IOSPreview Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-acceptance:
+	IOS_SCHEME=IOSAcceptance Scripts/ios/run-ios-tests.sh "$(IOS_OUTPUT_ROOT)"
+
+ios-acceptance-components:
+	Scripts/ios/run-ios-acceptance-components.sh "$(IOS_OUTPUT_ROOT)"
 
 ios-archive:
 	Scripts/ios/run-ios-archive.sh "$(IOS_OUTPUT_ROOT)"

@@ -122,8 +122,8 @@ final class EditorReplaceLayeringTests: XCTestCase {
             "SyntaxKit", "WorkspaceCore", "EditorKitIOS", "WorkspaceKitIOS",
         ])
         XCTAssertEqual(project.targets, [
-            "PerformanceTests", "Plainsong", "PlainsongTests", "PlainsongUITests",
-            "PlainsongIOS", "PlainsongIOSTests",
+            "IOSAcceptanceUITests", "PerformanceTests", "Plainsong", "PlainsongTests",
+            "PlainsongUITests", "PlainsongIOS", "PlainsongIOSTests",
         ])
         XCTAssertEqual(project.dependencies, [
             "package: EditorKit",
