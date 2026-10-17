@@ -38,22 +38,17 @@ extension WorkspaceAnchoredFileSystem {
         try checkCancellation()
         commit.hooks.emit(.willCommit(.swap))
         try commit.hooks.check(.renameSwap)
-        try commit.chain.validateNamespace()
+        try commit.validateNamespaces()
         try validatePreparedWrite(
             commit.prepared,
-            parentDescriptor: commit.parentDescriptor
+            parentDescriptor: commit.staging.descriptor
         )
         try validateNameStillReferencesDescriptor(
             parentDescriptor: commit.parentDescriptor,
             leaf: commit.leaf,
             metadata: context.originalMetadata
         )
-        guard secureRename(
-            parentDescriptor: commit.parentDescriptor,
-            from: commit.prepared.name,
-            to: commit.leaf,
-            flags: UInt32(RENAME_SWAP)
-        ) == 0 else {
+        guard commit.swapStagedNameWithLeaf() == 0 else {
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
     }
@@ -84,7 +79,7 @@ extension WorkspaceAnchoredFileSystem {
         )
         try validatePreparedContent(commit.prepared)
         try validateNameStillReferencesEntry(
-            parentDescriptor: commit.parentDescriptor,
+            parentDescriptor: commit.staging.descriptor,
             leaf: commit.prepared.name,
             entry: displacedEntry
         )
@@ -95,7 +90,7 @@ extension WorkspaceAnchoredFileSystem {
                 expectedDigest: expectedDigest
             )
         }
-        try commit.chain.validateNamespace()
+        try commit.validateNamespaces()
     }
 
     static func validateCommittedLeaf(_ context: WriteCommitContext) throws {

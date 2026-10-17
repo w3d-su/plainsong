@@ -56,16 +56,18 @@ extension WorkspaceAnchoredFileSystem {
 
     struct WriteCommitContext {
         let prepared: PreparedWrite
+        let staging: WriteStaging
         let location: WorkspaceFileSystemLocation
         let chain: DirectoryDescriptorChain
         let parentDescriptor: Int32
         let leaf: String
         let hooks: Hooks
 
+        /// Staged names (the prepared file, and the displaced original after a swap).
         var artifactRemovalContext: ArtifactRemovalContext {
             ArtifactRemovalContext(
-                chain: chain,
-                parentDescriptor: parentDescriptor,
+                chain: staging.chain,
+                parentDescriptor: staging.descriptor,
                 hooks: hooks
             )
         }
@@ -203,23 +205,30 @@ extension WorkspaceAnchoredFileSystem {
     static func prepareTemporaryWrite(
         _ data: Data,
         target: WriteTarget,
-        location: WorkspaceFileSystemLocation,
-        parentDescriptor: Int32,
+        staging: WriteStaging,
         hooks: Hooks
     ) throws -> PreparedWrite {
         let name = ".plainsong-write-\(UUID().uuidString).tmp"
+        if !staging.isSeparateDirectory, hooks.injectedFailure?(.createSiblingTemporary) != nil {
+            throw SiblingStagingRefused()
+        }
         let descriptor = name.withCString {
             Darwin.openat(
-                parentDescriptor,
+                staging.descriptor,
                 $0,
                 O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
                 mode_t(S_IRUSR | S_IWUSR)
             )
         }
+        let createError = errno
         guard descriptor >= 0,
-              let artifactLocation = location.sibling(named: name)
+              let artifactLocation = staging.location(named: name)
         else {
             if descriptor >= 0 { Darwin.close(descriptor) }
+            // Nothing was created, so a refused sibling can be retried in a separate directory.
+            if descriptor < 0, !staging.isSeparateDirectory, isSiblingStagingRefusal(createError) {
+                throw SiblingStagingRefused()
+            }
             throw WorkspaceAnchoredFileSystemError.unreadable
         }
         let expectedByteCount = Int64(data.count)
@@ -370,17 +379,7 @@ extension WorkspaceAnchoredFileSystem {
         to destination: String,
         flags: UInt32
     ) -> Int32 {
-        source.withCString { sourcePath in
-            destination.withCString { destinationPath in
-                Darwin.renameatx_np(
-                    parentDescriptor,
-                    sourcePath,
-                    parentDescriptor,
-                    destinationPath,
-                    flags | UInt32(RENAME_NOFOLLOW_ANY)
-                )
-            }
-        }
+        secureRename(from: parentDescriptor, source, to: parentDescriptor, destination, flags: flags)
     }
 
     static func unlink(parentDescriptor: Int32, name: String) -> Int32 {

@@ -111,7 +111,7 @@ extension WorkspaceAnchoredFileSystem {
             // cancelled write must still revalidate open-fd namespace state.
             let path = try WorkspaceLiteralFileURL.absolutePath(of: rootBindingURL)
             let descriptor = path.withCString {
-                Darwin.open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+                Darwin.open($0, O_SEARCH | O_CLOEXEC | O_NOFOLLOW)
             }
             guard descriptor >= 0 else {
                 // ENOENT/ENOTDIR: lexical root is gone or no longer a directory → binding lost.
