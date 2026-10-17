@@ -201,13 +201,10 @@ final class ExportHTMLHostedTests: XCTestCase {
         timeoutNanoseconds: UInt64 = 5_000_000_000,
         condition: @escaping @MainActor () async throws -> Bool
     ) async throws {
-        let start = DispatchTime.now().uptimeNanoseconds
-        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
-            if try await condition() {
-                return
-            }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-        XCTFail("Timed out waiting for \(description)")
+        try await PreviewHostedTestWait.until(
+            description,
+            timeoutNanoseconds: timeoutNanoseconds,
+            condition: condition
+        )
     }
 }
