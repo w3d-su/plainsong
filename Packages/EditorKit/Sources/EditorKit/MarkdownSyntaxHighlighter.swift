@@ -129,7 +129,7 @@ public struct MarkdownSyntaxHighlighter {
             ?? MarkdownSyntaxParser.visibleHighlightRange(in: text, requestedRange: visibleRange)
         let fragment = text.fragment(in: range) ?? ""
         let absoluteTokens = visiblePlan?.tokens
-            ?? parser.tokens(in: text, fileKind: fileKind, visibleRange: visibleRange)
+            ?? parser.tokens(in: text, fileKind: fileKind, expandedVisibleRange: range)
         let tokens = absoluteTokens
             .compactMap { token -> MarkdownSyntaxToken? in
                 guard NSIntersectionRange(token.range, range).length > 0 else {

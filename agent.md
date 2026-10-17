@@ -221,6 +221,11 @@ replacement local to EditorKit.
 
 - `MarkdownHighlightService` runs tree-sitter parsing off the main actor and applies
   highlight attributes to the visible range; the façade keeps a later Neon swap local.
+- Highlight requests include 1–4 Ki UTF-16 units of padding on either side. Viewport
+  observations inside the pending/completed window reuse it without publishing a
+  SwiftUI update. Edits, document/appearance changes and WYSIWYG selection changes
+  still restart the revision-fenced scheduler; fence/frontmatter context is expanded
+  once per source highlight, off the main actor.
 - Two-layer markdown grammar: `markdown` (block structure) with `markdown-inline`
   injected, then language injections inside fenced code blocks keyed by the info string.
 - Frontmatter: the markdown grammar exposes the YAML frontmatter block → inject
@@ -415,7 +420,11 @@ block-level element.
 - **Editor → preview (primary direction):** on editor scroll, compute first visible
   source line (TextKit 2 `textLayoutManager` viewport) → `scrollToLine`. JS finds the
   nearest `[data-line]` ≤ line and the next one > line, interpolates between their
-  `offsetTop`s proportionally to line distance → smooth, accurate positioning.
+  document-relative tops proportionally to line distance → smooth, accurate positioning.
+- Cache source-line and document-top indexes and binary-search both directions during
+  scrolling. Coalesce geometry rebuilds after DOM changes, image load/error, font
+  readiness, theme/Mermaid updates and viewport/root resizing. Measure document tops
+  with `getBoundingClientRect().top + scrollY`, including nested/positioned blocks.
 - **Preview → editor:** symmetric, using `previewScrolled`.
 - **Loop prevention:** a `scrollOwner` token (`editor` | `preview` | `none`) with 100 ms
   decay; messages from the non-owner are dropped.

@@ -23,6 +23,7 @@ import {
 import { MermaidRenderCoordinator } from "./mermaid-renderer";
 import { mdxErrorDetails } from "./mdx-error";
 import { renderMarkdown, renderMdx } from "./pipeline";
+import { PreviewScrollIndex } from "./scroll-index";
 
 export { PROTOCOL_VERSION } from "./bridge";
 
@@ -32,6 +33,7 @@ declare const __PLAINSONG_BUNDLED_CSS__: string;
 type ScrollOwner = "editor" | "preview" | "none";
 
 const previewRoot = requirePreviewRoot();
+const scrollIndex = new PreviewScrollIndex(previewRoot);
 
 // Drop-ordering key. Monotonic across document switches, unlike `version` which
 // resets per document — using `version` here stranded the preview on the previous
@@ -134,6 +136,7 @@ async function receive(message: BridgeMessage): Promise<void> {
       if (themeChanged) {
         await rerenderVisibleMermaidBlocks(previewRoot, mermaidRenderer);
       }
+      scrollIndex.invalidate();
       break;
     }
     case "exportHTML":
@@ -207,8 +210,10 @@ async function render(payload: Extract<BridgeMessage, { name: "render" }>["paylo
   currentBaseDir = payload.baseDir;
   currentAssetRootID = payload.assetRootID;
   highlightCodeBlocks(previewRoot);
+  scrollIndex.invalidate();
   await mermaidPatch;
   if (payload.renderID < latestRenderID) return;
+  scrollIndex.invalidate();
 
   postBridgeMessage({
     name: "renderComplete",
@@ -248,7 +253,7 @@ function clearMdxErrorBanner(): void {
 }
 
 function scrollToLine(line: number, animated: boolean): void {
-  const targetTop = interpolatedTopForLine(line);
+  const targetTop = scrollIndex.topForLine(line);
   if (targetTop === undefined) return;
 
   setScrollOwner("editor");
@@ -261,7 +266,7 @@ function scrollToLine(line: number, animated: boolean): void {
 function handlePreviewScroll(): void {
   if (scrollOwner === "editor") return;
 
-  const topVisibleLine = topVisibleLineFromScroll();
+  const topVisibleLine = scrollIndex.lineAtTop(window.scrollY + 16);
   if (topVisibleLine === undefined) return;
 
   setScrollOwner("preview");
@@ -280,54 +285,6 @@ function setScrollOwner(owner: ScrollOwner): void {
     scrollOwner = "none";
     scrollOwnerTimer = undefined;
   }, 100);
-}
-
-function lineAnchors(): Array<{ line: number; element: HTMLElement }> {
-  return Array.from(previewRoot.querySelectorAll<HTMLElement>("[data-line]"))
-    .map((element) => ({
-      element,
-      line: Number.parseInt(element.dataset.line ?? "", 10),
-    }))
-    .filter(({ line }) => Number.isFinite(line))
-    .sort((a, b) => a.line - b.line);
-}
-
-function interpolatedTopForLine(line: number): number | undefined {
-  const anchors = lineAnchors();
-  if (anchors.length === 0) return undefined;
-
-  let previous = anchors[0];
-  let next = anchors[anchors.length - 1];
-
-  for (const anchor of anchors) {
-    if (anchor.line <= line) previous = anchor;
-    if (anchor.line > line) {
-      next = anchor;
-      break;
-    }
-  }
-
-  if (previous === next || next.line <= previous.line) {
-    return previous.element.offsetTop;
-  }
-
-  const progress = (line - previous.line) / (next.line - previous.line);
-  return (
-    previous.element.offsetTop +
-    (next.element.offsetTop - previous.element.offsetTop) * progress
-  );
-}
-
-function topVisibleLineFromScroll(): number | undefined {
-  const y = window.scrollY + 16;
-  let bestLine: number | undefined;
-
-  for (const anchor of lineAnchors()) {
-    if (anchor.element.offsetTop > y) break;
-    bestLine = anchor.line;
-  }
-
-  return bestLine;
 }
 
 function sourceLineForElement(element: Element): number | undefined {
