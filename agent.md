@@ -623,6 +623,16 @@ open until owner evidence is recorded. The current review receipt and next-agent
 handoff live in `docs/ios/evidence/review-20261013/README.md`; an aggregate compilation
 and a portable Mac logic run do not close native or owner acceptance.
 
+Lane 12 owns the separate `IOSPreview` / `make ios-preview` entry. Its dedicated
+SwiftUI app host links system frameworks only; PreviewKit and MarkdownCore are
+linked in the unit-test bundle, avoiding duplicate package classes in the host.
+Admission must prove a built app-hosted Mach-O unit-test bundle. The full suite
+retains all original 94 cases and rejects skips; a separate first-controller run
+loads the production-default app-bundled index after byte parity checks. Keep the
+8-second ready and 2-second JavaScript limits. `PreviewKit-Package` remains the
+hostless package diagnostic, not the iOS app-host acceptance entry. This test
+scaffold does not install providers or authorize production composition before M0.
+
 ---
 
 ## 15. Build, Run, Tooling
