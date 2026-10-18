@@ -10,6 +10,16 @@ import XCTest
 @MainActor
 extension EditorFindHostedGateTests {
     func testHostedSourcePreviewTypingMainThreadBusySlices() async throws {
+        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: false)
+    }
+
+    /// Viewing the end once leaves TextKit's element cache filled to there (see
+    /// `EditorTextElementCacheTrimmer`); typing above it is the common case afterwards.
+    func testHostedSourcePreviewTypingAfterViewingDocumentEndMainThreadBusySlices() async throws {
+        try await recordSourcePreviewTypingBusySlices(visitingDocumentEnd: true)
+    }
+
+    private func recordSourcePreviewTypingBusySlices(visitingDocumentEnd: Bool) async throws {
         try requireScrollProbe()
         let fixture = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "large-1mb", withExtension: "md"))
         let source = try String(contentsOf: fixture, encoding: .utf8)
@@ -26,6 +36,10 @@ extension EditorFindHostedGateTests {
         }
         let editor = try hostedEditor(hosted)
         let middle = (source as NSString).lineRange(for: NSRange(location: source.utf16.count / 2, length: 0))
+        if visitingDocumentEnd {
+            editor.scrollRangeToVisible(NSRange(location: source.utf16.count, length: 0))
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
         editor.textSelection = NSRange(location: middle.location, length: 0)
         editor.scrollRangeToVisible(editor.selectedRange())
         try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -47,25 +61,37 @@ extension EditorFindHostedGateTests {
         let slices = monitor.stop()
 
         XCTAssertEqual(MarkdownTextView.textStorage(of: editor)?.string, hosted.appState.currentDocument.text)
-        let sorted = slices.sorted()
-        recordScrollReport("Source+preview typing main-thread busy slices", [
+        let sorted = slices.map(\.wallMilliseconds).sorted()
+        let longest = slices.sorted { $0.wallMilliseconds < $1.wallMilliseconds }.suffix(12)
+        let name = visitingDocumentEnd ? "after viewing the end" : "from the middle"
+        recordScrollReport("Source+preview typing \(name) main-thread busy slices", [
             "slices": slices.count,
             "maxMilliseconds": sorted.last ?? 0,
             "p95Milliseconds": sorted.isEmpty ? 0 : sorted[Int(Double(sorted.count - 1) * 0.95)],
-            "over16": slices.filter { $0 > 16 }.count,
-            "over50": slices.filter { $0 > 50 }.count,
-            "totalBusyMilliseconds": slices.reduce(0, +),
-            "longest": Array(sorted.suffix(12)),
+            "over16": sorted.filter { $0 > 16 }.count,
+            "over50": sorted.filter { $0 > 50 }.count,
+            "totalBusyMilliseconds": sorted.reduce(0, +),
+            "totalCPUMilliseconds": slices.map(\.cpuMilliseconds).reduce(0, +),
+            "longest": longest.map(\.wallMilliseconds),
+            "longestCPU": longest.map(\.cpuMilliseconds),
         ])
     }
 }
 
-/// Every stretch between the main run loop waking and going back to sleep.
+/// Every stretch between the main run loop waking and going back to sleep, with the
+/// main thread's CPU time in it: wall time well above CPU time means the thread waited
+/// (locks, synchronous IPC) rather than computed.
 @MainActor
 final class MainRunLoopBusyMonitor {
+    struct Slice {
+        let wallMilliseconds: Double
+        let cpuMilliseconds: Double
+    }
+
     private var observer: CFRunLoopObserver?
     private var wokeAt: UInt64?
-    private var slices: [Double] = []
+    private var cpuAtWake: Double = 0
+    private var slices: [Slice] = []
 
     func start() {
         let activities = CFRunLoopActivity.afterWaiting.rawValue | CFRunLoopActivity.beforeWaiting.rawValue
@@ -77,7 +103,7 @@ final class MainRunLoopBusyMonitor {
         wokeAt = DispatchTime.now().uptimeNanoseconds
     }
 
-    func stop() -> [Double] {
+    func stop() -> [Slice] {
         if let observer {
             CFRunLoopRemoveObserver(CFRunLoopGetMain(), observer, .commonModes)
         }
@@ -89,9 +115,29 @@ final class MainRunLoopBusyMonitor {
         let now = DispatchTime.now().uptimeNanoseconds
         if activity == .afterWaiting {
             wokeAt = now
+            cpuAtWake = Self.threadCPUMilliseconds()
         } else if let wokeAt {
-            slices.append(Double(now - wokeAt) / 1_000_000)
+            slices.append(Slice(
+                wallMilliseconds: Double(now - wokeAt) / 1_000_000,
+                cpuMilliseconds: Self.threadCPUMilliseconds() - cpuAtWake
+            ))
             self.wokeAt = nil
         }
+    }
+
+    private static func threadCPUMilliseconds() -> Double {
+        var info = thread_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
+        let thread = mach_thread_self()
+        defer { mach_port_deallocate(mach_task_self_, thread) }
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        let user = Double(info.user_time.seconds) * 1000 + Double(info.user_time.microseconds) / 1000
+        let system = Double(info.system_time.seconds) * 1000 + Double(info.system_time.microseconds) / 1000
+        return user + system
     }
 }

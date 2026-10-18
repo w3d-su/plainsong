@@ -45,6 +45,7 @@ extension MarkdownTextViewCoordinator {
     }
 
     func detachVisibleRangeReporter() {
+        textElementCacheTrimmer.cancel()
         visibleRangeObserver = nil
         visibleRangeTextView = nil
         visibleRangeChangeHandler = nil
@@ -107,6 +108,10 @@ extension MarkdownTextViewCoordinator {
         lastVisibleTextRange = visibleRange
         scrollProxy?.emitVisibleLine(containingUTF16Offset: visibleRange.location, in: textView)
         visibleRangeChangeHandler?(visibleRange)
+        textElementCacheTrimmer.visibleRangeDidChange(visibleRange, in: textView) { [weak self] in
+            guard let self else { return false }
+            return !isUpdating && !hasPendingWriterLease
+        }
     }
 }
 
