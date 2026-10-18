@@ -15,8 +15,9 @@ extension EditorFindHostedGateTests {
             let appState = fixture.appState
             let tasks = self.activeTasks(in: appState)
             tasks.forEach { $0.cancel() }
+            // Already nil when the test closed its document: the workspace root, the
+            // controller's only owner, is gone (`makeWorkspaceHost` asserts the mount).
             var previewController = host.previewLifecycle.controllerForShutdown
-            XCTAssertNotNil(previewController, "Hosted workspace did not expose its preview controller")
             previewController?.shutdownForTesting()
             host.window.makeFirstResponder(nil)
             host.hostingView.rootView = AnyView(EmptyView())
@@ -24,6 +25,8 @@ extension EditorFindHostedGateTests {
             await self.fulfillment(of: [host.disposal.expectation], timeout: 2)
             XCTAssertTrue(host.disposal.didDisappear, "Hosted root did not report disappearance")
             previewController = nil
+            let previewLifecycle = host.previewLifecycle
+            self.hostedTimeoutDiagnostics.append { previewLifecycle.timeoutDescription }
             try await self.waitUntil("hosted PreviewController and WKWebView deallocate") {
                 host.previewLifecycle.isReleased
             }
@@ -284,6 +287,7 @@ final class HostedRootDisappearance {
 final class HostedPreviewLifecycle {
     private weak var controller: PreviewController?
     private weak var webView: WKWebView?
+    private weak var scrollCoordinator: EditorPreviewScrollCoordinator?
 
     var controllerForShutdown: PreviewController? {
         controller
@@ -293,9 +297,24 @@ final class HostedPreviewLifecycle {
         controller == nil && webView == nil
     }
 
+    /// Which half is still alive, and whether the workspace's other `@StateObject` is too:
+    /// a live coordinator means the view's state survived, a lone controller means
+    /// something outside the view graph still owns it.
+    var timeoutDescription: String {
+        func state(_ object: AnyObject?) -> String {
+            object == nil ? "released" : "alive"
+        }
+        return "previewLifecycle controller=\(state(controller)) webView=\(state(webView)) "
+            + "scrollCoordinator=\(state(scrollCoordinator)) "
+            + "webViewInWindow=\(webView?.window != nil)"
+    }
+
     func capture(_ controller: PreviewController?) {
         self.controller = controller
         webView = controller?.webView
+        #if DEBUG
+            scrollCoordinator = EditorPreviewScrollCoordinator.latestDebugInstance
+        #endif
     }
 }
 
