@@ -1,5 +1,5 @@
-@testable import EditorKit
 import AppKit
+@testable import EditorKit
 import STTextView
 import XCTest
 
@@ -39,7 +39,11 @@ final class EditorTextElementCacheTrimmerTests: XCTestCase {
         let (scrollView, textView) = try makeTextView(document())
         let storage = try XCTUnwrap(MarkdownTextView.textStorage(of: textView))
         storage.addAttribute(.foregroundColor, value: NSColor.systemRed, range: NSRange(location: 10, length: 500))
-        storage.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: NSRange(location: storage.length - 900, length: 400))
+        storage.addAttribute(
+            .foregroundColor,
+            value: NSColor.systemBlue,
+            range: NSRange(location: storage.length - 900, length: 400)
+        )
         jumpToEndAndBack(scrollView, textView)
         textView.insertText("typed", replacementRange: textView.selectedRange())
         let before = try XCTUnwrap(storage.copy() as? NSAttributedString)
@@ -47,7 +51,7 @@ final class EditorTextElementCacheTrimmerTests: XCTestCase {
         let origin = scrollView.contentView.bounds.origin
         let canUndo = textView.undoManager?.canUndo
 
-        trimAll(below: try visibleRange(textView), in: textView)
+        try trimAll(below: visibleRange(textView), in: textView)
         textView.layoutSubtreeIfNeeded()
 
         XCTAssertTrue(storage.isEqual(to: before))
@@ -64,7 +68,7 @@ final class EditorTextElementCacheTrimmerTests: XCTestCase {
         let (scrollView, textView) = try makeTextView(document())
         jumpToEndAndBack(scrollView, textView)
         let cached = medianInsertMilliseconds(textView)
-        trimAll(below: try visibleRange(textView), in: textView)
+        try trimAll(below: visibleRange(textView), in: textView)
         let trimmed = medianInsertMilliseconds(textView)
         XCTAssertLessThan(trimmed, cached / 4, "cached \(cached) ms, trimmed \(trimmed) ms")
     }

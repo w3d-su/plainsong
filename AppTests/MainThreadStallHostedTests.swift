@@ -74,6 +74,7 @@ extension EditorFindHostedGateTests {
             "totalCPUMilliseconds": slices.map(\.cpuMilliseconds).reduce(0, +),
             "longest": longest.map(\.wallMilliseconds),
             "longestCPU": longest.map(\.cpuMilliseconds),
+            "longestStart": longest.map(\.startMilliseconds),
         ])
     }
 }
@@ -84,6 +85,8 @@ extension EditorFindHostedGateTests {
 @MainActor
 final class MainRunLoopBusyMonitor {
     struct Slice {
+        /// Since `start()`, to place long slices against the typing script.
+        let startMilliseconds: Double
         let wallMilliseconds: Double
         let cpuMilliseconds: Double
     }
@@ -91,6 +94,7 @@ final class MainRunLoopBusyMonitor {
     private var observer: CFRunLoopObserver?
     private var wokeAt: UInt64?
     private var cpuAtWake: Double = 0
+    private var startedAt: UInt64 = 0
     private var slices: [Slice] = []
 
     func start() {
@@ -100,7 +104,9 @@ final class MainRunLoopBusyMonitor {
         }
         CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
         self.observer = observer
-        wokeAt = DispatchTime.now().uptimeNanoseconds
+        startedAt = DispatchTime.now().uptimeNanoseconds
+        wokeAt = startedAt
+        cpuAtWake = Self.threadCPUMilliseconds()
     }
 
     func stop() -> [Slice] {
@@ -118,6 +124,7 @@ final class MainRunLoopBusyMonitor {
             cpuAtWake = Self.threadCPUMilliseconds()
         } else if let wokeAt {
             slices.append(Slice(
+                startMilliseconds: Double(wokeAt - startedAt) / 1_000_000,
                 wallMilliseconds: Double(now - wokeAt) / 1_000_000,
                 cpuMilliseconds: Self.threadCPUMilliseconds() - cpuAtWake
             ))

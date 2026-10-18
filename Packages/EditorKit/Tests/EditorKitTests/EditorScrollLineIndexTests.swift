@@ -4,7 +4,7 @@ import SwiftUI
 import XCTest
 
 final class EditorScrollLineIndexTests: XCTestCase {
-    func testIncrementalEditsMatchAFullRebuild() {
+    func testIncrementalEditsMatchAFullRebuild() throws {
         var generator = SeededGenerator(seed: 0x5EED)
         let pieces = ["", "a", "\n", "\n\n", "x\ny", "🧪", "中文\n", "\r\n", "line\nline\nline"]
         var text = String(repeating: "alpha\nbeta 🧪\n\ngamma\n", count: 20)
@@ -19,7 +19,7 @@ final class EditorScrollLineIndexTests: XCTestCase {
             let first = Int.random(in: 0 ..< boundaries.count, using: &generator)
             let last = min(boundaries.count - 1, first + Int.random(in: 0 ... 4, using: &generator))
             let range = NSRange(location: boundaries[first], length: boundaries[last] - boundaries[first])
-            let replacement = pieces.randomElement(using: &generator)!
+            let replacement = try XCTUnwrap(pieces.randomElement(using: &generator))
 
             XCTAssertTrue(index.replaceCharacters(in: range, with: replacement), "step \(step)")
             text = (text as NSString).replacingCharacters(in: range, with: replacement)
@@ -120,7 +120,9 @@ final class EditorScrollLineIndexTypingTests: XCTestCase {
         final class Model {
             var text: String
             var selection: NSRange?
-            init(text: String) { self.text = text }
+            init(text: String) {
+                self.text = text
+            }
         }
         let model = Model(text: source)
         let frame = NSRect(x: 0, y: 0, width: 560, height: 240)

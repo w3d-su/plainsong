@@ -3,7 +3,14 @@ import Foundation
 import XCTest
 
 final class ExactSourceTextTests: XCTestCase {
-    private let samples = ["", "a", "plain ascii\n", "e\u{301} vs \u{E9}", "中文 🧪 \0 tail", String(repeating: "段落 text\n", count: 5000)]
+    private let samples = [
+        "",
+        "a",
+        "plain ascii\n",
+        "e\u{301} vs \u{E9}",
+        "中文 🧪 \0 tail",
+        String(repeating: "段落 text\n", count: 5000),
+    ]
 
     func testNativeCopyPreservesEveryUTF16CodeUnitAndIsNative() throws {
         for sample in samples {
