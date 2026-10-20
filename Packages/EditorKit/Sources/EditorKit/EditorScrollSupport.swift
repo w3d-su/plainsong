@@ -182,13 +182,8 @@ private final class EditorScrollAttachment {
     private func firstVisibleLine() -> Int? {
         guard let textView else { return nil }
 
-        let layoutManager = textView.textLayoutManager
-        let contentManager = textView.textContentManager
-        let visibleLocation = layoutManager.textViewportLayoutController.viewportRange?.location
-            ?? layoutManager.documentRange.location
-        let offset = contentManager.offset(from: contentManager.documentRange.location, to: visibleLocation)
-        guard offset != NSNotFound else { return nil }
-
+        // Not `viewportRange.location`: the viewport extends above the visible area.
+        let offset = EditorVisibleTop.utf16Offset(in: textView) ?? 0
         return currentLineIndex().oneBasedLine(containingUTF16Offset: offset)
     }
 

@@ -424,7 +424,8 @@ Mapping basis: `data-line` attributes emitted by `rehype-source-lines` on every
 block-level element.
 
 - **Editor → preview (primary direction):** on editor scroll, compute first visible
-  source line (TextKit 2 `textLayoutManager` viewport) → `scrollToLine`. JS finds the
+  source line (the layout fragment at the visible top edge, not the TextKit viewport
+  start, which STTextView extends above the visible area) → `scrollToLine`. JS finds the
   nearest `[data-line]` ≤ line and the next one > line, interpolates between their
   document-relative tops proportionally to line distance → smooth, accurate positioning.
 - The preview keeps a line-sorted `[data-line]` anchor list, rebuilt only after DOM
