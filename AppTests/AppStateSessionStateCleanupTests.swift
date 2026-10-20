@@ -46,6 +46,84 @@ final class AppStateSessionStateCleanupTests: XCTestCase {
         XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[initialIdentity])
     }
 
+    func testStopTrackingReleasesUnreferencedRecoveryOwnershipBeforeIdentityCanBeReused() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        weak var recoverySession: DocumentSession?
+        recoverySession = try stopTrackingRestoredRecovery(in: appState, fixture: fixture)
+        let recoveryIdentity = try ObjectIdentifier(XCTUnwrap(recoverySession))
+        try "disk".write(to: fixture.url("post.md"), atomically: false, encoding: .utf8)
+
+        try appState.activateFileSession(url: fixture.url("post.md"))
+
+        XCTAssertNil(recoverySession)
+        XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[recoveryIdentity])
+        XCTAssertEqual(appState.sessionStateURL(for: appState.currentDocument), fixture.url("post.md"))
+    }
+
+    func testStopTrackingRetainsBoundRecoveryOwnershipUntilRegistrationIsRemoved() throws {
+        let fixture = try SessionStateCleanupFixture()
+        defer { fixture.cleanUp() }
+        let appState = fixture.makeAppState(currentDocument: DocumentSession())
+        let recoverySession = try stopTrackingRestoredRecovery(in: appState, fixture: fixture)
+        let recoveryIdentity = ObjectIdentifier(recoverySession)
+        let binding = appState.editorDocumentBinding(for: recoverySession)
+        try "disk".write(to: fixture.url("post.md"), atomically: false, encoding: .utf8)
+
+        try appState.activateFileSession(url: fixture.url("post.md"))
+
+        XCTAssertEqual(appState.editorDocumentBindingIDs[recoveryIdentity], binding.id)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[recoveryIdentity],
+            .unavailable(fileURL: fixture.url("missing.md"))
+        )
+        appState.removeEditorDocumentBindingRegistration(for: recoverySession)
+        XCTAssertNil(appState.unanchoredManagedSessionOwnershipProofs[recoveryIdentity])
+    }
+
+    /// Restores a detached text-recovery copy, fails its Close cleanup so the prompt offers
+    /// Stop Tracking, and stops tracking it: the copy stays current but is no longer owned by
+    /// any recovery record, cache entry, or retirement.
+    private func stopTrackingRestoredRecovery(
+        in appState: AppState,
+        fixture: SessionStateCleanupFixture
+    ) throws -> DocumentSession {
+        let missingURL = fixture.url("missing.md")
+        let record = WorkspaceMutationTextRecoveryRecord(
+            originalURL: missingURL,
+            fileKind: .markdown,
+            source: "Recovered text",
+            revision: 3,
+            reason: .trash
+        )
+        appState.pendingWorkspaceMutationTextRecoveryRecords = [record]
+        appState.restoreWorkspaceMutationTextRecoveryIfNeeded()
+        let session = appState.currentDocument
+        let sessionIdentity = ObjectIdentifier(session)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+            .unavailable(fileURL: missingURL)
+        )
+
+        fixture.recoveryStore.removeError = CocoaError(.fileWriteUnknown)
+        appState.closeMissingFile()
+        XCTAssertEqual(
+            appState.workspaceMutationReconciliationPrompt?.secondaryAction,
+            .stopTracking
+        )
+        appState.performWorkspaceMutationRecoverySecondaryAction()
+
+        XCTAssertNil(appState.workspaceMutationTextRecoveryContexts[sessionIdentity])
+        XCTAssertNil(appState.workspaceMutationTextRecoverySessions[record.id])
+        XCTAssertTrue(appState.currentDocument === session)
+        XCTAssertEqual(
+            appState.unanchoredManagedSessionOwnershipProofs[sessionIdentity],
+            .unavailable(fileURL: missingURL)
+        )
+        return session
+    }
+
     func testAllDirtyEvictionSavesFailOncePerPassAndRetainUnsavedText() throws {
         let fixture = try SessionStateCleanupFixture()
         defer { fixture.cleanUp() }
@@ -269,7 +347,7 @@ private final class SessionStateCleanupFixture {
     private let userDefaults: UserDefaults
     private let userDefaultsSuiteName: String
     private let operationRecoveryStore = CleanupOperationRecoveryStore()
-    private let recoveryStore = SessionStateCleanupRecoveryStore()
+    let recoveryStore = SessionStateCleanupRecoveryStore()
 
     init() throws {
         rootURL = FileManager.default.temporaryDirectory
@@ -325,6 +403,7 @@ private final class SessionStateCleanupRecentItemStore: RecentItemPersisting {
 
 private final class SessionStateCleanupRecoveryStore: WorkspaceMutationTextRecoveryPersisting {
     private var records: [UUID: WorkspaceMutationTextRecoveryRecord] = [:]
+    var removeError: Error?
 
     func load() throws -> [WorkspaceMutationTextRecoveryRecord] {
         Array(records.values)
@@ -335,6 +414,7 @@ private final class SessionStateCleanupRecoveryStore: WorkspaceMutationTextRecov
     }
 
     func remove(id: UUID) throws {
+        if let removeError { throw removeError }
         records[id] = nil
     }
 
