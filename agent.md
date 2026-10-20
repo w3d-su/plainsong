@@ -200,8 +200,9 @@ Node installed; regenerate with `make preview-bundle` whenever `preview-src/` ch
   A failed or fenced eviction candidate is retained and protected for the whole trim
   pass; each candidate is tried at most once per pass. The cache may exceed 8 while
   saves cannot complete, preserving unsaved content until a later trim can succeed.
-  Unreferenced untitled sessions release their unavailable ownership record on document
-  switch or editor-binding removal, before their object identity can be reused.
+  A session no App structure still owns (an untitled document, or a restored recovery copy
+  after Stop Tracking) releases its unavailable ownership record on document switch or
+  editor-binding removal, before its object identity can be reused.
 
 ---
 
