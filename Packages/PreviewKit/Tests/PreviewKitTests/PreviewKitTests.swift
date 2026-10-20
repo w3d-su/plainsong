@@ -379,18 +379,7 @@ final class PreviewKitTests: XCTestCase {
     }
 
     private func previewIndexFixtureURL() throws -> URL {
-        let testFile = URL(fileURLWithPath: #filePath)
-        let repositoryRoot = testFile
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let indexURL = repositoryRoot
-            .appendingPathComponent("App/Resources/preview/index.html")
-            .standardizedFileURL
-        XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path), "Missing preview bundle fixture")
-        return indexURL
+        try PreviewBundleFixture.indexURL()
     }
 
     private func temporaryDirectory() throws -> URL {
